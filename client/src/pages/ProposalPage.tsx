@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProposalSheet } from "@/components/proposal/ProposalSheet";
+import { clientFigure } from "@shared/proposal";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { money } from "@/lib/money";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
@@ -158,7 +159,20 @@ export default function ProposalPage({
   );
   const [showDesign, setShowDesign] = useState(false);
   /** Screen zoom only — the printed page is always full size. */
-  const [zoom, setZoom] = useState(0.8);
+  /*
+    On a phone the page opens FITTED to the width (8.5 in is 816 CSS px), so
+    the whole proposal is readable without zooming out first; the − / +
+    buttons still work from there (device audit, 2026-10-01).
+  */
+  const [zoom, setZoom] = useState(() => {
+    if (typeof window === "undefined") return 0.8;
+    const w = window.innerWidth;
+    if (w < 768) return Math.max(0.3, (w - 24) / 816);
+    // Beside the 320 px form and the 64 px app rail, an upright tablet has
+    // about 390 px for the page: 80% overflowed it sideways. A laptop still
+    // opens at 80% — there is room for that and more.
+    return Math.min(0.8, Math.max(0.4, (w - 64 - 320 - 48) / 816));
+  });
 
   const updateBid = trpc.bids.update.useMutation({
     onError: e => toast.error(e.message),
@@ -186,17 +200,26 @@ export default function ProposalPage({
   };
 
   /**
-   * Unpriced lines do NOT block the proposal (owner, 2026-09-26) — unlike a
-   * line the engine cannot price, which the server refuses on. But the total
-   * leaves them out, so printing a priced proposal asks first. Scope-only
-   * prints no money and asks nothing.
+   * Unpriced lines BLOCK printing a priced proposal (owner, 2026-09-29).
+   *
+   * Until then they did not (owner, 2026-09-26): this asked "Print anyway?"
+   * and the client's copy printed a short total — $0.00 on staging's bid 2,
+   * which had one line and it unpriced. Now the document shows "Price
+   * pending" in place of each figure (`clientFigure`, shared/proposal.ts) and
+   * Print / Save PDF / Ctrl+P say which lines to price, with no way past.
+   * Scope-only prints no money and is never blocked.
    */
   const notPriced =
     mode === "full" && data ? data.notPriced : NOTHING_NOT_PRICED;
+  const unpricedList = mode === "full" && data ? data.notPricedLines : [];
   const headline = notPricedHeadline(notPriced);
   const [confirmPrint, setConfirmPrint] = useState(false);
+  // A bid with no lines is blocked the same way (owner, 2026-09-30): its
+  // total is $0.00 and there is nothing to price, so the list is empty and
+  // the dialog says to add work instead.
+  const noWork = mode === "full" && !!data?.document.investment.noWork;
   const requestPrint = () => {
-    if (anyNotPriced(notPriced)) setConfirmPrint(true);
+    if (noWork || anyNotPriced(notPriced)) setConfirmPrint(true);
     else print();
   };
   // Ctrl+P goes through the same question as the button. A ref, so the
@@ -266,7 +289,10 @@ export default function ProposalPage({
   return (
     <div className="flex flex-col h-full bg-background">
       {/* ── Toolbar ────────────────────────────────────────────────────────── */}
-      <div className="border-b border-border px-6 py-3 flex items-center gap-3 bp-no-print">
+      {/* Wraps on a phone: "← Bid" and the title on the first line, the
+          controls below — on one line the explanation was squeezed to a
+          word per line (device audit, 2026-10-01). */}
+      <div className="border-b border-border px-4 md:px-6 py-3 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2 bp-no-print">
         <Button
           size="sm"
           variant="ghost"
@@ -275,7 +301,7 @@ export default function ProposalPage({
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Bid
         </Button>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 basis-[calc(100%-6rem)] md:basis-0">
           <h1 className="text-base font-semibold truncate">
             Proposal — {bid.name}
           </h1>
@@ -350,9 +376,14 @@ export default function ProposalPage({
         </Button>
       </div>
 
-      <div className="flex-1 overflow-hidden flex">
+      {/*
+        ON A PHONE: one column that scrolls as a whole — the page first, since
+        reviewing it is what a phone is for here, then what goes on it, then
+        the design controls if open. Side by side from md up, as before.
+      */}
+      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row">
         {/* ── Left: what goes on this proposal ───────────────────────────────── */}
-        <aside className="w-80 shrink-0 border-r border-border overflow-y-auto p-4 space-y-5 bp-no-print">
+        <aside className="md:w-80 shrink-0 border-t md:border-t-0 md:border-r border-border md:overflow-y-auto p-4 space-y-5 bp-no-print order-2 md:order-none">
           {doc.letterhead.needsSetup && (
             /*
               The same prompt as Settings, repeated here because this is where
@@ -564,14 +595,14 @@ export default function ProposalPage({
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-xs font-medium">On the proposal</span>
               <span className="font-mono text-sm">
-                {money(doc.investment.total)}
+                {clientFigure(doc.investment, doc.investment.total, money)}
               </span>
             </div>
           </section>
         </aside>
 
         {/* ── Middle: the page ───────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto bg-neutral-800/40 p-6 flex justify-center items-start bp-print-area">
+        <div className="md:flex-1 shrink-0 md:shrink overflow-auto bg-neutral-800/40 p-3 md:p-6 flex justify-center items-start bp-print-area order-1 md:order-none">
           <div
             style={{
               // `zoom` rather than `transform: scale()` on purpose: a transform
@@ -591,38 +622,57 @@ export default function ProposalPage({
 
         {/* ── Right: design, on demand ───────────────────────────────────────── */}
         {showDesign && (
-          <aside className="w-96 shrink-0 border-l border-border overflow-y-auto p-4 bp-no-print">
+          <aside className="md:w-96 shrink-0 border-t md:border-t-0 md:border-l border-border md:overflow-y-auto p-4 bp-no-print order-3 md:order-none">
             <ProposalDesignControls compact />
           </aside>
         )}
       </div>
 
-      {/* Asked before printing a priced proposal with unpriced lines — never
-          a block (owner, 2026-09-26). The client's copy carries no "not
-          priced" text, so this is the last place the estimator hears it. */}
+      {/* A block, not a question (owner, 2026-09-29). It said "Print
+          anyway" until then, and the client got a short total. There is
+          deliberately no button here that prints. */}
       <AlertDialog open={confirmPrint} onOpenChange={setConfirmPrint}>
         <AlertDialogContent className="bp-no-print">
           <AlertDialogHeader>
-            <AlertDialogTitle>{headline.text}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {noWork
+                ? "Add work before sending"
+                : `Price ${headline.one ? "this" : "these"} before sending`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              The total on this proposal leaves {headline.one ? "it" : "them"}{" "}
-              out, so the client will see a price that is short by whatever{" "}
-              {headline.one ? "it costs" : "they cost"}. The proposal itself
-              does not mention it.
+              {noWork ? (
+                <>
+                  This bid has no lines yet, so the total would be $0.00. The
+                  proposal can't be printed or saved until work is added to the
+                  bid.
+                </>
+              ) : (
+                <>
+                  {headline.text}, so the total would be short. The proposal
+                  can't be printed or saved until{" "}
+                  {headline.one ? "it is" : "they are"} priced on the bid.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {!noWork && unpricedList.length > 0 && (
+            <ul className="text-sm list-disc pl-5 space-y-0.5 max-h-48 overflow-y-auto">
+              {unpricedList.map((item, i) => (
+                <li key={i}>
+                  {item.name}
+                  <span className="text-muted-foreground">
+                    {item.wholeLine
+                      ? " — not priced"
+                      : ` — ${item.parts} part${item.parts === 1 ? "" : "s"} not priced`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={onBack}>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            <AlertDialogAction onClick={onBack}>
               Back to the bid
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setConfirmPrint(false);
-                // After the dialog has closed, so it is not in the print.
-                setTimeout(print, 0);
-              }}
-            >
-              Print anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -677,14 +677,12 @@ describe.skipIf(!hasDb)("only a role holding bids.delete may delete", () => {
       [ESTIMATOR, "estimator"],
       [VIEWER, "viewer"],
     ] as const) {
-      await database
-        .insert(companyMembers)
-        .values({
-          companyId: company.insertId,
-          userId,
-          role,
-          status: "active",
-        });
+      await database.insert(companyMembers).values({
+        companyId: company.insertId,
+        userId,
+        role,
+        status: "active",
+      });
     }
   });
 

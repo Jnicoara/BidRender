@@ -41,12 +41,14 @@ import { CONFIDENCE_TIER_VALUES } from "../drizzle/schema";
 const LINKED: LegendSymbol = {
   id: 1,
   label: "Duplex receptacle",
+  lookupKey: "duplex receptacle",
   assemblyId: 100,
   assemblyName: "Duplex recep, 20A",
 };
 const ALSO_LINKED: LegendSymbol = {
   id: 2,
   label: "Single pole switch",
+  lookupKey: "single pole switch",
   assemblyId: 101,
   assemblyName: "Switch, single pole",
 };
@@ -54,6 +56,7 @@ const ALSO_LINKED: LegendSymbol = {
 const UNLINKED: LegendSymbol = {
   id: 3,
   label: "Floor box",
+  lookupKey: "floor box",
   assemblyId: null,
   assemblyName: null,
 };

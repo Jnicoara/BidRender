@@ -53,6 +53,7 @@ import { trpc } from "@/lib/trpc";
 import { useCompany } from "@/hooks/useCompany";
 import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { toast } from "sonner";
+import { normaliseCaptureBox } from "@shared/symbolCapture";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -73,7 +74,34 @@ import {
   Trash2,
   Upload,
   X,
+  MoreHorizontal,
+  Redo2,
+  ScanSearch,
+  ListChecks,
+  Undo2,
+  PanelRight,
+  TriangleAlert,
+  RotateCcw,
+  SquareDashedMousePointer,
 } from "lucide-react";
+import { pinStylesForBid } from "@shared/pinLetters";
+import { pinCountsFor } from "@/lib/pinCounts";
+import { PinLookEditor } from "@/components/takeoff/PinLookEditor";
+import { MARK_STATUS_LABEL, type UserMarkStatus } from "@shared/markStatus";
+import { deviceFamily } from "@shared/deviceFamily";
+import {
+  FAMILY_MOUNTING,
+  markConnects,
+  type ConnectMark,
+  type ConnectPoint,
+  type ConnectRead,
+} from "@shared/connectPoint";
+import {
+  countAgainOffer,
+  loadLastCount,
+  saveLastCount,
+  type LastCount,
+} from "@/lib/countAgain";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -86,12 +114,32 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
+import {
+  drawingNextSheet,
+  marksMayShow,
+  planLoadState,
+} from "@/lib/planLoadState";
+import {
+  endUploadTiming,
+  markUpload,
+  startUploadTiming,
+} from "@/lib/uploadTiming";
+import {
   BUTTON_ZOOM_STEP,
+  FOCUS_ZOOM_OVER_FIT,
   REGION_SETTLE_MS,
+  centreOn,
   clampView,
   fitView,
   formatZoom,
   regionStillGood,
+  sharpRenderScale,
   snapToDevicePixel,
   wantedRegion,
   wheelZoomFactor,
@@ -99,6 +147,32 @@ import {
   type PlanView,
   type ViewBounds,
 } from "@/lib/planView";
+import {
+  IDLE as GESTURE_IDLE,
+  pinchView,
+  stepGesture,
+  type GestureEvent,
+  type GestureOutput,
+  type GestureState,
+} from "@/lib/touchGesture";
+import { EDITABLE_SELECTOR, wantsNativeMenu } from "@/lib/nativeMenu";
+
+/** What a finger on the drawing reaches directly: real controls and boxes. */
+const TOUCH_NATIVE_SELECTOR = `button, a[href], label, [role="button"], [role="menuitem"], [data-touch-native], ${EDITABLE_SELECTOR}`;
+import { usePlansLayout } from "@/hooks/usePlansLayout";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import { sheetDisplay, sheetLabel } from "@shared/sheetIdentity";
+import {
+  isPlansAddressFor,
+  pageBeyondSet,
+  planAddressHash,
+  readPlanAddress,
+  readRememberedView,
+  rememberView,
+  resolvePlanAddress,
+  restoreView,
+  writeRememberedView,
+} from "@/lib/planAddress";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import {
   PDF_WHOLE_DOWNLOAD_LIMIT_BYTES,
@@ -143,11 +217,37 @@ import {
 } from "@/components/takeoff/RunTypePicker";
 import { RunSpecEditor } from "@/components/takeoff/RunSpecEditor";
 import { resolveRunType } from "@shared/runTypeLookup";
+import { lockedEditRefusal } from "@shared/quantityLock";
+import {
+  readStoredTab,
+  tabForSelection,
+  tabWarnings,
+  visibleTabs,
+  writeStoredTab,
+  type PanelTab,
+} from "@/lib/panelTabs";
 import { runTypeSpec } from "@shared/takeoffCounts";
 import { CalibrateLayer } from "@/components/takeoff/CalibrateLayer";
 import { ScaleControl } from "@/components/takeoff/ScaleControl";
 import { JobHeightsChip } from "@/components/takeoff/JobHeightsChip";
-import { RunEndsEditor, TraceEndsPickers } from "@/components/takeoff/runEnds";
+import {
+  RunEndsEditor,
+  RunEndsSection,
+  TraceEndsPickers,
+  type RunEndsLeg,
+  type RunEndsValue,
+} from "@/components/takeoff/runEnds";
+
+/** A run row with no ends answered yet. */
+const NO_ENDS: RunEndsValue = {
+  startKind: null,
+  endKind: null,
+  startHeightInches: null,
+  endHeightInches: null,
+  distributionHeightInches: null,
+  startStampId: null,
+  endStampId: null,
+};
 import { TraceModeToggle } from "@/components/takeoff/TraceModeToggle";
 import {
   QuantityDropsReview,
@@ -186,10 +286,98 @@ import {
 import { uploadInParts } from "@/lib/multipartUpload";
 import {
   QUERIES_MOVED_BY,
+  sheetsToRefresh,
   type TakeoffChange,
   type TakeoffQuery,
 } from "@/lib/takeoffRefresh";
+import {
+  countLabel,
+  dropStep,
+  isNewestStep,
+  nextRedo,
+  nextUndo,
+  pushStep,
+  redoTitle,
+  settleRedo,
+  settleUndo,
+  undoForSubject,
+  undoTitle,
+  type EndsPatch,
+  type Packet,
+  type UndoEntry,
+  type UndoOp,
+  type UndoState,
+} from "@/lib/undoStack";
+import { emptiedCountCard } from "@/lib/emptiedCountCard";
+import { selectionDrop } from "@/lib/selectionDrop";
+import {
+  nextMarkBatch,
+  recoveredMarkKey,
+  splitRecoveredMarks,
+} from "@/lib/markBatches";
+import {
+  adoptRealGroup,
+  adoptRealSheet,
+  dropProvisional,
+  isProvisionalGroup,
+  isProvisionalSheet,
+  lostMarksMessage,
+} from "@/lib/provisionalCount";
+import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
+import { startPageTextRead, type PageTextReads } from "@/lib/pageTextRead";
+import { pageTextFor, rememberPageText } from "@/lib/pageText";
+import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
+import { pastDragThreshold, swallowNextClick } from "@/lib/dragThreshold";
+import { wheelIntent, type WheelGesture } from "@/lib/wheelIntent";
 import type { PageTextLayer } from "@/lib/textSelection";
+import type { FindResult, MatchBox } from "@/lib/findMatching";
+import {
+  lookAlikeCheck,
+  lookWordNotes,
+  type SavedLook,
+} from "@/lib/lookMatching";
+import {
+  browserStorage,
+  readTrustedLooks,
+  rememberTrustedLooks,
+} from "@/lib/trustedLooks";
+import type { SheetCheckInput, SheetCheckResult } from "@/lib/sheetCheck";
+import {
+  countNameFromLegend,
+  loadSessionLegend,
+  mergeLegendRows,
+  saveSessionLegend,
+  type SessionLegend,
+} from "@/lib/sheetCheckSession";
+import {
+  SheetCheckLayer,
+  SheetCheckPanel,
+  SheetCheckRunner,
+  sheetCheckRings,
+  type SheetCheckState,
+} from "@/components/takeoff/SheetCheck";
+import {
+  aiBatch,
+  applyAiAnswers,
+  clearOpen,
+  decide,
+  dropLookMatches,
+  matchItems,
+  nextToLookAt,
+  trustLooks,
+  type MatchItem,
+  type ScanFindAnswer,
+} from "@/lib/findMatchingSession";
+import {
+  MatchLayer,
+  MatchPanel,
+  type MatchPanelState,
+} from "@/components/takeoff/FindMatching";
+import {
+  existingToRemainName,
+  splitExistingToRemain,
+} from "@shared/existingToRemain";
+import { symbolLookupKey } from "@shared/takeoffCounts";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
 import {
@@ -212,14 +400,22 @@ import { takePendingPlan } from "@/lib/pendingPlanUpload";
 import { TraceLayer, type DropMarker } from "@/components/takeoff/TraceLayer";
 import {
   RunsPanel,
+  ThisSheetLine,
   type GroupBridgeState,
 } from "@/components/takeoff/RunsPanel";
+import { TakeoffSummaryPanel } from "@/components/takeoff/TakeoffSummaryPanel";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import {
+  countDeleteQuestion,
+  runDeleteQuestion,
+  type DeleteQuestion,
+} from "@/lib/deleteQuestions";
 import {
   clearDraft,
-  clearStampQueue,
   hasUnsavedWork,
   loadDraft,
   loadStampQueue,
+  queuedStampStatus,
   saveDraft,
   saveStampQueue,
 } from "@/lib/traceDraft";
@@ -237,11 +433,20 @@ import {
   boxSelection,
   clickSelection,
   deleteNeedsConfirm,
+  toolbarDelete,
   deleteQuestion,
   pruneSelection,
 } from "@/lib/stampSelection";
 import { withSavedSheet, withSheetChecked } from "@/lib/sheetScaleCache";
+import {
+  heldElsewhere,
+  heldOnSheet,
+  markForClick,
+  sheetKeyOf,
+  type SheetKey,
+} from "@/lib/toolOnSheet";
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
+import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
@@ -249,8 +454,14 @@ import {
   SymbolCaptureForm,
   SymbolCaptureLayer,
   cropToThumbnail,
+  renderSharpCapture,
   type CaptureRegion,
 } from "@/components/takeoff/SymbolCapture";
+import {
+  LegendCaptureForm,
+  readWholeLegend,
+  type WholeLegend,
+} from "@/components/takeoff/LegendCapture";
 import {
   allLayersOn,
   filterByLayers,
@@ -355,6 +566,29 @@ function usePdfWorker() {
       }
       if (msg.type === "textItems") {
         pending.current.get(msg.reqId)?.resolve(msg.layer);
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "matches") {
+        pending.current.get(msg.reqId)?.resolve({
+          result: msg.result,
+          readMs: msg.readMs,
+          findMs: msg.findMs,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "connectPoints") {
+        pending.current.get(msg.reqId)?.resolve(msg.points);
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "sheetChecked") {
+        pending.current.get(msg.reqId)?.resolve({
+          result: msg.result,
+          scan: msg.scan,
+          ms: msg.ms ?? 0,
+        });
         pending.current.delete(msg.reqId);
         return;
       }
@@ -498,6 +732,39 @@ function usePdfWorker() {
         ask<string>({ type: "text", pageNum, hash }),
       pageTextLayer: (pageNum: number, hash: string) =>
         ask<PageTextLayer>({ type: "textItems", pageNum, hash }),
+      findMatching: (
+        pageNum: number,
+        hash: string,
+        box: MatchBox | null,
+        looks: readonly SavedLook[]
+      ) =>
+        ask<{ result: FindResult; readMs: number; findMs: number }>({
+          type: "findMatching",
+          pageNum,
+          hash,
+          box,
+          looks,
+        }),
+      connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
+        ask<[number, ConnectPoint][]>({
+          type: "connectPoints",
+          pageNum,
+          hash,
+          marks,
+        }),
+      sheetCheck: (
+        legendPage: number,
+        planPage: number,
+        hash: string,
+        input: SheetCheckInput
+      ) =>
+        ask<{ result: SheetCheckResult | null; scan: boolean; ms: number }>({
+          type: "sheetCheck",
+          legendPage,
+          planPage,
+          hash,
+          input,
+        }),
     }),
     [load, loadUrl, ask]
   );
@@ -598,11 +865,19 @@ function PlanPane({
   overlay,
   onUrlExpired,
   controlsTarget,
+  fitOnly = false,
   thumbnailWants,
   onThumbnail,
+  focusRequest,
 }: {
   doc: Document;
   page: number;
+  /**
+   * A spot to bring to the middle of the view, in PAGE POINTS (the space
+   * marks and reader findings are stored in). `seq` changes on every request,
+   * so asking for the same spot twice still moves the view back to it.
+   */
+  focusRequest?: { x: number; y: number; seq: number } | null;
   /**
    * Where this pane's own zoom controls go — the one top bar.
    *
@@ -610,6 +885,11 @@ function PlanPane({
    * its own and a bar that has not mounted yet does not swallow the controls.
    */
   controlsTarget?: HTMLElement | null;
+  /**
+   * The phone: Fit alone. Two fingers zoom there, and the − % + trio cost the
+   * bar a whole row (device audit, 2026-10-01).
+   */
+  fitOnly?: boolean;
   /**
    * The pages worth a thumbnail right now, most wanted first — what the grid
    * and the pictures list have on screen (lib/thumbnailQueue.ts). Drawn one at
@@ -670,11 +950,48 @@ function PlanPane({
      */
     chromeTarget: HTMLElement | null;
     /**
+     * Device pixels per page point on screen right now — the sharpness the
+     * user is looking at (`sharpRenderScale`). Symbol capture renders at no
+     * less than this.
+     */
+    screenScale: number;
+    /**
+     * Draw a region of this page from the PDF at a chosen scale, region in
+     * page points. The same worker render the sharp patch uses. For symbol
+     * capture, which must not be cut from the soft backdrop.
+     */
+    renderRegion: (rect: PageRect, scale: number) => Promise<RenderedRegion>;
+    /**
      * This page's text with positions, read from the open document when
-     * asked — for "Select text". A function rather than data, so a sheet
+     * asked — for "Copy text". A function rather than data, so a sheet
      * nobody selects text on is never read for it.
      */
     loadTextLayer: () => Promise<PageTextLayer>;
+    /**
+     * Find all matching (@/lib/findMatching) on this page, in the worker:
+     * every copy of the symbol in `box` (page points).
+     */
+    findMatching: (
+      box: MatchBox | null,
+      looks: readonly SavedLook[]
+    ) => Promise<{ result: FindResult; readMs: number; findMs: number }>;
+    /**
+     * Where runs meet these wall devices on this page (shared/connectPoint),
+     * read from the page's line work in the worker.
+     */
+    connectPoints: (marks: ConnectMark[]) => Promise<[number, ConnectPoint][]>;
+    /**
+     * Check this page against a legend on another page of the same set
+     * (@/lib/sheetCheck), in the worker. Suggestions only.
+     */
+    sheetCheck: (
+      legendPage: number,
+      input: SheetCheckInput
+    ) => Promise<{
+      result: SheetCheckResult | null;
+      scan: boolean;
+      ms: number;
+    }>;
   }) => React.ReactNode;
   /**
    * Ask the server for a fresh URL for this document, and return it.
@@ -737,8 +1054,17 @@ function PlanPane({
   const pendingSharp = useRef<ImageBitmap | null>(null);
 
   const dpr = useDevicePixelRatio();
-  const { load, loadUrl, render, outline, pageText, pageTextLayer } =
-    usePdfWorker();
+  const {
+    load,
+    loadUrl,
+    render,
+    outline,
+    pageText,
+    pageTextLayer,
+    findMatching: findMatchingOnPage,
+    connectPoints: connectPointsOnPage,
+    sheetCheck: sheetCheckOnPage,
+  } = usePdfWorker();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   /** State, not a ref: the overlay has to re-render once this layer exists. */
@@ -813,14 +1139,86 @@ function PlanPane({
    *
    * Still waits for a raster, because fitting needs the sheet's dimensions. The
    * ref is what stops a re-render refitting a page the user has since zoomed.
+   *
+   * A LAYOUT effect since 2026-09-29, so the fit lands before the browser
+   * paints. As a plain effect there was one painted frame of the full raster
+   * at zoom 1, top-left, before the fit moved it (Track B plan, Part 4 § 1).
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (canvasSize.width === 0) return;
     const key = `${doc.id}:${page}`;
     if (fittedFor.current === key) return;
+    const firstArrival = fittedFor.current === null;
     fittedFor.current = key;
+    /*
+      A REFRESH COMES BACK TO THE SAME ZOOM AND PLACE (owner, 2026-09-30) —
+      on the first sheet this pane shows, and only if this tab was last
+      looking at exactly it (@/lib/planAddress). A page flip inside the
+      session still fits, as it always has.
+    */
+    const bounds = readBounds();
+    if (firstArrival && bounds) {
+      const back = restoreView(readRememberedView(), doc.id, page, bounds);
+      if (back) {
+        viewIsFitted.current = false;
+        setView(back);
+        return;
+      }
+    }
     fitToView();
-  }, [doc.id, page, canvasSize.width, canvasSize.height, fitToView]);
+  }, [
+    doc.id,
+    page,
+    canvasSize.width,
+    canvasSize.height,
+    fitToView,
+    readBounds,
+  ]);
+
+  /*
+    Remember where this tab is looking, a moment after it stops moving. A
+    fitted view is forgotten rather than stored: a refresh fits anyway, and a
+    stored fit would outlive a pane that has since changed size.
+  */
+  useEffect(() => {
+    if (canvasSize.width === 0) return;
+    const timer = window.setTimeout(() => {
+      const bounds = readBounds();
+      if (!bounds) return;
+      writeRememberedView(
+        viewIsFitted.current ? null : rememberView(doc.id, page, view, bounds)
+      );
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [view, doc.id, page, canvasSize.width, readBounds]);
+
+  /**
+   * "Show me on the drawing": centre the requested spot, zoomed in to at
+   * least FOCUS_ZOOM_OVER_FIT past fit (see `centreOn` for why it zooms).
+   *
+   * Until 2026-09-30 a jump only drew a ring (`focusPoint`, TraceLayer) and
+   * never moved the view — so pressing Link or ticking a reader suggestion
+   * at fit, or with the spot off screen, looked like it did nothing.
+   *
+   * Declared AFTER the fit-on-arrival effect, so on a commit where both run
+   * the fit happens first and this wins. A request that arrives before the
+   * page has a raster is not marked handled, and runs once bounds exist.
+   * Keyed on `seq` so a re-render (a new drawn scale, a resize) never
+   * re-centres a view the user has since moved.
+   */
+  const handledFocus = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusRequest || handledFocus.current === focusRequest.seq) return;
+    const bounds = readBounds();
+    if (!bounds) return;
+    handledFocus.current = focusRequest.seq;
+    const minZoom = fitView(bounds).zoom * FOCUS_ZOOM_OVER_FIT;
+    const point = {
+      x: focusRequest.x * drawnScale,
+      y: focusRequest.y * drawnScale,
+    };
+    aimView(current => centreOn(current, bounds, point, minZoom));
+  }, [focusRequest, readBounds, aimView, drawnScale]);
 
   /**
    * The pane changed size — re-fit if the view was a fit, otherwise re-clamp.
@@ -866,10 +1264,32 @@ function PlanPane({
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
+    /*
+      ZOOM OR PAN (owner, 2026-09-29): the mouse wheel stays zoom, like
+      Bluebeam; a two-finger trackpad scroll pans; a pinch zooms. Decided per
+      gesture by @/lib/wheelIntent, which says what it can and cannot tell
+      apart. A pan here goes through the same clamp as a drag.
+    */
+    let gesture: WheelGesture = null;
     const onWheel = (e: WheelEvent) => {
       const bounds = readBounds();
       if (!bounds) return;
       e.preventDefault();
+      const decided = wheelIntent(e, gesture);
+      gesture = decided.gesture;
+      if (decided.intent === "pan") {
+        aimView(current =>
+          clampView(
+            {
+              zoom: current.zoom,
+              x: current.x - e.deltaX,
+              y: current.y - e.deltaY,
+            },
+            bounds
+          )
+        );
+        return;
+      }
       const rect = vp.getBoundingClientRect();
       const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
       aimView(current =>
@@ -1005,6 +1425,9 @@ function PlanPane({
     const vp = viewportRef.current;
     if (!vp) return;
     const onDown = (e: PointerEvent) => {
+      // A text box on the viewer's screen layer is not the drawing: pressing
+      // in it never pans (see wantsNativeMenu).
+      if (wantsNativeMenu(e.target)) return;
       const wants =
         e.button === 2 ||
         e.button === 1 ||
@@ -1019,8 +1442,15 @@ function PlanPane({
      * A right-click that opens a context menu over the drawing is never what
      * was wanted here, and suppressing it only after a drag has begun still
      * flashes the menu on a click that does not move.
+     *
+     * Except in a text box. Until 2026-09-30 this also swallowed the menu on
+     * the "Name this symbol" and whole-legend name boxes, which sit inside the
+     * viewport, so their spelling suggestions could not be reached.
      */
-    const onMenu = (e: MouseEvent) => e.preventDefault();
+    const onMenu = (e: MouseEvent) => {
+      if (wantsNativeMenu(e.target)) return;
+      e.preventDefault();
+    };
     vp.addEventListener("pointerdown", onDown, true);
     vp.addEventListener("contextmenu", onMenu);
     return () => {
@@ -1029,13 +1459,39 @@ function PlanPane({
     };
   }, [startPan]);
 
-  /** The drag itself, on the window so it survives leaving the viewport. */
+  /**
+   * The drag itself, on the window so it survives leaving the viewport.
+   *
+   * ── Nothing moves until the pointer has (2026-09-29) ─────────────────────
+   * Below DRAG_THRESHOLD_PX a press is a click, and the sheet stays exactly
+   * where it was — including its "fitted" state, which a zero-length pan used
+   * to clear.
+   *
+   * ── And a real pan never selects what it started on ─────────────────────
+   * The `click` that follows a pan lands on whatever is under the pointer.
+   * Marks and run bodies select on click and are not draggable, so a drag
+   * that started on one panned the sheet AND picked it — and the next Delete
+   * removed a count nobody chose. After an ENGAGED pan the next click is
+   * swallowed, in the capture phase before anything sees it, for at most
+   * 400 ms. A guard, not a comment: see CLAUDE.md § "a comment claiming that
+   * SOMETHING ELSE handles it".
+   */
   useEffect(() => {
     if (!panning) return;
+    let engaged = false;
     const move = (e: PointerEvent) => {
       const from = panFrom.current;
       const bounds = readBounds();
       if (!from || !bounds) return;
+      if (
+        !engaged &&
+        !pastDragThreshold(
+          { x: from.pointerX, y: from.pointerY },
+          { x: e.clientX, y: e.clientY }
+        )
+      )
+        return;
+      engaged = true;
       aimView(
         clampView(
           {
@@ -1050,6 +1506,7 @@ function PlanPane({
     const end = () => {
       panFrom.current = null;
       setPanning(false);
+      if (engaged) swallowNextClick();
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", end);
@@ -1060,12 +1517,245 @@ function PlanPane({
       window.removeEventListener("pointercancel", end);
     };
   }, [panning, readBounds, aimView]);
+
+  /**
+   * FINGERS (references/device-audit.md § Touch; @/lib/touchGesture).
+   *
+   * A touch on the drawing is held, not forwarded, until it is known what it
+   * was: a tap is replayed to whatever is under it as a mouse click would
+   * have arrived (pointerdown, pointerup, click), so every tool keeps its one
+   * code path; a drag pans; two fingers pinch. Nothing a finger does on the
+   * way down can place a mark — the guard the panning plan made a condition
+   * of shipping touch at all.
+   *
+   * Two exceptions, both explicit:
+   * - A finger landing on something marked `data-touch-drag` (the capture
+   *   box, the copy-text box, a run's point handle) goes straight through,
+   *   because dragging IS that tool. A second finger arriving cancels it
+   *   (a real `pointercancel`) and pinches instead, so the sheet can always
+   *   be moved.
+   * - Mouse and pen are not touched at all: `pointerType` is checked first.
+   *
+   * Listeners are on the window in the CAPTURE phase so they run before
+   * anything in the page, including React's root listeners and the window
+   * listeners the mouse pan above relies on.
+   */
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    let state: GestureState = GESTURE_IDLE;
+    /** Ids of fingers this router is deciding for. */
+    const held = new Set<number>();
+    /** A finger handed to a drag tool, and the element it landed on. */
+    let forwarded: { id: number; target: Element } | null = null;
+    /** The view when the current pan or pinch began. */
+    let fromView: PlanView | null = null;
+    /** Events this router made itself, which it must let past. */
+    const own = new WeakSet<Event>();
+    /** Swallow the browser's own click after a held touch: we sent ours. */
+    let swallowClicksUntil = 0;
+
+    const local = (x: number, y: number) => {
+      const rect = vp.getBoundingClientRect();
+      return { x: x - rect.left, y: y - rect.top };
+    };
+
+    const replayTap = (x: number, y: number, id: number) => {
+      const target = document.elementFromPoint(x, y);
+      if (!target || !vp.contains(target)) return;
+      const init = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: x,
+        clientY: y,
+        button: 0,
+        pointerId: id,
+        pointerType: "touch",
+        isPrimary: true,
+        view: window,
+      };
+      for (const [type, buttons] of [
+        ["pointerdown", 1],
+        ["pointerup", 0],
+      ] as const) {
+        const ev = new PointerEvent(type, { ...init, buttons });
+        own.add(ev);
+        target.dispatchEvent(ev);
+      }
+      const click = new MouseEvent("click", { ...init, buttons: 0 });
+      own.add(click);
+      target.dispatchEvent(click);
+    };
+
+    const act = (out: GestureOutput, pointerId: number) => {
+      const bounds = readBounds();
+      if (out.type === "tap") {
+        swallowClicksUntil = performance.now() + 700;
+        replayTap(out.x, out.y, pointerId);
+        return;
+      }
+      if (out.type === "end") {
+        fromView = null;
+        swallowClicksUntil = performance.now() + 700;
+        return;
+      }
+      if (!bounds) return;
+      if (out.type === "pan") {
+        fromView ??= viewRef.current;
+        const start = fromView;
+        aimView(
+          clampView(
+            { zoom: start.zoom, x: start.x + out.dx, y: start.y + out.dy },
+            bounds
+          )
+        );
+      } else if (out.type === "pinch") {
+        fromView ??= viewRef.current;
+        const start = fromView;
+        aimView(
+          pinchView(start, bounds, {
+            startA: local(out.startA.x, out.startA.y),
+            startB: local(out.startB.x, out.startB.y),
+            nowA: local(out.nowA.x, out.nowA.y),
+            nowB: local(out.nowB.x, out.nowB.y),
+          })
+        );
+      }
+    };
+
+    const feed = (e: GestureEvent, pointerId: number) => {
+      const before = state.kind;
+      const step = stepGesture(state, e);
+      state = step.state;
+      // A new pinch starts from the view as it is NOW, not from a pan's start.
+      if (state.kind === "pinch" && before !== "pinch") fromView = null;
+      act(step.out, pointerId);
+    };
+
+    const finger = (e: PointerEvent) => ({
+      id: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      t: e.timeStamp,
+    });
+
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || own.has(e)) return;
+      if (!(e.target instanceof Node) || !vp.contains(e.target)) return;
+      const target = e.target as Element;
+      // A real control on top of the drawing — a pill's Finish or ✕, a name
+      // box — is not the drawing. Left entirely to the browser, so a tap
+      // focuses a text box and a long-press there still opens the menu with
+      // the spelling fixes (@/lib/nativeMenu).
+      if (state.kind === "idle" && target.closest?.(TOUCH_NATIVE_SELECTOR))
+        return;
+      if (
+        state.kind === "idle" &&
+        !forwarded &&
+        target.closest?.("[data-touch-drag]")
+      ) {
+        forwarded = { id: e.pointerId, target };
+        // Tracked anyway, so a second finger can take over as a pinch.
+        held.add(e.pointerId);
+        state = stepGesture(state, { type: "down", ...finger(e) }).state;
+        return;
+      }
+      if (forwarded) {
+        // A second finger while a drag tool has the first: the tool lets go
+        // and the two fingers move the sheet.
+        const cancel = new PointerEvent("pointercancel", {
+          bubbles: true,
+          pointerId: forwarded.id,
+          pointerType: "touch",
+        });
+        own.add(cancel);
+        forwarded.target.dispatchEvent(cancel);
+        forwarded = null;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      held.add(e.pointerId);
+      feed({ type: "down", ...finger(e) }, e.pointerId);
+    };
+
+    const onMoveUp = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || own.has(e)) return;
+      if (!held.has(e.pointerId)) return;
+      if (forwarded?.id === e.pointerId) {
+        // The drag tool's own finger: let the tool have it, and only keep
+        // the machine's idea of where it is in step.
+        if (e.type !== "pointermove") {
+          held.delete(e.pointerId);
+          forwarded = null;
+          state = GESTURE_IDLE;
+        } else {
+          // Where it is now, so a pinch that takes over starts from here
+          // rather than jumping back to where the drag began.
+          state = { kind: "pending", id: e.pointerId, start: finger(e) };
+        }
+        return;
+      }
+      e.stopPropagation();
+      const type =
+        e.type === "pointermove"
+          ? "move"
+          : e.type === "pointerup"
+            ? "up"
+            : "cancel";
+      if (type !== "move") held.delete(e.pointerId);
+      feed(
+        type === "cancel" ? { type, id: e.pointerId } : { type, ...finger(e) },
+        e.pointerId
+      );
+    };
+
+    const onClick = (e: MouseEvent) => {
+      if (own.has(e)) return;
+      if (performance.now() > swallowClicksUntil) return;
+      if (!(e.target instanceof Node) || !vp.contains(e.target)) return;
+      // Never a real control's click. A finger tapping the trace pill's
+      // Finish half a second after its last point was being eaten here, and
+      // the run simply did not finish (found by scripts/deviceTouch.mts).
+      // The browser's own click after a held tap lands on the drawing, never
+      // on a button: a touch that starts on a button is not held at all.
+      if ((e.target as Element).closest?.(TOUCH_NATIVE_SELECTOR)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointermove", onMoveUp, true);
+    window.addEventListener("pointerup", onMoveUp, true);
+    window.addEventListener("pointercancel", onMoveUp, true);
+    window.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointermove", onMoveUp, true);
+      window.removeEventListener("pointerup", onMoveUp, true);
+      window.removeEventListener("pointercancel", onMoveUp, true);
+      window.removeEventListener("click", onClick, true);
+    };
+  }, [readBounds, aimView]);
+
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
+  /** The page whose raster is on the canvas, or null before the first. */
+  const [drawnPage, setDrawnPage] = useState<number | null>(null);
+  const marksShow = marksMayShow({ drawnPage, page });
+  /** Opening → drawing sheet N → the sheet. @/lib/planLoadState. */
+  const loadState = planLoadState({
+    documentLoading: loading,
+    drawn: canvasSize.width > 0,
+    page,
+  });
   const [error, setError] = useState<string | null>(null);
-  /** Pages already sent for scale detection, so it runs once each. */
-  const detected = useRef(new Set<number>());
+  /**
+   * Pages whose text has been DELIVERED for scale detection, so it runs once
+   * each — counted on delivery, not on asking (@/lib/pageTextRead).
+   */
+  const detected = useRef<PageTextReads>({ delivered: new Set<number>() });
 
   /**
    * Held in a ref, and deliberately NOT in the effect's dependencies.
@@ -1094,7 +1784,7 @@ function PlanPane({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    detected.current.clear();
+    detected.current.delivered.clear();
 
     (async () => {
       try {
@@ -1148,6 +1838,7 @@ function PlanPane({
           }
         );
         if (cancelled) return;
+        markUpload("viewer opened the file");
         setPageCount(pages);
         setLoading(false);
         if (doc.pageCount !== pages) onPageCount(pages);
@@ -1209,7 +1900,11 @@ function PlanPane({
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
         canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+        endUploadTiming(`sheet ${page} drawn`);
         setCanvasSize({ width: bitmap.width, height: bitmap.height });
+        // Which sheet the canvas now holds — the marks wait for this
+        // (@/lib/planLoadState, `marksMayShow`).
+        setDrawnPage(page);
         // The scale this canvas was ACTUALLY drawn at, kept beside the canvas
         // it describes. Anything that converts between canvas pixels and page
         // points reads this, never RENDER_SCALE.
@@ -1421,6 +2116,9 @@ function PlanPane({
   const wantsKey = (thumbnailWants ?? []).join(",");
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
+    // Sheet 1 first: the worker is one queue, and a thumbnail ahead of the
+    // first sheet is the reader waiting on a picture they did not ask for.
+    if (canvasSize.width === 0) return;
     // Already running: it will see the new wants before its next render.
     if (thumbnailLoopRunning.current) return;
     if (nextThumbnail(wantsRef.current, thumbnailsDone.current) === null)
@@ -1469,27 +2167,31 @@ function PlanPane({
           thumbnailLoopRunning.current = false;
       }
     })();
-  }, [wantsKey, loading, error, pageCount, hash, render]);
+  }, [wantsKey, loading, error, pageCount, hash, render, canvasSize.width]);
 
-  // Pull the page's text once, for scale detection.
+  /*
+    Pull the page's text once, for scale detection (@/lib/pageTextRead).
+
+    Until 2026-10-06 this marked the page read when the pull STARTED and had
+    `onSheetVisible` in its dependencies. That handler changes when the sheet
+    list arrives, so on a fast machine the rows landed mid-pull: the effect
+    re-ran, saw "already read" and stopped, the first run was cancelled, and
+    the text went nowhere — a fresh upload sat on "Set scale" (local flow
+    test 2, about 4 runs in 5). Now the page counts as read only once its
+    text is delivered, and it is delivered to the CURRENT handler via a ref,
+    so a new handler is not a reason to start again.
+  */
+  const onSheetVisibleRef = useRef(onSheetVisible);
+  onSheetVisibleRef.current = onSheetVisible;
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
-    if (detected.current.has(page)) return;
-    detected.current.add(page);
-    let cancelled = false;
-
-    pageText(page, hash)
-      .then(text => {
-        if (!cancelled) onSheetVisible(page, text);
-      })
-      // Detection is a convenience. A page whose text will not extract simply
-      // stays unscaled until someone sets it.
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [page, pageCount, loading, error, pageText, hash, onSheetVisible]);
+    return startPageTextRead(
+      detected.current,
+      page,
+      () => pageText(page, hash),
+      (p, text) => onSheetVisibleRef.current(p, text)
+    );
+  }, [page, pageCount, loading, error, pageText, hash]);
 
   const go = useCallback(
     (to: number) => {
@@ -1562,35 +2264,39 @@ function PlanPane({
           <Loader2 className="w-3 h-3 animate-spin" /> Drawing…
         </span>
       )}
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0"
-        onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
-        disabled={loading}
-        aria-label="Zoom out"
-        title="Zoom out (−)"
-      >
-        <Minus className="w-4 h-4" />
-      </Button>
-      <span
-        className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
-        aria-live="polite"
-        aria-label={`Zoom ${formatZoom(view.zoom)}`}
-      >
-        {loading ? "—" : formatZoom(view.zoom)}
-      </span>
-      <Button
-        size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0"
-        onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
-        disabled={loading}
-        aria-label="Zoom in"
-        title="Zoom in (+)"
-      >
-        <Plus className="w-4 h-4" />
-      </Button>
+      {!fitOnly && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => zoomByStep(1 / BUTTON_ZOOM_STEP)}
+            disabled={loading}
+            aria-label="Zoom out"
+            title="Zoom out (−)"
+          >
+            <Minus className="w-4 h-4" />
+          </Button>
+          <span
+            className="font-mono text-xs tabular-nums min-w-[3.5rem] text-center text-muted-foreground"
+            aria-live="polite"
+            aria-label={`Zoom ${formatZoom(view.zoom)}`}
+          >
+            {loading ? "—" : formatZoom(view.zoom)}
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0"
+            onClick={() => zoomByStep(BUTTON_ZOOM_STEP)}
+            disabled={loading}
+            aria-label="Zoom in"
+            title="Zoom in (+)"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </>
+      )}
       <Button
         size="sm"
         variant="ghost"
@@ -1616,19 +2322,47 @@ function PlanPane({
       )}
       <div
         ref={viewportRef}
+        data-plan-viewport
         className={cn(
           "flex-1 overflow-hidden bg-muted/20 min-h-0 relative",
           panning ? "cursor-grabbing" : spaceHeld ? "cursor-grab" : null
         )}
+        // Fingers are this screen's to interpret (the touch router above):
+        // without this the browser scrolls or zooms the PAGE instead, and
+        // sends a pointercancel half-way through every pan.
+        style={{ touchAction: "none" }}
         onPointerDown={beginPlainPan}
       >
-        {loading ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        {/*
+          Opening, then drawing sheet N, then the sheet — one panel for both
+          waits, so nothing shows until the sheet can be shown whole and fitted
+          (@/lib/planLoadState). The empty canvas used to show between the two
+          as a white 300x150 square at the top-left.
+        */}
+        {loadState.show !== "sheet" && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 text-muted-foreground bg-muted/20">
             <Loader2 className="w-6 h-6 animate-spin" />
-            <p className="text-sm">Opening {doc.filename}…</p>
-            <p className="text-xs">Large drawings can take a few seconds.</p>
+            <p className="text-sm">{loadState.message}</p>
+            <p className="text-xs">
+              {doc.filename} · large drawings can take a few seconds.
+            </p>
           </div>
-        ) : (
+        )}
+        {/*
+          The "PDF loading bar" (track-b-plans-screen-edits-plan.md § 1): a
+          thin pulsing bar while the NEXT sheet draws over the last one, whose
+          marks are already hidden. No percentage — a page render reports no
+          progress, so a filling bar would be invented. A fade, never a slide
+          (CLAUDE.md § Responsiveness rule 4).
+        */}
+        {drawingNextSheet({ drawnPage, page }) && (
+          <div
+            role="status"
+            aria-label={`Drawing sheet ${page}`}
+            className="absolute top-0 inset-x-0 z-10 h-0.5 bg-[#F5C518] animate-pulse pointer-events-none"
+          />
+        )}
+        {loading ? null : (
           /*
             ONE transform, wrapping the page and the overlay together.
 
@@ -1645,7 +2379,12 @@ function PlanPane({
             which already reflects the transform.
           */
           <div
-            className="absolute top-0 left-0 origin-top-left will-change-transform"
+            className={cn(
+              "absolute top-0 left-0 origin-top-left will-change-transform",
+              // Mounted (the render needs the canvas) but not seen until the
+              // first raster is on it and fitted.
+              loadState.show !== "sheet" && "invisible"
+            )}
             style={{
               /*
                 Snapped to whole DEVICE pixels, not left as the raw offset.
@@ -1721,7 +2460,13 @@ function PlanPane({
                   }}
                 />
               )}
+              {/*
+                Only over THIS sheet's raster. A size alone was the old gate,
+                and after the first sheet there always is one — so on a sheet
+                change the new marks hung over the last sheet's drawing.
+              */}
               {canvasSize.width > 0 &&
+                marksShow &&
                 overlay?.({
                   ...canvasSize,
                   zoom: view.zoom,
@@ -1739,7 +2484,16 @@ function PlanPane({
                   renderScale: drawnScale,
                   canvas: canvasRef.current,
                   chromeTarget: chromeLayer,
+                  screenScale: sharpRenderScale(drawnScale, view.zoom, dpr),
+                  renderRegion: (rect, scale) =>
+                    render(page, scale, hash, rect),
                   loadTextLayer: () => pageTextLayer(page, hash),
+                  findMatching: (box, looks) =>
+                    findMatchingOnPage(page, hash, box, looks),
+                  connectPoints: marks =>
+                    connectPointsOnPage(page, hash, marks),
+                  sheetCheck: (legendPage, input) =>
+                    sheetCheckOnPage(legendPage, page, hash, input),
                 })}
             </div>
           </div>
@@ -1808,6 +2562,8 @@ type PendingMark = {
   assemblyCategory: string | null;
   x: number;
   y: number;
+  /** "Placing as" when it was clicked. Sent with it, and drawn by it. */
+  status: UserMarkStatus;
   /** In flight. Still drawn, no longer waiting to be sent. */
   sent: boolean;
 };
@@ -1831,8 +2587,16 @@ export default function TakeoffPage({
   const { data: bid } = trpc.bids.get.useQuery({ id: bidId });
   const { data: docs = [], isLoading } = trpc.bidPdfs.list.useQuery({ bidId });
 
-  const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
-  const [page, setPage] = useState(1);
+  /*
+    THE PLAN SET AND SHEET START FROM THE ADDRESS (owner, 2026-09-30): F5 on
+    page 5 of the third set used to land on the first set's first page. Read
+    once, on mount; checked against the bid's sets when they load, below.
+  */
+  const [askedAddress] = useState(() => readPlanAddress(window.location.hash));
+  const [selectedDocId, setSelectedDocId] = useState<number | null>(
+    askedAddress.setId
+  );
+  const [page, setPage] = useState(askedAddress.sheet ?? 1);
   const [dragging, setDragging] = useState(false);
   const [uploads, setUploads] = useState<UploadJob[]>([]);
   /**
@@ -2107,7 +2871,30 @@ export default function TakeoffPage({
    */
   const [reachingForMeasure, setReachingForMeasure] = useState(false);
 
-  const [tracing, setTracing] = useState(false);
+  /**
+   * The sheet a trace was started on, or null when not tracing. Read through
+   * `tracing` below, which is false on any other sheet — @/lib/toolOnSheet.
+   */
+  const [traceHeld, setTraceHeld] = useState<{
+    sheetKey: SheetKey;
+    /** The sheet row, so work left behind is saved where it was drawn. */
+    sheetId: number | null;
+    sheetName: string;
+  } | null>(null);
+  /** Where the tool is being picked up: the sheet on screen at that moment. */
+  const sheetKeyNow = useRef<SheetKey>("");
+  const sheetNow = useRef<{ id: number; name: string } | null>(null);
+  const setTracing = useCallback((on: boolean) => {
+    setTraceHeld(
+      on
+        ? {
+            sheetKey: sheetKeyNow.current,
+            sheetId: sheetNow.current?.id ?? null,
+            sheetName: sheetNow.current?.name ?? "",
+          }
+        : null
+    );
+  }, []);
   const [tracePathType, setTracePathType] = useState<RunPathType>("conduit");
   const [tracePoints, setTracePoints] = useState<PagePoint[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -2162,12 +2949,30 @@ export default function TakeoffPage({
     cable: { id: number; label: string } | null;
   }>({ conduit: null, cable: null });
 
-  const [armedGroup, setArmedGroup] = useState<{
+  /**
+   * As stored. Read it as `armedGroup` (below), which is null on any sheet
+   * other than the one it was picked up on — @/lib/toolOnSheet.
+   */
+  const [armedGroupHeld, setArmedGroupHeld] = useState<{
     groupId: number;
     label: string;
     /** Null for a plain count. Kept for the legend panel's active-row mark. */
     assemblyId: number | null;
+    /**
+     * The legend symbol it was picked up from, if any — so the legend marks
+     * THAT row, not every symbol sharing the assembly (§ 11 of the pin plan).
+     */
+    symbolId?: number | null;
+    /** The sheet it was picked up on. */
+    sheetKey: SheetKey;
   } | null>(null);
+  /** Put the count down (null). Picking one up goes through `armGroup`. */
+  const setArmedGroup = setArmedGroupHeld;
+  /** The last count picked up on this bid — what "Count again" offers. */
+  const [lastCount, setLastCount] = useState<LastCount | null>(() =>
+    loadLastCount(bidId)
+  );
+  useEffect(() => setLastCount(loadLastCount(bidId)), [bidId]);
   /**
    * The marks selected for deleting — one by click, more by Shift-click or
    * Shift-drag. The rules are in @/lib/stampSelection, where a test reaches
@@ -2176,6 +2981,15 @@ export default function TakeoffPage({
   const [selectedStampIds, setSelectedStampIds] = useState<ReadonlySet<number>>(
     () => new Set()
   );
+  /**
+   * The finger's Shift and Alt (references/device-audit.md § Touch). Select:
+   * taps add or remove marks and a drag boxes them. Free: a new leg's first
+   * point does not snap. Both toolbar/pill switches, shown on a coarse
+   * pointer, because a tablet has no key to hold.
+   */
+  const coarse = useCoarsePointer();
+  const [touchSelect, setTouchSelect] = useState(false);
+  const [freeLegPoints, setFreeLegPoints] = useState(false);
   /** Waiting for "Delete N marks?" to be answered. */
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   /** The question as it was asked — see `deleteSelected`. */
@@ -2184,9 +2998,57 @@ export default function TakeoffPage({
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(
     null
   );
-  const [capturingSymbol, setCapturingSymbol] = useState(false);
+  /** The same spot, as a request for PlanPane to bring it into view. */
+  const [focusRequest, setFocusRequest] = useState<{
+    x: number;
+    y: number;
+    seq: number;
+  } | null>(null);
+  const focusRingTimer = useRef<number | null>(null);
   /**
-   * "Select text" is picked up. ONE tool at a time, and it is kept that way in
+   * Every "show me on the drawing" goes through here: the counted-items list,
+   * a drop, a reader suggestion's tick and its Link / Fix. It MOVES the view
+   * (PlanPane's `focusRequest`) and rings the spot.
+   *
+   * The ring used to be the whole of it, and each caller cleared it with its
+   * own timer — so a second jump within 2.2s had its ring removed early by
+   * the first one's timer. One timer, reset on every jump.
+   */
+  const jumpTo = useCallback((at: { x: number; y: number }) => {
+    setFocusPoint(at);
+    setFocusRequest(current => ({ ...at, seq: (current?.seq ?? 0) + 1 }));
+    if (focusRingTimer.current !== null)
+      window.clearTimeout(focusRingTimer.current);
+    // Clear the highlight after a moment — a marker that stays ringed forever
+    // stops meaning "this is the one".
+    focusRingTimer.current = window.setTimeout(() => {
+      focusRingTimer.current = null;
+      setFocusPoint(null);
+    }, 2200);
+  }, []);
+  useEffect(
+    () => () => {
+      if (focusRingTimer.current !== null)
+        window.clearTimeout(focusRingTimer.current);
+    },
+    []
+  );
+  const [capturingSymbol, setCapturingSymbol] = useState(false);
+  /** "Whole legend" is picked up: the next drag is one box around a legend. */
+  const [capturingLegend, setCapturingLegend] = useState(false);
+  /**
+   * The legend being read or reviewed. `state` is null while reading, then
+   * the reading. `sheetId` is the sheet it was boxed on, recorded with each
+   * symbol saved, as single Capture records it.
+   */
+  const [legendDraft, setLegendDraft] = useState<{
+    state: WholeLegend | null;
+    sheetId: number | undefined;
+  } | null>(null);
+  /** "Saving 3 of 47" while Save all runs. */
+  const [legendSaving, setLegendSaving] = useState<string | null>(null);
+  /**
+   * "Copy text" is picked up. ONE tool at a time, and it is kept that way in
    * two places rather than by a comment: picking this up puts the others down
    * (`startSelectingText`), picking any of them up puts this down (their own
    * arm functions), and the layer itself is not rendered while another tool is
@@ -2199,13 +3061,28 @@ export default function TakeoffPage({
     // so putting the count down here cannot strand a click.
     setArmedGroup(null);
     setCapturingSymbol(false);
+    setCapturingLegend(false);
     setCalibrating(false);
     setSelectingText(true);
   }, []);
-  /** The crop taken from the page, awaiting a name. */
+  /**
+   * The crop taken from the page, awaiting a name.
+   *
+   * `thumbnail` starts as the instant soft preview and is replaced by the
+   * sharp render when it arrives (`renderSharpCapture`). `id` ties that late
+   * reply to THIS capture: one that was cancelled, or replaced by a newer box,
+   * must not have its picture land on the next one.
+   */
   const [pendingCapture, setPendingCapture] = useState<{
+    id: number;
+    /** The box, page points, kept on the LOOK (multiple-looks-plan.md § 2). */
+    region: CaptureRegion;
+    sheetId: number | undefined;
     thumbnail: string | null;
+    sharpening: boolean;
+    soft: boolean;
   } | null>(null);
+  const captureSeq = useRef(0);
   /**
    * Clicks not yet confirmed by the server — drawn here, mirrored to storage.
    *
@@ -2220,6 +3097,20 @@ export default function TakeoffPage({
     setPendingMarks(next);
   }, []);
   const nextPendingKey = useRef(-1);
+  /**
+   * PLACING AS (pin plan § 7, 2026-10-05): what a click puts down — a new
+   * device, or one already on the wall. STICKY: it stays across counts and
+   * sheets until changed, because a run of existing devices is the case it
+   * is for, and choosing it per click is the form-on-every-mark D3 rejected.
+   * Shown in the counting pill while anything is armed, amber when it is
+   * "existing". The marks say it too, from the click: new is filled,
+   * existing hollow with its letter in the count's color (`markPaint`,
+   * shared/takeoffMarks.ts). Until later on 2026-10-05 they did NOT — a
+   * new and an existing pin with a letter looked the same, because new's
+   * 0.22 tint hid under the letter's white halo — so this comment said the
+   * pill was the only cue. Checked on screen after the fix at three widths.
+   */
+  const [placingStatus, setPlacingStatus] = useState<UserMarkStatus>("new");
   /** Which layers are showing. Null until a sheet's contents are known. */
   const [layerState, setLayerState] = useState<LayerState | null>(null);
   const hadSystem = useRef<Set<string>>(new Set());
@@ -2227,6 +3118,110 @@ export default function TakeoffPage({
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
+
+  /*
+    THE TOOLS IN HAND, AS THIS SHEET SEES THEM. Every way of changing sheet
+    ends in `doc` and `page`, so keying on those two covers all of them —
+    including any added later — without a reset in each handler. On another
+    sheet a held tool reads as put down in this same render.
+  */
+  const sheetKey = sheetKeyOf(doc?.id ?? null, page);
+  sheetKeyNow.current = sheetKey;
+  const tracing = heldOnSheet(traceHeld, sheetKey) !== null;
+  const armedGroup = heldOnSheet(armedGroupHeld, sheetKey);
+
+  /*
+    THE ADDRESS BAR SAYS WHICH SET AND SHEET IS OPEN (@/lib/planAddress).
+
+    1. Once the bid's sets have loaded, the address asked for is checked
+       against them: a deleted set, or a page past the end, opens the first
+       sheet with no error.
+    2. From then on every flip rewrites the address with `replaceState`, so a
+       refresh or a copied link opens the same sheet — and Back still leaves
+       the screen in one press rather than walking back through every sheet.
+       Only while the address is still this bid's Plans screen.
+    3. An address changed by hand (or Back/Forward between two Plans addresses
+       of this bid) moves the screen to it.
+  */
+  const addressSettled = useRef(false);
+  useEffect(() => {
+    if (addressSettled.current || isLoading) return;
+    addressSettled.current = true;
+    const resolved = resolvePlanAddress(askedAddress, docs);
+    setSelectedDocId(resolved.setId);
+    setPage(resolved.page);
+  }, [isLoading, docs, askedAddress]);
+  // A set opened for the first time reports its page count only once its
+  // file is read; a page asked for past that end drops to the first.
+  useEffect(() => {
+    if (doc && pageBeyondSet(page, doc.pageCount)) setPage(1);
+  }, [doc, page]);
+  useEffect(() => {
+    if (!addressSettled.current || !doc) return;
+    const hash = window.location.hash;
+    if (!isPlansAddressFor(hash, bidId)) return;
+    const next = planAddressHash(bidId, doc.id, page);
+    if (hash === next) return;
+    window.history.replaceState(window.history.state, "", next);
+  }, [bidId, doc, page]);
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
+  useEffect(() => {
+    const follow = () => {
+      const hash = window.location.hash;
+      if (!addressSettled.current || !isPlansAddressFor(hash, bidId)) return;
+      const asked = readPlanAddress(hash);
+      if (asked.setId === null) return;
+      const resolved = resolvePlanAddress(asked, docsRef.current);
+      setSelectedDocId(resolved.setId);
+      setPage(resolved.page);
+    };
+    window.addEventListener("hashchange", follow);
+    window.addEventListener("popstate", follow);
+    return () => {
+      window.removeEventListener("hashchange", follow);
+      window.removeEventListener("popstate", follow);
+    };
+  }, [bidId]);
+
+  /*
+    A LINK TO ONE SPOT (@/lib/planSpotLink), 2026-10-01 — the reader-accuracy
+    review page sends the estimator to each AI find to say whose mistake it
+    was. It is the address above plus `x` and `y`, so the address code opens
+    the set and sheet exactly as for any Plans address (on arrival, and on a
+    hash change — that page reuses one app tab). This only waits for that
+    sheet to be the open one, centres the spot zoomed in as the drops
+    readout's jump does, and takes `x`/`y` off the address so a refresh does
+    not jump again. A set not on this bid: the address code opens the first
+    sheet, and this says why instead of jumping somewhere wrong.
+  */
+  const [spotLink, setSpotLink] = useState(() =>
+    readPlanSpot(window.location.hash)
+  );
+  useEffect(() => {
+    const onHash = () => setSpotLink(readPlanSpot(window.location.hash));
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  useEffect(() => {
+    if (!spotLink || isLoading) return;
+    const clear = () => {
+      setSpotLink(null);
+      window.history.replaceState(
+        window.history.state,
+        "",
+        withoutPlanSpot(window.location.hash)
+      );
+    };
+    if (!docs.some(d => d.id === spotLink.pdfId)) {
+      toast.error("That link points at a plan set that is not on this bid.");
+      clear();
+      return;
+    }
+    if (doc?.id !== spotLink.pdfId || page !== spotLink.page) return;
+    jumpTo({ x: spotLink.x, y: spotLink.y });
+    clear();
+  }, [spotLink, isLoading, docs, doc?.id, page, jumpTo]);
 
   /** A different plan is a different set of pictures. */
   useEffect(() => {
@@ -2269,6 +3264,30 @@ export default function TakeoffPage({
     [gridRange, listRange, thumbnailPageCount]
   );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
+  /*
+    A SHEET DRAWN BEFORE ITS ROW EXISTS (@/lib/provisionalCount, 2026-10-06).
+    A fresh upload is on screen three round trips before its sheet rows are;
+    a tap in that window had no sheet id and `markForClick` dropped it — the
+    staging smoke test's 0 of 3. Taps there are kept under a provisional
+    (negative) id per sheet, drawn at once, and moved onto the real sheet by
+    the effect beside `queueStamp` when the row arrives.
+  */
+  const provisionalSheets = useRef(new Map<SheetKey, number>());
+  const nextProvisionalSheet = useRef(-1);
+  const provisionalSheetFor = useCallback((key: SheetKey) => {
+    let id = provisionalSheets.current.get(key);
+    if (id === undefined) {
+      id = nextProvisionalSheet.current--;
+      provisionalSheets.current.set(key, id);
+    }
+    return id;
+  }, []);
+  /** The sheet id this sheet's unsent marks are held under right now. */
+  const drawnSheetId =
+    activeSheet?.id ?? provisionalSheets.current.get(sheetKey) ?? null;
+  sheetNow.current = activeSheet
+    ? { id: activeSheet.id, name: activeSheet.name }
+    : null;
 
   /**
    * A sheet changed — usually its scale.
@@ -2291,16 +3310,18 @@ export default function TakeoffPage({
    * a test can go red. This only carries it out.
    */
   const invalidateQuery = useCallback(
-    (query: TakeoffQuery) => {
-      const sheetId = activeSheet?.id;
+    (query: TakeoffQuery, stepSheetId?: number) => {
+      // The open sheet, and the sheet the change was made on when that is a
+      // different one (an undo pressed after switching). @/lib/takeoffRefresh.
+      const sheetIds = sheetsToRefresh(activeSheet?.id, stepSheetId);
       const bidPdfId = doc?.id;
       switch (query) {
         case "takeoffRuns.listForSheet":
-          if (sheetId)
+          for (const sheetId of sheetIds)
             void utils.takeoffRuns.listForSheet.invalidate({ sheetId });
           return;
         case "takeoffStamps.listForSheet":
-          if (sheetId)
+          for (const sheetId of sheetIds)
             void utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           return;
         case "bidPdfs.sheets":
@@ -2324,6 +3345,9 @@ export default function TakeoffPage({
           return;
         case "takeoffGroups.list":
           void utils.takeoffGroups.list.invalidate({ bidId });
+          return;
+        case "takeoffSummary.forBid":
+          void utils.takeoffSummary.forBid.invalidate({ bidId });
           return;
         case "takeoffHeights.forBid":
           void utils.takeoffHeights.forBid.invalidate({ bidId });
@@ -2356,12 +3380,261 @@ export default function TakeoffPage({
     [utils, activeSheet?.id, doc?.id, bidId]
   );
   const refreshFor = useCallback(
-    (change: TakeoffChange) => {
-      for (const query of QUERIES_MOVED_BY[change]) invalidateQuery(query);
+    (change: TakeoffChange, stepSheetId?: number) => {
+      for (const query of QUERIES_MOVED_BY[change])
+        invalidateQuery(query, stepSheetId);
     },
     [invalidateQuery]
   );
   const refreshSheets = () => refreshFor("sheet");
+
+  /*
+    ── UNDO AND REDO (takeoff-spec.md D6; Track B plan, Part 3) ───────────────
+    The stack is @/lib/undoStack, pure and tested; this carries it out.
+
+    Per bid (the page is keyed by bid), and kept for the life of the browser
+    TAB since 2026-09-29 (@/lib/undoPersist): leaving for the bid and coming
+    back, or reloading, keeps it. Another tab and a colleague's change are not
+    on it. Every step names what it undoes in the button's tooltip, and a step
+    the server refuses (its target changed since) is dropped with the
+    server's sentence rather than retried.
+
+    The undo calls are their own mutations, not the ones the tools use: those
+    push a NEW step on success, and an undo that pushed a step would clear the
+    redo it had just made.
+  */
+  const [undoState, setUndoState] = useState<UndoState>(() =>
+    loadUndo(tabStorage(), bidId)
+  );
+  const undoRef = useRef(undoState);
+  undoRef.current = undoState;
+  useEffect(() => saveUndo(tabStorage(), bidId, undoState), [bidId, undoState]);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const pushUndo = useCallback((entry: UndoEntry): UndoEntry => {
+    setUndoState(s => pushStep(s, entry));
+    // Handed back so a toast can take back exactly this step (deletedToast).
+    return entry;
+  }, []);
+  const undoRemoveMarks = trpc.takeoffStamps.removeMany.useMutation();
+  const undoRestoreMarks = trpc.takeoffStamps.restore.useMutation();
+  const undoRemoveRun = trpc.takeoffRuns.remove.useMutation();
+  const undoRestoreRun = trpc.takeoffRuns.restore.useMutation();
+  const undoSetPoints = trpc.takeoffRuns.setPoints.useMutation();
+  const undoSetEnds = trpc.takeoffRuns.setEnds.useMutation();
+  const undoRestoreGroup = trpc.takeoffGroups.restore.useMutation();
+  const undoRemoveGroup = trpc.takeoffGroups.remove.useMutation();
+  const undoMoveMarks = trpc.takeoffStamps.moveToGroup.useMutation();
+  /** Ops whose mutations are declared further down the page. */
+  const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
+    async () => null
+  );
+
+  /** Carry out one step; returns the step that reverses it, or null. */
+  const runUndoOp = useCallback(
+    async (op: UndoOp): Promise<UndoOp | null> => {
+      switch (op.kind) {
+        case "removeMarks": {
+          const r = await undoRemoveMarks.mutateAsync({ ids: op.ids });
+          return r.undo
+            ? { kind: "restoreMarks", packet: r.undo, ids: op.ids }
+            : null;
+        }
+        case "restoreMarks":
+          await undoRestoreMarks.mutateAsync({ undo: op.packet });
+          return { kind: "removeMarks", ids: op.ids };
+        case "removeRun": {
+          const r = await undoRemoveRun.mutateAsync({ id: op.id });
+          return r.undo
+            ? { kind: "restoreRun", packet: r.undo, id: op.id }
+            : null;
+        }
+        case "restoreRun":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "removeRun", id: op.id };
+        case "setPoints": {
+          const r = await undoSetPoints.mutateAsync({
+            id: op.runId,
+            points: op.points,
+          });
+          return r.undo
+            ? {
+                kind: "restorePoints",
+                packet: r.undo,
+                runId: op.runId,
+                points: op.points,
+              }
+            : null;
+        }
+        case "restorePoints":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "setPoints", runId: op.runId, points: op.points };
+        case "setEnds": {
+          const r = await undoSetEnds.mutateAsync({
+            id: op.runId,
+            ...op.patch,
+          });
+          return r.undo
+            ? {
+                kind: "restoreEnds",
+                packet: r.undo,
+                runId: op.runId,
+                patch: op.patch,
+              }
+            : null;
+        }
+        case "restoreEnds":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "setEnds", runId: op.runId, patch: op.patch };
+        case "restoreGroup":
+          await undoRestoreGroup.mutateAsync({ undo: op.packet });
+          return { kind: "removeGroup", id: op.id };
+        case "removeGroup": {
+          const r = await undoRemoveGroup.mutateAsync({ id: op.id });
+          return r.undo
+            ? { kind: "restoreGroup", packet: r.undo, id: op.id }
+            : null;
+        }
+        case "moveMarks": {
+          // Each count's marks go back where the server says they were.
+          const reverse: { groupId: number; ids: number[] }[] = [];
+          for (const move of op.moves) {
+            const r = await undoMoveMarks.mutateAsync(move);
+            reverse.push(...r.previous);
+          }
+          return reverse.length > 0
+            ? { kind: "moveMarks", moves: reverse }
+            : null;
+        }
+        case "restoreSheet":
+        case "clearSheet":
+          // Wired with the tool that makes them (clear sheet), further down.
+          return runUndoOpLater.current(op);
+        default: {
+          const unhandled: never = op;
+          return unhandled;
+        }
+      }
+    },
+    [
+      undoRemoveMarks,
+      undoRestoreMarks,
+      undoRemoveRun,
+      undoRestoreRun,
+      undoSetPoints,
+      undoSetEnds,
+      undoRestoreGroup,
+      undoRemoveGroup,
+      undoMoveMarks,
+    ]
+  );
+
+  const stepBack = useCallback(
+    async (direction: "undo" | "redo") => {
+      if (undoBusy) return;
+      const state = undoRef.current;
+      const entry = direction === "undo" ? nextUndo(state) : nextRedo(state);
+      const op = direction === "undo" ? entry?.undo : entry?.redo;
+      if (!entry || !op) return;
+      setUndoBusy(true);
+      try {
+        const reverse = await runUndoOp(op);
+        setUndoState(s =>
+          reverse === null
+            ? dropStep(s, entry)
+            : direction === "undo"
+              ? settleUndo(s, entry, reverse)
+              : settleRedo(s, entry, reverse)
+        );
+        toast.success(
+          `${direction === "undo" ? "Undone" : "Redone"}: ${entry.label}.`
+        );
+      } catch (error) {
+        setUndoState(s => dropStep(s, entry));
+        toast.error(
+          `Could not ${direction} "${entry.label}". ${(error as Error).message}`
+        );
+      } finally {
+        setUndoBusy(false);
+        refreshFor("undo", entry.sheetId);
+      }
+    },
+    [undoBusy, runUndoOp, refreshFor]
+  );
+
+  /**
+   * A delete's toast, with an Undo BUTTON (plan § 1.1) rather than the words
+   * "Ctrl+Z puts it back". It takes back its OWN step and only while that is
+   * still the newest (@/lib/undoStack `isNewestStep`): pressed after more
+   * work, a plain "undo the newest" would take back the wrong thing.
+   */
+  const deletedToast = useCallback(
+    (message: string, entry: UndoEntry | null) => {
+      toast.success(
+        message,
+        entry
+          ? {
+              action: {
+                label: "Undo",
+                onClick: () => {
+                  if (!isNewestStep(undoRef.current, entry)) {
+                    toast.error(
+                      "Something newer is on the undo list, so this cannot be taken back from here. Use Undo in the toolbar."
+                    );
+                    return;
+                  }
+                  void stepBack("undo");
+                },
+              },
+            }
+          : undefined
+      );
+    },
+    [stepBack]
+  );
+
+  /*
+    ── CLEAR THIS SHEET (overrides takeoff-spec.md D6, owner 2026-09-29) ──────
+    In the sheet's "…" menu, never a toolbar button. The question counts what
+    goes from the server's rows (@/lib/sheetClearQuestion), fetched fresh each
+    time it opens, and the whole clear is one undo step.
+  */
+  const [confirmClear, setConfirmClear] = useState(false);
+  const clearPreview = trpc.takeoffSheet.clearPreview.useQuery(
+    { sheetId: activeSheet?.id ?? 0 },
+    { enabled: confirmClear && Boolean(activeSheet), staleTime: 0, gcTime: 0 }
+  );
+  const clearSheet = trpc.takeoffSheet.clear.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (r, vars) => {
+      const name = activeSheet?.name ?? "this sheet";
+      const entry = r.undo
+        ? pushUndo({
+            label: `${name} cleared`,
+            sheetId: vars.sheetId,
+            undo: { kind: "restoreSheet", packet: r.undo },
+            redo: null,
+          })
+        : null;
+      deletedToast(
+        `Cleared ${name}: ${countLabel(r.removedRuns, "run", "runs", "and")} ${countLabel(r.removedMarks, "mark", "marks", "removed")}.`,
+        entry
+      );
+    },
+    onSettled: (_r, _e, vars) => refreshFor("sheetCleared", vars.sheetId),
+  });
+  const undoClearSheet = trpc.takeoffSheet.clear.useMutation();
+  const undoRestoreSheet = trpc.takeoffSheet.restore.useMutation();
+  runUndoOpLater.current = async (op: UndoOp): Promise<UndoOp | null> => {
+    if (op.kind === "restoreSheet") {
+      const r = await undoRestoreSheet.mutateAsync({ undo: op.packet });
+      return { kind: "clearSheet", sheetId: r.sheetId };
+    }
+    if (op.kind === "clearSheet") {
+      const r = await undoClearSheet.mutateAsync({ sheetId: op.sheetId });
+      return r.undo ? { kind: "restoreSheet", packet: r.undo } : null;
+    }
+    return null;
+  };
 
   const createTicket = trpc.bidPdfs.createUploadTicket.useMutation();
   const confirmAttach = trpc.bidPdfs.confirmAttach.useMutation();
@@ -2507,6 +3780,7 @@ export default function TakeoffPage({
   const beginSheetRead = useCallback(
     (bidPdfId: number, source: SheetReadSource) => {
       sheetReadJobs.current.get(bidPdfId)?.cancel();
+      const readStarted = performance.now();
       const job = startSheetRead({
         source,
         send: async pages => {
@@ -2519,8 +3793,12 @@ export default function TakeoffPage({
         },
         onProgress: progress => {
           setSheetReads(prev => ({ ...prev, [bidPdfId]: progress }));
-          if (progress.state !== "reading")
+          if (progress.state !== "reading") {
             sheetReadJobs.current.delete(bidPdfId);
+            console.info(
+              `[upload] sheet names read (${progress.state}): ${Math.round(performance.now() - readStarted)} ms after attach`
+            );
+          }
         },
         onBatchSaved: () => {
           void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
@@ -2625,6 +3903,9 @@ export default function TakeoffPage({
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) }
   );
+  /** The root of the run a row belongs to — what a run card is keyed by. */
+  const rootOfRun = (id: number) =>
+    runs.find(r => r.id === id)?.parentRunId ?? id;
   const { data: totals } = trpc.takeoffRuns.totals.useQuery({ bidId });
   /*
     Which colour each run type gets on THIS bid (T14): first used, first
@@ -2900,15 +4181,48 @@ export default function TakeoffPage({
           !row.sendability.sendable &&
           row.sendability.reason === "already-on-bid",
         sendable: row.sendability.sendable,
+        // Made by name, with nothing from the library behind it (§ 8a).
+        byNameOnly: row.kind === "plain" || row.kind === "typed",
       });
     }
     return map;
   }, [bidCounts.data]);
 
+  /*
+    LINK AN ASSEMBLY TO A COUNT made without one (legend plan § 8a). Every
+    mark is kept and changes what it counts, on every sheet — so the other
+    sheets' cached marks go too, as for a count deleted.
+  */
+  const setGroupSource = trpc.takeoffGroups.setSource.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (_result, vars) => {
+      const label =
+        bidCounts.data?.groups.find(g => g.id === vars.id)?.label ?? "count";
+      const assembly = allAssemblies.find(a => a.id === vars.assemblyId);
+      toast.success(
+        assembly
+          ? `"${label}" now counts ${assembly.name}. Every mark kept.`
+          : `"${label}" is a count by name again.`
+      );
+      // The armed tool follows, so the next click is the same thing.
+      setArmedGroup(armed =>
+        armed && armed.groupId === vars.id
+          ? { ...armed, assemblyId: vars.assemblyId }
+          : armed
+      );
+    },
+    onSettled: () => {
+      refreshFor("countSource");
+      void utils.takeoffStamps.listForSheet.invalidate();
+    },
+  });
+
   const sendToBid = trpc.takeoffGroups.sendToBid.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: result => {
-      void bidCounts.refetch();
+      // The bid's lines, the materials list and the summary move too — the
+      // count list alone left them stale until 2026-09-29.
+      refreshFor("sentToBid");
       /*
         The warning is shown as its own message rather than folded into the
         success line, and it does not block.
@@ -2920,10 +4234,12 @@ export default function TakeoffPage({
         the hand-added line turns up afterwards.
       */
       toast.success(
-        (quantitiesLocked
-          ? `${result.count} on the bid, frozen at that number — this bid's ` +
-            `quantities are locked, so further marks will not change it.`
-          : `${result.count} on the bid. The line follows your marks from here.`) +
+        /*
+          No locked wording: since 2026-09-29 a locked bid refuses the send
+          itself (server/lockGuard.ts), so a success is always on a bid whose
+          line follows the marks.
+        */
+        `${result.count} on the bid. The line follows your marks from here.` +
           // A free count arrives blank. Saying where the price goes, now,
           // beats the estimator finding a $0 line later.
           (result.unpriced
@@ -2934,20 +4250,184 @@ export default function TakeoffPage({
     },
   });
 
+  /*
+    DELETING A WHOLE COUNT — every mark, every sheet (plan § 1.2 c′). The
+    procedure existed with no control; it now sits behind a confirm naming
+    what goes, refuses a locked bid (server and here), and is one undo step.
+  */
+  const [countDeleteAsk, setCountDeleteAsk] = useState<{
+    id: number;
+    q: DeleteQuestion;
+  } | null>(null);
+  const removeGroup = trpc.takeoffGroups.remove.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (r, vars) => {
+      const label =
+        bidCounts.data?.groups.find(g => g.id === vars.id)?.label ?? "count";
+      const entry =
+        r.undo && activeSheet
+          ? pushUndo({
+              label: `count "${label}" deleted`,
+              sheetId: activeSheet.id,
+              undo: { kind: "restoreGroup", packet: r.undo, id: vars.id },
+              redo: null,
+            })
+          : null;
+      deletedToast(
+        `Deleted count "${label}" and its ${countLabel(r.removed, "mark", "marks", "")}`.trim() +
+          ".",
+        entry
+      );
+    },
+    // Every sheet's marks moved, not only this one's.
+    onSettled: () => {
+      refreshFor("markRemoved");
+      void utils.takeoffStamps.listForSheet.invalidate();
+    },
+  });
+  const askDeleteCount = useCallback(
+    (groupId: number) => {
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("its counts cannot be deleted"));
+        return;
+      }
+      const row = bidCounts.data?.groups.find(g => g.id === groupId);
+      if (!row) return;
+      // On the bid: say so now; the server refuses the same way.
+      if (bridgeByGroup.get(groupId)?.onBid) {
+        toast.error(
+          `"${row.label}" is on the bid as a line. Remove that line from the bid first, then this count can go.`
+        );
+        return;
+      }
+      setCountDeleteAsk({
+        id: groupId,
+        q: countDeleteQuestion({ label: row.label, marks: row.count }),
+      });
+    },
+    [quantitiesLocked, bidCounts.data, bridgeByGroup]
+  );
+
+  /*
+    THE WHOLE PLAN SET, ON THE BID OR NOT (plan § 2), and Send all (§ 3).
+    Refreshed through @/lib/takeoffRefresh — it is in BID_QUANTITY_QUERIES,
+    so every change kind on this screen moves it.
+  */
+  const bidSummary = trpc.takeoffSummary.forBid.useQuery(
+    { bidId },
+    { enabled: Number.isFinite(bidId) }
+  );
+  const sendAll = trpc.takeoffSummary.sendAll.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: result => {
+      const sent = result.sent.length;
+      if (result.notSent.length === 0) {
+        toast.success(
+          `Sent ${sent} to the bid. The lines follow your plans from here.`
+        );
+      } else {
+        // A partial send is a warning, never a green tick (audit #15).
+        toast.warning(
+          `Sent ${sent}. ${result.notSent.length} did not go: ` +
+            result.notSent.map(n => `${n.name} — ${n.why}`).join("; ")
+        );
+      }
+    },
+    onSettled: () => refreshFor("sentToBid"),
+  });
+
   /** Pick the tool up. One function, so both doors leave the same state. */
   const armGroup = useCallback(
-    (group: { id: number; label: string }, assemblyId: number | null) => {
+    (
+      group: { id: number; label: string },
+      assemblyId: number | null,
+      symbolId: number | null = null
+    ) => {
+      /*
+        A locked bid takes no new marks (the server refuses them too). Said
+        HERE, on picking the tool up, rather than on the first click: a click
+        is drawn at once and sent later, so a refusal arriving then would
+        leave marks on the screen that were never counted.
+      */
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("new marks cannot be placed"));
+        return;
+      }
+      // One tool at a time: a box drag or a calibration click must not also
+      // land as a mark.
       setSelectingText(false);
-      setArmedGroup({
+      setCapturingSymbol(false);
+      setCalibrating(false);
+      setArmedGroupHeld({
         groupId: group.id,
         label: group.label,
         assemblyId,
+        symbolId,
+        // The sheet on screen now. Picked up on the way to another sheet
+        // (the request was slow), it is down on arrival — which is right.
+        sheetKey: sheetKeyNow.current,
       });
+      // A provisional count (@/lib/provisionalCount) is remembered for
+      // "Count again" only once the server has made it — `armWhileCreating`
+      // comes back here with the real one.
+      if (isProvisionalGroup(group.id)) return;
+      // What "Count again" offers back once this is put down (@/lib/countAgain).
+      const last = { groupId: group.id, label: group.label };
+      setLastCount(last);
+      saveLastCount(bidId, last);
       toast.success(`Counting ${group.label} — click to place.`);
     },
-    []
+    [quantitiesLocked, bidId]
   );
+
+  /** A mark delete as an undo step: the packet puts them back, same ids. */
+  const pushMarksDeleted = (
+    undo: Packet | null,
+    ids: number[],
+    removed: number
+  ): UndoEntry | null => {
+    if (!undo || !activeSheet || removed === 0) return null;
+    // A card's own undo arrow can offer this when every mark was one count.
+    const groups = new Set(
+      stamps.filter(s => ids.includes(s.id)).map(s => s.groupId)
+    );
+    const [only] = Array.from(groups);
+    /*
+      The card as it stands now, before the delete lands. If these were its
+      last marks on the sheet the card is about to vanish, and with it the
+      undo arrow; remembering it lets the panel keep it in place, empty, with
+      the arrow still there (@/lib/emptiedCountCard).
+    */
+    const position = stampGroups.findIndex(g => g.groupId === only);
+    const card = position >= 0 ? stampGroups[position] : null;
+    return pushUndo({
+      label: countLabel(removed, "mark", "marks", "deleted"),
+      sheetId: activeSheet.id,
+      undo: { kind: "restoreMarks", packet: undo, ids },
+      redo: null,
+      subject:
+        groups.size === 1 && only != null
+          ? {
+              kind: "count",
+              id: only,
+              ...(card
+                ? {
+                    card: {
+                      label: card.name,
+                      assemblyId: card.assemblyId,
+                      assemblyCategory:
+                        card.stamps[0]?.assemblyCategory ?? null,
+                      position,
+                    },
+                  }
+                : {}),
+            }
+          : undefined,
+    });
+  };
   const removeStamp = trpc.takeoffStamps.remove.useMutation({
+    onSuccess: (r, vars) =>
+      deletedToast("Deleted 1 mark.", pushMarksDeleted(r.undo, [vars.id], 1)),
     onError: e => toast.error(e.message),
     // Not `refreshStamps`: a run that ended on this mark loses that end
     // (ON DELETE SET NULL), so its drops, connectors and Send preview move.
@@ -2964,63 +4444,294 @@ export default function TakeoffPage({
     what was asked for.
   */
   const removeStamps = trpc.takeoffStamps.removeMany.useMutation({
-    onSuccess: r =>
-      toast.success(
-        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}.`
-      ),
+    onSuccess: (r, vars) => {
+      // The toast carries an Undo BUTTON for this step (plan § 1.1).
+      deletedToast(
+        `Deleted ${r.removed} ${r.removed === 1 ? "mark" : "marks"}.`,
+        pushMarksDeleted(r.undo, vars.ids, r.removed)
+      );
+    },
     onError: e => toast.error(e.message),
     onSettled: () => {
       setSelectedStampIds(new Set());
       refreshFor("markRemoved");
     },
   });
+  /*
+    MOVING A SELECTION TO ANOTHER COUNT (2026-10-01). Same ids, same places;
+    only what they count changes. For separating devices drawn as existing to
+    remain from new ones without clicking every one again. One request, whole
+    or nothing, one undo step that puts each mark back under its own count.
+  */
+  const moveStamps = trpc.takeoffStamps.moveToGroup.useMutation({
+    onSuccess: r => {
+      if (r.moved > 0 && activeSheet && r.previous.length > 0)
+        pushUndo({
+          label: countLabel(r.moved, "mark", "marks", "moved"),
+          sheetId: activeSheet.id,
+          undo: { kind: "moveMarks", moves: r.previous },
+          redo: null,
+        });
+      toast.success(
+        `Moved ${r.moved} ${r.moved === 1 ? "mark" : "marks"} to ${r.label}.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      setSelectedStampIds(new Set());
+      refreshFor("marksMoved");
+    },
+  });
+  /*
+    MARKING WHAT A MARK IS — new, existing to remain, remove, relocate (pin
+    plan § 7). Only a new mark is priced (shared/markStatus.ts), so this moves
+    the count, its bid line and its drops: `markStatus` refreshes all of them.
+    The toast says what happened to the price, because that is the point.
+  */
+  const setMarkStatus = trpc.takeoffStamps.setStatus.useMutation({
+    onSuccess: (r, input) => {
+      const n = r.updated;
+      const what = n === 1 ? "mark" : "marks";
+      toast.success(
+        input.status === null || input.status === "new"
+          ? `${n} ${what} marked new — counted and priced.`
+          : `${n} ${what} marked ${MARK_STATUS_LABEL[input.status].toLowerCase()} — not priced as new.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      setSelectedStampIds(new Set());
+      refreshFor("markStatus");
+    },
+  });
+  /*
+    A MARK'S OWN DROP — its height, or left off (vertical-drops-plan § 2).
+    Both move a drop, so both refresh through `markDrop`, which reaches the
+    count row, a run end linked to the mark, and the bid's totals.
+  */
+  const setMarkHeight = trpc.takeoffStamps.setHeight.useMutation({
+    onSuccess: (r, input) => {
+      const what = r.updated === 1 ? "mark" : "marks";
+      toast.success(
+        input.inches === null
+          ? `${r.updated} ${what} back to the count's height.`
+          : input.source === "read"
+            ? `Height from the plan used on ${r.updated} ${what}.`
+            : `${r.updated} ${what} at ${r.updated === 1 ? "its" : "their"} own height — drops re-counted.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("markDrop"),
+  });
+  const setMarkDropExcluded = trpc.takeoffStamps.setDropExcluded.useMutation({
+    onSuccess: (r, input) => {
+      const what = r.updated === 1 ? "mark" : "marks";
+      toast.success(
+        input.excluded
+          ? `No drop on ${r.updated} ${what} — still counted as devices.`
+          : `${r.updated} ${what} given their drop again.`
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("markDrop"),
+  });
+  /*
+    A count's PIN LOOK (pin plan § 6). "Every job" lands on the legend symbol
+    or the assembly, which are not per bid, so those two lists are dropped as
+    well as the count list — or the swatch would keep the old look until a
+    reload, the staleness CLAUDE.md warns about.
+  */
+  const setLook = trpc.takeoffGroups.setLook.useMutation({
+    onSuccess: r =>
+      toast.success(
+        r.savedOn === "count"
+          ? "Look saved on this job."
+          : `Look saved on ${r.savedOn === "symbol" ? "the legend symbol" : "the assembly"} “${r.name}” — every job.`
+      ),
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      refreshFor("pinLook");
+      void utils.takeoffStamps.symbols.invalidate();
+      void utils.assemblies.list.invalidate();
+    },
+  });
+  /** Where "every job" would keep a count's look — the same rule as setLook. */
+  const everyJobTarget = useCallback(
+    (row: { label: string; assemblyId: number | null }) => {
+      const key = symbolLookupKey(row.label);
+      const symbol = symbols.find(
+        s => s.lookupKey === key || symbolLookupKey(s.label) === key
+      );
+      if (symbol) return { name: `legend symbol “${symbol.label}”` };
+      const assembly =
+        row.assemblyId === null
+          ? undefined
+          : allAssemblies.find(a => a.id === row.assemblyId);
+      if (assembly) return { name: `assembly “${assembly.name}”` };
+      return {
+        none: "Typed by name, so the look stays on this job. Capture its legend symbol to use it on every job.",
+      };
+    },
+    [symbols, allAssemblies]
+  );
   const selectedStamps = useMemo(
     () => stamps.filter(s => selectedStampIds.has(s.id)),
     [stamps, selectedStampIds]
+  );
+  /** Every count on the bid, for "Move to" — by name, so a long list reads. */
+  const moveTargets = useMemo(
+    () =>
+      (bidCounts.data?.groups ?? [])
+        .map(g => ({ id: g.id, label: g.label }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [bidCounts.data?.groups]
   );
   // A mark deleted elsewhere, or a different sheet, leaves the selection.
   useEffect(() => {
     setSelectedStampIds(current => pruneSelection(current, stamps));
   }, [stamps]);
-  const deleteSelected = useCallback(
-    (confirmed: boolean) => {
-      if (selectedStamps.length === 0 || removeStamps.isPending) return;
-      if (!confirmed && deleteNeedsConfirm(selectedStamps.length)) {
-        /*
-          The question is FROZEN when it is asked. Derived live, it re-read
-          the selection as the dialog closed and said "Delete 0 marks?" for
-          the length of the fade (seen 2026-09-29) — the wrong number, on the
-          one dialog whose job is the number.
-        */
-        setDeleteAsked(
-          deleteQuestion(selectedStamps.map(s => ({ groupName: s.name })))
-        );
+  /**
+   * Delete these marks — a selection, or a count card's marks on this sheet.
+   * More than one asks first. The question AND the ids are FROZEN when it is
+   * asked: derived live, it re-read the selection as the dialog closed and
+   * said "Delete 0 marks?" for the length of the fade (seen 2026-09-29) — the
+   * wrong number, on the one dialog whose job is the number — and the confirm
+   * must delete exactly what the question named.
+   */
+  const [deleteTargets, setDeleteTargets] = useState<number[]>([]);
+  const deleteMarks = useCallback(
+    (marks: readonly { id: number; name: string }[]) => {
+      if (marks.length === 0 || removeStamps.isPending) return;
+      const named = marks.map(s => ({ groupName: s.name }));
+      if (deleteNeedsConfirm(named)) {
+        setDeleteAsked(deleteQuestion(named));
+        setDeleteTargets(marks.map(s => s.id));
         setConfirmingDelete(true);
         return;
       }
-      setConfirmingDelete(false);
-      removeStamps.mutate({ ids: selectedStamps.map(s => s.id) });
+      removeStamps.mutate({ ids: marks.map(s => s.id) });
     },
-    [selectedStamps, removeStamps]
+    [removeStamps]
   );
+  const deleteSelected = useCallback(
+    (confirmed: boolean) => {
+      if (!confirmed) {
+        deleteMarks(selectedStamps);
+        return;
+      }
+      setConfirmingDelete(false);
+      if (deleteTargets.length > 0 && !removeStamps.isPending)
+        removeStamps.mutate({ ids: deleteTargets });
+    },
+    [selectedStamps, deleteMarks, deleteTargets, removeStamps]
+  );
+  /** Look-alikes, asked before a capture saves (multiple-looks-plan.md § 4). */
+  const checkLookAlikes = trpc.takeoffStamps.checkLookAlikes.useMutation({
+    onError: e => toast.error(e.message),
+  });
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
-    onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
+    onSettled: () => {
+      // A capture can add a look, so the legend row's open look list and
+      // Find all matching's looks move with it.
+      void utils.takeoffStamps.symbols.invalidate();
+      void utils.takeoffStamps.looksFor.invalidate();
+      void utils.takeoffStamps.searchLooks.invalidate();
+      void utils.takeoffStamps.looksOnSet.invalidate();
+    },
   });
+  /**
+   * The same procedure for "Capture whole legend", without the per-call
+   * refresh and error toast: Save all refreshes the legend once at the end and
+   * names every row that failed in one message, rather than 47 refetches and
+   * a toast per row.
+   */
+  const captureLegendSymbol = trpc.takeoffStamps.captureSymbol.useMutation();
+  /*
+    Link and unlink write into the legend's copy AT ONCE. The Legend picks
+    "count this assembly" or "count by name" from that copy, so until the
+    refetch landed a click straight after Link counted the symbol by name
+    and it went to the bid as a free count (staging smoke, 2026-10-05,
+    flow 6). The server also turns such a click into the assembly's count
+    (`takeoffGroups.create`, server/legendLinkCount.test.ts); this half
+    keeps the screen from saying "Count by name" for a linked symbol.
+  */
+  const setSymbolAssembly = async (id: number, assemblyId: number | null) => {
+    await utils.takeoffStamps.symbols.cancel();
+    const before = utils.takeoffStamps.symbols.getData();
+    utils.takeoffStamps.symbols.setData(undefined, rows =>
+      rows?.map(row =>
+        row.id === id
+          ? { ...row, assemblyId, isLinked: assemblyId !== null }
+          : row
+      )
+    );
+    return { before };
+  };
   const linkSymbol = trpc.takeoffStamps.linkSymbol.useMutation({
-    onError: e => toast.error(e.message),
+    onMutate: vars => setSymbolAssembly(vars.id, vars.assemblyId),
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffStamps.symbols.setData(undefined, context.before);
+      toast.error(e.message);
+    },
     onSuccess: r =>
       toast.success(`Linked to ${r.assemblyName} — one click from now on.`),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
   const unlinkSymbol = trpc.takeoffStamps.unlinkSymbol.useMutation({
-    onError: e => toast.error(e.message),
+    onMutate: vars => setSymbolAssembly(vars.id, null),
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffStamps.symbols.setData(undefined, context.before);
+      toast.error(e.message);
+    },
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
+  });
+  /*
+    Rename and reset share one ending: the symbol's plain count on this bid
+    took the name too, so everything showing that count's name moves
+    (`countRenamed`), and a tool already armed on it says the new name.
+  */
+  const afterSymbolRename = (r: {
+    label: string;
+    renamedCountId: number | null;
+  }) => {
+    setArmedGroup(armed =>
+      armed && armed.groupId === r.renamedCountId
+        ? { ...armed, label: r.label }
+        : armed
+    );
+  };
+  const settleSymbolRename = () => {
+    void utils.takeoffStamps.symbols.invalidate();
+    refreshFor("countRenamed");
+  };
+  const renameSymbol = trpc.takeoffStamps.renameSymbol.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: afterSymbolRename,
+    onSettled: settleSymbolRename,
+  });
+  const resetSymbolName = trpc.takeoffStamps.resetSymbolName.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: r => {
+      afterSymbolRename(r);
+      toast.success(`Back to “${r.label}”.`);
+    },
+    onSettled: settleSymbolRename,
   });
   const removeSymbol = trpc.takeoffStamps.removeSymbol.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => toast.success("Legend symbol deleted."),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
+  /*
+    A legend symbol is asked about (plan § 1.2 l): deleting it also deletes
+    every correction the reader learned from it (planCopilotCorrections,
+    ON DELETE CASCADE), and there is no undo for that. Marks placed from it
+    do not reference it and stay.
+  */
+  const [symbolDeleteId, setSymbolDeleteId] = useState<number | null>(null);
 
   // ── Plan reader (AI co-pilot) ─────────────────────────────────────────────
   /**
@@ -3042,7 +4753,10 @@ export default function TakeoffPage({
    * wrong place.
    */
   const pageCanvasScale = useRef(RENDER_SCALE);
-  const pageTextByPage = useRef<Map<number, string>>(new Map());
+  // Keyed by (plan set, page), never page alone: page 1 of two sets must not
+  // share words — the reader would get another drawing's text and printed
+  // scale (@/lib/pageText).
+  const pageTextByPage = useRef<Map<string, string>>(new Map());
   const [renderedPage, setRenderedPage] = useState<number | null>(null);
   const [renderedPageSize, setRenderedPageSize] = useState<{
     docId: number | null;
@@ -3101,6 +4815,115 @@ export default function TakeoffPage({
 
   /** False while the server has AI switched off (server/aiFeatures.ts). */
   const readerAvailable = useCompany().hasFeature("takeoff.copilot");
+
+  /*
+    THE RIGHT PANEL'S TABS (references/track-b-phone-and-readability-plan.md
+    § 1, owner 2026-09-30). Remembered per person in this browser; rules in
+    @/lib/panelTabs, which the suite can reach.
+  */
+  /*
+    PHONE OR LAPTOP (plan § 3, @/lib/plansLayout). On the phone the right
+    panel is one full-screen panel with the same tabs plus Sheets, opened from
+    the bar under the drawing and closed by "← Plan".
+  */
+  // Picking up a tool puts Select down: it only means anything with no tool
+  // armed, and left on it would quietly turn the next drag into a box.
+  useEffect(() => {
+    if (armedGroup || tracing) setTouchSelect(false);
+  }, [armedGroup, tracing]);
+
+  const layout = usePlansLayout();
+  const phone = layout === "phone";
+  /*
+    TABLET (references/device-audit.md, 2026-10-01): the panel stays BESIDE
+    the drawing, as on a laptop, but the sheet list becomes the panel's
+    Sheets tab as on a phone — two docked panels on an upright iPad left the
+    drawing a strip 116 px wide (measured). `compact` is "not a laptop".
+  */
+  const tablet = layout === "tablet";
+  const compact = layout !== "laptop";
+  const [windowWidth, setWindowWidth] = useState(() =>
+    typeof window === "undefined" ? 1536 : window.innerWidth
+  );
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  /**
+   * The panel on a tablet: the width the person chose, but never more than
+   * 38% of the screen, so an upright tablet keeps most of it for the drawing
+   * (820 px upright → 312 px panel; sideways the chosen 400 px still fits).
+   */
+  const workWidth = tablet
+    ? Math.max(
+        PANEL_LIMITS.work.min,
+        Math.min(panels.workWidth, Math.round(windowWidth * 0.38))
+      )
+    : panels.workWidth;
+  const [phonePanelOpen, setPhonePanelOpen] = useState(false);
+  /** Where the sheet list is portalled on the phone's Sheets tab. */
+  const [sheetsSlot, setSheetsSlot] = useState<HTMLElement | null>(null);
+  const panelTabs = useMemo(
+    () => visibleTabs(readerAvailable, layout),
+    [readerAvailable, layout]
+  );
+  const [panelTab, setPanelTab] = useState<PanelTab>(() =>
+    readStoredTab(readerAvailable, layout)
+  );
+  // The feature list can land after the first render; a remembered Reader
+  // tab then opens, and losing the reader closes it. The same for the
+  // layout: turning a tablet sideways takes Sheets away.
+  useEffect(() => {
+    setPanelTab(current =>
+      !panelTabs.includes(current)
+        ? "counts"
+        : current === "counts"
+          ? readStoredTab(readerAvailable, layout)
+          : current
+    );
+  }, [readerAvailable, layout, panelTabs]);
+  /*
+    On the phone, picking a sheet on the Sheets tab means "show me it": the
+    panel closes onto the drawing. Only from that tab — a sheet that changes
+    while Counts or Totals is open (a jump from a row) leaves the panel be.
+  */
+  // `sheetKey` is the one the tools in hand are keyed on (@/lib/toolOnSheet).
+  const lastSheetKey = useRef(sheetKey);
+  useEffect(() => {
+    if (lastSheetKey.current === sheetKey) return;
+    lastSheetKey.current = sheetKey;
+    if (phone && panelTab === "sheets") setPhonePanelOpen(false);
+  }, [sheetKey, phone, panelTab]);
+  const choosePanelTab = useCallback((tab: PanelTab) => {
+    setPanelTab(tab);
+    writeStoredTab(tab);
+  }, []);
+  /*
+    SELECTING ON THE DRAWING OPENS ITS TAB (§ 1 rule 4, approved). Keyed on
+    the selection itself, so every way of selecting — a click on the line,
+    a jump from the drops readout, a drop picked on the sheet — lands on the
+    editor for it. Arming a tool is not a selection and switches nothing.
+    Not remembered: the remembered tab is the one the person chose.
+  */
+  useEffect(() => {
+    if (selectedRunId !== null) setPanelTab(tabForSelection("run"));
+  }, [selectedRunId]);
+  useEffect(() => {
+    if (selectedStampIds.size > 0) setPanelTab(tabForSelection("mark"));
+  }, [selectedStampIds]);
+  /** A tab with a warning in it shows a mark (§ 1 rule 5, approved). */
+  const warnedTabs = useMemo(
+    () =>
+      tabWarnings({
+        notOnBid: bidSummary.data?.notOnBid.length ?? 0,
+        totalsLeftOut:
+          (totals?.unmeasurableCount ?? 0) +
+          (totals?.leftOut?.noType.count ?? 0),
+        countsThatCannotSend: bidCounts.data?.countedWithNoPrice ?? 0,
+      }),
+    [bidSummary.data, totals, bidCounts.data]
+  );
 
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
@@ -3171,13 +4994,21 @@ export default function TakeoffPage({
         bidId,
         sheetId: activeSheet.id,
         pageImage: snapshot.image,
-        pageText: pageTextByPage.current.get(page) ?? "",
+        pageText: pageTextFor(pageTextByPage.current, doc?.id, page),
         pageWidthPoints: snapshot.pageWidthPoints,
         pageHeightPoints: snapshot.pageHeightPoints,
         force,
       });
     },
-    [activeSheet?.id, canRead, bidId, page, readSheet, copilot?.readerModel]
+    [
+      activeSheet?.id,
+      canRead,
+      bidId,
+      doc?.id,
+      page,
+      readSheet,
+      copilot?.readerModel,
+    ]
   );
 
   /** A question is about the sheet on screen, so the answer goes with it. */
@@ -3236,14 +5067,27 @@ export default function TakeoffPage({
    * the request, and those clicks exist nowhere else. `saveStampQueue` removes
    * the key when the list is empty, so this is also how the mirror is cleared.
    */
+  /**
+   * Sheets whose stored queue THIS TAB wrote. Their marks are in memory, so
+   * the crash recovery below must not read them back as left over — that
+   * sent every tap twice (staging smoke, 2026-10-06: 6 marks for 3) when
+   * taps held for a sheet row were mirrored on the same render the row
+   * arrived and recovery ran for it. True by construction rather than by
+   * effect order: what this tab mirrored, this tab still holds; after a
+   * reload the set is empty and recovery reads the storage as before.
+   */
+  const mirroredHere = useRef(new Set<number>());
   const mirrorQueue = useCallback(
     (sheetId: number) => {
+      mirroredHere.current.add(sheetId);
       saveStampQueue(
         sheetId,
         bidId,
         pendingStamps.current
-          .filter(m => m.sheetId === sheetId)
-          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y }))
+          // A provisional count's id means nothing after a reload; its marks
+          // are mirrored once the count exists (`armWhileCreating`).
+          .filter(m => m.sheetId === sheetId && !isProvisionalGroup(m.groupId))
+          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y, status: m.status }))
       );
     },
     [bidId]
@@ -3252,65 +5096,102 @@ export default function TakeoffPage({
   const flushTimer = useRef<number | null>(null);
 
   /**
-   * Send every click that has not been sent yet.
+   * Send every click that has not been sent yet — one batch per sheet and
+   * count, never two counts in one.
    *
    * Its own function rather than only a timer body, because two things must
    * not wait for the timer: the armed count changing and the sheet changing.
-   * A batch goes over under ONE group id and one sheet id, so a click made
-   * after the tool changed hands would otherwise be counted as the previous
-   * thing — correct-looking, and wrong.
+   *
+   * ── The batch is decided by `nextMarkBatch`, not by the first mark ────────
+   * A batch goes over under ONE group id and one sheet id. This used to send
+   * EVERY unsent mark under the first one's ids, which the flush-on-tool-change
+   * kept safe only while no send ever failed: a failed batch goes back to
+   * unsent, and the next flush then carried count A's leftovers and count B's
+   * new marks together, all as A (audit #4, fixed 2026-09-29). Now each
+   * (sheet, count) goes as its own request; see @/lib/markBatches.
+   *
+   * ── `mutateAsync`, not `mutate` with callbacks ────────────────────────────
+   * Several batches can now be in flight at once, and React Query runs a
+   * `mutate` call's own onSuccess only for the LATEST call — so an earlier
+   * batch would never clear its drawn copy. Each promise settles its own.
    */
   const flushStamps = useCallback(() => {
     if (flushTimer.current !== null) {
       window.clearTimeout(flushTimer.current);
       flushTimer.current = null;
     }
-    const batch = pendingStamps.current.filter(m => !m.sent);
-    if (batch.length === 0) return;
+    for (;;) {
+      const batch = nextMarkBatch(pendingStamps.current);
+      if (batch.length === 0) return;
 
-    const sheetId = batch[0].sheetId;
-    const keys = new Set(batch.map(m => m.key));
-    // Still drawn, no longer waiting to be sent.
-    setPending(
-      pendingStamps.current.map(m =>
-        keys.has(m.key) ? { ...m, sent: true } : m
-      )
-    );
+      const sheetId = batch[0].sheetId;
+      const groupId = batch[0].groupId;
+      // One status per batch — nextMarkBatch never mixes them.
+      const status = batch[0].status;
+      const keys = new Set(batch.map(m => m.key));
+      // Still drawn, no longer waiting to be sent — which is also what stops
+      // the next turn of this loop picking the same marks up again.
+      setPending(
+        pendingStamps.current.map(m =>
+          keys.has(m.key) ? { ...m, sent: true } : m
+        )
+      );
 
-    dropStamps.mutate(
-      {
-        bidId,
-        sheetId,
-        groupId: batch[0].groupId,
-        at: batch.map(m => ({ x: m.x, y: m.y })),
-      },
-      {
+      dropStamps
+        .mutateAsync({
+          bidId,
+          sheetId,
+          groupId,
+          at: batch.map(m => ({ x: m.x, y: m.y })),
+          status,
+        })
         /*
           The drawn copy goes only once the refetch has LANDED, which is what
           `invalidate` resolves on. Dropping it when the response arrives
           instead would blank the marks for the length of one refetch and paint
           them again — a flicker in exactly the place a count is being read.
         */
-        onSuccess: async () => {
+        .then(async result => {
+          // One batch, one undo step. No ids back means the server could not
+          // confirm which marks it wrote, and an undo guessing would be worse.
+          if (result.ids.length > 0)
+            pushUndo({
+              label: countLabel(result.ids.length, "mark", "marks", "placed"),
+              sheetId,
+              undo: { kind: "removeMarks", ids: result.ids },
+              redo: null,
+              subject: { kind: "count", id: groupId },
+            });
+          /*
+            CANCEL first, then refresh. React Query's invalidate does NOT
+            cancel a query that is still on its FIRST fetch (no data yet): it
+            waits for that request and keeps its answer. So when these marks
+            were sent while the sheet's list was first loading — exactly what
+            happens to taps held for a fresh upload's sheet row — the list
+            fetched BEFORE the write came back empty and stayed that way:
+            "0 marks" on screen, 3 on the server (local smoke, 2026-10-06).
+            Cancelling makes the refresh a new request, sent after the write.
+          */
+          await utils.takeoffStamps.listForSheet.cancel({ sheetId });
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
           mirrorQueue(sheetId);
-        },
+        })
         /*
-          Back in the queue, and still on the drawing. A failed request must not
-          take a count off the screen: it rides the next flush, and survives a
-          reload in the mirror either way.
+          Back in the queue, and still on the drawing. A failed request must
+          not take a count off the screen: it rides the next flush — as ITS
+          OWN batch, whatever is queued behind it — and survives a reload in
+          the mirror either way. The hook's onError has already said why.
         */
-        onError: () => {
+        .catch(() => {
           setPending(
             pendingStamps.current.map(m =>
               keys.has(m.key) ? { ...m, sent: false } : m
             )
           );
-        },
-      }
-    );
-  }, [bidId, dropStamps, mirrorQueue, setPending, utils]);
+        });
+    }
+  }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
   /**
    * Take a click: draw it now, send it shortly after.
    *
@@ -3328,24 +5209,37 @@ export default function TakeoffPage({
    */
   const queueStamp = useCallback(
     (at: { x: number; y: number }) => {
-      if (!activeSheet || !armedGroup) return;
-      const sheetId = activeSheet.id;
+      // Read from the STORED tool, not the derived one: the guard that a
+      // count picked up on another sheet places nothing is this call, here,
+      // where a test can reach it — not an effect that may not have run yet.
+      const mark = markForClick(
+        armedGroupHeld,
+        sheetKey,
+        // No row yet (a fresh upload): kept under a stand-in, never dropped.
+        activeSheet?.id ?? provisionalSheetFor(sheetKey),
+        at
+      );
+      if (!mark) return;
+      const { group, sheetId } = mark;
 
       setPending([
         ...pendingStamps.current,
         {
           key: nextPendingKey.current--,
           sheetId,
-          groupId: armedGroup.groupId,
-          name: armedGroup.label,
-          assemblyId: armedGroup.assemblyId,
+          groupId: group.groupId,
+          name: group.label,
+          assemblyId: group.assemblyId,
           assemblyCategory: armedCategory,
-          x: at.x,
-          y: at.y,
+          x: mark.x,
+          y: mark.y,
+          status: placingStatus,
           sent: false,
         },
       ]);
-      mirrorQueue(sheetId);
+      // A stand-in sheet id means nothing after a reload; these marks are
+      // mirrored once the row arrives (the effect below).
+      if (!isProvisionalSheet(sheetId)) mirrorQueue(sheetId);
 
       if (flushTimer.current === null) {
         flushTimer.current = window.setTimeout(flushStamps, FLUSH_AFTER_MS);
@@ -3353,12 +5247,105 @@ export default function TakeoffPage({
     },
     [
       activeSheet?.id,
-      armedGroup,
+      armedGroupHeld,
+      sheetKey,
       armedCategory,
+      placingStatus,
+      provisionalSheetFor,
       flushStamps,
       mirrorQueue,
       setPending,
     ]
+  );
+
+  /*
+    The row arrived: taps made before it move onto the real sheet, are
+    mirrored, and go (@/lib/provisionalCount, `adoptRealSheet`). Keyed on the
+    sheet in view, which is the only sheet a tap can have been made on.
+  */
+  useEffect(() => {
+    if (!activeSheet) return;
+    const provisional = provisionalSheets.current.get(sheetKey);
+    if (provisional === undefined) return;
+    provisionalSheets.current.delete(sheetKey);
+    setPending(
+      adoptRealSheet(pendingStamps.current, provisional, activeSheet.id)
+    );
+    mirrorQueue(activeSheet.id);
+    flushStamps();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSheet?.id, sheetKey]);
+
+  /**
+   * Pick up a count the server has not made yet, and keep every click.
+   *
+   * Arms AT ONCE under a provisional id, so a click in the round trip is a
+   * mark rather than a plain click (that gap lost 0 of 3 and 2 of 3 marks,
+   * silently — @/lib/provisionalCount). When the count exists its queued
+   * marks take the real id and go; when it is refused they come off the
+   * drawing and the person is told how many were not counted.
+   */
+  const nextProvisionalId = useRef(-1);
+  const armWhileCreating = useCallback(
+    (
+      label: string,
+      assemblyId: number | null,
+      symbolId: number | null,
+      create: () => Promise<{ id: number; label: string }>,
+      afterCreate?: () => void
+    ) => {
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("new marks cannot be placed"));
+        return;
+      }
+      const provisionalId = nextProvisionalId.current--;
+      armGroup({ id: provisionalId, label }, assemblyId, symbolId);
+      create()
+        .then(real => {
+          setPending(
+            adoptRealGroup(pendingStamps.current, provisionalId, real)
+          );
+          // Still the tool in hand: it becomes the real count, which also
+          // re-runs the flush (the effect on the armed id). Put down or
+          // swapped meanwhile: only the queued marks needed moving.
+          setArmedGroupHeld(held =>
+            held?.groupId === provisionalId
+              ? { ...held, groupId: real.id, label: real.label }
+              : held
+          );
+          // What armGroup would have remembered for "Count again".
+          const last = { groupId: real.id, label: real.label };
+          setLastCount(last);
+          saveLastCount(bidId, last);
+          for (const sheetId of Array.from(
+            new Set(pendingStamps.current.map(m => m.sheetId))
+          ))
+            mirrorQueue(sheetId);
+          flushStamps();
+          toast.success(`Counting ${real.label} — click to place.`);
+          afterCreate?.();
+        })
+        .catch((error: unknown) => {
+          const { kept, lost } = dropProvisional(
+            pendingStamps.current,
+            provisionalId
+          );
+          setPending(kept);
+          setArmedGroupHeld(held =>
+            held?.groupId === provisionalId ? null : held
+          );
+          // The mutation's onError has said why; this says what it cost.
+          if (lost > 0)
+            toast.error(
+              lostMarksMessage(
+                lost,
+                label,
+                error instanceof Error ? error.message : null
+              )
+            );
+        });
+    },
+    [bidId, quantitiesLocked, armGroup, flushStamps, mirrorQueue, setPending]
   );
 
   /**
@@ -3375,6 +5362,710 @@ export default function TakeoffPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [armedGroup?.groupId, activeSheet?.id]);
 
+  /*
+    FIND ALL MATCHING (2026-10-01). Box one symbol; every copy on the sheet
+    is offered as an UNCONFIRMED ring (@/lib/findMatchingSession). Nothing
+    is stored until a copy is confirmed, and confirming queues an ordinary
+    mark exactly as a click does — same batch, same undo, same crash mirror.
+    The count a confirmed copy goes to is fixed when the search starts, so
+    switching counts mid-review cannot send copies to the wrong one.
+  */
+  type FindSession = {
+    sheetId: number;
+    group: { groupId: number; label: string; assemblyId: number | null };
+    panel: MatchPanelState;
+    /**
+     * The armed item's saved looks, searched with the box
+     * (multiple-looks-plan.md § 3). Empty for a plain count, or while they
+     * load — a search then uses the box alone, as before looks.
+     */
+    looks: SavedLook[];
+  };
+  const [findSession, setFindSession] = useState<FindSession | null>(null);
+  const findItems =
+    findSession?.panel.phase === "results" ? findSession.panel.items : null;
+
+  /*
+    THE PHONE'S SHEET GETS OUT OF THE WAY of a tool that works ON the drawing
+    (device audit, 2026-10-01). Capture, Copy text, Find all matching, a count
+    picked up from the Legend tab and a trace all need the drawing under the
+    finger, and the bottom sheet covers the half they are most likely aimed
+    at. The tool is armed either way; this only puts the sheet down.
+  */
+  const findBoxing = findSession?.panel.phase === "boxing";
+  useEffect(() => {
+    if (!phone) return;
+    if (
+      capturingSymbol ||
+      capturingLegend ||
+      selectingText ||
+      findBoxing ||
+      tracing ||
+      armedGroup
+    )
+      setPhonePanelOpen(false);
+  }, [
+    phone,
+    capturingSymbol,
+    capturingLegend,
+    selectingText,
+    findBoxing,
+    tracing,
+    armedGroup,
+  ]);
+
+  // Another sheet is another search; a locked bid takes no marks at all.
+  useEffect(() => {
+    setFindSession(current =>
+      current && current.sheetId !== activeSheet?.id ? null : current
+    );
+  }, [activeSheet?.id]);
+  useEffect(() => {
+    if (quantitiesLocked) setFindSession(null);
+  }, [quantitiesLocked]);
+
+  /** Queue marks under a count that need not be the armed one. */
+  const queueMarksFor = useCallback(
+    (
+      group: { groupId: number; label: string; assemblyId: number | null },
+      at: readonly { x: number; y: number }[]
+    ) => {
+      if (!activeSheet || at.length === 0) return;
+      const sheetId = activeSheet.id;
+      const category =
+        group.assemblyId === null
+          ? null
+          : (allAssemblies.find(a => a.id === group.assemblyId)?.category ??
+            null);
+      setPending([
+        ...pendingStamps.current,
+        ...at.map(point => ({
+          key: nextPendingKey.current--,
+          sheetId,
+          groupId: group.groupId,
+          name: group.label,
+          assemblyId: group.assemblyId,
+          assemblyCategory: category,
+          x: point.x,
+          y: point.y,
+          status: placingStatus,
+          sent: false,
+        })),
+      ]);
+      mirrorQueue(sheetId);
+      // Sent now rather than on the timer: a confirmation is a decision,
+      // not a run of clicks still in progress.
+      flushStamps();
+    },
+    [
+      activeSheet?.id,
+      allAssemblies,
+      placingStatus,
+      flushStamps,
+      mirrorQueue,
+      setPending,
+    ]
+  );
+
+  /**
+   * The "- EXISTING TO REMAIN" twin of the count being searched for, if the
+   * library or the bid has one (shared/existingToRemain.ts). Null when the
+   * search is already FOR an existing count, or there is no twin to use.
+   */
+  const existingTwin = useMemo(() => {
+    if (!findSession) return null;
+    const { base, existing } = splitExistingToRemain(findSession.group.label);
+    if (existing) return null;
+    const key = symbolLookupKey(existingToRemainName(base));
+    const assembly = allAssemblies.find(a => symbolLookupKey(a.name) === key);
+    if (assembly)
+      return {
+        kind: "assembly" as const,
+        id: assembly.id,
+        label: assembly.name,
+      };
+    const count = (bidCounts.data?.groups ?? []).find(
+      g => symbolLookupKey(g.label) === key
+    );
+    return count
+      ? { kind: "count" as const, id: count.id, label: count.label }
+      : null;
+  }, [findSession, allAssemblies, bidCounts.data?.groups]);
+
+  const startFind = useCallback(() => {
+    if (!activeSheet || !armedGroup || quantitiesLocked) return;
+    setSelectingText(false);
+    const sheetId = activeSheet.id;
+    setFindSession({
+      sheetId,
+      group: armedGroup,
+      panel: { phase: "boxing" },
+      looks: [],
+    });
+    /*
+      The legend item this count is, for its saved looks: the one it was
+      picked up from, or the one its name is. A plain count with no item has
+      none, and the search is the box alone, as before looks.
+    */
+    const key = symbolLookupKey(armedGroup.label);
+    const symbolId =
+      armedGroup.symbolId ??
+      symbols.find(
+        s =>
+          symbolLookupKey(s.label) === key ||
+          (s.originalName !== null && symbolLookupKey(s.originalName) === key)
+      )?.id ??
+      null;
+    if (symbolId === null) return;
+    void utils.takeoffStamps.searchLooks
+      .fetch({ symbolId, sheetId })
+      .then(r =>
+        setFindSession(s =>
+          s && s.sheetId === sheetId ? { ...s, looks: r.looks } : s
+        )
+      )
+      .catch(() => {
+        /* no looks: the box alone, which is what the panel then offers */
+      });
+  }, [activeSheet?.id, armedGroup, quantitiesLocked, symbols, utils]);
+
+  const runFind = useCallback(
+    async (
+      /** The box drawn now, or null to search the saved looks alone. */
+      region: CaptureRegion | null,
+      find: (
+        box: MatchBox | null,
+        looks: readonly SavedLook[]
+      ) => Promise<{ result: FindResult; readMs: number; findMs: number }>
+    ) => {
+      const looks = findSession?.looks ?? [];
+      setFindSession(s => (s ? { ...s, panel: { phase: "finding" } } : s));
+      try {
+        const { result, readMs, findMs } = await find(region, looks);
+        if (result.kind !== "ok") {
+          setFindSession(s =>
+            s ? { ...s, panel: { phase: "message", text: result.message } } : s
+          );
+          return;
+        }
+        const onSheet = [
+          ...stamps.map(s => ({ x: s.x, y: s.y, name: s.name })),
+          ...pendingStamps.current
+            .filter(m => m.sheetId === activeSheet?.id)
+            .map(m => ({ x: m.x, y: m.y, name: m.name })),
+        ];
+        setFindSession(s =>
+          s
+            ? {
+                ...s,
+                panel: {
+                  phase: "results",
+                  // Trusted: the item's first look and any look confirmed
+                  // once; an added look's finds wait for a hand confirm.
+                  items: matchItems(
+                    result.matches,
+                    onSheet,
+                    new Set([
+                      ...looks.filter(l => l.isFirst).map(l => l.id),
+                      ...Array.from(readTrustedLooks(browserStorage())),
+                    ])
+                  ),
+                  selectedId: null,
+                  readMs,
+                  findMs,
+                  box: region,
+                  scan: result.scan ?? null,
+                  looks: result.looks ?? null,
+                  ai: { busy: false, message: null },
+                },
+              }
+            : s
+        );
+      } catch (error) {
+        setFindSession(s =>
+          s
+            ? {
+                ...s,
+                panel: {
+                  phase: "message",
+                  text: `The search could not run: ${error instanceof Error ? error.message : String(error)}`,
+                },
+              }
+            : s
+        );
+      }
+    },
+    [stamps, activeSheet?.id, findSession?.looks]
+  );
+
+  /** Record decisions and move the selection on to what is still open. */
+  const decideFound = useCallback(
+    (ids: number[], state: MatchItem["state"]) => {
+      if (!findSession || findSession.panel.phase !== "results") return;
+      const panel = findSession.panel;
+      let items = decide(panel.items, ids, state);
+      // A find confirmed by hand trusts the new look that alone made it, and
+      // its other finds become ordinary ones (findMatchingSession, trustLooks).
+      if (state === "confirmed") {
+        const t = trustLooks(items, ids);
+        items = t.items;
+        rememberTrustedLooks(browserStorage(), t.trusted);
+      }
+      // After one decision, on to the next; after Confirm all, stay put.
+      const next =
+        ids.length === 1 ? nextToLookAt(items, panel.selectedId) : null;
+      setFindSession({
+        ...findSession,
+        panel: { ...panel, items, selectedId: next?.id ?? null },
+      });
+      if (next) jumpTo({ x: next.x, y: next.y });
+    },
+    [findSession, jumpTo]
+  );
+
+  const confirmFound = useCallback(
+    (ids: number[]) => {
+      if (!findSession || !findItems) return;
+      const chosen = findItems.filter(i => ids.includes(i.id));
+      queueMarksFor(
+        findSession.group,
+        chosen.map(i => ({ x: i.x, y: i.y }))
+      );
+      decideFound(ids, "confirmed");
+    },
+    [findSession, findItems, queueMarksFor, decideFound]
+  );
+
+  const confirmFoundExisting = useCallback(
+    async (ids: number[]) => {
+      if (!findItems || !existingTwin) return;
+      const chosen = findItems.filter(i => ids.includes(i.id));
+      let group: { groupId: number; label: string; assemblyId: number | null };
+      if (existingTwin.kind === "assembly") {
+        const g = await groupForAssembly
+          .mutateAsync({ bidId, assemblyId: existingTwin.id })
+          .catch(() => null);
+        if (!g) return;
+        group = { groupId: g.id, label: g.label, assemblyId: existingTwin.id };
+        void bidCounts.refetch();
+      } else {
+        group = {
+          groupId: existingTwin.id,
+          label: existingTwin.label,
+          assemblyId: null,
+        };
+      }
+      queueMarksFor(
+        group,
+        chosen.map(i => ({ x: i.x, y: i.y }))
+      );
+      decideFound(ids, "confirmedExisting");
+    },
+    [
+      findItems,
+      existingTwin,
+      groupForAssembly,
+      bidId,
+      bidCounts,
+      queueMarksFor,
+      decideFound,
+    ]
+  );
+
+  /*
+    CHECK SHEET (2026-10-01). The sheet against the legend read by "Whole
+    legend" (@/lib/sheetCheck, in the worker): your marks that disagree with
+    the drawing, legend symbols nobody marked, counts whose marks are drawn
+    differently, and the words beside each mark. Every line is a suggestion;
+    the buttons are the selection's own Move and Delete, the click queue, and
+    a new count. On a locked bid it is a report with no buttons.
+  */
+  const [sessionLegend, setSessionLegend] = useState<SessionLegend | null>(
+    null
+  );
+  const docIdNow = doc?.id ?? null;
+  useEffect(() => {
+    let store: Storage | null = null;
+    try {
+      store = window.sessionStorage;
+    } catch {
+      store = null;
+    }
+    setSessionLegend(
+      docIdNow === null ? null : loadSessionLegend(store, bidId, docIdNow)
+    );
+  }, [bidId, docIdNow]);
+  const keepSessionLegend = useCallback((legend: SessionLegend) => {
+    setSessionLegend(legend);
+    let store: Storage | null = null;
+    try {
+      store = window.sessionStorage;
+    } catch {
+      store = null;
+    }
+    saveSessionLegend(store, legend);
+  }, []);
+
+  type CheckSession = {
+    sheetId: number;
+    /** Asked-for runs; `ran` catches up when one finishes. */
+    run: number;
+    ran: number;
+    state: SheetCheckState;
+    hidden: Set<string>;
+    selected: string | null;
+  };
+  const [checkSession, setCheckSession] = useState<CheckSession | null>(null);
+  useEffect(() => {
+    setCheckSession(current =>
+      current && current.sheetId !== activeSheet?.id ? null : current
+    );
+  }, [activeSheet?.id]);
+  const startCheck = useCallback(() => {
+    if (!activeSheet) return;
+    setFindSession(null);
+    setCheckSession(current => {
+      const run = (current?.run ?? 0) + 1;
+      if (!sessionLegend)
+        return {
+          sheetId: activeSheet.id,
+          run,
+          ran: run,
+          state: { phase: "noLegend" },
+          hidden: new Set(),
+          selected: null,
+        };
+      // A result already on screen stays there while the new one is worked
+      // out — never swapped for a spinner on a re-check.
+      const keep =
+        current?.sheetId === activeSheet.id && current.state.phase === "done";
+      return {
+        sheetId: activeSheet.id,
+        run,
+        ran: current?.ran ?? 0,
+        state: keep ? current.state : { phase: "checking" },
+        hidden: keep ? current.hidden : new Set(),
+        selected: keep ? current.selected : null,
+      };
+    });
+  }, [activeSheet?.id, sessionLegend]);
+  /*
+    The check's numbers are about the marks on the sheet, so when the marks
+    move — a Move, a Delete, a Count it from this very panel — it runs
+    again. Without this, "3 of 5 match" outlives the marks it counted
+    (CLAUDE.md, the staleness class). Code only, so a re-run costs a second.
+  */
+  const checkIsOpen =
+    checkSession !== null && checkSession.state.phase === "done";
+  useEffect(() => {
+    if (checkIsOpen) startCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stamps]);
+
+  const runCheck = useCallback(
+    async (
+      check: (
+        legendPage: number,
+        input: SheetCheckInput
+      ) => Promise<{
+        result: SheetCheckResult | null;
+        scan: boolean;
+        ms: number;
+      }>
+    ) => {
+      if (!sessionLegend) return;
+      const asked = checkSession?.run ?? 0;
+      const set = (state: SheetCheckState) =>
+        setCheckSession(s =>
+          // A newer run has been asked for: this answer is already old.
+          s && s.run === asked ? { ...s, state, ran: asked } : s
+        );
+      try {
+        const { result, scan, ms } = await check(sessionLegend.page, {
+          legendRows: sessionLegend.rows.map(r => ({
+            name: r.name,
+            symbol: r.symbol,
+          })),
+          marks: stamps.map(s => ({
+            id: s.id,
+            x: s.x,
+            y: s.y,
+            count: s.name,
+            assemblyId: s.assemblyId,
+          })),
+          symbols: symbols.map(s => ({
+            label: s.label,
+            assemblyId: s.assemblyId,
+          })),
+          picks: sessionLegend.picks,
+        });
+        if (scan || !result)
+          set({
+            phase: "message",
+            text: "This sheet is a scan — a picture with no line work — so its symbols cannot be compared. Check it by eye.",
+          });
+        else if (result.looks.length === 0)
+          set({
+            phase: "message",
+            text: "None of the legend's symbols could be read as line work. Read the legend again with Whole legend, boxing only the legend.",
+          });
+        else set({ phase: "done", result, ms });
+      } catch (error) {
+        set({
+          phase: "message",
+          text: `The check could not run: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
+    [sessionLegend, stamps, symbols, checkSession?.run]
+  );
+
+  const checkResult =
+    checkSession?.state.phase === "done" ? checkSession.state.result : null;
+  /** The bid's ONE count for a legend item, from what the check matched. */
+  const countForItem = useCallback(
+    (item: string) => {
+      if (!checkResult) return null;
+      const labels = Array.from(
+        new Set(
+          checkResult.marks.filter(m => m.item === item).map(m => m.count)
+        )
+      );
+      if (labels.length !== 1) return null;
+      const g = (bidCounts.data?.groups ?? []).find(x => x.label === labels[0]);
+      return g
+        ? { groupId: g.id, label: g.label, assemblyId: g.assemblyId }
+        : null;
+    },
+    [checkResult, bidCounts.data?.groups]
+  );
+  const hideCheckRow = useCallback((key: string) => {
+    setCheckSession(s =>
+      s ? { ...s, hidden: new Set(s.hidden).add(key), selected: null } : s
+    );
+  }, []);
+  const breakTies = trpc.planCopilot.breakTies.useMutation();
+  /**
+   * The one AI call in the check: small crops of the spots code could not
+   * settle, with the legend's own pictures of the tied items
+   * (server/tieBreak.ts). A button press, never an effect. The answer is a
+   * suggestion the panel shows unconfirmed.
+   */
+  const askTieBreak = useCallback(
+    async (
+      batch: {
+        items: { id: number; name: string; picture: string }[];
+        crops: {
+          id: number;
+          spotId: number;
+          x: number;
+          y: number;
+          itemIds: number[];
+        }[];
+      },
+      renderRegion: (
+        rect: PageRect,
+        scale: number
+      ) => Promise<{ bitmap: ImageBitmap }>
+    ): Promise<{
+      picks: Map<number, string | null>;
+      message: string | null;
+    }> => {
+      if (!activeSheet || batch.crops.length === 0)
+        return { picks: new Map(), message: null };
+      const half = 20;
+      const scale = 6;
+      const crops = await Promise.all(
+        batch.crops.map(async c => {
+          const { bitmap } = await renderRegion(
+            { x: c.x - half, y: c.y - half, width: 2 * half, height: 2 * half },
+            scale
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext("2d")!;
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          // The red square the request tells the model to look inside.
+          const k = canvas.width / (2 * half);
+          ctx.strokeStyle = "#e11d48";
+          ctx.lineWidth = 2;
+          ctx.strokeRect((half - 8) * k, (half - 8) * k, 16 * k, 16 * k);
+          return {
+            id: c.id,
+            picture: canvas.toDataURL("image/png"),
+            itemIds: c.itemIds,
+          };
+        })
+      );
+      try {
+        const r = await breakTies.mutateAsync({
+          sheetId: activeSheet.id,
+          items: batch.items.map(i => ({
+            id: i.id,
+            label: i.name.slice(0, 200),
+            picture: i.picture,
+          })),
+          crops,
+        });
+        const nameOf = new Map(batch.items.map(i => [i.id, i.name] as const));
+        const spotOf = new Map(batch.crops.map(c => [c.id, c.spotId] as const));
+        const picks = new Map<number, string | null>();
+        r.picks.forEach(p => {
+          const spot = spotOf.get(p.cropId);
+          if (spot !== undefined)
+            picks.set(
+              spot,
+              p.itemId === null ? null : (nameOf.get(p.itemId) ?? null)
+            );
+        });
+        return { picks, message: r.message };
+      } catch (error) {
+        return {
+          picks: new Map(),
+          message: `The AI could not be asked: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    },
+    [activeSheet?.id, breakTies]
+  );
+
+  const checkScanFinds = trpc.planCopilot.checkScanFinds.useMutation();
+  /**
+   * Find all matching on a SCAN: ask the AI what is written beside the next
+   * few copies (server/tieBreak.ts `scanFindsRequest`). A button press,
+   * never an effect; small crops of the spots, never the sheet; the answers
+   * become reasons on copies that stay unconfirmed (applyAiAnswers).
+   */
+  const askAboutScanFinds = useCallback(
+    async (
+      renderRegion: (
+        rect: PageRect,
+        scale: number
+      ) => Promise<{ bitmap: ImageBitmap }>
+    ) => {
+      if (!activeSheet || !findSession || findSession.panel.phase !== "results")
+        return;
+      const panel = findSession.panel;
+      const b = panel.box;
+      if (!b) return; // the button is only offered with a box (FindMatching)
+      const batch = aiBatch(panel.items);
+      if (batch.length === 0) return;
+      const setAi = (ai: { busy: boolean; message: string | null }) =>
+        setFindSession(s =>
+          s && s.panel.phase === "results"
+            ? { ...s, panel: { ...s.panel, ai } }
+            : s
+        );
+      setAi({ busy: true, message: null });
+      // 180 dpi (2.5 px a point), a crop of 52–68 pt round the spot and a
+      // red box on the symbol: the sizes measured in scanned-plans-plan.md
+      // § 4.
+      const scale = 2.5;
+      const crop = async (
+        x: number,
+        y: number,
+        halfWidth: number,
+        halfHeight: number
+      ) => {
+        const half = Math.max(26, 1.6 * Math.max(halfWidth, halfHeight));
+        const { bitmap } = await renderRegion(
+          { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
+          scale
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bitmap, 0, 0);
+        bitmap.close();
+        const k = canvas.width / (2 * half);
+        ctx.strokeStyle = "#e11d48";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          (half - halfWidth - 2) * k,
+          (half - halfHeight - 2) * k,
+          (2 * halfWidth + 4) * k,
+          (2 * halfHeight + 4) * k
+        );
+        return canvas.toDataURL("image/jpeg", 0.85);
+      };
+      try {
+        const picked = await crop(
+          b.x + b.width / 2,
+          b.y + b.height / 2,
+          Math.abs(b.width) / 2,
+          Math.abs(b.height) / 2
+        );
+        const crops = await Promise.all(
+          batch.map(async (item, k) => ({
+            id: k + 1,
+            itemId: item.id,
+            picture: await crop(
+              item.x,
+              item.y,
+              item.halfWidth,
+              item.halfHeight
+            ),
+          }))
+        );
+        const r = await checkScanFinds.mutateAsync({
+          sheetId: activeSheet.id,
+          picked,
+          crops: crops.map(c => ({ id: c.id, picture: c.picture })),
+        });
+        const itemOf = new Map(crops.map(c => [c.id, c.itemId] as const));
+        const answers = new Map<number, ScanFindAnswer | null>();
+        r.answers.forEach(a => {
+          const id = itemOf.get(a.cropId);
+          if (id !== undefined) answers.set(id, a.answer);
+        });
+        setFindSession(s =>
+          s && s.panel.phase === "results"
+            ? {
+                ...s,
+                panel: {
+                  ...s.panel,
+                  items: applyAiAnswers(s.panel.items, answers),
+                  ai: { busy: false, message: r.message },
+                },
+              }
+            : s
+        );
+      } catch (error) {
+        setAi({
+          busy: false,
+          message: `The AI could not be asked: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    },
+    [activeSheet?.id, findSession, checkScanFinds]
+  );
+
+  const selectFound = useCallback((id: number | null) => {
+    setFindSession(s =>
+      s && s.panel.phase === "results"
+        ? { ...s, panel: { ...s.panel, selectedId: id } }
+        : s
+    );
+  }, []);
+  const nextFound = useCallback(() => {
+    if (!findSession || findSession.panel.phase !== "results") return;
+    const next = nextToLookAt(
+      findSession.panel.items,
+      findSession.panel.selectedId
+    );
+    if (next) {
+      selectFound(next.id);
+      jumpTo({ x: next.x, y: next.y });
+    }
+  }, [findSession, selectFound, jumpTo]);
+
   /**
    * Recover stamps clicked but never sent, after a crash or reload.
    *
@@ -3388,60 +6079,133 @@ export default function TakeoffPage({
    */
   useEffect(() => {
     if (!activeSheet) return;
+    // Written by this tab: those marks are in the live queue, not lost
+    // (`mirroredHere`). Recovering them would send them a second time.
+    if (mirroredHere.current.has(activeSheet.id)) return;
     const queued = loadStampQueue(activeSheet.id);
     if (!queued || queued.stamps.length === 0) return;
 
     const sheetId = activeSheet.id;
-    const at = queued.stamps.map(st => ({ x: st.x, y: st.y }));
-    const announce = () => {
-      clearStampQueue(sheetId);
-      toast.success(
-        `Recovered ${queued.stamps.length} mark${queued.stamps.length === 1 ? "" : "s"} from your last session.`
-      );
-    };
+    type Stored = (typeof queued.stamps)[number];
 
-    const first = queued.stamps[0];
-    if (typeof first.groupId === "number" && first.groupId > 0) {
-      dropStamps.mutate(
-        { bidId: queued.bidId, sheetId, groupId: first.groupId, at },
-        { onSuccess: announce }
-      );
-      return;
-    }
+    /*
+      ONE PART PER COUNT. This used to send the whole stored queue under its
+      FIRST entry's count, so a crash with two counts' clicks waiting put all of
+      them on one (audit #4, fixed 2026-09-29 — @/lib/markBatches). And one
+      part per placed-as status, so existing clicks come back as existing.
+    */
+    const parts = splitRecoveredMarks(queued.stamps, recoveredMarkKey);
 
     // Older shape. The assembly is the honest reading of what was counted; a
     // queue with only a name becomes a plain count under that name, reusing
     // one if the bid already has it rather than making a second.
-    const resolve =
-      typeof first.assemblyId === "number" && first.assemblyId > 0
-        ? groupForAssembly.mutateAsync({
-            bidId: queued.bidId,
-            assemblyId: first.assemblyId,
-          })
-        : createGroup.mutateAsync({
-            bidId: queued.bidId,
-            label: first.assemblyName?.trim() || "Recovered count",
-            reuseExisting: true,
-          });
+    //
+    // An assembly the bid now counts as several items (one per legend symbol,
+    // shared/assemblyCounts.ts) has nobody here to say which: these take the
+    // FIRST, and the toast says so rather than opening a chooser.
+    let tookFirstOfSeveral = false;
+    const groupFor = (
+      first: Stored
+    ): Promise<{ id: number; firstOfSeveral?: boolean }> =>
+      typeof first.groupId === "number" && first.groupId > 0
+        ? Promise.resolve({ id: first.groupId })
+        : typeof first.assemblyId === "number" && first.assemblyId > 0
+          ? groupForAssembly.mutateAsync({
+              bidId: queued.bidId,
+              assemblyId: first.assemblyId,
+              ifSeveral: "first",
+            })
+          : createGroup.mutateAsync({
+              bidId: queued.bidId,
+              label: first.assemblyName?.trim() || "Recovered count",
+              reuseExisting: true,
+            });
 
-    resolve
-      .then(group =>
-        dropStamps.mutateAsync({
-          bidId: queued.bidId,
-          sheetId,
-          groupId: group.id,
-          at,
-        })
-      )
-      .then(announce)
-      .catch(() => {
+    void (async () => {
+      let remaining = parts;
+      let recovered = 0;
+      try {
+        for (const part of parts) {
+          const group = await groupFor(part[0]);
+          if (group.firstOfSeveral) tookFirstOfSeveral = true;
+          await dropStamps.mutateAsync({
+            bidId: queued.bidId,
+            sheetId,
+            groupId: group.id,
+            at: part.map(st => ({ x: st.x, y: st.y })),
+            status: queuedStampStatus(part[0]),
+          });
+          recovered += part.length;
+          /*
+            Written back after EACH part, so a failure half way leaves only
+            what did not go. Rewriting it only at the end would re-send the
+            parts that had already landed on the next visit — counted twice.
+          */
+          remaining = remaining.slice(1);
+          saveStampQueue(sheetId, queued.bidId, remaining.flat());
+        }
+      } catch {
         // Left in storage on purpose: a failed recovery must not be a silent
         // deletion. The next visit to this sheet tries again.
-      });
+      }
+      if (recovered > 0)
+        toast.success(
+          `Recovered ${recovered} mark${recovered === 1 ? "" : "s"} from your last session.` +
+            (tookFirstOfSeveral
+              ? " Some were for an assembly this bid counts as several items, and went to the first of them — check its card."
+              : "")
+        );
+    })();
   }, [activeSheet?.id]);
 
   /**
-   * T picks "Select text" up or puts it down. Not while tracing — the button
+   * Every count's pin letter and colour on this BID (shared/pinLetters.ts) —
+   * bid-wide, not this sheet's, so a count wears one letter on every sheet.
+   * Read by the drawing and the panel from this one map, so a card's swatch
+   * and its pins cannot disagree. It follows `takeoffGroups.list`, which every
+   * count change already refreshes.
+   */
+  const pinStyles = useMemo(
+    () =>
+      pinStylesForBid(
+        // Chosen looks at every level — count, legend symbol, assembly.
+        pinCountsFor(bidCounts.data?.groups ?? [], allAssemblies, symbols)
+      ),
+    [bidCounts.data?.groups, allAssemblies, symbols]
+  );
+
+  /**
+   * R re-arms the last count ("Count again", @/lib/countAgain). Only while
+   * nothing is in hand — the chip is not on screen otherwise — and never
+   * while typing.
+   */
+  const countAgain = countAgainOffer(
+    lastCount,
+    bidCounts.data?.groups,
+    armedGroup !== null || tracing
+  );
+  useEffect(() => {
+    if (!activeSheet || !countAgain) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "r" && e.key !== "R") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      armGroup(countAgain, countAgain.assemblyId);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeSheet, countAgain, armGroup]);
+
+  /**
+   * T picks "Copy text" up or puts it down. Not while tracing — the button
    * is hidden then too — and never while typing, or a T in a search box would
    * change tools.
    */
@@ -3475,7 +6239,8 @@ export default function TakeoffPage({
   useEffect(() => {
     if (selectedStampIds.size === 0 || tracing || armedGroup) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // A picked run point claims Delete first (TraceLayer, capture phase).
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (
         el &&
@@ -3487,6 +6252,12 @@ export default function TakeoffPage({
         return;
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
+        // Said here rather than left to the server's refusal: the key used
+        // to send a request that could only come back refused (§ 1.2 a).
+        if (quantitiesLocked) {
+          toast.error(lockedEditRefusal("its marks cannot be deleted"));
+          return;
+        }
         deleteSelected(false);
       } else if (e.key === "Escape" && !confirmingDelete) {
         e.preventDefault();
@@ -3495,7 +6266,45 @@ export default function TakeoffPage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedStampIds, tracing, armedGroup, deleteSelected, confirmingDelete]);
+  }, [
+    selectedStampIds,
+    tracing,
+    armedGroup,
+    deleteSelected,
+    confirmingDelete,
+    quantitiesLocked,
+  ]);
+
+  /**
+   * Ctrl/⌘+Z undoes, Ctrl/⌘+Shift+Z and Ctrl+Y redo. Not while tracing,
+   * where TraceLayer's own Ctrl+Z takes back the last point, and never from a
+   * field, where the browser's own undo is the one meant.
+   */
+  useEffect(() => {
+    if (tracing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        void stepBack("undo");
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        void stepBack("redo");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tracing, stepBack]);
 
   /** Escape puts the stamp tool down. */
   useEffect(() => {
@@ -3605,6 +6414,55 @@ export default function TakeoffPage({
     () => filterByLayers(layeredStamps, effectiveLayers),
     [layeredStamps, effectiveLayers]
   );
+
+  /** The selection's own height and left-off drops, for the pill. */
+  const selectionDrops = useMemo(
+    () => selectionDrop(stamps, selectedStampIds),
+    [stamps, selectedStampIds]
+  );
+
+  /**
+   * Where a run meets each mark on this sheet (shared/connectPoint.ts): the
+   * wall for a wall device whose wall the drawing shows, the centre for
+   * everything else. Every snap reads this — a leg's start, an ordinary trace
+   * click, an end let go — so a run ending at a wall receptacle ends at the box
+   * in the wall, not the middle of the drawing of it, and is not short by the
+   * stand-off. The family is the PIN's (same name > assembly > category), so a
+   * device cannot be drawn as one thing and met as another.
+   */
+  const [connectRead, setConnectRead] = useState<{
+    sheetId: number;
+    read: ConnectRead;
+  } | null>(null);
+  const connectMarks = useMemo<ConnectMark[]>(
+    () =>
+      visibleStamps.map(st => ({
+        id: st.id,
+        x: st.x,
+        y: st.y,
+        family:
+          (st.groupId != null ? pinStyles.get(st.groupId)?.family : null) ??
+          deviceFamily({
+            label: st.name,
+            assemblyCategory: st.assemblyCategory ?? null,
+          }),
+      })),
+    [visibleStamps, pinStyles]
+  );
+  const wallMarks = useMemo(
+    () => connectMarks.filter(m => FAMILY_MOUNTING[m.family] === "wall"),
+    [connectMarks]
+  );
+  const connects = useMemo(
+    () =>
+      markConnects(
+        connectMarks,
+        connectRead && connectRead.sheetId === activeSheet?.id
+          ? connectRead.read
+          : null
+      ),
+    [connectMarks, connectRead, activeSheet?.id]
+  );
   const visibleRuns = useMemo(
     () => filterByLayers(layeredRuns, effectiveLayers),
     [layeredRuns, effectiveLayers]
@@ -3643,6 +6501,7 @@ export default function TakeoffPage({
           assemblyCategory: st.assemblyCategory ?? null,
           x: st.x,
           y: st.y,
+          status: st.status,
         }))
       ),
     [visibleStamps]
@@ -3714,7 +6573,16 @@ export default function TakeoffPage({
   });
   const commitRun = trpc.takeoffRuns.commit.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: result =>
+    onSuccess: (result, vars) => {
+      // Undoing a finish deletes the run, legs and all; redo puts it back.
+      if (activeSheet)
+        pushUndo({
+          label: "run finished",
+          sheetId: activeSheet.id,
+          undo: { kind: "removeRun", id: vars.id },
+          redo: null,
+          subject: { kind: "run", id: vars.id },
+        });
       // "traced", because this is the FLAT length and the panel two inches
       // away may already be showing a larger number with the drops added.
       // Two figures for the same run in the same second, one of them
@@ -3729,17 +6597,292 @@ export default function TakeoffPage({
           : result.legCount > 1
             ? `Run finished — ${result.legCount} legs, ${result.runFeet} ft flat.`
             : `Run finished — ${result.runFeet} ft flat.`
-      ),
+      );
+    },
     onSettled: refreshRuns,
   });
   const removeRun = trpc.takeoffRuns.remove.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: result => {
+    onSuccess: (result, vars) => {
+      // Read before the refresh drops the row from the cache.
+      const gone = runs.find(r => r.id === vars.id);
+      const isLeg = gone?.parentRunId != null;
+      const entry =
+        result.undo && activeSheet
+          ? pushUndo({
+              label: isLeg ? "leg deleted" : "run deleted",
+              sheetId: activeSheet.id,
+              undo: { kind: "restoreRun", packet: result.undo, id: vars.id },
+              redo: null,
+              subject: { kind: "run", id: rootOfRun(vars.id) },
+            })
+          : null;
+      // Until 2026-09-29 a run delete said nothing at all (plan § 1.2 d).
+      deletedToast(
+        isLeg
+          ? "Deleted one leg."
+          : `Deleted run ${gone?.name ?? ""}`.trim() + ".",
+        entry
+      );
       // A tee the last branch left behind that could not be joined back is
       // still a box on the drawing — said, not left to be discovered (D20).
       if (result.keptAsBox.length > 0)
         toast.message(
           "The box at that tee stays — the two sides carry different circuits or types, so they were not joined back into one leg."
+        );
+    },
+    onSettled: refreshRuns,
+  });
+
+  /**
+   * What the toolbar Delete and the Delete key remove: the selected marks if
+   * there are any (more than one asks first), otherwise the selected run.
+   * One function for both, so the key can never delete something the button
+   * did not name (@/lib/stampSelection, toolbarDelete).
+   */
+  /*
+    DELETING A RUN, scaled to what is lost (plan § 1.1). A whole run asks
+    first and names its length ("Delete run Homerun — 84 ft?"); one leg of a
+    branched run goes at once. Both leave a toast with Undo. A locked bid is
+    refused here, before any question — asking about something that will be
+    refused is its own small lie.
+  */
+  const [runDeleteAsk, setRunDeleteAsk] = useState<{
+    id: number;
+    q: DeleteQuestion;
+  } | null>(null);
+  const askRemoveRun = useCallback(
+    (id: number) => {
+      if (removeRun.isPending) return;
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("its runs cannot be deleted"));
+        return;
+      }
+      const row = runs.find(r => r.id === id);
+      if (!row) return;
+      if (row.parentRunId != null) {
+        removeRun.mutate({ id });
+        return;
+      }
+      const network = runs.filter(r => r.id === id || r.parentRunId === id);
+      setRunDeleteAsk({ id, q: runDeleteQuestion(network) });
+    },
+    [removeRun, quantitiesLocked, runs]
+  );
+
+  const deleteSelection = useCallback(() => {
+    if (selectedStamps.length > 0) {
+      deleteSelected(false);
+      return;
+    }
+    if (selectedRunId !== null) askRemoveRun(selectedRunId);
+  }, [selectedStamps.length, deleteSelected, selectedRunId, askRemoveRun]);
+
+  /**
+   * The Delete key for a selected RUN (marks have their own handler above).
+   * `defaultPrevented` is checked because a picked run POINT claims the same
+   * key first (TraceLayer, capture phase) — deleting the point must not also
+   * delete the run it is on.
+   */
+  useEffect(() => {
+    if (
+      selectedRunId === null ||
+      selectedStampIds.size > 0 ||
+      tracing ||
+      armedGroup ||
+      quantitiesLocked
+    )
+      return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "Delete") return;
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      deleteSelection();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    selectedRunId,
+    selectedStampIds,
+    tracing,
+    armedGroup,
+    quantitiesLocked,
+    deleteSelection,
+  ]);
+
+  /**
+   * What sits at a run's ends, and their heights — the DROP.
+   *
+   * On the page rather than inside the ends editor, for two reasons. The
+   * editor used to refresh `takeoffRuns` only, so the Send preview, the bid's
+   * lines and the materials list showed the old drop until something else
+   * moved them ("runEnds" in @/lib/takeoffRefresh is the rule now, tested).
+   * And an end change is an undo step, which only the page's stack can hold.
+   */
+  const saveEnds = trpc.takeoffRuns.setEnds.useMutation({
+    onError: e => toast.error(e.message),
+    onSuccess: (result, vars) => {
+      const { id, ...patch } = vars;
+      if (result.undo && activeSheet)
+        pushUndo({
+          label: "run ends changed",
+          sheetId: activeSheet.id,
+          undo: {
+            kind: "restoreEnds",
+            packet: result.undo,
+            runId: id,
+            patch,
+          },
+          redo: null,
+          subject: { kind: "run", id: rootOfRun(id) },
+        });
+    },
+    onSettled: () => refreshFor("runEnds"),
+  });
+  const onSetEnds = useCallback(
+    (runId: number, patch: EndsPatch) =>
+      saveEnds.mutate({ id: runId, ...patch }),
+    [saveEnds]
+  );
+
+  /** The end clicked on the plan, lit in the Run ends section. */
+  const [endHighlight, setEndHighlight] = useState<{
+    runId: number;
+    end: "start" | "end";
+  } | null>(null);
+  // Brought into view when it changes; the section lists it by data attribute.
+  useEffect(() => {
+    if (!endHighlight) return;
+    const id = window.setTimeout(() => {
+      document
+        .querySelector(
+          `[data-run-end="${endHighlight.runId}-${endHighlight.end}"]`
+        )
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [endHighlight]);
+
+  /**
+   * "Set ends": select the first run on this sheet with one end counted and
+   * the other not answered — the totals' `partialVerticalCount` rule
+   * (shared/takeoffQuantities.ts: unanswered, with some vertical) — and light
+   * the unanswered end. The count is bid-wide; if none is on this sheet, say
+   * so rather than open nothing.
+   */
+  const openPartialEnds = () => {
+    for (const r of runs) {
+      const v = r.quantities?.verticals;
+      if (!v) continue;
+      for (const end of ["start", "end"] as const) {
+        const other = end === "start" ? v.end : v.start;
+        const here = v[end];
+        const onTee = end === "start" ? r.startTee : r.endTee;
+        if (
+          !onTee &&
+          !here.counted &&
+          here.reason === "no-kind" &&
+          other.counted
+        ) {
+          setSelectedRunId(r.id);
+          setEndHighlight({ runId: r.id, end });
+          return;
+        }
+      }
+    }
+    toast.message(
+      "The runs with one end counted are on other sheets of this bid — open them there."
+    );
+  };
+
+  /** Every leg of a run as the Run ends section lists them: root first. */
+  const runEndsLegs = (rootId: number): RunEndsLeg[] => {
+    const legs = runs
+      .filter(r => (r.parentRunId ?? r.id) === rootId)
+      .sort(
+        (a, b) =>
+          Number(a.parentRunId !== null) - Number(b.parentRunId !== null) ||
+          a.id - b.id
+      );
+    return legs.map((r, i) => ({
+      id: r.id,
+      label: legs.length > 1 ? `Leg ${i + 1}` : "Run",
+      ends: r.ends ?? NO_ENDS,
+      about: {
+        start: {
+          heightSource: r.ends?.startHeightSource ?? "unset",
+          onExisting: r.ends?.startOnExisting ?? false,
+        },
+        end: {
+          heightSource: r.ends?.endHeightSource ?? "unset",
+          onExisting: r.ends?.endOnExisting ?? false,
+        },
+      },
+      verticals: r.quantities?.verticals ?? null,
+      teeEnds: { start: Boolean(r.startTee), end: Boolean(r.endTee) },
+      points: r.points,
+    }));
+  };
+
+  /**
+   * Dragging, adding or removing a run's points (T8, D7a).
+   *
+   * Optimistic, per the responsiveness rule: the new points go into the
+   * sheet's run list at once and the save follows; a refusal puts the old
+   * ones back. Everything the points decide — length, bends, pull points, the
+   * bid — moves through `refreshRuns` when the save lands.
+   */
+  const editPoints = trpc.takeoffRuns.setPoints.useMutation({
+    onMutate: async vars => {
+      if (!activeSheet) return undefined;
+      const key = { sheetId: activeSheet.id };
+      await utils.takeoffRuns.listForSheet.cancel(key);
+      const before = utils.takeoffRuns.listForSheet.getData(key);
+      utils.takeoffRuns.listForSheet.setData(key, old =>
+        old?.map(r => (r.id === vars.id ? { ...r, points: vars.points } : r))
+      );
+      return { key, before };
+    },
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffRuns.listForSheet.setData(context.key, context.before);
+      toast.error(e.message);
+    },
+    onSuccess: (result, vars) => {
+      if (result.undo && activeSheet)
+        pushUndo({
+          label: "run points edited",
+          sheetId: activeSheet.id,
+          undo: {
+            kind: "restorePoints",
+            packet: result.undo,
+            runId: vars.id,
+            points: result.points,
+          },
+          redo: null,
+          subject: { kind: "run", id: rootOfRun(vars.id) },
+        });
+      /*
+        Said, not left to be found (Track B plan, Part 1 § 2): a corner that
+        moved has lost its LB or pull-box answer and will be proposed again.
+      */
+      if (result.clearedAnswers > 0)
+        toast.message(
+          `${result.clearedAnswers} pull-point ${result.clearedAnswers === 1 ? "answer" : "answers"} cleared — the corner moved. Ctrl+Z puts ${result.clearedAnswers === 1 ? "it" : "them"} back.`
+        );
+      const run = runs.find(r => r.id === vars.id);
+      if (run?.typedLengthInches != null)
+        toast.message(
+          "This run has a typed length, and that is still what the bid uses — the drawing changed, the bid did not."
         );
     },
     onSettled: refreshRuns,
@@ -4081,6 +7224,12 @@ export default function TakeoffPage({
 
   const startTracing = useCallback(
     (pathType: RunPathType) => {
+      // Same reason as `armGroup`: a trace autosaves as it goes, and every
+      // save of it would be refused on a locked bid.
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("new runs cannot be traced"));
+        return;
+      }
       setTracePathType(pathType);
       setTracePoints([]);
       draftRunId.current = null;
@@ -4090,7 +7239,7 @@ export default function TakeoffPage({
       setTracing(true);
       setSelectedRunId(null);
     },
-    [resetLegs]
+    [resetLegs, quantitiesLocked]
   );
 
   /**
@@ -4234,12 +7383,27 @@ export default function TakeoffPage({
         legs: sheetRuns
           .filter(r => r.id === rootId || r.parentRunId === rootId)
           .map(r => ({ id: r.id, points: r.points as PagePoint[] })),
-        stamps: visibleStamps.map(s => ({ id: s.id, x: s.x, y: s.y })),
+        stamps: visibleStamps.map(s => ({
+          id: s.id,
+          x: s.x,
+          y: s.y,
+          // snapToMark skips an unconfirmed mark (@shared/markStatus).
+          status: s.status,
+          connect: connects.get(s.id)?.point,
+        })),
       });
       // A quantity trace joins without a tee (D21, answer 2).
       return activeTraceMode === "quantity" ? quantitySnap(snap) : snap;
     },
-    [activeSheet, utils, runs, legRootId, visibleStamps, activeTraceMode]
+    [
+      activeSheet,
+      utils,
+      runs,
+      legRootId,
+      visibleStamps,
+      connects,
+      activeTraceMode,
+    ]
   );
 
   /** The first click of a leg: snapped, then the leg's first point. */
@@ -4263,6 +7427,10 @@ export default function TakeoffPage({
       pathType: RunPathType;
       traceMode: TraceMode;
     }) => {
+      if (quantitiesLocked) {
+        toast.error(lockedEditRefusal("legs cannot be added"));
+        return;
+      }
       setTracePathType(run.pathType);
       setTracePoints([]);
       draftRunId.current = null;
@@ -4275,7 +7443,7 @@ export default function TakeoffPage({
       setTracing(true);
       setSelectedRunId(null);
     },
-    []
+    [quantitiesLocked]
   );
 
   const finishTrace = useCallback(async () => {
@@ -4366,21 +7534,126 @@ export default function TakeoffPage({
     resetLegs();
   }, [activeSheet?.id, legRootId, commitRun, resetLegs]);
 
+  /*
+    The doors above refuse to pick a tool up on a locked bid, but the lock is
+    read from a query: a tool picked up in the moment before it arrives would
+    otherwise stay in hand, placing marks the server then refuses. So the
+    moment the lock is known, whatever is in hand is put down.
+  */
+  useEffect(() => {
+    if (!quantitiesLocked) return;
+    setArmedGroup(null);
+    if (tracing) cancelTrace();
+  }, [quantitiesLocked, tracing, cancelTrace]);
+
+  /*
+    THE SHEET CHANGED: whatever was in hand is put down, and stays down.
+
+    The guard is already in place before this runs — `armedGroup` and
+    `tracing` read as down on any other sheet (@/lib/toolOnSheet). This clears
+    the stored tool so that coming BACK to the first sheet does not pick it up
+    again by itself, and keeps a trace's work rather than dropping it.
+
+    A trace left part way is saved where it was DRAWN, as a draft — the same
+    state the 4-second autosave already leaves it in, and drafts count on the
+    bid and show in the runs list. It is not finished for the estimator: a run
+    nobody said was done is not one. Saved legs of a branched run are
+    committed with their root, as Discard does; the leg in progress goes.
+  */
+  useEffect(() => {
+    if (heldElsewhere(armedGroupHeld, sheetKey)) setArmedGroupHeld(null);
+    if (!traceHeld || !heldElsewhere(traceHeld, sheetKey)) return;
+    const left = traceHeld;
+    const where = left.sheetName || "the last sheet";
+    if (legRootId !== null) {
+      commitRun.mutate({ id: legRootId });
+      toast.info(`Run on ${where} kept. Changing sheet puts the tool down.`);
+    } else if (
+      left.sheetId !== null &&
+      hasUnsavedWork(tracePoints, savedPointCount.current)
+    ) {
+      const sheetId = left.sheetId;
+      saveRun.mutate(
+        {
+          bidId,
+          sheetId,
+          id: draftRunId.current ?? undefined,
+          name: `Run on ${left.sheetName}`,
+          pathType: tracePathType,
+          points: tracePoints,
+          status: "draft",
+          runTypeId: armedRunType[tracePathType]?.id ?? null,
+          traceMode,
+        },
+        {
+          onSuccess: () => {
+            clearDraft(sheetId);
+            refreshRuns();
+          },
+        }
+      );
+      toast.info(
+        `Run on ${where} saved as a draft. Changing sheet puts the tool down.`
+      );
+    } else if (draftRunId.current !== null) {
+      toast.info(
+        `Run on ${where} saved as a draft. Changing sheet puts the tool down.`
+      );
+    }
+    setTraceHeld(null);
+    setTracePoints([]);
+    draftRunId.current = null;
+    savedPointCount.current = 0;
+    resetLegs();
+    // Only the sheet changing is a reason to run; the rest is read as it is.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetKey]);
+
   const handleSheetVisible = useCallback(
     (pageNumber: number, text: string) => {
       // Kept for the plan reader too. The extraction has already happened for
       // scale detection, so the reader gets the sheet's own words — title
       // block, general notes, keynotes — for free alongside the picture.
-      pageTextByPage.current.set(pageNumber, text);
+      if (doc)
+        rememberPageText(pageTextByPage.current, doc.id, pageNumber, text);
       const sheet = sheets.find(s => s.pageNumber === pageNumber);
-      // Nothing to attach a reading to yet; ensureSheets is still in flight and
-      // this page's text will be re-read the next time it is shown.
-      if (!sheet) return;
+      /*
+        Nothing to attach a reading to yet: ensureSheets is still in flight.
+        The text is KEPT and read the moment the rows arrive (the effect
+        below, @/lib/scaleCatchUp).
+
+        This comment used to say the page "will be re-read the next time it
+        is shown", and nothing did that: a drawn page is cached and its text
+        is not extracted again, so sheet 1 of a fresh upload sat on "Set
+        scale" until a reload (found by the smoke test, 2026-10-01).
+      */
+      if (!sheet) {
+        if (doc)
+          earlyPageText.current.set(earlyTextKey(doc.id, pageNumber), text);
+        return;
+      }
       if (sheet.scaleSource !== "none") return;
       detectScale.mutate({ id: sheet.id, sheetText: text });
     },
-    [sheets]
+    [sheets, doc]
   );
+
+  // Pages read before their sheet rows existed: detect them now (above).
+  const earlyPageText = useRef<Map<string, string>>(new Map());
+  const scaleCatchUpAsked = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!doc) return;
+    for (const { sheetId, text } of sheetsToCatchUp(
+      doc.id,
+      sheets,
+      earlyPageText.current,
+      scaleCatchUpAsked.current
+    )) {
+      scaleCatchUpAsked.current.add(sheetId);
+      detectScale.mutate({ id: sheetId, sheetText: text });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheets, doc?.id]);
 
   /**
    * Send ONE queued file: check it, transfer it, record the sheet.
@@ -4569,6 +7842,7 @@ export default function TakeoffPage({
 
       try {
         setState({ state: "uploading", sent: 0 });
+        startUploadTiming(file.name, file.size);
 
         const handle = {
           onProgress: (sent: number) => setState({ sent }),
@@ -4594,6 +7868,7 @@ export default function TakeoffPage({
         if (shouldUseMultipart(file.size)) {
           const sent = await uploadLargeFile(file);
           if (sent) {
+            markUpload("transfer (pieces)", file.size);
             storageKey = sent;
             xhrRef.current = null;
             setState({ state: "finishing", sent: file.size });
@@ -4603,6 +7878,7 @@ export default function TakeoffPage({
               storageKey,
               byteSize: file.size,
             });
+            markUpload("attach");
             setState({ state: "done" });
             setSelectedDocId(attached.id);
             setPage(1);
@@ -4622,7 +7898,9 @@ export default function TakeoffPage({
             filename: file.name,
             byteSize: file.size,
           });
+          markUpload("ticket");
           await putDirectToStorage(ticket.uploadUrl, file, handle);
+          markUpload("transfer (one PUT, direct)", file.size);
           storageKey = ticket.storageKey;
         } catch (directError) {
           // Only a `blocked` failure is worth another attempt. It means zero
@@ -4640,6 +7918,7 @@ export default function TakeoffPage({
 
           setState({ sent: 0 });
           storageKey = await postViaServer(bidId, file, handle);
+          markUpload("transfer (through the server)", file.size);
         }
         xhrRef.current = null;
 
@@ -4651,6 +7930,7 @@ export default function TakeoffPage({
           storageKey,
           byteSize: file.size,
         });
+        markUpload("attach");
 
         setState({ state: "done" });
         setSelectedDocId(attached.id);
@@ -4809,8 +8089,22 @@ export default function TakeoffPage({
         stays, because that is the bar you work from.
       */}
       {!focusMode && (
-        <div className="border-b border-border px-6 py-2 shrink-0">
-          <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "border-b border-border shrink-0",
+            phone ? "px-2 py-1" : "px-6 py-2"
+          )}
+        >
+          {/* Wraps (2026-09-29): on one line at phone width "Add PDF" sat
+              76px past the edge, measured. The title keeps the first line
+              (basis-56) and the buttons drop below it whole. On the phone
+              the buttons are one ⋯ instead, so the line never wraps. */}
+          <div
+            className={cn(
+              "flex items-center gap-x-3 gap-y-2",
+              phone ? "flex-nowrap gap-x-1" : "flex-wrap"
+            )}
+          >
             <Button
               size="sm"
               variant="ghost"
@@ -4819,8 +8113,13 @@ export default function TakeoffPage({
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Bid
             </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-semibold truncate">
+            <div className={cn("flex-1 min-w-0", !phone && "basis-56")}>
+              <h1
+                className={cn(
+                  "font-semibold truncate",
+                  phone ? "text-base" : "text-lg"
+                )}
+              >
                 Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
               </h1>
               {/*
@@ -4832,55 +8131,102 @@ export default function TakeoffPage({
                 not reach the price, while the price moves underneath them, is
                 worse than saying nothing.
               */}
-              <p className="text-xs text-muted-foreground">
-                Set each sheet&apos;s scale, then mark and trace what is on it.
-                Counts you send to the bid change its price; the rest stay here
-                until you do.
-              </p>
+              {/* Laptop only: on a tablet or phone it was two or three lines
+                  of height taken from the drawing on every visit, to say what
+                  the screen is for (device audit, 2026-10-01). */}
+              {!compact && (
+                <p className="text-xs text-muted-foreground">
+                  Set each sheet&apos;s scale, then mark and trace what is on
+                  it. Counts you send to the bid change its price; the rest stay
+                  here until you do.
+                </p>
+              )}
             </div>
+            {/*
+              THE PHONE: the three bid-level actions behind one ⋯, so the
+              header is one line and the drawing gets the rest. Same three
+              actions, same handlers — no phone-only copy of what they do.
+            */}
+            {phone && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 w-8 px-0 shrink-0"
+                    aria-label="More for this bid's plans"
+                    title="Materials list, export, add a PDF"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setMaterialsListOpen(true)}>
+                    <ClipboardList className="w-3.5 h-3.5" /> Materials list
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTakeoffExportOpen(true)}>
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
+                  </DropdownMenuItem>
+                  {docs.length > 0 && (
+                    <DropdownMenuItem
+                      disabled={uploading}
+                      onSelect={() => fileInput.current?.click()}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {uploading ? "Uploading…" : "Add PDF"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             {/* Left of "Add PDF" and available from the first mark, not at the
               end: a supplier quote is how a contractor finds out what things
               cost, so it must not sit behind a finished, priced bid. It stays
               outlined rather than filled because adding a plan is still the
               louder action on this screen. */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs shrink-0"
-              onClick={() => setMaterialsListOpen(true)}
-              title="Materials list — quantities only, for a supplier quote"
-            >
-              <ClipboardList className="w-3.5 h-3.5" /> Materials list
-            </Button>
-            {/* The takeoff itself, by sheet and type — the door out to a
+            {!phone && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  onClick={() => setMaterialsListOpen(true)}
+                  title="Materials list — quantities only, for a supplier quote"
+                >
+                  <ClipboardList className="w-3.5 h-3.5" /> Materials list
+                </Button>
+                {/* The takeoff itself, by sheet and type — the door out to a
                 spreadsheet. Beside the materials list because both are files
                 that leave the app; outlined, like it. */}
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs shrink-0"
-              onClick={() => setTakeoffExportOpen(true)}
-              title="Every count and run, by sheet and type — prices only if you ask"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
-            </Button>
-            {docs.length > 0 && (
-              <Button
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                onClick={() => fileInput.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading…
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5" /> Add PDF
-                  </>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  onClick={() => setTakeoffExportOpen(true)}
+                  title="Every count and run, by sheet and type — prices only if you ask"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
+                </Button>
+                {docs.length > 0 && (
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs shrink-0"
+                    onClick={() => fileInput.current?.click()}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />{" "}
+                        Uploading…
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" /> Add PDF
+                      </>
+                    )}
+                  </Button>
                 )}
-              </Button>
+              </>
             )}
           </div>
         </div>
@@ -4926,6 +8272,37 @@ export default function TakeoffPage({
             disabled={!doc}
           />
 
+          {/* The sheet's own menu: where a destructive action lives, rather
+              than as a button always on show (Clear this sheet, D6 override). */}
+          {activeSheet && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 px-0"
+                  title="More for this sheet"
+                  aria-label="More for this sheet"
+                  disabled={tracing}
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  disabled={quantitiesLocked}
+                  onSelect={() => setConfirmClear(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {quantitiesLocked
+                    ? "Clear this sheet — unlock the bid first"
+                    : "Clear all marks and runs on this sheet…"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           <div className="w-px h-4 bg-border" />
 
           {/*
@@ -4951,43 +8328,204 @@ export default function TakeoffPage({
               what is being stamped — and the only way to stop — must not
               disappear on an unscaled sheet.
             */
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 text-xs"
-              onClick={() => setArmedGroup(null)}
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              Counting {armedGroup.label}
-              <X className="w-3 h-3" />
-            </Button>
+            <>
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => setArmedGroup(null)}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                Counting {armedGroup.label}
+                <X className="w-3 h-3" />
+              </Button>
+              {/*
+                PLACING AS — beside the count it qualifies, and only while one
+                is armed, which is the only time it does anything. Two
+                choices, not the four "Mark as…" offers: a run of existing
+                devices is the case that comes in runs; remove and relocate
+                are set on a selection afterwards. Sticky (see
+                `placingStatus`). Not on a locked bid, which takes no marks.
+              */}
+              {!quantitiesLocked && (
+                <div
+                  role="group"
+                  aria-label="Place marks as"
+                  className="inline-flex h-7 items-center rounded-md border border-border p-0.5 text-xs"
+                >
+                  {(["new", "existing"] as const).map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={placingStatus === s}
+                      onClick={() => setPlacingStatus(s)}
+                      title={
+                        s === "new"
+                          ? "Place new devices — counted and priced on the bid"
+                          : "Place existing devices to remain — drawn hollow, not priced"
+                      }
+                      className={`h-full rounded px-2 transition-colors ${
+                        placingStatus === s
+                          ? s === "new"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-amber-500 text-black"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {s === "new" ? "New" : "Existing"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
             activeSheet &&
             !tracing && (
-              <StampPicker
-                assemblies={allAssemblies.map(a => ({
-                  id: a.id,
-                  name: a.name,
-                  category: a.category ?? null,
-                }))}
-                disabled={allAssemblies.length === 0}
-                onPick={assembly => {
-                  groupForAssembly
-                    .mutateAsync({ bidId, assemblyId: assembly.id })
-                    .then(group => armGroup(group, assembly.id))
-                    .catch(() => {
-                      /* the mutation's onError has already said so */
-                    });
-                }}
-                onCountPlain={label => {
-                  createGroup
-                    .mutateAsync({ bidId, label })
-                    .then(group => armGroup(group, null))
-                    .catch(() => {
-                      /* a duplicate name is refused by name, and said so */
-                    });
-                }}
-              />
+              <>
+                <StampPicker
+                  assemblies={allAssemblies.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    category: a.category ?? null,
+                  }))}
+                  disabled={allAssemblies.length === 0}
+                  onRefused={
+                    quantitiesLocked
+                      ? () =>
+                          toast.error(
+                            lockedEditRefusal("new marks cannot be placed")
+                          )
+                      : undefined
+                  }
+                  /*
+                  Several items sharing one assembly each have their own count
+                  (shared/assemblyCounts.ts), and the picker has no symbol to
+                  say which — so it asks, from the counts this bid already has.
+                */
+                  countsOf={assemblyId =>
+                    (bidCounts.data?.groups ?? []).filter(
+                      g => g.assemblyId === assemblyId
+                    )
+                  }
+                  onPickCount={(count, assemblyId) =>
+                    armGroup(count, assemblyId)
+                  }
+                  onPick={assembly => {
+                    // Armed at once; clicks before the count exists are kept
+                    // (armWhileCreating). The mutation's onError says why a
+                    // refusal happened, armWhileCreating what it cost.
+                    armWhileCreating(assembly.name, assembly.id, null, () =>
+                      groupForAssembly.mutateAsync({
+                        bidId,
+                        assemblyId: assembly.id,
+                      })
+                    );
+                  }}
+                  onCountPlain={label => {
+                    // A duplicate name is refused by name, and said so.
+                    armWhileCreating(label, null, null, () =>
+                      createGroup.mutateAsync({ bidId, label })
+                    );
+                  }}
+                />
+                {/*
+                COUNT AGAIN (pin plan § 11.6). A sheet change puts the count
+                down; this puts the last one back in one click, on the sheet
+                the person now means. Never by itself.
+              */}
+                {countAgain && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs max-w-[12rem]"
+                    onClick={() => armGroup(countAgain, countAgain.assemblyId)}
+                    title={`Count ${countAgain.label} again (R)`}
+                    aria-label={`Count ${countAgain.label} again`}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Again: {countAgain.label}</span>
+                  </Button>
+                )}
+              </>
             )
+          )}
+
+          {/*
+            CANCEL, ON SCREEN, for the box tools (device audit, touch #30).
+            With a mouse these stop with Esc or the Legend panel's Cancel; on
+            a tablet there is no Esc, and on a phone the panel has just put
+            itself away so the box can be drawn. So the bar says what is armed
+            and how to put it down, the same way "Counting X ✕" does.
+          */}
+          {(coarse || phone) &&
+            (capturingSymbol || capturingLegend || findBoxing) && (
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => {
+                  setCapturingSymbol(false);
+                  setCapturingLegend(false);
+                  if (findBoxing) setFindSession(null);
+                }}
+              >
+                {capturingLegend
+                  ? "Boxing the legend"
+                  : findBoxing
+                    ? "Box one symbol to find"
+                    : "Box a symbol to capture"}
+                <X className="w-3 h-3" />
+                <span className="sr-only">Cancel</span>
+              </Button>
+            )}
+
+          {/*
+            FIND ALL MATCHING sits beside the count it fills, and only there:
+            what it finds is offered AS the armed count, so with nothing armed
+            it would have nothing to offer them as. Not on a locked bid, which
+            takes no new marks.
+          */}
+          {!phone &&
+            armedGroup &&
+            activeSheet &&
+            !tracing &&
+            !quantitiesLocked && (
+              <Button
+                size="sm"
+                variant={findSession ? "secondary" : "outline"}
+                className="h-7 gap-1.5 text-xs"
+                onClick={() =>
+                  findSession ? setFindSession(null) : startFind()
+                }
+                title="Box one symbol and find every copy of it on this sheet. Nothing is counted until you confirm it."
+                aria-pressed={Boolean(findSession)}
+              >
+                <ScanSearch className="w-3.5 h-3.5" />
+                Find all matching
+              </Button>
+            )}
+          {/*
+            CHECK SHEET needs no armed count: it reads every count on the
+            sheet against the legend. Shown on a locked bid too — there it is
+            a report with no buttons. Not on a phone, which reads rather than
+            counts (Track B's device rule), like Find all matching beside it.
+          */}
+          {!phone && activeSheet && !tracing && (
+            <Button
+              size="sm"
+              variant={checkSession ? "secondary" : "outline"}
+              className="h-7 gap-1.5 text-xs"
+              onClick={() =>
+                checkSession ? setCheckSession(null) : startCheck()
+              }
+              title={
+                sessionLegend
+                  ? `Compare every mark on this sheet with the legend on ${sessionLegend.sheetName}. Nothing changes until you press a button.`
+                  : "Compare every mark on this sheet with the legend. Read the legend first with Whole legend."
+              }
+              aria-pressed={Boolean(checkSession)}
+            >
+              <ListChecks className="w-3.5 h-3.5" />
+              Check sheet
+            </Button>
           )}
 
           {activeSheet && !tracing && <div className="w-px h-4 bg-border" />}
@@ -5000,7 +8538,7 @@ export default function TakeoffPage({
             sheet the screen offered NO tool at all, and a tool that is not on
             screen does not read as unavailable, it reads as non-existent.
           */}
-          {activeSheet && !tracing && (
+          {!phone && activeSheet && !tracing && (
             <>
               {/*
                 aria-disabled, not disabled. A truly disabled button gets
@@ -5018,7 +8556,11 @@ export default function TakeoffPage({
                 aria-disabled={!measurability}
                 onClick={() => {
                   if (!measurability) return;
-                  if (traceCondition) toast.info(traceCondition);
+                  // Not on a locked bid: `startTracing` refuses there, and a
+                  // "trace the path" hint beside that refusal contradicts it
+                  // (seen on screen, 2026-09-29).
+                  if (traceCondition && !quantitiesLocked)
+                    toast.info(traceCondition);
                   startTracing("conduit");
                 }}
                 onMouseEnter={() => setReachingForMeasure(true)}
@@ -5026,6 +8568,7 @@ export default function TakeoffPage({
                 onFocus={() => setReachingForMeasure(true)}
                 onBlur={() => setReachingForMeasure(false)}
                 title={traceCondition ?? "Trace a conduit run"}
+                aria-label={`Trace conduit: ${armedRunType.conduit?.label ?? "Conduit"}`}
               >
                 {/* Plain, deliberately — see runIcons. The shape says which
                     tool this is; colour on the drawing says which TYPE, and a
@@ -5077,7 +8620,8 @@ export default function TakeoffPage({
                 aria-disabled={!measurability}
                 onClick={() => {
                   if (!measurability) return;
-                  if (traceCondition) toast.info(traceCondition);
+                  if (traceCondition && !quantitiesLocked)
+                    toast.info(traceCondition);
                   startTracing("cable");
                 }}
                 onMouseEnter={() => setReachingForMeasure(true)}
@@ -5088,6 +8632,7 @@ export default function TakeoffPage({
                   traceCondition ??
                   "Trace a run of self-contained cable — MC or Romex"
                 }
+                aria-label={`Trace cable: ${armedRunType.cable?.label ?? "Cable"}`}
               >
                 <CableIcon className="w-3.5 h-3.5" />{" "}
                 {armedRunType.cable?.label ?? "Cable"}
@@ -5124,13 +8669,18 @@ export default function TakeoffPage({
           )}
 
           {/*
-            ── SELECT TEXT ──────────────────────────────────────────────────
+            ── COPY TEXT ────────────────────────────────────────────────────
             Its own group, after Measure: it reads the sheet rather than
             counting or measuring it, and it needs no scale, so it is never
             dimmed with the Measure tools. Hidden while tracing, like Count and
             Measure, rather than cancelling a trace somebody is halfway through.
+
+            Called "Select text" until 2026-09-29 (owner). Selecting marks is
+            a real thing on this screen now (click, Shift-drag), and two
+            "select"s doing different things was the confusion. It saves
+            nothing and puts nothing on the sheet; it reads words to copy.
           */}
-          {activeSheet && !tracing && (
+          {!phone && activeSheet && !tracing && (
             <>
               <div className="w-px h-4 bg-border" />
               <Button
@@ -5144,9 +8694,158 @@ export default function TakeoffPage({
                 title="Drag a box to copy part numbers and notes (T)"
               >
                 <TextSelect className="w-3.5 h-3.5" />
-                Select text
+                Copy text
                 {selectingText && <X className="w-3 h-3" />}
               </Button>
+            </>
+          )}
+
+          {/*
+            ── UNDO / REDO (D6) ─────────────────────────────────────────────
+            Icons only, and the tooltip NAMES the step ("Undo: 3 marks
+            placed"), so nobody undoes blind. Hidden while tracing: there,
+            Ctrl+Z takes back the last point, and two arrows meaning two
+            different things on one screen is the confusion to avoid.
+          */}
+          {activeSheet && !tracing && (
+            <>
+              <div className="w-px h-4 bg-border" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 px-0"
+                onClick={() => void stepBack("undo")}
+                disabled={undoBusy || nextUndo(undoState) === null}
+                title={undoTitle(undoState)}
+                aria-label={undoTitle(undoState)}
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+              </Button>
+              {!phone && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 px-0"
+                  onClick={() => void stepBack("redo")}
+                  disabled={undoBusy || nextRedo(undoState) === null}
+                  title={redoTitle(undoState)}
+                  aria-label={redoTitle(undoState)}
+                >
+                  <Redo2 className="w-3.5 h-3.5" />
+                </Button>
+              )}
+              {/*
+                DELETE, beside the arrows that take it back. It names what it
+                will delete ("Delete 3 marks") and is greyed out until
+                something is selected; marks of more than one count, or a
+                whole run, ask first (@/lib/stampSelection, toolbarDelete).
+              */}
+              {(() => {
+                const run = runs.find(r => r.id === selectedRunId) ?? null;
+                const state = toolbarDelete(
+                  selectedStamps.length,
+                  run ? { isLeg: run.parentRunId != null } : null,
+                  new Set(selectedStamps.map(s => s.groupId)).size
+                );
+                const locked = quantitiesLocked && state.enabled;
+                return (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    disabled={!state.enabled || locked}
+                    title={
+                      locked
+                        ? "This bid's quantities are locked — unlock them on the bid to delete."
+                        : state.title
+                    }
+                    onClick={deleteSelection}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {state.label}
+                  </Button>
+                );
+              })()}
+              {/*
+                SELECT — the finger's Shift-click and Shift-drag (device audit,
+                touch #16/#17). Only on a coarse pointer: with a mouse the keys
+                already do it, and a switch nobody needs is a switch in the way.
+              */}
+              {coarse && !armedGroup && (!phone || touchSelect) && (
+                <Button
+                  size="sm"
+                  variant={touchSelect ? "default" : "outline"}
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={() => setTouchSelect(on => !on)}
+                  aria-pressed={touchSelect}
+                  title={
+                    touchSelect
+                      ? "Selecting — tap marks to add or remove, drag to box them. Tap to stop."
+                      : "Select several marks: tap them, or drag a box"
+                  }
+                >
+                  <SquareDashedMousePointer className="w-3.5 h-3.5" />
+                  Select
+                </Button>
+              )}
+              {/*
+                THE PHONE'S TOOLS (device audit, 2026-10-01). A phone is for
+                checking a bid and quick counts, so the bar keeps Count, Undo
+                and Delete and everything else moves behind this one button —
+                still there, because manual mode must stay complete (CLAUDE.md
+                § AI features), just not taking half the screen. Each item
+                calls exactly what its toolbar button calls.
+              */}
+              {phone && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      aria-label="More tools"
+                    >
+                      <MoreHorizontal className="w-3.5 h-3.5" /> Tools
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={!measurability}
+                      onSelect={() => startTracing("conduit")}
+                    >
+                      <ConduitIcon className="w-3.5 h-3.5" /> Trace{" "}
+                      {armedRunType.conduit?.label ?? "conduit"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={!measurability}
+                      onSelect={() => startTracing("cable")}
+                    >
+                      <CableIcon className="w-3.5 h-3.5" /> Trace{" "}
+                      {armedRunType.cable?.label ?? "cable"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => startSelectingText()}>
+                      <TextSelect className="w-3.5 h-3.5" /> Copy text
+                    </DropdownMenuItem>
+                    {armedGroup && !quantitiesLocked && (
+                      <DropdownMenuItem onSelect={() => startFind()}>
+                        <ScanSearch className="w-3.5 h-3.5" /> Find all matching
+                      </DropdownMenuItem>
+                    )}
+                    {!armedGroup && (
+                      <DropdownMenuItem onSelect={() => setTouchSelect(true)}>
+                        <SquareDashedMousePointer className="w-3.5 h-3.5" />
+                        Select several marks
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      disabled={undoBusy || nextRedo(undoState) === null}
+                      onSelect={() => void stepBack("redo")}
+                    >
+                      <Redo2 className="w-3.5 h-3.5" /> {redoTitle(undoState)}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </>
           )}
 
@@ -5236,7 +8935,8 @@ export default function TakeoffPage({
               Counting needs no scale, and a specifications or legend sheet has
               nothing on it to measure at all.
             */}
-            {activeSheet && (
+            {/* On the phone only while tracing, where the length needs it. */}
+            {activeSheet && (!phone || tracing) && (
               <ScaleControl
                 sheet={activeSheet}
                 wanted={
@@ -5244,6 +8944,14 @@ export default function TakeoffPage({
                 }
                 notToScale={notToScaleBySheet[activeSheet.id] ?? false}
                 pageSize={activePageSize}
+                onRefused={
+                  quantitiesLocked
+                    ? () =>
+                        toast.error(
+                          lockedEditRefusal("a sheet's scale cannot be changed")
+                        )
+                    : undefined
+                }
                 onSet={scaleText =>
                   setSheetScale.mutateAsync({ id: activeSheet.id, scaleText })
                 }
@@ -5259,19 +8967,25 @@ export default function TakeoffPage({
               makes flat distance measurable, the other makes vertical distance
               measurable, and neither of them counts anything until it is set.
             */}
-            <JobHeightsChip
-              bidId={bidId}
-              onChanged={() => refreshFor("heights")}
-            />
+            {!phone && (
+              <>
+                <JobHeightsChip
+                  bidId={bidId}
+                  onChanged={() => refreshFor("heights")}
+                />
 
-            <div className="w-px h-4 bg-border" />
+                <div className="w-px h-4 bg-border" />
+              </>
+            )}
 
             {/* PlanPane portals its zoom cluster in here. */}
             <div ref={setZoomSlot} className="flex items-center" />
 
-            <div className="w-px h-4 bg-border" />
+            {!phone && <div className="w-px h-4 bg-border" />}
 
+            {/* No Focus on the phone: it has no side panels to put away. */}
             <Button
+              hidden={phone}
               size="sm"
               variant={focusMode ? "default" : "ghost"}
               className="h-7 gap-1.5 px-2 text-xs"
@@ -5364,6 +9078,7 @@ export default function TakeoffPage({
           <SidePanel
             side="left"
             label="the sheet list"
+            phone={compact ? { as: "portal", target: sheetsSlot } : undefined}
             open={panels.sheets}
             width={panels.sheetsWidth}
             minWidth={PANEL_LIMITS.sheets.min}
@@ -5430,11 +9145,23 @@ export default function TakeoffPage({
                     className="h-11 w-11 -my-2 -mr-2 p-0 shrink-0 self-center text-muted-foreground hover:text-destructive"
                     onClick={e => {
                       e.stopPropagation();
+                      // Refused before the dialog, not after it: a confirm
+                      // for something that will be refused is noise.
+                      if (quantitiesLocked) {
+                        toast.error(
+                          lockedEditRefusal("its plan sets cannot be removed")
+                        );
+                        return;
+                      }
                       setConfirmRemove(d);
                     }}
                     onKeyDown={e => e.stopPropagation()}
                     aria-label={`Remove ${d.filename}`}
-                    title={`Remove ${d.filename}`}
+                    title={
+                      quantitiesLocked
+                        ? "This bid's quantities are locked — unlock them on the bid to remove a plan set."
+                        : `Remove ${d.filename}`
+                    }
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -5484,8 +9211,10 @@ export default function TakeoffPage({
               key={doc.id}
               doc={doc}
               page={page}
+              focusRequest={focusRequest}
               onPage={setPage}
               controlsTarget={zoomSlot}
+              fitOnly={phone}
               thumbnailWants={wantedThumbnails}
               onThumbnail={rememberThumbnail}
               onPageCount={pageCount =>
@@ -5507,7 +9236,24 @@ export default function TakeoffPage({
                 return fresh?.find(d => d.id === doc.id)?.url ?? null;
               }}
               overlay={size =>
-                measurability ? (
+                /*
+                  Mounted with the DRAWING. This read `measurability ? (`
+                  until 2026-10-06, so until that query answered — a round
+                  trip after a sheet opens, more on a fresh upload, whose
+                  sheet rows come three round trips after the drawing — there
+                  was no layer over the sheet: the count was armed, the pill
+                  said so, and every tap fell on the bare canvas and was lost
+                  without a word (staging smoke, touch.spec, 0 of 3, four runs
+                  in a row). Counting needs no scale and no sheet row:
+                  TraceLayer takes a measurability still loading as "cannot
+                  trace yet", and a tap before the row is kept under a
+                  stand-in sheet id (`provisionalSheetFor`). Each child that
+                  needs the row checks `activeSheet` itself. PlanPane already
+                  calls this only once the sheet has a drawn size; the test is
+                  repeated here rather than dropped so the block below keeps
+                  its shape.
+                */
+                size.width > 0 ? (
                   <>
                     {/* Calibration takes the drawing while it is on: two
                               clicks that mean something different from every
@@ -5554,7 +9300,9 @@ export default function TakeoffPage({
                       !tracing &&
                       !calibrating &&
                       !capturingSymbol &&
-                      !pendingCapture && (
+                      !pendingCapture &&
+                      !capturingLegend &&
+                      !legendDraft && (
                         <TextSelectLayer
                           width={size.width}
                           height={size.height}
@@ -5573,46 +9321,329 @@ export default function TakeoffPage({
                         renderScale={size.renderScale}
                         onCancel={() => setCapturingSymbol(false)}
                         onRegion={(region: CaptureRegion) => {
-                          const thumbnail = size.canvas
+                          // The soft preview, at once, so the form is never
+                          // empty while the sharp render runs.
+                          const preview = size.canvas
                             ? cropToThumbnail(
                                 size.canvas,
                                 region,
                                 size.renderScale
                               )
                             : null;
+                          const id = ++captureSeq.current;
                           setCapturingSymbol(false);
-                          setPendingCapture({ thumbnail });
+                          setPendingCapture({
+                            id,
+                            region,
+                            sheetId: activeSheet?.id,
+                            thumbnail: preview,
+                            sharpening: true,
+                            soft: false,
+                          });
+                          const settle = (sharp: string | null) =>
+                            setPendingCapture(current =>
+                              current?.id === id
+                                ? {
+                                    ...current,
+                                    thumbnail: sharp ?? current.thumbnail,
+                                    sharpening: false,
+                                    soft: sharp === null && preview !== null,
+                                  }
+                                : current
+                            );
+                          renderSharpCapture(
+                            region,
+                            size.screenScale,
+                            size.renderRegion
+                          ).then(settle, error => {
+                            console.warn(
+                              "[capture] sharp render failed; keeping the preview",
+                              error
+                            );
+                            settle(null);
+                          });
                         }}
                       />
                     )}
                     {pendingCapture && (
                       <SymbolCaptureForm
                         thumbnail={pendingCapture.thumbnail}
+                        sharpening={pendingCapture.sharpening}
+                        soft={pendingCapture.soft}
+                        chromeTarget={size.chromeTarget}
                         onCancel={() => setPendingCapture(null)}
-                        onSave={label => {
-                          captureSymbol.mutate(
-                            {
-                              label,
-                              thumbnail: pendingCapture.thumbnail,
-                              capturedFromSheetId: activeSheet?.id,
-                            },
-                            {
-                              onSuccess: r =>
-                                toast.success(
-                                  r.alreadyKnown
-                                    ? "Already in your legend."
-                                    : "Captured — click it to choose an assembly."
-                                ),
+                        existingFor={name => {
+                          const key = symbolLookupKey(name);
+                          const hit = symbols.find(
+                            s =>
+                              symbolLookupKey(s.label) === key ||
+                              (s.originalName !== null &&
+                                symbolLookupKey(s.originalName) === key)
+                          );
+                          return hit
+                            ? {
+                                label: hit.label,
+                                looks: hit.looks,
+                                thumbnail: hit.thumbnail,
+                              }
+                            : null;
+                        }}
+                        onCapture={async (label, { addAsLook, accepted }) => {
+                          // Look-alikes (multiple-looks-plan.md § 4), for a
+                          // new item's first look and an added one alike: the
+                          // boxed symbol is searched on its own sheet, and the
+                          // spots are checked against marks counted as other
+                          // items BEFORE anything is saved.
+                          const capture = pendingCapture;
+                          const box = normaliseCaptureBox(capture.region);
+                          const boxed = box.width > 0 && box.height > 0;
+                          let cannotCompare: string | null = null;
+                          const sheetId = capture.sheetId;
+                          if (!accepted && boxed) {
+                            const onSheet =
+                              sheetId !== undefined &&
+                              sheetId === activeSheet?.id
+                                ? sheetId
+                                : null;
+                            // Other items' looks on this set are searched in
+                            // the same pass: a spot both find is claimed twice.
+                            const others =
+                              onSheet === null
+                                ? null
+                                : await utils.takeoffStamps.looksOnSet
+                                    .fetch({ sheetId: onSheet, label })
+                                    .catch(() => null);
+                            // Adding a look: the item's own looks go in too,
+                            // so their device words can be compared with this
+                            // one's (§ 4 point 1). Their finds are its own.
+                            const key = symbolLookupKey(label);
+                            const ownId = addAsLook
+                              ? symbols.find(
+                                  s =>
+                                    symbolLookupKey(s.label) === key ||
+                                    (s.originalName !== null &&
+                                      symbolLookupKey(s.originalName) === key)
+                                )?.id
+                              : undefined;
+                            const own =
+                              onSheet === null || ownId === undefined
+                                ? null
+                                : await utils.takeoffStamps.searchLooks
+                                    .fetch({
+                                      symbolId: ownId,
+                                      sheetId: onSheet,
+                                    })
+                                    .catch(() => null);
+                            const found =
+                              onSheet === null
+                                ? null
+                                : await size
+                                    .findMatching(box, [
+                                      ...(others?.looks ?? []),
+                                      ...(own?.looks ?? []),
+                                    ])
+                                    .then(r => r.result)
+                                    .catch(() => null);
+                            const check = lookAlikeCheck(
+                              found,
+                              new Map(
+                                (others?.looks ?? []).map(l => [
+                                  l.id,
+                                  l.symbolId,
+                                ])
+                              )
+                            );
+                            const ownIds = new Set(
+                              (own?.looks ?? []).map(l => l.id)
+                            );
+                            const notes =
+                              found?.kind === "ok" && found.symbol.device
+                                ? lookWordNotes(
+                                    found.symbol.device,
+                                    (found.looks?.device ?? [])
+                                      .filter(d => ownIds.has(d.id))
+                                      .map(d => d.device)
+                                  )
+                                : [];
+                            if ("cannotCompare" in check || onSheet === null)
+                              cannotCompare =
+                                "cannotCompare" in check
+                                  ? check.cannotCompare
+                                  : null;
+                            else {
+                              const { alike } =
+                                await checkLookAlikes.mutateAsync({
+                                  sheetId: onSheet,
+                                  label,
+                                  spots: check.spots,
+                                  otherLooks: check.otherLooks,
+                                });
+                              if (alike.length > 0 || notes.length > 0)
+                                return { alike, notes };
+                              cannotCompare = !others
+                                ? "Other items' looks on this set could not be compared."
+                                : others.leftOut > 0
+                                  ? `${others.leftOut} older look${others.leftOut === 1 ? "" : "s"} of other items on this set ${others.leftOut === 1 ? "was" : "were"} not compared.`
+                                  : null;
                             }
+                          }
+                          const r = await captureSymbol.mutateAsync({
+                            label,
+                            thumbnail: capture.thumbnail,
+                            capturedFromSheetId: capture.sheetId,
+                            box: boxed ? box : undefined,
+                            addAsLook,
+                          });
+                          toast.success(
+                            [
+                              r.lookAlreadySaved
+                                ? "This look is already saved."
+                                : r.alreadyKnown && r.lookAdded
+                                  ? `Added look ${r.looks} for ${label}. It is still one item: one count, one price.`
+                                  : r.alreadyKnown
+                                    ? "Already in your legend."
+                                    : r.autoLinked
+                                      ? `Captured and linked to “${
+                                          allAssemblies.find(
+                                            a => a.id === r.assemblyId
+                                          )?.name ?? label
+                                        }”, the assembly of the same name.`
+                                      : // A click on it COUNTS (legend plan
+                                        // § 8a); linking is the row's own
+                                        // control, never the first step.
+                                        "Captured — click it in the legend to start counting. Link it to an assembly from its row whenever you like.",
+                              cannotCompare,
+                            ]
+                              .filter(Boolean)
+                              .join(" ")
                           );
                           setPendingCapture(null);
+                          return null;
                         }}
+                      />
+                    )}
+                    {capturingLegend && (
+                      <SymbolCaptureLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        onCancel={() => setCapturingLegend(false)}
+                        onRegion={(region: CaptureRegion) => {
+                          setCapturingLegend(false);
+                          const sheetId = activeSheet?.id;
+                          setLegendDraft({ state: null, sheetId });
+                          readWholeLegend({
+                            box: region,
+                            renderRegion: size.renderRegion,
+                            loadTextLayer: size.loadTextLayer,
+                            library: allAssemblies.map(a => a.name),
+                            captured: symbols.map(s => s.label),
+                          }).then(
+                            state => {
+                              setLegendDraft(current =>
+                                current ? { ...current, state } : current
+                              );
+                              // Kept for "Check sheet", whatever is saved.
+                              // A legend in three columns is three boxes on
+                              // one sheet, so they add up (mergeLegendRows).
+                              if (state.kind === "rows" && doc && activeSheet)
+                                keepSessionLegend({
+                                  bidId,
+                                  docId: doc.id,
+                                  page,
+                                  sheetName: activeSheet.name,
+                                  rows: mergeLegendRows(
+                                    sessionLegend?.docId === doc.id &&
+                                      sessionLegend.page === page
+                                      ? sessionLegend.rows
+                                      : [],
+                                    state.rows.map(r => ({
+                                      name: r.name,
+                                      symbol: r.symbol,
+                                      picture: r.picture,
+                                    }))
+                                  ),
+                                  picks: sessionLegend?.picks ?? {},
+                                });
+                            },
+                            error => {
+                              setLegendDraft(null);
+                              toast.error(
+                                `The legend could not be read: ${
+                                  error instanceof Error
+                                    ? error.message
+                                    : String(error)
+                                }`
+                              );
+                            }
+                          );
+                        }}
+                      />
+                    )}
+                    {legendDraft && (
+                      <LegendCaptureForm
+                        state={legendDraft.state}
+                        library={allAssemblies.map(a => a.name)}
+                        captured={symbols.map(s => s.label)}
+                        chromeTarget={size.chromeTarget}
+                        saving={legendSaving}
+                        onCancel={() => setLegendDraft(null)}
+                        onSave={async picked => {
+                          let saved = 0;
+                          let linked = 0;
+                          const failed: string[] = [];
+                          for (let i = 0; i < picked.length; i++) {
+                            const row = picked[i];
+                            setLegendSaving(
+                              `Saving ${i + 1} of ${picked.length}…`
+                            );
+                            try {
+                              const r = await captureLegendSymbol.mutateAsync({
+                                label: row.name,
+                                thumbnail: row.picture,
+                                capturedFromSheetId: legendDraft.sheetId,
+                              });
+                              saved++;
+                              if (r.autoLinked) linked++;
+                            } catch {
+                              failed.push(row.name);
+                            }
+                          }
+                          setLegendSaving(null);
+                          setLegendDraft(null);
+                          void utils.takeoffStamps.symbols.invalidate();
+                          if (saved > 0) {
+                            toast.success(
+                              `Saved ${saved} symbol${saved === 1 ? "" : "s"} to your legend` +
+                                (linked > 0
+                                  ? `; ${linked} linked to the assembly of the same name.`
+                                  : ".")
+                            );
+                          }
+                          if (failed.length > 0) {
+                            toast.error(
+                              `${failed.length} could not be saved: ${failed.join(", ")}`
+                            );
+                          }
+                        }}
+                      />
+                    )}
+                    {activeSheet && (
+                      <ConnectPointReader
+                        // Only when a run can snap: tracing, or a run's
+                        // ends up for dragging. No reading on a mere look.
+                        enabled={tracing || selectedRunId !== null}
+                        sheetId={activeSheet.id}
+                        marks={wallMarks}
+                        read={size.connectPoints}
+                        onRead={setConnectRead}
                       />
                     )}
                     <TraceLayer
                       width={size.width}
                       height={size.height}
                       renderScale={size.renderScale}
+                      connects={connects}
                       measurability={measurability}
                       tracing={tracing}
                       pathType={tracePathType}
@@ -5627,6 +9658,7 @@ export default function TakeoffPage({
                       onPointsChange={setTracePoints}
                       existingRuns={drawnRuns}
                       runColors={runColors}
+                      pins={pinStyles}
                       drops={dropMarkers}
                       onSelectDrop={drop => {
                         // Open the trace's leg in the panel, with this drop
@@ -5641,7 +9673,34 @@ export default function TakeoffPage({
                       onCancel={cancelTrace}
                       selectedRunId={selectedRunId}
                       onSelectRun={setSelectedRunId}
-                      stamping={Boolean(armedGroup) && !tracing}
+                      /*
+                        Points are editable on the selected run only, with no
+                        other tool armed — and never on a locked bid, where
+                        the handles are not drawn at all (the server refuses
+                        too). A drag is the thing the lock exists to stop.
+                      */
+                      editableRunId={
+                        quantitiesLocked || selectingText ? null : selectedRunId
+                      }
+                      onPickEnd={(runId, end) =>
+                        setEndHighlight({ runId, end })
+                      }
+                      onEditPoints={(id, points) =>
+                        editPoints.mutate({ id, points })
+                      }
+                      /*
+                        The structural half of "one tool at a time", as for
+                        the text layer above: while another tool holds the
+                        sheet, a click cannot also be a mark.
+                      */
+                      stamping={
+                        Boolean(armedGroup) &&
+                        !tracing &&
+                        !capturingSymbol &&
+                        !pendingCapture &&
+                        !calibrating &&
+                        !selectingText
+                      }
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}
                       stamps={[
@@ -5653,6 +9712,7 @@ export default function TakeoffPage({
                           assemblyCategory: st.assemblyCategory ?? null,
                           x: st.x,
                           y: st.y,
+                          status: st.status,
                         })),
                         /*
                           Clicked and not yet saved, drawn the same way.
@@ -5664,7 +9724,8 @@ export default function TakeoffPage({
                           click that missed.
                         */
                         ...pendingMarks
-                          .filter(m => m.sheetId === activeSheet?.id)
+                          // Held under a stand-in until the row arrives.
+                          .filter(m => m.sheetId === drawnSheetId)
                           .map(m => ({
                             id: m.key,
                             name: m.name,
@@ -5673,6 +9734,9 @@ export default function TakeoffPage({
                             assemblyCategory: m.assemblyCategory,
                             x: m.x,
                             y: m.y,
+                            // What "placing as" said when it was clicked, so
+                            // an existing device is hollow before the reply.
+                            status: m.status === "new" ? null : m.status,
                             pending: true,
                           })),
                       ]}
@@ -5690,7 +9754,58 @@ export default function TakeoffPage({
                         )
                       }
                       onDeleteSelected={() => deleteSelected(false)}
+                      moveTargets={quantitiesLocked ? [] : moveTargets}
+                      onMoveSelected={groupId =>
+                        moveStamps.mutate({
+                          // A mark still being sent has no id yet.
+                          ids: Array.from(selectedStampIds).filter(
+                            id => id > 0
+                          ),
+                          groupId,
+                        })
+                      }
+                      onSetStatusSelected={
+                        quantitiesLocked || !bidId
+                          ? undefined
+                          : status =>
+                              setMarkStatus.mutate({
+                                bidId,
+                                ids: Array.from(selectedStampIds).filter(
+                                  id => id > 0
+                                ),
+                                status,
+                              })
+                      }
+                      selectedDrop={selectionDrops}
+                      onSetHeightSelected={
+                        quantitiesLocked || !bidId
+                          ? undefined
+                          : inches =>
+                              setMarkHeight.mutate({
+                                bidId,
+                                ids: Array.from(selectedStampIds).filter(
+                                  id => id > 0
+                                ),
+                                inches,
+                                source: "typed",
+                              })
+                      }
+                      onSetDropExcludedSelected={
+                        quantitiesLocked || !bidId
+                          ? undefined
+                          : excluded =>
+                              setMarkDropExcluded.mutate({
+                                bidId,
+                                ids: Array.from(selectedStampIds).filter(
+                                  id => id > 0
+                                ),
+                                excluded,
+                              })
+                      }
                       onClearSelection={() => setSelectedStampIds(new Set())}
+                      selectMode={touchSelect}
+                      freePoints={freeLegPoints}
+                      onToggleFreePoints={() => setFreeLegPoints(on => !on)}
                       focusPoint={focusPoint}
                       chromeTarget={size.chromeTarget}
                       legs={{
@@ -5704,6 +9819,180 @@ export default function TakeoffPage({
                         preview: at => snapLegStart(at),
                       }}
                     />
+                    {/*
+                      Find all matching, last so its rings sit over the marks
+                      and take their own clicks (FindMatching.tsx).
+                    */}
+                    {findSession &&
+                      activeSheet &&
+                      findSession.sheetId === activeSheet.id && (
+                        <>
+                          {findSession.panel.phase === "boxing" && (
+                            <SymbolCaptureLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              onCancel={() => setFindSession(null)}
+                              onRegion={region =>
+                                void runFind(region, size.findMatching)
+                              }
+                            />
+                          )}
+                          {findSession.panel.phase === "results" && (
+                            <MatchLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              items={findSession.panel.items}
+                              selectedId={findSession.panel.selectedId}
+                              onSelect={selectFound}
+                            />
+                          )}
+                          <MatchPanel
+                            label={findSession.group.label}
+                            existingLabel={existingTwin?.label ?? null}
+                            state={findSession.panel}
+                            chromeTarget={size.chromeTarget}
+                            canAskAi={readerAvailable}
+                            onAskAi={() =>
+                              void askAboutScanFinds(size.renderRegion)
+                            }
+                            savedLooks={{
+                              total: findSession.looks.length,
+                              thisSet: findSession.looks.filter(
+                                l => l.confirmsThisSet
+                              ).length,
+                            }}
+                            onSearchLooks={() =>
+                              void runFind(null, size.findMatching)
+                            }
+                            onConfirm={confirmFound}
+                            onConfirmExisting={ids =>
+                              void confirmFoundExisting(ids)
+                            }
+                            onReject={ids => decideFound(ids, "rejected")}
+                            onNext={nextFound}
+                            onClose={() => setFindSession(null)}
+                          />
+                        </>
+                      )}
+                    {checkSession &&
+                      activeSheet &&
+                      checkSession.sheetId === activeSheet.id && (
+                        <>
+                          {checkSession.run !== checkSession.ran && (
+                            <SheetCheckRunner
+                              key={checkSession.run}
+                              run={() => void runCheck(size.sheetCheck)}
+                            />
+                          )}
+                          {checkResult && (
+                            <SheetCheckLayer
+                              width={size.width}
+                              height={size.height}
+                              renderScale={size.renderScale}
+                              rings={sheetCheckRings(
+                                checkResult,
+                                checkSession.hidden
+                              )}
+                              selected={checkSession.selected}
+                            />
+                          )}
+                          <SheetCheckPanel
+                            state={checkSession.state}
+                            legendName={sessionLegend?.sheetName ?? null}
+                            legendRows={sessionLegend?.rows ?? []}
+                            picks={sessionLegend?.picks ?? {}}
+                            locked={quantitiesLocked}
+                            onUseHeight={(markId, inches) => {
+                              if (!bidId) return;
+                              setMarkHeight.mutate({
+                                bidId,
+                                ids: [markId],
+                                inches,
+                                source: "read",
+                              });
+                            }}
+                            countForItem={countForItem}
+                            moveTargets={moveTargets}
+                            hidden={checkSession.hidden}
+                            selected={checkSession.selected}
+                            canAskAi={readerAvailable}
+                            renderRegion={size.renderRegion}
+                            chromeTarget={size.chromeTarget}
+                            onPick={(count, item) => {
+                              if (!sessionLegend) return;
+                              const picks = { ...sessionLegend.picks };
+                              const k = count.trim().toLowerCase();
+                              if (item) picks[k] = item;
+                              else delete picks[k];
+                              keepSessionLegend({ ...sessionLegend, picks });
+                              startCheck();
+                            }}
+                            onHide={hideCheckRow}
+                            onSelectRing={(key, at) => {
+                              setCheckSession(s =>
+                                s ? { ...s, selected: key } : s
+                              );
+                              jumpTo(at);
+                            }}
+                            onJump={jumpTo}
+                            onMove={(ids, groupId) =>
+                              moveStamps.mutate({ ids, groupId })
+                            }
+                            onDelete={deleteMarks}
+                            onSelectMarks={ids =>
+                              setSelectedStampIds(new Set(ids))
+                            }
+                            onCount={(group, at) => queueMarksFor(group, at)}
+                            onCountNew={(item, at) => {
+                              void createGroup
+                                .mutateAsync({
+                                  bidId,
+                                  label: countNameFromLegend(item),
+                                  reuseExisting: true,
+                                })
+                                .then(g => {
+                                  // The count is named from the row's first
+                                  // sentence, so it would no longer match the
+                                  // row by name: record the row as its pick.
+                                  if (sessionLegend)
+                                    keepSessionLegend({
+                                      ...sessionLegend,
+                                      picks: {
+                                        ...sessionLegend.picks,
+                                        [g.label.trim().toLowerCase()]: item,
+                                      },
+                                    });
+                                  queueMarksFor(
+                                    {
+                                      groupId: g.id,
+                                      label: g.label,
+                                      assemblyId: null,
+                                    },
+                                    at
+                                  );
+                                  void bidCounts.refetch();
+                                })
+                                .catch(() => {});
+                            }}
+                            onSplit={(_count, ids, label) => {
+                              void createGroup
+                                .mutateAsync({ bidId, label })
+                                .then(g => {
+                                  moveStamps.mutate({ ids, groupId: g.id });
+                                  void bidCounts.refetch();
+                                })
+                                .catch(() => {});
+                            }}
+                            onAskAi={batch =>
+                              askTieBreak(batch, size.renderRegion)
+                            }
+                            onRerun={startCheck}
+                            onClose={() => setCheckSession(null)}
+                          />
+                        </>
+                      )}
                   </>
                 ) : null
               }
@@ -5717,8 +10006,25 @@ export default function TakeoffPage({
           <SidePanel
             side="right"
             label="counted items"
+            phone={
+              phone
+                ? {
+                    as: "sheet",
+                    open: phonePanelOpen,
+                    onClose: () => setPhonePanelOpen(false),
+                    // Named as the toolbar's sheet chip names it, from the
+                    // same function — "Sheet 1" here beside "E0.01" there
+                    // was seen on screen 2026-09-30.
+                    title: activeSheet
+                      ? sheetLabel(
+                          sheetDisplay(activeSheet, identities.get(page))
+                        )
+                      : `Sheet ${page}`,
+                  }
+                : undefined
+            }
             open={panels.work}
-            width={panels.workWidth}
+            width={workWidth}
             minWidth={PANEL_LIMITS.work.min}
             maxWidth={PANEL_LIMITS.work.max}
             onToggle={() =>
@@ -5730,6 +10036,24 @@ export default function TakeoffPage({
           >
             <RunsPanel
               runColors={runColors}
+              pins={pinStyles}
+              lookEditor={(groupId, name, swatch) => {
+                const style = pinStyles.get(groupId);
+                const row = bidCounts.data?.groups.find(g => g.id === groupId);
+                if (!style || !row) return swatch;
+                return (
+                  <PinLookEditor
+                    name={name}
+                    style={style}
+                    own={row.look}
+                    everyJob={everyJobTarget(row)}
+                    busy={setLook.isPending}
+                    onSave={look => setLook.mutate({ id: groupId, ...look })}
+                  >
+                    {swatch}
+                  </PinLookEditor>
+                );
+              }}
               hideOtherRuns={hideOtherRuns}
               onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
               onAddLeg={run => {
@@ -5763,16 +10087,26 @@ export default function TakeoffPage({
               waitingToSend={bidCounts.data?.waitingToSend}
               countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
               onSendToBid={id => sendToBid.mutate({ id })}
+              linkAssemblies={allAssemblies.map(a => ({
+                id: a.id,
+                name: a.name,
+                category: a.category ?? null,
+              }))}
+              onLinkAssembly={(id, assemblyId) =>
+                setGroupSource.mutate({ id, assemblyId })
+              }
               sendingGroupId={
                 sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
               }
-              onJumpTo={at => {
-                setFocusPoint(at);
-                // Clear the highlight after a moment — a marker that stays
-                // ringed forever stops meaning "this is the one".
-                window.setTimeout(() => setFocusPoint(null), 2200);
-              }}
+              onJumpTo={jumpTo}
               onRemoveStamp={id => removeStamp.mutate({ id })}
+              summary={
+                <TakeoffSummaryPanel
+                  summary={bidSummary.data}
+                  sending={sendAll.isPending}
+                  onSendAll={expect => sendAll.mutate({ bidId, expect })}
+                />
+              }
               onAnswerBranchWiring={(runId, answer) =>
                 setBranchWiring.mutate({ id: runId, branchWiring: answer })
               }
@@ -5899,10 +10233,7 @@ export default function TakeoffPage({
                     }
                     selected={selectedDrop}
                     onSelect={setSelectedDrop}
-                    onJumpTo={at => {
-                      setFocusPoint(at);
-                      window.setTimeout(() => setFocusPoint(null), 2200);
-                    }}
+                    onJumpTo={jumpTo}
                     onAnswer={answers =>
                       answerDrops.mutate({
                         rootRunId: run.parentRunId ?? run.id,
@@ -5912,84 +10243,103 @@ export default function TakeoffPage({
                     busy={answerDrops.isPending}
                   />
                 ) : (
-                  <RunEndsEditor
-                    bidId={bidId}
-                    runId={run.id}
-                    ends={
-                      run.ends ?? {
-                        startKind: null,
-                        endKind: null,
-                        startHeightInches: null,
-                        endHeightInches: null,
-                        distributionHeightInches: null,
-                        startStampId: null,
-                        endStampId: null,
-                      }
-                    }
-                    verticals={run.quantities?.verticals ?? null}
-                    suggestion={suggestionForRun(run.id)}
-                    teeEnds={{
-                      start: Boolean(run.startTee),
-                      end: Boolean(run.endTee),
-                    }}
-                  />
+                  <>
+                    {/* Every end of every leg of this run (owner, 2026-09-29). */}
+                    <RunEndsSection
+                      bidId={bidId}
+                      legs={runEndsLegs(run.parentRunId ?? run.id)}
+                      onSave={onSetEnds}
+                      onJumpTo={jumpTo}
+                      highlight={endHighlight}
+                      locked={quantitiesLocked}
+                    />
+                    <RunEndsEditor
+                      bidId={bidId}
+                      ends={run.ends ?? NO_ENDS}
+                      verticals={run.quantities?.verticals ?? null}
+                      suggestion={suggestionForRun(run.id)}
+                      teeEnds={{
+                        start: Boolean(run.startTee),
+                        end: Boolean(run.endTee),
+                      }}
+                      onSave={patch => onSetEnds(run.id, patch)}
+                      endsElsewhere
+                    />
+                  </>
                 )
+              }
+              /*
+                THE READER has its own tab since 2026-09-30 (§ 1 of the
+                panel plan). It used to sit above the layers and legend in
+                one long column. Opening the tab starts nothing: a read is
+                a button, never an effect (CLAUDE.md § AI features).
+              */
+              reader={
+                readerAvailable ? (
+                  <CoPilotPanel
+                    state={copilot}
+                    reading={readSheet.isPending}
+                    canRead={canRead}
+                    onRead={runReader}
+                    onConfirm={findingIds => {
+                      if (!copilot?.runId) return;
+                      confirmFindings.mutate({
+                        runId: copilot.runId,
+                        findingIds,
+                        confirmed: true,
+                      });
+                    }}
+                    onDismiss={findingIds =>
+                      dismissFindings.mutate({ findingIds })
+                    }
+                    onCorrect={(findingId, symbolLinkId) =>
+                      correctFinding.mutate({
+                        findingId,
+                        symbolLinkId,
+                        confirmed: true,
+                      })
+                    }
+                    onJumpTo={jumpTo}
+                    symbols={symbols}
+                    onAsk={question => {
+                      if (!activeSheet) return;
+                      const snapshot = snapshotPage(
+                        pageCanvas.current,
+                        pageCanvasScale.current,
+                        copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
+                      );
+                      if (!snapshot) return;
+                      askCopilot.mutate({
+                        sheetId: activeSheet.id,
+                        question,
+                        pageImage: snapshot.image,
+                        pageText: pageTextFor(
+                          pageTextByPage.current,
+                          doc?.id,
+                          page
+                        ),
+                      });
+                    }}
+                    asking={askCopilot.isPending}
+                    answer={copilotAnswer}
+                    onClearAnswer={() => setCopilotAnswer(null)}
+                  />
+                ) : undefined
+              }
+              tab={panelTab}
+              tabs={panelTabs}
+              onTab={choosePanelTab}
+              warnedTabs={warnedTabs}
+              phone={compact}
+              onSheetsSlot={setSheetsSlot}
+              focusGroupId={
+                selectedStampIds.size === 0
+                  ? null
+                  : (stamps.find(s => selectedStampIds.has(s.id))?.groupId ??
+                    null)
               }
               legend={
                 <>
-                  {/* Above the layers and the legend: what the reader found
-                        is the thing a user comes to this pane to act on, and
-                        the legend it depends on sits below it where it is
-                        still one glance away. */}
-                  {readerAvailable && (
-                    <CoPilotPanel
-                      state={copilot}
-                      reading={readSheet.isPending}
-                      canRead={canRead}
-                      onRead={runReader}
-                      onConfirm={findingIds => {
-                        if (!copilot?.runId) return;
-                        confirmFindings.mutate({
-                          runId: copilot.runId,
-                          findingIds,
-                          confirmed: true,
-                        });
-                      }}
-                      onDismiss={findingIds =>
-                        dismissFindings.mutate({ findingIds })
-                      }
-                      onCorrect={(findingId, symbolLinkId) =>
-                        correctFinding.mutate({
-                          findingId,
-                          symbolLinkId,
-                          confirmed: true,
-                        })
-                      }
-                      onJumpTo={at => {
-                        setFocusPoint(at);
-                        window.setTimeout(() => setFocusPoint(null), 2200);
-                      }}
-                      symbols={symbols}
-                      onAsk={question => {
-                        if (!activeSheet) return;
-                        const snapshot = snapshotPage(
-                          pageCanvas.current,
-                          pageCanvasScale.current,
-                          copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
-                        );
-                        if (!snapshot) return;
-                        askCopilot.mutate({
-                          sheetId: activeSheet.id,
-                          question,
-                          pageImage: snapshot.image,
-                          pageText: pageTextByPage.current.get(page) ?? "",
-                        });
-                      }}
-                      asking={askCopilot.isPending}
-                      answer={copilotAnswer}
-                      onClearAnswer={() => setCopilotAnswer(null)}
-                    />
-                  )}
                   <LayersPanel
                     present={present}
                     state={effectiveLayers}
@@ -6012,28 +10362,122 @@ export default function TakeoffPage({
                       category: a.category,
                     }))}
                     activeAssemblyId={armedGroup?.assemblyId ?? null}
+                    activeSymbolId={armedGroup?.symbolId ?? null}
                     capturing={capturingSymbol}
                     onStartCapture={() => {
+                      // The box is a drag on the drawing; a count still in
+                      // hand would take the same press as a mark.
+                      setArmedGroup(null);
                       setSelectingText(false);
+                      setCapturingLegend(false);
                       setCapturingSymbol(true);
                     }}
                     onCancelCapture={() => setCapturingSymbol(false)}
+                    capturingLegend={capturingLegend}
+                    onStartLegend={() => {
+                      setSelectingText(false);
+                      setCapturingSymbol(false);
+                      setPendingCapture(null);
+                      setCapturingLegend(true);
+                    }}
+                    onCancelLegend={() => setCapturingLegend(false)}
                     onLink={(symbolId, assemblyId) =>
                       linkSymbol.mutate({ id: symbolId, assemblyId })
                     }
                     onUnlink={id => unlinkSymbol.mutate({ id })}
-                    onRemove={id => removeSymbol.mutate({ id })}
+                    renameRefusal={
+                      quantitiesLocked
+                        ? lockedEditRefusal(
+                            "its legend names cannot be changed"
+                          )
+                        : null
+                    }
+                    onRename={(id, label) =>
+                      renameSymbol.mutate({ id, bidId, label })
+                    }
+                    onResetName={id => resetSymbolName.mutate({ id, bidId })}
+                    onRemove={id => setSymbolDeleteId(id)}
+                    onLookRemoved={lookId => {
+                      // An open find that look made is dropped unless the
+                      // box found it too — never re-pointed
+                      // (multiple-looks-plan.md § 7).
+                      const dropped =
+                        findSession?.panel.phase === "results"
+                          ? dropLookMatches(findSession.panel.items, lookId)
+                              .dropped
+                          : 0;
+                      setFindSession(s =>
+                        s
+                          ? {
+                              ...s,
+                              looks: s.looks.filter(l => l.id !== lookId),
+                              panel:
+                                s.panel.phase === "results"
+                                  ? {
+                                      ...s.panel,
+                                      items: dropLookMatches(
+                                        s.panel.items,
+                                        lookId
+                                      ).items,
+                                      selectedId: null,
+                                    }
+                                  : s.panel,
+                            }
+                          : s
+                      );
+                      return dropped > 0
+                        ? `${dropped} unconfirmed find${dropped === 1 ? "" : "s"} that look made ${dropped === 1 ? "was" : "were"} dropped from this search.`
+                        : null;
+                    }}
                     onUseSymbol={symbol => {
                       const assembly = allAssemblies.find(
                         a => a.id === symbol.assemblyId
                       );
                       if (!assembly) return;
-                      groupForAssembly
-                        .mutateAsync({ bidId, assemblyId: assembly.id })
-                        .then(group => armGroup(group, assembly.id))
-                        .catch(() => {
-                          /* the mutation's onError has already said so */
-                        });
+                      // The symbol goes too: several symbols sharing one
+                      // assembly each count into their own count (§ 11.2).
+                      // Armed at once; clicks before the count exists are
+                      // kept (armWhileCreating).
+                      armWhileCreating(
+                        symbol.label,
+                        assembly.id,
+                        symbol.id,
+                        () =>
+                          groupForAssembly.mutateAsync({
+                            bidId,
+                            assemblyId: assembly.id,
+                            symbolId: symbol.id,
+                          }),
+                        // It may have made a count, or linked a plain one.
+                        () =>
+                          void utils.takeoffGroups.list.invalidate({ bidId })
+                      );
+                    }}
+                    onCountSymbol={symbol => {
+                      /*
+                        A plain count under the symbol's name (§ 8a). Reused,
+                        not refused, when the bid already has it: clicking
+                        the same symbol again means "keep counting that".
+                      */
+                      // Armed at once; clicks before the count exists are
+                      // kept (armWhileCreating, which also refuses on a
+                      // locked bid).
+                      armWhileCreating(
+                        symbol.label,
+                        null,
+                        symbol.id,
+                        () =>
+                          createGroup.mutateAsync({
+                            bidId,
+                            label: symbol.label,
+                            reuseExisting: true,
+                            // A renamed symbol still owns the count made
+                            // under its original name on this bid.
+                            symbolId: symbol.id,
+                          }),
+                        () =>
+                          void utils.takeoffGroups.list.invalidate({ bidId })
+                      );
                     }}
                   />
                 </>
@@ -6041,7 +10485,19 @@ export default function TakeoffPage({
               totals={totals}
               selectedRunId={selectedRunId}
               onSelectRun={setSelectedRunId}
-              onRemoveRun={id => removeRun.mutate({ id })}
+              onRemoveRun={askRemoveRun}
+              onDeleteCountMarks={deleteMarks}
+              onDeleteCount={askDeleteCount}
+              onOpenPartialEnds={openPartialEnds}
+              cardUndo={subject => undoForSubject(undoState, subject)}
+              emptiedCount={emptiedCountCard(
+                undoState,
+                activeSheet?.id ?? null,
+                stampGroups.map(g => g.groupId)
+              )}
+              // Only ever enabled for the NEWEST step, so it is the ordinary
+              // undo — never an out-of-order one (@/lib/undoStack).
+              onCardUndo={() => void stepBack("undo")}
               onCommitRun={id => commitRun.mutate({ id })}
               onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
               onAddCircuit={(runId, name, conductorCount, groundCount) =>
@@ -6064,14 +10520,43 @@ export default function TakeoffPage({
                       setSelectedDocId(to.bidPdfId);
                     if (to.pageNumber !== null) setPage(to.pageNumber);
                     setSelectedRunId(to.runId);
-                    setFocusPoint({ x: to.x, y: to.y });
-                    window.setTimeout(() => setFocusPoint(null), 2200);
+                    // Same commit as the page change, so PlanPane fits the
+                    // new sheet first and then centres this spot on it.
+                    jumpTo({ x: to.x, y: to.y });
                   }}
                 />
               }
             />
           </SidePanel>
         </div>
+      )}
+
+      {/*
+        THE PHONE'S BAR UNDER THE DRAWING (plan § 3): this sheet's line, and
+        the way into the panel. A warning anywhere in the panel shows here
+        too — with the panel closed, its tabs' marks are out of sight, and a
+        line not on the bid is a bid that is short (plan § 4 item 2).
+      */}
+      {phone && doc && !phonePanelOpen && (
+        <button
+          type="button"
+          onClick={() => setPhonePanelOpen(true)}
+          className="flex h-12 shrink-0 items-center gap-2 border-t border-border bg-card px-3 text-left"
+          aria-label="Open the panel: counts, runs, sheets and totals"
+        >
+          <ThisSheetLine
+            stampGroups={stampGroups}
+            runs={visibleRuns}
+            className="min-w-0 flex-1 truncate text-sm"
+          />
+          {warnedTabs.size > 0 && (
+            <TriangleAlert
+              className="w-4 h-4 shrink-0 text-warning"
+              aria-label="something needs a look"
+            />
+          )}
+          <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
+        </button>
       )}
 
       {dragging && docs.length > 0 && (
@@ -6083,7 +10568,67 @@ export default function TakeoffPage({
         </div>
       )}
 
-      {/* "Delete N marks?" — asked for more than one, never for one. */}
+      {/* "Delete run Homerun — 84 ft?" — a whole run, named (plan § 1.1). */}
+      <ConfirmDialog
+        open={runDeleteAsk !== null}
+        onOpenChange={open => !open && setRunDeleteAsk(null)}
+        title={runDeleteAsk?.q.title ?? ""}
+        actionLabel={runDeleteAsk?.q.action ?? "Delete run"}
+        tone="destructive"
+        disabled={removeRun.isPending}
+        onConfirm={() => {
+          if (runDeleteAsk) {
+            removeRun.mutate({ id: runDeleteAsk.id });
+            if (selectedRunId === runDeleteAsk.id) setSelectedRunId(null);
+          }
+          setRunDeleteAsk(null);
+        }}
+      >
+        {runDeleteAsk?.q.lines.map(line => (
+          <p key={line}>{line}</p>
+        ))}
+      </ConfirmDialog>
+
+      {/* "Delete count …?" — the whole count, every sheet (plan § 1.2 c′). */}
+      <ConfirmDialog
+        open={countDeleteAsk !== null}
+        onOpenChange={open => !open && setCountDeleteAsk(null)}
+        title={countDeleteAsk?.q.title ?? ""}
+        actionLabel={countDeleteAsk?.q.action ?? "Delete count"}
+        tone="destructive"
+        disabled={removeGroup.isPending}
+        onConfirm={() => {
+          if (countDeleteAsk) removeGroup.mutate({ id: countDeleteAsk.id });
+          setCountDeleteAsk(null);
+        }}
+      >
+        {countDeleteAsk?.q.lines.map(line => (
+          <p key={line}>{line}</p>
+        ))}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={symbolDeleteId !== null}
+        onOpenChange={open => !open && setSymbolDeleteId(null)}
+        title="Delete this legend symbol?"
+        actionLabel="Delete symbol"
+        tone="destructive"
+        disabled={removeSymbol.isPending}
+        onConfirm={() => {
+          if (symbolDeleteId !== null)
+            removeSymbol.mutate({ id: symbolDeleteId });
+          setSymbolDeleteId(null);
+        }}
+      >
+        <p>
+          It comes off the legend on this job and every other job, and the
+          corrections the plan reader learned from it go with it. This cannot be
+          undone.
+        </p>
+        <p>Marks already placed stay where they are.</p>
+      </ConfirmDialog>
+
+      {/* "Delete N marks?" — asked when they span more than one count. */}
       <AlertDialog
         open={confirmingDelete}
         onOpenChange={open => !open && setConfirmingDelete(false)}
@@ -6104,6 +10649,62 @@ export default function TakeoffPage({
               {deleteAsked.confirm}
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear this sheet: the exact counts, then one button naming them. */}
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          {(() => {
+            const name = activeSheet?.name ?? "this sheet";
+            const q = clearPreview.data
+              ? sheetClearQuestion(
+                  name,
+                  clearPreview.data,
+                  // The open sheet's runs are the sheet being cleared. A run
+                  // with no scale has no length, so none are claimed then.
+                  runs.some(r => r.quantities !== null)
+                    ? runs.reduce((s, r) => s + (r.quantities?.runFeet ?? 0), 0)
+                    : null
+                )
+              : null;
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {q?.title ?? `Clear ${name}?`}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2">
+                      {q ? (
+                        q.lines.map(line => <p key={line}>{line}</p>)
+                      ) : clearPreview.isError ? (
+                        <p>{clearPreview.error.message}</p>
+                      ) : (
+                        <p>Counting what is on {name}…</p>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep them</AlertDialogCancel>
+                  {q && !q.empty && (
+                    <AlertDialogAction
+                      disabled={clearSheet.isPending}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                      onClick={() => {
+                        if (activeSheet)
+                          clearSheet.mutate({ sheetId: activeSheet.id });
+                        setConfirmClear(false);
+                      }}
+                    >
+                      {q.confirm}
+                    </AlertDialogAction>
+                  )}
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
         </AlertDialogContent>
       </AlertDialog>
 
@@ -6159,4 +10760,61 @@ export default function TakeoffPage({
       </AlertDialog>
     </div>
   );
+}
+
+/**
+ * Asks the PDF worker where runs meet this sheet's wall devices, and hands
+ * the answer up. Renders nothing; it lives inside the drawing pane because
+ * that is where the worker call for THIS page is in scope.
+ *
+ * Re-asks only when the marks it would ask about change (one added, one
+ * moved). The worker keeps the page's line work, so a re-ask is cheap.
+ */
+function ConnectPointReader({
+  enabled,
+  sheetId,
+  marks,
+  read,
+  onRead,
+}: {
+  enabled: boolean;
+  sheetId: number;
+  marks: ConnectMark[];
+  read: (marks: ConnectMark[]) => Promise<[number, ConnectPoint][]>;
+  onRead: (read: { sheetId: number; read: ConnectRead }) => void;
+}) {
+  const key =
+    enabled && marks.length > 0
+      ? `${sheetId}|${marks.map(m => `${m.id}:${m.x}:${m.y}:${m.family}`).join(",")}`
+      : null;
+  useEffect(() => {
+    if (key === null) return;
+    let live = true;
+    const asked = marks;
+    read(asked).then(
+      points => {
+        if (!live) return;
+        const byId = new Map(asked.map(m => [m.id, m] as const));
+        const result = new Map<
+          number,
+          { x: number; y: number; connect: ConnectPoint }
+        >();
+        for (const [id, connect] of points) {
+          const m = byId.get(id);
+          if (m) result.set(id, { x: m.x, y: m.y, connect });
+        }
+        onRead({ sheetId, read: result });
+      },
+      err => {
+        // Snaps go to the centre and say "still reading" — never silent.
+        console.warn("[connect points] could not read the sheet", err);
+      }
+    );
+    return () => {
+      live = false;
+    };
+    // `key` is every input that matters; `read` is a fresh arrow each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return null;
 }

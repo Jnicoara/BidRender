@@ -1,6 +1,6 @@
 /**
  * Which words on a sheet sit inside a box the estimator dragged, in reading
- * order — the arithmetic behind the plan viewer's "Select text" tool.
+ * order — the arithmetic behind the plan viewer's "Copy text" tool.
  *
  * Here rather than in the component because vitest reaches `client/src/lib`
  * and cannot reach a React component (CLAUDE.md: a rule with no red to go to

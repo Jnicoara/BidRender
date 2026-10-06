@@ -158,6 +158,15 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   // plain 500 name is retired. Never deployed under the old name, but local
   // and test databases hold the row, and a rename here keeps its id there.
   "400 kcmil crimp lug": "400 kcmil crimp lug, single size",
+  // Weatherproof boxes sized by hub (plan § 9b, owner 2026-09-29). The
+  // unsized rows become the 1/2" ones — what most were bought as — and the
+  // 3/4" rows are new. Same ids, so assemblies and bids keep resolving.
+  "Weatherproof box, single-gang": '1/2" weatherproof box, single-gang',
+  "Weatherproof box, double-gang": '1/2" weatherproof box, double-gang',
+  "Weatherproof box, triple-gang": '1/2" weatherproof box, triple-gang',
+  "Weatherproof round box": '1/2" weatherproof round box',
+  "Weatherproof box, single-gang, PVC":
+    '1/2" weatherproof box, single-gang, PVC',
 };
 
 /** An old spelling, normalised the way search ranking compares names. */

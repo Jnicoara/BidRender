@@ -42,9 +42,11 @@ import {
   type MaterialsListDoc,
 } from "../shared/materialsList";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9301;
 const OTHER_USER = 9302;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const describeDb = hasDb ? describe : describe.skip;
@@ -268,6 +270,61 @@ describe("rolling assemblies into one list", () => {
     ]);
     expect(entries[0].qty).toBe(37);
   });
+
+  /*
+    Owner, 2026-09-29 (starter assemblies plan Q5): a fractional part is
+    allowed in an assembly, and the purchase list rounds a piece UP to whole,
+    after summing. Red if the list goes back to two decimals for pieces.
+  */
+  it("orders whole pieces, rounded up after the sum, never 0.25 of one", () => {
+    const firestop = {
+      name: "Firestop caulk",
+      unit: "each" as const,
+      category: null,
+      qty: 0.25,
+    };
+    const one = aggregateMaterials([
+      { name: "Firestop penetration", count: 1, materials: [firestop] },
+    ]);
+    expect(one[0].qty).toBe(1);
+    const four = aggregateMaterials([
+      { name: "Firestop penetration", count: 4, materials: [firestop] },
+    ]);
+    expect(four[0].qty).toBe(1);
+    const five = aggregateMaterials([
+      { name: "Firestop penetration", count: 5, materials: [firestop] },
+    ]);
+    expect(five[0].qty).toBe(2);
+  });
+
+  it("does not order an extra piece from float noise", () => {
+    const tenth = {
+      name: "Part",
+      unit: "each" as const,
+      category: null,
+      qty: 0.1,
+    };
+    // 0.1 summed thirty times is 3.0000000000000013 in floating point.
+    const sources = Array.from({ length: 30 }, (_, i) => ({
+      name: `A${i}`,
+      count: 1,
+      materials: [tenth],
+    }));
+    expect(aggregateMaterials(sources)[0].qty).toBe(3);
+  });
+
+  it("keeps footage at two decimals rather than rounding it up", () => {
+    const entries = aggregateMaterials([
+      {
+        name: "Run",
+        count: 1,
+        materials: [
+          { name: "#12 THHN", unit: "foot", category: null, qty: 10.25 },
+        ],
+      },
+    ]);
+    expect(entries[0].qty).toBe(10.25);
+  });
 });
 
 describe("measured footage is reported as its own kind of thing", () => {
@@ -336,6 +393,7 @@ const docFixture = (
     },
   ],
   measured: [{ label: "Conduit", feet: 340, note: "Traced length." }],
+  forQuote: [],
   notes: ["A note."],
   ...over,
 });
@@ -383,6 +441,28 @@ describe("the CSV a supplier opens", () => {
     expect(isEmptyList(docFixture({ entries: [], measured: [] }))).toBe(true);
     expect(isEmptyList(docFixture())).toBe(false);
     expect(lineCount(docFixture())).toBe(3);
+  });
+
+  /*
+    LEGEND PLAN § 8a. A bid whose only takeoff is a count by name ("A1
+    luminaire: 38") is NOT an empty list — it is exactly the list a lighting
+    package is quoted from — and the CSV says what the rows are, never a price.
+  */
+  it("a count with no assembly is something to send, under its own heading", () => {
+    const doc = docFixture({
+      entries: [],
+      measured: [],
+      forQuote: [{ name: "A1 luminaire", qty: 38, unit: "each" }],
+    });
+    expect(isEmptyList(doc)).toBe(false);
+    expect(lineCount(doc)).toBe(1);
+    const rows = toCsv(doc).split("\r\n");
+    const heading = rows.indexOf('"Supplier to price"');
+    expect(heading).toBeGreaterThan(-1);
+    const row = rows.slice(heading).find(r => r.includes("A1 luminaire"))!;
+    expect(row).toContain('"38"');
+    expect(row).toContain('"ea"');
+    expect(row).not.toMatch(/\$|0\.00/);
   });
 });
 
@@ -820,6 +900,18 @@ const MONEY_KEY =
   /cost|price|pricing|rate|markup|overhead|profit|margin|tax|total|amount|subtotal|charge|dollar|usd/i;
 const MONEY_VALUE = /[$£€]|\b\d{1,3}(,\d{3})+(\.\d{2})?\b/;
 
+/**
+ * A cost as a NUMBER in the text: not inside a longer run of digits. A plain
+ * substring check failed whenever the clock lined up — `preparedOn`
+ * "05:54:01.424Z" contains "1.42", the test's device cost (gate run
+ * 37420713101, 2026-10-06) — and random fixture names carry digits too.
+ * Still catches the figure written as 1.42, "1.42" or 1.4200.
+ */
+function asAFigure(cost: number): RegExp {
+  const fixed = cost.toFixed(2).replace(".", "\\.");
+  return new RegExp(`(?<![\\d.])${fixed}0*(?!\\d)`);
+}
+
 function moneyKeysIn(value: unknown, path = ""): string[] {
   if (value === null || typeof value !== "object") return [];
   if (Array.isArray(value)) {
@@ -910,7 +1002,7 @@ describeDb("carries no pricing", () => {
       deviceCost * 11,
       wireCost * 330,
     ]) {
-      expect(text).not.toContain(figure.toFixed(2));
+      expect(text).not.toMatch(asAFigure(figure));
     }
   });
 
@@ -919,7 +1011,7 @@ describeDb("carries no pricing", () => {
     const doc = await caller().materialsList.get({ bidId });
     const csv = toCsv(doc);
     expect(csv).not.toMatch(/[$£€]/);
-    expect(csv).not.toContain(deviceCost.toFixed(2));
+    expect(csv).not.toMatch(asAFigure(deviceCost));
     // The header row names every column the file will ever have.
     const header = csv.split("\r\n").find(l => l.startsWith('"Item"'))!;
     expect(header).toBe('"Item","Unit","Quantity","Category","From"');

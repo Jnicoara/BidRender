@@ -46,7 +46,7 @@ export default function AdminSettingsPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Shield className="w-5 h-5 text-primary" />
           <div>

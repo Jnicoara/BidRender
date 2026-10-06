@@ -29,6 +29,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { behindTheLock } from "./behindTheLock.testHelper";
 import { lineHoursUnset, lineNotPriced } from "../shared/lineNotPriced";
 
 const USER = 8795;
@@ -288,34 +289,82 @@ withDb("a field bend is labor only", () => {
     // Owner, 2026-09-26: "any traced line whose part has no labor set must
     // show Not priced for labor, never 0 h". The send used to write
     // `laborHours ?? 0`, freezing a missing unit as a considered zero.
+    //
+    // This used to prove the refill on the COUPLING. Since 2026-09-29 a
+    // coupling's labor is in the run's per-foot rate and never refills (the
+    // test below), so the refill is proven on the pipe.
     const type = await emtType('1/2"');
     const { bidId, sheetId } = await aBid("Labor unset");
     await trace(bidId, sheetId, type.id, L);
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
 
     let lines = (await detail(bidId)).lines;
-    for (const role of ["raceway", "coupling", "connector", "strap"]) {
-      const sent = line(lines, role)!;
-      expect(sent.snapshotLaborHours, role).toBeNull();
-      expect(lineHoursUnset(sent), role).toBe(true);
-    }
+    const pipeLine = line(lines, "raceway")!;
+    expect(pipeLine.snapshotLaborHours).toBeNull();
+    expect(lineHoursUnset(pipeLine)).toBe(true);
 
-    const coupling = await shipped('1/2" EMT set-screw coupling');
-    await caller().materials.update({ id: coupling.id, laborHours: 0.05 });
-    expect((await preview(bidId)).get("coupling")!.resend).toEqual({
+    const pipe = await shipped('1/2" EMT');
+    await caller().materials.update({ id: pipe.id, laborHours: 0.04 });
+    const [entry] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
+    expect(entry.rows.find(r => r.role === "raceway")!.resend).toEqual({
       kind: "refill",
       price: null,
-      hours: 0.05,
+      hours: 0.04,
     });
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     lines = (await detail(bidId)).lines;
-    expect(Number(line(lines, "coupling")!.snapshotLaborHours)).toBeCloseTo(
-      0.05,
+    expect(Number(line(lines, "raceway")!.snapshotLaborHours)).toBeCloseTo(
+      0.04,
       4
     );
+    expect(lineHoursUnset(line(lines, "raceway")!)).toBe(false);
+  });
+
+  it("pays for couplings, connectors and straps in the run's per-foot rate — never twice", async () => {
+    // Owner, 2026-09-29. The run's hours per foot cover these three, so their
+    // lines carry the part's cost and ZERO hours of their own, even when the
+    // part has hours, and Send again never fills any in. Before this rule the
+    // coupling below froze 0.05 h × its count on top of every foot of pipe.
+    const coupling = await shipped('1/2" EMT set-screw coupling');
+    const connector = await shipped('1/2" EMT set-screw connector');
+    const pipe = await shipped('1/2" EMT');
+    await caller().materials.update({ id: coupling.id, laborHours: 0.05 });
+    await caller().materials.update({ id: connector.id, laborHours: 0.1 });
+    await caller().materials.update({ id: pipe.id, laborHours: 0.04 });
+
+    const type = await emtType('1/2"');
+    const { bidId, sheetId } = await aBid("Run rate covers");
+    await trace(bidId, sheetId, type.id, L);
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+
+    let lines = (await detail(bidId)).lines;
+    for (const role of ["coupling", "connector", "strap"]) {
+      const sent = line(lines, role)!;
+      expect(Number(sent.snapshotLaborHours), role).toBe(0);
+      expect(lineHoursUnset(sent), role).toBe(false);
+      expect(sent.breakdown?.totalLaborHours ?? 0, role).toBe(0);
+    }
+    // The pipe still carries its own hours: the rate that now covers them.
+    expect(Number(line(lines, "raceway")!.snapshotLaborHours)).toBeCloseTo(
+      0.04,
+      4
+    );
+    // A field bend is NOT covered: it keeps its own labor unit.
+    expect(line(lines, "fieldBend")).toBeDefined();
+
+    // A line sent BEFORE this rule, still holding NULL hours: Send again must
+    // not fill the part's 0.05 in, and it must not read as "Not priced".
+    const database = (await getDb())!;
+    await database
+      .update(bidLineItems)
+      .set({ snapshotLaborHours: null })
+      .where(eq(bidLineItems.id, line(lines, "coupling")!.id));
+    // The preview offers nothing for it (null is "nothing to do").
+    expect((await preview(bidId)).get("coupling")!.resend).toBeNull();
+    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    lines = (await detail(bidId)).lines;
+    expect(line(lines, "coupling")!.snapshotLaborHours).toBeNull();
     expect(lineHoursUnset(line(lines, "coupling")!)).toBe(false);
-    // The connector's part still has none: still Not priced.
-    expect(lineHoursUnset(line(lines, "connector")!)).toBe(true);
   });
 
   it("never reaches the supplier list as pipe", async () => {
@@ -377,8 +426,14 @@ withDb("factory elbows from the company size up", () => {
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     await caller().bids.lockQuantities({ bidId });
 
-    await trace(bidId, sheetId, type.id, L);
-    await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    // Behind the lock: a locked bid refuses tracing since 2026-09-29; this
+    // is a drawing that moved before that rule.
+    await behindTheLock(bidId, () => trace(bidId, sheetId, type.id, L));
+    // Since 2026-09-29 a locked bid refuses the send outright (server/lockGuard.ts),
+    // which is a stronger form of "Send-again does not move a frozen line".
+    await expect(
+      caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id })
+    ).rejects.toThrow(/locked/);
     const elbow = line((await detail(bidId)).lines, "elbow90")!;
     expect(Number(elbow.qty)).toBe(1);
     const database = await getDb();
@@ -552,6 +607,46 @@ withDb("a pull point is proposed, and only an answer adds one", () => {
     expect(p.get("pullBox")).toMatchObject({ qty: 0 });
     expect(p.get("lb")!.why).toMatch(
       /1 pull point proposed and not answered yet/
+    );
+  });
+});
+
+/*
+  A type bought as SWEEPS says "sweep" beside the sweep row (plan W1, owner
+  Q1, 2026-09-29). It said "At least 1 90° elbow" under
+  `2" PVC Sch 40 90-degree sweep, 36" radius` — a caption naming the old part
+  beside a row that is a different one reads as confirmation (CLAUDE.md
+  rule 7). Red before the fix: the sentence was the fixed word "90° elbow".
+*/
+withDb("a sweep type's sentence names the sweep", () => {
+  it("counts the L's turn as one 90° sweep, and never says elbow", async () => {
+    const sweep = await shipped('2" PVC Sch 40 90-degree sweep, 36" radius');
+    const type = await caller().takeoffRunTypes.create({
+      label: `PVC sweeps ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: (await shipped('2" PVC Sch 40')).id,
+      elbow90MaterialId: sweep.id,
+    });
+    const { bidId, sheetId } = await aBid("Sweep words");
+    await trace(bidId, sheetId, type.id, L);
+
+    const row = (await preview(bidId)).get("elbow90")!;
+    expect(row).toMatchObject({ status: "counted", qty: 1 });
+    expect(row.materialName).toBe(sweep.name);
+    expect(row.why).toMatch(/^At least 1 90° sweep: 1 corner/);
+    expect(row.why).not.toMatch(/elbow/);
+  });
+
+  it("a type that chose nothing still says elbow", async () => {
+    const type = await caller().takeoffRunTypes.create({
+      label: `PVC elbows ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: (await shipped('2" PVC Sch 40')).id,
+    });
+    const { bidId, sheetId } = await aBid("Elbow words");
+    await trace(bidId, sheetId, type.id, L);
+    expect((await preview(bidId)).get("elbow90")!.why).toMatch(
+      /^At least 1 90° elbow: 1 corner/
     );
   });
 });

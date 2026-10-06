@@ -35,6 +35,7 @@ export type TakeoffQuery =
   | "takeoffRuns.typeColors"
   | "takeoffRunTypes.bridgeForBid"
   | "takeoffGroups.list"
+  | "takeoffSummary.forBid"
   | "takeoffHeights.forBid"
   | "bidPdfs.list"
   | "bidPdfs.sheetJumpList"
@@ -62,6 +63,13 @@ export const BID_QUANTITY_QUERIES = [
   */
   "bids.get",
   "materialsList.get",
+  /*
+    ADDED 2026-09-29 with the whole-set summary. It states every quantity on
+    the plan set as on the bid or not, so anything that moves a quantity or a
+    line moves it — which is why it lives in this list and not beside one
+    mutation (CLAUDE.md, the staleness class).
+  */
+  "takeoffSummary.forBid",
 ] as const satisfies readonly TakeoffQuery[];
 
 const RUN_QUERIES = [
@@ -111,6 +119,33 @@ export type TakeoffChange =
    * its drops, its connectors and what Send would put on the bid all move.
    */
   | "markRemoved"
+  /**
+   * Marks put under another count (takeoffStamps.moveToGroup). Two counts'
+   * quantities move at once, each with its drop, and a run ending on a moved
+   * mark now ends on a different thing.
+   */
+  | "marksMoved"
+  /**
+   * Marks marked new, existing, remove or relocate (shared/markStatus.ts).
+   * Only a new mark is a quantity, so every bid figure the marks feed moves —
+   * the count's number, its line, its drop's footage on the run-type lines,
+   * the materials list — exactly as a move between counts does.
+   */
+  | "markStatus"
+  /**
+   * A mark's own height set, or its drop left off or given back
+   * (vertical-drops-plan § 2). It moves that mark's drop — the count's row,
+   * a run end linked to it, the run-type lines and the materials list —
+   * so the same queries as a status change, keyed by BID: a drop placed on
+   * one sheet moves the totals every sheet shows.
+   */
+  | "markDrop"
+  /**
+   * A count's pin look chosen (shape, letter, colour). No number moves; the
+   * count list carries the look. The legend's `symbols` and the assemblies
+   * list are not per bid and are the caller's to drop.
+   */
+  | "pinLook"
   /** A sheet's row: its scale, its number, its title. */
   | "sheet"
   /**
@@ -125,7 +160,62 @@ export type TakeoffChange =
    * footage lands on run-type lines, so every bid quantity moves, and the
    * group row shows the result.
    */
-  | "groupDrop";
+  | "groupDrop"
+  /**
+   * An undo or redo (@/lib/undoStack). It can put back or take away marks
+   * AND runs at once, so it moves everything either can. Its per-sheet lists
+   * are the STEP's sheet, which may not be the open one — see
+   * `sheetsToRefresh`.
+   */
+  | "undo"
+  /** Every mark and run on one sheet removed (or put back) in one step. */
+  | "sheetCleared"
+  /**
+   * What sits at a run's end, or its height: the DROP. Until 2026-09-29 the
+   * ends editor refreshed `takeoffRuns` only, so the Send preview, the bid's
+   * lines and the materials list kept the old drop footage on screen.
+   */
+  | "runEnds"
+  /**
+   * A count or run type sent to the bid, singly or by Send all. Until
+   * 2026-09-29 the single count send refetched the count list only, so the
+   * bid's cached lines and the materials list kept the old answer.
+   */
+  | "sentToBid"
+  /**
+   * An assembly linked to a count, or taken off it (legend plan § 8a). Every
+   * mark of the count changes what it counts — its colour, what the
+   * materials list itemises and what Send would price — on every sheet.
+   * The other sheets' cached marks are the caller's to drop, as for a whole
+   * count deleted: this table knows the open sheet only.
+   */
+  | "countSource"
+  /**
+   * A legend symbol renamed (2026-10-01). Its plain count on this bid takes
+   * the new name, and that name is read live by the count card, the marks'
+   * tooltips, the bid line, the materials list and the summary — so all of
+   * them move, though no number does. The legend's own `symbols` query is not
+   * per bid and is the caller's to drop.
+   */
+  | "countRenamed";
+
+/**
+ * Which sheets' own lists (marks, runs) a change must refresh.
+ *
+ * The screen invalidated per-sheet lists for the OPEN sheet only. An undo
+ * pressed after switching sheets changes the sheet the step was on, and that
+ * sheet's cached marks would have shown the old answer on return — the
+ * staleness class in CLAUDE.md. So both, when they differ.
+ */
+export function sheetsToRefresh(
+  openSheetId: number | null | undefined,
+  stepSheetId: number | null | undefined
+): number[] {
+  const ids = [openSheetId, stepSheetId].filter(
+    (id): id is number => typeof id === "number"
+  );
+  return Array.from(new Set(ids));
+}
 
 function unique(list: readonly TakeoffQuery[]): readonly TakeoffQuery[] {
   return Array.from(new Set(list));
@@ -144,6 +234,19 @@ export const QUERIES_MOVED_BY: Readonly<
   */
   marksPlaced: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
   markRemoved: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  marksMoved: unique([
+    ...MARK_QUERIES,
+    ...RUN_QUERIES,
+    ...BID_QUANTITY_QUERIES,
+  ]),
+  markStatus: unique([
+    ...MARK_QUERIES,
+    ...RUN_QUERIES,
+    ...BID_QUANTITY_QUERIES,
+  ]),
+  markDrop: unique([...MARK_QUERIES, ...RUN_QUERIES, ...BID_QUANTITY_QUERIES]),
+  // The summary lists every count with its swatch, so it follows too.
+  pinLook: unique([...MARK_QUERIES, "takeoffSummary.forBid"]),
   sheet: unique(SHEET_QUERIES),
   planRemoved: unique([
     "bidPdfs.list",
@@ -153,4 +256,10 @@ export const QUERIES_MOVED_BY: Readonly<
   ]),
   heights: unique(["takeoffHeights.forBid", ...RUN_QUERIES]),
   groupDrop: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  undo: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  sheetCleared: unique([...MARK_QUERIES, ...RUN_QUERIES]),
+  runEnds: unique(RUN_QUERIES),
+  sentToBid: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
+  countSource: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
+  countRenamed: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
 };

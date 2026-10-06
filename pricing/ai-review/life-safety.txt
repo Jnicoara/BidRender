@@ -1,5 +1,5 @@
 Category: Life Safety
-Items: 23
+Items: 24
 
 Category | Name | Size
 Life Safety | Addressable module | -
@@ -25,3 +25,4 @@ Life Safety | Hardwired smoke detector, 10-year | -
 Life Safety | Hardwired smoke/CO detector | -
 Life Safety | Heat detector | -
 Life Safety | Rapid-entry key box | -
+Life Safety | System smoke detector | -

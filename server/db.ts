@@ -18,6 +18,14 @@ import {
 } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
+import {
+  QUANTITY_MARK_STATUSES,
+  emptySplit,
+  isPricedMark,
+  markStatusOf,
+  type MarkStatus,
+  type StatusSplit,
+} from "../shared/markStatus";
 import { mysqlConnection } from "./databaseConnection";
 import {
   InsertUser,
@@ -106,6 +114,9 @@ import {
   InsertSymbolLink,
   SymbolLink,
   symbolLinks,
+  InsertSymbolLook,
+  SymbolLook,
+  symbolLooks,
   EarlyAccessSignup,
   earlyAccessSignups,
   InsertPlanCopilotRun,
@@ -152,6 +163,7 @@ import {
   projects,
   userMaterialsDb,
   users,
+  passwordResetTokens,
   masterItems,
   masterAssemblies,
   masterAssemblyItems,
@@ -179,6 +191,7 @@ import {
   type RunMaterialRole,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { sessionCutoff } from "../shared/sessionValidity";
 import { FILE_SOURCES } from "./backup/collectFiles";
 import type { PlanCounts } from "../shared/planCounts";
 import {
@@ -211,7 +224,12 @@ import { unpricedPartsIn, type NotPricedTally } from "../shared/lineNotPriced";
 import { appliedModifiers } from "../shared/modifierLookup";
 import { resolveMaterial, materialIdsToFetch } from "../shared/materialLookup";
 import { resolveAssembly } from "../shared/assemblyLookup";
-import { buildHeightContext, type HeightContext } from "./runVerticals";
+import {
+  buildHeightContext,
+  verticalsForRunRow,
+  type HeightContext,
+  type RunEnds,
+} from "./runVerticals";
 import {
   groupDrops,
   markDropEntries,
@@ -221,10 +239,13 @@ import {
 import { groupRunFootage, type RunTypeFootageRow } from "./runTypeFootageCore";
 import { resolveRunType } from "../shared/runTypeLookup";
 import {
+  countCableFittings,
   countFittings,
   FITTING_KINDS,
+  MC_STRAP_SPACING,
   isFittingRole,
   isStickJoint,
+  laborInRunRate,
   type FittingCount,
   type FittingKind,
   type RacewayFittingSpec,
@@ -240,6 +261,11 @@ import {
   fittingRows,
   bendMergeFeetForOverrides,
   bendMethodFor,
+  bendWordsFor,
+  cableRunRows,
+  cableTeeRows,
+  mcFittingNames,
+  SMALL_TEE_BOX,
   lbHubsTakeConnectors,
   pickFittingMaterial,
   parseRacewayName,
@@ -254,6 +280,7 @@ import {
   rehomeAnswersAtCut,
   rootOf,
   teeBoxOwners,
+  cableTeeOwners,
   type TeeRef,
 } from "../shared/runNetwork";
 import { pathRealInches } from "../shared/takeoffGeometry";
@@ -448,13 +475,125 @@ export async function countBidsWithLineItems(userId: number): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
-export async function updateUserPassword(userId: number, passwordHash: string) {
+/**
+ * Set a new password AND end every session issued before now (0097).
+ *
+ * The only way a password changes, so the two cannot be separated: a password
+ * change that left the old sessions running would not help the person whose
+ * password was stolen. The caller issues the CURRENT device a fresh session
+ * afterwards if it should stay signed in (`authRouter.changePassword`).
+ */
+export async function updateUserPassword(
+  userId: number,
+  passwordHash: string,
+  now: Date = new Date()
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db
     .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({
+      passwordHash,
+      sessionsValidAfter: sessionCutoff(now),
+      updatedAt: now,
+    })
     .where(eq(users.id, userId));
+}
+
+/**
+ * Store a new reset token for `userId`, voiding any earlier unused one.
+ *
+ * Only the newest link works: asking twice and then clicking the first email
+ * is refused. That keeps "which link is live" a question with one answer, and
+ * it means a mailbox holding several old reset emails holds one credential,
+ * not several.
+ */
+export async function createPasswordResetToken(
+  userId: number,
+  tokenHash: string,
+  expiresAt: Date,
+  now: Date = new Date()
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokens.userId, userId),
+          isNull(passwordResetTokens.usedAt)
+        )
+      );
+    await tx
+      .insert(passwordResetTokens)
+      .values({ userId, tokenHash, expiresAt, createdAt: now });
+  });
+}
+
+/**
+ * Use a reset token: claim it, set the password, end every old session — all
+ * in one transaction, or none of it.
+ *
+ * ── Single-use, by construction ─────────────────────────────────────────────
+ * The claim is ONE conditional UPDATE: `usedAt IS NULL AND expiresAt > now`.
+ * MySQL takes a row lock for it, so of two requests racing on the same link
+ * exactly one sees `affectedRows = 1`; the other sees 0 and changes nothing.
+ * A read-then-write ("is it unused? then mark it") would let both through.
+ *
+ * Returns the user whose password changed, or null when the token is unknown,
+ * already used or expired — deliberately one answer for all three, since
+ * which of them it was tells a stranger holding a guessed token nothing useful
+ * and tells the real owner nothing they can act on differently.
+ */
+export async function completePasswordReset(
+  tokenHash: string,
+  passwordHash: string,
+  now: Date = new Date()
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.transaction(async tx => {
+    const [claim] = await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokens.tokenHash, tokenHash),
+          isNull(passwordResetTokens.usedAt),
+          gt(passwordResetTokens.expiresAt, now)
+        )
+      );
+    if (claim.affectedRows !== 1) return null;
+
+    const [row] = await tx
+      .select({ userId: passwordResetTokens.userId })
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.tokenHash, tokenHash))
+      .limit(1);
+    if (!row) return null;
+
+    await tx
+      .update(users)
+      .set({
+        passwordHash,
+        sessionsValidAfter: sessionCutoff(now),
+        updatedAt: now,
+      })
+      .where(eq(users.id, row.userId));
+    // Any other link still in the mailbox dies with this one.
+    await tx
+      .update(passwordResetTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokens.userId, row.userId),
+          isNull(passwordResetTokens.usedAt)
+        )
+      );
+    return row.userId;
+  });
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -1236,6 +1375,17 @@ export async function withSeedLock(
  * is not at 600 — an unconditional DELETE here deadlocked against ordinary
  * inserts elsewhere. The SELECT costs nothing by comparison and, finding
  * nothing, leaves the table untouched.
+ *
+ * ── The check is a GROUP BY, never the self-join ──────────────────────────────
+ * It used to be the same self-join as the DELETE, `LIMIT 1`. `name` has no
+ * index, so MySQL drove it off `userId` — every baseline row against every
+ * other, quadratic. At 1,554 baseline materials that one SELECT measured
+ * 4,551 ms (2026-10-01, bidrender_test_b), on EVERY seed: every server start
+ * and every test that re-seeds. That was the materialsLibrary "flake" — seven
+ * tests that call the seed sat at 3.4–5.0 s against vitest's 5 s limit, so
+ * any extra load on the MySQL tipped some over, and by 1,554 rows two failed
+ * alone. Same question, one pass: 6 ms. A LIMIT on the join does not help when
+ * there is nothing to find — it has to try every pair to say so.
  */
 async function dedupeBaselineRows(
   table: "materials" | "labor_rates" | "modifiers" | "assemblies" | "kits"
@@ -1245,10 +1395,9 @@ async function dedupeBaselineRows(
   // Table name is a compile-time constant from the union above, never user input.
   const result = await db.execute(
     sql.raw(
-      `SELECT 1 FROM \`${table}\` dupe
-     JOIN \`${table}\` keeper
-       ON dupe.name = keeper.name AND dupe.id > keeper.id
-     WHERE dupe.userId IS NULL AND keeper.userId IS NULL
+      `SELECT 1 FROM \`${table}\`
+     WHERE userId IS NULL
+     GROUP BY name HAVING COUNT(*) > 1
      LIMIT 1`
     )
   );
@@ -1256,12 +1405,19 @@ async function dedupeBaselineRows(
   const [rows] = result as unknown as [unknown[], unknown];
   if (rows.length === 0) return;
 
+  // The keepers are found by the same GROUP BY, materialised first, so the
+  // join is every baseline row against the few duplicated names rather than
+  // against every other row.
   await db.execute(
     sql.raw(
       `DELETE dupe FROM \`${table}\` dupe
-     JOIN \`${table}\` keeper
-       ON dupe.name = keeper.name AND dupe.id > keeper.id
-     WHERE dupe.userId IS NULL AND keeper.userId IS NULL`
+     JOIN (
+       SELECT name, MIN(id) AS keepId FROM \`${table}\`
+       WHERE userId IS NULL
+       GROUP BY name HAVING COUNT(*) > 1
+     ) keeper
+       ON dupe.name = keeper.name AND dupe.id > keeper.keepId
+     WHERE dupe.userId IS NULL`
     )
   );
 }
@@ -5128,6 +5284,25 @@ export async function updateBidPdfSheet(
  * rows that are already in scope. The callers below have verified the bid
  * before they get here.
  */
+/**
+ * Rule 1 of shared/markStatus.ts as SQL: a mark is a QUANTITY only when its
+ * status is NULL (placed before the column — new) or a quantity status. An
+ * existing device, a remove, a relocate or an unconfirmed mark counts toward
+ * nothing. Built from the same list the rule reads, so the two cannot drift.
+ *
+ * Applied at every source a quantity is made from: the bid's line counts
+ * (`stampCountsForBid`), the counts the screens compare them with
+ * (`countStampsByGroup` — the SAME rule, or a count with an existing mark in
+ * it would look out of date with its line forever), and the marks the
+ * materials list, the takeoff export and the drops read (`getStampsForBid`).
+ */
+function markIsQuantity() {
+  return or(
+    isNull(takeoffStamps.status),
+    inArray(takeoffStamps.status, [...QUANTITY_MARK_STATUSES])
+  );
+}
+
 async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
   const db = await getDb();
   if (!db) return new Map();
@@ -5137,7 +5312,9 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
     .where(
       and(
         eq(takeoffStamps.bidId, bidId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        // Every bid line's live quantity comes from here: new marks only.
+        markIsQuantity()
       )
     )
     .groupBy(takeoffStamps.groupId);
@@ -5314,6 +5491,19 @@ function feetForRole(
         bought: footage.groundBoughtFeet,
         installed: footage.groundInstalledFeet,
       };
+    /*
+      A T body is a COUNT, not footage, and 0096 added its role before the
+      code that counts it (references/materials-track-c-plan.md § 4). Until
+      that code ships, nothing writes a `teeBody` line — `sendToBid` builds no
+      candidate with it — so this answers no footage rather than a length.
+
+      This case is a tripwire, not a feature: the wiring adds `teeBody` to
+      `TEE_KINDS`, which takes it out of this switch's type, and this label
+      then fails to compile. Delete it at that point — the count path in
+      `withTracedFootage` above takes over.
+    */
+    case "teeBody":
+      return { bought: 0, installed: 0 };
   }
 }
 
@@ -6198,6 +6388,9 @@ export async function addCountToBid(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
+  // Before either insert below — see releaseArchivedPlanSlot.
+  await releaseArchivedPlanSlot(bidId, { groupId: group.id });
+
   /*
     A FREE COUNT — a name and some marks, nothing from the library.
 
@@ -6355,6 +6548,44 @@ export async function saveLineAsAssembly(input: {
     snapshotUnpricedParts: 0,
   });
   return { assemblyId, materialId };
+}
+
+/**
+ * Delete an ARCHIVED from-plans line that still holds the slot a send is about
+ * to fill.
+ *
+ * The unique indexes on (bidId, takeoffGroupId) and (bidId, takeoffRunTypeId,
+ * runMaterialRole) include archived rows, while every send decides "is it on
+ * the bid?" from LIVE lines. So a count whose line had been archived passed
+ * the check and then died on the index with a raw database error — found
+ * 2026-09-29 by `server/sendAll.test.ts` before Send all was built on it.
+ *
+ * Deleting is right rather than restoring: an archived line is out of every
+ * total already, its snapshot is from whenever it was sent, and the send
+ * about to run writes a fresh one from the same count. Since 2026-09-29 a
+ * plan line cannot be archived at all (`archiveLinkedCopies` refuses), so
+ * this only ever meets rows archived before that.
+ */
+async function releaseArchivedPlanSlot(
+  bidId: number,
+  slot: { groupId: number } | { runTypeId: number; role: RunMaterialRole }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(bidLineItems)
+    .where(
+      and(
+        eq(bidLineItems.bidId, bidId),
+        isNotNull(bidLineItems.archivedAt),
+        "groupId" in slot
+          ? eq(bidLineItems.takeoffGroupId, slot.groupId)
+          : and(
+              eq(bidLineItems.takeoffRunTypeId, slot.runTypeId),
+              eq(bidLineItems.runMaterialRole, slot.role)
+            )
+      )
+    );
 }
 
 /** The live bid line for a counted group, if it has one. */
@@ -8227,6 +8458,27 @@ export async function updateRunCircuit(
     );
 }
 
+/**
+ * The run a circuit hangs on, or null when the circuit is not this user's.
+ * Asked so a circuit edit can be refused on a locked bid: the circuit is
+ * addressed by its own id, and the lock lives on the run's bid.
+ */
+export async function getRunIdOfCircuit(
+  id: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ runId: takeoffRunCircuits.runId })
+    .from(takeoffRunCircuits)
+    .where(
+      and(eq(takeoffRunCircuits.id, id), eq(takeoffRunCircuits.userId, userId))
+    )
+    .limit(1);
+  return row?.runId ?? null;
+}
+
 export async function deleteRunCircuit(id: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -8289,7 +8541,11 @@ export async function getStampsForBid(
       and(
         eq(takeoffStamps.bidId, bidId),
         eq(takeoffStamps.userId, userId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        // The materials list, the export and the drops read this: quantities
+        // only (`markIsQuantity`). The sheet's own drawing reads
+        // getStampsForSheet, which shows every mark whatever its status.
+        markIsQuantity()
       )
     )
     .orderBy(asc(takeoffStamps.id));
@@ -8569,6 +8825,54 @@ export async function updateTakeoffGroup(
 }
 
 /**
+ * Change what a count IS — a plain count gets an assembly, or loses one —
+ * with every mark kept (legend plan § 8a; plan-viewer-overhaul.md § 16, "mark
+ * first, name it after").
+ *
+ * The group and its marks move in ONE transaction. A mark carries the assembly
+ * it was counted under (`takeoff_stamps.assemblyId`), and the materials list
+ * and the mark colours read it from there, so a group that changed while its
+ * marks did not would itemise nothing and draw the old colour — a count that
+ * says it is linked while the supply list says it is not.
+ *
+ * The label is left alone: it is what the estimator called the thing on this
+ * job. Any typed price goes, because an assembly prices it from here on and
+ * two prices on one count is two answers to one question.
+ */
+export async function setGroupSource(
+  id: number,
+  userId: number,
+  assembly: { id: number; name: string; category: string | null } | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    await tx
+      .update(takeoffGroups)
+      .set({
+        kind: assembly ? "assembly" : "plain",
+        assemblyId: assembly?.id ?? null,
+        materialId: null,
+        unitCost: null,
+        unitHours: null,
+        laborRateId: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)));
+    await tx
+      .update(takeoffStamps)
+      .set({
+        assemblyId: assembly?.id ?? null,
+        assemblyName: assembly?.name ?? null,
+        assemblyCategory: assembly?.category ?? null,
+      })
+      .where(
+        and(eq(takeoffStamps.groupId, id), eq(takeoffStamps.userId, userId))
+      );
+  });
+}
+
+/**
  * Remove a counted thing, and with it every mark on the drawing.
  *
  * The marks go by the foreign key's `cascade`, not by a second statement here —
@@ -8586,7 +8890,48 @@ export async function deleteTakeoffGroup(
     .where(and(eq(takeoffGroups.id, id), eq(takeoffGroups.userId, userId)));
 }
 
-/** How many marks each group has, for a list that says so without a second query. */
+/**
+ * How many marks of each STATUS each group has — for the card's words
+ * ("12 new · 4 existing"). DISPLAY ONLY, which is why it carries no
+ * `markIsQuantity`: it is the one count whose job is to show the marks the
+ * priced counts leave out. Nothing may read a quantity from it.
+ */
+export async function statusSplitByGroup(
+  bidId: number,
+  userId: number
+): Promise<Map<number, StatusSplit>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({
+      groupId: takeoffStamps.groupId,
+      status: takeoffStamps.status,
+      total: sql<number>`count(*)`,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    )
+    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
+  const splits = new Map<number, StatusSplit>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    const split = splits.get(row.groupId) ?? emptySplit();
+    split[markStatusOf(row.status)] += Number(row.total);
+    splits.set(row.groupId, split);
+  }
+  return splits;
+}
+
+/**
+ * How many NEW marks each group has — the number "Send N to bid" sends and the
+ * list prints as the count. Existing, remove and relocate marks are in
+ * `statusSplitByGroup`, never here (shared/markStatus.ts).
+ */
 export async function countStampsByGroup(
   bidId: number,
   userId: number
@@ -8603,7 +8948,9 @@ export async function countStampsByGroup(
       and(
         eq(takeoffStamps.bidId, bidId),
         eq(takeoffStamps.userId, userId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        // "Send N to bid" sends this N: new marks only.
+        markIsQuantity()
       )
     )
     .groupBy(takeoffStamps.groupId);
@@ -8622,6 +8969,92 @@ export async function createStamps(rows: InsertTakeoffStamp[]): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db.insert(takeoffStamps).values(rows);
+}
+
+/**
+ * Set what these marks are (shared/markStatus.ts). NULL is new. Scoped to the
+ * bid AND the company, so an id from another bid changes nothing; returns how
+ * many rows changed.
+ */
+export async function setStampStatus(
+  bidId: number,
+  userId: number,
+  ids: number[],
+  status: Exclude<MarkStatus, "new"> | null
+): Promise<number> {
+  const database = await getDb();
+  if (!database) throw new Error("DB unavailable");
+  const [result] = await database
+    .update(takeoffStamps)
+    .set({ status, updatedAt: new Date() })
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows ?? 0;
+}
+
+/**
+ * A mark's own device height (0098), or NULL to follow its count. `source`
+ * says who wrote it: `typed` by a person, `read` from the plan and ACCEPTED
+ * by one (Sheet Check's "Use") — never written by a read alone.
+ */
+export async function setStampHeight(
+  bidId: number,
+  userId: number,
+  ids: number[],
+  inches: number | null,
+  source: "typed" | "read"
+): Promise<number> {
+  const database = await getDb();
+  if (!database) throw new Error("DB unavailable");
+  const [result] = await database
+    .update(takeoffStamps)
+    .set({
+      mountHeightInches: inches === null ? null : inches.toFixed(2),
+      mountHeightSource: inches === null ? null : source,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows ?? 0;
+}
+
+/**
+ * Leave these marks' drops off (0098), or give them back. NULL, not false,
+ * for "has its drop": NULL already means it, and one spelling is one thing
+ * to query for.
+ */
+export async function setStampDropExcluded(
+  bidId: number,
+  userId: number,
+  ids: number[],
+  excluded: boolean
+): Promise<number> {
+  const database = await getDb();
+  if (!database) throw new Error("DB unavailable");
+  const [result] = await database
+    .update(takeoffStamps)
+    .set({ dropExcluded: excluded ? true : null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  return (result as { affectedRows?: number }).affectedRows ?? 0;
 }
 
 /** Tag where a placed stamp sits — the Location layer. */
@@ -8697,6 +9130,98 @@ export async function deleteStamps(
   return result.affectedRows;
 }
 
+/**
+ * The count each of these marks belongs to now, for marks on ONE bid.
+ *
+ * Read before a move so the move can be undone to exactly where each mark
+ * was — a selection can span several counts. Marks of another company or
+ * another bid are simply not returned, so the caller compares lengths.
+ */
+export async function getStampGroupsOnBid(
+  ids: readonly number[],
+  userId: number,
+  bidId: number
+): Promise<{ id: number; groupId: number | null }[]> {
+  if (ids.length === 0) return [];
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db
+    .select({ id: takeoffStamps.id, groupId: takeoffStamps.groupId })
+    .from(takeoffStamps)
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId),
+        // A mark whose plan set is gone is not on the bid, so it is not
+        // returned — and the move refuses whole (quantitiesIgnoreDeletedPlans).
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    );
+}
+
+/**
+ * Put marks under another count, in ONE statement, keeping their ids and
+ * places. The provenance columns are rewritten from the new count by the
+ * caller, the same way `drop` writes them, so a moved mark is
+ * indistinguishable from one placed under that count.
+ */
+export async function moveStampsToGroup(
+  ids: readonly number[],
+  userId: number,
+  bidId: number,
+  to: {
+    groupId: number;
+    assemblyId: number | null;
+    assemblyName: string | null;
+    assemblyCategory: string | null;
+  }
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db
+    .update(takeoffStamps)
+    .set({ ...to, updatedAt: new Date() })
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    );
+  return result.affectedRows;
+}
+
+/**
+ * How many of these marks sit on a bid whose quantities are locked.
+ *
+ * Asked BEFORE a delete so a selection goes whole or not at all: a selection
+ * that reaches into a locked bid is refused entire, rather than deleting the
+ * unlocked half and leaving the screen to explain a partial result.
+ */
+export async function countStampsOnLockedBids(
+  ids: readonly number[],
+  userId: number
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(takeoffStamps)
+    .innerJoin(bids, eq(bids.id, takeoffStamps.bidId))
+    .where(
+      and(
+        inArray(takeoffStamps.id, [...ids]),
+        eq(takeoffStamps.userId, userId),
+        isNotNull(bids.quantitiesLockedAt)
+      )
+    );
+  return Number(row?.n ?? 0);
+}
+
 /** Every symbol the user has captured, linked or not. */
 export async function getSymbolLinks(userId: number): Promise<SymbolLink[]> {
   const db = await getDb();
@@ -8761,6 +9286,134 @@ export async function updateSymbolLink(
     .update(symbolLinks)
     .set({ ...safe, updatedAt: new Date() })
     .where(and(eq(symbolLinks.id, id), eq(symbolLinks.userId, userId)));
+}
+
+// ─── Looks: several pictures of one legend item (symbol_looks, 0102) ──────────
+// references/multiple-looks-plan.md. An item with no look rows is read as one
+// box-less look, its old `symbol_links.thumbnail` (§ 2): no backfill.
+
+export async function createSymbolLook(
+  data: InsertSymbolLook
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(symbolLooks).values(data);
+  return result.insertId;
+}
+
+/**
+ * One item's looks, newest first, with the plan set each came from. Scoped
+ * by the company owner and the item both, so another company's item id
+ * finds nothing.
+ */
+export async function getSymbolLooks(
+  symbolLinkId: number,
+  userId: number
+): Promise<
+  (SymbolLook & { pageNumber: number | null; setName: string | null })[]
+> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      look: symbolLooks,
+      pageNumber: bidPdfSheets.pageNumber,
+      setName: bidPdfs.filename,
+    })
+    .from(symbolLooks)
+    .leftJoin(bidPdfSheets, eq(bidPdfSheets.id, symbolLooks.sheetId))
+    .leftJoin(bidPdfs, eq(bidPdfs.id, symbolLooks.bidPdfId))
+    .where(
+      and(
+        eq(symbolLooks.symbolLinkId, symbolLinkId),
+        eq(symbolLooks.userId, userId)
+      )
+    )
+    .orderBy(desc(symbolLooks.createdAt), desc(symbolLooks.id));
+  return rows.map(r => ({
+    ...r.look,
+    pageNumber: r.pageNumber ?? null,
+    setName: r.setName ?? null,
+  }));
+}
+
+/** How many look rows each of a company's items has, for the legend list. */
+export async function countSymbolLooks(
+  userId: number
+): Promise<Map<number, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({ id: symbolLooks.symbolLinkId, n: sql<number>`count(*)` })
+    .from(symbolLooks)
+    .where(eq(symbolLooks.userId, userId))
+    .groupBy(symbolLooks.symbolLinkId);
+  return new Map(rows.map(r => [r.id, Number(r.n)]));
+}
+
+/**
+ * Every look captured on one plan set, with its item's name and its page,
+ * newest first — for the look-alike check (multiple-looks-plan.md § 4).
+ */
+export async function getSymbolLooksOnSet(bidPdfId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      look: symbolLooks,
+      label: symbolLinks.label,
+      pageNumber: bidPdfSheets.pageNumber,
+    })
+    .from(symbolLooks)
+    .innerJoin(symbolLinks, eq(symbolLinks.id, symbolLooks.symbolLinkId))
+    .leftJoin(bidPdfSheets, eq(bidPdfSheets.id, symbolLooks.sheetId))
+    .where(
+      and(eq(symbolLooks.bidPdfId, bidPdfId), eq(symbolLooks.userId, userId))
+    )
+    .orderBy(desc(symbolLooks.createdAt), desc(symbolLooks.id));
+  return rows.map(r => ({
+    ...r.look,
+    label: r.label,
+    pageNumber: r.pageNumber ?? null,
+  }));
+}
+
+/** One look, scoped by the company owner: another company's id finds nothing. */
+export async function getSymbolLook(
+  id: number,
+  userId: number
+): Promise<SymbolLook | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(symbolLooks)
+    .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)))
+    .limit(1);
+  return row;
+}
+
+/** Delete one look row. Writes nothing else — no mark, count or bid line. */
+export async function deleteSymbolLook(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .delete(symbolLooks)
+    .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)));
+}
+
+/** Point one look at another item. Writes nothing else. */
+export async function moveSymbolLook(
+  id: number,
+  symbolLinkId: number,
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(symbolLooks)
+    .set({ symbolLinkId })
+    .where(and(eq(symbolLooks.id, id), eq(symbolLooks.userId, userId)));
 }
 
 export async function deleteSymbolLink(id: number, userId: number) {
@@ -10688,7 +11341,12 @@ function costSums(productivityPct: number) {
       A line from before 0087 has no frozen count; the Dashboard reads its
       recipe live (`liveUnpricedParts`), analytics does not — see BidCostRow.
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
+    /*
+      A line with $0 or unset material counts at least ONE (its material is
+      missing — `lineMaterialNotPriced`, owner 2026-10-05), never on top of
+      the recipe parts that already say so.
+    */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -11150,6 +11808,9 @@ export async function getDashboardBids(
         bidId: bids.id,
         assemblyId: bidLineItems.assemblyId,
         lines: sql<string>`COUNT(*)`,
+        // Of those, the ones with no material at all — each counts at least
+        // one part not priced (`lineMaterialNotPriced`).
+        noMaterial: sql<string>`SUM(CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END)`,
       })
       .from(bids)
       .innerJoin(bidLineItems, liveLines)
@@ -11170,7 +11831,11 @@ export async function getDashboardBids(
   const liveParts = new Map<number, number>();
   for (const row of unfrozen) {
     if (row.assemblyId === null) continue;
-    const parts = Number(row.lines) * (live.get(row.assemblyId) ?? 0);
+    const recipe = live.get(row.assemblyId) ?? 0;
+    const noMaterial = Number(row.noMaterial);
+    const parts =
+      (Number(row.lines) - noMaterial) * recipe +
+      noMaterial * Math.max(recipe, 1);
     liveParts.set(row.bidId, (liveParts.get(row.bidId) ?? 0) + parts);
   }
 
@@ -11547,6 +12212,26 @@ export async function answerPullPoint(
   });
 }
 
+/** The run a pull-point answer belongs to, or null when it is not this user's. */
+export async function getRunIdOfPullPoint(
+  answerId: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ runId: takeoffPullPoints.runId })
+    .from(takeoffPullPoints)
+    .where(
+      and(
+        eq(takeoffPullPoints.id, answerId),
+        eq(takeoffPullPoints.userId, userId)
+      )
+    )
+    .limit(1);
+  return row?.runId ?? null;
+}
+
 /** Withdraw one answer, so the spot is proposed afresh. */
 export async function clearPullPointAnswer(
   userId: number,
@@ -11877,7 +12562,9 @@ export async function fittingRowsByRunType(
       row,
       type: resolveRunType(palette, storedId),
     }))
-    .filter(e => e.type !== undefined && e.type.pathType === "conduit");
+    // Cable types too, since 2026-09-29: a tee on a cable run buys its box
+    // (cableTeeRows). Everything else below is for conduit and skips them.
+    .filter(e => e.type !== undefined);
   if (entries.length === 0) return out;
 
   const linked = await getMaterialsByIds(
@@ -11891,6 +12578,7 @@ export async function fittingRowsByRunType(
         type!.elbow45MaterialId,
         type!.lbMaterialId,
         type!.pullBoxMaterialId,
+        type!.conductorMaterialId,
       ].filter((id): id is number => id !== null)
     ),
     userId
@@ -11903,10 +12591,32 @@ export async function fittingRowsByRunType(
   const racewayBaselineName = await shippedNamesOf(
     entries.map(({ type }) => resolved(type!.racewayMaterialId))
   );
+  // The same for a cable type's cable: its MC connector and strap are read
+  // from the shipped name (`mcFittingNames`), so a renamed fork still finds
+  // them. A company's own cable with no baseline falls back to its own name.
+  const cableBaselineName = await shippedNamesOf(
+    entries
+      .filter(({ type }) => type!.pathType === "cable")
+      .map(({ type }) => resolved(type!.conductorMaterialId))
+  );
+  const mcPartsOf = (t: NonNullable<(typeof entries)[number]["type"]>) => {
+    const cable = resolved(t.conductorMaterialId);
+    return cable
+      ? mcFittingNames(cableBaselineName(cable) ?? cable.name)
+      : null;
+  };
 
   const wantedNames = Array.from(
     new Set(
       entries.flatMap(({ type }) => {
+        if (type!.pathType === "cable") {
+          const mc = mcPartsOf(type!);
+          return [
+            SMALL_TEE_BOX.box,
+            SMALL_TEE_BOX.cover,
+            ...(mc ? [mc.connector, mc.strap] : []),
+          ];
+        }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
         return FITTING_KINDS.map(kind =>
@@ -11957,10 +12667,52 @@ export async function fittingRowsByRunType(
     new Map(entries.map(({ storedId, row }) => [storedId, row.legs])),
     typeId => sizeByType.get(typeId) ?? null
   );
+  // A tee only cable meets has no pipe legs to be owned through: a cable type
+  // buys it (cableTeeOwners). A tee any pipe meets stays the pipe's.
+  const cableOwners = cableTeeOwners(
+    teeOwners,
+    new Map(
+      entries
+        .filter(({ type }) => type!.pathType === "cable")
+        .map(({ storedId, row }) => [storedId, row.tees])
+    )
+  );
 
   for (const { storedId, row, type } of entries) {
     const t = type!;
     const raceway = resolved(t.racewayMaterialId);
+    if (t.pathType === "cable") {
+      // The box at each tee it owns, and — on MC — a connector at each end
+      // and its straps (§ R1). No pipe to fit. NM gets no connector here: into
+      // a plastic box it takes none, and which box it is is not known.
+      const ownedByCable = row.tees.filter(
+        tee => cableOwners.get(tee.id) === storedId
+      );
+      const mc = mcPartsOf(t);
+      const cable = resolved(t.conductorMaterialId);
+      const runRows =
+        mc && cable
+          ? cableRunRows(
+              countCableFittings(row.cableLegs, {
+                name: cable.name,
+                ...MC_STRAP_SPACING,
+              }),
+              {
+                connector: {
+                  override: resolved(t.connectorMaterialId) ?? null,
+                  wanted: mc.connector,
+                },
+                strap: {
+                  override: resolved(t.strapMaterialId) ?? null,
+                  wanted: mc.strap,
+                },
+              },
+              found
+            )
+          : [];
+      out.set(storedId, [...runRows, ...cableTeeRows(ownedByCable, found)]);
+      continue;
+    }
     const ownedTees = row.tees.filter(
       tee => teeOwners.get(tee.id) === storedId
     );
@@ -12007,6 +12759,11 @@ export async function fittingRowsByRunType(
             // Wider when this type's 90 or 45 is a sweep, so a traced sweep
             // is one bend. The run panel reads the same (`runBendDetail.ts`).
             mergeWithinFeet: bendMergeFeetForOverrides(
+              resolved(t.elbow90MaterialId)?.name ?? null,
+              resolved(t.elbow45MaterialId)?.name ?? null
+            ),
+            // And a sweep type's sentence says "sweeps", from the same names.
+            words: bendWordsFor(
               resolved(t.elbow90MaterialId)?.name ?? null,
               resolved(t.elbow45MaterialId)?.name ?? null
             ),
@@ -12138,6 +12895,10 @@ export async function addRunTypeRowToBid(
 
   const laborRate = hourlyCostFor(rates, defaults?.defaultLaborRateId ?? null);
 
+  await releaseArchivedPlanSlot(bidId, {
+    runTypeId: input.runTypeId,
+    role: input.role,
+  });
   const [result] = await db.insert(bidLineItems).values({
     bidId,
     takeoffRunTypeId: input.runTypeId,
@@ -12206,11 +12967,21 @@ function runLinePricing(
   };
 }
 
-/** The labor unit a run-type line of this role reads from its part. */
+/**
+ * The labor unit a run-type line of this role reads from its part.
+ *
+ * A coupling, connector or strap freezes ZERO, whatever its part says: the
+ * run's per-foot rate pays for them (`LABOR_IN_RUN_RATE`, owner 2026-09-29).
+ * Zero rather than NULL because it is an answer, not a gap: NULL would read
+ * "Not priced" and ask somebody to set hours that must never be used here.
+ * A swap and a refill both come through this function, so neither can put the
+ * part's own hours back.
+ */
 function runLineLaborUnit(
   role: RunMaterialRole,
   material: Material
 ): string | null {
+  if (laborInRunRate(role)) return "0.0000";
   const unit =
     role === "fieldBend" ? material.fieldBendLaborHours : material.laborHours;
   return unit === null ? null : Number(unit).toFixed(4);
@@ -12354,15 +13125,18 @@ export async function heightContextForBid(
   userId: number,
   bidDistributionInches: number | null
 ): Promise<HeightContext> {
-  const [defaults, company, job, extraDefaults, runTypes] = await Promise.all([
-    getHeightDefaults(userId),
-    getMountingHeights(userId),
-    getBidMountingHeights(bidId, userId),
-    // Extra and makeup ride on this context so no caller can load the heights
-    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
-    getExtraDefaults(userId),
-    getRunTypesFor(userId, true),
-  ]);
+  const [defaults, company, job, extraDefaults, runTypes, linkedMarks] =
+    await Promise.all([
+      getHeightDefaults(userId),
+      getMountingHeights(userId),
+      getBidMountingHeights(bidId, userId),
+      // Extra and makeup ride on this context so no caller can load the heights
+      // and forget them (server/runVerticals.ts, `HeightContext.extras`).
+      getExtraDefaults(userId),
+      getRunTypesFor(userId, true),
+      // A linked run end reads its mark's height (vertical-drops-plan § 2).
+      getMarksLinkedByRuns(bidId, userId),
+    ]);
   return buildHeightContext({
     defaults,
     company,
@@ -12370,7 +13144,59 @@ export async function heightContextForBid(
     bidDistributionInches,
     extraDefaults,
     runTypes,
+    linkedMarks,
   });
+}
+
+/**
+ * The marks a run end on this bid is linked to, with what their count says
+ * about drops. Only the linked ones: a bid can hold thousands of marks and a
+ * handful of links, and the height context is loaded on every totals read.
+ */
+export async function getMarksLinkedByRuns(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const runs = await db
+    .select({
+      startStampId: takeoffRuns.startStampId,
+      endStampId: takeoffRuns.endStampId,
+    })
+    .from(takeoffRuns)
+    .where(
+      and(
+        eq(takeoffRuns.bidId, bidId),
+        eq(takeoffRuns.userId, userId),
+        // A run on a removed plan set links nothing that is priced.
+        onLivePlanSheet(takeoffRuns.sheetId, bidId)
+      )
+    );
+  const ids = Array.from(
+    new Set(
+      runs
+        .flatMap(r => [r.startStampId, r.endStampId])
+        .filter((id): id is number => id !== null)
+    )
+  );
+  if (ids.length === 0) return [];
+  return db
+    .select({
+      id: takeoffStamps.id,
+      mountHeightInches: takeoffStamps.mountHeightInches,
+      mountHeightSource: takeoffStamps.mountHeightSource,
+      status: takeoffStamps.status,
+      dropKind: takeoffGroups.dropKind,
+      dropHeightInches: takeoffGroups.dropHeightInches,
+    })
+    .from(takeoffStamps)
+    .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
+    .where(
+      and(
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
 }
 
 /**
@@ -12387,13 +13213,13 @@ export async function loadGroupDrops(
   bidId: number,
   userId: number,
   heights: HeightContext,
-  runs: readonly {
+  // The run ROW (RunEnds), because a run end claims a mark's drop only
+  // where it counts a vertical itself (`stampsClaimedByRuns`).
+  runs: readonly (RunEnds & {
     sheetId: number;
     points: { x: number; y: number }[] | null;
-    startStampId: number | null;
-    endStampId: number | null;
     isSuggestion: boolean;
-  }[],
+  })[],
   scales: ReadonlyMap<
     number,
     { scaleRatio: number | null; scaleSource: string; notToScale: boolean }
@@ -12412,22 +13238,36 @@ export async function loadGroupDrops(
       dropHeightInches: g.dropHeightInches,
       dropRunTypeId: g.dropRunTypeId,
     })),
-    marks: stamps.map(s => ({
+    // A drop is pipe and wire bought for a NEW device. An existing one is
+    // already fed, so its mark buys no drop (shared/markStatus.ts).
+    marks: stamps.filter(isPricedMark).map(s => ({
       id: s.id,
       groupId: s.groupId,
       sheetId: s.sheetId,
       x: Number(s.x),
       y: Number(s.y),
+      // 0098. decimal(7,2) arrives as a string.
+      height: {
+        inches:
+          s.mountHeightInches === null ? null : Number(s.mountHeightInches),
+        source: s.mountHeightSource,
+      },
+      dropExcluded: s.dropExcluded === true,
     })),
     // A suggestion is nobody's claim and nobody's end yet.
     runs: runs
       .filter(r => !r.isSuggestion)
-      .map(r => ({
-        sheetId: r.sheetId,
-        points: r.points ?? [],
-        startStampId: r.startStampId,
-        endStampId: r.endStampId,
-      })),
+      .map(r => {
+        const v = verticalsForRunRow(r, heights);
+        return {
+          sheetId: r.sheetId,
+          points: r.points ?? [],
+          startStampId: r.startStampId,
+          endStampId: r.endStampId,
+          startCountsVertical: v.start.counted,
+          endCountsVertical: v.end.counted,
+        };
+      }),
     heights: {
       layers: heights.layers,
       companyInches: heights.companyInches,

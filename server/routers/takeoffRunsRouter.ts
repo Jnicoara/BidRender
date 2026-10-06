@@ -26,7 +26,7 @@ import {
   PULL_POINT_PLACES,
   PULL_POINT_STATUSES,
 } from "../../drizzle/schema";
-import { placeAnswer } from "../../shared/runBends";
+import { placeAnswer, stubsToReview } from "../../shared/runBends";
 import {
   RUN_PATH_TYPES,
   RUN_STATUSES,
@@ -55,6 +55,8 @@ import {
 } from "../../shared/takeoffQuantities";
 import { runWireOwnership } from "../../shared/branchWire";
 import { runOnBid, type RunTotalsLeftOut } from "../../shared/runOnBid";
+import { lockedEditRefusal } from "../../shared/quantityLock";
+import { runCarriesNoWire } from "../../shared/runNoWire";
 import {
   runDisplayName,
   runName,
@@ -62,10 +64,22 @@ import {
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
 import {
+  RUN_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
+import {
+  withNetworkSnapshot,
+  restoreNetwork,
+  type NetworkSnapshot,
+} from "../takeoffRestore";
+import {
   EMPTY_HEIGHT_CONTEXT,
   extrasForRunRow,
   extrasViewForRunRow,
   verticalsForRunRow,
+  endOfRun,
 } from "../runVerticals";
 import {
   extraPctSchema,
@@ -81,6 +95,11 @@ import { rootOf } from "../../shared/runNetwork";
 import { traceModeOf } from "../../shared/traceMode";
 import { quantityTraceSummary } from "../../shared/quantityDrops";
 import { runTypeColorOrder } from "../../shared/takeoffMarks";
+import { markIsSnapTarget } from "../../shared/markStatus";
+
+/** Said when a run end is pointed at a mark nobody has checked yet. */
+export const UNCONFIRMED_MARK_REFUSAL =
+  "That mark has not been confirmed yet, so a run cannot attach to it. Confirm the mark first, or end the run beside it.";
 import {
   circuitPlan,
   findMatchingRunType,
@@ -154,20 +173,72 @@ async function requireRun(id: number, userId: number) {
 }
 
 /**
- * Refuse to change what a run IS on a bid whose quantities are locked.
+ * Refuse to change a run on a bid whose quantities are locked.
  * shared/quantityLock.ts says what the lock means; this is where changing a
- * run's materials stops at it.
+ * run stops at it.
+ *
+ * ── Every write, since 2026-09-29 (owner: "a locked bid must not change") ───
+ * It used to guard only what a run IS — its type, its points, its ends —
+ * while a new run could still be traced, a typed length typed, a leg added
+ * and a pull point answered. The locked line did not move (it reads its
+ * stored `qty`), but the drawing behind it did, so unlocking later re-read a
+ * drawing nobody had checked against the quote. Now nothing on a locked bid's
+ * runs changes; `server/lockedEdits.test.ts` has each refusal and its
+ * unlocked twin.
+ *
+ * `what` finishes the sentence, so the refusal names the thing that was tried.
  */
-async function refuseIfLocked(bidId: number, userId: number) {
+async function refuseIfLocked(
+  bidId: number,
+  userId: number,
+  what = "its runs cannot be changed"
+) {
   const bid = await db.getBidById(bidId, userId);
   if (!bid)
     throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
   if (bid.quantitiesLockedAt !== null)
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "This bid's quantities are locked, so its runs cannot be changed. Unlock them on the bid first.",
+      message: lockedEditRefusal(what),
     });
+}
+
+/** The same refusal, for something addressed through its run's id. */
+async function refuseIfRunLocked(
+  runId: number | null,
+  userId: number,
+  what?: string
+) {
+  if (runId === null)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+  const run = await requireRun(runId, userId);
+  await refuseIfLocked(run.bidId, userId, what);
+}
+
+/**
+ * An end on a TEE stays on the tee (D20): the tee is where three legs meet,
+ * and a leg that drifted off it would still be joined in the counts while
+ * visibly apart on the drawing. Pinned here, by construction, rather than
+ * trusted to the client.
+ *
+ * One helper for `save` and `setPoints`, so the two cannot pin differently.
+ * Returns the SAME array when nothing is pinned.
+ */
+async function pinTeeEnds<P extends { x: number; y: number }>(
+  run: Pick<Awaited<ReturnType<typeof requireRun>>, "startTeeId" | "endTeeId">,
+  points: P[],
+  userId: number
+): Promise<P[] | { x: number; y: number }[]> {
+  if (points.length < 2) return points;
+  const [start, end] = await Promise.all([
+    run.startTeeId === null ? null : db.getTeeById(run.startTeeId, userId),
+    run.endTeeId === null ? null : db.getTeeById(run.endTeeId, userId),
+  ]);
+  if (!start && !end) return points;
+  const pinned = points.map(p => ({ x: p.x, y: p.y }));
+  if (start) pinned[0] = { x: start.x, y: start.y };
+  if (end) pinned[pinned.length - 1] = { x: end.x, y: end.y };
+  return pinned;
 }
 
 /** The sheet's scale as the pure functions want it. */
@@ -320,6 +391,23 @@ export const takeoffRunsRouter = router({
         }));
 
         const traced = tracedRunOf(run);
+        // What each end resolves to — the same function the arithmetic uses.
+        const startEnd = endOfRun(
+          run.startKind,
+          run.startHeightInches,
+          run.startTeeId,
+          run.startStampId,
+          run.traceMode,
+          heights
+        );
+        const endEnd = endOfRun(
+          run.endKind,
+          run.endHeightInches,
+          run.endTeeId,
+          run.endStampId,
+          run.traceMode,
+          heights
+        );
         return {
           id: run.id,
           name: run.name,
@@ -355,6 +443,19 @@ export const takeoffRunsRouter = router({
           location: run.location,
           circuits: runCircuits,
           /**
+           * The bid would price this run's wire and there is none — amber on
+           * the row. Read from `wire`, the circuits the arithmetic uses, by the
+           * same function the bid's warning counts with (shared/runNoWire.ts).
+           */
+          noWire: runCarriesNoWire(run, wire),
+          /**
+           * An end that may be a double-click stub which bought an elbow —
+           * listed for the estimator to check, never changed (owner,
+           * 2026-09-29). shared/runBends.ts `stubsToReview`, the same rule
+           * `scripts/stubReview.mts` lists across a database.
+           */
+          stubsToReview: stubsToReview(run.points ?? []),
+          /**
            * What the estimator typed, in inches, or null for "measured from
            * the drawing" (§ 4c). Raw, for the field that edits it; the
            * arithmetic reads it through `quantities`.
@@ -383,6 +484,21 @@ export const takeoffRunsRouter = router({
             distributionHeightInches: run.distributionHeightInches,
             startStampId: run.startStampId,
             endStampId: run.endStampId,
+            /**
+             * Where each end's device height came from — "this mark, typed",
+             * "read from the plan", the count's — so the row can say it
+             * (vertical-drops-plan § 5). A height nobody can trace back is
+             * a number nobody can check.
+             */
+            startHeightSource: startEnd.source,
+            endHeightSource: endEnd.source,
+            /**
+             * The end is linked to a device marked EXISTING. Its drop is
+             * still priced (owner, 2026-10-05: option C) and the row SAYS so,
+             * with one click to leave it off. Never silent either way.
+             */
+            startOnExisting: startEnd.mark?.status === "existing",
+            endOnExisting: endEnd.mark?.status === "existing",
           },
           /**
            * Whose wire this run is, and what the estimator actually said (D18).
@@ -491,9 +607,17 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
-      const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
-      if (!bid)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+      /*
+        Both a new run and a re-save of an existing one. The autosave of a
+        trace in progress goes through here too, which is why the Plans screen
+        will not arm the trace tool on a locked bid: an autosave refused every
+        few seconds would be a stream of errors for work the screen let begin.
+      */
+      await refuseIfLocked(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.id ? "its runs cannot be changed" : "new runs cannot be traced"
+      );
 
       /*
         What this run IS, resolved from the palette rather than trusted.
@@ -570,25 +694,12 @@ export const takeoffRunsRouter = router({
             message: "That run belongs to another sheet.",
           });
         }
-        /*
-          An end on a TEE stays on the tee (D20): the tee is where three legs
-          meet, and a leg that drifted off it would still be joined in the
-          counts while visibly apart on the drawing. Pinned here, by
-          construction, rather than trusted to the client.
-        */
-        const pins = [
-          existing.startTeeId === null
-            ? null
-            : await db.getTeeById(existing.startTeeId, ctx.scope.dataUserId),
-          existing.endTeeId === null
-            ? null
-            : await db.getTeeById(existing.endTeeId, ctx.scope.dataUserId),
-        ];
-        if ((pins[0] || pins[1]) && input.points.length >= 2) {
-          const points = input.points.map(p => ({ x: p.x, y: p.y }));
-          if (pins[0]) points[0] = { x: pins[0].x, y: pins[0].y };
-          if (pins[1])
-            points[points.length - 1] = { x: pins[1].x, y: pins[1].y };
+        const points = await pinTeeEnds(
+          existing,
+          input.points,
+          ctx.scope.dataUserId
+        );
+        if (points !== input.points) {
           const pinned = ratio === null ? null : pathRealInches(points, ratio);
           values.points = points;
           values.lengthInches = pinned === null ? null : pinned.toFixed(4);
@@ -597,11 +708,7 @@ export const takeoffRunsRouter = router({
         // New points: an answered pull point whose corner moved or went is
         // dropped, so that corner is proposed afresh. Answers whose corner is
         // still there are kept (owner, 2026-09-26, decision 5).
-        await db.dropOrphanedPullPoints(
-          input.id,
-          ctx.scope.dataUserId,
-          input.points
-        );
+        await db.dropOrphanedPullPoints(input.id, ctx.scope.dataUserId, points);
         return {
           id: input.id,
           measured: inches !== null,
@@ -640,6 +747,8 @@ export const takeoffRunsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
+      // Finishing re-measures every leg against the sheet's scale today.
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
       const measurability = measurabilityOf(sheetScale(sheet));
       const ratio = measurability.ok ? measurability.ratio : null;
@@ -729,6 +838,8 @@ export const takeoffRunsRouter = router({
           message: "That run is not a suggestion.",
         });
       }
+      // An accepted suggestion becomes a draft, and drafts count on the bid.
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       await requireMeasurableSheet(run.sheetId, ctx.scope.dataUserId);
       // Accepting a suggestion accepts every leg of it (D20).
       const group = await db.getRunGroup(
@@ -784,7 +895,12 @@ export const takeoffRunsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireRun(input.id, ctx.scope.dataUserId);
+      const run = await requireRun(input.id, ctx.scope.dataUserId);
+      await refuseIfLocked(
+        run.bidId,
+        ctx.scope.dataUserId,
+        "a run's length cannot be typed or cleared"
+      );
       await db.updateRun(input.id, ctx.scope.dataUserId, {
         typedLengthInches:
           input.typedLengthInches === null
@@ -1019,14 +1135,107 @@ export const takeoffRunsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.id, ctx.scope.dataUserId);
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       const sheet = await requireSheet(run.sheetId, ctx.scope.dataUserId);
       const measurability = measurabilityOf(sheetScale(sheet));
-      const result = await db.removeLeg(
-        input.id,
+      // The whole network is snapshotted, because a leg delete can re-join
+      // the pieces either side of a tee (server/takeoffRestore.ts).
+      const { result, snapshot } = await withNetworkSnapshot(
+        run,
         ctx.scope.dataUserId,
-        measurability.ok ? measurability.ratio : null
+        () =>
+          db.removeLeg(
+            input.id,
+            ctx.scope.dataUserId,
+            measurability.ok ? measurability.ratio : null
+          )
       );
-      return { success: true, ...result };
+      return {
+        success: true,
+        ...result,
+        undo: sealPacket(RUN_PACKET, ctx.scope.dataUserId, snapshot),
+      };
+    }),
+
+  /**
+   * Put a deleted run or leg back exactly as it was — undo of a delete, redo
+   * of a finish. Refused when the run has changed since, when a mark it ended
+   * on is gone, or on a locked bid (server/takeoffRestore.ts).
+   */
+  restore: procedure
+    .input(z.object({ undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const snapshot = openPacket<NetworkSnapshot>(
+        RUN_PACKET,
+        userId,
+        input.undo
+      );
+      if (!snapshot)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      await refuseIfLocked(snapshot.bidId, userId);
+      await restoreNetwork(snapshot, userId);
+      return { restored: snapshot.rootId };
+    }),
+
+  /**
+   * Move, add or remove a run's points — the drag-to-edit path (T8, D7a).
+   *
+   * ── NOT `save`, on purpose ───────────────────────────────────────────────
+   * `save` defaults `status` to draft, `isSuggestion` to false and `location`
+   * to null, so saving new points through it would demote a finished run to a
+   * draft and clear its location — every other field of the run silently
+   * reset by an edit that was only about geometry. This writes the points and
+   * the length they measure, and nothing else. `typedLengthInches` is never
+   * touched: a typed length keeps pricing the bid, and the drawing moves.
+   *
+   * Tee ends are pinned (`pinTeeEnds`, shared with `save`). An answered pull
+   * point whose corner moved is dropped so it is proposed again, and the
+   * count is returned so the screen can say so. Refused on a locked bid.
+   *
+   * Returns `undo`: the run's whole network as it was, which puts back the
+   * points AND any pull-point answer the move cleared.
+   */
+  setPoints: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        points: pointsSchema.min(2),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.id, userId);
+      await refuseIfLocked(run.bidId, userId);
+      const sheet = await requireSheet(run.sheetId, userId);
+      const measurability = measurabilityOf(sheetScale(sheet));
+      const ratio = measurability.ok ? measurability.ratio : null;
+      const points = (await pinTeeEnds(run, input.points, userId)).map(p => ({
+        x: p.x,
+        y: p.y,
+      }));
+      const inches = ratio === null ? null : pathRealInches(points, ratio);
+
+      const { result: clearedAnswers, snapshot } = await withNetworkSnapshot(
+        run,
+        userId,
+        async () => {
+          await db.updateRun(input.id, userId, {
+            points,
+            lengthInches: inches === null ? null : inches.toFixed(4),
+            scaleRatioUsed: ratio === null ? null : String(ratio),
+          });
+          return db.dropOrphanedPullPoints(input.id, userId, points);
+        }
+      );
+      return {
+        points,
+        clearedAnswers,
+        undo: sealPacket(RUN_PACKET, userId, snapshot),
+      };
     }),
 
   /**
@@ -1074,6 +1283,7 @@ export const takeoffRunsRouter = router({
         from.parentRunId === null
           ? from
           : await requireRun(from.parentRunId, userId);
+      await refuseIfLocked(root.bidId, userId, "legs cannot be added");
       const group = await db.getRunGroup(root.id, userId);
 
       const start = input.start;
@@ -1107,13 +1317,20 @@ export const takeoffRunsRouter = router({
         start.kind === "tee" ? start.stampId : null,
       ].filter((id): id is number => id !== null);
       if (stampIds.length > 0) {
-        const onSheet = new Set(
-          (await db.getStampsForSheet(root.sheetId, userId)).map(s => s.id)
-        );
+        const marks = await db.getStampsForSheet(root.sheetId, userId);
+        const onSheet = new Map(marks.map(s => [s.id, s]));
         if (stampIds.some(id => !onSheet.has(id)))
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "That mark is not on this sheet.",
+          });
+        // The client never snaps to an unconfirmed mark; the server refuses
+        // one too, so an old or modified client cannot copy an unchecked
+        // spot into a run (shared/markStatus.ts, rule 2).
+        if (stampIds.some(id => !markIsSnapTarget(onSheet.get(id)!.status)))
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: UNCONFIRMED_MARK_REFUSAL,
           });
       }
       if (start.kind !== "tee") await requireKnownKind(start.startKind, userId);
@@ -1203,6 +1420,12 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.runId, ctx.scope.dataUserId);
+      // A circuit is wire the length of the run.
+      await refuseIfLocked(
+        run.bidId,
+        ctx.scope.dataUserId,
+        "circuits cannot be changed"
+      );
       if (run.pathType !== "conduit") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1246,14 +1469,26 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { id, ...patch } = input;
-      await db.updateRunCircuit(id, ctx.scope.dataUserId, patch);
+      const userId = ctx.scope.dataUserId;
+      await refuseIfRunLocked(
+        await db.getRunIdOfCircuit(id, userId),
+        userId,
+        "circuits cannot be changed"
+      );
+      await db.updateRunCircuit(id, userId, patch);
       return { success: true };
     }),
 
   removeCircuit: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.deleteRunCircuit(input.id, ctx.scope.dataUserId);
+      const userId = ctx.scope.dataUserId;
+      await refuseIfRunLocked(
+        await db.getRunIdOfCircuit(input.id, userId),
+        userId,
+        "circuits cannot be changed"
+      );
+      await db.deleteRunCircuit(input.id, userId);
       return { success: true };
     }),
 
@@ -1432,6 +1667,8 @@ export const takeoffRunsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const run = await requireRun(input.id, userId);
+      // An end decides the run's drop footage, which is on the bid.
+      await refuseIfLocked(run.bidId, userId);
 
       /*
         A GUARD (CLAUDE.md rule 7): a tee end carries straight on at run
@@ -1471,12 +1708,21 @@ export const takeoffRunsRouter = router({
       );
       if (claiming.length > 0) {
         const onSheet = await db.getStampsForSheet(run.sheetId, userId);
-        const ids = new Set(onSheet.map(stamp => stamp.id));
+        const byId = new Map(onSheet.map(stamp => [stamp.id, stamp]));
         for (const stampId of claiming) {
-          if (!ids.has(stampId)) {
+          const stamp = byId.get(stampId);
+          if (!stamp) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "That mark is not on this sheet.",
+            });
+          }
+          // Rule 2 of shared/markStatus.ts, enforced here as well as in the
+          // client's snap.
+          if (!markIsSnapTarget(stamp.status)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: UNCONFIRMED_MARK_REFUSAL,
             });
           }
         }
@@ -1496,10 +1742,14 @@ export const takeoffRunsRouter = router({
       for (const field of fields) {
         if (input[field] !== undefined) patch[field] = input[field];
       }
-      if (Object.keys(patch).length === 0) return { ok: true };
+      if (Object.keys(patch).length === 0) return { ok: true, undo: null };
 
-      await db.updateRun(input.id, userId, patch);
-      return { ok: true };
+      // The run's network as it was, so an end change is one undo step
+      // (server/takeoffRestore.ts, as for a drag).
+      const { snapshot } = await withNetworkSnapshot(run, userId, () =>
+        db.updateRun(input.id, userId, patch)
+      );
+      return { ok: true, undo: sealPacket(RUN_PACKET, userId, snapshot) };
     }),
 
   /**
@@ -1524,6 +1774,12 @@ export const takeoffRunsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const run = await requireRun(input.runId, ctx.scope.dataUserId);
+      // An LB or a pull box is a fitting on the bid.
+      await refuseIfLocked(
+        run.bidId,
+        ctx.scope.dataUserId,
+        "pull points cannot be answered"
+      );
       const where = placeAnswer(
         { points: run.points ?? [], endDrop: { state: "unknown" } },
         { id: 0, ...input }
@@ -1546,7 +1802,13 @@ export const takeoffRunsRouter = router({
   clearPullPointAnswer: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.clearPullPointAnswer(ctx.scope.dataUserId, input.id);
+      const userId = ctx.scope.dataUserId;
+      await refuseIfRunLocked(
+        await db.getRunIdOfPullPoint(input.id, userId),
+        userId,
+        "pull points cannot be answered"
+      );
+      await db.clearPullPointAnswer(userId, input.id);
       return { ok: true };
     }),
 
@@ -1646,6 +1908,7 @@ export const takeoffRunsRouter = router({
       const root = group.find(r => r.id === input.rootRunId);
       if (!root || root.parentRunId !== null)
         throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
+      await refuseIfLocked(root.bidId, userId);
       if (traceModeOf(root) !== "quantity")
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1790,7 +2053,7 @@ export const takeoffRunsRouter = router({
       const fromMarks = (
         await db.loadGroupDrops(input.bidId, userId, heights, allRuns, scales)
       )
-        .filter(d => d.status === "counted" && d.perDropFeet !== null)
+        .filter(d => d.status === "counted" && d.totalDropFeet !== null)
         .map(d => ({
           groupId: d.groupId,
           groupLabel: groupLabel.get(d.groupId) ?? "Count",
@@ -1800,11 +2063,10 @@ export const takeoffRunsRouter = router({
               heights.types
             ) ?? "",
           count: d.countedMarks.length,
-          perDropFeet: d.perDropFeet as number,
-          feet:
-            Math.round(
-              (d.perDropFeet as number) * d.countedMarks.length * 100
-            ) / 100,
+          // One length only when every mark drops the same: a mark at its
+          // own height makes "N × one drop" false, so it is never sent.
+          perDropFeet: d.buckets.length === 1 ? d.buckets[0].perDropFeet : null,
+          feet: d.totalDropFeet as number,
           runTypeId: d.runTypeId,
           mayDoubleCount: d.mayDoubleCount,
         }))

@@ -19,9 +19,10 @@
  *
  * ── What a drop buys ─────────────────────────────────────────────────────────
  * Pipe (or cable) the length of the drop, and wire per conductor of the run
- * type down it, through the SAME extras rules as a run's vertical (§ 7.1):
- * the wire % applies, the conduit % does not (a drop is arithmetic between two
- * known heights), and makeup is added at the device end only — once per wire,
+ * type down it, through the SAME extras rules as a run's vertical: the wire %
+ * and — since 2026-10-05 (owner) — the conduit % both apply. Until then the
+ * conduit % did not (overhaul § 7.1: "a drop is arithmetic between two known
+ * heights"). Makeup is added at the device end only — once per wire,
  * or once in cable feet on a cable type (Q3). Extra is material only (Q5).
  *
  * ── Fittings are NOT counted (owner, 2026-09-28, Q8) ─────────────────────────
@@ -34,12 +35,14 @@
  * unknown, and its drop is arithmetic between two heights the estimator set.
  */
 import {
+  resolveDeviceHeight,
   resolveDistributionHeight,
-  resolveMountingHeight,
   stampsClaimedByRuns,
   SUGGEST_WITHIN_INCHES,
   verticalAtEnd,
+  type DeviceHeightSource,
   type HeightLayers,
+  type MarkHeight,
 } from "./takeoffHeights";
 import {
   resolveExtraPct,
@@ -67,6 +70,14 @@ export type DropMark = {
   sheetId: number;
   x: number;
   y: number;
+  /**
+   * This mark's own height (0098), REQUIRED so no loader can drop it: a 54"
+   * receptacle on an 18" count drops 3 ft less, and a mapping that forgot
+   * the column would price it at the count's height with nothing to show.
+   */
+  height: MarkHeight;
+  /** "No drop on these" (0098). REQUIRED for the same reason. */
+  dropExcluded: boolean;
 };
 
 /** A run row's ends: what claims a mark, and what may double-count one. */
@@ -75,6 +86,13 @@ export type DropRunEnd = {
   points: readonly { x: number; y: number }[];
   startStampId: number | null;
   endStampId: number | null;
+  /**
+   * Whether the run counts a vertical at each end (`verticalsForRunRow`).
+   * A linked end that counts none does NOT take the mark's drop — see
+   * `stampsClaimedByRuns`.
+   */
+  startCountsVertical: boolean;
+  endCountsVertical: boolean;
 };
 
 /** What the drop's run type is — already resolved through any fork. */
@@ -99,6 +117,8 @@ export type DropFootage = {
   wireBoughtFeet: number;
   groundInstalledFeet: number;
   groundBoughtFeet: number;
+  /** Conduit waste on the drop (owner 2026-10-05: drops get it too). */
+  conduitExtraFeet: number;
   wireExtraFeet: number;
   makeupFeet: number;
 };
@@ -130,8 +150,26 @@ export type GroupDrop = {
   markCount: number;
   /** Marks whose drop a run end already counts — left out, by the rule. */
   claimedCount: number;
-  /** The marks that each carry a drop. */
+  /** The marks that each carry a drop, at whatever height. */
   countedMarks: readonly { id: number; sheetId: number }[];
+  /**
+   * Every counted drop, one bucket per device height — the count's own and
+   * one per distinct height a mark carries itself. What the bid sums: since
+   * marks can have their own height, "one drop × N marks" is no longer the
+   * total, and nothing may compute it that way.
+   */
+  buckets: readonly DropBucket[];
+  /** Feet of drop across every counted mark. Null when none counted. */
+  totalDropFeet: number | null;
+  /** Counted marks at a height of their own rather than the count's. */
+  ownHeightCount: number;
+  /** Marks whose drop was left off ("No drop on these"). */
+  excludedCount: number;
+  /**
+   * Marks that WANT a drop and get none because a height is missing — said
+   * on the row in amber, never counted as 0. Null when there are none.
+   */
+  uncounted: { count: number; reason: string } | null;
   /**
    * Counted marks within `SUGGEST_WITHIN_INCHES` of a run end that has NOT
    * claimed them — a possible double count, FLAGGED rather than resolved:
@@ -140,6 +178,15 @@ export type GroupDrop = {
   mayDoubleCount: number;
   /** One drop's footage; null unless counted. */
   perDrop: DropFootage | null;
+};
+
+/** Drops at one device height. */
+export type DropBucket = {
+  deviceInches: number;
+  source: DeviceHeightSource;
+  perDropFeet: number;
+  perDrop: DropFootage;
+  marks: readonly { id: number; sheetId: number }[];
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -157,6 +204,7 @@ export function dropsFootage(per: DropFootage, count: number): DropFootage {
     wireBoughtFeet: round2(per.wireBoughtFeet * count),
     groundInstalledFeet: round2(per.groundInstalledFeet * count),
     groundBoughtFeet: round2(per.groundBoughtFeet * count),
+    conduitExtraFeet: round2(per.conduitExtraFeet * count),
     wireExtraFeet: round2(per.wireExtraFeet * count),
     makeupFeet: round2(per.makeupFeet * count),
   };
@@ -167,7 +215,9 @@ export function oneDrop(
   feet: number,
   type: DropTypeSpec,
   wirePct: number,
-  makeupInches: number
+  makeupInches: number,
+  /** Conduit waste, on the drop as on a run (owner 2026-10-05). */
+  conduitPct: number
 ): DropFootage {
   const makeup = makeupInches / 12;
   if (type.pathType === "cable") {
@@ -184,6 +234,7 @@ export function oneDrop(
       wireBoughtFeet: 0,
       groundInstalledFeet: 0,
       groundBoughtFeet: 0,
+      conduitExtraFeet: 0,
       wireExtraFeet: round2(feet * wirePct),
       makeupFeet: round2(makeup),
     };
@@ -195,9 +246,11 @@ export function oneDrop(
   return {
     pathType: "conduit",
     dropFeet: feet,
-    // No conduit extra on a drop (§ 7.1): bought is installed.
+    // Conduit waste on the drop, as on a run's drops (owner, 2026-10-05;
+    // until then a drop got none — overhaul § 7.1).
     conduitInstalledFeet: feet,
-    conduitBoughtFeet: feet,
+    conduitBoughtFeet: round2(feet + round2(feet * conduitPct)),
+    conduitExtraFeet: round2(feet * conduitPct),
     cableInstalledFeet: 0,
     cableBoughtFeet: 0,
     wireInstalledFeet: round2(wireInstalled),
@@ -257,12 +310,15 @@ export function groupDrops(input: {
 
   return input.groups.map(group => {
     const marks = input.marks.filter(m => m.groupId === group.id);
-    const counted = marks.filter(m => !claimed.has(m.id));
+    const unclaimed = marks.filter(m => !claimed.has(m.id));
+    // "No drop on these" — skipped like a claimed mark, and said on the row.
+    const wanting = unclaimed.filter(m => !m.dropExcluded);
     const base = {
       groupId: group.id,
       runTypeId: group.dropRunTypeId,
       markCount: marks.length,
-      claimedCount: marks.length - counted.length,
+      claimedCount: marks.length - unclaimed.length,
+      excludedCount: unclaimed.length - wanting.length,
       distributionInches: distribution,
     };
     const none = (
@@ -276,53 +332,123 @@ export function groupDrops(input: {
       perDropFeet: null,
       deviceInches,
       countedMarks: [],
+      buckets: [],
+      totalDropFeet: null,
+      ownHeightCount: 0,
+      uncounted: null,
       mayDoubleCount: 0,
       perDrop: null,
     });
 
     if (group.dropKind === null) return none("not-answered", null, null);
-    const device = resolveMountingHeight(
-      group.dropKind,
-      input.heights.layers,
-      group.dropHeightInches
-    ).inches;
+    const kind = group.dropKind;
+    const heightFor = (mark: MarkHeight | null) =>
+      resolveDeviceHeight({
+        kind,
+        layers: input.heights.layers,
+        runEndInches: null,
+        mark,
+        countInches: group.dropHeightInches,
+      });
+    // The COUNT's own drop — what the row leads with, and what every mark
+    // without a height of its own gets.
+    const device = heightFor(null).inches;
     const vertical = verticalAtEnd({
-      kind: group.dropKind,
+      kind,
       endInches: device,
       distributionInches: distribution,
     });
-    if (!vertical.counted) {
-      if (vertical.reason === "level") return none("level", null, device);
-      return none(
-        "no-height",
-        vertical.reason === "no-distribution-height"
-          ? "no run height set for this job"
-          : "no height set for that type",
-        device
-      );
-    }
+    const reasonOf = (r: string) =>
+      r === "no-distribution-height"
+        ? "no run height set for this job"
+        : "no height set for that type";
+    if (!vertical.counted && vertical.reason === "level")
+      return none("level", null, device);
+    if (!vertical.counted && vertical.reason === "no-distribution-height")
+      return none("no-height", reasonOf(vertical.reason), device);
+
     const type =
       group.dropRunTypeId === null ? null : input.typeFor(group.dropRunTypeId);
     if (!type)
       return {
         ...none("no-type", "say what the drop is made of", device),
-        perDropFeet: vertical.feet,
+        perDropFeet: vertical.counted ? vertical.feet : null,
       };
 
     const wirePct =
       resolveExtraPct("wireExtraPct", null, type.extras, input.extras).value ??
       0;
     const makeup =
-      resolveMakeup(group.dropKind, null, type.extras, input.extras).value ?? 0;
+      resolveMakeup(kind, null, type.extras, input.extras).value ?? 0;
+    const conduitPct =
+      resolveExtraPct("conduitExtraPct", null, type.extras, input.extras)
+        .value ?? 0;
+
+    // Each mark at its own height where it has one, else the count's.
+    const buckets = new Map<number, DropBucket>();
+    let uncountedMarks = 0;
+    let ownHeightCount = 0;
+    const countedMarks: DropMark[] = [];
+    for (const mark of wanting) {
+      const own = heightFor(mark.height);
+      const at = verticalAtEnd({
+        kind,
+        endInches: own.inches,
+        distributionInches: distribution,
+      });
+      if (!at.counted) {
+        // Level is an answer (a mark at run height); anything else is a
+        // missing height, said in amber — never a 0.
+        if (at.reason !== "level") uncountedMarks += 1;
+        continue;
+      }
+      if (own.source === "mark-typed" || own.source === "mark-read")
+        ownHeightCount += 1;
+      countedMarks.push(mark);
+      const bucket = buckets.get(at.endInches) ?? {
+        deviceInches: at.endInches,
+        source: own.source,
+        perDropFeet: at.feet,
+        perDrop: oneDrop(at.feet, type, wirePct, makeup, conduitPct),
+        marks: [],
+      };
+      buckets.set(at.endInches, {
+        ...bucket,
+        marks: [...bucket.marks, { id: mark.id, sheetId: mark.sheetId }],
+      });
+    }
+    const list = Array.from(buckets.values());
+    const uncounted =
+      uncountedMarks > 0 && !vertical.counted
+        ? { count: uncountedMarks, reason: reasonOf(vertical.reason) }
+        : null;
+    if (list.length === 0) {
+      if (!vertical.counted)
+        return none("no-height", reasonOf(vertical.reason), device);
+      // Every mark left off, claimed or level: counted, at nothing.
+      return {
+        ...none("counted", null, device),
+        perDropFeet: vertical.feet,
+        perDrop: oneDrop(vertical.feet, type, wirePct, makeup, conduitPct),
+      };
+    }
     return {
       ...base,
       status: "counted",
       reason: null,
-      perDropFeet: vertical.feet,
+      perDropFeet: vertical.counted ? vertical.feet : null,
       deviceInches: device,
-      countedMarks: counted.map(m => ({ id: m.id, sheetId: m.sheetId })),
-      mayDoubleCount: counted.filter(nearAnOpenEnd).length,
-      perDrop: oneDrop(vertical.feet, type, wirePct, makeup),
+      countedMarks: countedMarks.map(m => ({ id: m.id, sheetId: m.sheetId })),
+      buckets: list,
+      totalDropFeet: round2(
+        list.reduce((sum, b) => sum + b.perDropFeet * b.marks.length, 0)
+      ),
+      ownHeightCount,
+      uncounted,
+      mayDoubleCount: countedMarks.filter(nearAnOpenEnd).length,
+      perDrop: vertical.counted
+        ? oneDrop(vertical.feet, type, wirePct, makeup, conduitPct)
+        : null,
     };
   });
 }
@@ -346,7 +472,12 @@ export function notAnsweredDrop(
     deviceInches: null,
     markCount: 0,
     claimedCount: 0,
+    excludedCount: 0,
     countedMarks: [],
+    buckets: [],
+    totalDropFeet: null,
+    ownHeightCount: 0,
+    uncounted: null,
     mayDoubleCount: 0,
     perDrop: null,
   };
@@ -367,19 +498,18 @@ export type MarkDropEntry = {
 export function markDropEntries(drops: readonly GroupDrop[]): MarkDropEntry[] {
   const out: MarkDropEntry[] = [];
   for (const drop of drops) {
-    if (drop.status !== "counted" || !drop.perDrop || drop.runTypeId === null)
-      continue;
-    const bySheet = new Map<number, number>();
-    for (const mark of drop.countedMarks)
-      bySheet.set(mark.sheetId, (bySheet.get(mark.sheetId) ?? 0) + 1);
-    bySheet.forEach((count, sheetId) =>
-      out.push({
-        runTypeId: drop.runTypeId as number,
-        sheetId,
-        perDrop: drop.perDrop as DropFootage,
-        count,
-      })
-    );
+    if (drop.status !== "counted" || drop.runTypeId === null) continue;
+    const runTypeId = drop.runTypeId;
+    // Per BUCKET: a mark at its own height has its own drop length, so the
+    // count's one drop × every mark would price it at the count's height.
+    for (const bucket of drop.buckets) {
+      const bySheet = new Map<number, number>();
+      for (const mark of bucket.marks)
+        bySheet.set(mark.sheetId, (bySheet.get(mark.sheetId) ?? 0) + 1);
+      bySheet.forEach((count, sheetId) =>
+        out.push({ runTypeId, sheetId, perDrop: bucket.perDrop, count })
+      );
+    }
   }
   return out;
 }

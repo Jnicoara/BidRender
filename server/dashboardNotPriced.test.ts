@@ -163,6 +163,9 @@ beforeAll(async () => {
     lugId,
     strap,
   ]);
+  const pricedRecipe = await assemblyOf(USER, "Dashboard probe priced recipe", [
+    strap,
+  ]);
   const pipe = await runType(USER, "Dashboard probe EMT");
   const pipe2 = await runType(USER, "Dashboard probe EMT 2");
 
@@ -225,7 +228,7 @@ beforeAll(async () => {
     });
   });
 
-  await add("from an assembly", { lines: 1, parts: 2 }, async bidId => {
+  await add("from an assembly", { lines: 1, parts: 3 }, async bidId => {
     // Whole cost $0 — one line, and its parts are in that already.
     await line(bidId, {
       assemblyId: recipe,
@@ -233,7 +236,9 @@ beforeAll(async () => {
       snapshotLaborHours: "0.0000",
       snapshotUnpricedParts: 3,
     });
-    // Labor-only: priced, nothing missing.
+    // Labor, no material: its labor is in, its material is ONE thing not
+    // priced (owner, 2026-10-05). Until then this read "priced, nothing
+    // missing" — the trap a pole bid with no pole in it fell through.
     await line(bidId, { assemblyId: recipe, snapshotMaterialCost: "0.0000" });
     // Priced, with two frozen $0 parts: "+ 2 parts".
     await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: 2 });
@@ -245,6 +250,20 @@ beforeAll(async () => {
     await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
     await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
   });
+
+  await add(
+    "labor only, from before 0087",
+    { lines: 0, parts: 1 },
+    async bidId => {
+      // A recipe whose parts are all priced, so the live read says 0 — and the
+      // line's own $0 material still counts one (the SQL's live branch).
+      await line(bidId, {
+        assemblyId: pricedRecipe,
+        snapshotMaterialCost: "0.0000",
+        snapshotUnpricedParts: null,
+      });
+    }
+  );
 
   await add("no quantity", { lines: 0, parts: 0 }, async bidId => {
     await line(bidId, { qty: "0", snapshotMaterialCost: null });
@@ -319,6 +338,7 @@ withDb("the dashboard card's not-priced count", () => {
     "from a run type",
     "from an assembly",
     "from before 0087",
+    "labor only, from before 0087",
     "no quantity",
     "broken lines",
     "archived lines",

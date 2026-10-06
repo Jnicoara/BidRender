@@ -1,5 +1,5 @@
 Category: Connectors & Terminations
-Items: 33
+Items: 38
 
 Category | Name | Size
 Connectors & Terminations | Butt splice | -
@@ -27,8 +27,13 @@ Connectors & Terminations | Lever wire connector, 2-port | -
 Connectors & Terminations | Lever wire connector, 3-port | -
 Connectors & Terminations | Lever wire connector, 5-port | -
 Connectors & Terminations | MC anti-short bushing | -
+Connectors & Terminations | 3/8" MC connector | 3/8"
+Connectors & Terminations | 1/2" MC connector | 1/2"
+Connectors & Terminations | 3/4" MC connector | 3/4"
+Connectors & Terminations | 1" MC connector | 1"
 Connectors & Terminations | Push-in wire connector | -
 Connectors & Terminations | Ring terminal | -
+Connectors & Terminations | 2" SE cable connector | 2"
 Connectors & Terminations | Spade terminal | -
 Connectors & Terminations | Split-bolt connector | -
 Connectors & Terminations | Terminal block | -

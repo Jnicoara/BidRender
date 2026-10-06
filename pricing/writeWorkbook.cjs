@@ -198,7 +198,20 @@ const NEW_FILL = {
   fgColor: { argb: "FFE2EFDA" },
 };
 
-function buildSheet(name, rows, note) {
+/**
+ * Every Home Depot row first, then every Supplier row, so one sitting at
+ * homedepot.com is one unbroken block. The sort is stable, so inside each
+ * block the order buildPricingSheet.mts chose — category, type, size — stands.
+ */
+const PRICE_AT_ORDER = ["Home Depot", "Supplier"];
+const byPriceAt = rows =>
+  rows
+    .map((row, i) => ({ row, i, at: PRICE_AT_ORDER.indexOf(priceAt(row)) }))
+    .sort((a, b) => a.at - b.at || a.i - b.i)
+    .map(entry => entry.row);
+
+function buildSheet(name, unsorted, note) {
+  const rows = byPriceAt(unsorted);
   const ws = wb.addWorksheet(name, { views: [{ state: "frozen", ySplit: 2 }] });
   ws.mergeCells(1, 1, 1, HEADERS.length);
   const banner = ws.getCell(1, 1);
@@ -276,7 +289,7 @@ function buildSheet(name, rows, note) {
 buildSheet(
   "Generic catalog",
   generic,
-  "STARTER CATALOG — GENERIC ITEMS. Fill in the YELLOW 'Pack price' column only; 'Price per unit' calculates itself as Pack price / Pack qty. 'NEW' marks a row not yet in the app's catalog. Rows with no NEW flag already exist and keep their exact name, unit and category. Sorted by category, then type, then physical size — so the nine sizes of one part sit together. Filter the Type column to work one part at a time."
+  "STARTER CATALOG — GENERIC ITEMS. Fill in the YELLOW 'Pack price' column only; 'Price per unit' calculates itself as Pack price / Pack qty. 'NEW' marks a row not yet in the app's catalog. Rows with no NEW flag already exist and keep their exact name, unit and category. All Home Depot rows come first, then all Supplier rows ('Price at' column). Inside each block, sorted by category, then type, then physical size — so the nine sizes of one part sit together. Filter the Type column to work one part at a time."
 );
 buildSheet(
   "Brand variants",
@@ -334,7 +347,7 @@ const lines = [
   ["", ""],
   [
     "Sort order",
-    "Category, then TYPE (the name with the size taken out), then physical size — the app's own size table, not alphabetical. AWG runs backwards and inverts at 1/0, so a text or numeric sort puts the heaviest conductor among the thin ones.",
+    "Price at first — every Home Depot row, then every Supplier row, so the store rows are one sitting. Inside each block: category, then TYPE (the name with the size taken out), then physical size — the app's own size table, not alphabetical. AWG runs backwards and inverts at 1/0, so a text or numeric sort puts the heaviest conductor among the thin ones.",
   ],
   [
     "Units",
@@ -366,6 +379,10 @@ legend.getCell(
 
 wb.xlsx.writeFile(OUT).then(() => {
   console.log(`wrote ${OUT}`);
-  console.log(`  Generic catalog: ${generic.length} rows`);
-  console.log(`  Brand variants:  ${branded.length} rows`);
+  const split = rows =>
+    PRICE_AT_ORDER.map(
+      at => `${rows.filter(row => priceAt(row) === at).length} ${at}`
+    ).join(", ");
+  console.log(`  Generic catalog: ${generic.length} rows (${split(generic)})`);
+  console.log(`  Brand variants:  ${branded.length} rows (${split(branded)})`);
 });

@@ -49,7 +49,7 @@ import {
   pickIsPriced,
 } from "../../shared/runFittingMaterials";
 import { materialItemKey } from "../../shared/materialMarkup";
-import { isFittingRole } from "../../shared/runFittings";
+import { isFittingRole, laborInRunRate } from "../../shared/runFittings";
 import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
 import { footageByRunType } from "../runTypeFootage";
 import { MARK_COLORS } from "../../shared/takeoffMarks";
@@ -62,6 +62,7 @@ import {
   refuseUnknownKinds,
 } from "../extrasInput";
 import * as db from "../db";
+import { refuseSendIfLocked } from "../lockGuard";
 
 /**
  * Gated on bids rather than on a library permission, deliberately: this palette
@@ -178,6 +179,9 @@ async function resendPlans(
       candidate.role,
       resendPlan({
         isFitting: isFittingRole(candidate.role),
+        // Couplings, connectors and straps: the run's per-foot rate pays
+        // their labor, so Send again never fills hours in on them.
+        laborInRunRate: laborInRunRate(candidate.role),
         // A field bend is priced by hours on its raceway, never by cost.
         laborOnly: candidate.role === "fieldBend",
         linePart: part(line.runMaterialId),
@@ -767,9 +771,8 @@ export const takeoffRunTypesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
-      if (!bid)
-        throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+      // Refused whole on a locked bid (owner, 2026-09-29) — server/lockGuard.ts.
+      const bid = await refuseSendIfLocked(input.bidId, ctx.scope.dataUserId);
       /*
         RESOLVED, exactly like the read above, and for a sharper reason.
 
@@ -834,15 +837,19 @@ export const takeoffRunTypesRouter = router({
         the same legs — one list, so the lock rule and the refresh rule below
         are written once for both. `sendable` carries each kind's own reasons.
       */
+      /*
+        Counted across EVERY type on the bid, then this type's rows taken.
+        A tee's box belongs to one type (`teeBoxOwners`: the largest pipe
+        meeting there), and that can only be decided with all of them in
+        view. Given this type alone, it owned every tee it touched, so
+        sending a 1/2" type and a 3/4" type that share a tee stored a box for
+        each (2026-09-29, plan W4). Cable types too: a tee on a cable run buys
+        its box.
+      */
       const fittings =
-        type.pathType === "conduit"
-          ? ((
-              await db.fittingRowsByRunType(
-                ctx.scope.dataUserId,
-                new Map([[input.runTypeId, f]])
-              )
-            ).get(input.runTypeId) ?? [])
-          : [];
+        (await db.fittingRowsByRunType(ctx.scope.dataUserId, footage)).get(
+          input.runTypeId
+        ) ?? [];
       const candidates = [
         ...rows.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
@@ -882,16 +889,13 @@ export const takeoffRunTypesRouter = router({
       const wanted = input.role
         ? candidates.filter(row => row.role === input.role)
         : candidates;
-      // Refill or swap, per role — the same plan the preview showed. Only
-      // asked on an unlocked bid; a locked one is refused below regardless.
-      const plans =
-        bid.quantitiesLockedAt === null
-          ? await resendPlans(
-              ctx.scope.dataUserId,
-              wanted,
-              existing.filter(line => line.archivedAt === null)
-            )
-          : new Map<string, ResendPlan>();
+      // Refill or swap, per role — the same plan the preview showed. A locked
+      // bid never reaches here (refused at the top).
+      const plans = await resendPlans(
+        ctx.scope.dataUserId,
+        wanted,
+        existing.filter(line => line.archivedAt === null)
+      );
 
       const sent = [];
       const updated = [];
@@ -910,20 +914,12 @@ export const takeoffRunTypesRouter = router({
         */
         const live = already.get(row.role);
         /*
-          A LOCKED bid keeps the footage it was sent at. This used to refresh
-          regardless, so pressing Send again after tracing more quietly
-          rewrote a quantity somebody had already quoted — the column IS the
-          frozen answer once `quantitiesLockedAt` is set, so this UPDATE was
-          the lock's one open door. A NEW row still arrives, frozen at today's
-          number, the same as a count sent to a locked bid.
+          A LOCKED bid used to be handled here: an existing line was skipped
+          (a re-send once rewrote a quoted quantity — the lock's open door)
+          while a NEW row still arrived frozen. Since 2026-09-29 the whole send
+          is refused at the top, so neither happens; the old skip is gone
+          rather than left as a branch nothing can reach.
         */
-        if (live && bid.quantitiesLockedAt !== null) {
-          skipped.push({
-            role: row.role,
-            why: "This bid's quantities are locked. Unlock the bid to update it from the drawing.",
-          });
-          continue;
-        }
         if (live) {
           const allowedAgain = row.sendable;
           if (!allowedAgain.ok) {

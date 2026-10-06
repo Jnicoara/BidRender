@@ -37,16 +37,72 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import {
   buildCountedItems,
+  nameMatchesSymbol,
   stampName,
+  symbolCountsOn,
   symbolLookupKey,
+  symbolOriginalName,
 } from "../../shared/takeoffCounts";
 import {
   measurabilityOf,
   runFeet,
   tracedRunOf,
 } from "../../shared/takeoffQuantities";
+import { lockedEditRefusal } from "../../shared/quantityLock";
+// A person's choices only: `unconfirmed` is the reader's, not a menu item.
+import { USER_MARK_STATUSES } from "../../shared/markStatus";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
+import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
+import { planViewerUrl } from "../storage";
+import {
+  isSameLook,
+  lookConfirmsSet,
+  lookCount,
+  looksForSearch,
+  thumbnailAfterRemoval,
+  lookAlikes,
+  firstLookId,
+  withLookFinds,
+  MAX_LOOK_ALIKE_LOOKS,
+  type LookSpot,
+  type LookBox,
+} from "../../shared/symbolLooks";
+
+/** A look row's capture box, or null when it was saved without one. */
+function lookBoxOf(row: {
+  captureX: string | null;
+  captureY: string | null;
+  captureWidth: string | null;
+  captureHeight: string | null;
+}): LookBox | null {
+  if (
+    row.captureX === null ||
+    row.captureY === null ||
+    row.captureWidth === null ||
+    row.captureHeight === null
+  )
+    return null;
+  return {
+    x: Number(row.captureX),
+    y: Number(row.captureY),
+    width: Number(row.captureWidth),
+    height: Number(row.captureHeight),
+  };
+}
+import {
+  STAMPS_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
+import {
+  bidsOfStamps,
+  confirmPlacedIds,
+  deleteStampsWithSnapshot,
+  restoreStamps,
+  type StampSnapshot,
+} from "../takeoffRestore";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -67,14 +123,90 @@ const coordSchema = z.number().finite().min(-100000).max(100000);
  * generous ceiling here would let a full-page screenshot into a text column
  * and quietly bloat every list query that reads it.
  */
+// The column is MySQL TEXT (65,535 bytes). This was 200_000, so a picture
+// between the two passed here and failed in the database. See
+// shared/symbolCapture.ts.
 const thumbnailSchema = z
   .string()
-  .max(200_000)
+  .max(SYMBOL_THUMBNAIL_MAX_CHARS)
   .refine(
     v => v.startsWith("data:image/"),
     "Thumbnail must be an image data URL"
   )
   .nullable();
+
+/**
+ * An item from before looks has its old picture and no look rows; that
+ * picture is its first look (multiple-looks-plan.md § 2), read rather than
+ * backfilled. Written as a box-less row the moment a row is ADDED to such an
+ * item, or the new row would hide it.
+ */
+async function keepOldPictureAsFirstLook(
+  item: {
+    id: number;
+    thumbnail: string | null;
+    capturedFromSheetId: number | null;
+  },
+  lookRows: number,
+  owner: number
+) {
+  if (lookRows > 0 || !item.thumbnail) return;
+  const from = item.capturedFromSheetId
+    ? await db.getBidPdfSheet(item.capturedFromSheetId, owner)
+    : undefined;
+  await db.createSymbolLook({
+    userId: owner,
+    symbolLinkId: item.id,
+    thumbnail: item.thumbnail,
+    bidPdfId: from?.bidPdfId ?? null,
+    sheetId: from?.id ?? null,
+    createdByUserId: null,
+  });
+}
+
+/**
+ * The marks on one sheet, counted as an item OTHER than `item`, that a look's
+ * spots land on (`lookAlikes`, plan § 4). A mark is the item's own when its
+ * count carries one of the item's names or counts its assembly.
+ */
+async function lookAlikesOnSheet(
+  sheetId: number,
+  spots: readonly LookSpot[],
+  item: { label: string; lookupKey: string; assemblyId: number | null },
+  owner: number
+) {
+  const marks = (await db.getStampsForSheet(sheetId, owner)).map(row => ({
+    x: Number(row.x),
+    y: Number(row.y),
+    name: stampName(row),
+    assemblyId: row.assemblyId,
+  }));
+  return lookAlikes(
+    spots,
+    marks,
+    mark =>
+      nameMatchesSymbol(mark.name, item) ||
+      (item.assemblyId !== null && mark.assemblyId === item.assemblyId)
+  );
+}
+
+/**
+ * The item a captured label would reach: the existing one it names (its
+ * current or captured name), or a new one — with the same-name library
+ * assembly `captureSymbol` would link it to. Kept beside the capture's own
+ * lookup so the look-alike check judges "another item" against the same one.
+ */
+async function itemForLabel(label: string, owner: number) {
+  const lookupKey = symbolLookupKey(label);
+  const existing =
+    (await db.getSymbolLinkByKey(owner, lookupKey)) ??
+    (await db.getSymbolLinks(owner)).find(row => nameMatchesSymbol(label, row));
+  if (existing) return existing;
+  const same = (await db.getLibraryAssemblies(owner)).find(
+    a => symbolLookupKey(a.name) === lookupKey
+  );
+  return { label, lookupKey, assemblyId: same?.id ?? null };
+}
 
 async function requireSheet(sheetId: number, userId: number) {
   const sheet = await db.getBidPdfSheet(sheetId, userId);
@@ -88,6 +220,103 @@ async function requireBid(bidId: number, userId: number) {
   if (!bid)
     throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
   return bid;
+}
+
+/**
+ * Refuse to delete marks from a bid whose quantities are locked.
+ *
+ * The locked line reads its stored `qty`, so the number would not move — but
+ * the drawing it was priced from would, and unlocking later re-reads that
+ * drawing. Whole selection or nothing.
+ *
+ * This comment used to say "placing a mark stays allowed on purpose (the send
+ * toast says further marks will not change a locked line)". That was reversed
+ * on 2026-09-29 by the owner — a locked bid must not change — because a mark
+ * placed after the lock is the same disagreement in the other direction: the
+ * sheet shows more than the quote, and unlocking silently adds it. `drop` now
+ * refuses too, and the toast no longer promises otherwise.
+ */
+async function refuseIfAnyLocked(ids: readonly number[], userId: number) {
+  if ((await db.countStampsOnLockedBids(ids, userId)) > 0)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "This bid's quantities are locked, so its marks cannot be removed. Unlock them on the bid first.",
+    });
+}
+
+/**
+ * Rename one captured symbol, and its plain count on this bid with it.
+ *
+ * Every refusal is checked before anything is written, so a refused rename
+ * leaves the legend and the bid exactly as they were.
+ */
+async function renameSymbolOnBid(
+  userId: number,
+  symbolId: number,
+  bidId: number,
+  nextLabel: (link: { label: string; lookupKey: string }) => string
+) {
+  const link = await db.getSymbolLinkById(symbolId, userId);
+  if (!link)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Symbol not found." });
+  const bid = await requireBid(bidId, userId);
+  if (bid.quantitiesLockedAt !== null)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: lockedEditRefusal("its legend names cannot be changed"),
+    });
+
+  const label = nextLabel(link).trim();
+  if (!label)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "A symbol needs a name.",
+    });
+
+  // Another symbol already answering to this name would make the two
+  // indistinguishable to every matcher, the plan reader included.
+  const clash = (await db.getSymbolLinks(userId)).find(
+    row => row.id !== link.id && nameMatchesSymbol(label, row)
+  );
+  if (clash)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `Your legend already has a symbol called "${clash.label}".`,
+    });
+
+  const groups = await db.getGroupsForBid(bidId, userId);
+  const mine = symbolCountsOn(groups, link);
+  if (mine.length > 1)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message:
+        `This bid counts "${mine[0].label}" and "${mine[1].label}" separately, ` +
+        `and both are this symbol. Delete or rename one of those counts first, ` +
+        `so the new name has one count to go to.`,
+    });
+  const count = mine[0] ?? null;
+  const taken = groups.find(
+    g =>
+      g.id !== count?.id && symbolLookupKey(g.label) === symbolLookupKey(label)
+  );
+  if (taken)
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `This bid already counts something called "${taken.label}".`,
+    });
+
+  // Only the label. `lookupKey` keeps the captured name — that is the point.
+  await db.updateSymbolLink(link.id, userId, { label });
+  if (count && count.label !== label)
+    await db.updateTakeoffGroup(count.id, userId, { label });
+
+  return {
+    id: link.id,
+    label,
+    originalName: symbolOriginalName({ label, lookupKey: link.lookupKey }),
+    renamedCountId: count?.id ?? null,
+  };
 }
 
 export const takeoffStampsRouter = router({
@@ -120,6 +349,11 @@ export const takeoffStampsRouter = router({
         groupId: z.number().int().positive(),
         /** Where these ones sit. Optional — tagging can happen after placing. */
         location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
+        /**
+         * What these ones ARE (shared/markStatus.ts). Omitted or null is new,
+         * which is what every mark was before the column existed.
+         */
+        status: z.enum(USER_MARK_STATUSES).nullable().default(null),
         /** One entry per click. Bounded so a runaway loop cannot flood a sheet. */
         at: z
           .array(z.object({ x: coordSchema, y: coordSchema }))
@@ -128,7 +362,12 @@ export const takeoffStampsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("new marks cannot be placed"),
+        });
       await requireSheet(input.sheetId, ctx.scope.dataUserId);
 
       const group = await db.getGroupById(input.groupId, ctx.scope.dataUserId);
@@ -158,7 +397,8 @@ export const takeoffStampsRouter = router({
         assemblyCategory = assembly?.category ?? null;
       }
 
-      await db.createStamps(
+      // The ids go back so the screen can offer "undo: N marks placed".
+      const ids = await db.createStampsReturningIds(
         input.at.map(point => ({
           bidId: input.bidId,
           sheetId: input.sheetId,
@@ -170,18 +410,43 @@ export const takeoffStampsRouter = router({
           location: input.location,
           x: point.x.toFixed(4),
           y: point.y.toFixed(4),
+          status: input.status === "new" ? null : input.status,
         }))
       );
 
-      return { dropped: input.at.length };
+      /*
+        `createStampsReturningIds` assumes one insert's ids are consecutive,
+        which MySQL promises only while no other insert interleaves with it
+        (this server runs innodb_autoinc_lock_mode=2). An undo that removes
+        the wrong mark is far worse than no undo, so the ids go back only if
+        every one of them is a row this insert wrote.
+      */
+      const confirmed = await confirmPlacedIds(ids, {
+        userId: ctx.scope.dataUserId,
+        sheetId: input.sheetId,
+        groupId: group.id,
+      });
+
+      return { dropped: input.at.length, ids: confirmed };
     }),
 
-  /** Remove one stamp — the misclick path. */
+  /**
+   * Remove one stamp — the misclick path. Refused on a locked bid.
+   *
+   * Returns `undo`, a sealed packet `restore` accepts (server/restorePacket.ts).
+   */
   remove: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
-      await db.deleteStamp(input.id, ctx.scope.dataUserId);
-      return { success: true };
+      await refuseIfAnyLocked([input.id], ctx.scope.dataUserId);
+      const { snapshot } = await deleteStampsWithSnapshot(
+        [input.id],
+        ctx.scope.dataUserId
+      );
+      return {
+        success: true,
+        undo: sealPacket(STAMPS_PACKET, ctx.scope.dataUserId, snapshot),
+      };
     }),
 
   /**
@@ -204,8 +469,127 @@ export const takeoffStampsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const ids = Array.from(new Set(input.ids));
-      const removed = await db.deleteStamps(ids, ctx.scope.dataUserId);
-      return { removed };
+      await refuseIfAnyLocked(ids, ctx.scope.dataUserId);
+      const { removed, snapshot } = await deleteStampsWithSnapshot(
+        ids,
+        ctx.scope.dataUserId
+      );
+      return {
+        removed,
+        undo: sealPacket(STAMPS_PACKET, ctx.scope.dataUserId, snapshot),
+      };
+    }),
+
+  /**
+   * Put marks under another count — "these were counted as the wrong thing".
+   *
+   * Asked for on 2026-10-01 for the reader-accuracy hand count: devices drawn
+   * as EXISTING TO REMAIN had been counted together with new ones, and the
+   * only way to separate them was to delete and click every one again. A
+   * moved mark keeps its id and its place, so run ends, tees and AI findings
+   * that point at it still do; only what it counts changes.
+   *
+   * Whole selection or nothing, on ONE bid, and never on a locked bid — the
+   * same reason deleting is refused there: the drawing a locked quote was
+   * priced from must not move under it.
+   *
+   * `previous` is where each mark was, so the screen can undo to exactly that
+   * even when the selection spanned several counts.
+   */
+  moveToGroup: procedure
+    .input(
+      z.object({
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        groupId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const ids = Array.from(new Set(input.ids));
+      const group = await db.getGroupById(input.groupId, userId);
+      if (!group)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That count was not found.",
+        });
+      const bid = await requireBid(group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its marks cannot be moved"),
+        });
+
+      const current = await db.getStampGroupsOnBid(ids, userId, group.bidId);
+      if (current.length !== ids.length)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message:
+            "Some of those marks are not on this bid any more. Nothing was moved.",
+        });
+
+      let assemblyCategory: string | null = null;
+      if (group.assemblyId !== null) {
+        const assembly = await db.getAssemblyById(group.assemblyId, userId);
+        assemblyCategory = assembly?.category ?? null;
+      }
+      const moved = await db.moveStampsToGroup(ids, userId, group.bidId, {
+        groupId: group.id,
+        assemblyId: group.assemblyId,
+        assemblyName: group.kind === "assembly" ? group.label : null,
+        assemblyCategory,
+      });
+
+      const byGroup = new Map<number | null, number[]>();
+      for (const row of current) {
+        if (row.groupId === group.id) continue;
+        const list = byGroup.get(row.groupId) ?? [];
+        list.push(row.id);
+        byGroup.set(row.groupId, list);
+      }
+      return {
+        moved,
+        label: group.label,
+        // A mark with no count (pre-phase-6, never backfilled) cannot be put
+        // back under nothing by this procedure, so it is left out of undo.
+        previous: Array.from(byGroup.entries())
+          .filter((e): e is [number, number[]] => e[0] !== null)
+          .map(([groupId, ids]) => ({ groupId, ids })),
+      };
+    }),
+
+  /**
+   * Put deleted marks back — undo of a delete, redo of a placement.
+   *
+   * Same ids, and every run end, tee and AI finding that pointed at them is
+   * pointed at them again (server/takeoffRestore.ts). Refused, with a
+   * sentence, when that cannot be done exactly: the count is gone, the marks
+   * are already back, or the bid is locked.
+   */
+  restore: procedure
+    .input(z.object({ undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const snapshot = openPacket<StampSnapshot>(
+        STAMPS_PACKET,
+        userId,
+        input.undo
+      );
+      if (!snapshot)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      for (const bidId of bidsOfStamps(snapshot)) {
+        const bid = await requireBid(bidId, userId);
+        if (bid.quantitiesLockedAt !== null)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "This bid's quantities are locked, so its marks cannot be put back. Unlock them on the bid first.",
+          });
+      }
+      const restored = await restoreStamps(snapshot, userId);
+      return { restored };
     }),
 
   /** Every stamp on a sheet, for drawing the marks. */
@@ -229,7 +613,119 @@ export const takeoffStampsRouter = router({
         location: row.location,
         x: Number(row.x),
         y: Number(row.y),
+        /**
+         * NULL = new (0098, 0103). The drawing shows every mark; only a new
+         * one is counted, and a run never snaps to an `unconfirmed` one
+         * (shared/markStatus.ts, rules 1 and 2).
+         */
+        status: row.status,
+        /**
+         * The mark's own height (0098), null = follows its count, and who
+         * wrote it. Listed by hand: this feeds a screen (CLAUDE.md).
+         */
+        mountHeightInches:
+          row.mountHeightInches === null ? null : Number(row.mountHeightInches),
+        mountHeightSource: row.mountHeightSource,
+        /** "No drop on these" (0098). */
+        dropExcluded: row.dropExcluded === true,
       }));
+    }),
+
+  /**
+   * Say what these marks ARE: new, existing to remain, to be removed, or to
+   * be relocated (pin plan § 7). `null` puts them back to new.
+   *
+   * Refused on a locked bid with the standard sentence, like every other
+   * mark edit: a status moves the quantity (only a new mark is priced), and a
+   * locked bid's quantities are exactly what the lock promises not to move.
+   */
+  setStatus: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        status: z.enum(USER_MARK_STATUSES).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's status cannot be changed"),
+        });
+      // NULL, not "new": NULL already means new, and one spelling of it is
+      // one thing to query for.
+      const updated = await db.setStampStatus(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids,
+        input.status === "new" ? null : input.status
+      );
+      return { updated };
+    }),
+
+  /**
+   * A mark's own device height, in inches, or null to follow its count
+   * (references/vertical-drops-plan.md § 2). `read` is only ever sent by
+   * Sheet Check's "Use" — a height read off the plan reaches a mark when a
+   * person accepts it, never by being read. Refused on a locked bid: a
+   * height moves a drop, and a drop is a quantity.
+   */
+  setHeight: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        // Floor to a high bay: -60 in (below a slab) to 50 ft.
+        inches: z.number().min(-60).max(600).nullable(),
+        source: z.enum(["typed", "read"]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's height cannot be changed"),
+        });
+      const updated = await db.setStampHeight(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids,
+        input.inches,
+        input.source
+      );
+      return { updated };
+    }),
+
+  /**
+   * "No drop on these" — or give them back. A mark left off keeps its
+   * place in the count; only its drop goes, and the count's row says how
+   * many (shared/groupDrops.ts `excludedCount`).
+   */
+  setDropExcluded: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        ids: z.array(z.number().int().positive()).min(1).max(2000),
+        excluded: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's drop cannot be changed"),
+        });
+      const updated = await db.setStampDropExcluded(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids,
+        input.excluded
+      );
+      return { updated };
     }),
 
   /** Tag one stamp's Location. */
@@ -315,6 +811,7 @@ export const takeoffStampsRouter = router({
           assemblyId: s.assemblyId,
           x: Number(s.x),
           y: Number(s.y),
+          status: s.status,
         })),
         runs
           // A suggestion is not counted work; it stays out of the list that
@@ -342,13 +839,26 @@ export const takeoffStampsRouter = router({
   /** Every symbol this user has captured, across all their jobs. */
   symbols: procedure.query(async ({ ctx }) => {
     const rows = await db.getSymbolLinks(ctx.scope.dataUserId);
+    const looks = await db.countSymbolLooks(ctx.scope.dataUserId);
     return rows.map(row => ({
+      /** Pictures of how it is drawn (multiple-looks-plan.md § 2). */
+      looks: lookCount(looks.get(row.id) ?? 0, Boolean(row.thumbnail)),
       id: row.id,
       label: row.label,
+      /** The captured name, when it has been renamed since; else null. */
+      originalName: symbolOriginalName(row),
       assemblyId: row.assemblyId,
       thumbnail: row.thumbnail,
       /** The whole point of the panel: is this one click away from stamping? */
       isLinked: row.assemblyId !== null,
+      /** The captured name's key — how a renamed symbol still finds its counts. */
+      lookupKey: row.lookupKey,
+      /** Its chosen pin look, every job (shared/pinLetters.ts). NULL = automatic. */
+      look: {
+        shape: row.markShape,
+        letter: row.markLetter,
+        color: row.markColor,
+      },
     }));
   }),
 
@@ -368,14 +878,97 @@ export const takeoffStampsRouter = router({
         capturedFromSheetId: z.number().int().positive().optional(),
         /** Supplied when the user links at capture time rather than later. */
         assemblyId: z.number().int().positive().nullable().default(null),
+        /**
+         * The box it was captured with, page points on `capturedFromSheetId`.
+         * Kept on the LOOK, so Find all matching can rebuild it later.
+         */
+        box: z
+          .object({
+            x: z.number().finite(),
+            y: z.number().finite(),
+            width: z.number().finite().positive(),
+            height: z.number().finite().positive(),
+          })
+          .optional(),
+        /**
+         * The name is already an item and the person said "Yes, another
+         * look" (multiple-looks-plan.md § 1). Without it a matching name
+         * keeps today's answer: the item is left as it is.
+         */
+        addAsLook: z.boolean().default(false),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const lookupKey = symbolLookupKey(input.label);
-      const existing = await db.getSymbolLinkByKey(
-        ctx.scope.dataUserId,
-        lookupKey
-      );
+      // A renamed symbol answers to its new name AND its captured one, so
+      // boxing it again under either finds the same row (no second "Linear").
+      const existing =
+        (await db.getSymbolLinkByKey(ctx.scope.dataUserId, lookupKey)) ??
+        (await db.getSymbolLinks(ctx.scope.dataUserId)).find(row =>
+          nameMatchesSymbol(input.label, row)
+        );
+
+      // The sheet the box is on, owned by this company, and its plan set.
+      const sheet = input.capturedFromSheetId
+        ? await db.getBidPdfSheet(
+            input.capturedFromSheetId,
+            ctx.scope.dataUserId
+          )
+        : undefined;
+      const lookFields = {
+        userId: ctx.scope.dataUserId,
+        thumbnail: input.thumbnail,
+        bidPdfId: sheet?.bidPdfId ?? null,
+        sheetId: sheet?.id ?? null,
+        captureX: input.box && sheet ? String(input.box.x) : null,
+        captureY: input.box && sheet ? String(input.box.y) : null,
+        captureWidth: input.box && sheet ? String(input.box.width) : null,
+        captureHeight: input.box && sheet ? String(input.box.height) : null,
+        // The PERSON, for "who added it"; userId above decides what is read.
+        createdByUserId: ctx.scope.actorUserId,
+      };
+
+      if (existing && input.addAsLook) {
+        const looks = await db.getSymbolLooks(
+          existing.id,
+          ctx.scope.dataUserId
+        );
+        const box = input.box && sheet ? input.box : null;
+        if (
+          looks.some(l =>
+            isSameLook(
+              { sheetId: l.sheetId, box: lookBoxOf(l) },
+              { sheetId: sheet?.id ?? null, box }
+            )
+          )
+        )
+          return {
+            id: existing.id,
+            alreadyKnown: true,
+            lookAdded: false,
+            lookAlreadySaved: true,
+            looks: looks.length,
+            assemblyId: existing.assemblyId,
+            isLinked: existing.assemblyId !== null,
+            autoLinked: false,
+          };
+        await keepOldPictureAsFirstLook(
+          existing,
+          looks.length,
+          ctx.scope.dataUserId
+        );
+        await db.createSymbolLook({ ...lookFields, symbolLinkId: existing.id });
+        return {
+          id: existing.id,
+          alreadyKnown: true,
+          lookAdded: true,
+          lookAlreadySaved: false,
+          looks: Math.max(looks.length, existing.thumbnail ? 1 : 0) + 1,
+          assemblyId: existing.assemblyId,
+          isLinked: existing.assemblyId !== null,
+          autoLinked: false,
+        };
+      }
 
       if (existing) {
         // Fill in a thumbnail or a link if this capture supplies one the
@@ -393,27 +986,372 @@ export const takeoffStampsRouter = router({
           existing.id,
           ctx.scope.dataUserId
         );
+        const rows = await db.getSymbolLooks(existing.id, ctx.scope.dataUserId);
         return {
           id: existing.id,
           alreadyKnown: true,
+          lookAdded: false,
+          lookAlreadySaved: false,
+          looks: lookCount(rows.length, Boolean(updated?.thumbnail)),
           assemblyId: updated?.assemblyId ?? null,
           isLinked: (updated?.assemblyId ?? null) !== null,
+          autoLinked: false,
         };
+      }
+
+      // A NEW symbol named exactly like an assembly in the library is linked
+      // to it (2026-09-30): the job scripts/readerTestAssemblies.mts did by
+      // hand after every capture. Exact name only, compared the way symbols
+      // are keyed, so nothing is guessed; an assembly the caller chose always
+      // wins; and an EXISTING symbol is never relinked (the branch above).
+      let assemblyId = input.assemblyId;
+      let autoLinked = false;
+      if (assemblyId === null) {
+        const library = await db.getLibraryAssemblies(ctx.scope.dataUserId);
+        const same = library.find(a => symbolLookupKey(a.name) === lookupKey);
+        if (same) {
+          assemblyId = same.id;
+          autoLinked = true;
+        }
       }
 
       const id = await db.createSymbolLink({
         userId: ctx.scope.dataUserId,
         label: input.label,
         lookupKey,
-        assemblyId: input.assemblyId,
+        assemblyId,
         thumbnail: input.thumbnail,
         capturedFromSheetId: input.capturedFromSheetId ?? null,
       });
+      // Its first look, with the box, so Find all matching can search it
+      // later from any sheet. Without a box the old picture stands for it.
+      const firstLook = Boolean(input.box && sheet);
+      if (firstLook)
+        await db.createSymbolLook({ ...lookFields, symbolLinkId: id });
       return {
         id,
         alreadyKnown: false,
-        assemblyId: input.assemblyId,
-        isLinked: input.assemblyId !== null,
+        lookAdded: firstLook,
+        lookAlreadySaved: false,
+        looks: lookCount(firstLook ? 1 : 0, Boolean(input.thumbnail)),
+        assemblyId,
+        isLinked: assemblyId !== null,
+        autoLinked,
+      };
+    }),
+
+  /**
+   * LOOK-ALIKES (multiple-looks-plan.md § 4): asked BEFORE a capture saves —
+   * a new item's first look or a look added to one. Read-only; it writes
+   * nothing. A mutation only so thousands of spots travel in a POST body
+   * rather than a URL.
+   *
+   * The spots are where the boxed symbol was found on its own sheet, run by
+   * the client (the matcher lives in the PDF worker). The answer is every
+   * OTHER item whose marks on that sheet those spots land on. "Other" is
+   * judged against the item the save would reach: the existing one this
+   * label names, or — for a new name — the new item and the same-name
+   * assembly it would be linked to.
+   *
+   * Until 2026-10-06 this was a gate inside `captureSymbol`. It moved because
+   * the spots come from the client either way, so the gate guaranteed
+   * nothing a separate check does not, and it gave the save a second result
+   * shape that every caller had to handle.
+   */
+  checkLookAlikes: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        label: nameSchema,
+        spots: z
+          .array(
+            z.object({
+              x: z.number().finite(),
+              y: z.number().finite(),
+              reach: z.number().finite().nonnegative(),
+            })
+          )
+          .max(5000),
+        /**
+         * Other items whose saved looks (`looksOnSet`) also found some of
+         * those spots in the same search, and how many. Named here, under
+         * this company, so an id from elsewhere names nothing.
+         */
+        otherLooks: z
+          .array(
+            z.object({
+              symbolId: z.number().int().positive(),
+              spots: z.number().int().nonnegative(),
+            })
+          )
+          .max(MAX_LOOK_ALIKE_LOOKS)
+          .default([]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const sheet = await db.getBidPdfSheet(input.sheetId, owner);
+      if (!sheet)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      const item = await itemForLabel(input.label, owner);
+      const marks = await lookAlikesOnSheet(sheet.id, input.spots, item, owner);
+      const names = new Map(
+        (await db.getSymbolLinks(owner)).map(row => [row.id, row.label])
+      );
+      const ownId = "id" in item ? item.id : null;
+      return {
+        alike: withLookFinds(
+          marks,
+          input.otherLooks.flatMap(o => {
+            const name = names.get(o.symbolId);
+            return name && o.symbolId !== ownId
+              ? [{ name, spots: o.spots }]
+              : [];
+          })
+        ),
+      };
+    }),
+
+  /**
+   * Other items' looks captured on the open sheet's plan set, for the
+   * look-alike check (plan § 4): the new look and each of these are searched
+   * together, and a spot both find is a spot two items claim. Only looks
+   * with a box and a sheet (nothing else can be searched), never the item
+   * the label reaches, newest first, at most MAX_LOOK_ALIKE_LOOKS — the
+   * number searched is said, so a capped answer is not read as a full one.
+   * Same set only, so no url is needed: the worker opens this set already.
+   */
+  looksOnSet: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        label: nameSchema,
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const sheet = await db.getBidPdfSheet(input.sheetId, owner);
+      if (!sheet)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      const item = await itemForLabel(input.label, owner);
+      const ownId = "id" in item ? item.id : null;
+      const looks = (await db.getSymbolLooksOnSet(sheet.bidPdfId, owner))
+        .map(l => ({ ...l, box: lookBoxOf(l) }))
+        .flatMap(l =>
+          l.symbolLinkId !== ownId && l.box && l.pageNumber !== null
+            ? [{ ...l, box: l.box, pageNumber: l.pageNumber }]
+            : []
+        );
+      return {
+        looks: looks.slice(0, MAX_LOOK_ALIKE_LOOKS).map(l => ({
+          id: l.id,
+          symbolId: l.symbolLinkId,
+          label: l.label,
+          box: l.box,
+          pageNumber: l.pageNumber,
+          setName: null,
+          confirmsThisSet: true,
+          isFirst: false,
+          url: null,
+        })),
+        leftOut: Math.max(0, looks.length - MAX_LOOK_ALIKE_LOOKS),
+      };
+    }),
+
+  /**
+   * The looks Find all matching searches for one item, from the sheet open
+   * now: only looks with a box, this plan set's first, newest first, at most
+   * MAX_LOOKS_PER_SEARCH (shared/symbolLooks.ts). A look from ANOTHER set
+   * comes with that set's viewer url, so the worker can rebuild the symbol
+   * from that set's drawing — and with `confirmsThisSet: false`, so every
+   * find only it makes is a suggestion (the design rule in that file).
+   *
+   * The url is minted here, after the look and its plan set were both found
+   * under this company — the same authorization `bidPdfsRouter` gives it —
+   * and is never stored or logged.
+   */
+  searchLooks: procedure
+    .input(
+      z.object({
+        symbolId: z.number().int().positive(),
+        sheetId: z.number().int().positive(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const [item, sheet] = await Promise.all([
+        db.getSymbolLinkById(input.symbolId, owner),
+        db.getBidPdfSheet(input.sheetId, owner),
+      ]);
+      if (!item || !sheet)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Symbol not found.",
+        });
+      const rows = await db.getSymbolLooks(item.id, owner);
+      const first = firstLookId(rows);
+      const chosen = looksForSearch(
+        rows.map(r => ({ ...r, box: lookBoxOf(r) })),
+        sheet.bidPdfId
+      );
+      const looks = await Promise.all(
+        chosen.map(async l => {
+          const here = lookConfirmsSet(l, sheet.bidPdfId);
+          const pdf =
+            here || l.bidPdfId === null
+              ? undefined
+              : await db.getBidPdf(l.bidPdfId, owner);
+          return {
+            id: l.id,
+            box: l.box!,
+            pageNumber: l.pageNumber,
+            setName: l.setName,
+            confirmsThisSet: here,
+            /** Trusted like the box; an added look is not, until confirmed once. */
+            isFirst: l.id === first,
+            url: pdf ? await planViewerUrl(pdf.storageKey, new Date()) : null,
+          };
+        })
+      );
+      return {
+        // A look whose sheet was deleted has nowhere to be rebuilt from.
+        looks: looks.flatMap(l =>
+          l.pageNumber === null ? [] : [{ ...l, pageNumber: l.pageNumber }]
+        ),
+        /** Looks with no box: shown in the legend, cannot seed a search. */
+        withoutBox:
+          lookCount(rows.length, Boolean(item.thumbnail)) -
+          rows.filter(r => lookBoxOf(r) !== null).length,
+      };
+    }),
+
+  /**
+   * One item's saved looks, for the legend row's list (plan § 5): the
+   * picture, and where each came from. Newest first. No url — opening the
+   * look's sheet is the viewer's job, from `sheetId`.
+   */
+  looksFor: procedure
+    .input(z.object({ symbolId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const item = await db.getSymbolLinkById(
+        input.symbolId,
+        ctx.scope.dataUserId
+      );
+      if (!item)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Symbol not found.",
+        });
+      const rows = await db.getSymbolLooks(item.id, ctx.scope.dataUserId);
+      return rows.map(r => ({
+        id: r.id,
+        thumbnail: r.thumbnail,
+        sheetId: r.sheetId,
+        pageNumber: r.pageNumber,
+        setName: r.setName,
+        hasBox: lookBoxOf(r) !== null,
+        createdAt: r.createdAt,
+      }));
+    }),
+
+  /**
+   * Remove one look (plan § 5). Changes what FUTURE searches find, never
+   * what is counted: no mark, count, bid line or snapshot is written, on any
+   * bid, locked or not (§ 7) — symbolLooks.test.ts reads them on both sides.
+   * When the removed look was the picture the item shows, the item takes its
+   * first remaining look, or none (`thumbnailAfterRemoval`).
+   */
+  removeLook: procedure
+    .input(z.object({ lookId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const look = await db.getSymbolLook(input.lookId, owner);
+      const item = look
+        ? await db.getSymbolLinkById(look.symbolLinkId, owner)
+        : undefined;
+      if (!look || !item)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Look not found." });
+      await db.deleteSymbolLook(look.id, owner);
+      const remaining = await db.getSymbolLooks(item.id, owner);
+      const thumbnail = thumbnailAfterRemoval(item.thumbnail, look, remaining);
+      if (thumbnail !== item.thumbnail)
+        await db.updateSymbolLink(item.id, owner, { thumbnail });
+      return {
+        symbolId: item.id,
+        looks: lookCount(remaining.length, thumbnail !== null),
+        hasPicture: thumbnail !== null,
+      };
+    }),
+
+  /**
+   * Move one look to another item (plan § 5) — a look saved under the wrong
+   * item. The look keeps its picture and box. Refused when the target already
+   * has the same look (same sheet, same box: `isSameLook`).
+   *
+   * Like removing, it moves NO counted mark (§ 7): marks belong to a count,
+   * not to the look that found them. Moving marks is "Move to…", a separate
+   * step. Each item's shown picture follows: the source falls to its next
+   * look (`thumbnailAfterRemoval`), and a target with no picture takes this
+   * one. A target from before looks keeps its old picture as its first look.
+   */
+  moveLook: procedure
+    .input(
+      z.object({
+        lookId: z.number().int().positive(),
+        toSymbolId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const owner = ctx.scope.dataUserId;
+      const look = await db.getSymbolLook(input.lookId, owner);
+      const [from, to] = await Promise.all([
+        look ? db.getSymbolLinkById(look.symbolLinkId, owner) : undefined,
+        db.getSymbolLinkById(input.toSymbolId, owner),
+      ]);
+      if (!look || !from)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Look not found." });
+      if (!to)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Symbol not found.",
+        });
+      if (to.id === from.id)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `This look is already on “${to.label}”.`,
+        });
+      const targetLooks = await db.getSymbolLooks(to.id, owner);
+      const box = lookBoxOf(look);
+      if (
+        targetLooks.some(l =>
+          isSameLook(
+            { sheetId: l.sheetId, box: lookBoxOf(l) },
+            { sheetId: look.sheetId, box }
+          )
+        )
+      )
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `“${to.label}” already has this look, from the same box on the same sheet.`,
+        });
+
+      await keepOldPictureAsFirstLook(to, targetLooks.length, owner);
+      await db.moveSymbolLook(look.id, to.id, owner);
+
+      const left = await db.getSymbolLooks(from.id, owner);
+      const fromThumbnail = thumbnailAfterRemoval(from.thumbnail, look, left);
+      if (fromThumbnail !== from.thumbnail)
+        await db.updateSymbolLink(from.id, owner, { thumbnail: fromThumbnail });
+      if (to.thumbnail === null && look.thumbnail !== null)
+        await db.updateSymbolLink(to.id, owner, { thumbnail: look.thumbnail });
+
+      const now = await db.getSymbolLooks(to.id, owner);
+      return {
+        fromSymbolId: from.id,
+        toSymbolId: to.id,
+        toLabel: to.label,
+        fromLooks: lookCount(left.length, fromThumbnail !== null),
+        toLooks: now.length,
       };
     }),
 
@@ -468,6 +1406,56 @@ export const takeoffStampsRouter = router({
       });
       return { success: true };
     }),
+
+  /**
+   * Rename a captured symbol — the estimator's name, shown everywhere.
+   *
+   * The name it was captured under is kept as `lookupKey` and stays a name it
+   * answers to (see `SymbolNames` in shared/takeoffCounts.ts), so a count made
+   * under it on another job, or the plan reader using it, still lands here.
+   *
+   * Asked FROM a bid, and the plain count of this symbol on that bid takes the
+   * new name too, so the count card, the bid line (which reads the count's
+   * name live), the summary and the CSV all agree with the legend. Other bids
+   * keep the names they were counted under — finished work does not change
+   * because the library did. Assembly-backed counts are never touched: their
+   * name is the assembly's, and the assembly's own name is never written here.
+   *
+   * A locked bid refuses, like every other change to its plans.
+   */
+  renameSymbol: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        bidId: z.number().int().positive(),
+        label: nameSchema,
+      })
+    )
+    .mutation(async ({ input, ctx }) =>
+      renameSymbolOnBid(
+        ctx.scope.dataUserId,
+        input.id,
+        input.bidId,
+        () => input.label
+      )
+    ),
+
+  /** Put a renamed symbol back to the name it was captured under. */
+  resetSymbolName: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        bidId: z.number().int().positive(),
+      })
+    )
+    .mutation(async ({ input, ctx }) =>
+      renameSymbolOnBid(
+        ctx.scope.dataUserId,
+        input.id,
+        input.bidId,
+        link => link.lookupKey
+      )
+    ),
 
   removeSymbol: procedure
     .input(z.object({ id: z.number().int().positive() }))

@@ -162,9 +162,21 @@ export function lockedBannerCopy(
             followingLines === 1 ? "s" : ""
           } your plans — ${
             followingLines === 1 ? "it holds" : "they hold"
-          } the quantity the drawing said when you locked it. Marking, tracing and untracing change nothing here until you unlock. Prices are a separate thing and were already frozen on each line the day it was added.`
-        : `Nothing on this bid takes its quantity from the plans, so the lock is holding nothing today. Anything you send from the plans while it is locked arrives frozen at the number it came over with. Prices are a separate thing and were already frozen on each line the day it was added.`,
+          } the quantity the drawing said when you locked it. Marking, tracing, deleting and sending from the plans wait until you unlock. Prices are a separate thing and were already frozen on each line the day it was added.`
+        : `Nothing on this bid takes its quantity from the plans, so the lock is holding nothing today. Nothing can be sent to it from the plans until you unlock. Prices are a separate thing and were already frozen on each line the day it was added.`,
   };
+}
+
+/**
+ * The refusal for any change to a locked bid's plans — one sentence, finished
+ * by what was tried ("new marks cannot be placed").
+ *
+ * Shared so the Plans screen, which refuses BEFORE asking the server, and the
+ * server, which refuses anyway, say the same words. Owner, 2026-09-29: a
+ * locked bid must not change — not by deleting, and not by adding either.
+ */
+export function lockedEditRefusal(what: string): string {
+  return `This bid's quantities are locked, so ${what}. Unlock them on the bid first.`;
 }
 
 /** The quiet line offering the lock, on a bid whose quantities still follow. */

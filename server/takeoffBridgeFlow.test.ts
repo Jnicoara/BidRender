@@ -16,7 +16,14 @@
  * Fixture ids are distinct from every other suite — vitest runs files in
  * parallel and shared ids delete each other's rows mid-run.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  onTestFinished,
+} from "vitest";
 import { eq, inArray, like } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
@@ -149,6 +156,26 @@ beforeAll(async () => {
     });
   }
 });
+
+/**
+ * Remove a SHARED (userId NULL) assembly this test inserted, and any fork of
+ * it, when the test ends — pass or FAIL.
+ *
+ * The deletes used to be the last lines of each test body, so a test that
+ * failed first left the shared row behind, and `assemblies.test.ts` — which
+ * runs BEFORE this file — found a shipped assembly with no materials on the
+ * next run (2026-09-29, measured; plan T1). `onTestFinished` runs on failure
+ * too. Registered right after the insert, so nothing between can skip it.
+ */
+function dropSharedAssemblyWhenDone(id: number) {
+  onTestFinished(async () => {
+    const database = await getDb();
+    if (!database) return;
+    // Forks first: they point at the shipped row.
+    await database.delete(assemblies).where(eq(assemblies.baselineId, id));
+    await database.delete(assemblies).where(eq(assemblies.id, id));
+  });
+}
 
 beforeEach(async () => {
   if (!hasDb) return;
@@ -481,6 +508,8 @@ withDb("what the screens are told", () => {
       waitingToSend: 0,
       countedWithNoPrice: 0,
       doubleCounted: [],
+      runsWithNoWire: 0,
+      runsNotOnBid: { notSent: 0, noType: 0 },
     });
   });
 });
@@ -512,6 +541,7 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
       overheadLaborHours: "0.0000",
     });
     const baselineId = shipped.insertId;
+    dropSharedAssemblyWhenDone(baselineId);
 
     // Count with it FIRST, the way a real user does.
     const group = await countOf(bidId, sheetId, baselineId, 10);
@@ -547,8 +577,6 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
     expect(lines).toHaveLength(1);
     // 1.25 h is the fork's. 0.5 h is the starter's, and is what shipped before.
     expect(Number(lines[0].snapshotLaborHours)).toBe(1.25);
-
-    await database!.delete(assemblies).where(eq(assemblies.id, baselineId));
   });
 
   it("SEES THE SAME ASSEMBLY TWICE when one line is on the shipped row and one on the fork", async () => {
@@ -564,6 +592,8 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
     // Named under "Fork flow starter" so beforeEach's clean-by-name heals a
     // run that fails before its own cleanup — this row is GLOBAL (userId
     // NULL), and one left behind broke assemblies.test.ts on 2026-09-28.
+    // That heal runs only when THIS file next starts, after assemblies.test.ts
+    // has already read the row, so the cleanup is registered here as well.
     const name = `Fork flow starter R3 ${Date.now()}`;
     const [shipped] = await database!.insert(assemblies).values({
       userId: null,
@@ -573,6 +603,7 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
       overheadLaborHours: "0.0000",
     });
     const baselineId = shipped.insertId;
+    dropSharedAssemblyWhenDone(baselineId);
 
     // Added by hand from the starter, while it was still the shipped row.
     await caller().bids.addAssembly({ bidId, assemblyId: baselineId, qty: 6 });
@@ -595,8 +626,5 @@ withDb("a count follows YOUR fork of a shipped assembly", () => {
     expect(sent.warning).toMatch(/added by hand/i);
     const bid = await caller().bids.get({ id: bidId });
     expect(bid.fromPlans.doubleCounted.length).toBe(1);
-
-    await database!.delete(assemblies).where(eq(assemblies.id, forkId));
-    await database!.delete(assemblies).where(eq(assemblies.id, baselineId));
   });
 });

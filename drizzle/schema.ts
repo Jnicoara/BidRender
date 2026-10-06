@@ -1,8 +1,10 @@
 import {
   bigint,
+  char,
   boolean,
   int,
   json,
+  smallint,
   mysqlEnum,
   mysqlTable,
   type AnyMySqlColumn,
@@ -94,10 +96,48 @@ export const users = mysqlTable("users", {
    * at any time — which is why this clears rather than latching.
    */
   checklistDismissedAt: timestamp("checklistDismissedAt"),
+
+  /**
+   * A session token issued before this moment is refused (0097). Set by a
+   * password reset and by a password change, which is what makes either one
+   * sign out every other device — a session otherwise lasts a year and
+   * carries nothing to check against. `shared/sessionValidity.ts` decides.
+   *
+   * NULL means neither has happened, and every session is judged as it was
+   * before the column existed. Deliberately no default: `now()` would have
+   * signed every user out on the day the migration ran.
+   */
+  sessionsValidAfter: timestamp("sessionsValidAfter"),
 });
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/**
+ * One emailed password-reset link (0097). The token itself is never stored:
+ * `tokenHash` is its SHA-256, like a company invite code, so a copy of this
+ * table cannot be used to reset anybody's password.
+ *
+ * Single-use by `usedAt`, claimed with one conditional UPDATE so two requests
+ * racing on the same link cannot both succeed (`claimPasswordResetToken`).
+ */
+export const passwordResetTokens = mysqlTable(
+  "password_reset_tokens",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: char("tokenHash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expiresAt").notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("password_reset_tokens_tokenHash_uq").on(t.tokenHash),
+    index("password_reset_tokens_userId_idx").on(t.userId),
+  ]
+);
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 export const projects = mysqlTable(
@@ -1017,6 +1057,16 @@ export const assemblies = mysqlTable(
     archivedAt: timestamp("archivedAt"),
 
     isActive: boolean("isActive").default(true).notNull(),
+
+    /**
+     * This assembly's chosen pin look on every job (0100;
+     * track-b-count-pin-styles-plan.md § 6). NULL = automatic. A shipped
+     * assembly forks on edit, so this is only ever set on a company's copy.
+     */
+    markShape: varchar("markShape", { length: 16 }),
+    markLetter: varchar("markLetter", { length: 4 }),
+    markColor: varchar("markColor", { length: 7 }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -2646,6 +2696,14 @@ export const RUN_MATERIAL_ROLES = [
   */
   "teeBox",
   "teeCover",
+  /*
+    A T conduit body at a branch tee (0096), appended. Its own role because a
+    run type can have box tees and body tees on one bid, and a line is keyed
+    by run type + role. No cover role: the body is priced with its cover and
+    gasket. Nothing writes it until the Track C wiring ships
+    (references/materials-track-c-plan.md § 4).
+  */
+  "teeBody",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 
@@ -2881,6 +2939,15 @@ export const takeoffRuns = mysqlTable(
       (): AnyMySqlColumn => takeoffRunTees.id,
       { onDelete: "set null" }
     ),
+
+    /**
+     * Whether each end's wall connection was checked (0104; connect-point-plan
+     * § 9 Q3). NULL = not answered (counts and shows, as before); "found" =
+     * the app found the wall; "confirmed" = the estimator checked it. Never
+     * moves a length — that comes from the points.
+     */
+    startConnect: mysqlEnum("startConnect", ["found", "confirmed"]),
+    endConnect: mysqlEnum("endConnect", ["found", "confirmed"]),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -3451,6 +3518,21 @@ export const takeoffGroups = mysqlTable(
       onDelete: "set null",
     }),
 
+    /**
+     * This count's chosen pin look (0099; track-b-count-pin-styles-plan.md
+     * § 6). NULL = automatic. Names and `#rrggbb` values, not enums: a value
+     * the code no longer knows reads as automatic, as run-type colours do.
+     */
+    markShape: varchar("markShape", { length: 16 }),
+    markLetter: varchar("markLetter", { length: 4 }),
+    markColor: varchar("markColor", { length: 7 }),
+    /**
+     * Which legend symbol this count belongs to, as `symbol_links.lookupKey`
+     * (§ 11.7, count-by-tag § 2). NULL = not from a symbol. Not a foreign key
+     * on purpose: deleting a library symbol must not touch a bid.
+     */
+    symbolLookupKey: varchar("symbolLookupKey", { length: 255 }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3465,6 +3547,24 @@ export type TakeoffGroup = typeof takeoffGroups.$inferSelect;
 export type InsertTakeoffGroup = typeof takeoffGroups.$inferInsert;
 
 // ─── Stamps (takeoff phase 2c) ────────────────────────────────────────────────
+/**
+ * What a mark IS on the job (0098; track-b-count-pin-styles-plan.md § 7). NULL
+ * on `takeoff_stamps.status` reads as "new" — every mark placed before the
+ * column. Appending a value later keeps every stored index, like the other
+ * enums here; never reorder.
+ *
+ * `unconfirmed` (0103) is a mark nobody has checked yet — placed by the AI
+ * reader or offered by Find all matching. It is never counted toward a
+ * quantity and never a snap target for a run (shared/markStatus.ts).
+ */
+export const MARK_STATUSES = [
+  "new",
+  "existing",
+  "remove",
+  "relocate",
+  "unconfirmed",
+] as const;
+
 /**
  * One placed instance of an assembly on a sheet — a single click of the stamp
  * tool.
@@ -3547,6 +3647,27 @@ export const takeoffStamps = mysqlTable(
     x: decimal("x", { precision: 12, scale: 4 }).notNull(),
     y: decimal("y", { precision: 12, scale: 4 }).notNull(),
 
+    /*
+      The marks batch, 0098 (migrations-0098-batch-plan.md § S). All nullable
+      with no default, and NULL is always today's meaning — see the .sql.
+    */
+    /** NULL = new. How the others are PRICED is code, not this column. */
+    status: mysqlEnum("status", MARK_STATUSES),
+    /** 0/90/180/270; NULL = turning not known (connect-point-plan § 5.2). */
+    rotation: smallint("rotation"),
+    mirrored: boolean("mirrored"),
+    /** A height for THIS mark. NULL follows the count; 0 is a real height. */
+    mountHeightInches: decimal("mountHeightInches", {
+      precision: 7,
+      scale: 2,
+    }),
+    /** "read" = taken off the drawing and confirmed; never overwrites "typed". */
+    mountHeightSource: mysqlEnum("mountHeightSource", ["typed", "read"]),
+    /** "Keep" in a sheet check, remembered past that check. */
+    checkAcceptedAt: timestamp("checkAcceptedAt"),
+    /** This one mark takes no drop; NULL follows the count's (H3). */
+    dropExcluded: boolean("dropExcluded"),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3618,6 +3739,16 @@ export const symbolLinks = mysqlTable(
       { onDelete: "set null" }
     ),
 
+    /** This symbol's chosen pin look (0101); NULL = automatic. */
+    markShape: varchar("markShape", { length: 16 }),
+    markLetter: varchar("markLetter", { length: 4 }),
+    markColor: varchar("markColor", { length: 7 }),
+    /**
+     * The name exactly as captured, kept by a rename (0101). NULL = never
+     * renamed, or renamed before the column: fall back to `lookupKey`.
+     */
+    originalLabel: varchar("originalLabel", { length: 255 }),
+
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
@@ -3629,6 +3760,54 @@ export const symbolLinks = mysqlTable(
 
 export type SymbolLink = typeof symbolLinks.$inferSelect;
 export type InsertSymbolLink = typeof symbolLinks.$inferInsert;
+
+/**
+ * One LOOK of a legend item — the same symbol as drawn on one plan set — with
+ * the box it was captured with and where conduit meets it (0102;
+ * multiple-looks-plan.md § 6, connect-point-plan.md § 5). An item with no look
+ * rows reads its old `symbol_links.thumbnail` as a box-less first look, so
+ * nothing was backfilled.
+ */
+export const symbolLooks = mysqlTable(
+  "symbol_looks",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The company OWNER (ctx.scope.dataUserId), as on every table. */
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    symbolLinkId: int("symbolLinkId")
+      .notNull()
+      .references(() => symbolLinks.id, { onDelete: "cascade" }),
+    thumbnail: text("thumbnail"),
+    bidPdfId: int("bidPdfId").references(() => bidPdfs.id, {
+      onDelete: "set null",
+    }),
+    sheetId: int("sheetId").references(() => bidPdfSheets.id, {
+      onDelete: "set null",
+    }),
+    /** The capture box, in PDF page points. */
+    captureX: decimal("captureX", { precision: 12, scale: 4 }),
+    captureY: decimal("captureY", { precision: 12, scale: 4 }),
+    captureWidth: decimal("captureWidth", { precision: 12, scale: 4 }),
+    captureHeight: decimal("captureHeight", { precision: 12, scale: 4 }),
+    /** From the box's centre. NULL = never answered; 0,0 = the middle. */
+    connectDx: decimal("connectDx", { precision: 10, scale: 4 }),
+    connectDy: decimal("connectDy", { precision: 10, scale: 4 }),
+    /** The PERSON who added it — authorship only, never a scoping key. */
+    createdByUserId: int("createdByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    index("symbol_looks_symbolLinkId_idx").on(t.symbolLinkId),
+    index("symbol_looks_userId_idx").on(t.userId),
+  ]
+);
+
+export type SymbolLook = typeof symbolLooks.$inferSelect;
+export type InsertSymbolLook = typeof symbolLooks.$inferInsert;
 
 // ─── Plan co-pilot (AI plan reading) ──────────────────────────────────────────
 /**

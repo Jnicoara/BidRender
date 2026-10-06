@@ -88,13 +88,16 @@ import {
   handPricedGap,
 } from "@/components/HandPricedLineFields";
 import { quantitySource } from "@shared/quantityLock";
+import { runsNotOnBidText } from "@shared/runsNotOnBid";
 import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { TapExplain } from "@/components/TapExplain";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
-import { bidNotPricedCount } from "@/lib/notPricedTotal";
+import { laborInRunRate } from "@shared/runFittings";
+import { bidNotPricedCount, materialMissingLines } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 
 /**
@@ -522,6 +525,8 @@ export default function BidsPage({
    * cards use, so this screen and the search result for it cannot disagree.
    */
   const notPricedTally = bidNotPricedCount(lines);
+  /** Of the tally's parts: lines with labor and no material at all. */
+  const materialMissing = materialMissingLines(lines);
   /**
    * Traced lines whose part had no labor unit when sent — labor "Not
    * priced". Their own strip, because the next move is on the Materials
@@ -569,7 +574,13 @@ export default function BidsPage({
   groups.sort((a, b) => (a.label === null ? 1 : b.label === null ? -1 : 0));
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    /*
+      On a phone the WHOLE page scrolls, header included. Wrapped to fit 390
+      px, the bid's header is four lines — about a third of the screen — and
+      pinned it would sit over every line card. From md up the header stays
+      put and only the body scrolls, as before (device audit, 2026-10-01).
+    */
+    <div className="flex flex-col h-full bg-background overflow-y-auto md:overflow-hidden">
       <MaterialsListDialog
         bidId={bidId}
         open={materialsListOpen}
@@ -590,7 +601,7 @@ export default function BidsPage({
         open={takeoffExportOpen}
         onOpenChange={setTakeoffExportOpen}
       />
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Button
             size="sm"
@@ -791,12 +802,15 @@ export default function BidsPage({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="shrink-0 md:shrink md:flex-1 md:overflow-y-auto px-4 md:px-6 py-5">
         {bid.isSample && <SampleBidNotice bidId={bid.id} />}
         {/* Above everything, full width: it changes what every quantity below
             it MEANS, so it cannot sit in a column somebody scrolls past. */}
         <QuantityLockPanel bidId={bidId} />
-        <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+        {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
+            track is as wide as its widest child's longest unbreakable line,
+            which made the whole bid 445 px wide on a 390 px phone. */}
+        <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[1fr_22rem]">
           <div className="space-y-4 min-w-0">
             {/* Add an assembly — deliberately minimal */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-2">
@@ -868,7 +882,10 @@ export default function BidsPage({
 
             {/* Line items */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
+              {/* Column heads on a laptop or tablet only: on a phone each line
+                  is a card (name, then its numbers), so there are no columns
+                  for them to head (device audit, 2026-10-01). */}
+              <div className="hidden md:flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/30 text-xs font-medium text-muted-foreground">
                 <span className="flex-1">Line item</span>
                 <span className="w-16 text-right shrink-0">Qty</span>
                 <span className="w-24 text-right shrink-0">Hours</span>
@@ -937,10 +954,16 @@ export default function BidsPage({
                       return (
                         <div
                           key={line.id}
-                          className="flex items-center gap-3 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                          // A CARD on a phone: the name takes the first line
+                          // and the numbers wrap beneath it. A row from md up.
+                          className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
                         >
-                          <div className="flex-1 min-w-0">
-                            <span className="text-sm truncate">
+                          <div className="flex-1 min-w-0 basis-full md:basis-0">
+                            {/* `block`: truncate on an inline span only stops
+                                the wrap and never clips, so on a sideways
+                                tablet a long name ran under the quantity. On
+                                a phone's card it wraps whole instead. */}
+                            <span className="block text-sm break-words md:truncate">
                               {line.name}
                             </span>
                             {/*
@@ -1080,6 +1103,11 @@ export default function BidsPage({
                           `bidsRouter.updateLine` refuses with the same
                           sentence, from the same module.
                         */}
+                          {/* On a phone's card the quantity is not under a
+                              "Qty" column head, so it carries its own. */}
+                          <span className="md:hidden text-xs text-muted-foreground">
+                            Qty
+                          </span>
                           {source !== "typed" ? (
                             <span
                               className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
@@ -1131,35 +1159,67 @@ export default function BidsPage({
                                   priced", never "0 h" (owner, 2026-09-26) —
                                   the same words and colour as the cost cell. */}
                               {lineHoursUnset(line) ? (
-                                <span className="text-xs w-24 text-right shrink-0 text-[#F5C518]">
+                                <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
                                   Not priced
                                 </span>
+                              ) : line.takeoffRunTypeId !== null &&
+                                laborInRunRate(line.runMaterialRole) ? (
+                                /* A coupling, connector or strap: its labor is
+                                   in the run's per-foot rate (owner,
+                                   2026-09-29). Said in words, because "0 h"
+                                   beside a counted fitting reads as a figure
+                                   somebody chose — the unset-is-not-zero rule
+                                   from the other side. */
+                                <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                  <TapExplain explanation="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own.">
+                                    in run rate
+                                  </TapExplain>
+                                </span>
                               ) : (
-                                <span
-                                  className="font-mono text-xs w-24 text-right shrink-0 text-muted-foreground"
-                                  title={
+                                <span className="font-mono text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                  {(() => {
+                                    const hours = (
+                                      <>
+                                        {round(
+                                          line.breakdown.totalLaborHours,
+                                          2
+                                        )}{" "}
+                                        h
+                                        {/* Only when there ARE hours: "0 h on 111 ft"
+                                            said where nothing sits (seen on screen). */}
+                                        {line.laborQty !== null &&
+                                          line.breakdown.totalLaborHours > 0 &&
+                                          Number(line.laborQty) !==
+                                            Number(line.qty) && (
+                                            <span className="block font-sans text-[0.65rem]">
+                                              on{" "}
+                                              {round(Number(line.laborQty), 2)}{" "}
+                                              ft
+                                            </span>
+                                          )}
+                                      </>
+                                    );
                                     /* Traced footage bought with extra: the
                                        hours are on what is INSTALLED, and the
                                        extra is material only (Q5). Said here,
                                        where a reader would notice the hours
-                                       not following the quantity. */
-                                    line.laborQty !== null &&
-                                    Number(line.laborQty) !== Number(line.qty)
-                                      ? `Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`
-                                      : undefined
-                                  }
-                                >
-                                  {round(line.breakdown.totalLaborHours, 2)} h
-                                  {/* Only when there ARE hours: "0 h on 111 ft"
-                                      said where nothing sits (seen on screen). */}
-                                  {line.laborQty !== null &&
-                                    line.breakdown.totalLaborHours > 0 &&
-                                    Number(line.laborQty) !==
-                                      Number(line.qty) && (
-                                      <span className="block font-sans text-[0.65rem]">
-                                        on {round(Number(line.laborQty), 2)} ft
-                                      </span>
-                                    )}
+                                       not following the quantity — and as a
+                                       tap as well as a hover, since a title
+                                       does not exist for a finger. */
+                                    if (
+                                      line.laborQty === null ||
+                                      Number(line.laborQty) === Number(line.qty)
+                                    )
+                                      return hours;
+                                    return (
+                                      <TapExplain
+                                        className="text-right"
+                                        explanation={`Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`}
+                                      >
+                                        {hours}
+                                      </TapExplain>
+                                    );
+                                  })()}
                                 </span>
                               )}
                               {/*
@@ -1169,21 +1229,30 @@ export default function BidsPage({
                               */}
                               <LineCost
                                 line={line}
-                                className="w-24 text-right shrink-0"
+                                className="md:w-24 text-right shrink-0"
                               />
                             </>
                           )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            onClick={() =>
-                              removeLine.mutate({ bidId, id: line.id })
-                            }
-                            aria-label={`Remove ${line.name}`}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
+                          {/*
+                            A locked line from the plans cannot be removed
+                            (server: bids.removeLine). The slot stays so the
+                            row keeps its shape; a hand-typed line keeps its X.
+                          */}
+                          {source === "locked" ? (
+                            <span className="w-7 shrink-0" aria-hidden />
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 shrink-0 ml-auto md:ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                              onClick={() =>
+                                removeLine.mutate({ bidId, id: line.id })
+                              }
+                              aria-label={`Remove ${line.name}`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                       );
                     })}
@@ -1194,7 +1263,7 @@ export default function BidsPage({
           </div>
 
           {/* Rollup */}
-          <div className="lg:sticky lg:top-0 h-fit space-y-4">
+          <div className="lg:sticky lg:top-0 h-fit space-y-4 min-w-0">
             {/* Who the work is for. Above the total because it is part of what
                 the bid IS rather than part of what it costs, and because the
                 proposal reads it. Entirely optional — see ClientLinkField. */}
@@ -1351,20 +1420,48 @@ export default function BidsPage({
                 was frozen with the line's price, so pricing the part in the
                 library does not reach this bid — the advice says how to.
               */}
-              {notPricedTally.parts > 0 && (
+              {/*
+                MATERIAL MISSING ENTIRELY (owner, 2026-10-05): a line with
+                labor and no material at all. Counted in the parts above, but
+                its own strip, because there is no part to go and price — the
+                parts advice would send somebody looking for one.
+              */}
+              {materialMissing > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     <span className="text-foreground font-medium">
-                      {notPricedTally.parts} part
-                      {notPricedTally.parts === 1 ? " is" : "s are"} not priced
+                      {materialMissing} line
+                      {materialMissing === 1 ? " has" : "s have"} labor but no
+                      material price
+                    </span>{" "}
+                    — the total above has{" "}
+                    {materialMissing === 1 ? "its" : "their"} labor and none of{" "}
+                    {materialMissing === 1 ? "its" : "their"} material. Add the
+                    material to the assembly, then remove the line and add the
+                    assembly again.
+                  </p>
+                </div>
+              )}
+              {notPricedTally.parts - materialMissing > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {notPricedTally.parts - materialMissing} part
+                      {notPricedTally.parts - materialMissing === 1
+                        ? " is"
+                        : "s are"}{" "}
+                      not priced
                     </span>{" "}
                     inside assembly lines that are otherwise priced — the
                     Materials total above leaves{" "}
-                    {notPricedTally.parts === 1 ? "it" : "them"} out. A line
-                    keeps the price it was added with, so price the part on the
-                    Materials screen, then remove the line and add the assembly
-                    again.
+                    {notPricedTally.parts - materialMissing === 1
+                      ? "it"
+                      : "them"}{" "}
+                    out. A line keeps the price it was added with, so price the
+                    part on the Materials screen, then remove the line and add
+                    the assembly again.
                   </p>
                 </div>
               )}
@@ -1385,7 +1482,8 @@ export default function BidsPage({
                     total above. Set the hours on the Materials screen, then
                     press Send again on the <PlansLink bidId={bidId} /> — it
                     fills in labor on a line that has none, and never changes
-                    hours that are set.
+                    hours that are set. Couplings, connectors and straps never
+                    need hours here: the run&apos;s hours per foot pay for them.
                   </p>
                 </div>
               )}
@@ -1507,6 +1605,49 @@ export default function BidsPage({
                     your library, so there is nothing to price them from. Count
                     them again on the <PlansLink bidId={bidId} />, from the
                     library or as a free count.
+                  </p>
+                </div>
+              )}
+
+              {/*
+                Runs traced and never sent (owner, 2026-09-29: "never
+                silent"). The sentence is shared/runsNotOnBid.ts, the same
+                one the quote panel shows, so the two cannot word it apart.
+              */}
+              {runsNotOnBidText(fromPlans.runsNotOnBid) && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {runsNotOnBidText(fromPlans.runsNotOnBid)}
+                    </span>{" "}
+                    None of that footage is in the total above. Send it from the{" "}
+                    <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
+
+              {/*
+                Pipe on the bid with no wire in it (owner, 2026-09-29). The
+                rule is shared/runNoWire.ts, the same one the run's own row
+                on the Plans screen reads, where the one-tap fix is.
+              */}
+              {fromPlans.runsWithNoWire > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {fromPlans.runsWithNoWire} conduit run
+                      {fromPlans.runsWithNoWire === 1 ? " has" : "s have"} no
+                      wire
+                    </span>{" "}
+                    {/* Not "the pipe is in the total": a run whose type
+                        was never sent has its pipe off the bid too, and
+                        that sentence was false for it (seen on screen,
+                        2026-09-29). This says only what is true of both. */}
+                    — nothing is pulled through its pipe, so no wire for it is
+                    priced. Add the wire on the <PlansLink bidId={bidId} />;
+                    each run offers its type&apos;s wire in one tap.
                   </p>
                 </div>
               )}
@@ -1679,9 +1820,12 @@ export default function BidsPage({
                     Total due{" "}
                     <IncompletePriceTag show={incomplete} className="ml-1" />
                   </span>
-                  <span className="font-mono text-base text-[#F5C518]">
-                    {money(totals.totalDue)}
-                  </span>
+                  {/* The bottom line says what it leaves out too (2026-10-05). */}
+                  <NotPricedTotal
+                    amount={money(totals.totalDue)}
+                    notPriced={notPricedTally}
+                    className="font-mono text-base text-[#F5C518]"
+                  />
                 </div>
               )}
 
@@ -1751,9 +1895,16 @@ export default function BidsPage({
                           className="ml-1"
                         />
                       </span>
-                      <span className="font-mono text-base text-[#F5C518]">
-                        {money(totals.totalDue)}
-                      </span>
+                      {/*
+                        The bottom line says what it leaves out, as the Bid
+                        price above does — until 2026-10-05 a labor-only
+                        line left $1,440.00 here with nothing beside it.
+                      */}
+                      <NotPricedTotal
+                        amount={money(totals.totalDue)}
+                        notPriced={notPricedTally}
+                        className="font-mono text-base text-[#F5C518]"
+                      />
                     </div>
                   )}
                 </>

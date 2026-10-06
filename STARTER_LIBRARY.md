@@ -144,6 +144,8 @@ Each entry carries a **Project Type** tag: Residential / Commercial / Both.
 > **Labor hours are deliberately absent _from this document_.** See [Important Notes](#important-notes) — they must not be invented here.
 >
 > **What the app ships instead.** The Assembly Builder needs a non-zero number to price against, because a zero prices the work at nothing — a far more dangerous default than a visible guess. So `shared/laborHourDefaults.ts` holds placeholder hours keyed by task type, and the seeded starter assemblies carry them. They are placeholders in exactly the sense this document means: a starting figure the user replaces, labelled as a guess everywhere it appears, and never presented as a labor unit. This document stays the hours-free reference; that file is the app's editable default.
+>
+> **Being replaced (owner, 2026-09-29).** Starters will ship with hours NOT SET, shown as "Hours not set", and the placeholders on the shipped starters are cleared — `references/starter-assemblies-plan.md` D1. The paragraph above describes the app until that lands, which needs a Track A migration (`references/track-a-handoff-starter-assemblies.md` H2).
 
 ### CORE — build first
 
@@ -283,7 +285,7 @@ A typical bill of materials for each of the 27 CORE assemblies, drawn from the [
 - **Circuit sizing:** receptacles on 20A / 12-2, lighting and switching on 15A / 14-2.
 - **Run lengths are per-device allowances**, not home runs: ~25 ft for a receptacle, ~20 ft for a switch leg, ~30–40 ft where the assembly includes its own home run to the panel. These are the single biggest guess here and the first thing worth tuning against real jobs.
 - **Breakers are included only where the assembly creates a new circuit**, not where it extends an existing one.
-- **Fixtures and appliances are owner/GC-supplied** unless noted — the assembly covers the wiring, box, and connection.
+- **Fixtures and appliances are owner/GC-supplied** unless noted — the assembly covers the wiring, box, and connection. _Overridden 2026-09-29 (owner): the fixture or appliance is its own line in every starter, so an owner-furnished job deletes one line — `references/starter-assemblies-plan.md` D2._
 
 **† marks a material not yet in the Materials list above.** These are collected in [Materials Still Needed](#materials-still-needed) at the end of this section.
 
@@ -582,5 +584,5 @@ Every † above, consolidated. These are referenced by CORE assemblies but absen
 ## Important Notes
 
 - **Labor units are not AI-generated.** Any labor unit appearing here or in future entries is a placeholder/reference estimate only. Real labor units must come from the user's own field experience and/or the **NECA Manual of Labor Units** — a real, purchasable industry reference, which the user now owns. Never treat an AI-produced labor unit as fact.
-- **Box material and wiring method are NOT separate assemblies.** Metal vs plastic boxes, Romex vs conduit — these are handled by swapping materials within a single assembly, or by a user forking their own variant. Splitting them would multiply the library without adding value.
+- **Box material and wiring method are NOT separate assemblies.** Metal vs plastic boxes, Romex vs conduit — these are handled by swapping materials within a single assembly, or by a user forking their own variant. Splitting them would multiply the library without adding value. _One deliberate exception, 2026-09-29 (owner): the commercial MC versions of the common devices ship as their own starters, because a retail contractor rebuilding every device before a first bid is setup-before-value — `references/starter-assemblies-plan.md` D4._
 - **Conduit and wire runs are intentionally excluded** from the assembly list. They're handled by traced, dynamically-calculated footage on the takeoff page (see ASSEMBLIES_PLAN.md § CONDUIT & WIRE CALCULATION), not as fixed assemblies.

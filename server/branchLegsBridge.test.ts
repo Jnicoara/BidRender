@@ -23,6 +23,7 @@ import {
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { behindTheLock } from "./behindTheLock.testHelper";
 
 const USER = 9821;
 const hasDb = Boolean(process.env.DATABASE_URL);
@@ -262,28 +263,32 @@ withDb("sent, marked up, locked and listed", () => {
     await caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
     await caller().bids.lockQuantities({ bidId });
 
-    // A second branch off the far piece: another tee.
-    await caller().takeoffRuns.addLeg({
-      runId: run.rootId,
-      points: [
-        { x: ft(40), y: ft(10) },
-        { x: ft(55), y: ft(10) },
-      ],
-      start: {
-        kind: "tee",
-        hostRunId: run.cutRunId!,
-        at: { x: ft(40), y: ft(10) },
-        tolerance: 3,
-        fitting: "box",
-        stampId: null,
-      },
-      endKind: null,
-    });
-    const again = await caller().takeoffRunTypes.sendToBid({
-      bidId,
-      runTypeId: type.id,
-    });
-    expect(again.updated).toEqual([]);
+    // A second branch off the far piece: another tee. Behind the lock — a
+    // locked bid refuses a new leg since 2026-09-29; this is a drawing that
+    // moved before that rule.
+    await behindTheLock(bidId, () =>
+      caller().takeoffRuns.addLeg({
+        runId: run.rootId,
+        points: [
+          { x: ft(40), y: ft(10) },
+          { x: ft(55), y: ft(10) },
+        ],
+        start: {
+          kind: "tee",
+          hostRunId: run.cutRunId!,
+          at: { x: ft(40), y: ft(10) },
+          tolerance: 3,
+          fitting: "box",
+          stampId: null,
+        },
+        endKind: null,
+      })
+    );
+    // Since 2026-09-29 a locked bid refuses the send outright (server/lockGuard.ts),
+    // which is a stronger form of "Send-again does not move a frozen line".
+    await expect(
+      caller().takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id })
+    ).rejects.toThrow(/locked/);
     expect(Number(line((await detail(bidId)).lines, "teeBox")!.qty)).toBe(1);
 
     await caller().bids.unlockQuantities({ bidId });

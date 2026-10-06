@@ -83,6 +83,23 @@ export type MeasuredEntry = {
   note: string;
 };
 
+/**
+ * A count with no assembly behind it — "A1 luminaire: 38" — for the supplier
+ * to price as it stands (legend plan § 8a).
+ *
+ * Its own kind of row, kept apart from `entries`, because nothing in the app
+ * knows what it is made of: it is a thing the supplier quotes, not a part the
+ * app itemised. Like every row here it has no field a price could go in, so it
+ * can never read as $0 — it reads as "the supplier prices this".
+ */
+export type ForQuoteEntry = {
+  /** The count's name, as the estimator gave it on this job. */
+  name: string;
+  qty: number;
+  /** Always each: a count is a number of things. */
+  unit: "each";
+};
+
 /** The whole document, as both exporters consume it. */
 export type MaterialsListDoc = {
   bidName: string;
@@ -91,6 +108,8 @@ export type MaterialsListDoc = {
   preparedOn: Date;
   entries: MaterialsEntry[];
   measured: MeasuredEntry[];
+  /** Counts with no assembly, for the supplier to price. */
+  forQuote: ForQuoteEntry[];
   /** Anything the reader must know to read the list correctly. */
   notes: string[];
 };
@@ -130,6 +149,30 @@ export type CountedAssemblySource = {
 export function roundQty(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * The quantity a supplier is asked for: a piece or a box is bought WHOLE,
+ * rounded UP; footage keeps its two decimals.
+ *
+ * Owner, 2026-09-29 (starter assemblies plan Q5): an assembly may carry a
+ * fractional part — a quarter tube of firestop per penetration — but the
+ * purchase list must never ask for 0.25 of an item. The fraction is kept
+ * through the SUM and rounded once at the end, so four penetrations order one
+ * tube, not four.
+ *
+ * Rounded to four places before the ceiling, because a float sum of 0.1 three
+ * times is 0.30000000000000004 and 2 pieces summed that way would otherwise
+ * order 3.
+ *
+ * This is whole PIECES, not whole PACKS: the catalog has no pack size yet
+ * (references/material-markup.md D3). When it does, rounding to a pack
+ * belongs here too — see todo.md.
+ */
+export function orderQty(unit: MaterialUnit, value: number): number {
+  if (unit === "foot") return roundQty(value);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.ceil(Math.round(value * 10_000) / 10_000);
 }
 
 /**
@@ -204,7 +247,7 @@ export function aggregateMaterials(
 
   return Array.from(byKey.values()).map(entry => ({
     ...entry,
-    qty: roundQty(entry.qty),
+    qty: orderQty(entry.unit, entry.qty),
   }));
 }
 
@@ -268,6 +311,15 @@ export function measuredEntries(totals: {
   return out;
 }
 
+/**
+ * The section's heading and the sentence under it — ONE copy for the dialog,
+ * the CSV and the PDF, so a supplier reading any of the three is told the same
+ * thing: these were counted, not itemised, and the price is theirs to give.
+ */
+export const SUPPLIER_TO_PRICE_HEADING = "Supplier to price";
+export const SUPPLIER_TO_PRICE_NOTE =
+  "Counted on the drawings, with no parts list. Please quote as a package.";
+
 /** Human unit label — "ft" reads better than "foot" against a number. */
 export function unitLabel(unit: MaterialUnit): string {
   return unit === "foot" ? "ft" : unit === "box" ? "box" : "ea";
@@ -275,12 +327,16 @@ export function unitLabel(unit: MaterialUnit): string {
 
 /** Is there anything at all to send? An empty list is not worth a file. */
 export function isEmptyList(doc: MaterialsListDoc): boolean {
-  return doc.entries.length === 0 && doc.measured.length === 0;
+  return (
+    doc.entries.length === 0 &&
+    doc.measured.length === 0 &&
+    doc.forQuote.length === 0
+  );
 }
 
 /** Total distinct orderable lines — what the button badge counts. */
 export function lineCount(doc: MaterialsListDoc): number {
-  return doc.entries.length + doc.measured.length;
+  return doc.entries.length + doc.measured.length + doc.forQuote.length;
 }
 
 // ─── CSV ──────────────────────────────────────────────────────────────────────
@@ -329,6 +385,22 @@ export function toCsv(doc: MaterialsListDoc): string {
     rows.push(csvRow(["Item", "Unit", "Quantity", "Note"]));
     for (const entry of doc.measured) {
       rows.push(csvRow([entry.label, "ft", entry.feet, entry.note]));
+    }
+  }
+
+  if (doc.forQuote.length > 0) {
+    rows.push("");
+    rows.push(csvRow([SUPPLIER_TO_PRICE_HEADING]));
+    rows.push(csvRow(["Item", "Unit", "Quantity", "Note"]));
+    for (const entry of doc.forQuote) {
+      rows.push(
+        csvRow([
+          entry.name,
+          unitLabel(entry.unit),
+          entry.qty,
+          SUPPLIER_TO_PRICE_NOTE,
+        ])
+      );
     }
   }
 

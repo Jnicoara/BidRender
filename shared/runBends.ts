@@ -251,6 +251,113 @@ export function turnDegrees(a: Point, b: Point, c: Point): number | null {
   return (Math.atan2(cross, dot) * 180) / Math.PI;
 }
 
+/**
+ * Two consecutive points closer than this, in PAGE points, are one point as
+ * far as direction goes. 3 points is 1/24" of paper — too short to draw on
+ * purpose at any zoom, and far longer than the drift between the two presses
+ * of a double-click at working zoom.
+ *
+ * Why it exists: a double-click that finishes a trace used to append a second
+ * point a pixel from the first. `turnDegrees` only refuses an EXACTLY zero
+ * segment, so the turn onto that stub — pointing any direction at all — was
+ * counted as a corner and bought as an elbow (server/runBends.test.ts, "a
+ * near-duplicate end point"). The trace tool no longer adds that point; this
+ * is what keeps runs saved before that from still buying one.
+ */
+export const STUB_POINTS = 3;
+
+/**
+ * The indices of `points` that carry direction: each point closer than
+ * STUB_POINTS to the last kept one is dropped, so a real corner clicked twice
+ * keeps its turn and a stub at either end simply disappears.
+ */
+export function directionalVertices(points: readonly Point[]): number[] {
+  const kept: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const last = kept[kept.length - 1];
+    if (
+      last !== undefined &&
+      Math.hypot(points[i].x - points[last].x, points[i].y - points[last].y) <
+        STUB_POINTS
+    )
+      continue;
+    kept.push(i);
+  }
+  return kept;
+}
+
+/**
+ * AN END THAT MAY BE A DOUBLE-CLICK STUB, FOR A PERSON TO REVIEW.
+ *
+ * Owner, 2026-09-29: flag, don't change. Runs traced before the trace tool
+ * learned to ignore a drifting double-click (@/lib/traceClick, same day) can
+ * end in a short segment that the bend counter reads as a corner — an elbow
+ * nobody drew. STUB_POINTS already hides the tiny ones; longer ones cannot be
+ * told apart from a short run into a box by geometry alone, so they are
+ * LISTED, never removed: the stored points are the estimator's.
+ *
+ * An end is listed when its first or last segment (after STUB_POINTS
+ * collapsing) is shorter than `reviewBelow` page points AND the turn onto it
+ * is at least MIN_BEND_DEGREES — i.e. it could have bought a fitting.
+ *
+ * ── Where 40 comes from: REASONED, not yet measured on real data ──────────
+ * The old guard let through a drift of more than 4 screen px. A hand drifts
+ * up to about 8 px between two presses; at 19% zoom a pixel is ~5.3 page
+ * points, so ~40 points is the longest stub the old tool could plausibly have
+ * left at the lowest common zoom. Measured 2026-09-29 on the local database
+ * only: 14 runs, one listed (17.3 pt, turning 131°). `scripts/stubReview.mts`
+ * prints the length distribution — run it against production (read-only)
+ * before trusting this number.
+ */
+export const STUB_REVIEW_POINTS = 40;
+
+export type StubToReview = {
+  end: "start" | "end";
+  /** The corner the stub turns at — an ORIGINAL index into the points. */
+  vertex: number;
+  /** Length of the short end segment, in page points. */
+  segmentPoints: number;
+  /** The turn onto it, unsigned. */
+  degrees: number;
+  /** Where that corner is, for "Show". */
+  point: Point;
+};
+
+export function stubsToReview(
+  points: readonly Point[],
+  reviewBelow: number = STUB_REVIEW_POINTS
+): StubToReview[] {
+  const kept = directionalVertices(points);
+  if (kept.length < 3) return [];
+  const at = (k: number) => points[kept[k]];
+  const len = (a: number, b: number) =>
+    Math.hypot(at(b).x - at(a).x, at(b).y - at(a).y);
+  const out: StubToReview[] = [];
+  const check = (
+    end: "start" | "end",
+    outer: number,
+    corner: number,
+    beyond: number
+  ) => {
+    const segmentPoints = len(outer, corner);
+    if (segmentPoints >= reviewBelow) return;
+    const t = turnDegrees(at(beyond), at(corner), at(outer));
+    if (t === null || Math.abs(t) < MIN_BEND_DEGREES) return;
+    out.push({
+      end,
+      vertex: kept[corner],
+      segmentPoints,
+      degrees: Math.abs(t),
+      point: at(corner),
+    });
+  };
+  check("start", 0, 1, 2);
+  const n = kept.length;
+  // With three points both ends share one corner; one entry says it.
+  if (n > 3 || out.length === 0) check("end", n - 1, n - 2, n - 3);
+  return out;
+}
+
 /** A turn this small is straight on — not a bend, and not wobble either. */
 const STRAIGHT_DEGREES = 0.5;
 
@@ -303,15 +410,22 @@ export function legBends(
     });
   }
 
+  // Turns are read off the path with near-duplicate points collapsed (see
+  // STUB_POINTS); `vertices` still name ORIGINAL indices, because pull-point
+  // answers are matched against `leg.points` by position.
+  const kept = directionalVertices(p);
+
   // Group interior vertices: same sign, and within MERGE_WITHIN_FEET of the
   // previous member measured ALONG the path.
   type Group = { vertices: number[]; sum: number; sign: number };
   const groups: Group[] = [];
   let current: Group | null = null;
   let sinceLast = 0; // page points along the path since the group's last vertex
-  for (let i = 1; i < p.length - 1; i++) {
-    sinceLast += Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y);
-    const t = turnDegrees(p[i - 1], p[i], p[i + 1]);
+  for (let k = 1; k < kept.length - 1; k++) {
+    const [a, b, c] = [kept[k - 1], kept[k], kept[k + 1]];
+    const i = b;
+    sinceLast += Math.hypot(p[b].x - p[a].x, p[b].y - p[a].y);
+    const t = turnDegrees(p[a], p[b], p[c]);
     if (t === null || Math.abs(t) < STRAIGHT_DEGREES) continue;
     const sign = Math.sign(t);
     const close =
@@ -592,6 +706,27 @@ export type BendReport = {
 const NO_KICKS = "plans do not show the kicks and offsets at boxes";
 
 /**
+ * What a 90 and a 45 are CALLED on this run type — the part it buys.
+ *
+ * The kind stays `elbow90` / `elbow45` whatever is bought; the WORD follows
+ * the part. A type set to buy sweeps sent `2" PVC Sch 40 90-degree sweep, 36"
+ * radius` under a sentence saying "At least 2 90° elbows" (todo.md, found
+ * 2026-09-29): a caption naming the old part beside a row that is a different
+ * one reads as confirmation (CLAUDE.md rule 7). `bendWordsFor` in
+ * runFittingMaterials.ts decides it from the chosen part's name.
+ */
+export type BendWords = Record<
+  "elbow90" | "elbow45",
+  { one: string; many: string }
+>;
+
+/** A type that chose nothing buys the catalog's factory elbow. */
+export const ELBOW_WORDS: BendWords = {
+  elbow90: { one: "90° elbow", many: "90° elbows" },
+  elbow45: { one: "45° elbow", many: "45° elbows" },
+};
+
+/**
  * Every bend kind for these legs of ONE raceway, plus the per-leg detail.
  *
  * Bends that an accepted pull point sits on are made by that LB or box and are
@@ -601,7 +736,8 @@ export function countBends(
   legs: readonly BendLeg[],
   method: BendMethod,
   limit: number,
-  mergeWithinFeet: number = MERGE_WITHIN_FEET
+  mergeWithinFeet: number = MERGE_WITHIN_FEET,
+  words: BendWords = ELBOW_WORDS
 ): BendReport {
   const perLeg = legs.map(leg => {
     const bends = legBends(leg, mergeWithinFeet);
@@ -710,8 +846,8 @@ export function countBends(
     if (method.method !== "factory")
       return { kind, status: "included", why: method.why };
     return kind === "elbow90"
-      ? counted(kind, n90, "90° elbow", partsFor(corners90, drops))
-      : counted(kind, n45, "45° elbow", partsFor(corners45, 0));
+      ? counted(kind, n90, words.elbow90.one, partsFor(corners90, drops))
+      : counted(kind, n45, words.elbow45.one, partsFor(corners45, 0));
   };
 
   const fieldBend = ((): BendCount => {

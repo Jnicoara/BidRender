@@ -19,7 +19,8 @@
  * shared/copilotActions.ts. This is the convenient half of the guardrail, not
  * the enforcing half.
  */
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { findingSpot, initialPicks, spotToShow } from "@/lib/readerPicks";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -79,8 +80,8 @@ const TIER_STYLE: Record<
     icon: Check,
   },
   low: {
-    row: "border-l-2 border-l-[#F5C518] bg-[#F5C518]/5",
-    badge: "text-[#F5C518] border-[#F5C518]/40",
+    row: "border-l-2 border-l-warning bg-warning/10",
+    badge: "text-warning border-warning/40",
     icon: TriangleAlert,
   },
   unreadable: {
@@ -135,25 +136,23 @@ export function CoPilotPanel({
     ) ?? [];
 
   /**
-   * Confident proposals arrive ticked; uncertain ones do not.
+   * Nothing arrives ticked (2026-09-29, `@/lib/readerPicks`).
    *
-   * The asymmetry is the point. Accepting a confident batch should be one
-   * click, and accepting an uncertain one should be a decision the user made
-   * on purpose rather than one they failed to undo.
+   * Confident proposals used to arrive ticked so a batch was one click. The
+   * reader's POSITIONS turned out to be off by up to ~2.4 in of paper on a
+   * real sheet, so that click put marks down where nobody had looked. Now
+   * each one is ticked by hand, and ticking it shows where it is.
    */
   const runKey = state?.runId ?? 0;
   useEffect(() => {
-    setPicked(
-      new Set(
-        (state?.findings ?? [])
-          .filter(
-            f =>
-              f.acceptable && f.confidence === "high" && f.status === "proposed"
-          )
-          .map(f => f.id)
-      )
-    );
+    setPicked(initialPicks(state?.findings ?? []));
   }, [runKey, state?.findings.length]);
+
+  /** The open picker, so it can be scrolled into view where it opened. */
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    pickerRef.current?.scrollIntoView({ block: "nearest" });
+  }, [correcting?.id]);
 
   const grouped = useMemo(() => {
     const tiers: ConfidenceTier[] = ["high", "low", "unreadable"];
@@ -182,17 +181,92 @@ export function CoPilotPanel({
       .filter((s): s is SymbolEntry => Boolean(s));
   }, [symbols, symbolQuery]);
 
-  const toggle = (id: number) =>
+  const toggle = (finding: CopilotFinding) => {
+    const nowTicked = !picked.has(finding.id);
     setPicked(previous => {
       const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(finding.id)) next.delete(finding.id);
+      else next.add(finding.id);
       return next;
     });
+    // Ticking is looking: the drawing goes to the spot being accepted.
+    const spot = spotToShow(finding, nowTicked);
+    if (spot) onJumpTo(spot);
+  };
 
   const counts = state?.counts;
   const confirmedCount =
     state?.findings.filter(f => f.status === "confirmed").length ?? 0;
+
+  /**
+   * "That's actually…" — the correction, which is also the link flow for a
+   * symbol the reader could not resolve. Rendered under its own row.
+   */
+  const renderPicker = (finding: CopilotFinding) => (
+    <div
+      ref={pickerRef}
+      className="border-b border-border px-3 py-2 space-y-2 bg-muted/30"
+    >
+      <p className="text-xs font-medium">
+        What is “{finding.rawLabel}” really?
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Pick one of your legend symbols. It will be read this way on the rest of
+        this drawing set — for your account only. The drawing has moved to where
+        the reader put it; check that spot before placing.
+      </p>
+      <Input
+        value={symbolQuery}
+        onChange={e => setSymbolQuery(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Escape") setCorrecting(null);
+        }}
+        placeholder="Search your legend…"
+        className="h-7 text-xs"
+        autoFocus
+      />
+      <div>
+        {linkable.map(symbol => (
+          <button
+            key={symbol.id}
+            className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-center gap-2"
+            onClick={() => {
+              onCorrect(finding.id, symbol.id);
+              setCorrecting(null);
+            }}
+          >
+            {symbol.thumbnail ? (
+              <img
+                src={symbol.thumbnail}
+                alt=""
+                className="w-5 h-5 object-contain rounded bg-white shrink-0"
+              />
+            ) : (
+              <Link2 className="w-3 h-3 text-muted-foreground shrink-0" />
+            )}
+            <span className="flex-1 min-w-0 truncate">{symbol.label}</span>
+          </button>
+        ))}
+        {linkable.length === 0 && (
+          <p className="text-xs text-muted-foreground px-2 py-2">
+            {symbols.length === 0
+              ? "No legend symbols yet. Capture one from the sheet's legend below and link it to an assembly — that is what tells the reader what a symbol means."
+              : symbolQuery.trim()
+                ? "None of your linked legend symbols match that."
+                : "Your legend symbols are not linked to anything yet. Press Link beside one in the Legend below to choose its assembly, then come back here."}
+          </p>
+        )}
+      </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-full text-xs text-muted-foreground"
+        onClick={() => setCorrecting(null)}
+      >
+        Not now
+      </Button>
+    </div>
+  );
 
   return (
     <div className="border-t border-border shrink-0">
@@ -219,7 +293,7 @@ export function CoPilotPanel({
         <Button
           size="sm"
           variant="ghost"
-          className={cn("h-5 px-1.5 text-[0.7rem]", !counts && "ml-auto")}
+          className={cn("h-5 px-1.5 text-xs", !counts && "ml-auto")}
           disabled={reading || !canRead}
           onClick={() => onRead(Boolean(state?.runId))}
           title={
@@ -262,10 +336,10 @@ export function CoPilotPanel({
           {state?.message && (
             <p
               className={cn(
-                "mx-3 mb-2 rounded px-2 py-1.5 text-[0.7rem] border",
+                "mx-3 mb-2 rounded px-2 py-1.5 text-xs border",
                 state.status === "failed"
                   ? "border-destructive/40 text-destructive bg-destructive/5"
-                  : "border-[#F5C518]/40 text-[#F5C518] bg-[#F5C518]/5"
+                  : "border-warning/40 text-warning bg-warning/10"
               )}
             >
               {state.message}
@@ -274,7 +348,7 @@ export function CoPilotPanel({
 
           {state?.summary && (
             <div className="mx-3 mb-2 rounded border border-border bg-muted/20 px-2 py-1.5">
-              <p className="text-[0.65rem] uppercase tracking-wide text-muted-foreground mb-1">
+              <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
                 Scope on this sheet
               </p>
               <p className="text-xs leading-relaxed">{state.summary}</p>
@@ -282,17 +356,18 @@ export function CoPilotPanel({
           )}
 
           {confirmedCount > 0 && (
-            <p className="px-3 pb-2 text-[0.7rem] text-emerald-400">
+            <p className="px-3 pb-2 text-xs text-emerald-400">
               {confirmedCount} placed on this sheet.
             </p>
           )}
 
-          {/* The findings, banded by tier. */}
-          <div className="max-h-72 overflow-y-auto">
+          {/* The findings, banded by tier. No scroll box of their own since
+              the Reader got its own tab: the tab is the one scroll area. */}
+          <div>
             {grouped.map(({ tier, rows }) =>
               rows.length === 0 ? null : (
                 <div key={tier}>
-                  <div className="px-3 py-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground bg-muted/20 border-y border-border/50">
+                  <div className="px-3 py-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground bg-muted/20 border-y border-border/50">
                     {TIER_LABEL[tier]} · {rows.length}
                     {tier === "unreadable" && (
                       <span className="normal-case tracking-normal">
@@ -304,85 +379,99 @@ export function CoPilotPanel({
                   {rows.map(finding => {
                     const style = TIER_STYLE[finding.confidence];
                     const Icon = style.icon;
-                    const at =
-                      finding.x !== null && finding.y !== null
-                        ? { x: finding.x, y: finding.y }
-                        : null;
+                    const at = findingSpot(finding);
                     return (
-                      <div
-                        key={finding.id}
-                        className={cn(
-                          "group px-3 py-1.5 border-b border-border/40 flex items-start gap-2",
-                          style.row
-                        )}
-                      >
-                        {/* No tick box on an unreadable finding: there is
+                      <Fragment key={finding.id}>
+                        <div
+                          className={cn(
+                            "group px-3 py-1.5 border-b border-border/40 flex items-start gap-2",
+                            style.row
+                          )}
+                        >
+                          {/* No tick box on an unreadable finding: there is
                             nothing to accept, and offering one would imply
                             there is. */}
-                        {finding.acceptable ? (
-                          <input
-                            type="checkbox"
-                            checked={picked.has(finding.id)}
-                            onChange={() => toggle(finding.id)}
-                            className="mt-0.5 shrink-0 accent-[#F5C518]"
-                            aria-label={`Place ${finding.assemblyName ?? finding.rawLabel}`}
-                          />
-                        ) : (
-                          <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                        )}
+                          {finding.acceptable ? (
+                            <input
+                              type="checkbox"
+                              checked={picked.has(finding.id)}
+                              onChange={() => toggle(finding)}
+                              className="mt-0.5 shrink-0 accent-[#F5C518]"
+                              aria-label={`Place ${finding.assemblyName ?? finding.rawLabel}`}
+                            />
+                          ) : (
+                            <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                          )}
 
-                        <button
-                          type="button"
-                          className="flex-1 min-w-0 text-left"
-                          onClick={() => at && onJumpTo(at)}
-                          disabled={!at}
-                          title={at ? "Show me on the drawing" : undefined}
-                        >
-                          <p className="text-xs truncate">
-                            {finding.assemblyName ?? finding.rawLabel}
-                          </p>
-                          {finding.assemblyName &&
-                            finding.assemblyName !== finding.rawLabel && (
-                              <p className="text-[0.7rem] text-muted-foreground truncate">
-                                read as “{finding.rawLabel}”
+                          <button
+                            type="button"
+                            className="flex-1 min-w-0 text-left"
+                            onClick={() => at && onJumpTo(at)}
+                            disabled={!at}
+                            title={at ? "Show me on the drawing" : undefined}
+                          >
+                            <p className="text-xs truncate">
+                              {finding.assemblyName ?? finding.rawLabel}
+                            </p>
+                            {finding.assemblyName &&
+                              finding.assemblyName !== finding.rawLabel && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  read as “{finding.rawLabel}”
+                                </p>
+                              )}
+                            {finding.reason && (
+                              <p className="text-xs text-muted-foreground leading-snug">
+                                {finding.reason}
                               </p>
                             )}
-                          {finding.reason && (
-                            <p className="text-[0.7rem] text-muted-foreground leading-snug">
-                              {finding.reason}
-                            </p>
-                          )}
-                          {finding.note && (
-                            <p className="text-[0.7rem] text-muted-foreground/80 italic leading-snug">
-                              {finding.note}
-                            </p>
-                          )}
-                        </button>
-
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          <span
-                            className={cn(
-                              "rounded-full border px-1.5 text-[0.6rem] leading-4",
-                              style.badge
+                            {finding.note && (
+                              <p className="text-xs text-muted-foreground/80 italic leading-snug">
+                                {finding.note}
+                              </p>
                             )}
-                          >
-                            {TIER_LABEL[finding.confidence]}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-5 px-1 text-[0.65rem] text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                            onClick={() => {
-                              setCorrecting(finding);
-                              setSymbolQuery("");
-                            }}
-                            title="Tell it what this really is"
-                          >
-                            <Link2 className="w-3 h-3 mr-0.5" />
-                            {finding.needsLink ? "Link" : "Fix"}
-                          </Button>
+                          </button>
+
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <span
+                              className={cn(
+                                "rounded-full border px-1.5 text-xs leading-4",
+                                style.badge
+                              )}
+                            >
+                              {TIER_LABEL[finding.confidence]}
+                            </span>
+                            {/* Link is always shown: it is the only way forward
+                              for that row, and a hover-only button does not
+                              exist on a touch screen. Fix stays quiet. */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={cn(
+                                "h-5 px-1 text-xs",
+                                finding.needsLink
+                                  ? "text-foreground"
+                                  : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                              )}
+                              onClick={() => {
+                                setCorrecting(
+                                  correcting?.id === finding.id ? null : finding
+                                );
+                                setSymbolQuery("");
+                                if (at) onJumpTo(at);
+                              }}
+                              title="Tell it what this really is"
+                            >
+                              <Link2 className="w-3 h-3 mr-0.5" />
+                              {finding.needsLink ? "Link" : "Fix"}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                        {/* The picker opens UNDER THE ROW it is about. It used
+                          to open below the whole list and the Place row,
+                          which on a 56-row reading was out of sight — so
+                          Link looked like it did nothing (2026-09-29). */}
+                        {correcting?.id === finding.id && renderPicker(finding)}
+                      </Fragment>
                     );
                   })}
                 </div>
@@ -414,70 +503,6 @@ export function CoPilotPanel({
                 }}
               >
                 <X className="w-3.5 h-3.5" /> Dismiss
-              </Button>
-            </div>
-          )}
-
-          {/* "That's actually…" — the correction, which is also the link flow
-              for a symbol the reader could not resolve. */}
-          {correcting && (
-            <div className="border-t border-border mt-2 p-3 space-y-2 bg-muted/20">
-              <p className="text-xs font-medium">
-                What is “{correcting.rawLabel}” really?
-              </p>
-              <p className="text-[0.7rem] text-muted-foreground">
-                Pick one of your legend symbols. It will be read this way on the
-                rest of this drawing set — for your account only.
-              </p>
-              <Input
-                value={symbolQuery}
-                onChange={e => setSymbolQuery(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Escape") setCorrecting(null);
-                }}
-                placeholder="Search your legend…"
-                className="h-7 text-xs"
-                autoFocus
-              />
-              <div className="max-h-40 overflow-y-auto">
-                {linkable.map(symbol => (
-                  <button
-                    key={symbol.id}
-                    className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-center gap-2"
-                    onClick={() => {
-                      onCorrect(correcting.id, symbol.id);
-                      setCorrecting(null);
-                    }}
-                  >
-                    {symbol.thumbnail ? (
-                      <img
-                        src={symbol.thumbnail}
-                        alt=""
-                        className="w-5 h-5 object-contain rounded bg-white shrink-0"
-                      />
-                    ) : (
-                      <Link2 className="w-3 h-3 text-muted-foreground shrink-0" />
-                    )}
-                    <span className="flex-1 min-w-0 truncate">
-                      {symbol.label}
-                    </span>
-                  </button>
-                ))}
-                {linkable.length === 0 && (
-                  <p className="text-[0.7rem] text-muted-foreground px-2 py-2">
-                    No linked legend symbols yet. Capture one from the sheet's
-                    legend below and link it to an assembly first — that is what
-                    tells the reader what a symbol means.
-                  </p>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-full text-xs text-muted-foreground"
-                onClick={() => setCorrecting(null)}
-              >
-                Not now
               </Button>
             </div>
           )}

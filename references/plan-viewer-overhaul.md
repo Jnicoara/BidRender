@@ -375,28 +375,28 @@ Each phase ships and gets used before the next starts.
 > **Re-ordered 2026-09-17 after testing Phase 1 on the live site.** The order
 > below is the current one; § 4.1 records what the testing changed and why.
 
-| Phase    | What                                                                              | DB change                |
-| -------- | --------------------------------------------------------------------------------- | ------------------------ |
-| **1**    | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                              | No                       |
-| **1a**   | ~~Page-flip fit bug + tool discoverability~~ **shipped**                          | **No**                   |
-| **2**    | ~~Two-point scale calibration~~ **shipped**                                       | No (reuses `scaleRatio`) |
-| **3**    | ~~Sharp re-render of the visible area~~ **shipped**                               | **No**                   |
-| **4**    | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**                | **No**                   |
-| **4b**   | Measure-only tool                                                                 | **No**                   |
-| **5**    | **Verticals on runs — the money phase**                                           | **Yes**                  |
-| **6**    | Group row, plain counting, and marks you can tell apart — § 5e                    | **Yes** — count groups   |
-| **6b**   | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                   | **Yes** (small)          |
-| **6c**   | Takeoff-only jobs: stop nagging a finished count — § 5h                           | **Yes** (one column)     |
-| **7**    | Run settings: allowances, materials, sizes, ground                                | **Yes**                  |
-| **8**    | **Verticals on stamps**                                                           | **Yes** (small)          |
-| **9**    | Editing runs: drag a vertex, insert/remove points                                 | No                       |
-| **9a**   | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10        | **Yes** (small)          |
-| **10**   | AI reader tiling, and the daily-limit question with it — **gated on § 15**        | No                       |
-| **10b**  | **AI-suggested known distances for calibration** — see § 13                       | No                       |
-| **11**   | Tablet and touch                                                                  | No                       |
-| **12**   | **Alternates and allowances** — add/deduct priced apart from the base — § 5g      | **Yes**                  |
-| **13**   | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g    | **Yes** (small)          |
-| **V1–4** | Viewer batch: big sets, sheet numbers, go-to, search — § 17 (independent of 5–13) | **V2 only** (additive)   |
+| Phase    | What                                                                                                                   | DB change                |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| **1**    | ~~Zoom, pan, and the three viewer bugs~~ **shipped**                                                                   | No                       |
+| **1a**   | ~~Page-flip fit bug + tool discoverability~~ **shipped**                                                               | **No**                   |
+| **2**    | ~~Two-point scale calibration~~ **shipped**                                                                            | No (reuses `scaleRatio`) |
+| **3**    | ~~Sharp re-render of the visible area~~ **shipped**                                                                    | **No**                   |
+| **4**    | ~~The layout: top bar, collapsing panels, focus mode~~ **shipped**                                                     | **No**                   |
+| **4b**   | Measure-only tool                                                                                                      | **No**                   |
+| **5**    | **Verticals on runs — the money phase**                                                                                | **Yes**                  |
+| **6**    | Group row, plain counting, and marks you can tell apart — § 5e                                                         | **Yes** — count groups   |
+| **6b**   | **The bridge: counts onto the bid, then levels 3 and 2** — § 5f                                                        | **Yes** (small)          |
+| **6c**   | Takeoff-only jobs: stop nagging a finished count — § 5h                                                                | **Yes** (one column)     |
+| **7**    | Run settings: allowances, materials, sizes, ground                                                                     | **Yes**                  |
+| **8**    | **Verticals on stamps**                                                                                                | **Yes** (small)          |
+| **9**    | Editing runs: drag a vertex, insert/remove points                                                                      | No                       |
+| **9a**   | **AI-assisted legend capture** — see § 9, and § 9.6 for why it precedes 10                                             | **Yes** (small)          |
+| **10**   | AI reader tiling, and the daily-limit question with it — **gated on § 15**                                             | No                       |
+| **10b**  | **AI-suggested known distances for calibration** — see § 13                                                            | No                       |
+| **11**   | Tablet and touch — **phone LAYOUT built 2026-09-30, touch gestures not** (`track-b-phone-and-readability-plan.md` § 3) | No                       |
+| **12**   | **Alternates and allowances** — add/deduct priced apart from the base — § 5g                                           | **Yes**                  |
+| **13**   | Per-bid proposal breakdown: where the choice is STORED, then the shapes — § 5g                                         | **Yes** (small)          |
+| **V1–4** | Viewer batch: big sets, sheet numbers, go-to, search — § 17 (independent of 5–13)                                      | **V2 only** (additive)   |
 
 > **Phase 6 was split on 2026-09-18 and 6c inserted.** The bridge (6b) is the
 > largest piece in this document and is not a step inside an appearance phase —
@@ -1150,6 +1150,11 @@ sheet at a time while that is true, and each picture appears as it arrives.
 **Tablet and touch stay at Phase 11.** The rails are 18px, which is a mouse
 target, not a thumb target.
 
+> **Phase 11 BUILT 2026-10-01 (Track B)** — `references/device-audit.md`:
+> touch pan and pinch that never place a mark, 44 px targets on any coarse
+> pointer, a 44 px fold button on the rail, a tablet layout, a phone bottom
+> sheet, and finger versions of every Shift / Alt / right-click / Esc action.
+
 **The bid header is hidden in focus mode rather than folded into the top bar.**
 Folding it in was considered: at 1536px the bar already carries eleven controls
 and adding a bid name, Materials list and Add PDF would make it wrap on any
@@ -1666,6 +1671,13 @@ take.
 
 ## 5d. Phase 5 — verticals on runs. PLANNED 2026-09-18, not built
 
+> **BUILT — this heading was stale until 2026-10-05.** Run-end verticals
+> (`shared/takeoffHeights.ts`, `server/runVerticals.ts`) and, later, drops
+> on counted marks (`shared/groupDrops.ts`) are live and priced. One
+> difference from this section: accepting the stamp suggestion did NOT set
+> the end kind; since 2026-10-05 a linked end with no kind takes its
+> mark's count's kind instead. references/vertical-drops-plan.md.
+
 The money phase, and the first database change since the viewer work started.
 Everything below is governed by § 5a: measure honest, pad visibly. A vertical is
 a measurement, not a pad, and it is shown as its own number everywhere it is
@@ -2147,6 +2159,13 @@ and vertical drags are ignored. One gesture, two behaviours.
 — that behaviour is deliberate and stays. If EITHER axis overflows, apply the
 overlap rule to both.
 
+> **Overridden by the owner, 2026-09-29 — BUILT the same day** (`clampView`,
+> `FIT_SLACK_FRACTION` 0.15 in `client/src/lib/planView.ts`). "Centre
+> both" is what makes the sheet feel stuck from Fit downwards (measured: an
+> 80×60 px drag at Fit moves nothing). The owner wants panning at every zoom.
+> The per-VIEW decision stays; a sheet that fits gets a small, measured slack
+> instead of a forced centre. See `references/track-b-panning-plan.md`.
+
 **Why, and this is the part worth keeping:** the code's own comment justifies
 the centring with _"a sheet small enough to see whole is not one anybody is
 repositioning"_. That reasoning is true when the whole sheet fits and false in
@@ -2160,6 +2179,20 @@ the drag. `fitView` is untouched, because at fit zoom the whole sheet fits by
 definition and still centres.
 
 ### Stamps have to look different from each other
+
+> **Override DECIDED 2026-10-01** (pin plan § 10, decided by Claude on the
+> owner's delegation; shape six still depends on a measurement there):
+> `references/track-b-count-pin-styles-plan.md` replaces the CATEGORY shape
+> map below ("triangles are lighting") with a device-family map, adds a
+> letter inside every pin, moves count colors from the id hash to first-use
+> order per bid (as run types already are), and stores an optional chosen
+> look on the assembly, the legend symbol and the count. It **keeps** this
+> section's rejection of the captured legend image as the pin, and the
+> 10–26 px clamp. **The shape map was BUILT 2026-10-01** (`shared/deviceFamily.ts`):
+> receptacles and boxes are circles, lighting is squares, data is triangles,
+> switches are diamonds, panels and equipment are a 2:1 rectangle, and
+> everything else is hexagons. A count's own name decides first, and its
+> assembly is only the default.
 
 Every stamp is a 10px circle in `#F5C518` (`TraceLayer.tsx`). **That is the same
 yellow as a conduit run and the same yellow as every warning in the app** — so
@@ -2512,6 +2545,21 @@ marker nagging toward the bid breaks that promise on the screen where it was
 made.
 
 #### OVERRIDE 3 — a sent bid can be LOCKED, and then nothing follows the drawing
+
+> **Narrowed 2026-09-29 (owner: "a locked bid must not change").** As built
+> below, the lock froze the bid's numbers while the drawing behind them could
+> still gain marks, runs, legs, typed lengths, pull points and circuits
+> (`takeoffStampsRouter` said placing stayed allowed "on purpose"). Now the
+> drawing is frozen too: every one of those is refused with "This bid's
+> quantities are locked, so … Unlock them on the bid first."
+> (`shared/quantityLock.ts` `lockedEditRefusal`, `server/lockedEdits.test.ts`).
+> **Widened the same evening, by the owner's answers to that plan's
+> questions 1, 3 and 4:** a locked bid also refuses Send to bid (the count
+> send and the run-type send, through one check, `server/lockGuard.ts` —
+> reversing "a count sent to a locked bid arrives frozen"), setting, clearing
+> or auto-applying a sheet's scale, removing a plan set, and removing a bid
+> line that came from the plans. A hand-typed line stays removable.
+> `server/lockedPlans.test.ts`.
 
 **Decided and built 2026-09-24. This amends D2(a) a second time, and it amends
 OVERRIDE 2's own sentence — "after that the count is live for ever" — which was
@@ -3857,6 +3905,16 @@ real job.
   asymmetry is the design: accepting a confident batch is one press, accepting
   an uncertain one is a decision somebody made rather than one they failed to
   undo.
+  **REVERSED 2026-09-29 (branch a-reader-fixes): nothing arrives ticked, and
+  ticking a proposal takes the drawing to it.** Measured on staging's E-100:
+  the reader's POSITIONS are off by up to about 2.4 in of paper, mostly
+  downward and growing toward the bottom of the sheet, so not a fixed offset.
+  A placed mark sat beside keynote tag 7 instead of on the A1 fixture it
+  named. The app put it exactly where the reader said, to four decimals.
+  "Confident" is about WHAT a mark is, never WHERE. See
+  `client/src/lib/readerPicks.ts`. The accuracy test in
+  `references/legend-reading-plan.md` § 0 B (branch a-plans-reader) should
+  measure position error as well as what was found.
 - **Bulk place and bulk dismiss**, over whatever is ticked.
 - **Click a row and the viewer jumps to it** and rings the spot (`focusPoint`).
 - **Nothing is placed until Place is pressed**, and the server re-checks every
@@ -4259,6 +4317,11 @@ the screen around it, and drop it first if Phase 5 runs long.
 **Dragging a vertex stays last and is cuttable.** Undo-and-re-click already
 works. If it competes with anything in Phases 5–8, it loses.
 
+> **Moved forward and BUILT 2026-09-29:** the owner asked for it with 5–8
+> built. Drag a point, drag a "+" to add one, right-click or Delete to
+> remove one; refused on a locked bid; undoable. `takeoffRuns.setPoints`,
+> `client/src/lib/runPointEdit.ts`, plan Part 1.
+
 **NEVER CALIBRATE OFF THE GRAPHIC SCALE BAR.** Decided 2026-09-18, and this one
 is filed here because it is the single most likely thing in this document to be
 undone by somebody being sensible.
@@ -4364,6 +4427,14 @@ This keeps the 2026-09-18 decision that colour means which TYPE a run is
 - **Elevations stored in inches, displayed in feet and inches.**
 - **No per-area heights.** Per-run override is enough; per-area is a demo
   feature that gets used twice.
+  > **Narrowed 2026-10-05 by the owner: a run height PER SHEET, yes.** A
+  > multi-storey job (floor 1 at 12', floor 2 at 10') was a per-run override
+  > on every run of one floor. Per-area and "ceiling height" stay out.
+  > Needs `bid_pdf_sheets.distributionHeightInches` (Track A); chain becomes
+  > run → sheet → job → company. references/vertical-drops-plan.md § 2, § 7.
+- **A vertical belongs to the GROUP** (below) **— narrowed 2026-10-05:** a
+  MARK may carry its own height (0098), which replaces its count's for
+  that mark only (check-my-marks-plan § 10.6; vertical-drops-plan § 2).
 - **The double-count rule goes in the CODE**, not only in this document.
 - **The run end device type is picked by the user, never guessed** from a nearby
   stamp.
@@ -4381,6 +4452,12 @@ Answered 2026-09-17. **The split tracks WHY each number exists, not where the
 footage came from.** That distinction is the whole point and is the thing most
 likely to be "simplified" away by someone who sees two percentages and assumes
 they are the same idea applied twice.
+
+> **OVERRIDDEN 2026-10-05 by the owner: conduit waste covers flat + drops,**
+> the same base as wire waste, on traced runs and on count drops. The
+> reasoning below is kept as the record of what was decided first; it no
+> longer governs the arithmetic. `shared/takeoffQuantities.ts`,
+> `shared/groupDrops.ts`; references/vertical-drops-plan.md § 3.
 
 **CONDUIT allowance — traced length ONLY.** It exists to cover _route
 uncertainty_: the jog around a duct, the offset that was not on the plan. A drop
@@ -4552,6 +4629,13 @@ millisecond. It will not tell two similar symbols apart reliably, and it is not
 being asked to — it is being asked to ORDER three candidates and to veto an
 obviously wrong one. **Honest limit: this is a ranker, not a decider.**
 
+> **Scans are a different case, 2026-10-01** (`references/scanned-plans-plan.md`
+> § 7). The objection above is to correlating against thumbnails stored from
+> OTHER jobs. On a scanned sheet the picked symbol is cut from the same sheet
+> at the same resolution, none of those differences exist, and correlation
+> measured 85 of 86 on Old Blueridge. This section still stands for matching
+> across jobs; nothing here is overridden.
+
 **Stage 3 — the model, on the final yes/no only.** Vision is genuinely good at
 "are these the same symbol, allowing for line weight and scale", and genuinely
 bad value at being run 200 times. So it sees the new crop and the top one or two
@@ -4566,7 +4650,23 @@ The library is too small to train on, the symbols are too similar for a generic
 image embedding to separate, and a user with 40 symbols will never generate
 enough labelled data to make any of it better than the funnel above.
 
+> **Narrowed 2026-10-01 (Track C): matching the PDF's own LINE WORK on ONE
+> sheet is realistic, and measured.** "Find all matching" boxes a symbol on a
+> CAD sheet and finds every copy of its segments and words on that sheet, no
+> AI — 44 of 46 hand marks on Weld 1 E-200, 0.1 s a search, look-alikes
+> flagged, scans refused. The rejection above still stands for what it named:
+> PIXEL matching of stored thumbnails across a SET. Plan and numbers:
+> `references/find-all-matching-plan.md`.
+
 ### 9.4 THE THING THAT NEEDS CARE: a remembered match must never apply itself
+
+> **Applied to LOOKS, 2026-10-05 (owner).** An item may now carry several
+> looks (`symbol_looks`, `multiple-looks-plan.md`). The owner's rule there
+> is this section, one level down: a look saved from another plan set may
+> suggest a match but never labels one until THAT set's own legend confirms
+> the item — a look captured on the set, or the symbol boxed on its sheet.
+> Proven on Old Blueridge, where the half-filled duplex means "above the
+> backsplash", not GFCI. Enforced in `client/src/lib/lookMatching.ts`.
 
 **Engineering firms use different symbols.** There are common conventions and
 every office has a house style. The same shape means different things on two
@@ -5527,6 +5627,12 @@ build tiling on — and leaves run-to-run variance for later.
 measurement is only worth taking when its answer changes what gets built next,
 and the answer goes stale if the model, the detail level or the prompt moves in
 between. Running it early buys a number that has to be re-earned.
+
+> **Superseded 2026-09-29 by `references/reader-accuracy-test-plan.md`**, on the
+> owner's go-ahead: the bake-off now compares legend and zoom (today, legend
+> pictures, zoomed-in pieces, both) instead of detail levels, and runs before
+> Phase 10 because its answer decides whether Phase 10 is built. The hand counts
+> are reused for every later re-run; `scripts/readerAccuracy.mts` runs it.
 
 ### 15.5 The gate
 

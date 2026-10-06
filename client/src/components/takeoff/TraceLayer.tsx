@@ -28,10 +28,15 @@
  * OUT to an untransformed layer (`chromeTarget`), because chrome that scales
  * with the drawing is three pixels tall at 20% and off-screen at 400%.
  */
+import type { PinStyle } from "@shared/pinLetters";
 import {
+  LETTER_MIN_PX,
+  letterFit,
   markAppearance,
+  markPaint,
   markPath,
   markRadiusInOverlay,
+  markScreenDiameter,
   markStrokeInOverlay,
   runAppearance,
   runStrokeInOverlay,
@@ -43,20 +48,54 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
 import { CROSSHAIR_COLORS, crosshairCursorStyle } from "@/lib/crosshairCursor";
-import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  useCrosshairColor,
+  useCrosshairSize,
+  useShowNextSegment,
+} from "@/hooks/useCrosshairColor";
 import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HeightFields } from "@/components/HeightFields";
+import { traceReadout } from "@/lib/traceReadout";
 import {
   formatFeetInches,
-  pathRealInches,
   screenToPagePoints,
   type PagePoint,
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
-import { legSnapLabel, type LegSnap } from "@/lib/legSnap";
+import {
+  legSnapLabel,
+  snapToMark,
+  type LegSnap,
+  type SnapStamp,
+} from "@/lib/legSnap";
+import {
+  MARK_STATUS_LABEL,
+  USER_MARK_STATUSES,
+  isUserMarkStatus,
+  type MarkStatus,
+  type UserMarkStatus,
+} from "@shared/markStatus";
+import {
+  connectLabel,
+  connectShortLabel,
+  type ConnectPoint,
+} from "@shared/connectPoint";
 import { stampsInBox } from "@/lib/stampSelection";
 import { projectOntoPath } from "@shared/runNetwork";
 import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
+import { traceClickPoint } from "@/lib/traceClick";
+import { pastDragThreshold } from "@/lib/dragThreshold";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import {
+  insertPoint,
+  isPinned,
+  movePoint,
+  removePoint,
+  samePoints,
+  segmentMidpoints,
+  type PinnedEnds,
+} from "@/lib/runPointEdit";
 
 /**
  * How wide a run's invisible click target is, in SCREEN pixels.
@@ -161,6 +200,18 @@ const RUN_COLOR: Record<RunPathType, string> = {
   cable: "#4ADE80",
 };
 
+/**
+ * Where a run meets a wall device: at the wall (found), or at the centre and
+ * short (amber, dashed, "?" — the drawing's language for provisional).
+ */
+const MEETS_WALL_COLOR = "#22D3EE";
+const MEETS_UNSURE_COLOR = "#F59E0B";
+/** The same two, dark enough to read as text on a white sheet. */
+const MEETS_WALL_TEXT = "#0E7490";
+const MEETS_UNSURE_TEXT = "#B45309";
+/** A run end this close to a mark's point (page points) sits on it. */
+const ON_END_POINTS = 0.75;
+
 export type PlacedStamp = {
   id: number;
   /** What it is counting — the group's label. See shared/takeoffCounts.ts. */
@@ -173,6 +224,11 @@ export type PlacedStamp = {
   assemblyCategory: string | null;
   x: number;
   y: number;
+  /**
+   * NULL = new. Required, like SnapStamp's: the snap reads it, and a list that
+   * left it out would let a run snap to an unconfirmed mark (@shared/markStatus).
+   */
+  status: MarkStatus | null;
   /**
    * Clicked, drawn, and not yet acknowledged by the server.
    *
@@ -232,6 +288,12 @@ export function TraceLayer({
   onStampClick,
   onBoxSelect,
   onDeleteSelected,
+  moveTargets,
+  onMoveSelected,
+  onSetStatusSelected,
+  selectedDrop,
+  onSetHeightSelected,
+  onSetDropExcludedSelected,
   onClearSelection,
   focusPoint,
   chromeTarget,
@@ -239,7 +301,35 @@ export function TraceLayer({
   drops,
   onSelectDrop,
   runColors,
+  pins,
+  editableRunId = null,
+  onEditPoints,
+  onPickEnd,
+  selectMode = false,
+  freePoints = false,
+  onToggleFreePoints,
+  connects,
 }: {
+  /**
+   * Where a run meets each mark (shared/connectPoint.ts), by stamp id. Every
+   * snap to a mark lands here: at the wall for a wall device, else the centre.
+   * Omitted, a run meets every mark at its centre, as before.
+   */
+  connects?: ReadonlyMap<number, ConnectPoint>;
+  /**
+   * Each count's letter and first-use colour on this bid (shared/pinLetters).
+   * The panel's swatches read the same map, so a card and its pins agree.
+   */
+  pins?: ReadonlyMap<number, PinStyle>;
+  /**
+   * The run whose points can be dragged (T8, D7a) — the selected one, when
+   * nothing else is armed and the bid is not locked. Null shows no handles.
+   */
+  editableRunId?: number | null;
+  /** A drag, an added point or a removed one, finished: save these points. */
+  onEditPoints?: (runId: number, points: PagePoint[]) => void;
+  /** An end of the selected run clicked (not dragged): show it in Run ends. */
+  onPickEnd?: (runId: number, end: "start" | "end") => void;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /** Branch legs while tracing (D20). Omitted, "New leg" does not exist. */
@@ -262,7 +352,13 @@ export function TraceLayer({
    * necessary.
    */
   zoom: number;
-  measurability: Measurability;
+  /**
+   * `undefined` while the sheet's measurability is still LOADING. That is
+   * "cannot trace yet", never "cannot count": the page used to withhold this
+   * whole layer until the query answered, and every tap in that gap fell on
+   * the bare canvas and vanished (staging smoke, 2026-10-06).
+   */
+  measurability: Measurability | undefined;
   tracing: boolean;
   pathType: RunPathType;
   /**
@@ -310,13 +406,63 @@ export function TraceLayer({
   /** The saved marks inside a Shift-drag box, in page points. */
   onBoxSelect: (ids: number[]) => void;
   onDeleteSelected: () => void;
+  /**
+   * The counts the selection can be moved to. Empty hides "Move to" — on a
+   * locked bid, where the server would refuse it anyway.
+   */
+  moveTargets?: { id: number; label: string }[];
+  onMoveSelected?: (groupId: number) => void;
+  /** Set the selected marks' status. Omitted (a locked bid), no control. */
+  onSetStatusSelected?: (status: UserMarkStatus) => void;
+  /**
+   * The selection's own height (null: none set, or they differ) and how
+   * many have their drop left off (vertical-drops-plan § 2).
+   */
+  selectedDrop?: { inches: number | null; mixed: boolean; excluded: number };
+  /** Set the selected marks' own height, or null to follow the count. */
+  onSetHeightSelected?: (inches: number | null) => void;
+  /** "No drop on these" / give them back. Omitted (locked), no control. */
+  onSetDropExcludedSelected?: (excluded: boolean) => void;
   onClearSelection: () => void;
   /** Highlighted after a jump from the counted-items list. */
   focusPoint: { x: number; y: number } | null;
   /** Untransformed layer for screen-sized chrome. See `withChrome` below. */
   chromeTarget?: HTMLElement | null;
+  /**
+   * SELECT, the touch version of Shift (references/device-audit.md § Touch).
+   * While on, a tap on a mark adds or removes it and a finger drag boxes
+   * marks — exactly what Shift-click and Shift-drag do with a mouse.
+   */
+  selectMode?: boolean;
+  /**
+   * FREE POINTS, the touch version of Alt: the next leg's first point lands
+   * where it is put rather than snapping to the run or a mark (D20).
+   */
+  freePoints?: boolean;
+  /** Shows the Snap / Free switch in the trace pill on a coarse pointer. */
+  onToggleFreePoints?: () => void;
 }) {
+  const coarse = useCoarsePointer();
+  /**
+   * The floating pills' shape. One line with a mouse, as always. With a
+   * finger every button in them is 44 px, and on one line the trace pill ran
+   * past both edges of an upright tablet's drawing (seen 2026-10-01: "Run
+   * total" cut to "n Run total"), so there it wraps inside the drawing.
+   */
+  const pillShape = coarse
+    ? "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl"
+    : "w-max whitespace-nowrap rounded-full";
+  /*
+    The SELECTION pill wraps on every device. With "Move to…", "Mark as…",
+    a height and "No drop on these" it is wider than the drawing pane at
+    laptop width, and one unwrapped row ran off both sides — the count of
+    marks selected was under the side panel (seen 2026-10-05, 1536 px).
+  */
+  const widePillShape =
+    "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl";
   const svgRef = useRef<SVGSVGElement | null>(null);
+  /** When the last press while tracing landed — see @/lib/traceClick. */
+  const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
   const [crosshairColor] = useCrosshairColor();
   const [crosshairSize] = useCrosshairSize();
   /** Moved directly, never through a render. See CrosshairGuides. */
@@ -325,6 +471,24 @@ export function TraceLayer({
   const [hover, setHover] = useState<PagePoint | null>(null);
   /** Alt is held: a new leg's first click places a free point (D20). */
   const [hoverAlt, setHoverAlt] = useState(false);
+
+  /**
+   * The marks a run can snap to, each with where a run MEETS it. A mark still
+   * on its way to the server is not a target: it has no row to link yet.
+   */
+  const snapStamps = useMemo<SnapStamp[]>(
+    () =>
+      stamps
+        .filter(s => !s.pending)
+        .map(s => ({
+          id: s.id,
+          x: s.x,
+          y: s.y,
+          status: s.status,
+          connect: connects?.get(s.id)?.point,
+        })),
+    [stamps, connects]
+  );
 
   /** A leg can be finished with nothing traced yet: the run's legs are saved. */
   const canFinish = points.length >= 2 || Boolean(legs?.active);
@@ -353,15 +517,37 @@ export function TraceLayer({
    * zoom — the same idea as the run's hit target. Measured off the overlay's
    * laid-out size, which already includes the zoom transform.
    */
-  const snapReach = useCallback((): number => {
+  const pagePerScreenPx = useCallback((): number => {
     const svg = svgRef.current;
-    if (!svg) return LEG_SNAP_PX;
+    if (!svg) return 1;
     const rect = svg.getBoundingClientRect();
     const devicePerCss = rect.width === 0 ? 1 : width / rect.width;
-    return (LEG_SNAP_PX * devicePerCss) / renderScale;
+    return devicePerCss / renderScale;
   }, [width, renderScale]);
+  const snapReach = useCallback(
+    (): number => LEG_SNAP_PX * pagePerScreenPx(),
+    [pagePerScreenPx]
+  );
 
-  const ratio = measurability.ok ? measurability.ratio : null;
+  /**
+   * An ordinary trace click near a mark lands on the mark's connect point —
+   * since 2026-10-01; before, it stayed where it fell, so a run "ending at" a
+   * wall receptacle ended at the middle of its symbol, short by the stand-off
+   * (references/connect-point-plan.md). Alt, or Free on a touch screen,
+   * places the point exactly where it falls. Null: no mark in reach.
+   */
+  const traceSnap = useCallback(
+    (at: PagePoint, free: boolean) =>
+      free ? null : snapToMark(at, snapReach(), snapStamps),
+    [snapReach, snapStamps]
+  );
+  /** The same snap for where the pointer is, so the ring shows the click. */
+  const hoverSnap =
+    tracing && !legs?.pending && hover
+      ? traceSnap(hover, hoverAlt || freePoints)
+      : null;
+
+  const ratio = measurability?.ok ? measurability.ratio : null;
 
   /** Page points → the overlay's pixel space. */
   /*
@@ -379,6 +565,109 @@ export function TraceLayer({
     (p: PagePoint) => ({ x: p.x * renderScale, y: p.y * renderScale }),
     [renderScale]
   );
+
+  /**
+   * WHERE A RUN MEETS A DEVICE, drawn (connect-point plan § 4.1, § 5.3).
+   *
+   * - At the wall: a short solid tick from the symbol's centre to the foot on
+   *   the wall, ending in a dot — the run stops at the box, and this says why
+   *   it does not reach the middle of the symbol.
+   * - A wall device met at its centre (a scan, no wall found, not read yet):
+   *   a dashed amber ring with "?" — that end is short by the stand-off, and
+   *   nothing else on the screen would say so.
+   * - A centre-mounted device: nothing extra; meeting a light in the middle
+   *   is what everyone expects.
+   *
+   * `label` adds the few words beside it, for the cursor preview only.
+   */
+  const renderMeets = (
+    key: string,
+    stamp: { x: number; y: number },
+    connect: ConnectPoint | undefined,
+    label: boolean,
+    title?: string
+  ) => {
+    if (!connect || connect.kind === "centre") return null;
+    const r = markRadiusInOverlay(zoom) * 0.45;
+    const stroke = markStrokeInOverlay(zoom);
+    const centre = toScreen(stamp);
+    const at = toScreen(connect.point);
+    const text = label ? connectShortLabel(connect) : null;
+    const fontSize = runWidthInOverlay(zoom, 11);
+    const labelSize = runWidthInOverlay(zoom, 13);
+    return (
+      <g key={key} pointerEvents="none">
+        <title>{title ?? connectLabel(connect)}</title>
+        {connect.kind === "wall" ? (
+          <>
+            <line
+              x1={centre.x}
+              y1={centre.y}
+              x2={at.x}
+              y2={at.y}
+              stroke={MEETS_WALL_COLOR}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+            />
+            <circle
+              cx={at.x}
+              cy={at.y}
+              r={r * 0.6}
+              fill={MEETS_WALL_COLOR}
+              stroke="#0b0b0b"
+              strokeWidth={stroke * 0.5}
+            />
+          </>
+        ) : (
+          <>
+            <circle
+              cx={at.x}
+              cy={at.y}
+              r={r * 1.6}
+              fill="none"
+              stroke={MEETS_UNSURE_COLOR}
+              strokeWidth={stroke}
+              strokeDasharray={`${r * 0.5} ${r * 0.35}`}
+            />
+            <text
+              x={at.x}
+              y={at.y + fontSize * 0.35}
+              textAnchor="middle"
+              fontSize={fontSize}
+              fontWeight={700}
+              fill={MEETS_UNSURE_COLOR}
+              stroke="#0b0b0b"
+              strokeWidth={fontSize * 0.18}
+              paintOrder="stroke"
+            >
+              ?
+            </text>
+          </>
+        )}
+        {text && (
+          /*
+            Dark text on a white halo, not the "Next" label's light-on-dark:
+            this one sits right on the line work it is talking about, and a
+            sheet is white. Checked at 1536 px and on a tablet, 2026-10-01 —
+            the dark halo read as a smudge.
+          */
+          <text
+            x={at.x + runWidthInOverlay(zoom, 12)}
+            y={at.y + runWidthInOverlay(zoom, 18)}
+            fontSize={labelSize}
+            fontWeight={600}
+            fill={connect.kind === "wall" ? MEETS_WALL_TEXT : MEETS_UNSURE_TEXT}
+            stroke="#ffffff"
+            strokeWidth={labelSize * 0.3}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
+            {text}
+          </text>
+        )}
+      </g>
+    );
+  };
 
   const clientToPage = useCallback(
     (clientX: number, clientY: number): PagePoint | null => {
@@ -437,7 +726,7 @@ export function TraceLayer({
       window.removeEventListener("blur", clear);
     };
   }, []);
-  const boxing = shiftHeld && !tracing && !stamping;
+  const boxing = (shiftHeld || selectMode) && !tracing && !stamping;
   const [box, setBox] = useState<{ from: PagePoint; to: PagePoint } | null>(
     null
   );
@@ -484,17 +773,219 @@ export function TraceLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [box !== null, clientToPage, snapReach, stamps, onBoxSelect]);
 
-  /** Live length of what is being traced, including the rubber-band segment. */
-  const liveInches = useMemo(() => {
-    if (!tracing || ratio === null) return null;
-    const withHover = hover && points.length > 0 ? [...points, hover] : points;
-    return pathRealInches(withHover, ratio);
-  }, [tracing, points, hover, ratio]);
+  /*
+    ── EDITING A RUN'S POINTS (T8, D7a) ────────────────────────────────────────
+    The selected run shows a round handle per point and a faint "+" on each
+    segment. Drag a handle to move it, drag a "+" to add a point there,
+    right-click a handle (or click it, then Delete) to remove it. The line
+    follows the pointer live and saves on release; Escape during a drag puts
+    it back and saves nothing. The rules are @/lib/runPointEdit.
 
-  const committedInches = useMemo(() => {
-    if (ratio === null) return null;
-    return pathRealInches(points, ratio);
-  }, [points, ratio]);
+    A handle's press calls stopPropagation: the viewport pans on a plain
+    left-drag, and a React event raised here bubbles to it (CLAUDE.md § "a
+    comment claiming that SOMETHING ELSE handles it").
+  */
+  type Drag = {
+    runId: number;
+    index: number;
+    /** The points before the drag, with an inserted point already in. */
+    origin: PagePoint[];
+    points: PagePoint[];
+    pinned: PinnedEnds;
+    moved: boolean;
+    /** Started on a "+": the point exists only if the drag goes somewhere. */
+    inserted: boolean;
+    /** Where the press began, on screen — for the drag threshold. */
+    start: { x: number; y: number };
+  };
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  const [pickedVertex, setPickedVertex] = useState<{
+    runId: number;
+    index: number;
+  } | null>(null);
+  useEffect(() => {
+    setPickedVertex(null);
+    setDrag(null);
+  }, [editableRunId]);
+
+  /*
+    The points just saved, held until the run list catches up. Without it the
+    line jumps back to where it was for the length of the save and then
+    forward again, on the one thing the person is watching. Cleared by ANY
+    change to the list: the page writes the new points into its cache at once,
+    and restores the old ones if the save fails, and both arrive here as a new
+    list.
+  */
+  const [settled, setSettled] = useState<{
+    runId: number;
+    points: PagePoint[];
+  } | null>(null);
+  useEffect(() => setSettled(null), [existingRuns]);
+  /** Where a run's points are drawn: mid-drag, just saved, or as stored. */
+  const pointsNow = (run: ExistingRun): PagePoint[] =>
+    drag && drag.runId === run.id
+      ? drag.points
+      : settled && settled.runId === run.id
+        ? settled.points
+        : run.points;
+  const commitEdit = useCallback(
+    (runId: number, points: PagePoint[]) => {
+      setSettled({ runId, points });
+      onEditPoints?.(runId, points);
+    },
+    [onEditPoints]
+  );
+
+  /**
+   * An END let go near a mark lands on it, as tracing does — at its connect
+   * point, through the same `snapToMark` a click uses, so a dragged end and a
+   * clicked one cannot meet the same device in two places.
+   */
+  const snapEnd = useCallback(
+    (d: Drag, points: PagePoint[]): PagePoint[] => {
+      if (d.index !== 0 && d.index !== points.length - 1) return points;
+      const hit = snapToMark(points[d.index], snapReach(), snapStamps);
+      if (!hit) return points;
+      return movePoint(points, d.index, hit.point, d.pinned) ?? points;
+    },
+    [snapReach, snapStamps]
+  );
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      const page = clientToPage(e.clientX, e.clientY);
+      const d = dragRef.current;
+      if (!page || !d) return;
+      /*
+        A press is a CLICK until the pointer has moved DRAG_THRESHOLD_PX
+        (2026-09-29). It used to become a move on ANY movement, so a click
+        meant to pick a point committed a hair's shift to the run's length.
+      */
+      if (
+        !d.moved &&
+        !pastDragThreshold(d.start, { x: e.clientX, y: e.clientY })
+      )
+        return;
+      const next = movePoint(d.origin, d.index, page, d.pinned);
+      if (next) setDrag({ ...d, points: next, moved: true });
+    };
+    const end = () => {
+      const d = dragRef.current;
+      setDrag(null);
+      if (!d) return;
+      if (!d.moved) {
+        // A press with no movement picks the point, so Delete can remove it.
+        // A "+" pressed and not dragged adds nothing.
+        if (!d.inserted) {
+          setPickedVertex({ runId: d.runId, index: d.index });
+          // An END pressed and let go shows that end in the Run ends section.
+          const last = d.origin.length - 1;
+          if (d.index === 0 || d.index === last)
+            onPickEnd?.(d.runId, d.index === 0 ? "start" : "end");
+        }
+        return;
+      }
+      const final = snapEnd(d, d.points);
+      const run = existingRuns.find(r => r.id === d.runId);
+      if (run && !samePoints(run.points, final)) commitEdit(d.runId, final);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = null;
+      setDrag(null);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      window.removeEventListener("keydown", key, true);
+    };
+    // Re-bound only when a drag starts or ends, not on every move.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    drag !== null,
+    clientToPage,
+    snapEnd,
+    existingRuns,
+    commitEdit,
+    onPickEnd,
+  ]);
+
+  /**
+   * Remove the picked point — the Delete key, a right-click on the handle,
+   * and (for a finger, which has neither) the "Remove point" button in the
+   * pill below. One function, so the three cannot disagree about pinned ends.
+   */
+  const pickedRun = pickedVertex
+    ? (existingRuns.find(r => r.id === pickedVertex.runId) ?? null)
+    : null;
+  const pickedRemoval =
+    pickedVertex && pickedRun
+      ? removePoint(pickedRun.points, pickedVertex.index, {
+          start: !!pickedRun.startTee,
+          end: !!pickedRun.endTee,
+        })
+      : null;
+  const removePicked = useCallback(() => {
+    if (!pickedRun || !pickedRemoval) return;
+    setPickedVertex(null);
+    commitEdit(pickedRun.id, pickedRemoval);
+  }, [pickedRun, pickedRemoval, commitEdit]);
+
+  /** Delete or Backspace removes the picked point; Escape lets go of it. */
+  useEffect(() => {
+    if (!pickedVertex) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.tagName === "SELECT" ||
+          el.isContentEditable)
+      )
+        return;
+      if (e.key === "Escape") {
+        setPickedVertex(null);
+        return;
+      }
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const run = existingRuns.find(r => r.id === pickedVertex.runId);
+      if (!run) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const next = removePoint(run.points, pickedVertex.index, {
+        start: !!run.startTee,
+        end: !!run.endTee,
+      });
+      setPickedVertex(null);
+      if (next) commitEdit(run.id, next);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pickedVertex, existingRuns, commitEdit]);
+
+  /**
+   * Run total (clicked points only — the pill) and Next (last point to the
+   * cursor — the label at the cursor). @/lib/traceReadout keeps the cursor
+   * out of the total; its test is what says so.
+   */
+  const readout = useMemo(
+    // The snapped point, so "Next" is the length the click will actually add.
+    () =>
+      traceReadout(points, tracing ? (hoverSnap?.point ?? hover) : null, ratio),
+    [tracing, points, hover, hoverSnap?.point.x, hoverSnap?.point.y, ratio]
+  );
+  const [showNext] = useShowNextSegment();
 
   // Escape backs out one vertex at a time, then cancels — the same shape as
   // Escape everywhere else in the app: abandon the smallest thing first.
@@ -532,8 +1023,16 @@ export function TraceLayer({
    *
    * So the overlay always renders. `tracing` is gated by the caller, and this
    * is a note rather than a wall.
+   *
+   * CORRECTED 2026-10-06: "always renders" was true of THIS component and
+   * false of the screen. TakeoffPage only mounted the overlay once the
+   * measurability query had LOADED, so on a freshly opened sheet over a slow
+   * connection the stamp tool was armed with no layer to take the taps — the
+   * same fault as the early return above, one level up, found by the staging
+   * smoke test (0 of 3 taps kept). The page now mounts it with the sheet, and
+   * a measurability still loading is passed as `undefined`.
    */
-  const blocked = !measurability.ok ? measurability : null;
+  const blocked = measurability && !measurability.ok ? measurability : null;
 
   /**
    * The SVG scales with the drawing; everything else must not.
@@ -550,6 +1049,54 @@ export function TraceLayer({
   const withChrome = (chrome: React.ReactNode) =>
     chromeTarget ? createPortal(chrome, chromeTarget) : chrome;
 
+  /**
+   * A glyph for each run end that sits ON a wall device: at its wall foot
+   * (meets the wall), or at its centre (short — a run traced before this, or
+   * placed with Alt). Only a mark the end actually sits on.
+   */
+  const runEndMeets = () =>
+    existingRuns.flatMap(run => {
+      const inSelected =
+        selectedRoot !== null && (run.parentRunId ?? run.id) === selectedRoot;
+      if (!tracing && !inSelected) return [];
+      const pts = pointsNow(run);
+      if (pts.length < 2) return [];
+      return [pts[0], pts[pts.length - 1]].flatMap((end, i) => {
+        const near = (p: PagePoint) =>
+          Math.hypot(p.x - end.x, p.y - end.y) <= ON_END_POINTS;
+        for (const s of snapStamps) {
+          const connect = connects?.get(s.id);
+          // Not read yet: say nothing rather than flash amber for the half
+          // second the worker takes.
+          if (
+            !connect ||
+            (connect.kind === "no-wall" && connect.reason === "reading")
+          )
+            continue;
+          const key = `meets-${run.id}-${i}`;
+          if (connect.kind === "wall" && near(connect.point))
+            return [renderMeets(key, s, connect, false)];
+          if (connect.kind !== "centre" && near(s))
+            return [
+              connect.kind === "wall"
+                ? renderMeets(
+                    key,
+                    s,
+                    {
+                      kind: "no-wall",
+                      point: { x: s.x, y: s.y },
+                      reason: "none-in-reach",
+                    },
+                    false,
+                    "This end stops at the symbol's centre — the wall is beside it. Drag the end onto the mark to meet the wall."
+                  )
+                : renderMeets(key, s, connect, false),
+            ];
+        }
+        return [];
+      });
+    });
+
   return (
     <>
       <svg
@@ -562,6 +1109,9 @@ export function TraceLayer({
           tracing || stamping || boxing || box ? "" : "pointer-events-none",
           (boxing || box) && "cursor-crosshair"
         )}
+        // In Select mode a finger boxes marks instead of panning the sheet
+        // (TakeoffPage's touch router passes it straight through).
+        data-touch-drag={boxing || box ? "" : undefined}
         /*
           The crosshair is the CURSOR, not something drawn into the overlay.
           See @/lib/crosshairCursor — the compositor draws it with the pointer,
@@ -629,7 +1179,11 @@ export function TraceLayer({
               Alt — and Shift-click ends this leg and starts the next there.
             */
             if (legs?.busy) return;
-            const at = { point: page, tolerance: snapReach(), free: e.altKey };
+            const at = {
+              point: page,
+              tolerance: snapReach(),
+              free: e.altKey || freePoints,
+            };
             if (legs?.pending) {
               legs.onStart(at);
               return;
@@ -638,7 +1192,26 @@ export function TraceLayer({
               legs.onNewLeg(at);
               return;
             }
-            onPointsChange([...points, page]);
+            // The second press of a double-click lands on or near the point
+            // the first one placed; adding it drew a stub the bend counter
+            // read as an elbow. Judged by distance AND by the time since the
+            // previous press, so a drifting double-click at low zoom is
+            // caught too. @/lib/traceClick.
+            const now = e.timeStamp;
+            const since = now - lastTracePress.current;
+            lastTracePress.current = now;
+            //
+            // On a mark the point is its connect point (the wall, for a wall
+            // device), and the double-click test reads THAT point, not the
+            // raw press — see traceClickPoint for the stub it stops.
+            const next = traceClickPoint(
+              points,
+              page,
+              traceSnap(page, e.altKey || freePoints)?.point ?? null,
+              pagePerScreenPx(),
+              since
+            );
+            if (next) onPointsChange([...points, next]);
             return;
           }
           // The stamp mechanic: one selection, then a drop per click with
@@ -647,7 +1220,8 @@ export function TraceLayer({
         }}
         onDoubleClick={e => {
           // Double-click finishes, which is what every drawing tool does. The
-          // extra point the first click added is already in the path.
+          // first press placed the end point; the second added nothing
+          // (traceClickPoint above).
           if (tracing && canFinish) {
             e.preventDefault();
             onFinish();
@@ -666,7 +1240,9 @@ export function TraceLayer({
 
         {/* Runs already traced */}
         {existingRuns.map(run => {
-          const screen = run.points.map(toScreen);
+          // While a point is being dragged the line follows the pointer.
+          const livePoints = pointsNow(run);
+          const screen = livePoints.map(toScreen);
           if (screen.length < 2) return null;
           const isSelected = run.id === selectedRunId;
           /*
@@ -847,7 +1423,11 @@ export function TraceLayer({
         {stamps.map(placed => {
           const at = toScreen({ x: placed.x, y: placed.y });
           const isSelected = !placed.pending && selectedStampIds.has(placed.id);
-          const { shape, color } = markAppearance(placed);
+          const { shape, color, letter, status } = markAppearance(placed, pins);
+          const paint = markPaint(status, color);
+          // Below the size a letter can be read at, shape + colour remain.
+          const showLetter =
+            letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
           /*
             Sized in screen pixels and expressed in overlay units, because this
             overlay is inside the zoom transform. Selection adds a fifth on top
@@ -875,24 +1455,102 @@ export function TraceLayer({
               onClick={e =>
                 !tracing &&
                 !placed.pending &&
-                onStampClick(placed.id, e.shiftKey)
+                onStampClick(placed.id, e.shiftKey || selectMode)
               }
             >
+              {/*
+                STATUS (pin plan § 7, shared/takeoffMarks.ts `statusLook`):
+                new is filled; existing is HOLLOW with a SOLID outline — never
+                dashed, which is "unconfirmed"; remove adds an X; relocate an
+                arrow badge. The card says the same split in words.
+              */}
               <path
                 d={markPath(shape, at.x, at.y, r)}
-                fill={color}
-                fillOpacity={0.22}
+                // Hollow is truly hollow: a white fill hid the plan symbol
+                // underneath (seen 2026-10-05), which § 4 forbids.
+                // Fill, outline weight and letter paint all come from
+                // `markPaint`, so filled and hollow differ in three places.
+                fill={status.filled ? color : "none"}
+                fillOpacity={paint.fillOpacity}
                 stroke={color}
-                strokeWidth={isSelected ? stroke * 1.4 : stroke}
+                strokeWidth={
+                  (isSelected ? stroke * 1.4 : stroke) * paint.strokeScale
+                }
+                strokeDasharray={
+                  status.dashed ? `${r * 0.45} ${r * 0.3}` : undefined
+                }
                 strokeLinejoin="round"
               />
+              {status.cross && (
+                <path
+                  d={`M${at.x - r * 0.75},${at.y - r * 0.75}L${at.x + r * 0.75},${at.y + r * 0.75}M${at.x + r * 0.75},${at.y - r * 0.75}L${at.x - r * 0.75},${at.y + r * 0.75}`}
+                  stroke="#DC2626"
+                  strokeWidth={stroke * 1.4}
+                  strokeLinecap="round"
+                  pointerEvents="none"
+                />
+              )}
+              {status.arrow && (
+                /*
+                  A filled arrowhead on a dark disc: a thin stroked arrow
+                  read as a "+" at the size a pin is drawn (seen at 212%,
+                  2026-10-05).
+                */
+                <g pointerEvents="none">
+                  <circle
+                    cx={at.x + r * 0.9}
+                    cy={at.y - r * 0.9}
+                    r={r * 0.6}
+                    fill="#0b0b0b"
+                    stroke={color}
+                    strokeWidth={stroke * 0.8}
+                  />
+                  <path
+                    d={`M${at.x + r * 0.55},${at.y - r * 1.02}H${at.x + r * 0.95}V${at.y - r * 1.25}L${at.x + r * 1.32},${at.y - r * 0.9}L${at.x + r * 0.95},${at.y - r * 0.55}V${at.y - r * 0.78}H${at.x + r * 0.55}Z`}
+                    fill="#ffffff"
+                  />
+                </g>
+              )}
               {/*
                 The centre dot is what makes a mark point at something. Kept at
                 a fixed fraction of the shape so it stays a dot rather than
                 becoming a filled shape at one zoom and vanishing at another.
+
+                Where the pin is big enough, the count's LETTER takes the dot's
+                place (shared/pinLetters.ts): it points just as well, and it
+                says which count this is on a print or to a colour-blind eye.
+                On a filled pin: dark text over a pale halo, so it reads on
+                white paper and on black linework alike. On a HOLLOW pin the
+                letter is in the count's color over a thin dark halo instead
+                (`markPaint`): the pale halo filled the inside back in, and
+                new and existing looked the same (2026-10-05).
               */}
-              <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
-              <title>{placed.name}</title>
+              {showLetter ? (
+                <text
+                  x={at.x}
+                  y={at.y + letterFit(shape, r, letter).dy}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={letterFit(shape, r, letter).size}
+                  fontWeight={700}
+                  fontFamily="ui-sans-serif, system-ui, sans-serif"
+                  fill={paint.letterFill}
+                  stroke={paint.letterHalo}
+                  strokeWidth={stroke * paint.letterHaloScale}
+                  paintOrder="stroke"
+                  pointerEvents="none"
+                >
+                  {letter}
+                </text>
+              ) : (
+                <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
+              )}
+              <title>
+                {(letter ? `${letter} — ${placed.name}` : placed.name) +
+                  (status.status === "new"
+                    ? ""
+                    : ` — ${MARK_STATUS_LABEL[status.status]}, not priced`)}
+              </title>
             </g>
           );
         })}
@@ -1155,7 +1813,7 @@ export function TraceLayer({
                 ? legs.preview({
                     point: hover,
                     tolerance: snapReach(),
-                    free: hoverAlt,
+                    free: hoverAlt || freePoints,
                   })
                 : null;
             const to = points[0] ?? preview?.point ?? null;
@@ -1204,11 +1862,45 @@ export function TraceLayer({
                         }
                       />
                     )}
+                    {preview.kind === "stamp" &&
+                      (() => {
+                        const s = snapStamps.find(
+                          st => st.id === preview.stampId
+                        );
+                        return s
+                          ? renderMeets(
+                              "meets-leg",
+                              s,
+                              connects?.get(s.id),
+                              true
+                            )
+                          : null;
+                      })()}
                   </g>
                 )}
               </>
             );
           })()}
+
+        {/* Where the next click lands, when it lands on a mark. */}
+        {hoverSnap && (
+          <g pointerEvents="none">
+            <circle
+              cx={toScreen(hoverSnap.point).x}
+              cy={toScreen(hoverSnap.point).y}
+              r={markRadiusInOverlay(zoom) * 0.7}
+              fill="none"
+              stroke="#F5C518"
+              strokeWidth={markStrokeInOverlay(zoom)}
+            />
+            {renderMeets(
+              "meets-hover",
+              hoverSnap.stamp,
+              connects?.get(hoverSnap.stamp.id),
+              true
+            )}
+          </g>
+        )}
 
         {/* The trace in progress */}
         {tracing && points.length > 0 && (
@@ -1224,19 +1916,38 @@ export function TraceLayer({
               strokeLinejoin="round"
               strokeLinecap="round"
             />
-            {/* Rubber band to the pointer, so the length updates before the
-                click rather than after it. */}
+            {/* Rubber band to the pointer: where the next click goes. A third
+                of the run's stroke and faint, so it cannot be mistaken for
+                traced run (it was two thirds at 0.75 until 2026-09-29). It
+                stays when the Next label is switched off. */}
             {hover && (
               <line
                 x1={toScreen(points[points.length - 1]).x}
                 y1={toScreen(points[points.length - 1]).y}
-                x2={toScreen(hover).x}
-                y2={toScreen(hover).y}
+                x2={toScreen(hoverSnap?.point ?? hover).x}
+                y2={toScreen(hoverSnap?.point ?? hover).y}
                 stroke={RUN_COLOR[pathType]}
-                strokeWidth={runStroke * (2 / 3)}
+                strokeWidth={runStroke * (1 / 3)}
                 strokeDasharray="6 5"
-                strokeOpacity={0.75}
+                strokeOpacity={0.45}
               />
+            )}
+            {/* "Next": this segment's length alone, at the cursor. Dim and
+                small, because it is a preview; the run total is in the pill.
+                Settings → Display turns it off. */}
+            {hover && showNext && readout.next !== null && (
+              <text
+                x={toScreen(hover).x + runWidthInOverlay(zoom, 14)}
+                y={toScreen(hover).y - runWidthInOverlay(zoom, 10)}
+                fontSize={runWidthInOverlay(zoom, 11)}
+                fill="#94A3B8"
+                stroke="#0b0b0b"
+                strokeWidth={runWidthInOverlay(zoom, 11) * 0.18}
+                paintOrder="stroke"
+                pointerEvents="none"
+              >
+                Next {formatFeetInches(readout.next)}
+              </text>
             )}
             {points.map((point, index) => {
               const screen = toScreen(point);
@@ -1254,6 +1965,149 @@ export function TraceLayer({
             })}
           </>
         )}
+
+        {/* Point handles on the selected run — last, so they sit on top. */}
+        {!tracing &&
+          !stamping &&
+          editableRunId !== null &&
+          onEditPoints &&
+          (() => {
+            const run = existingRuns.find(r => r.id === editableRunId);
+            if (!run || run.points.length < 2) return null;
+            const pts = pointsNow(run);
+            const pinned = { start: !!run.startTee, end: !!run.endTee };
+            const color = runAppearance(runColors, run).color;
+            // A finger needs a bigger handle to land on (and to SEE past its
+            // own tip): 24 px across on a touch screen, 10 with a mouse.
+            const r = runWidthInOverlay(zoom, coarse ? 12 : 5);
+            const stroke = runWidthInOverlay(zoom, 1.5);
+            const begin = (
+              e: React.PointerEvent,
+              index: number,
+              origin: PagePoint[],
+              inserted: boolean
+            ) => {
+              if (e.button !== 0) return;
+              e.stopPropagation();
+              e.preventDefault();
+              setPickedVertex(null);
+              setDrag({
+                runId: run.id,
+                index,
+                origin,
+                points: origin,
+                pinned,
+                moved: false,
+                inserted,
+                start: { x: e.clientX, y: e.clientY },
+              });
+            };
+            return (
+              <g className="pointer-events-auto">
+                {!drag &&
+                  segmentMidpoints(run.points).map(({ segment, at }) => {
+                    const s = toScreen(at);
+                    const origin = insertPoint(run.points, segment, at);
+                    if (!origin) return null;
+                    return (
+                      <g
+                        key={`add-${segment}`}
+                        className="cursor-copy"
+                        data-touch-drag
+                        onPointerDown={e => begin(e, segment + 1, origin, true)}
+                      >
+                        <circle
+                          cx={s.x}
+                          cy={s.y}
+                          r={r * 0.8}
+                          fill="#0b0b0b"
+                          fillOpacity={0.55}
+                          stroke={color}
+                          strokeOpacity={0.6}
+                          strokeWidth={stroke}
+                        />
+                        <path
+                          d={`M${s.x - r * 0.45},${s.y}H${s.x + r * 0.45}M${s.x},${s.y - r * 0.45}V${s.y + r * 0.45}`}
+                          stroke={color}
+                          strokeOpacity={0.8}
+                          strokeWidth={stroke}
+                        />
+                        <title>Drag to add a point here</title>
+                      </g>
+                    );
+                  })}
+                {pts.map((p, index) => {
+                  const s = toScreen(p);
+                  if (isPinned(index, pts.length, pinned))
+                    return (
+                      <rect
+                        key={`pt-${index}`}
+                        x={s.x - r * 0.8}
+                        y={s.y - r * 0.8}
+                        width={r * 1.6}
+                        height={r * 1.6}
+                        fill="#94A3B8"
+                        stroke="#0b0b0b"
+                        strokeWidth={stroke}
+                        className="cursor-pointer"
+                        // Cannot move, but can still be looked up in Run ends.
+                        onPointerDown={e => e.stopPropagation()}
+                        onClick={() =>
+                          onPickEnd?.(run.id, index === 0 ? "start" : "end")
+                        }
+                      >
+                        <title>
+                          This end is on a branch tee, so it stays where the
+                          branch leaves the run.
+                        </title>
+                      </rect>
+                    );
+                  const picked =
+                    pickedVertex?.runId === run.id &&
+                    pickedVertex.index === index;
+                  return (
+                    <circle
+                      key={`pt-${index}`}
+                      cx={s.x}
+                      cy={s.y}
+                      r={r}
+                      fill={picked ? "#F5C518" : "#ffffff"}
+                      stroke={color}
+                      strokeWidth={stroke * 1.4}
+                      className="cursor-move"
+                      // Dragging a point is this handle's whole job, so a
+                      // finger on it moves the point, not the sheet.
+                      data-touch-drag
+                      onPointerDown={e => begin(e, index, run.points, false)}
+                      onContextMenu={e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const next = removePoint(run.points, index, pinned);
+                        if (next) commitEdit(run.id, next);
+                      }}
+                    >
+                      <title>
+                        {run.points.length > 2
+                          ? "Drag to move · right-click (or click, then Delete) to remove"
+                          : "Drag to move · a run needs at least two points"}
+                      </title>
+                    </circle>
+                  );
+                })}
+              </g>
+            );
+          })()}
+
+        {/*
+          Where each run's ENDS meet a device — while tracing (every run, so
+          a new one can be lined up against them) or on the selected run. The
+          rest of the time it is clutter on a drawing already full of marks.
+          LAST in the drawing, over the drag handles: on a touch screen a
+          handle is big enough to hide the whole tick (seen on a tablet,
+          2026-10-01), and this takes no pointer events, so it hides nothing
+          from a finger.
+        */}
+        {connects && runEndMeets()}
       </svg>
 
       {withChrome(
@@ -1282,7 +2136,10 @@ export function TraceLayer({
               pointer events. Delete is also the Delete / Backspace key.
             */
             <div
-              className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none"
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                widePillShape
+              )}
               role="status"
               aria-live="polite"
             >
@@ -1291,7 +2148,12 @@ export function TraceLayer({
                 {selectedStampIds.size === 1 ? "mark" : "marks"} selected
               </span>
               <span className="text-[0.7rem] text-muted-foreground">
-                Shift-click or Shift-drag to add more
+                {/* A finger has no Shift: it has the Select switch. */}
+                {!coarse
+                  ? "Shift-click or Shift-drag to add more"
+                  : selectMode
+                    ? "Tap marks to add or remove · drag to box more"
+                    : "Turn on Select to pick more"}
               </span>
               <Button
                 size="sm"
@@ -1301,6 +2163,102 @@ export function TraceLayer({
               >
                 Delete
               </Button>
+              {onMoveSelected && moveTargets && moveTargets.length > 1 && (
+                /*
+                  Counted as the wrong thing — most often a device drawn as
+                  existing to remain, counted with the new ones. A plain
+                  select: one choice, and the keyboard and screen readers
+                  already know it.
+                */
+                <select
+                  className="h-6 rounded-md border border-border bg-background px-1.5 text-xs pointer-events-auto max-w-56"
+                  value=""
+                  aria-label="Move the selected marks to another count"
+                  title="Move the selected marks to another count. They keep their places."
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    if (id > 0) onMoveSelected(id);
+                  }}
+                >
+                  <option value="">Move to…</option>
+                  {moveTargets.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {onSetStatusSelected && (
+                /*
+                  What these marks ARE (pin plan § 7). Existing, remove and
+                  relocate are drawn differently and are NOT priced as new
+                  (shared/markStatus.ts) — the card says how many.
+                */
+                <select
+                  className="h-6 rounded-md border border-border bg-background px-1.5 text-xs pointer-events-auto"
+                  value=""
+                  aria-label="Mark the selected marks as new, existing, remove or relocate"
+                  title="New is priced. Existing to remain, remove and relocate are not priced as new devices."
+                  onChange={e => {
+                    if (isUserMarkStatus(e.target.value))
+                      onSetStatusSelected(e.target.value);
+                  }}
+                >
+                  <option value="">Mark as…</option>
+                  {USER_MARK_STATUSES.map(s => (
+                    <option key={s} value={s}>
+                      {MARK_STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {onSetHeightSelected && selectedDrop && (
+                /*
+                  THESE MARKS' OWN HEIGHT (vertical-drops-plan § 2). Empty
+                  follows the count — a real height IS in effect, so it is
+                  not "not set". The same control the count row and the run
+                  ends use, so the three cannot drift apart.
+                */
+                <span className="flex items-center gap-1 pointer-events-auto text-xs">
+                  <span className="text-muted-foreground">Height</span>
+                  <HeightFields
+                    compact
+                    value={selectedDrop.inches}
+                    belowFloor={false}
+                    ariaPrefix="The selected marks' own height"
+                    onSave={inches => onSetHeightSelected(inches)}
+                    onClear={
+                      selectedDrop.inches !== null || selectedDrop.mixed
+                        ? () => onSetHeightSelected(null)
+                        : undefined
+                    }
+                    clearLabel="Follow the count"
+                    unsetLabel={
+                      selectedDrop.mixed ? "heights differ" : "the count's"
+                    }
+                    setLabel="Set"
+                  />
+                </span>
+              )}
+              {onSetDropExcludedSelected && selectedDrop && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-xs pointer-events-auto"
+                  onClick={() =>
+                    onSetDropExcludedSelected(selectedDrop.excluded === 0)
+                  }
+                  title={
+                    selectedDrop.excluded === 0
+                      ? "Leave these marks' drops off the bid. They stay counted as devices."
+                      : "Count these marks' drops again."
+                  }
+                >
+                  {selectedDrop.excluded === 0
+                    ? "No drop on these"
+                    : "Give these a drop"}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -1314,6 +2272,50 @@ export function TraceLayer({
             </div>
           )}
 
+          {!tracing && !stamping && pickedVertex && pickedRun && (
+            /*
+              A PICKED POINT, and what can be done to it. Before this pill the
+              only ways to remove a point were Delete and a right-click on the
+              handle — neither of which a finger has (device audit, touch #27).
+              Shown on every device: a button that says what Delete does is
+              not in a mouse user's way either.
+            */
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+              role="status"
+              aria-live="polite"
+            >
+              <span className="text-sm font-medium">Point picked</span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-6 px-2 text-xs pointer-events-auto"
+                onClick={removePicked}
+                disabled={!pickedRemoval}
+                title={
+                  pickedRemoval
+                    ? "Remove this point from the run (Delete)"
+                    : "A run needs at least two points, and a pinned end stays"
+                }
+              >
+                Remove point
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-muted-foreground pointer-events-auto"
+                onClick={() => setPickedVertex(null)}
+                aria-label="Let go of the point"
+                title="Let go of the point (Esc)"
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+
           {stamping && armedGroupName && (
             /*
               Nothing in here is clickable — it is a label saying what is armed
@@ -1321,7 +2323,12 @@ export function TraceLayer({
               readout below: a pointer crossing a number must not change the
               cursor, and must not stop the drawing underneath from tracking it.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-[#F5C518]/50 bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+            >
               {/*
                 "Counting", not "Stamping", since phase 6: a plain count has no
                 stamp behind it, and the panel this feeds is called Counted
@@ -1331,7 +2338,9 @@ export function TraceLayer({
               <span className="text-xs text-muted-foreground">Counting</span>
               <span className="text-sm font-medium">{armedGroupName}</span>
               <span className="text-[0.7rem] text-muted-foreground">
-                click to place · Esc to stop
+                {coarse
+                  ? "tap to place · two fingers move the sheet"
+                  : "click to place · Esc to stop"}
               </span>
             </div>
           )}
@@ -1372,12 +2381,17 @@ export function TraceLayer({
               same latent ceiling. It is not over it today, so it is left
               alone — but it is the same one line if it ever gets a term added.
             */
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-max whitespace-nowrap flex items-center gap-2 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none">
+            <div
+              className={cn(
+                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                pillShape
+              )}
+            >
               <span className="text-xs text-muted-foreground">
                 {pathType === "conduit" ? "Conduit run" : "Cable run"}
               </span>
               {/*
-                TWO NUMBERS, EACH SAYING WHICH IT IS.
+                ONE NUMBER: THE RUN TOTAL.
 
                 This pill showed the length INCLUDING the rubber-band segment
                 to the cursor, while the Finish button showed only the placed
@@ -1386,10 +2400,12 @@ export function TraceLayer({
                 move the mouse and it changes, and what gets saved is the
                 other one. Reported from bid 23 on 2026-09-21.
 
-                Placed comes first and stays put, because it is the number
-                that will exist after the next click. "To cursor" appears only
-                while there IS a rubber band, so a finished path shows one
-                figure rather than the same figure twice.
+                The 2026-09-21 fix labelled both ("placed" and "to cursor"),
+                but "to cursor" was still the whole path plus the preview, so a
+                stray mouse still made a big number appear. Since 2026-09-29
+                the pill holds only the clicked points, which never move with
+                the mouse, and the preview segment alone is a dim "Next" label
+                at the cursor (@/lib/traceReadout).
               */}
               {/*
                 ── EVERY SLOT IN THIS PILL HAS A FIXED WIDTH ─────────────────
@@ -1406,35 +2422,17 @@ export function TraceLayer({
                 The pill is the same width for the whole run, and nothing in
                 it can push or cover anything else.
               */}
-              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
-                {committedInches === null
-                  ? "—"
-                  : formatFeetInches(committedInches)}
-              </span>
               <span className="text-[0.7rem] text-muted-foreground">
                 {/* No scale: the path is still worth drawing, and its length
                     is typed in the run panel once it is finished (§ 4c). */}
                 {ratio === null
                   ? "no scale — type the length when finished"
-                  : "placed"}
+                  : "Run total"}
               </span>
-              <span
-                className={cn(
-                  "flex items-center gap-2",
-                  !(
-                    liveInches !== null &&
-                    committedInches !== null &&
-                    Math.abs(liveInches - committedInches) > 0.5
-                  ) && "invisible"
-                )}
-                aria-hidden={liveInches === null}
-              >
-                <span className="font-mono text-sm tabular-nums text-muted-foreground inline-block min-w-[9ch] text-right">
-                  {liveInches === null ? "" : formatFeetInches(liveInches)}
-                </span>
-                <span className="text-[0.7rem] text-muted-foreground">
-                  to cursor
-                </span>
+              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
+                {readout.runTotal === null
+                  ? "—"
+                  : formatFeetInches(readout.runTotal)}
               </span>
               <span className="text-[0.7rem] text-muted-foreground inline-block min-w-[4.5rem] tabular-nums">
                 {points.length} {points.length === 1 ? "point" : "points"}
@@ -1464,7 +2462,7 @@ export function TraceLayer({
                               legs.preview({
                                 point: hover,
                                 tolerance: snapReach(),
-                                free: hoverAlt,
+                                free: hoverAlt || freePoints,
                               })
                             )
                           : "Click where the next leg starts"
@@ -1474,6 +2472,27 @@ export function TraceLayer({
               )}
 
               <div className="w-px h-4 bg-border" />
+
+              {/*
+                SNAP / FREE, the finger's Alt. Only where there is no Alt key
+                to hold; on a laptop the pill stays as it was.
+              */}
+              {coarse && onToggleFreePoints && legs && (
+                <Button
+                  size="sm"
+                  variant={freePoints ? "default" : "outline"}
+                  className="h-6 text-xs pointer-events-auto"
+                  onClick={onToggleFreePoints}
+                  aria-pressed={freePoints}
+                  title={
+                    freePoints
+                      ? "A new leg starts exactly where you tap"
+                      : "A new leg's start snaps to the run or a mark"
+                  }
+                >
+                  {freePoints ? "Free" : "Snap"}
+                </Button>
+              )}
 
               {legs && (
                 <Button
@@ -1508,8 +2527,8 @@ export function TraceLayer({
               >
                 <Check className="w-3 h-3" /> Finish
                 <span className="font-mono inline-block min-w-[9ch] text-left">
-                  {committedInches !== null && points.length >= 2
-                    ? formatFeetInches(committedInches)
+                  {readout.runTotal !== null && points.length >= 2
+                    ? formatFeetInches(readout.runTotal)
                     : ""}
                 </span>
               </Button>

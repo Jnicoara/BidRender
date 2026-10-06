@@ -342,19 +342,39 @@ const STRAP_FAMILIES = [
   { label: "rigid", slang: "rmc grc imc galvanized" },
 ];
 
-const straps: BaselineMaterial[] = STRAP_FAMILIES.flatMap(family =>
-  TRADE_SIZES.map(size => ({
-    name: oneHoleStrapName(size, family.label),
+const straps: BaselineMaterial[] = [
+  ...STRAP_FAMILIES.flatMap(family =>
+    TRADE_SIZES.map(size => ({
+      name: oneHoleStrapName(size, family.label),
+      unitOfSale: "each" as const,
+      costPerUnit: UNPRICED,
+      category: "Conduit Fittings" as const,
+      searchAliases: aliases(
+        sizeAliases(size),
+        family.slang,
+        "1 hole clamp conduit pipe hanger support"
+      ),
+    }))
+  ),
+  /*
+    Flex straps (retail catalog plan § R7, 2026-09-29), one per flex size.
+    FMC and liquidtight share them, as strapFamily says: until these the
+    count said "No catalog strap" on every flex run, which was honest and
+    left the estimator to add them by hand at every rooftop unit and cooler.
+  */
+  ...FLEX_SIZES.map(size => ({
+    name: oneHoleStrapName(size, "flexible conduit"),
     unitOfSale: "each" as const,
     costPerUnit: UNPRICED,
     category: "Conduit Fittings" as const,
     searchAliases: aliases(
       sizeAliases(size),
-      family.slang,
-      "1 hole clamp conduit pipe hanger support"
+      "greenfield fmc liquidtight lfmc sealtite seal tite",
+      "1 hole clamp conduit hanger support"
     ),
-  }))
-);
+    description: "Fits flexible metal and liquidtight conduit of this size.",
+  })),
+];
 
 // ─── Flex ─────────────────────────────────────────────────────────────────────
 
@@ -429,6 +449,24 @@ const terminations: BaselineMaterial[] = [
     searchAliases: aliases(sizeAliases(size), "lock nut ring steel"),
     defaultQty: 2,
   })),
+  // Plan § 9b, owner 2026-09-29: every unused hub on a weatherproof box takes
+  // one, and nothing in the catalog closed a hub before. 1/2" and 3/4" only,
+  // the two hub sizes the weatherproof boxes ship in.
+  //
+  // Sold as a "closure plug", but "plug" is kept OUT of the name, and that was
+  // measured: named `1/2" closure plug`, the pair led a bare "plug" search
+  // ahead of Duplex receptacle — the same fault that renamed the plug-on SPD
+  // (power.ts). A word in a name outranks an alias; here it is an alias.
+  ...(['1/2"', '3/4"'] as const).map(size => ({
+    name: `${size} threaded closure`,
+    unitOfSale: "each" as const,
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings" as const,
+    searchAliases: aliases(
+      sizeAliases(size),
+      "closure plug hub plug cap blank wp weatherproof bell box hole filler"
+    ),
+  })),
 ];
 
 // ─── Weatherheads ─────────────────────────────────────────────────────────────
@@ -465,8 +503,11 @@ export const CONDUIT: BaselineMaterial[] = [
     unitOfSale: "each",
     costPerUnit: UNPRICED,
     category: "Conduit Fittings",
+    // Hyphenated, one word each: aliases() drops a repeated word, so the
+    // spaced "one hole 1 hole two hole 2 hole" was stored as "one hole 1 two
+    // 2" and "2 hole strap" could not find it (count sweep, 2026-09-29).
     searchAliases: aliases(
-      "one hole 1 hole two hole 2 hole conduit pipe clamp minerallac hanger"
+      "one-hole 1-hole two-hole 2-hole hole conduit pipe clamp minerallac hanger"
     ),
     defaultQty: 3,
   },
@@ -478,5 +519,49 @@ export const CONDUIT: BaselineMaterial[] = [
     costPerUnit: UNPRICED,
     category: "Conduit Fittings",
     searchAliases: aliases("reducer knockout ko step down enclosure hole pair"),
+  },
+  /*
+    Roof and mast parts (starter assemblies plan § Gaps, 2026-09-29). The
+    first two were on the pricing sheet under its pending Service Entrance
+    shelf ("Mast roof flashing", "Riser strap, 2 in"); they ship here until
+    that shelf exists — references/track-a-handoff-starter-assemblies.md.
+
+    The mast parts are SIZED, 2" like the meter hub they go with: every row
+    on this shelf must carry a size (materialSizeOrder.test.ts), and a mast
+    flashing is bought to fit the mast. The roof boot is the one exception,
+    a cone cut to fit, and is listed there as genuinely unsized.
+
+    The boot is NOT named "Conduit …" and does not alias "conduit": built
+    first as "Conduit roof flashing boot", it took the top result for
+    "conduit" (materialSearchRank.test.ts, same day).
+  */
+  {
+    name: '2" mast roof flashing',
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases("2in boot roof jack service neoprene seal overhead"),
+    description: "Seals a service mast where it passes through the roof.",
+  },
+  {
+    name: '2" riser strap',
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases(
+      "2in service mast support clamp two-hole bracket overhead"
+    ),
+    description: "Holds a service mast to the wall below the roof line.",
+  },
+  {
+    name: "Roof flashing boot",
+    unitOfSale: "each",
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings",
+    searchAliases: aliases(
+      "roof jack penetration rtu rooftop pipe seal neoprene cone"
+    ),
+    description:
+      "Seals a conduit through a roof, as at a rooftop unit. Cut to fit. Not a pitch pocket.",
   },
 ];

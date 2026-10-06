@@ -133,6 +133,13 @@ export type RunTypeFootageRow = {
    */
   legs: FittingLeg[];
   /**
+   * Every counted CABLE run of this type as a leg, for its connectors and
+   * straps (`countCableFittings`, since 2026-09-29). Its own list rather than
+   * `legs`, because `legs` is what tee ownership and the bend count read, and
+   * both are pipe rules. Empty on a conduit type.
+   */
+  cableLegs: FittingLeg[];
+  /**
    * Every tee these legs meet (D20). NOT the tees this type buys a box for —
    * a tee between two sizes is here in both groups, and which one buys the
    * box is decided across all of them by `teeBoxOwners`.
@@ -277,24 +284,29 @@ export function groupRunFootage(input: {
       pipe on the bid. Added before the unmeasurable `continue`, because a run
       with no scale still has two ends and therefore two connectors.
     */
+    /*
+      A quantity trace makes no tees (D21). One switched from route keeps
+      its tee rows for switching back, unread: no box, no joined node.
+
+      Collected for CABLE runs too since 2026-09-29: a tee on a cable run buys
+      its box (plan W4, `cableTeeRows`). The LEGS below go to two lists:
+      `legs` for pipe, `cableLegs` for cable (its connectors and straps).
+    */
+    const tees = run.traceMode === "quantity" ? null : input.teesById;
+    const startTee =
+      run.startTeeId === null || tees === null
+        ? null
+        : (tees.get(run.startTeeId) ?? null);
+    const endTee =
+      run.endTeeId === null || tees === null
+        ? null
+        : (tees.get(run.endTeeId) ?? null);
+    for (const tee of [startTee, endTee]) {
+      if (tee && !row.tees.some(t => t.id === tee.id)) row.tees.push(tee);
+    }
+
     if (run.pathType === "conduit") {
       const inchesPerPoint = pointsToRealInches(1, ratio);
-      /*
-        A quantity trace makes no tees (D21). One switched from route keeps
-        its tee rows for switching back, unread: no box, no joined node.
-      */
-      const tees = run.traceMode === "quantity" ? null : input.teesById;
-      const startTee =
-        run.startTeeId === null || tees === null
-          ? null
-          : (tees.get(run.startTeeId) ?? null);
-      const endTee =
-        run.endTeeId === null || tees === null
-          ? null
-          : (tees.get(run.endTeeId) ?? null);
-      for (const tee of [startTee, endTee]) {
-        if (tee && !row.tees.some(t => t.id === tee.id)) row.tees.push(tee);
-      }
       row.legs.push(
         legFromRun({
           id: run.id,
@@ -310,6 +322,35 @@ export function groupRunFootage(input: {
           verticals,
           feetPerPoint: inchesPerPoint === null ? null : inchesPerPoint / 12,
           answers: input.pullPointAnswersByRun.get(run.id) ?? [],
+          traceMode: run.traceMode,
+          startKind: run.startKind,
+          endKind: run.endKind,
+        })
+      );
+    } else {
+      /*
+        A cable run as a leg, for its connectors and straps (§ R1). Its feet
+        are what is strapped: the traced length and the counted drops. Not the
+        makeup tails (they are in the box) and not the extra % (it covers
+        route uncertainty, the same as extra conduit). No pull points: a
+        cable has none.
+      */
+      row.cableLegs.push(
+        legFromRun({
+          id: run.id,
+          parentRunId: run.parentRunId,
+          startTee,
+          endTee,
+          startStampId: run.startStampId,
+          endStampId: run.endStampId,
+          points: run.points,
+          conduitFeet: quantities
+            ? Math.round((quantities.runFeet + quantities.verticalFeet) * 100) /
+              100
+            : null,
+          verticals,
+          feetPerPoint: null,
+          answers: [],
           traceMode: run.traceMode,
           startKind: run.startKind,
           endKind: run.endKind,
@@ -408,7 +449,11 @@ export function groupRunFootage(input: {
     );
     row.makeupFeet += f.makeupFeet;
     if (f.pathType === "cable") row.racewayExtraFeet += f.wireExtraFeet;
-    else row.wireExtraFeet += f.wireExtraFeet;
+    else {
+      row.wireExtraFeet += f.wireExtraFeet;
+      // Conduit waste on drops too (owner, 2026-10-05).
+      row.racewayExtraFeet += f.conduitExtraFeet;
+    }
   }
 
   for (const row of Array.from(byType.values())) {
@@ -468,6 +513,7 @@ function rowFor(
       typedFeet: 0,
       endsNotCountedCount: 0,
       legs: [],
+      cableLegs: [],
       tees: [],
     };
     byType.set(runTypeId, row);

@@ -41,9 +41,11 @@ import {
   resolveBidPricingSettings,
   type CompanyPricingDefaults,
 } from "../shared/pricing";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const hasDb = !!process.env.DATABASE_URL;
 const USER = 9696;
+dropFixtureUsersAfterAll([USER]);
 
 const ctxFor = (id: number): TrpcContext =>
   ({ user: { id, role: "user" } }) as unknown as TrpcContext;

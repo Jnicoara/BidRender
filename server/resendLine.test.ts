@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { resendPlan, swapText } from "../shared/resendLine";
+import { laborInRunRate } from "../shared/runFittings";
 
 const setScrew = {
   key: 110,
@@ -17,6 +18,16 @@ const compression = {
   name: '1/2" EMT compression coupling',
   costPerUnit: "0.9000",
 };
+/**
+ * A fitting that KEEPS its own hours. The labor-refill tests below used to use
+ * the coupling; since 2026-09-29 a coupling's labor is in the run's per-foot
+ * rate and never refills, so the mechanics are tested on an elbow instead.
+ */
+const elbow = {
+  key: 120,
+  name: '1/2" EMT 90-degree elbow',
+  costPerUnit: "1.1000",
+};
 
 /** A line and its part that both have their hours — only money is at issue. */
 const hoursSet = { lineHours: "0.0500", currentHours: "0.0500" };
@@ -27,6 +38,7 @@ describe("refill a price", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
+        laborInRunRate: true,
         linePart: setScrew,
         currentPart: setScrew,
         lineCost: "0.0000",
@@ -40,6 +52,7 @@ describe("refill a price", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
+        laborInRunRate: true,
         linePart: setScrew,
         currentPart: setScrew,
         lineCost: "0.3000",
@@ -53,6 +66,7 @@ describe("refill a price", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
+        laborInRunRate: true,
         linePart: setScrewUnpriced,
         currentPart: setScrewUnpriced,
         lineCost: "0",
@@ -67,6 +81,7 @@ describe("refill a price", () => {
       resendPlan({
         isFitting: false,
         laborOnly: false,
+        laborInRunRate: false,
         linePart: null,
         currentPart: emt,
         lineCost: "0",
@@ -82,27 +97,29 @@ describe("refill labor — a line sent before its part had hours", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
-        linePart: setScrew,
-        currentPart: setScrew,
-        lineCost: "0.4500",
+        laborInRunRate: false,
+        linePart: elbow,
+        currentPart: elbow,
+        lineCost: "1.1000",
         lineHours: null,
-        currentHours: "0.0500",
+        currentHours: "0.2500",
       })
-    ).toEqual({ kind: "refill", price: null, hours: 0.05 });
+    ).toEqual({ kind: "refill", price: null, hours: 0.25 });
   });
 
   it("fills in both at once when the line has neither", () => {
     expect(
       resendPlan({
-        isFitting: false,
+        isFitting: true,
         laborOnly: false,
-        linePart: setScrew,
-        currentPart: setScrew,
+        laborInRunRate: false,
+        linePart: elbow,
+        currentPart: elbow,
         lineCost: "0.0000",
         lineHours: null,
-        currentHours: "0.0500",
+        currentHours: "0.2500",
       })
-    ).toEqual({ kind: "refill", price: 0.45, hours: 0.05 });
+    ).toEqual({ kind: "refill", price: 1.1, hours: 0.25 });
   });
 
   it("never refills over hours already set — a 0 included", () => {
@@ -110,11 +127,12 @@ describe("refill labor — a line sent before its part had hours", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
-        linePart: setScrew,
-        currentPart: setScrew,
-        lineCost: "0.4500",
+        laborInRunRate: false,
+        linePart: elbow,
+        currentPart: elbow,
+        lineCost: "1.1000",
         lineHours: "0.0000",
-        currentHours: "0.0500",
+        currentHours: "0.2500",
       })
     ).toEqual({ kind: "keep" });
   });
@@ -124,13 +142,69 @@ describe("refill labor — a line sent before its part had hours", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
-        linePart: setScrew,
-        currentPart: setScrew,
-        lineCost: "0.4500",
+        laborInRunRate: false,
+        linePart: elbow,
+        currentPart: elbow,
+        lineCost: "1.1000",
         lineHours: null,
         currentHours: null,
       })
     ).toEqual({ kind: "keep" });
+  });
+});
+
+describe("couplings, connectors and straps: the run's per-foot rate covers them", () => {
+  // Owner, 2026-09-29. The labor is in every foot of the run already; filling
+  // the part's own hours in would pay for it twice.
+  it("names exactly those three, and nothing else a run counts", () => {
+    expect(
+      ["coupling", "connector", "strap"].map(r => laborInRunRate(r))
+    ).toEqual([true, true, true]);
+    expect(
+      [
+        "elbow90",
+        "elbow45",
+        "fieldBend",
+        "lb",
+        "pullBox",
+        "teeBox",
+        "teeCover",
+        "raceway",
+        "conductor",
+        "ground",
+        null,
+      ].map(r => laborInRunRate(r))
+    ).toEqual(Array(11).fill(false));
+  });
+
+  it("never refills hours, even when the line has none and the part has some", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        laborOnly: false,
+        laborInRunRate: true,
+        linePart: setScrew,
+        currentPart: setScrew,
+        lineCost: "0.4500",
+        lineHours: null,
+        currentHours: "0.0500",
+      })
+    ).toEqual({ kind: "keep" });
+  });
+
+  it("still refills its PRICE — only the labor is covered", () => {
+    expect(
+      resendPlan({
+        isFitting: true,
+        laborOnly: false,
+        laborInRunRate: true,
+        linePart: setScrew,
+        currentPart: setScrew,
+        lineCost: "0.0000",
+        lineHours: null,
+        currentHours: "0.0500",
+      })
+    ).toEqual({ kind: "refill", price: 0.45, hours: null });
   });
 });
 
@@ -145,6 +219,7 @@ describe("a field bend is priced by HOURS on a $0 part", () => {
       resendPlan({
         isFitting: true,
         laborOnly: true,
+        laborInRunRate: false,
         linePart: pipe,
         currentPart: pipe,
         lineCost: "0.0000",
@@ -159,6 +234,7 @@ describe("a field bend is priced by HOURS on a $0 part", () => {
       resendPlan({
         isFitting: true,
         laborOnly: true,
+        laborInRunRate: false,
         linePart: pipe,
         currentPart: pipe,
         lineCost: "0.0000",
@@ -174,6 +250,7 @@ describe("a field bend is priced by HOURS on a $0 part", () => {
       resendPlan({
         isFitting: true,
         laborOnly: true,
+        laborInRunRate: false,
         linePart: pipe,
         currentPart: other,
         lineCost: "0.0000",
@@ -190,6 +267,7 @@ describe("swap", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
+        laborInRunRate: true,
         linePart: setScrew,
         currentPart: compression,
         lineCost: "0.4500",
@@ -203,6 +281,7 @@ describe("swap", () => {
       resendPlan({
         isFitting: true,
         laborOnly: false,
+        laborInRunRate: true,
         linePart: null,
         currentPart: compression,
         lineCost: "0",
@@ -217,6 +296,7 @@ describe("swap", () => {
       resendPlan({
         isFitting: false,
         laborOnly: false,
+        laborInRunRate: false,
         linePart: { key: 90, name: '1/2" EMT', costPerUnit: "1" },
         currentPart: other,
         lineCost: "1",

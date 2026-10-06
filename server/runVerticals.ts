@@ -20,11 +20,13 @@
  */
 import {
   heightList,
+  resolveDeviceHeight,
   resolveDistributionHeight,
-  resolveMountingHeight,
   verticalsForRun,
   type HeightLayers,
   type HeightRow,
+  type DeviceHeightSource,
+  type MarkHeight,
   type RunVerticals,
 } from "../shared/takeoffHeights";
 import { heightAtEnd, kindAtEnd } from "../shared/runNetwork";
@@ -88,6 +90,24 @@ export type HeightContext = {
    * type is gone.
    */
   dropTypeFor: (runTypeId: number) => DropTypeSpec | null;
+  /**
+   * A mark a run end is LINKED to (`startStampId`/`endStampId`): its own
+   * height (0098), its count's drop kind and height, and its status. Loaded
+   * with the rest of the context so no caller can price a linked end without
+   * it (references/vertical-drops-plan.md § 2). Null for any other id.
+   */
+  markAt: (stampId: number) => LinkedMark | null;
+};
+
+/** What a run end needs to know about the mark it is linked to. */
+export type LinkedMark = {
+  height: MarkHeight;
+  /** The count's `dropKind` — what this device IS, as a height type. */
+  countKind: string | null;
+  /** The count's "Height for this count". */
+  countInches: number | null;
+  /** NULL = new. An existing device is priced and SAID (plan § 4, C). */
+  status: string | null;
 };
 
 /**
@@ -143,6 +163,19 @@ export function buildHeightContext(input: {
     makeupPanelInches: number | null;
     makeupByKindInches: Record<string, number> | null;
   })[];
+  /**
+   * Every mark a run end on this bid is linked to, with its count's drop.
+   * REQUIRED: a context without them would price a linked 54" receptacle at
+   * the type's 18" with nothing to show it had skipped a step.
+   */
+  linkedMarks: readonly {
+    id: number;
+    mountHeightInches: string | number | null;
+    mountHeightSource: "typed" | "read" | null;
+    status: string | null;
+    dropKind: string | null;
+    dropHeightInches: number | null;
+  }[];
 }): HeightContext {
   const {
     defaults,
@@ -151,7 +184,24 @@ export function buildHeightContext(input: {
     bidDistributionInches,
     extraDefaults,
     runTypes,
+    linkedMarks,
   } = input;
+  const marks = new Map<number, LinkedMark>(
+    linkedMarks.map(m => [
+      m.id,
+      {
+        height: {
+          // decimal(7,2) arrives as a string from mysql2.
+          inches:
+            m.mountHeightInches === null ? null : Number(m.mountHeightInches),
+          source: m.mountHeightSource,
+        },
+        countKind: m.dropKind,
+        countInches: m.dropHeightInches,
+        status: m.status,
+      },
+    ])
+  );
   const typeExtras = (type: (typeof runTypes)[number]): ExtraSettings => ({
     conduitExtraPct: extraNumber(type.conduitExtraPct),
     wireExtraPct: extraNumber(type.wireExtraPct),
@@ -160,6 +210,7 @@ export function buildHeightContext(input: {
     makeupByKindInches: type.makeupByKindInches,
   });
   return {
+    markAt: stampId => marks.get(stampId) ?? null,
     dropTypeFor: runTypeId => {
       const type = resolveRunType(runTypes, runTypeId);
       if (!type) return null;
@@ -220,6 +271,7 @@ export const EMPTY_HEIGHT_CONTEXT: HeightContext = {
   types: heightList({ company: [] }),
   extras: NO_EXTRAS_CONTEXT,
   dropTypeFor: () => null,
+  markAt: () => null,
 };
 
 /**
@@ -274,6 +326,13 @@ export type RunEnds = {
    * would warn "flat only" about every one. See `kindForMode`.
    */
   traceMode: TraceMode | null;
+  /**
+   * The mark each end is linked to. REQUIRED like the tee ids: a linked
+   * end takes its height from the mark (`endOfRun`), and a caller that
+   * could leave these out would price it at the type's height instead.
+   */
+  startStampId: number | null;
+  endStampId: number | null;
 };
 
 /**
@@ -293,37 +352,92 @@ export function verticalsForRunRow(
     run: run.distributionHeightInches,
   });
 
-  // A tee end carries straight on at run height — no drop (D20). So does an
-  // unanswered end of a quantity trace, which is flat by choice (D21).
-  const startKind = kindAtEnd(
-    kindForMode(run.startKind, run.traceMode),
-    run.startTeeId
+  const start = endOfRun(
+    run.startKind,
+    run.startHeightInches,
+    run.startTeeId,
+    run.startStampId,
+    run.traceMode,
+    context
   );
-  const endKind = kindAtEnd(
-    kindForMode(run.endKind, run.traceMode),
-    run.endTeeId
-  );
-  const startHeight = resolveMountingHeight(
-    startKind,
-    context.layers,
-    heightAtEnd(run.startHeightInches, run.startTeeId)
-  );
-  const endHeight = resolveMountingHeight(
-    endKind,
-    context.layers,
-    heightAtEnd(run.endHeightInches, run.endTeeId)
+  const end = endOfRun(
+    run.endKind,
+    run.endHeightInches,
+    run.endTeeId,
+    run.endStampId,
+    run.traceMode,
+    context
   );
 
   return verticalsForRun(
     {
-      kind: startKind,
-      endInches: startHeight.inches,
+      kind: start.kind,
+      endInches: start.inches,
       distributionInches: distribution.inches,
     },
     {
-      kind: endKind,
-      endInches: endHeight.inches,
+      kind: end.kind,
+      endInches: end.inches,
       distributionInches: distribution.inches,
     }
   );
+}
+
+/**
+ * One end: what is there, and how high.
+ *
+ * ── A LINKED mark answers both, when the run does not ─────────────────────
+ * A run end linked to a mark (the Link chip, or a leg started on a mark)
+ * used to say nothing about it: its kind stayed whatever the end picker
+ * held, often nothing, and the mark's own height was never read. Now, when
+ * the end has no kind of its own, it takes the kind its COUNT drops to —
+ * not a guess from a nearby symbol (overhaul § 6 forbids that): the person
+ * linked this mark, and its count already says what it is. The height then
+ * runs this end's own → the mark's → the count's → job → company →
+ * shipped (`resolveDeviceHeight`, the same order a count's drop uses).
+ *
+ * Not on a quantity trace: there an unanswered end is level by decision
+ * (D21), and a link must not turn it into a drop nobody approved.
+ */
+export function endOfRun(
+  kind: string | null,
+  ownInches: number | null,
+  teeId: number | null,
+  stampId: number | null,
+  traceMode: TraceMode | null,
+  context: HeightContext
+): {
+  kind: string | null;
+  inches: number | null;
+  source: DeviceHeightSource;
+  mark: LinkedMark | null;
+} {
+  const mark =
+    stampId !== null && teeId === null ? context.markAt(stampId) : null;
+  const linkedKind =
+    kind === null && traceMode !== "quantity" && mark ? mark.countKind : null;
+  // A tee end carries straight on at run height — no drop (D20). So does an
+  // unanswered end of a quantity trace, which is flat by choice (D21).
+  const resolvedKind = kindAtEnd(
+    kindForMode(kind ?? linkedKind, traceMode),
+    teeId
+  );
+  const height = resolveDeviceHeight({
+    kind: resolvedKind,
+    layers: context.layers,
+    runEndInches: heightAtEnd(ownInches, teeId),
+    mark: mark ? mark.height : null,
+    // The count's height is a height for the count's KIND; an end the run
+    // itself calls something else does not borrow it.
+    countInches:
+      mark && resolvedKind !== null && resolvedKind === mark.countKind
+        ? mark.countInches
+        : null,
+  });
+  return {
+    kind: resolvedKind,
+    inches: height.inches,
+    source: height.source,
+    mark,
+  };
 }

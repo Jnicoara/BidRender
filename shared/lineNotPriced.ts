@@ -17,8 +17,12 @@
  *     (`needsPricing`). Nobody chose that zero. EXCEPT a field bend, which is
  *     labor only: its $0 is by nature, and it is not priced while its HOURS
  *     are NULL (2026-09-26).
- *   • FROM AN ASSEMBLY or a count: a labor-only assembly legitimately carries
- *     no material, so only a line whose WHOLE cost is $0 is not priced.
+ *   • FROM AN ASSEMBLY or a count: only a line whose WHOLE cost is $0 is not
+ *     priced as a whole. Since 2026-10-05 (owner) one with labor but $0
+ *     material is NOT fully priced either: its labor stays in the total and
+ *     its material counts as one part not priced (`lineMaterialNotPriced`).
+ *     This said "a labor-only assembly legitimately carries no material"
+ *     until then — the rule that let a pole bid go out with no pole in it.
  *
  * A zero quantity is never "not priced": nothing is on the line to price, and
  * $0 for nothing is true.
@@ -33,6 +37,7 @@
  */
 import { needsPricing } from "./materialPricing";
 import { canPriceByHand, lineNeedsPrice } from "./handPricedLines";
+import { laborInRunRate } from "./runFittings";
 
 export type NotPricedLineLike = {
   qty: string | number;
@@ -85,12 +90,58 @@ export function lineNotPriced(
  * apart now; they read 0 h until they are sent again after the part is given
  * hours. A hand-priced line has its own rule and its own strip
  * (`shared/handPricedLines.ts`), because the next move there is to type.
+ *
+ * NEVER a coupling, connector or strap (owner, 2026-09-29): the run's per-foot
+ * rate pays their labor (`laborInRunRate`), so no hours are missing. Lines of
+ * theirs sent before that rule may still hold NULL; reading them as "Not
+ * priced" would send somebody to set hours that must never be used. The role
+ * is REQUIRED so a caller cannot leave it off and bring that back.
  */
 export function lineHoursUnset(line: {
   takeoffRunTypeId: number | null;
+  runMaterialRole: string | null;
   snapshotLaborHours: string | number | null;
 }): boolean {
-  return line.takeoffRunTypeId !== null && line.snapshotLaborHours === null;
+  return (
+    line.takeoffRunTypeId !== null &&
+    line.snapshotLaborHours === null &&
+    !laborInRunRate(line.runMaterialRole)
+  );
+}
+
+// ─── Material missing from a line that has labor ─────────────────────────────
+
+/**
+ * An ASSEMBLY or count line that is priced (its labor is in the total) but
+ * carries no material at all — "material not priced", never fully priced.
+ *
+ * ── The trap this closes (owner, 2026-10-05) ────────────────────────────────
+ * `lineNotPriced` calls an assembly line priced whenever its whole cost is
+ * not $0, because "a labor-only assembly legitimately carries no material".
+ * So a light-pole assembly with 6 h of labor and no material read "$510.00",
+ * the bid total looked finished, and it was a pole bid with no pole in it
+ * (references/quote-items-plan.md § 0). The owner's rule: a line with labor
+ * and $0 or unset material must NEVER read as fully priced. Its labor stays
+ * in the total; its material is counted as not priced, once.
+ *
+ * This REVERSES "a labor-only assembly is priced" for the material half:
+ * such a line is now priced for labor and flagged for material. Nothing in
+ * the app can yet say "no material, on purpose" for an assembly — that needs
+ * a column (todo.md, Track A next migration batch). A hand-priced line is
+ * untouched: there a TYPED $0 is an answer (an owner-supplied part).
+ */
+export function lineMaterialNotPriced(
+  line: NotPricedLineLike,
+  directCost: number | null
+): boolean {
+  const qty = Number(line.qty);
+  if (!Number.isFinite(qty) || qty <= 0) return false;
+  if (line.assemblyId === null) return false;
+  // A line the engine cannot price at all says "Can't price" — a different
+  // fault, already said. Counting it here too would say it twice.
+  if (directCost === null) return false;
+  if (lineNotPriced(line, directCost)) return false; // already all of it
+  return Number(line.snapshotMaterialCost ?? 0) === 0;
 }
 
 // ─── Parts not priced, inside a line that is ─────────────────────────────────
@@ -135,7 +186,10 @@ export function linePartsNotPriced(
   if (!Number.isFinite(qty) || qty <= 0) return 0;
   if (line.assemblyId === null) return 0;
   if (lineNotPriced(line, directCost)) return 0;
-  return Math.max(0, Math.floor(line.unpricedParts));
+  const parts = Math.max(0, Math.floor(line.unpricedParts));
+  // Material missing entirely counts once — not on top of $0 recipe parts,
+  // which already say the material is short (2026-10-05).
+  return lineMaterialNotPriced(line, directCost) ? Math.max(parts, 1) : parts;
 }
 
 /**
@@ -146,6 +200,32 @@ export function linePartsNotPriced(
 export type NotPricedTally = { lines: number; parts: number };
 
 export const NOTHING_NOT_PRICED: NotPricedTally = { lines: 0, parts: 0 };
+
+/**
+ * The lines a total leaves something out of, by name, for a warning that has
+ * to say WHICH ("Duplex receptacle, 2 parts not priced"). Same two predicates
+ * as `countNotPriced` below, so the list and the count cannot disagree.
+ */
+export function notPricedLines<L extends PartsLineLike & { name: string }>(
+  lines: readonly { line: L; directCost: number | null }[]
+): { name: string; wholeLine: boolean; parts: number }[] {
+  return lines.flatMap(
+    ({
+      line,
+      directCost,
+    }): {
+      name: string;
+      wholeLine: boolean;
+      parts: number;
+    }[] => {
+      if (lineNotPriced(line, directCost)) {
+        return [{ name: line.name, wholeLine: true, parts: 0 }];
+      }
+      const parts = linePartsNotPriced(line, directCost);
+      return parts > 0 ? [{ name: line.name, wholeLine: false, parts }] : [];
+    }
+  );
+}
 
 /** How much of a bid the total leaves unpriced. */
 export function countNotPriced(

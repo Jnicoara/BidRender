@@ -19,6 +19,12 @@
  */
 import { heightTypeLabel } from "./takeoffHeights";
 import type { PagePoint } from "./takeoffGeometry";
+import {
+  emptySplit,
+  isPricedMark,
+  markStatusOf,
+  type StatusSplit,
+} from "./markStatus";
 
 /**
  * A stamp as the counter needs it.
@@ -49,6 +55,13 @@ export type StampRecord = {
   assemblyCategory?: string | null;
   x: number;
   y: number;
+  /**
+   * `takeoff_stamps.status` — NULL is new. REQUIRED, not optional, so every
+   * mapping from a row has to say it: a mapping that dropped it would count
+   * an existing device as a new one, and nothing would look wrong
+   * (shared/markStatus.ts, the hard rule).
+   */
+  status: string | null;
 };
 
 /**
@@ -296,8 +309,16 @@ export type CountedAssembly = {
   /** Null for a plain count, or an assembly deleted since it was stamped. */
   assemblyId: number | null;
   name: string;
-  /** How many were dropped. Derived from the stamps themselves. */
+  /**
+   * How many are NEW — the quantity anything bought or priced may use. A
+   * mark that is existing, to be removed or relocated is not a new device
+   * (shared/markStatus.ts), so it is in `placed` and `split`, never here.
+   */
   count: number;
+  /** Every mark placed, whatever its status. Display only. */
+  placed: number;
+  /** How many of each status. */
+  split: StatusSplit;
   /** Every instance, so the list can walk through them one at a time. */
   stamps: StampRecord[];
 };
@@ -342,21 +363,25 @@ export function groupStamps(stamps: StampRecord[]): CountedAssembly[] {
 
   for (const stamp of stamps) {
     const key = countKey(stamp);
-
-    const existing = groups.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.stamps.push(stamp);
-      continue;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        kind: "assembly",
+        groupId: stamp.groupId,
+        assemblyId: stamp.assemblyId,
+        name: stamp.name,
+        count: 0,
+        placed: 0,
+        split: emptySplit(),
+        stamps: [],
+      };
+      groups.set(key, group);
     }
-    groups.set(key, {
-      kind: "assembly",
-      groupId: stamp.groupId,
-      assemblyId: stamp.assemblyId,
-      name: stamp.name,
-      count: 1,
-      stamps: [stamp],
-    });
+    group.placed += 1;
+    group.split[markStatusOf(stamp.status)] += 1;
+    // The hard rule: only a NEW mark is a quantity.
+    if (isPricedMark(stamp)) group.count += 1;
+    group.stamps.push(stamp);
   }
 
   return Array.from(groups.values());
@@ -449,4 +474,79 @@ export function stampsInRegion(
 /** Normalise a symbol label into the key its uniqueness is judged on. */
 export function symbolLookupKey(label: string): string {
   return label.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * A captured legend symbol, as far as its NAMES go.
+ *
+ * ── Two names, and no new column for them (2026-10-01) ───────────────────────
+ * A symbol can be renamed. `label` is then the estimator's name, shown
+ * everywhere; `lookupKey` is NOT re-derived from it and keeps the key of the
+ * name the symbol was CAPTURED under. That is the original name, and it is
+ * what matching keeps finding: a plain count made under it on another bid,
+ * the plan reader naming it, a recapture typed the same way.
+ *
+ * The cost of using the column that exists: `lookupKey` is lower-cased, so the
+ * original's capitals are gone. "Reset to original" restores "linear type",
+ * not "LINEAR TYPE", and says so on the button. An exact original needs
+ * `symbol_links.originalLabel` — flagged for Track A in todo.md.
+ */
+export type SymbolNames = { label: string; lookupKey: string };
+
+/** Every key this symbol answers to — its current name and its original. */
+export function symbolNameKeys(symbol: SymbolNames): string[] {
+  const current = symbolLookupKey(symbol.label);
+  return current === symbol.lookupKey ? [current] : [current, symbol.lookupKey];
+}
+
+/** Does a name (a count's label, a reader's word) mean this symbol? */
+export function nameMatchesSymbol(name: string, symbol: SymbolNames): boolean {
+  return symbolNameKeys(symbol).includes(symbolLookupKey(name));
+}
+
+/**
+ * The original name, or null when the symbol still carries it. A rename that
+ * only changes capitals is not a rename — the key is the same.
+ */
+export function symbolOriginalName(symbol: SymbolNames): string | null {
+  return symbolLookupKey(symbol.label) === symbol.lookupKey
+    ? null
+    : symbol.lookupKey;
+}
+
+/**
+ * The plain counts on one bid that are this symbol's — counted by its name,
+ * under either the current one or the original, with no assembly behind them.
+ * A count made under the current name comes first, because that is the one a
+ * click on the symbol would make today.
+ *
+ * Counts of OTHER assemblies are excluded on purpose. And a count of the
+ * symbol's own assembly is included only when it carries the symbol's name:
+ * since 2026-10-01 a linked symbol arms its own count of the assembly, under
+ * its name (shared/assemblyCounts.ts), so that count IS the symbol's and a
+ * rename must follow it — or the next click would no longer find it. A count
+ * under the ASSEMBLY's name is never matched, so renaming a symbol never
+ * renames a count other symbols may share (track-b-count-pin-styles-plan.md
+ * § 11).
+ */
+export function symbolCountsOn<
+  G extends { label: string; assemblyId: number | null },
+>(
+  groups: readonly G[],
+  symbol: SymbolNames & { assemblyId?: number | null }
+): G[] {
+  const current = symbolLookupKey(symbol.label);
+  const linked = symbol.assemblyId ?? null;
+  return groups
+    .filter(
+      g =>
+        (g.assemblyId === null ||
+          (linked !== null && g.assemblyId === linked)) &&
+        nameMatchesSymbol(g.label, symbol)
+    )
+    .sort(
+      (a, b) =>
+        Number(symbolLookupKey(b.label) === current) -
+        Number(symbolLookupKey(a.label) === current)
+    );
 }

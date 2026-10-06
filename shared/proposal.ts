@@ -34,6 +34,7 @@
 
 import { PROPOSAL_LAYOUTS, type ProposalLayout } from "../drizzle/schema";
 import { roundMoney } from "./pricing";
+import type { NotPricedTally } from "./lineNotPriced";
 import {
   groupScopeNotes,
   sectionAllowedInMode,
@@ -394,6 +395,12 @@ export type BuildProposalInput = {
   };
   /** Passed in, never read from the clock — see shared/retention.ts for why. */
   now: Date;
+  /**
+   * Lines and parts the totals count as $0 because nobody priced them
+   * (`countNotPriced`). Required, not optional: a caller that could leave it
+   * out would print a short total as if it were the price.
+   */
+  notPriced: NotPricedTally;
 };
 
 export type ProposalDocument = {
@@ -495,6 +502,23 @@ export type ProposalDocument = {
     } | null;
     /** True when overhead or profit is in the total — drives the wording. */
     includesIndirect: boolean;
+    /**
+     * True when a line or part on the bid is not priced, so every figure
+     * worked out from the bid's price is SHORT. The document then shows
+     * "Price pending" in place of each of them, never the short number
+     * (owner, 2026-09-29: "a client document must never show $0 or a short
+     * total"). The figures above stay filled in for the estimator's own
+     * checks; the renderer must not print them while this is true.
+     */
+    pricePending: boolean;
+    /**
+     * True when the bid has no lines at all, so there is no work to price
+     * and every work figure is $0.00 (owner, 2026-09-30: an empty bid must
+     * not show the client $0.00). Implies `pricePending`; the document then
+     * says "No work added yet" rather than "Price pending", because nothing
+     * is waiting on a price — the bid is simply empty.
+     */
+    noWork: boolean;
   };
   terms: string | null;
 };
@@ -550,7 +574,9 @@ function buildInvestment(
   totals: BuildProposalInput["totals"],
   salesTax: BuildProposalInput["salesTax"],
   taxExemptReason: string | null | undefined,
-  expenseLines: readonly { name: string; amount: number }[] = []
+  expenseLines: readonly { name: string; amount: number }[],
+  pricePending: boolean,
+  noWork: boolean
 ): ProposalDocument["investment"] {
   const workTotal = totals.workPrice ?? totals.finalPrice;
   const expensesTotal = sumExpenses(expenseLines);
@@ -561,7 +587,14 @@ function buildInvestment(
   /** Work + charges. What tax sits under, and the price before tax. */
   const subtotal = roundMoney(workTotal + expensesTotal);
   const includesIndirect = totals.overheadAmount > 0 || totals.profitAmount > 0;
-  const base = { subtotal, workTotal, expenses, includesIndirect };
+  const base = {
+    subtotal,
+    workTotal,
+    expenses,
+    includesIndirect,
+    pricePending,
+    noWork,
+  };
 
   if (salesTax?.status === "exempt") {
     return {
@@ -600,6 +633,28 @@ function buildInvestment(
   };
 }
 
+/** What the document prints where a short figure would otherwise be. */
+export const PRICE_PENDING = "Price pending";
+
+/** What it prints instead when the bid has no lines at all. */
+export const NO_WORK_YET = "No work added yet";
+
+/**
+ * A figure worked out from the bid's price, as the client's document shows it:
+ * the amount, or "Price pending" while anything on the bid is not priced, or
+ * "No work added yet" while the bid has no lines. Every such figure goes
+ * through here, so no layout can print a short one or a $0.00 for an empty
+ * bid. Expense lines and an exempt $0 tax line are exact and do not.
+ */
+export function clientFigure(
+  investment: Pick<ProposalDocument["investment"], "pricePending" | "noWork">,
+  amount: number,
+  format: (value: number) => string
+): string {
+  if (investment.noWork) return NO_WORK_YET;
+  return investment.pricePending ? PRICE_PENDING : format(amount);
+}
+
 export function buildProposal(input: BuildProposalInput): ProposalDocument {
   const {
     bid,
@@ -612,9 +667,16 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
     expenses = [],
     scopeNotes = [],
     mode = "full",
+    notPriced,
   } = input;
 
   const inclusions = groupScopeNotes(scopeNotes);
+  // Scope-only prints no money, so nothing on it can be short. A bid with no
+  // lines is pending too: its total is a true $0.00 for work nobody has added,
+  // which a client reads as a price.
+  const noWork = mode === "full" && input.lines.length === 0;
+  const pricePending =
+    noWork || (mode === "full" && (notPriced.lines > 0 || notPriced.parts > 0));
 
   /**
    * A section appears when the user has not hidden it AND the mode allows it.
@@ -744,7 +806,14 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
     unitPricing,
     mode,
     inclusions,
-    investment: buildInvestment(totals, salesTax, taxExemptReason, expenses),
+    investment: buildInvestment(
+      totals,
+      salesTax,
+      taxExemptReason,
+      expenses,
+      pricePending,
+      noWork
+    ),
     terms: blank(design.termsText) ? null : design.termsText!.trim(),
   };
 }

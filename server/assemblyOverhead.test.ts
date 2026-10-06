@@ -46,9 +46,11 @@ import {
   applyProductivityToHours,
   calculateLineItem,
 } from "../shared/pricing";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const USER = 6363;
+dropFixtureUsersAfterAll([USER]);
 
 const ctxFor = (id: number): TrpcContext =>
   ({

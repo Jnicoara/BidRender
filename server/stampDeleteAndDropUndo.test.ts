@@ -24,8 +24,10 @@ import {
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { dropFieldsOf, restoreDropPatch } from "../client/src/lib/dropUndo";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 9384;
+dropFixtureUsersAfterAll([USER]);
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const caller = () =>

@@ -14,7 +14,9 @@
  * that skipped that step would print an order no user ever sees, which is
  * worse than not checking: it would look like evidence.
  *
- *   pnpm tsx scripts/searchSpotCheck.mts             # the standard sweep
+ *   pnpm tsx scripts/searchSpotCheck.mts             # both sweeps below
+ *   pnpm tsx scripts/searchSpotCheck.mts --standard  # the standard sweep only
+ *   pnpm tsx scripts/searchSpotCheck.mts --counts    # "2 gang box", "3 way" …
  *   pnpm tsx scripts/searchSpotCheck.mts --diff      # raw vs role-ranked
  *   pnpm tsx scripts/searchSpotCheck.mts romex 1900  # ad-hoc queries
  */
@@ -152,10 +154,55 @@ function ranked(query: string, limit = SHOW): string[] {
     .map(row => row.name);
 }
 
+/**
+ * A number followed by a count word — "2 gang box", "3 way", "2 pole 20".
+ *
+ * Its own sweep because the standard one had none of these, and on
+ * 2026-09-29 a catalog change (the hub-sized weatherproof boxes, 8c5c478)
+ * pushed Double-gang box out of the top five for "2 gang box" with the
+ * standard sweep unchanged. A count number was matched inside sizes ("2" in
+ * `1/2"`). Run with --counts; the standard run includes it too.
+ */
+const COUNT_SWEEP = [
+  ...["1", "2", "3", "4", "5"].flatMap(n => [`${n} gang`, `${n} gang box`]),
+  "2 gang plate",
+  "3 gang plate",
+  "2 gang mud ring",
+  ...["1", "2", "3"].flatMap(n => [`${n} pole`, `${n} pole breaker`]),
+  "1 pole 20",
+  "2 pole 20",
+  "2 pole 30",
+  "3 pole 60",
+  "3 way",
+  "3 way switch",
+  "4 way",
+  "4 way switch",
+  ...["1", "2", "3", "5"].flatMap(n => [`${n} hole`, `${n} hole strap`]),
+  "3 hole box",
+  "2 head",
+  "2 light",
+  "3 light",
+  "20 space",
+  "30 space",
+  "40 space",
+  "42 space",
+  "20 space panel",
+  "2 circuit",
+  "4 circuit",
+];
+
 const args = process.argv.slice(2);
 const diff = args.includes("--diff");
-const given = args.filter(a => a !== "--diff");
-const queries = given.length ? given : SWEEP;
+const counts = args.includes("--counts");
+const standard = args.includes("--standard");
+const given = args.filter(a => !a.startsWith("--"));
+const queries = given.length
+  ? given
+  : counts
+    ? COUNT_SWEEP
+    : standard
+      ? SWEEP
+      : [...SWEEP, ...COUNT_SWEEP];
 
 if (diff) {
   let changed = 0;

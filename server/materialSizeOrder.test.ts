@@ -435,8 +435,13 @@ describe("the real catalog", () => {
     // "EMT strap" is the plain wall strap and is genuinely one-size-fits-most,
     // unlike the strut straps which are sized per trade size. It sorts to the
     // end of its category by name, which is right. "Reducing washer set"
-    // (2026-09-25) is a mixed set of step-downs, not one size.
-    const GENUINELY_UNSIZED = new Set(["EMT strap", "Reducing washer set"]);
+    // (2026-09-25) is a mixed set of step-downs, not one size. "Roof flashing
+    // boot" (2026-09-29) is a cone cut to fit the conduit it seals.
+    const GENUINELY_UNSIZED = new Set([
+      "EMT strap",
+      "Reducing washer set",
+      "Roof flashing boot",
+    ]);
 
     const sizeNamed = BASELINE_MATERIALS.filter(
       m =>

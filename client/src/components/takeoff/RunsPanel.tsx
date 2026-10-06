@@ -10,20 +10,180 @@
  * Circuit rows follow CLAUDE.md § Editing fields via InlineNumberField —
  * conductor counts are exactly the sort of number someone types down a column.
  */
-import { markAppearance, markPath } from "@shared/takeoffMarks";
-import { Fragment, useState } from "react";
+import {
+  NEW_FILL_OPACITY,
+  letterFit,
+  markAppearance,
+  markPath,
+} from "@shared/takeoffMarks";
+import type { PinStyle } from "@shared/pinLetters";
+import { Fragment, useEffect, useRef, useState } from "react";
+import {
+  AssemblySearchList,
+  type SearchableAssembly,
+} from "./AssemblySearchList";
 import { layoutLegs } from "@/lib/runLegs";
+import { PANEL_TAB_LABELS, sheetLine, type PanelTab } from "@/lib/panelTabs";
 import { cn } from "@/lib/utils";
 import { money } from "@/lib/money";
 import {
   Check,
+  Link2,
   Plus,
   Sparkles,
   Trash2,
   TriangleAlert,
+  Undo2,
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { UndoSubject } from "@/lib/undoStack";
+import {
+  emptiedCardIndex,
+  type EmptiedCountCard,
+} from "@/lib/emptiedCountCard";
+
+/**
+ * A card's undo arrow. Always drawn, so the card does not change shape as the
+ * stack moves; enabled only when the newest step on the bid is about this
+ * card, and its tooltip names that step.
+ */
+function CardUndo({
+  subject,
+  cardUndo,
+  onCardUndo,
+}: {
+  subject: UndoSubject;
+  cardUndo?: (subject: UndoSubject) => { label: string } | null;
+  onCardUndo?: () => void;
+}) {
+  if (!cardUndo || !onCardUndo) return null;
+  const step = cardUndo(subject);
+  const title = step
+    ? `Undo: ${step.label}`
+    : "Nothing to undo here — the last change was somewhere else";
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-6 w-6 p-0 shrink-0 text-muted-foreground"
+      disabled={!step}
+      onClick={e => {
+        e.stopPropagation();
+        onCardUndo();
+      }}
+      title={title}
+      aria-label={title}
+    >
+      <Undo2 className="w-3 h-3" />
+    </Button>
+  );
+}
+/**
+ * The swatch IS the legend. It draws the same shape, colour and letter as the
+ * marks on the drawing, from the same function and the same per-bid map — a
+ * panel that showed a yellow circle for every count would be worse than no
+ * swatch at all, because it would assert a sameness the drawing contradicts.
+ * One component for the live card and the emptied one, so they cannot drift.
+ *
+ * Fixed at 20px rather than clamped: this one is on the screen, not on the
+ * paper, so it has no zoom to fight.
+ */
+function CountSwatch({
+  groupId,
+  assemblyId,
+  assemblyCategory,
+  pins,
+  className,
+}: {
+  groupId: number | null;
+  assemblyId: number | null;
+  assemblyCategory: string | null;
+  pins?: ReadonlyMap<number, PinStyle>;
+  className?: string;
+}) {
+  const { shape, color, letter } = markAppearance(
+    { groupId, assemblyId, assemblyCategory },
+    pins
+  );
+  return (
+    <svg
+      width={20}
+      height={20}
+      viewBox="0 0 20 20"
+      className={cn("shrink-0", className)}
+      aria-hidden="true"
+    >
+      <path
+        d={markPath(shape, 10, 10, 8)}
+        fill={color}
+        fillOpacity={NEW_FILL_OPACITY}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {letter && (
+        <text
+          x={10}
+          y={10 + letterFit(shape, 8, letter).dy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={letterFit(shape, 8, letter).size}
+          fontWeight={700}
+          className="fill-foreground"
+        >
+          {letter}
+        </text>
+      )}
+    </svg>
+  );
+}
+
+/**
+ * A count card whose last mark on this sheet was just deleted. Same swatch,
+ * same name and same undo arrow as the live card, in the same place, so the
+ * way back is where the delete was (@/lib/emptiedCountCard). It goes as soon
+ * as anything newer happens.
+ */
+function EmptiedCountRow({
+  card,
+  pins,
+  cardUndo,
+  onCardUndo,
+}: {
+  card: EmptiedCountCard;
+  pins?: ReadonlyMap<number, PinStyle>;
+  cardUndo?: (subject: UndoSubject) => { label: string } | null;
+  onCardUndo?: () => void;
+}) {
+  return (
+    <div className="border-b border-border px-3 py-2 bg-muted/30">
+      <div className="flex items-center gap-2">
+        <CountSwatch
+          groupId={card.groupId}
+          assemblyId={card.assemblyId}
+          assemblyCategory={card.assemblyCategory}
+          pins={pins}
+          className="opacity-50"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm truncate text-muted-foreground">{card.label}</p>
+          <p className="text-xs text-muted-foreground">
+            None left on this sheet — undo puts them back
+          </p>
+        </div>
+        <span className="font-mono text-sm tabular-nums text-muted-foreground">
+          0
+        </span>
+        <CardUndo
+          subject={{ kind: "count", id: card.groupId }}
+          cardUndo={cardUndo}
+          onCardUndo={onCardUndo}
+        />
+      </div>
+    </div>
+  );
+}
 import {
   CableIcon,
   ConduitIcon,
@@ -37,6 +197,7 @@ import {
   groundSentence,
   newCircuitFor,
   nextCircuitName,
+  typeCarriesWire,
   suggestAfter,
 } from "@/lib/runCircuits";
 import { runAppearance, type RunTypeColors } from "@shared/takeoffMarks";
@@ -61,10 +222,15 @@ export type RunExtrasPatch = {
   makeupByKindInches?: Record<string, number> | null;
 };
 import { verticalsNotice } from "@shared/takeoffHeights";
-import { FITTING_KIND_LABELS, type FittingKind } from "@shared/runFittings";
+import { unmatchedKindWords, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 import type { TraceMode } from "@shared/traceMode";
 import type { RunTotalsLeftOut } from "@shared/runOnBid";
+import {
+  statusSplitText,
+  unpricedStatusNote,
+  type StatusSplit,
+} from "@shared/markStatus";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -129,16 +295,16 @@ function RunPullPoints({
 }) {
   const where = (place: "corner" | "end-drop") =>
     place === "end-drop" ? "at the top of the drop" : "at this corner";
-  const button = "h-6 px-2 text-[0.7rem]";
+  const button = "h-6 px-2 text-xs";
   return (
     <div className="mt-2 pt-2 border-t border-border/60 space-y-1.5">
       {bends.summary && (
-        <p className="text-[0.7rem] text-muted-foreground leading-snug">
+        <p className="text-xs text-muted-foreground leading-snug">
           {bends.summary}
         </p>
       )}
       {bends.overLimit.map(line => (
-        <p key={line} className="text-[0.7rem] text-[#F5C518] leading-snug">
+        <p key={line} className="text-xs text-warning leading-snug">
           {line}
         </p>
       ))}
@@ -158,7 +324,7 @@ function RunPullPoints({
               key={`${p.place}:${p.x}:${p.y}`}
               className="rounded border border-dashed border-[#F5C518]/60 px-2 py-1.5 space-y-1"
             >
-              <p className="text-[0.7rem] leading-snug">
+              <p className="text-xs leading-snug">
                 <span className="text-[#F5C518] font-medium">
                   Pull point proposed
                 </span>{" "}
@@ -216,7 +382,7 @@ function RunPullPoints({
           key={`accepted-${a.answerId}`}
           className="flex items-center justify-between gap-2"
         >
-          <p className="text-[0.7rem] leading-snug">
+          <p className="text-xs leading-snug">
             {a.kind === "lb" ? "LB" : "Pull box"} added {where(a.place)}.
           </p>
           <Button
@@ -226,7 +392,9 @@ function RunPullPoints({
             disabled={busy}
             onClick={() => onUndo(a.answerId)}
           >
-            Undo
+            {/* Not "Undo": that word is the toolbar's stack, and this only
+                takes back this one answer (plan § 1.2 g, audit #26). */}
+            Take back
           </Button>
         </div>
       ))}
@@ -238,7 +406,7 @@ function RunPullPoints({
             key={`dismissed-${p.answer!.id}`}
             className="flex items-center justify-between gap-2"
           >
-            <p className="text-[0.7rem] text-muted-foreground leading-snug">
+            <p className="text-xs text-muted-foreground leading-snug">
               Pull point dismissed {where(p.place)}.
             </p>
             <Button
@@ -248,7 +416,7 @@ function RunPullPoints({
               disabled={busy}
               onClick={() => onUndo(p.answer!.id)}
             >
-              Undo
+              Take back
             </Button>
           </div>
         ))}
@@ -292,6 +460,19 @@ export type PanelRun = {
     conductorCount: number | null;
     groundCount: number | null;
   } | null;
+  /**
+   * The bid would price this run's wire and there is none — from the
+   * server, through shared/runNoWire.ts, so the row and the bid agree.
+   */
+  noWire?: boolean;
+  /** Ends that may be double-click stubs, to check (shared/runBends.ts). */
+  stubsToReview?: {
+    end: "start" | "end";
+    vertex: number;
+    segmentPoints: number;
+    degrees: number;
+    point: { x: number; y: number };
+  }[];
   pathType: "conduit" | "cable";
   status: "draft" | "committed";
   isSuggestion: boolean;
@@ -491,7 +672,7 @@ function Footage({
           (seen on screen, 2026-09-29). */}
       {extra > 0 && (
         <div
-          className="text-right text-[0.7rem] text-muted-foreground/80"
+          className="text-right text-xs text-muted-foreground/80"
           title="Extra is bought but not installed, so it carries no install hours. Makeup is installed and does."
         >
           labor on {exact(installed)} ft
@@ -535,7 +716,7 @@ function TypedLength({
   if (!shown) {
     return (
       <button
-        className="mt-1 text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        className="mt-1 text-xs text-muted-foreground underline hover:text-foreground"
         onClick={e => {
           e.stopPropagation();
           setOpen(true);
@@ -563,7 +744,7 @@ function TypedLength({
           className="w-24"
         />
       </div>
-      <p className="text-[0.7rem] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Flat length only — drops and extra are added on top.
         {typedInches !== null && drawn !== null && (
           <> The drawn line measures {exact(drawn)} ft.</>
@@ -632,7 +813,7 @@ function RunExtrasEditor({
   if (!open && !differs) {
     return (
       <button
-        className="mt-1 block text-[0.7rem] text-muted-foreground underline hover:text-foreground"
+        className="mt-1 block text-xs text-muted-foreground underline hover:text-foreground"
         onClick={e => {
           e.stopPropagation();
           setOpen(true);
@@ -670,7 +851,7 @@ function RunExtrasEditor({
 
   return (
     <div className="mt-1.5 space-y-0.5" onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-between text-[0.7rem]">
+      <div className="flex items-center justify-between text-xs">
         <span className="font-medium">
           Extra and makeup{differs ? " — differs from its type" : ""}
         </span>
@@ -808,6 +989,12 @@ export type GroupBridgeState = {
   onBid: boolean;
   /** Can go over now. False covers "no price" and "not built yet" alike. */
   sendable: boolean;
+  /**
+   * Counted by name, with no assembly behind it (kinds `plain` and `typed`).
+   * The card then offers "Link assembly" — legend plan § 8a. Optional so a
+   * caller that never offers linking need not say.
+   */
+  byNameOnly?: boolean;
 };
 
 export type PanelStampGroup = {
@@ -815,7 +1002,12 @@ export type PanelStampGroup = {
   groupId: number | null;
   assemblyId: number | null;
   name: string;
+  /** NEW marks — priced (shared/markStatus.ts). */
   count: number;
+  /** Every mark on this sheet, whatever its status. */
+  placed: number;
+  /** How many of each status, for the words on the card. */
+  split: StatusSplit;
   stamps: {
     id: number;
     x: number;
@@ -885,9 +1077,12 @@ function resendSentence(resend: NonNullable<ResendPreview>): string {
   return `On Send: ${parts.join(", ")}`;
 }
 
-/** "Couplings", "90° elbows" — from the one table the server words with too. */
+/**
+ * "Couplings", "90° bends" — shown only where no part matched (a matched row
+ * shows the part's own name), so it reads as the server's unmatched lines do.
+ */
 function fittingLabel(role: FittingKind): string {
-  const many = FITTING_KIND_LABELS[role].many;
+  const many = unmatchedKindWords(role).many;
   return many.charAt(0).toUpperCase() + many.slice(1);
 }
 
@@ -897,7 +1092,11 @@ export type RunTypeBridgeEntry = {
   /** For the swatch: the line style this type is drawn in. */
   pathType: "conduit" | "cable";
   rows: RunTypeBridgeRow[];
-  /** Conduit types only; empty on a cable type. */
+  /**
+   * Every conduit fitting on a conduit type; on a cable type, the box and
+   * cover at its tees (`cableTeeRows`) and, on MC, its connectors and straps
+   * (`cableRunRows`) — both since 2026-09-29.
+   */
   fittings: RunTypeBridgeFitting[];
   /** Runs of this type nobody has answered the branch-wiring question for. */
   unansweredCount: number;
@@ -915,6 +1114,39 @@ export type RunTypeBridgeEntry = {
   quantityFeet: number;
 };
 
+/**
+ * "This sheet: 3 marks · 6 items · 358 ft of runs" — the panel's pinned line,
+ * and on the phone the bar under the drawing too. ONE component for both, so
+ * the two can never count differently (CLAUDE.md § Copying a layout does not
+ * copy the behaviour).
+ */
+export function ThisSheetLine({
+  stampGroups,
+  runs,
+  className,
+}: {
+  stampGroups: readonly { placed: number }[];
+  runs: readonly {
+    runTypeId: number | null;
+    isSuggestion: boolean;
+    quantities: { runFeet: number } | null;
+  }[];
+  className?: string;
+}) {
+  return (
+    <p className={className}>
+      {sheetLine({
+        counts: stampGroups,
+        runs: runs.map(r => ({
+          runTypeId: r.runTypeId,
+          isSuggestion: r.isSuggestion,
+          feet: r.quantities?.runFeet ?? null,
+        })),
+      })}
+    </p>
+  );
+}
+
 export function RunsPanel({
   runs,
   totals,
@@ -923,6 +1155,12 @@ export function RunsPanel({
   selectedRunId,
   onSelectRun,
   onRemoveRun,
+  onDeleteCountMarks,
+  onDeleteCount,
+  onOpenPartialEnds,
+  cardUndo,
+  onCardUndo,
+  emptiedCount = null,
   onCommitRun,
   onAcceptSuggestion,
   onAddCircuit,
@@ -933,10 +1171,21 @@ export function RunsPanel({
   waitingToSend,
   countedWithNoPrice,
   onSendToBid,
+  linkAssemblies,
+  onLinkAssembly,
   sendingGroupId,
   onJumpTo,
   onRemoveStamp,
   legend,
+  reader,
+  summary,
+  tab,
+  tabs,
+  onTab,
+  warnedTabs,
+  phone = false,
+  onSheetsSlot,
+  focusGroupId,
   renderRunEnds,
   renderRunType,
   onAnswerBranchWiring,
@@ -956,10 +1205,27 @@ export function RunsPanel({
   pullPointBusy = false,
   onAddLeg,
   runColors,
+  pins,
   hideOtherRuns,
   onToggleHideOtherRuns,
+  lookEditor,
 }: {
   runs: PanelRun[];
+  /**
+   * Each count's letter and first-use colour on this bid — the SAME map the
+   * drawing reads (shared/pinLetters.ts), so a card's swatch is its pins.
+   */
+  pins?: ReadonlyMap<number, PinStyle>;
+  /**
+   * Wraps a count's swatch in the pin-look editor (PinLookEditor), or
+   * returns it unchanged. A render prop so the save lives with the page's
+   * other mutations and its refresh helper.
+   */
+  lookEditor?: (
+    groupId: number,
+    name: string,
+    swatch: React.ReactNode
+  ) => React.ReactNode;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
   runColors: RunTypeColors;
   /**
@@ -1041,13 +1307,43 @@ export function RunsPanel({
   countedWithNoPrice?: number;
   waitingToSend?: number;
   onSendToBid?: (groupId: number) => void;
+  /**
+   * The library, for "Link assembly" on a count made by name (§ 8a). Both
+   * this and `onLinkAssembly` must be given for the control to appear.
+   */
+  linkAssemblies?: SearchableAssembly[];
+  onLinkAssembly?: (groupId: number, assemblyId: number) => void;
   /** The count currently crossing, so its own control can say so. */
   sendingGroupId?: number | null;
   /** Move the viewer to a mark on the drawing and highlight it. */
   onJumpTo: (at: { x: number; y: number }) => void;
   onRemoveStamp: (id: number) => void;
-  /** The legend panel, rendered beneath the list. */
+  /** The Legend tab: layers and captured symbols. */
   legend?: React.ReactNode;
+  /** The Reader tab's content, when the reader exists (§ 1 rule 6). */
+  reader?: React.ReactNode;
+  /**
+   * Which tab is open, and the ones offered. Held by the page, not here,
+   * because selecting on the DRAWING opens a tab (§ 1 rule 4) and the
+   * drawing is not in this component.
+   */
+  tab: PanelTab;
+  tabs: readonly PanelTab[];
+  onTab: (tab: PanelTab) => void;
+  /** Tabs with something in them that needs a look (§ 1 rule 5). */
+  warnedTabs: ReadonlySet<PanelTab>;
+  /** The phone layout: finger-sized tabs (plan § 3). */
+  phone?: boolean;
+  /** The element the phone's Sheets tab lends to the sheet list. */
+  onSheetsSlot?: (el: HTMLElement | null) => void;
+  /** The count whose marks were just selected on the drawing, to show. */
+  focusGroupId?: number | null;
+  /**
+   * The whole-set summary (TakeoffSummaryPanel), where the one grey "N counts
+   * are not on the bid yet" line used to be. A node, like `legend`: it owns
+   * its query and the Send all mutation.
+   */
+  summary?: React.ReactNode;
   /**
    * The ends editor for the open run. A render prop for the same reason
    * `legend` is one: this panel takes data and gives back clicks, and the
@@ -1102,6 +1398,26 @@ export function RunsPanel({
   selectedRunId: number | null;
   onSelectRun: (id: number | null) => void;
   onRemoveRun: (id: number) => void;
+  /**
+   * A count card's trash: delete that count's marks on THIS sheet. The count
+   * itself stays, and its bid line follows. More than one asks first.
+   */
+  onDeleteCountMarks?: (marks: { id: number; name: string }[]) => void;
+  /** Delete the whole count, every sheet — the page asks first. */
+  onDeleteCount?: (groupId: number) => void;
+  /** "Set ends": open the first run with one end not counted. */
+  onOpenPartialEnds?: () => void;
+  /**
+   * A card's own undo arrow (@/lib/undoStack `undoForSubject`): the step it
+   * would take back, named, or null when the newest step is not about it.
+   */
+  cardUndo?: (subject: UndoSubject) => { label: string } | null;
+  onCardUndo?: () => void;
+  /**
+   * The count whose last mark on this sheet was just deleted, kept in its
+   * place with its undo arrow (@/lib/emptiedCountCard). Null otherwise.
+   */
+  emptiedCount?: EmptiedCountCard | null;
   onCommitRun: (id: number) => void;
   onAcceptSuggestion: (id: number) => void;
   onAddCircuit: (
@@ -1122,6 +1438,36 @@ export function RunsPanel({
 }) {
   const [addingTo, setAddingTo] = useState<number | null>(null);
   const [circuitName, setCircuitName] = useState("");
+  /** The count whose "which assembly?" search is open, if any. */
+  const [linkingGroupId, setLinkingGroupId] = useState<number | null>(null);
+
+  /*
+    BRING THE SELECTION INTO VIEW (§ 1 rule 4). Opening the Runs tab for a
+    run picked on the drawing is not enough when its row is 1,700px down the
+    list under the traced footage — measured on the fixture, 2026-09-30. Only
+    when the row is out of view, so a row clicked in the panel itself does
+    not jump. `scrollTop` rather than scrollIntoView: it moves this scroller
+    only, never the page around it.
+  */
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const selector =
+      tab === "runs" && selectedRunId !== null
+        ? `[data-run-row="${selectedRunId}"]`
+        : tab === "counts" && focusGroupId != null
+          ? `[data-count-card="${focusGroupId}"]`
+          : null;
+    if (!selector) return;
+    const row = scroller.querySelector<HTMLElement>(selector);
+    if (!row) return;
+    const view = scroller.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    if (at.top >= view.top && at.top < view.bottom - 40) return;
+    scroller.scrollTop += at.top - view.top;
+  }, [tab, selectedRunId, focusGroupId]);
+  const emptiedAt = emptiedCardIndex(stampGroups.length, emptiedCount);
 
   /**
    * Add one circuit and stay ready for the next one.
@@ -1140,13 +1486,83 @@ export function RunsPanel({
 
   return (
     <div className="h-full flex flex-col bg-card border-l border-border min-h-0">
-      <div className="px-3 py-2 border-b border-border shrink-0">
-        <div className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
-          <Zap className="w-3 h-3" /> Counted items
-          <span className="ml-auto normal-case tracking-normal">
-            {stampGroups.reduce((n, g) => n + g.count, 0) + runs.length}
-          </span>
-        </div>
+      {/*
+        TABS — one box at a time (references/track-b-phone-and-readability-plan.md
+        § 1). A strip that scrolls sideways if it ever runs out of width; it
+        never wraps to two rows. A tab with a warning inside it carries the
+        mark on the tab itself, because a warning in a closed tab is unseen.
+      */}
+      <div
+        role="tablist"
+        aria-label="Plan panel"
+        // A swipeable strip on purpose, never a page that scrolls sideways
+        // (the device audit exempts exactly this attribute).
+        data-sideways-ok
+        // No visible scrollbar: on a desktop browser at phone width it drew
+        // a 14px bar under the tabs (seen 2026-09-30); the strip still swipes.
+        className="flex shrink-0 overflow-x-auto border-b border-border [scrollbar-width:none]"
+      >
+        {tabs.map(t => {
+          const active = t === tab;
+          const warned = warnedTabs.has(t);
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onTab(t)}
+              title={
+                warned ? `${PANEL_TAB_LABELS[t]} — needs a look` : undefined
+              }
+              /*
+                NO `transition-colors`, on purpose. It was here first, and in
+                a background tab a transition never advances, so the strip
+                held the PREVIOUS tab's underline over the new tab's content
+                — seen on screen 2026-09-30. Which tab is open must never be
+                one frame behind.
+              */
+              className={cn(
+                // px-1.5, not more: all five must fit the panel's 280px
+                // minimum, or Totals — the tab most likely to carry the
+                // warning mark — is the one scrolled out of sight. A
+                // finger's 44px on the phone (takeoff-spec ground rule 2).
+                "flex-1 min-w-fit flex items-center justify-center gap-1 px-1.5 text-xs border-b-2 whitespace-nowrap",
+                phone ? "h-11 text-sm px-2.5" : "h-9",
+                active
+                  ? "border-[#F5C518] text-foreground font-medium"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {PANEL_TAB_LABELS[t]}
+              {warned && (
+                <TriangleAlert
+                  className="w-3 h-3 text-warning shrink-0"
+                  aria-label="needs a look"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/*
+        PINNED, above every tab and never scrolling (§ 1 rule 3, answer 6).
+        It replaced "Counted items 9", which added this sheet's marks to its
+        runs and so counted nothing.
+      */}
+      <div className="px-3 py-1.5 border-b border-border shrink-0 text-xs">
+        <ThisSheetLine
+          stampGroups={stampGroups}
+          runs={runs}
+          className="text-foreground"
+        />
+        {quantitiesLocked && (
+          <p className="text-muted-foreground mt-0.5">
+            This bid's quantities are locked, so its plans cannot be marked,
+            traced, changed or sent to it. Unlock it on the bid first.
+          </p>
+        )}
       </div>
 
       {/*
@@ -1166,62 +1582,118 @@ export function RunsPanel({
         a wheel that does different things two inches apart, and a legend you
         can only reach by first scrolling something else to the bottom.
       */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto min-h-0">
+        {/*
+          THE PHONE'S SHEETS TAB: the left panel's own sheet list, portalled
+          here (SidePanel `phone.as === "portal"`). Full height, so the list's
+          own scroller is the one scroll area and this one has nothing to do.
+        */}
+        {tab === "sheets" && (
+          <div ref={onSheetsSlot} className="h-full flex flex-col min-h-0" />
+        )}
         {/* Stamped assemblies first: an estimator drops dozens per sheet and
             traces a handful of runs, so the thing they are actively adding to
             stays where they can watch it climb. */}
-        {stampGroups.map(group => (
-          <div
-            key={group.groupId ?? group.assemblyId ?? group.name}
-            className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              {/*
-                The swatch IS the legend. It draws the same shape in the same
-                colour as the marks on the drawing, from the same function —
-                a panel that showed a yellow circle for every count would be
-                worse than no swatch at all, because it would assert a sameness
-                that the drawing contradicts.
-
-                Fixed at 20px here rather than clamped: this one is on the
-                screen, not on the paper, so it has no zoom to fight.
-              */}
-              {(() => {
-                const { shape, color } = markAppearance({
-                  groupId: group.groupId,
-                  assemblyId: group.assemblyId,
-                  assemblyCategory: group.stamps[0]?.assemblyCategory ?? null,
-                });
-                return (
-                  <svg
-                    width={20}
-                    height={20}
-                    viewBox="0 0 20 20"
-                    className="shrink-0"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d={markPath(shape, 10, 10, 8)}
-                      fill={color}
-                      fillOpacity={0.22}
-                      stroke={color}
-                      strokeWidth={2}
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                );
-              })()}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">{group.name}</p>
-                <p className="text-[0.7rem] text-muted-foreground">
-                  {group.count} placed
-                </p>
-              </div>
-              <span className="font-mono text-sm tabular-nums">
-                {group.count}
-              </span>
+        {tab === "counts" &&
+          stampGroups.length === 0 &&
+          !(emptiedAt === 0 && emptiedCount) && (
+            <div className="p-6 text-center">
+              <Zap className="w-7 h-7 mx-auto mb-3 text-muted-foreground/50" />
+              <p className="text-sm font-medium text-muted-foreground">
+                Nothing counted on this sheet yet
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-1.5">
+                Pick something to count from Count in the toolbar, or click a
+                symbol on the Legend tab, then click on the drawing.
+              </p>
             </div>
-            {/*
+          )}
+        {tab === "counts" &&
+          stampGroups.map((group, cardIndex) => (
+            <Fragment key={group.groupId ?? group.assemblyId ?? group.name}>
+              {emptiedAt === cardIndex && emptiedCount && (
+                <EmptiedCountRow
+                  card={emptiedCount}
+                  pins={pins}
+                  cardUndo={cardUndo}
+                  onCardUndo={onCardUndo}
+                />
+              )}
+              <div
+                data-count-card={group.groupId ?? undefined}
+                className="border-b border-border px-3 py-2 hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {/* The swatch IS the legend — see CountSwatch. Opens the
+                      look editor where there is one. */}
+                  {(() => {
+                    const swatch = (
+                      <CountSwatch
+                        groupId={group.groupId}
+                        assemblyId={group.assemblyId}
+                        assemblyCategory={
+                          group.stamps[0]?.assemblyCategory ?? null
+                        }
+                        pins={pins}
+                      />
+                    );
+                    return lookEditor && group.groupId !== null
+                      ? lookEditor(group.groupId, group.name, swatch)
+                      : swatch;
+                  })()}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm truncate">{group.name}</p>
+                    {/*
+                      The split in WORDS (pin plan § 7): a pin's fill does not
+                      survive a printout, and the number beside this is the
+                      NEW marks only — the ones that are priced.
+                    */}
+                    <p className="text-xs">
+                      {statusSplitText(group.split) ?? `${group.placed} placed`}
+                    </p>
+                    {unpricedStatusNote(group.split) && (
+                      <p className="text-[0.7rem] text-amber-600 dark:text-amber-400">
+                        {unpricedStatusNote(group.split)}
+                      </p>
+                    )}
+                  </div>
+                  <span className="font-mono text-sm tabular-nums">
+                    {group.count}
+                  </span>
+                  {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
+                  {group.groupId !== null && (
+                    <CardUndo
+                      subject={{ kind: "count", id: group.groupId }}
+                      cardUndo={cardUndo}
+                      onCardUndo={onCardUndo}
+                    />
+                  )}
+                  {onDeleteCountMarks && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                      disabled={quantitiesLocked || group.stamps.length === 0}
+                      onClick={() =>
+                        onDeleteCountMarks(
+                          group.stamps.map(s => ({
+                            id: s.id,
+                            name: group.name,
+                          }))
+                        )
+                      }
+                      title={
+                        quantitiesLocked
+                          ? "This bid's quantities are locked — unlock them on the bid to delete."
+                          : `Delete the ${group.placed} ${group.name} ${group.placed === 1 ? "mark" : "marks"} on this sheet — the count stays`
+                      }
+                      aria-label={`Delete ${group.name} marks on this sheet`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+                {/*
               Where this count stands with the bid.
 
               Three states and three different things worth saying, all of them
@@ -1234,14 +1706,16 @@ export function RunsPanel({
               a badge on the drawing, which is what level 1's promise of a quiet
               count actually forbids.
             */}
-            {(() => {
-              const state =
-                group.groupId === null ? undefined : bridge?.get(group.groupId);
-              if (!state) return null;
-              if (state.onBid) {
-                return (
-                  <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                    {/*
+                {(() => {
+                  const state =
+                    group.groupId === null
+                      ? undefined
+                      : bridge?.get(group.groupId);
+                  if (!state) return null;
+                  if (state.onBid) {
+                    return (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {/*
                       LOCKED IS SAID HERE, not left to the bid screen.
 
                       This is the screen somebody is standing on while they
@@ -1253,61 +1727,140 @@ export function RunsPanel({
                       did not move. CLAUDE.md § a label describing the OLD
                       meaning.
                     */}
-                    {quantitiesLocked
-                      ? "On the bid — locked, so these marks no longer change it"
-                      : "On the bid — the line follows these marks"}
-                  </p>
-                );
-              }
-              if (!state.sendable || !onSendToBid) return null;
-              const busy = sendingGroupId === group.groupId;
-              return (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onSendToBid(group.groupId as number)}
-                  className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
-                >
-                  {/*
-                    The BID's count, not this sheet's. A count marked across
-                    five sheets sends all of them, and a control reading "Send 5
-                    to bid" beside a panel showing five of fourteen would be
-                    telling the truth about the wrong number.
-                  */}
-                  {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
-                </button>
-              );
-            })()}
-            {/* The drop to each of these devices (held-migrations plan § 3):
-                set once on the count, shown once set. */}
-            {group.groupId !== null &&
-              groupDrops?.get(group.groupId) &&
-              onSetGroupDrop && (
-                <GroupDrop
-                  info={groupDrops.get(group.groupId)!}
-                  heightTypes={dropHeightTypes}
-                  runTypes={dropRunTypes}
-                  locked={quantitiesLocked}
-                  onSet={patch =>
-                    onSetGroupDrop(group.groupId as number, patch)
+                        {quantitiesLocked
+                          ? "On the bid — locked"
+                          : "On the bid — the line follows these marks"}
+                      </p>
+                    );
                   }
-                />
-              )}
-            {/* Walk the instances: each chip jumps the viewer to that mark. */}
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {group.stamps.map((placed, index) => (
-                <button
-                  key={placed.id}
-                  onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
-                  className="px-1.5 py-0.5 rounded text-[0.65rem] font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
-                  title="Show this one on the drawing"
-                >
-                  {index + 1}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+                  // No Send on a locked bid: the server refuses it (lockGuard),
+                  // and the locked notice below says why.
+                  if (quantitiesLocked) return null;
+                  const busy = sendingGroupId === group.groupId;
+                  const canSend = state.sendable && onSendToBid;
+                  /*
+                  LINK AN ASSEMBLY, any time (legend plan § 8a). Offered on a
+                  count made by name and not yet on the bid — the server
+                  refuses one on the bid, whose line was priced there. Not a
+                  nag: one quiet word beside Send, never a badge.
+                */
+                  const canLink =
+                    state.byNameOnly && linkAssemblies && onLinkAssembly;
+                  if (!canSend && !canLink) return null;
+                  return (
+                    <div className="mt-1 flex items-center gap-3">
+                      {canSend && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onSendToBid(group.groupId as number)}
+                          className="text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                        >
+                          {/*
+                        The BID's count, not this sheet's. A count marked across
+                        five sheets sends all of them, and a control reading "Send 5
+                        to bid" beside a panel showing five of fourteen would be
+                        telling the truth about the wrong number.
+                      */}
+                          {busy ? "Sending…" : `Send ${state.bidCount} to bid`}
+                        </button>
+                      )}
+                      {canLink && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setLinkingGroupId(id =>
+                              id === group.groupId ? null : group.groupId
+                            )
+                          }
+                          className="inline-flex items-center gap-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                          title="Choose the assembly this count is — every mark is kept"
+                        >
+                          <Link2 className="w-3 h-3" /> Link assembly…
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+                {linkingGroupId !== null &&
+                  linkingGroupId === group.groupId &&
+                  linkAssemblies &&
+                  onLinkAssembly && (
+                    <div className="mt-1.5 rounded border border-border bg-muted/20 p-2 space-y-1.5">
+                      <p className="text-xs text-muted-foreground">
+                        Which assembly is “{group.name}”? Every mark is kept and
+                        counts it from now on.
+                      </p>
+                      <AssemblySearchList
+                        assemblies={linkAssemblies}
+                        onPick={assembly => {
+                          onLinkAssembly(group.groupId as number, assembly.id);
+                          setLinkingGroupId(null);
+                        }}
+                        onCancel={() => setLinkingGroupId(null)}
+                      />
+                    </div>
+                  )}
+                {/* The drop to each of these devices (held-migrations plan § 3):
+                set once on the count, shown once set. */}
+                {group.groupId !== null &&
+                  groupDrops?.get(group.groupId) &&
+                  onSetGroupDrop && (
+                    <GroupDrop
+                      info={groupDrops.get(group.groupId)!}
+                      heightTypes={dropHeightTypes}
+                      runTypes={dropRunTypes}
+                      locked={quantitiesLocked}
+                      onSet={patch =>
+                        onSetGroupDrop(group.groupId as number, patch)
+                      }
+                    />
+                  )}
+                {/* Walk the instances: each chip jumps the viewer to that mark. */}
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {group.stamps.map((placed, index) => (
+                    <button
+                      key={placed.id}
+                      onClick={() => onJumpTo({ x: placed.x, y: placed.y })}
+                      className="px-1.5 py-0.5 rounded text-xs font-mono bg-muted hover:bg-[#F5C518]/20 hover:text-[#F5C518] transition-colors"
+                      title="Show this one on the drawing"
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                  {/*
+                  The WHOLE count — every mark on every sheet (plan § 1.2
+                  c′). Words, not a second bin beside the first: two bins on
+                  one card, one for this sheet and one for all of them, is a
+                  coin toss. It asks first and names what goes.
+                */}
+                  {onDeleteCount &&
+                    group.groupId !== null &&
+                    !quantitiesLocked &&
+                    !bridge?.get(group.groupId)?.onBid && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteCount(group.groupId as number)}
+                        className="ml-auto text-xs text-muted-foreground hover:text-destructive underline-offset-2 hover:underline"
+                        title="Delete this count and its marks on every sheet — asks first"
+                      >
+                        Delete count…
+                      </button>
+                    )}
+                </div>
+              </div>
+            </Fragment>
+          ))}
+        {tab === "counts" &&
+          emptiedAt === stampGroups.length &&
+          emptiedCount && (
+            <EmptiedCountRow
+              card={emptiedCount}
+              pins={pins}
+              cardUndo={cardUndo}
+              onCardUndo={onCardUndo}
+            />
+          )}
 
         {/*
           Where the takeoff stands with the bid — one line, in one place.
@@ -1349,16 +1902,10 @@ export function RunsPanel({
           does NOT go on the drawing — level 1's promise of a quiet count, and
           § 5f, which forbids a badge on the sheet.
         */}
-        {quantitiesLocked ? (
-          <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
-            This bid's quantities are locked, so nothing you mark or trace
-            changes what is on it. Unlock it on the bid to let the lines follow
-            again.
-          </p>
-        ) : null}
-
-        {stampGroups.length > 0 && waitingToSend !== undefined ? (
-          <p className="px-3 py-2 text-[0.7rem] text-muted-foreground border-b border-border">
+        {tab !== "totals" ? null : summary ? (
+          summary
+        ) : stampGroups.length > 0 && waitingToSend !== undefined ? (
+          <p className="px-3 py-2 text-xs text-muted-foreground border-b border-border">
             {waitingToSend > 0
               ? `${waitingToSend} count${waitingToSend === 1 ? " is" : "s are"} not on the bid yet.`
               : countedWithNoPrice
@@ -1387,9 +1934,9 @@ export function RunsPanel({
           A half-specified type still shows its feet. The measurement is real
           work somebody did; what is missing is only the name to order it under.
         */}
-        {runTypeBridge && runTypeBridge.length > 0 && (
+        {tab === "runs" && runTypeBridge && runTypeBridge.length > 0 && (
           <div className="border-b border-border">
-            <div className="px-3 pt-2.5 pb-1 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+            <div className="px-3 pt-2.5 pb-1 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
               Traced footage
             </div>
             {runTypeBridge.map(entry => {
@@ -1412,7 +1959,7 @@ export function RunsPanel({
                 <div key={entry.runTypeId} className="px-3 pb-2.5">
                   {/* The type's swatch, so this block — and the route /
                       quantity split under it — names its lines on sight. */}
-                  <p className="flex items-center gap-1.5 text-xs font-medium min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-medium min-w-0">
                     <RunTypeSwatch
                       runTypeId={entry.runTypeId}
                       pathType={entry.pathType}
@@ -1424,15 +1971,20 @@ export function RunsPanel({
                     {entry.rows.map(row => (
                       <div key={row.role}>
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-[0.7rem] text-muted-foreground truncate">
+                          <span
+                            className={cn(
+                              "text-sm truncate",
+                              row.materialName === null && "text-warning"
+                            )}
+                          >
                             {row.materialName ?? "Not said what this is"}
                           </span>
-                          <span className="text-[0.7rem] font-mono tabular-nums shrink-0">
+                          <span className="text-sm font-mono tabular-nums shrink-0">
                             {row.feet} ft
                           </span>
                         </div>
                         {row.resend && (
-                          <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                          <p className="text-xs text-warning leading-snug">
                             {resendSentence(row.resend)}
                           </p>
                         )}
@@ -1475,7 +2027,7 @@ export function RunsPanel({
                       // as that row's (seen on screen 2026-09-26).
                       const what = pipe?.materialName ?? "Footage";
                       return (
-                        <p className="mt-0.5 text-[0.65rem] text-muted-foreground leading-snug">
+                        <p className="mt-0.5 text-xs text-muted-foreground leading-snug">
                           {route > 0
                             ? `${what}: ${feet(route)} from routes + ${feet(entry.quantityFeet)} from quantity traces`
                             : `${what}: all ${feet(entry.quantityFeet)} from quantity traces`}
@@ -1493,12 +2045,11 @@ export function RunsPanel({
                           <div className="flex items-baseline justify-between gap-2">
                             <span
                               className={cn(
-                                "text-[0.7rem] truncate",
+                                "text-sm truncate",
                                 fitting.materialName === null &&
                                   fitting.status === "counted" &&
-                                  fitting.qty > 0
-                                  ? "text-[#F5C518]"
-                                  : "text-muted-foreground"
+                                  fitting.qty > 0 &&
+                                  "text-warning"
                               )}
                             >
                               {fitting.materialName ??
@@ -1506,18 +2057,18 @@ export function RunsPanel({
                             </span>
                             <span className="flex items-baseline gap-1.5 shrink-0">
                               {fitting.priced === false && (
-                                <span className="text-[0.65rem] text-[#F5C518]">
+                                <span className="text-xs text-warning">
                                   Not priced
                                 </span>
                               )}
-                              <span className="text-[0.7rem] font-mono tabular-nums">
+                              <span className="text-sm font-mono tabular-nums">
                                 {fitting.status === "counted"
                                   ? (fitting.atLeast ? "≥ " : "") + fitting.qty
                                   : "—"}
                               </span>
                             </span>
                           </div>
-                          <p className="text-[0.65rem] text-muted-foreground/80 leading-snug">
+                          <p className="text-xs text-muted-foreground/80 leading-snug">
                             {fitting.why}
                           </p>
                           {/*
@@ -1527,14 +2078,14 @@ export function RunsPanel({
                             changes money on the bid.
                           */}
                           {fitting.resend && (
-                            <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                            <p className="text-xs text-warning leading-snug">
                               {resendSentence(fitting.resend)}
                             </p>
                           )}
                           {fitting.materialProblem &&
                             fitting.status === "counted" &&
                             fitting.qty > 0 && (
-                              <p className="text-[0.65rem] text-[#F5C518] leading-snug">
+                              <p className="text-xs text-warning leading-snug">
                                 {fitting.materialProblem}
                               </p>
                             )}
@@ -1555,7 +2106,7 @@ export function RunsPanel({
                   ).map(message => (
                     <p
                       key={message}
-                      className="mt-1 text-[0.7rem] text-muted-foreground"
+                      className="mt-1 text-xs text-muted-foreground"
                     >
                       {message}
                     </p>
@@ -1574,7 +2125,7 @@ export function RunsPanel({
                     old meaning, which dropped the pipe too.
                   */}
                   {entry.branchCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {entry.branchCount} run
                       {entry.branchCount === 1 ? " is" : "s are"} branch wiring
                       your devices already include, so{" "}
@@ -1586,7 +2137,7 @@ export function RunsPanel({
                     </p>
                   )}
                   {entry.unansweredCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {entry.unansweredCount} run
                       {entry.unansweredCount === 1 ? " has" : "s have"} devices
                       at both ends and{" "}
@@ -1595,7 +2146,7 @@ export function RunsPanel({
                     </p>
                   )}
                   {entry.unmeasurableCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-[#F5C518]">
+                    <p className="mt-1 text-xs text-warning">
                       {entry.unmeasurableCount} run
                       {entry.unmeasurableCount === 1 ? " is" : "s are"} on a
                       sheet with no scale, so not counted at all.
@@ -1613,14 +2164,10 @@ export function RunsPanel({
                     row, not from the diff.
                   */}
                   {onBidCount > 0 && (
-                    <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {onBidCount} on the bid
                       {quantitiesLocked ? (
-                        <>
-                          {" "}
-                          — locked, so tracing no longer changes{" "}
-                          {onBidCount === 1 ? "it" : "them"}
-                        </>
+                        <> — locked</>
                       ) : (
                         <>
                           {" "}
@@ -1633,12 +2180,14 @@ export function RunsPanel({
                       )}
                     </p>
                   )}
-                  {(sendable.length > 0 || toUpdate > 0) && onSendRunType ? (
+                  {(sendable.length > 0 || toUpdate > 0) &&
+                  onSendRunType &&
+                  !quantitiesLocked ? (
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => onSendRunType(entry.runTypeId)}
-                      className="mt-1 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
+                      className="mt-1 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground disabled:opacity-60"
                     >
                       {busy
                         ? "Sending…"
@@ -1660,17 +2209,17 @@ export function RunsPanel({
           </div>
         )}
 
-        {dropsReadout}
+        {tab === "totals" && dropsReadout}
 
-        {runs.length === 0 && stampGroups.length === 0 ? (
+        {tab !== "runs" ? null : runs.length === 0 ? (
           <div className="p-6 text-center">
             <Zap className="w-7 h-7 mx-auto mb-3 text-muted-foreground/50" />
             <p className="text-sm font-medium text-muted-foreground">
-              Nothing counted yet
+              No runs on this sheet yet
             </p>
             <p className="text-xs text-muted-foreground/70 mt-1.5">
-              Mark an assembly onto the plan, or trace a conduit or cable run.
-              Everything you place appears here as you go.
+              Trace a conduit or cable run on the drawing. Each one appears here
+              as you go, with what it puts on the bid.
             </p>
           </div>
         ) : (
@@ -1689,7 +2238,7 @@ export function RunsPanel({
                 key={`legs-${place.rootId}`}
                 className="flex items-center justify-between gap-2 border-b border-border/60 bg-muted/20 px-3 py-1.5"
               >
-                <span className="text-[0.7rem] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {place.count} legs · run total{" "}
                   <span className="font-mono text-foreground">
                     {place.runTotalFeet === null
@@ -1701,7 +2250,7 @@ export function RunsPanel({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 px-2 text-[0.7rem]"
+                    className="h-6 px-2 text-xs"
                     onClick={() => onAddLeg(run)}
                   >
                     Add leg
@@ -1713,6 +2262,7 @@ export function RunsPanel({
               <Fragment key={run.id}>
                 {header}
                 <div
+                  data-run-row={run.id}
                   className={cn(
                     "border-b border-border px-3 py-2.5 cursor-pointer transition-colors",
                     multi && "pl-6",
@@ -1778,12 +2328,12 @@ export function RunsPanel({
                         are not there. Just the leg.
                       */}
                       {multi && run.traceMode === "quantity" && (
-                        <p className="text-[0.7rem] text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           Leg {place.index}
                         </p>
                       )}
                       {multi && run.traceMode !== "quantity" && (
-                        <p className="text-[0.7rem] text-muted-foreground truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           Leg {place.index}
                           {place.startsAs === "branch"
                             ? // Not "branch": the main's continuation past a
@@ -1797,7 +2347,7 @@ export function RunsPanel({
                             (place.sameCircuitsAsFirst ? (
                               " · same circuits as leg 1"
                             ) : (
-                              <span className="text-[#F5C518]/90">
+                              <span className="text-warning">
                                 {" "}
                                 · circuits differ from leg 1
                               </span>
@@ -1833,10 +2383,10 @@ export function RunsPanel({
                         return (
                           <p
                             className={cn(
-                              "text-[0.7rem] truncate",
+                              "text-xs truncate",
                               run.spec
                                 ? "text-muted-foreground"
-                                : "text-[#F5C518]/80"
+                                : "text-warning"
                             )}
                           >
                             {run.spec ??
@@ -1853,7 +2403,7 @@ export function RunsPanel({
                         {run.traceMode === "quantity" && place.index === 1 && (
                           <Badge
                             variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
+                            className="text-xs px-1.5 py-0 text-muted-foreground"
                             title="Flat footage of this type — no ends, no circuits. Drops are proposed, never assumed."
                           >
                             Quantity
@@ -1862,7 +2412,7 @@ export function RunsPanel({
                         {run.isSuggestion && (
                           <Badge
                             variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 border-[#F5C518]/40 text-[#F5C518]"
+                            className="text-xs px-1.5 py-0 border-[#F5C518]/40 text-[#F5C518]"
                           >
                             <Sparkles className="w-2.5 h-2.5 mr-1" /> Suggested
                           </Badge>
@@ -1870,7 +2420,7 @@ export function RunsPanel({
                         {run.status === "draft" && !run.isSuggestion && (
                           <Badge
                             variant="outline"
-                            className="text-[0.65rem] px-1.5 py-0 text-muted-foreground"
+                            className="text-xs px-1.5 py-0 text-muted-foreground"
                           >
                             Draft
                           </Badge>
@@ -1888,7 +2438,7 @@ export function RunsPanel({
                           return waiting > 0 ? (
                             <Badge
                               variant="outline"
-                              className="text-[0.65rem] px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
+                              className="text-xs px-1.5 py-0 border-dashed border-[#F5C518]/60 text-[#F5C518]"
                             >
                               {waiting === 1
                                 ? "Pull point to review"
@@ -1905,7 +2455,7 @@ export function RunsPanel({
                           onAddLeg &&
                           !run.isSuggestion && (
                             <button
-                              className="text-[0.7rem] underline text-muted-foreground hover:text-foreground"
+                              className="text-xs underline text-muted-foreground hover:text-foreground"
                               onClick={e => {
                                 e.stopPropagation();
                                 onAddLeg(run);
@@ -1916,6 +2466,18 @@ export function RunsPanel({
                           )}
                       </div>
                     </div>
+                    {/* One undo arrow per run, on its first row: every
+                        leg's steps are the run's (D20). */}
+                    {(!multi || place.index === 1) && (
+                      <CardUndo
+                        subject={{
+                          kind: "run",
+                          id: run.parentRunId ?? run.id,
+                        }}
+                        cardUndo={cardUndo}
+                        onCardUndo={onCardUndo}
+                      />
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -1943,6 +2505,12 @@ export function RunsPanel({
                             : `Delete leg ${place.index} only`
                           : undefined
                       }
+                      /*
+                        A locked bid refuses a run delete (server); the bin
+                        says so by being off, rather than offering a click
+                        that will only be refused (plan § 1.2 row d).
+                      */
+                      disabled={quantitiesLocked}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -1970,15 +2538,17 @@ export function RunsPanel({
                   {run.wireOwnership === "unanswered" &&
                     onAnswerBranchWiring && (
                       <div className="mt-1.5 rounded border border-border/60 bg-muted/20 px-2 py-1.5">
-                        <p className="text-[0.7rem] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Devices at both ends — is this the branch wiring your
                           devices already include?
                         </p>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        {/* Wraps: side by side they ran 50px past a 280px
+                            panel, hiding "No" (measured 2026-09-30). */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 px-2 text-[0.7rem]"
+                            className="h-6 px-2 text-xs"
                             onClick={e => {
                               e.stopPropagation();
                               onAnswerBranchWiring(run.id, true);
@@ -1989,7 +2559,7 @@ export function RunsPanel({
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-6 px-2 text-[0.7rem]"
+                            className="h-6 px-2 text-xs"
                             onClick={e => {
                               e.stopPropagation();
                               onAnswerBranchWiring(run.id, false);
@@ -2008,7 +2578,7 @@ export function RunsPanel({
                 */}
                   {run.branchWiring === true &&
                     run.traceMode !== "quantity" && (
-                      <p className="text-[0.7rem] text-muted-foreground mt-1.5">
+                      <p className="text-xs text-muted-foreground mt-1.5">
                         {run.pathType === "conduit"
                           ? "Branch wiring — your devices already include this wire, so it is not counted again. The conduit still is."
                           : "Branch wiring — your devices already include this cable, so it is not counted again."}{" "}
@@ -2029,7 +2599,7 @@ export function RunsPanel({
                   {/* A run that cannot be measured says so instead of showing 0 */}
                   {run.quantities === null ? (
                     <>
-                      <p className="text-xs text-[#F5C518] mt-1.5 flex items-start gap-1.5">
+                      <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 mt-1.5 flex items-start gap-1.5">
                         <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
                         {onSetTypedLength
                           ? "No scale on this sheet, so this run is not in the totals. Type its length to count it."
@@ -2067,7 +2637,7 @@ export function RunsPanel({
                       {/* An extra nobody set whispers (§ 2.3), so the row
                           says it — the totals count these as well. */}
                       {carriesNoExtra(run.quantities) && (
-                        <p className="text-[0.7rem] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           No extra set — Settings › Heights & extra, or this
                           run's own below.
                         </p>
@@ -2121,25 +2691,101 @@ export function RunsPanel({
                           />
                         ) : (
                           <div className="flex items-baseline justify-between text-xs gap-2">
-                            <span className="text-muted-foreground shrink-0">
-                              Wires in this pipe
+                            {/* Amber for the same reason as the route row
+                                below; no one-tap here, because the type is
+                                what says "no wire" and has none to offer. */}
+                            <span
+                              className={cn(
+                                "shrink-0",
+                                run.noWire
+                                  ? "text-warning flex items-center gap-1"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {run.noWire && (
+                                <TriangleAlert className="w-3 h-3" />
+                              )}
+                              {run.noWire
+                                ? "No wire on the bid for this pipe"
+                                : "Wires in this pipe"}
                             </span>
-                            <span className="font-mono text-muted-foreground/70">
-                              none — the type says no wire
+                            <span
+                              className={cn(
+                                "font-mono",
+                                run.noWire
+                                  ? "text-warning"
+                                  : "text-muted-foreground/70"
+                              )}
+                            >
+                              the type says no wire
                             </span>
                           </div>
                         ))}
                       {run.pathType === "conduit" &&
                         run.traceMode !== "quantity" &&
                         (run.circuits.length === 0 ? (
-                          <div className="flex items-baseline justify-between text-xs gap-2">
-                            <span className="text-muted-foreground shrink-0">
-                              Wires in this pipe
+                          <div
+                            className={cn(
+                              "flex items-baseline justify-between text-xs gap-2",
+                              // The warning takes its own line and the two
+                              // fixes sit under it: side by side in a 400px
+                              // panel the one-tap wrapped in two (seen on
+                              // screen, 2026-09-29).
+                              run.noWire && "flex-wrap justify-start gap-y-1"
+                            )}
+                          >
+                            {/*
+                              AMBER when the bid would price this run's wire
+                              and there is none (shared/runNoWire.ts). It used
+                              to be a grey "none", which read as a quiet fact
+                              rather than as pipe going on the bid empty. Grey
+                              stays for a run whose wire is left out on
+                              purpose (branch wiring, no type).
+                            */}
+                            <span
+                              className={cn(
+                                "shrink-0",
+                                run.noWire
+                                  ? "text-warning flex items-center gap-1 basis-full"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {run.noWire ? (
+                                <>
+                                  <TriangleAlert className="w-3 h-3" />
+                                  No wire on the bid for this pipe
+                                </>
+                              ) : (
+                                "Wires in this pipe"
+                              )}
                             </span>
                             <span className="flex items-baseline gap-2">
-                              <span className="font-mono text-muted-foreground/70">
-                                none
-                              </span>
+                              {!run.noWire && (
+                                <span className="font-mono text-muted-foreground/70">
+                                  none
+                                </span>
+                              )}
+                              {/*
+                                The one-tap fix (owner, 2026-09-29): the type's
+                                own wire as one circuit. Offered, never done by
+                                itself — no silent default — and only when the
+                                type says what wire it carries.
+                              */}
+                              {run.noWire &&
+                                typeCarriesWire(run.typeDefaults ?? null) && (
+                                  <button
+                                    className="underline text-warning hover:text-foreground"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      addOneCircuit(
+                                        run,
+                                        nextCircuitName(run.circuits)
+                                      );
+                                    }}
+                                  >
+                                    Use the run type's wire
+                                  </button>
+                                )}
                               <button
                                 className="underline text-muted-foreground hover:text-foreground"
                                 onClick={e => {
@@ -2226,6 +2872,36 @@ export function RunsPanel({
                       )}
 
                       {/*
+                        A possible double-click stub that bought an elbow
+                        (owner, 2026-09-29): LISTED for the estimator to
+                        check, never changed — the points are theirs. Amber,
+                        because if it is a stub the elbow on the bid is one
+                        nobody drew. shared/runBends.ts `stubsToReview`.
+                      */}
+                      {(run.stubsToReview ?? []).map(stub => (
+                        <div
+                          key={`${stub.end}-${stub.vertex}`}
+                          className="flex items-start gap-1.5 text-xs text-warning"
+                        >
+                          <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                          <span className="flex-1">
+                            Check this elbow: the run&apos;s {stub.end} is a
+                            very short segment that turns{" "}
+                            {Math.round(stub.degrees)}°. It may be a slipped
+                            double-click rather than a corner.
+                          </span>
+                          <button
+                            className="underline shrink-0 hover:text-foreground"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onJumpTo(stub.point);
+                            }}
+                          >
+                            Show
+                          </button>
+                        </div>
+                      ))}
+                      {/*
                       An incomplete total has to shout, and a HALF total is
                       incomplete. An unset height makes a run quietly low and
                       nothing on screen says so — the same argument § 2.3 makes
@@ -2262,7 +2938,7 @@ export function RunsPanel({
                           the "copying a layout does not copy the behaviour"
                           trap in CLAUDE.md arriving as typography.
                         */}
-                          <span className="text-[0.7rem] text-[#F5C518] text-left">
+                          <span className="text-xs text-warning text-left">
                             {verticalsNotice(run.quantities?.verticals)}
                           </span>
                         </div>
@@ -2271,7 +2947,7 @@ export function RunsPanel({
                   )}
 
                   {run.scaleChangedSinceTraced && (
-                    <p className="text-[0.7rem] text-[#F5C518] mt-1">
+                    <p className="text-xs text-warning mt-1">
                       The sheet's scale changed since this was traced — check
                       the length.
                     </p>
@@ -2296,7 +2972,7 @@ export function RunsPanel({
                     ) && (
                       <button
                         type="button"
-                        className="mt-1.5 text-[0.7rem] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                        className="mt-1.5 text-xs underline underline-offset-2 text-muted-foreground hover:text-foreground"
                         aria-pressed={hideOtherRuns}
                         onClick={e => {
                           e.stopPropagation();
@@ -2326,7 +3002,7 @@ export function RunsPanel({
                   */}
                   {isSelected && onSetTraceMode && !run.isSuggestion && (
                     <p
-                      className="mt-2 text-[0.7rem] text-muted-foreground"
+                      className="mt-2 text-xs text-muted-foreground"
                       onClick={e => e.stopPropagation()}
                     >
                       {run.traceMode === "quantity"
@@ -2406,7 +3082,7 @@ export function RunsPanel({
                               className="h-6 w-12 text-xs"
                               ariaLabel={`Conductors for ${circuit.name}`}
                             />
-                            <span className="text-[0.7rem] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               cond.
                             </span>
                             {/*
@@ -2450,10 +3126,10 @@ export function RunsPanel({
                                 })
                               }
                               className={cn(
-                                "text-[0.7rem] rounded px-1 py-0.5 border transition-colors",
+                                "text-xs rounded px-1 py-0.5 border transition-colors",
                                 circuit.separateGround
                                   ? "border-[#F5C518]/60 text-[#F5C518]"
-                                  : // Dotted underline at rest, because at 11px a
+                                  : // Dotted underline at rest, because at this size a
                                     // bare word beside "cond." reads as a label
                                     // and nobody would find the isolated-ground
                                     // option. It changes a wire quantity, so it
@@ -2472,7 +3148,7 @@ export function RunsPanel({
                             >
                               {circuit.separateGround ? "own gnd." : "gnd."}
                             </button>
-                            <span className="text-[0.7rem] font-mono text-muted-foreground w-16 text-right">
+                            <span className="text-xs font-mono text-muted-foreground w-16 text-right">
                               {run.quantities
                                 ? feet(
                                     run.quantities.wireByCircuit.find(
@@ -2555,7 +3231,7 @@ export function RunsPanel({
                       bid cannot disagree.
                     */}
                         {run.circuits.length > 0 && run.quantities && (
-                          <div className="flex items-baseline justify-between text-[0.7rem] gap-2 pt-0.5">
+                          <div className="flex items-baseline justify-between text-xs gap-2 pt-0.5">
                             <span className="text-muted-foreground/70">
                               {groundSentence(
                                 run.quantities.grounds,
@@ -2569,7 +3245,7 @@ export function RunsPanel({
                           </div>
                         )}
 
-                        <p className="text-[0.7rem] text-muted-foreground/70">
+                        <p className="text-xs text-muted-foreground/70">
                           {/*
                         BOTH RULES, because they are now different and the
                         line above states the one that surprises people.
@@ -2618,113 +3294,117 @@ export function RunsPanel({
           })
         )}
 
-        {legend}
-      </div>
+        {tab === "legend" && legend}
+        {tab === "reader" && reader}
 
-      {/*
+        {/*
         Bid totals. Conduit, cable and wire never merge into one number.
 
-        Pinned below the scroller and NEVER inside it: this is the number the
-        panel exists to show, and a total you have to go looking for is a total
-        that gets read off stale. shrink-0 is what keeps its last row whole.
+        **This said "pinned below the scroller and NEVER inside it" until
+        2026-09-30**, because a total you have to go looking for gets read off
+        stale. The tabs (references/track-b-phone-and-readability-plan.md § 1)
+        move it into the Totals tab, and keep the reason with two guards
+        instead: the tab carries a warning mark whenever anything is not on
+        the bid, and the pinned "This sheet" line above every tab is the
+        figure that moves while you work.
       */}
-      {totals && (
-        <div className="border-t border-border px-3 py-2.5 shrink-0 space-y-1">
-          <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
-            This bid, all sheets
-          </div>
-          {/* Bought, with every term that went into it — the flat share is
+        {tab === "totals" && totals && (
+          <div className="border-t border-border px-3 py-2.5 space-y-1">
+            <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
+              This bid, all sheets
+            </div>
+            {/* Bought, with every term that went into it — the flat share is
               the remainder, so the four always add up on screen. */}
-          <Footage
-            label="Conduit"
-            flat={round2(
-              totals.conduitBoughtFeet -
-                totals.conduitVerticalFeet -
-                totals.conduitExtraFeet
-            )}
-            vertical={totals.conduitVerticalFeet}
-            extra={totals.conduitExtraFeet}
-            total={totals.conduitBoughtFeet}
-          />
-          <Footage
-            label="Cable"
-            flat={round2(
-              totals.cableBoughtFeet -
-                totals.cableVerticalFeet -
-                totals.cableExtraFeet -
-                totals.cableMakeupFeet
-            )}
-            vertical={totals.cableVerticalFeet}
-            extra={totals.cableExtraFeet}
-            makeup={totals.cableMakeupFeet}
-            total={totals.cableBoughtFeet}
-          />
-          <Footage
-            label="Wire"
-            flat={round2(
-              totals.wireBoughtFeet -
-                totals.wireVerticalFeet -
-                totals.wireExtraFeet -
-                totals.wireMakeupFeet
-            )}
-            vertical={totals.wireVerticalFeet}
-            extra={totals.wireExtraFeet}
-            makeup={totals.wireMakeupFeet}
-            total={totals.wireBoughtFeet}
-          />
-          {/* Drops from marks (§ 3): what they add, and what is not counted
+            <Footage
+              label="Conduit"
+              flat={round2(
+                totals.conduitBoughtFeet -
+                  totals.conduitVerticalFeet -
+                  totals.conduitExtraFeet
+              )}
+              vertical={totals.conduitVerticalFeet}
+              extra={totals.conduitExtraFeet}
+              total={totals.conduitBoughtFeet}
+            />
+            <Footage
+              label="Cable"
+              flat={round2(
+                totals.cableBoughtFeet -
+                  totals.cableVerticalFeet -
+                  totals.cableExtraFeet -
+                  totals.cableMakeupFeet
+              )}
+              vertical={totals.cableVerticalFeet}
+              extra={totals.cableExtraFeet}
+              makeup={totals.cableMakeupFeet}
+              total={totals.cableBoughtFeet}
+            />
+            <Footage
+              label="Wire"
+              flat={round2(
+                totals.wireBoughtFeet -
+                  totals.wireVerticalFeet -
+                  totals.wireExtraFeet -
+                  totals.wireMakeupFeet
+              )}
+              vertical={totals.wireVerticalFeet}
+              extra={totals.wireExtraFeet}
+              makeup={totals.wireMakeupFeet}
+              total={totals.wireBoughtFeet}
+            />
+            {/* Drops from marks (§ 3): what they add, and what is not counted
               for them — fittings (Q8), a count with no run type or height,
               and marks near an unlinked run end that may count twice. */}
-          {totals.markDropCount > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              Includes {totals.markDropCount} drop
-              {totals.markDropCount === 1 ? "" : "s"} to counted devices (
-              {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
-              them are not counted.
-            </p>
-          )}
-          {(totals.markDropNotes?.noTypeGroups ?? 0) +
-            (totals.markDropNotes?.noHeightGroups ?? 0) >
-            0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {(totals.markDropNotes?.noTypeGroups ?? 0) +
-                (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
-              counted item
-              {(totals.markDropNotes?.noTypeGroups ?? 0) +
-                (totals.markDropNotes?.noHeightGroups ?? 0) ===
-              1
-                ? " asks"
-                : "s ask"}{" "}
-              for a drop that is not counted — see the item for why.
-            </p>
-          )}
-          {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.markDropNotes?.mayDoubleCount} marked device
-              {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
-              run's end may have its drop counted twice.
-            </p>
-          )}
-          {totals.conduitExtraFeet +
-            totals.cableExtraFeet +
-            totals.wireExtraFeet >
-            0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              Extra is bought, not installed — labor is on the installed feet.
-            </p>
-          )}
-          {totals.noExtraCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.noExtraCount} run
-              {totals.noExtraCount === 1 ? " carries" : "s carry"} no extra —
-              none is set. Set it in Settings › Heights & extra.
-            </p>
-          )}
+            {totals.markDropCount > 0 && (
+              <p className="text-xs text-muted-foreground pt-1">
+                Includes {totals.markDropCount} drop
+                {totals.markDropCount === 1 ? "" : "s"} to counted devices (
+                {totals.markDropFeet.toFixed(2)} ft). Connectors and elbows for
+                them are not counted.
+              </p>
+            )}
+            {(totals.markDropNotes?.noTypeGroups ?? 0) +
+              (totals.markDropNotes?.noHeightGroups ?? 0) >
+              0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                  (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
+                counted item
+                {(totals.markDropNotes?.noTypeGroups ?? 0) +
+                  (totals.markDropNotes?.noHeightGroups ?? 0) ===
+                1
+                  ? " asks"
+                  : "s ask"}{" "}
+                for a drop that is not counted — see the item for why.
+              </p>
+            )}
+            {(totals.markDropNotes?.mayDoubleCount ?? 0) > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.markDropNotes?.mayDoubleCount} marked device
+                {totals.markDropNotes?.mayDoubleCount === 1 ? "" : "s"} near a
+                run's end may have its drop counted twice.
+              </p>
+            )}
+            {totals.conduitExtraFeet +
+              totals.cableExtraFeet +
+              totals.wireExtraFeet >
+              0 && (
+              <p className="text-xs text-muted-foreground pt-1">
+                Extra is bought, not installed — labor is on the installed feet.
+              </p>
+            )}
+            {totals.noExtraCount > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.noExtraCount} run
+                {totals.noExtraCount === 1 ? " carries" : "s carry"} no extra —
+                none is set. Set it in Settings › Heights & extra.
+              </p>
+            )}
 
-          {/*
+            {/*
             THE ZERO HAS TO SHOUT.
 
             § 2.3 makes the argument about an unset allowance and it applies
@@ -2734,29 +3414,29 @@ export function RunsPanel({
             job the missing footage is a large share of the total, and a bid
             that is under is the mistake that gets won.
           */}
-          {totals.flatOnlyCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.conduitVerticalFeet === 0 &&
-              totals.cableVerticalFeet === 0 &&
-              totals.wireVerticalFeet === 0
-                ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
-                : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
-            </p>
-          )}
-          {/*
+            {totals.flatOnlyCount > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.conduitVerticalFeet === 0 &&
+                totals.cableVerticalFeet === 0 &&
+                totals.wireVerticalFeet === 0
+                  ? `No vertical footage is in these numbers. ${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only.`
+                  : `${totals.flatOnlyCount} run${totals.flatOnlyCount === 1 ? " is" : "s are"} counted flat only — no drop or rise on ${totals.flatOnlyCount === 1 ? "it" : "them"}.`}
+              </p>
+            )}
+            {/*
             QUANTITY TRACES (D21) — flat by choice, so not in the line above,
             and said here in its own words: none of their drops are in these
             numbers until approved. Only while ends are waiting; once every
             end is answered there is nothing left out to say.
           */}
-          {(totals.quantity?.openEnds ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {`Quantity traces are flat footage only — no drops are in these numbers for ${totals.quantity!.openEnds} leg end${totals.quantity!.openEnds === 1 ? "" : "s"}. Open a quantity trace to add them.`}
-            </p>
-          )}
-          {/*
+            {(totals.quantity?.openEnds ?? 0) > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {`Quantity traces are flat footage only — no drops are in these numbers for ${totals.quantity!.openEnds} leg end${totals.quantity!.openEnds === 1 ? "" : "s"}. Open a quantity trace to add them.`}
+              </p>
+            )}
+            {/*
             THE HALF-COUNTED RUN, WHICH IS THE WORSE OF THE TWO.
 
             The line above says a number is missing its drops entirely. This
@@ -2769,38 +3449,61 @@ export function RunsPanel({
             situations need opposite actions and a single number covering both
             could not say which one to take.
           */}
-          {totals.partialVerticalCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
-            </p>
-          )}
-          {totals.unmeasurableCount > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {totals.unmeasurableCount} run
-              {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
-              totals — no usable scale on the sheet. Type{" "}
-              {totals.unmeasurableCount === 1 ? "its length" : "their lengths"}{" "}
-              in the run to count{" "}
-              {totals.unmeasurableCount === 1 ? "it" : "them"}.
-            </p>
-          )}
-          {/*
+            {/*
+            A BUTTON since 2026-09-29 (owner): the sentence said what was
+            wrong and left the estimator to go and find the run. It opens the
+            first such run's Run ends section; the number stays, because it is
+            what says how much is missing.
+          */}
+            {totals.partialVerticalCount > 0 &&
+              (onOpenPartialEnds ? (
+                <button
+                  type="button"
+                  onClick={onOpenPartialEnds}
+                  className="mt-1 w-full text-left text-xs text-warning flex items-start gap-1.5 rounded border border-warning/40 bg-warning/10 px-2 py-1 hover:bg-warning/20"
+                >
+                  <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                  <span>
+                    <span className="font-medium underline underline-offset-2">
+                      Set ends
+                    </span>
+                    {` — ${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted, so ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short.`}
+                  </span>
+                </button>
+              ) : (
+                <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                  <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                  {`${totals.partialVerticalCount} run${totals.partialVerticalCount === 1 ? " has" : "s have"} only one end counted — ${totals.partialVerticalCount === 1 ? "its" : "their"} drops are short by whatever is missing.`}
+                </p>
+              ))}
+            {totals.unmeasurableCount > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.unmeasurableCount} run
+                {totals.unmeasurableCount === 1 ? " is" : "s are"} not in these
+                totals — no usable scale on the sheet. Type{" "}
+                {totals.unmeasurableCount === 1
+                  ? "its length"
+                  : "their lengths"}{" "}
+                in the run to count{" "}
+                {totals.unmeasurableCount === 1 ? "it" : "them"}.
+              </p>
+            )}
+            {/*
             Typed lengths ARE in the figures above (§ 4c), and this says so:
             a number an estimator supplied and one the app measured are
             different kinds of fact. Plain, not amber — typing is an answer.
           */}
-          {totals.typedCount > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              {totals.typedCount} run
-              {totals.typedCount === 1
-                ? " has a length"
-                : "s have lengths"}{" "}
-              typed by hand rather than measured off the drawing.
-            </p>
-          )}
-          {/*
+            {totals.typedCount > 0 && (
+              <p className="text-xs text-muted-foreground pt-1">
+                {totals.typedCount} run
+                {totals.typedCount === 1
+                  ? " has a length"
+                  : "s have lengths"}{" "}
+                typed by hand rather than measured off the drawing.
+              </p>
+            )}
+            {/*
             WHAT THE BID PRICES, AND WHAT IT DOES NOT (owner, 2026-09-27).
 
             These figures used to be finished runs only while the bid priced
@@ -2812,28 +3515,29 @@ export function RunsPanel({
             missing from a bid; plain for branch wiring, because that one is
             the estimator's own answer working as intended.
           */}
-          {(totals.leftOut?.noType.count ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-[#F5C518] pt-1 flex items-start gap-1.5">
-              <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-              {noTypeSentence(totals.leftOut!.noType)}
+            {(totals.leftOut?.noType.count ?? 0) > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {noTypeSentence(totals.leftOut!.noType)}
+              </p>
+            )}
+            {(totals.leftOut?.branch.count ?? 0) > 0 && (
+              <p className="text-xs text-muted-foreground pt-1">
+                {totals.leftOut!.branch.count} run
+                {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
+                wiring — the devices already include that wire, so it is not
+                counted here. Conduit still is.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground/70 pt-1">
+              What the bid prices, all sheets.
+              {(totals.leftOut?.draftCount ?? 0) > 0 &&
+                ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}
+              Suggestions are not counted.
             </p>
-          )}
-          {(totals.leftOut?.branch.count ?? 0) > 0 && (
-            <p className="text-[0.7rem] text-muted-foreground pt-1">
-              {totals.leftOut!.branch.count} run
-              {totals.leftOut!.branch.count === 1 ? " is" : "s are"} branch
-              wiring — the devices already include that wire, so it is not
-              counted here. Conduit still is.
-            </p>
-          )}
-          <p className="text-[0.7rem] text-muted-foreground/70 pt-1">
-            What the bid prices, all sheets.
-            {(totals.leftOut?.draftCount ?? 0) > 0 &&
-              ` Includes ${totals.leftOut!.draftCount} run${totals.leftOut!.draftCount === 1 ? "" : "s"} not finished yet.`}{" "}
-            Suggestions are not counted.
-          </p>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

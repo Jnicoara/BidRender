@@ -55,6 +55,7 @@ import {
   ratioFromCalibration,
 } from "@shared/planCalibration";
 import { COMMON_SCALES, describeScale } from "@shared/planScale";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 
 /*
   The colour of the measured span ON THE DRAWING — now the crosshair's (`ink`
@@ -172,6 +173,7 @@ export function CalibrateLayer({
   const [applyError, setApplyError] = useState<string | null>(null);
   /** The measuring tips, folded behind the "?" in the bar. */
   const [tipsOpen, setTipsOpen] = useState(false);
+  const coarse = useCoarsePointer();
   /**
    * The bar moves to the BOTTOM edge while the pointer is near the top one.
    *
@@ -379,7 +381,11 @@ export function CalibrateLayer({
       )}
     >
       <div
-        className="flex items-center gap-2 h-8 pl-2.5 pr-1 rounded-full border border-border bg-card/95 shadow-lg text-xs whitespace-nowrap"
+        className={cn(
+          "flex items-center gap-2 pl-2.5 pr-1 rounded-full border border-border bg-card/95 shadow-lg text-xs whitespace-nowrap",
+          // A finger's buttons are 44 px; the bar grows to hold them.
+          coarse ? "min-h-11" : "h-8"
+        )}
         role="status"
         aria-live="polite"
       >
@@ -388,10 +394,30 @@ export function CalibrateLayer({
         <span className="text-muted-foreground">·</span>
         <span className="truncate">{instruction}</span>
         {extra}
-        <span className="text-[0.65rem] text-muted-foreground pr-2">
-          {/* Escape backs out a click before it leaves — say which it does. */}
-          {points.length === 0 ? "Esc to cancel" : "Esc undoes the click"}
-        </span>
+        {coarse ? (
+          /*
+            A finger has no Escape, so the bar carries what Escape does as a
+            button, with the same two steps: back out the click, then leave
+            (device audit, touch #32).
+          */
+          <button
+            type="button"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground px-2"
+            onClick={() => {
+              if (points.length > 0) {
+                onPointsChange(points.slice(0, -1));
+                setHover(null);
+              } else onCancel();
+            }}
+          >
+            {points.length === 0 ? "Cancel" : "Undo click"}
+          </button>
+        ) : (
+          <span className="text-[0.65rem] text-muted-foreground pr-2">
+            {/* Escape backs out a click before it leaves — say which it does. */}
+            {points.length === 0 ? "Esc to cancel" : "Esc undoes the click"}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -933,6 +959,15 @@ export function CalibrateLayer({
           // dropped a calibration point would be maddening — you would move the
           // sheet and silently set one end of the measurement at the same time.
           if (e.button !== 0) return;
+          /*
+            Claim the press, as the trace overlay does. Without this the event
+            bubbled on to the viewer's plain-drag pan, so a calibration click
+            that wobbled also nudged the sheet — harmless only while the sheet
+            could not pan at Fit, and not harmless once it can (2026-09-29):
+            the second end would be aimed at a sheet sliding under the hand,
+            and the scale multiplies every run on the sheet.
+          */
+          e.stopPropagation();
           // The tips are read, then the drawing is clicked; they go on that click.
           setTipsOpen(false);
           if (points.length >= 2) return;

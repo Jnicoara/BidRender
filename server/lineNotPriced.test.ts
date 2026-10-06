@@ -6,7 +6,9 @@ import { describe, expect, it } from "vitest";
 import {
   countNotPriced,
   lineHoursUnset,
+  lineMaterialNotPriced,
   lineNotPriced,
+  linePartsNotPriced,
 } from "../shared/lineNotPriced";
 import { missingEntryCounts } from "../shared/handPricedLines";
 
@@ -81,20 +83,48 @@ describe("a field bend — labor on a part that is $0 by nature", () => {
 });
 
 describe("labor on a traced line — 'Not priced', never 0 h", () => {
-  it("is unset on ANY traced line whose part had no labor unit", () => {
-    // A coupling, a pipe — not only a field bend (owner, 2026-09-26).
-    expect(
-      lineHoursUnset({ takeoffRunTypeId: 7, snapshotLaborHours: null })
-    ).toBe(true);
+  it("is unset on a traced line whose part had no labor unit", () => {
+    // Pipe, wire, an elbow — not only a field bend (owner, 2026-09-26). This
+    // used to say "a coupling, a pipe"; a coupling left the list 2026-09-29.
+    for (const role of ["raceway", "conductor", "elbow90", "lb", "pullBox"]) {
+      expect(
+        lineHoursUnset({
+          takeoffRunTypeId: 7,
+          runMaterialRole: role,
+          snapshotLaborHours: null,
+        })
+      ).toBe(true);
+    }
+  });
+  it("is never unset on a coupling, connector or strap — the run rate pays them", () => {
+    // Owner, 2026-09-29. A line of theirs sent before the rule holds NULL;
+    // calling it "Not priced" would ask for hours that must never be used.
+    for (const role of ["coupling", "connector", "strap"]) {
+      expect(
+        lineHoursUnset({
+          takeoffRunTypeId: 7,
+          runMaterialRole: role,
+          snapshotLaborHours: null,
+        })
+      ).toBe(false);
+    }
   });
   it("is an answer at a SET 0 — wire nuts made up with the device", () => {
     expect(
-      lineHoursUnset({ takeoffRunTypeId: 7, snapshotLaborHours: "0.0000" })
+      lineHoursUnset({
+        takeoffRunTypeId: 7,
+        runMaterialRole: "raceway",
+        snapshotLaborHours: "0.0000",
+      })
     ).toBe(false);
   });
   it("leaves hand-priced lines to their own rule and their own strip", () => {
     expect(
-      lineHoursUnset({ takeoffRunTypeId: null, snapshotLaborHours: null })
+      lineHoursUnset({
+        takeoffRunTypeId: null,
+        runMaterialRole: null,
+        snapshotLaborHours: null,
+      })
     ).toBe(false);
     expect(
       missingEntryCounts([
@@ -110,8 +140,35 @@ describe("a line from an assembly", () => {
   it("is not priced when the whole line comes to $0", () => {
     expect(lineNotPriced(assembly, 0)).toBe(true);
   });
-  it("is priced when it is labor only — no material is legitimate there", () => {
+  it("keeps its labor in the total — it is not unpriced as a WHOLE", () => {
     expect(lineNotPriced(assembly, 85)).toBe(false);
+  });
+  it("but never reads FULLY priced: its missing material is counted (owner, 2026-10-05)", () => {
+    // The trap: a light pole assembly with 6 h of labor and no material read
+    // "$510.00" and the bid total looked finished — a pole bid with no pole
+    // in it. Labor stays in; the material is one thing not priced.
+    const line = { ...assembly, snapshotLaborHours: "6", unpricedParts: 0 };
+    expect(lineMaterialNotPriced(line, 510)).toBe(true);
+    expect(linePartsNotPriced(line, 510)).toBe(1);
+    expect(countNotPriced([{ line, directCost: 510 }])).toEqual({
+      lines: 0,
+      parts: 1,
+    });
+  });
+  it("counts the missing material ONCE, not on top of unpriced recipe parts", () => {
+    // Two $0 parts already say the material is short; "+ 3" would overstate it.
+    const line = { ...assembly, snapshotLaborHours: "6", unpricedParts: 2 };
+    expect(linePartsNotPriced(line, 510)).toBe(2);
+  });
+  it("is fully priced when it has material", () => {
+    const line = {
+      ...assembly,
+      snapshotMaterialCost: "42",
+      snapshotLaborHours: "6",
+      unpricedParts: 0,
+    };
+    expect(lineMaterialNotPriced(line, 552)).toBe(false);
+    expect(linePartsNotPriced(line, 552)).toBe(0);
   });
 });
 

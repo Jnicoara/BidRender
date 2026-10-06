@@ -121,7 +121,7 @@ export default function BidArchivePage({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4 shrink-0">
+      <div className="page-header border-b border-border px-6 py-4 shrink-0">
         <div className="flex items-center gap-3">
           <Button
             size="sm"

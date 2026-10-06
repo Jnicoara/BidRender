@@ -725,7 +725,7 @@ addAll(
     "Shallow round box",
     "Masonry box, single-gang",
     "Masonry box, double-gang",
-    "Weatherproof box, triple-gang",
+    '1/2" weatherproof box, triple-gang',
     "16x16 pull box",
     "24x24 pull box",
     "Junction box cover, 4 in",

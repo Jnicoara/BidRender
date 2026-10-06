@@ -31,6 +31,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -85,6 +86,14 @@
   /* Destructive */
   --destructive: oklch(0.63 0.22 25);
   --destructive-foreground: oklch(0.985 0 0);
+
+  /*
+    Warning — a true AMBER, deliberately not the brand yellow, which means
+    "selected / active" (references/track-b-phone-and-readability-plan.md
+    § 2.3, owner's answer 2). First used by the Plans panel's tab mark,
+    2026-09-30; the rest of the panel's warnings move to it in Part A.
+  */
+  --warning: oklch(0.8 0.16 70);
 
   /* Borders / inputs */
   --border: oklch(0.26 0.012 265);
@@ -170,6 +179,9 @@
   /* Destructive */
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(0.985 0 0);
+
+  /* Warning — amber on white needs its own, darker value to be read. */
+  --warning: oklch(0.62 0.16 60);
 
   /* Borders / inputs */
   --border: oklch(0.85 0.008 265);
@@ -366,6 +378,146 @@
   }
   .tab-enter {
     animation: tab-enter 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+
+  /*
+    THE PHONE'S FULL-SCREEN PANEL (references/track-b-phone-and-readability-
+    plan.md § 3): every control a finger's 44px (takeoff-spec ground rule 2).
+    One rule over the panel rather than a size on each of its hundred
+    buttons, so a control added later cannot miss it. min-height, not
+    height: it outranks a component's own h-6 without fighting its width.
+  */
+  .phone-panel button,
+  .phone-panel [role="button"],
+  .phone-panel input,
+  .phone-panel select {
+    min-height: 44px;
+  }
+
+  /*
+    ── A FINGER, ANYWHERE IN THE APP (references/device-audit.md) ──────────
+    Widened 2026-10-01 from the phone panel above to every screen, on any
+    device whose main pointer is a finger — phones AND tablets, either way
+    round. A laptop's mouse does not match `pointer: coarse`, so the laptop
+    keeps its dense rows exactly as they were.
+
+    1. Every control is at least 44 x 44 px (takeoff-spec ground rule 2).
+       min-*, not height/width, so a component's own h-7 or w-6 is outgrown
+       rather than fought. Checkboxes and switches are left their own size:
+       they sit inside a label that is the real target.
+    2. Nothing is reachable only by hovering. A control written as
+       `opacity-0 group-hover:opacity-100` is simply shown — a finger cannot
+       hover, so on a tablet those were buttons that did not exist. Matched
+       on the class itself, so one added next month is covered too.
+    `[data-compact]` opts a control out, for the rare one that is genuinely
+    not a target (a decorative chip); it must say why where it is used.
+  */
+  @media (pointer: coarse) {
+    :where(
+        button,
+        [role="button"],
+        [role="tab"],
+        [role="menuitem"],
+        [role="option"],
+        [role="combobox"],
+        a[href],
+        input:not([type="checkbox"]):not([type="radio"]):not(
+            [type="range"]
+          ):not([type="hidden"]),
+        select,
+        summary
+      ):not([data-compact]):not([role="checkbox"]):not([role="switch"]):not(
+        [role="radio"]
+      ) {
+      min-height: 44px;
+    }
+    :where(button, [role="button"], [role="tab"]):not([data-compact]):not(
+        [role="checkbox"]
+      ):not([role="switch"]):not([role="radio"]) {
+      min-width: 44px;
+    }
+    /* A control that sets its OWN small minimum (min-h-8 on the Totals tab's
+       folded rows) outranks the rule above from the utilities layer. The
+       small ones are listed, so a deliberate min-h-12 is never lowered. */
+    :is(button, [role="button"], [role="tab"]):is(
+      .min-h-5,
+      .min-h-6,
+      .min-h-7,
+      .min-h-8,
+      .min-h-9,
+      .min-h-10
+    ) {
+      min-height: 44px !important;
+    }
+    /* A switch or checkbox keeps its size and LOOK, but its hit area grows
+       to 44 x 44 around it — an invisible ring, so a finger landing beside a
+       32 x 18 switch still flips it. */
+    :where(
+      [role="switch"],
+      [role="checkbox"],
+      input[type="checkbox"],
+      input[type="radio"]
+    ) {
+      position: relative;
+    }
+    :where([role="switch"], [role="checkbox"])::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+    [class*="group-hover:opacity-100"].opacity-0,
+    [class*="group-hover:opacity-100"][class*="opacity-0"] {
+      /* !important: this sits in @layer components, and the utilities layer
+         (where opacity-0 lives) wins over it otherwise, whatever the
+         specificity. */
+      opacity: 1 !important;
+    }
+  }
+
+  /*
+    ── EVERY SCREEN'S TITLE ROW, ON A PHONE (device audit, 2026-10-01) ───────
+    Each screen opens with the same row: icon, a title over a line of
+    explanation, then a total or a button or two. At 390 px that row kept one
+    line and squeezed the explanation to ONE WORD PER LINE (the Dashboard's
+    ran 14 lines deep, measured). So on a phone the row wraps: the icon and
+    the title take the first line, everything after it drops below whole.
+    `.page-header` is the opt-in, on the row's outer box; the inner row and
+    the title block are the shape every one of those screens already has.
+  */
+  /* !important on the two that collide with utilities (px-6, flex-1): this
+     is @layer components, which the utilities layer outranks otherwise. */
+  @media (max-width: 767px) {
+    .page-header {
+      padding-inline: 1rem !important;
+    }
+    .page-header > .flex {
+      flex-wrap: wrap;
+      row-gap: 0.5rem;
+    }
+    .page-header > .flex > .flex-1 {
+      flex-basis: calc(100% - 2rem) !important;
+    }
+  }
+  /*
+    A TABLET, or any window under 1280: the row may wrap, and the title never
+    shrinks below 14rem to avoid it. On an upright tablet the bid's header had
+    squeezed its NAME to zero width and its status to "D" (seen in the device
+    audit) — six buttons and a date left the title nothing, and `min-w-0` let
+    it go. Here the buttons drop to a second line instead, only when they do
+    not fit; a 1536 px laptop never reaches this rule.
+  */
+  @media (min-width: 768px) and (max-width: 1279px) {
+    .page-header > .flex {
+      flex-wrap: wrap;
+      row-gap: 0.5rem;
+    }
+    .page-header > .flex > .flex-1 {
+      min-width: 14rem !important;
+    }
   }
 
   /* Number change flash */

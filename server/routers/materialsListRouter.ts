@@ -64,7 +64,7 @@ import {
 import * as db from "../db";
 import { footageByRunType } from "../runTypeFootage";
 import { resolveRunType } from "../../shared/runTypeLookup";
-import { FITTING_KIND_LABELS } from "../../shared/runFittings";
+import { unmatchedKindWords } from "../../shared/runFittings";
 import { isBendRole } from "../../shared/runBends";
 import { isTeeRole, rootOf } from "../../shared/runNetwork";
 import { runOnBid } from "../../shared/runOnBid";
@@ -92,11 +92,31 @@ export const materialsListRouter = router({
       if (!bid)
         throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
 
-      const [lineItems, stamps, runs] = await Promise.all([
+      const [lineItems, stamps, runs, groups] = await Promise.all([
         db.getBidLineItems(input.bidId),
         db.getStampsForBid(input.bidId, ctx.scope.dataUserId),
         db.getRunsForBid(input.bidId, ctx.scope.dataUserId),
+        db.getGroupsForBid(input.bidId, ctx.scope.dataUserId),
       ]);
+
+      /*
+        COUNTS MADE WITH NO ASSEMBLY — "Supplier to price" (legend plan § 8a).
+
+        A count that was only ever a name ("A1 luminaire") is exactly what a
+        lighting or gear package is: the supplier prices it, the app never
+        knew its parts. Until 2026-09-30 it went into the "not itemised" note,
+        which a supplier reads as an apology rather than a line to quote.
+
+        Decided by the GROUP's kind, not by a NULL assemblyId: a count whose
+        assembly was deleted also has none, and that one is a gap to explain
+        (the note below), not a package to quote.
+      */
+      const counterOnly = new Set(
+        groups
+          .filter(group => group.kind === "plain" || group.kind === "typed")
+          .map(group => group.id)
+      );
+      const forQuote: MaterialsListDoc["forQuote"] = [];
 
       // ── What each assembly is made of ──────────────────────────────────────
       // One query for every assembly involved, rather than one per line.
@@ -161,6 +181,18 @@ export const materialsListRouter = router({
         // Pipe, wire and fittings from traced runs are read from the runs
         // themselves below; listing the line too would count them twice.
         if (line.takeoffRunTypeId !== null) continue;
+        if (
+          line.assemblyId === null &&
+          line.takeoffGroupId !== null &&
+          counterOnly.has(line.takeoffGroupId)
+        ) {
+          forQuote.push({
+            name: line.name,
+            qty: Number(line.qty),
+            unit: "each",
+          });
+          continue;
+        }
         const materials =
           line.assemblyId === null
             ? []
@@ -206,9 +238,19 @@ export const materialsListRouter = router({
           assemblyId: stamp.assemblyId,
           x: Number(stamp.x),
           y: Number(stamp.y),
+          // An existing device is not bought (shared/markStatus.ts).
+          status: stamp.status,
         }))
       )) {
         if (group.groupId !== null && countedOnBid.has(group.groupId)) continue;
+        if (
+          group.assemblyId === null &&
+          group.groupId !== null &&
+          counterOnly.has(group.groupId)
+        ) {
+          forQuote.push({ name: group.name, qty: group.count, unit: "each" });
+          continue;
+        }
         const materials =
           group.assemblyId === null
             ? []
@@ -275,11 +317,15 @@ export const materialsListRouter = router({
               the each, on top of the pipe already listed by the foot.
             */
             if (row.role === "fieldBend") continue;
-            const kind = FITTING_KIND_LABELS[row.role].many;
-            if (
-              row.count.status === "unknown" &&
-              footage.get(runTypeId)?.legs.length
-            ) {
+            // Used only on lines with no part matched — "90° bends", not
+            // "elbows", beside a type that may buy sweeps (runFittings.ts).
+            const kind = unmatchedKindWords(row.role).many;
+            // Cable legs too (§ R1): an MC type's straps on an unscaled
+            // sheet are uncountable, and the supplier is told so.
+            const traced =
+              (footage.get(runTypeId)?.legs.length ?? 0) +
+              (footage.get(runTypeId)?.cableLegs.length ?? 0);
+            if (row.count.status === "unknown" && traced > 0) {
               uncounted.push(`${label} ${kind} — ${row.count.why}`);
               continue;
             }
@@ -575,6 +621,7 @@ export const materialsListRouter = router({
         preparedOn: new Date(),
         entries,
         measured: measuredEntries(totals),
+        forQuote,
         notes,
       };
     }),

@@ -69,9 +69,32 @@ git log --oneline -1 origin/main
 
 ## 4. Deploy sequence
 
-0. **Try it on staging first** — § 11: `git push origin local-dev:staging`,
-   migrations against `.env.staging.local` first, check the screens there.
-1. **Pre-flight** — § 3 above.
+> **`main` only ever fast-forwards to a commit that already passed the gate.**
+> Added 2026-10-01. GitHub's ruleset on `main` requires the **test** check
+> (`.github/workflows/gate.yml`) to be green ON THE COMMIT being pushed, so a
+> commit made on `main` itself — a hand edit, a merge commit, a revert — is
+> refused, because it has never been through the gate. So:
+>
+> - **Release what staging tested.** `main` moves to **the commit staging is
+>   serving** (`curl -s https://staging.bidridge.com/api/version`), by
+>   `git merge --ff-only <that commit>` — not to the tip of `local-dev`, which
+>   may have moved since. That commit passed the gate on `local-dev`, was
+>   deployed to staging, and passed the browser smoke test there (§ 12).
+> - **`--ff-only` refusing is a stop sign**, not something to work around:
+>   `main` has something you have not seen.
+> - **A revert goes through `local-dev` too** — § 4a.
+
+0. **Staging first.** Code-only changes reach staging BY THEMSELVES now: a
+   green push to `local-dev` is pushed to `staging` by the gate workflow, which
+   waits for staging to serve it and then runs the browser smoke test (§ 12).
+   A push that changes anything under `drizzle/` is REFUSED there — apply its
+   migrations to staging by hand (`.env.staging.local`, § 5), then
+   `git push origin local-dev:staging` yourself. To stop the automatic push,
+   set the repository variable `STAGING_AUTODEPLOY` to `off` (GitHub →
+   Settings → Secrets and variables → Actions → Variables).
+1. **Pre-flight** — § 3 above. Then confirm the release commit is green: the
+   Actions tab shows **Gate** passed for it on `local-dev`, including the
+   **smoke** job.
 2. **Sort the migrations, if there are any** — § 5, "Which goes first". Each
    **file** is either additive or a meaning change; a release normally has
    both.
@@ -101,17 +124,24 @@ code never arrived.
 GitHub nor your local checkout. **This is the fastest way out of a bad deploy**
 and the first thing to reach for.
 
-Rolling back the code as well, when you want `main` to match what is running:
+Rolling back the code as well, when you want `main` to match what is running —
+**through `local-dev`, because `main` refuses a commit the gate has not seen**
+(the ruleset, § 4):
 
 ```bash
+git checkout local-dev && git pull --ff-only
 git revert --no-commit <bad-commit>...<bad-commit>
 git commit -m "Revert <what>"
-git push origin main
+git push origin local-dev            # the gate runs; staging follows if green
+# when the Gate run for that commit is green:
+git checkout main && git merge --ff-only local-dev && git push origin main
+git checkout local-dev
 ```
 
 That undoes the change as a _new_ commit and triggers a fresh deploy. Slower
-than the Activity-tab rollback, but it keeps the history honest — prefer it
-over force-pushing `main`, which rewrites what everyone else has.
+than the Activity-tab rollback — which needs no gate and stays the fastest way
+out — but it keeps the history honest. Never force-push `main`; the ruleset
+blocks it anyway.
 
 **A rollback does not undo a migration.** Migrations are forward-only here, so
 rolling the code back to before a schema change leaves the database ahead of it.
@@ -1377,13 +1407,15 @@ are:
 wrong password answers at once with `Access denied`; a stale address never
 answers at all.
 
-> **And `scripts/schemaDrift.mts` LIES first.** Before the timeout it prints
-> **"No \_\_drizzle_migrations table — this database has never been
-> migrated."** That is false — production had 89 applied at the time. The
-> script read a failed connection as an empty answer. **Never act on that line
-> without a successful connection**: running every migration against a live
-> database because of it is the one outcome here worse than the lockout. See
-> `todo.md`.
+> **`scripts/schemaDrift.mts` used to LIE first — FIXED 2026-09-29.** Before
+> the timeout it printed **"No \_\_drizzle_migrations table — this database
+> has never been migrated."** That was false — production had 89 applied at
+> the time — because the script read a failed connection as an empty answer.
+> It now prints **"Could not read this database (…). This is NOT 'never
+> migrated'"** and exits 2 before checking anything
+> (`scripts/schemaDrift.test.ts`). "Never been migrated" now appears only when
+> the database answered and has no migrations table. The rule stands anyway:
+> never act on a migration count from a run that did not connect.
 
 If a production command fails like this and the site itself still loads,
 the address is the first thing to check — before suspecting the password, the
@@ -1422,9 +1454,19 @@ can see and that cannot touch a single live row.
 | Database               | `bidrender`, login `bidrender_app` | `bidrender_staging`, login `bidrender_staging_app` — same cluster         |
 | Plans bucket           | `bidrender-plans`                  | `bidrender-plans-staging`                                                 |
 | Password page          | none                               | yes — `STAGING_PASSWORD`                                                  |
-| AI features            | on                                 | **off**, and no Anthropic key at all                                      |
+| AI features            | on                                 | **on since 2026-09-29** — `DISABLE_AI_FEATURES=false`, own key            |
 | Nightly backup / purge | yes                                | **no** — `DISABLE_SCHEDULED_JOBS=true`, no `CRON_SECRET`                  |
 | Cost                   | —                                  | $10/mo app (1 vCPU / 1 GiB fixed, same as live); database and bucket free |
+
+> **Corrected 2026-10-01.** The AI row said "**off**, and no Anthropic key at
+> all" until today, two days after it stopped being true. On 2026-09-29 staging
+> got `DISABLE_AI_FEATURES=false` and its own Anthropic key, named
+> `bidridge-staging` in the Anthropic console, set as an encrypted Run Time
+> variable in the app's settings. A staging check that day placed a real AI
+> mark. The stale row was then repeated as "staging has AI off" in a status
+> answer, which is how it was caught. **Staging AI calls spend real money**
+> on that key, under the same per-person daily limit as live. To answer "is
+> AI on?", read the app's settings, not this table.
 
 ### How to reach it
 
@@ -1475,6 +1517,64 @@ additive ones run BEFORE the push (§ 5, three steps).
 4. Meaning-changing backfills, if the release has any, run now (§ 5, step 3).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
+
+### Staging: migrations 0103–0104 (done 2026-10-05) — NOT yet on live
+
+Batch 1b (`migrations-0098-batch-plan.md` § S): `'unconfirmed'` appended to
+`takeoff_stamps.status` (every row NULL) and `takeoff_runs.startConnect` /
+`endConnect`. Both additive. Shipped with the two mark-status rules in
+`shared/markStatus.ts` (only new marks are quantities; a run never snaps to or
+attaches to an unconfirmed mark) — which move no number while every status is
+NULL, as it is on staging and live.
+
+1. **Backup**: `staging-2026-10-05T19-41-13Z-before-0103-0104.sql` (65 tables)
+   in `C:\dev\bidrender-backups\`, restored locally, every count equal to
+   staging's.
+2. **Rehearsal on it**: drift before, 103 recorded, the 2 expected
+   differences; **2 applied**, 105; "matches", 141/141; second run nothing;
+   data counts unchanged; no mark has a status.
+3. **Gate green** on `af65f84` (full suite on a fresh database through 0104).
+4. **Staging**: the same 2 differences before; **2 applied**, 105; "matches",
+   141/141; second run nothing; data unchanged; old code (`fe2df5e`) answered
+   throughout.
+5. **Code**: `af65f84` pushed to `staging` by hand, `local-dev` fast-forwarded
+   to it; `/api/version` = `af65f84` (built 19:58 UTC); drift against it:
+   matches.
+
+**Live takes 0096–0104 together**: `references/live-release-plan.md`.
+
+### Staging: migrations 0096–0102 (done 2026-10-02) — NOT yet on live
+
+The marks batch (`migrations-0098-batch-plan.md` § S, Batch 1) with the two
+password-reset files from `a-email-reset`. All seven are additive and
+nullable, so they went on the database BEFORE the code (§ 5).
+
+1. **Backed up staging, and proved the backup restores.** Staging has no
+   nightly backup, so the backup is a `mysqldump` over TLS
+   (`--single-transaction`) to `C:\dev\bidrender-backups\` on the owner's
+   laptop: `staging-2026-10-02T05-14-49Z-before-0096-0102.sql` (63 tables),
+   restored into a local scratch database and compared with staging table by
+   table — every count equal.
+2. **Rehearsed on that restored copy**, twice (an earlier copy too): drift
+   before, 8 tables out — exactly the expected set; migrate, **7 applied**;
+   drift after, "matches", 141/141 foreign keys; second migrate, nothing to
+   apply; every data count unchanged; the new code's main reads (bids,
+   dashboard, counts, symbols, plan sets) all answer on it.
+3. **Staging**: drift before, 96 recorded, the same 8 tables. Migrate, **7
+   applied**, 103 recorded. Drift after, "Database matches the schema",
+   141/141. Second run, nothing. Data counts before and after: identical. The
+   OLD code (`9455e5f`) kept answering in between.
+4. **Code**: `c3b1677` pushed to `staging` by hand (a push with `drizzle/`
+   changes is refused by the auto-deploy, by design), then `local-dev`
+   fast-forwarded to the same commit; the auto-deploy then found nothing to
+   refuse and confirmed `/api/version` = `c3b1677`. Drift against the running
+   code: matches.
+
+**For live, later, the same order:** fresh backup of live and prove it
+restores (§ 5a), drift, migrate (**expect 7 applied, 103 recorded** — if the
+number differs, stop and find out why before going on: either this line is
+stale or the database is not where you think), drift, check the old code,
+then release `main` (§ 4).
 
 ### Live release: migrations 0089–0095 (written 2026-09-29, done 2026-09-29)
 
@@ -1668,3 +1768,96 @@ the same question, allowed `GET, PUT, POST, HEAD`. Both § 9 and
 five `R2_PLANS_*` settings had been set to **Build Time**, so the running app
 saw them as empty — "PLAN_STORAGE=r2 but the plan bucket is not configured".
 They must be **Run Time** (the build never reads them).
+
+## 12. The browser smoke test on staging — `e2e/`
+
+**Added 2026-10-01** (references/build-pipeline-plan.md, piece 3). After every
+automatic staging deploy (§ 4, step 0), GitHub Actions runs a Playwright test
+in **its own headless browser** against `https://staging.bidridge.com` — the
+staging recheck list, done by a machine. It reports **failures only**: a green
+run says nothing; a red one emails the repo owner with the failing step named,
+and keeps a screenshot of the failing page as a run artifact for 7 days.
+
+**What it covers** (`e2e/smoke/`): an empty bid's proposal and blocked Print;
+uploading a two-sheet plan; the right-panel tabs; capturing symbols; rename and
+reset; 8a (count with no assembly, link later); two symbols on one assembly
+keeping separate counts and lines at one price; "Not on the bid yet" and Send
+all sending once; a sheet switch putting the count down; pins waiting for their
+own page, with the loading bar; R and "Again"; a refresh keeping sheet and zoom;
+undo, redo, delete and Undo; a traced run measuring **77.78 ft** (checked by
+arithmetic); deleting a run asking first, Enter not deleting; Clear this sheet
+and one Ctrl+Z; a locked bid refusing Send, a scale change, a mark delete and a
+plan removal; the new-version bar not reloading the page; every main screen at
+desktop, phone 390x844 and tablet 820x1180 / 1180x820 with nothing cut off; and
+the count-link-send flow **by touch** on both tablet sizes.
+
+**What it does NOT cover:** anything that spends AI money (it never presses an
+AI button), a real phone in a hand, and how a screen feels. Those stay manual.
+
+**It can never touch live.** The address must be staging or this machine
+(`scripts/smokeTarget.ts`, tested), and `bidridge.com` is refused by name. It
+uses its own staging account, names every bid it makes `CI smoke …`, archives
+them at the end, and sweeps any a crashed run left behind before it starts.
+
+**Known faults are carried as expected failures, never skipped**
+(`KNOWN_FAULTS` in `e2e/smoke/screens.spec.ts`, `test.fail`): visible on every
+run, and red ("expected to fail, but passed") the day they are fixed, so the
+entry comes out. **The list is empty today.** On its first day it found four —
+the Dashboard, bid and Proposal headers running off a 390px phone, and the
+sidebar covering the full-screen panel's "← Plan" on an upright tablet — and
+all four were fixed by Track B's device work the same day, each one reported
+by this mechanism.
+
+### Setting it up — the owner's steps, once
+
+The password never goes into the repo, a file, or a log. It lives in your
+password manager and in GitHub's encrypted secrets, which print as `***`.
+
+**A. Make the staging test account**
+
+1. Open a **private** browser window and go to `https://staging.bidridge.com`.
+2. Type the **staging password** (the yellow page) and press Enter.
+3. On the sign-in page, click **Create account**.
+4. Name: `CI smoke`. Email: an address you control that is used for nothing
+   else — a Gmail plus-address works (`yourname+bidridge-smoke@gmail.com`).
+5. Password: let your password manager **generate** one (long, with a symbol).
+   Save it there as **"BidRidge staging — smoke test"**, with the email.
+6. Click **Create account**. You can close the window at the welcome screen —
+   the test finishes first-run itself. **Never create this account on live.**
+
+**B. Give GitHub the three secrets**
+
+1. Go to `https://github.com/Jnicoara/BidRender`.
+2. Click **Settings** (top bar) → in the left column **Secrets and variables**
+   → **Actions**.
+3. On the **Secrets** tab, click **New repository secret**.
+4. Name `SMOKE_EMAIL`; Secret: the account's email. Click **Add secret**.
+5. **New repository secret** again: name `SMOKE_PASSWORD`; Secret: the
+   account's password. **Add secret**.
+6. **New repository secret** again: name `SMOKE_STAGING_PASSWORD`; Secret: the
+   staging password from step A2. **Add secret**.
+
+Until all three exist, the smoke job prints a warning ("NOT RUN: the … secrets
+are not all set") and passes, so a missing setup is visible but never blocks a
+merge. After step B, the next green push to `local-dev` runs it.
+
+**C. Check the first run** — **Actions** tab → **Gate** → the newest run on
+`local-dev` → the **smoke** job. Green means done. If the very first step
+(`sign in the smoke account`) fails, its message says which of the three was
+refused; re-enter that secret (a secret cannot be read back, only replaced).
+
+**Pausing staging deploys** while you recheck by hand: **Settings → Secrets and
+variables → Actions → Variables → New repository variable**, name
+`STAGING_AUTODEPLOY`, value `off`. Delete it (or set `on`) to resume.
+
+**Running it locally:** put a LOCAL account in `.env.test.local` (git-ignored:
+`SMOKE_BASE_URL=http://127.0.0.1:<port>`, `SMOKE_EMAIL`, `SMOKE_PASSWORD`),
+start a server on that port, then `pnpm smoke`. A production build
+(`pnpm build && pnpm start`) is the closer match to staging — the new-version
+bar only exists in a build.
+
+**Artifacts stay credential-free on purpose.** The repo is public, so anyone
+can download a run's artifacts. Playwright TRACES record every request with
+headers and bodies — the passwords and the session — so traces and video are
+off (`e2e/playwright.config.ts`), and only failure screenshots are uploaded.
+Do not turn traces on in CI.

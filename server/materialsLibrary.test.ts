@@ -8,7 +8,7 @@
  * skipped without DATABASE_URL, matching how v545.test.ts expects a real DB.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   createMaterial,
   archiveMaterial,
@@ -117,6 +117,46 @@ describe.skipIf(!hasDb)("baseline material seeding", () => {
       r => r.userId === null && r.name === "20A Single-Pole breaker"
     );
     expect(duplicated).toHaveLength(1);
+  });
+
+  it("still finds and removes a duplicated baseline row, keeping the original", async () => {
+    // The duplicate check was rewritten from a self-join to a GROUP BY; this is
+    // what says the two ask the same question.
+    const db = await getDb();
+    const name = BASELINE_MATERIALS[0].name;
+    const [original] = await db!
+      .select({ id: materials.id })
+      .from(materials)
+      .where(and(eq(materials.name, name), isNull(materials.userId)));
+    await db!.insert(materials).values({
+      name,
+      unitOfSale: "each",
+      costPerUnit: "0",
+      userId: null,
+    });
+
+    await seedBaselineMaterials();
+
+    const left = await db!
+      .select({ id: materials.id })
+      .from(materials)
+      .where(and(eq(materials.name, name), isNull(materials.userId)));
+    expect(left).toEqual([original]);
+  });
+
+  /*
+    A budget, and a deliberately loose one. The duplicate check was a
+    quadratic self-join that alone took 4.5 s at 1,554 rows (2026-10-01), so a
+    re-seed of a catalog with nothing to do sat right at vitest's 5 s limit and
+    failed whenever the MySQL was busy. Fixed, the whole re-seed measured
+    ~100 ms. 1.5 s is >10x that headroom for a loaded CI box, and red on the
+    old query at any load.
+  */
+  it("re-seeds an already-seeded catalog well inside the test time limit", async () => {
+    await seedBaselineMaterials();
+    const started = performance.now();
+    await seedBaselineMaterials();
+    expect(performance.now() - started).toBeLessThan(1_500);
   });
 
   it("stores cost as an exact decimal, not a rounded float", async () => {

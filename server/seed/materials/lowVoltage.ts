@@ -104,6 +104,19 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
     ),
   },
   {
+    // The crimp-on male end, for a drop that terminates at a camera or an
+    // access point rather than a jack. Starter assemblies plan § Gaps,
+    // 2026-09-29. NOT named "plug", and no "plug" alias: "plug" is what an
+    // estimator types for a receptacle, and the first build of this row as
+    // "Cat6 plug" took the top result for it (search sweep, same day).
+    // No "connector" either, which answers the cable connectors.
+    ...lv("each"),
+    name: "Cat6 RJ45 end",
+    searchAliases: aliases(
+      "cat 6 rj-45 8p8c modular crimp ends termination camera ap"
+    ),
+  },
+  {
     ...lv("each"),
     name: "Cat6 patch panel",
     searchAliases: aliases(
@@ -145,6 +158,15 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
     searchAliases: aliases(
       "18-2 18 gauge thermostat bell doorbell signal class 2 two conductor"
     ),
+  },
+  {
+    ...lv("foot"),
+    // Retail catalog plan § R4: what an occupancy sensor is wired in.
+    name: "18/3 control wire",
+    searchAliases: aliases(
+      "18-3 18 gauge occupancy sensor power pack signal class 2 three conductor"
+    ),
+    description: "Class 2. Runs from a low-voltage sensor to its power pack.",
   },
   {
     ...lv("foot"),

@@ -44,7 +44,8 @@ type LaterUserColumns =
   | "accessTier"
   | "activeCompanyId"
   | "onboardingCompletedAt"
-  | "checklistDismissedAt";
+  | "checklistDismissedAt"
+  | "sessionsValidAfter";
 
 /**
  * A users row as the database returns one: what each case states, plus the
@@ -64,6 +65,7 @@ function userRow(fields: Omit<User, LaterUserColumns>): User {
     activeCompanyId: null,
     onboardingCompletedAt: null,
     checklistDismissedAt: null,
+    sessionsValidAfter: null,
   };
 }
 

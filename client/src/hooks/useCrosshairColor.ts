@@ -53,3 +53,19 @@ export function useCrosshairSize(): [
   );
   return [asCrosshairSize(stored), setStored];
 }
+
+/**
+ * Whether the dim "Next" length follows the cursor while tracing. Default ON.
+ *
+ * Off hides only the label. The thin preview line stays, because without it
+ * nobody can see where the next click will go (Track B plan, Part 2).
+ */
+export function useShowNextSegment(): [boolean, (show: boolean) => void] {
+  const id = useMeId();
+  const [stored, setStored] = useLocalStorage<boolean>(
+    `bp_trace_show_next:${id}`,
+    true
+  );
+  // Anything but an explicit false reads as the default.
+  return [stored !== false, setStored];
+}

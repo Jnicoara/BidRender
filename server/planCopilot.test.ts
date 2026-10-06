@@ -44,9 +44,11 @@ import { bidPdfs, bids, symbolLinks, users } from "../drizzle/schema";
 import { PLAN_COPILOT_MODEL } from "./routers/planCopilotRouter";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";
 import type { TrpcContext } from "./_core/context";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 8611;
 const OTHER_USER = 8612;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const runIf = hasDb ? describe : describe.skip;
@@ -310,9 +312,18 @@ runIf("no writes without confirmation", () => {
     expect(result.placed).toBe(2);
     const stamps = await getStampsForSheet(s.sheetId, USER);
     expect(stamps).toHaveLength(2);
+    // Counted as the symbol's assembly, in the SYMBOL's own count — named for
+    // the symbol since 2026-10-01, when Place began passing the symbol so two
+    // symbols sharing one assembly stop merging (pin plan § 11.2.4). Before
+    // that the count wore the assembly's name; the assembly is what this
+    // assertion was always about.
+    expect(stamps.map(st => st.assemblyId)).toEqual([
+      s.recepAssemblyId,
+      s.recepAssemblyId,
+    ]);
     expect(stamps.map(st => st.assemblyName)).toEqual([
-      s.recepAssemblyName,
-      s.recepAssemblyName,
+      "Duplex receptacle",
+      "Duplex receptacle",
     ]);
     // The position survives the round trip, so the mark lands where the model
     // said it saw it — a stamp somewhere else is unverifiable against the plan.

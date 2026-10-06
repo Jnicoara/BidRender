@@ -40,15 +40,19 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
-import type { Tool } from "../_core/llm";
 import { AiLimitReached, invokeLLM } from "../llm";
 import { aiFeaturesEnabled } from "../aiFeatures";
 import {
-  COPILOT_ACTIONS,
-  MODEL_INVOCABLE_ACTIONS,
-  MODEL_INVOCABLE_ACTION_IDS,
-  canPerform,
-} from "../../shared/copilotActions";
+  TIE_BREAK_MAX_CROPS,
+  TIE_BREAK_MAX_IMAGE_CHARS,
+  TIE_BREAK_MODEL,
+  parseScanFinds,
+  parseTieBreak,
+  scanFindsRequest,
+  tieBreakRequest,
+  type ScanFindAnswer,
+} from "../tieBreak";
+import { COPILOT_ACTIONS, canPerform } from "../../shared/copilotActions";
 import {
   buildFindings,
   isAcceptable,
@@ -63,6 +67,12 @@ import { symbolLookupKey } from "../../shared/takeoffCounts";
 import type { CopilotRunStatus } from "../../drizzle/schema";
 import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
+import {
+  MAX_TEXT_CHARS,
+  PLAN_READ_MAX_TOKENS,
+  parseSheetReading,
+  sheetReadingRequest,
+} from "../planReading";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -99,18 +109,6 @@ export const PLAN_COPILOT_MODEL =
 /** Ceiling on the rasterised page the client sends. See the client for the size it targets. */
 const MAX_IMAGE_CHARS = 4_000_000;
 
-/** Ceiling on extracted sheet text handed to the model. */
-const MAX_TEXT_CHARS = 12_000;
-
-/**
- * Ceiling on one sheet reading's reply. See the call site for the arithmetic.
- *
- * Named rather than inlined because `hitTheCeiling` below has to recognise the
- * case, and a truncation check comparing against a different number than the
- * request used is a check that silently stops working.
- */
-const PLAN_READ_MAX_TOKENS = 16_000;
-
 const imageSchema = z
   .string()
   .max(MAX_IMAGE_CHARS, "That page image is too large to read.")
@@ -119,123 +117,14 @@ const imageSchema = z
     "Page image must be an image data URL"
   );
 
-/**
- * The one thing the model may return.
- *
- * A single tool with an enum on every item, so the closed action set is real at
- * the model layer as well as in the validation below — exactly the shape the
- * navigation helper uses. There is no output that expresses "place these on the
- * bid": `confirm_stamps` is not in MODEL_INVOCABLE_ACTION_IDS, so it is not in
- * the enum, so it cannot be asked for.
- */
-function reportTool(): Tool {
-  return {
-    type: "function",
-    function: {
-      name: "report_sheet",
-      description:
-        "Report what this plan sheet contains. Call this exactly once, after reading the whole sheet.",
-      parameters: {
-        type: "object",
-        properties: {
-          summary: {
-            type: "string",
-            description:
-              "Two to five sentences describing the scope of work this sheet asks of the electrical trade. Plain language, no pricing, no hours, no totals.",
-          },
-          items: {
-            type: "array",
-            description:
-              "One entry per device symbol you find on the drawing. Do not merge repeats — a symbol appearing twelve times is twelve entries.",
-            items: {
-              type: "object",
-              properties: {
-                action: {
-                  type: "string",
-                  enum: MODEL_INVOCABLE_ACTION_IDS,
-                  description:
-                    "propose_stamp when you can read the mark; flag_for_review when you cannot make it out and want a person to check that spot.",
-                },
-                symbol: {
-                  type: "string",
-                  description:
-                    "The legend label this mark matches, copied from the legend list you were given. Leave empty if it matches none of them.",
-                },
-                x: {
-                  type: "number",
-                  description:
-                    "Horizontal position, 0 at the left edge of the image to 1 at the right.",
-                },
-                y: {
-                  type: "number",
-                  description:
-                    "Vertical position, 0 at the top edge of the image to 1 at the bottom.",
-                },
-                confidence: {
-                  type: "number",
-                  description:
-                    "How sure you are about this one, 0 to 1. Be honest and be harsh — a wrong count costs the contractor a job.",
-                },
-                legible: {
-                  type: "boolean",
-                  description:
-                    "False if you cannot actually make the mark out. Say false rather than guessing; a guess is worse than a gap here.",
-                },
-                note: {
-                  type: "string",
-                  description:
-                    "Optional, short: why this one is uncertain or unreadable.",
-                },
-              },
-              required: ["action"],
-            },
-          },
-        },
-        required: ["summary", "items"],
-      },
-    },
-  };
-}
-
-/**
- * The prompt.
- *
- * The legend list is the substance of it. Handing the model the user's OWN
- * symbol labels and telling it to choose among them is what stops it applying
- * a generic idea of what an electrical symbol means to a set of drawings whose
- * author had their own idea.
- */
-function readingPrompt(symbols: LegendSymbol[], sheetName: string): string {
-  const legend =
-    symbols.length === 0
-      ? "(This user has not captured any legend symbols yet. You may still report marks you see, naming them as they appear on the drawing — they will be offered to the user to link.)"
-      : symbols
-          .map(
-            s =>
-              `- "${s.label}"${s.assemblyName ? ` — the user has linked this to: ${s.assemblyName}` : " — captured but not yet linked to anything"}`
-          )
-          .join("\n");
-
-  return [
-    "You are reading one sheet of a set of construction drawings for an electrical estimator.",
-    `The sheet is called "${sheetName}".`,
-    "",
-    "This user's legend symbols — the ONLY names you may put in the `symbol` field:",
-    legend,
-    "",
-    "How to work:",
-    "- Find every device symbol on the drawing and report each occurrence separately.",
-    "- Match each one to a legend label above. If it matches none of them, still report it and describe it in `symbol` as it appears; the user will link it.",
-    "- Give a position for every item, as a fraction of the image width and height.",
-    "- If you cannot actually make a mark out — it is smudged, overlapped, cut off, too small — use flag_for_review and set legible to false. Do NOT report it as a low-confidence guess. A gap the user fills in themselves is fine; a wrong count that looks confident is not.",
-    "- Ignore anything that is not a device on this sheet: title blocks, revision clouds, legends, schedules, north arrows, keynote bubbles.",
-    "",
-    "Do not calculate anything. No prices, no labor hours, no totals, no material lists.",
-    "Counts and locations only — the estimating software does the arithmetic.",
-    "",
-    "Call report_sheet exactly once with everything you found.",
-  ].join("\n");
-}
+/** A tie-break crop or legend picture: small by construction. */
+const tieImage = z
+  .string()
+  .max(TIE_BREAK_MAX_IMAGE_CHARS, "That picture is too large.")
+  .refine(
+    v => v.startsWith("data:image/"),
+    "Picture must be an image data URL"
+  );
 
 async function requireSheet(sheetId: number, userId: number) {
   const sheet = await db.getBidPdfSheet(sheetId, userId);
@@ -251,8 +140,13 @@ async function requireBid(bidId: number, userId: number) {
   return bid;
 }
 
-/** The user's legend, in the shape the resolver wants. */
-async function legendFor(userId: number): Promise<LegendSymbol[]> {
+/**
+ * The user's legend, in the shape the resolver wants.
+ *
+ * Exported for scripts/readerAccuracy.mts, so the test's method (a) hands the
+ * model the same list of names Read sheet does.
+ */
+export async function legendFor(userId: number): Promise<LegendSymbol[]> {
   const [links, assemblies] = await Promise.all([
     db.getSymbolLinks(userId),
     db.getLibraryAssemblies(userId),
@@ -261,6 +155,7 @@ async function legendFor(userId: number): Promise<LegendSymbol[]> {
   return links.map(link => ({
     id: link.id,
     label: link.label,
+    lookupKey: link.lookupKey,
     assemblyId: link.assemblyId,
     assemblyName:
       link.assemblyId === null ? null : (names.get(link.assemblyId) ?? null),
@@ -513,72 +408,21 @@ export const planCopilotRouter = router({
         return stateForRun(run, ctx.scope.dataUserId);
       };
 
+      // The request is built in server/planReading.ts, where the reasons for
+      // thinking-off and the token ceiling are written down, so the accuracy
+      // test (scripts/readerAccuracy.mts) sends exactly what this sends.
       let result;
       try {
         result = await invokeLLM({
           feature: "plan-read",
           user: ctx.user,
-          model: PLAN_COPILOT_MODEL,
-          messages: [
-            { role: "system", content: readingPrompt(symbols, sheet.name) },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: [
-                    "Here is the sheet. Read it and call report_sheet.",
-                    input.pageText.trim()
-                      ? `\nText extracted from this sheet (may be partial or garbled):\n${input.pageText.slice(0, MAX_TEXT_CHARS)}`
-                      : "\n(No text could be extracted from this sheet — it is likely a scan.)",
-                  ].join("\n"),
-                },
-                { type: "image_url", image_url: { url: input.pageImage } },
-              ],
-            },
-          ],
-          tools: [reportTool()],
-          toolChoice: "auto",
-          /**
-           * No thinking, explicitly.
-           *
-           * Leaving this out does not mean "off" on the current models — it
-           * means adaptive thinking runs and bills at the output rate, folded
-           * invisibly into `output_tokens`. Measured on a real 36x24 sheet that
-           * was about three cents a sheet nobody had chosen.
-           *
-           * Counting symbols against a legend the user supplied is recognition,
-           * not reasoning, so there is little here for thinking to buy. If
-           * findings ever get noticeably worse, the replacement is NOT to
-           * delete this line — it is `output_config: { effort: "low" }` with
-           * adaptive thinking, which keeps a little reasoning at a fraction of
-           * the spend. Deleting the line returns to paying an unknown amount.
-           */
-          thinking: { type: "disabled" },
-          /**
-           * MEASURED, not guessed. Counted on the real Old Blueridge sheets:
-           * one finding serialises to a 117-character JSON object, which is
-           * about 40 output tokens, and sheet E1.02 carries 78 device symbols.
-           * So a real sheet's answer is roughly 3,270 tokens — 82% of the old
-           * 4,000 cap, on a small school remodel.
-           *
-           * That cap was therefore already one dense commercial sheet away from
-           * truncating every read, and truncation here is the worst shape of
-           * failure available: the tool arguments are cut mid-JSON, the parse
-           * fails, the user gets nothing, and the call is paid for in full.
-           *
-           * 16,000 covers about 380 findings — denser than any single E-sheet
-           * in either sample set — and is the documented default ceiling for a
-           * non-streaming request, so it cannot collide with an HTTP timeout.
-           * It raises the WORST case to about 16c of output on a sheet that
-           * would have failed outright before; it does not raise the typical
-           * cost at all, because the model stops when it has finished.
-           *
-           * Spend is controlled by the daily allowance in shared/aiLimits.ts,
-           * not by this number. A cap tight enough to save real money is a cap
-           * tight enough to turn readings into failures.
-           */
-          maxTokens: PLAN_READ_MAX_TOKENS,
+          ...sheetReadingRequest({
+            model: PLAN_COPILOT_MODEL,
+            symbols,
+            sheetName: sheet.name,
+            pageText: input.pageText,
+            pageImage: input.pageImage,
+          }),
         });
       } catch (error) {
         // Out of allowance is not a failure to hide behind a generic message —
@@ -601,6 +445,8 @@ export const planCopilotRouter = router({
         );
       }
 
+      const reading = parseSheetReading(result);
+
       /**
        * ── Ran out of room. Say so, rather than blaming the answer ───────────
        * A reply stopped by the token ceiling comes back with its tool arguments
@@ -610,18 +456,18 @@ export const planCopilotRouter = router({
        * thing. They would re-read the sheet, hit the same ceiling, and get the
        * same sentence.
        *
-       * So it is checked first and separately: a distinct message that names
-       * the cause, and a `console.error` rather than the usual warn, because
-       * the fix is a constant in this file and nobody will go looking for it
-       * unless something shouts. This should be unreachable at 16,000 tokens
-       * on any single E-sheet — if it ever fires, a sheet denser than either
-       * sample set exists and PLAN_READ_MAX_TOKENS needs revisiting.
+       * So it is its own case and its own message that names the cause, and a
+       * `console.error` rather than the usual warn, because the fix is a
+       * constant and nobody will go looking for it unless something shouts.
+       * This should be unreachable at 16,000 tokens on any single E-sheet — if
+       * it ever fires, a sheet denser than either sample set exists and
+       * PLAN_READ_MAX_TOKENS needs revisiting.
        */
-      if (result.choices?.[0]?.finish_reason === "max_tokens") {
+      if (reading.kind === "truncated") {
         console.error(
           `[plan-copilot] reply hit the ${PLAN_READ_MAX_TOKENS}-token ceiling ` +
             `on sheet=${sheet.id} — the reading was truncated and discarded. ` +
-            `Raise PLAN_READ_MAX_TOKENS in server/routers/planCopilotRouter.ts.`
+            `Raise PLAN_READ_MAX_TOKENS in server/planReading.ts.`
         );
         return record(
           "failed",
@@ -631,31 +477,18 @@ export const planCopilotRouter = router({
         );
       }
 
-      const choice = result.choices?.[0]?.message;
-      const call = choice?.tool_calls?.find(
-        c => c.function?.name === "report_sheet"
-      );
-
-      if (!call) {
-        const text =
-          typeof choice?.content === "string" ? choice.content.trim() : "";
+      if (reading.kind === "no-report") {
         noteFailure("model returned no report_sheet call");
         return record(
           "degraded",
-          text || null,
+          reading.text || null,
           "The plan reader looked at this sheet but did not identify any symbols on it. Nothing was proposed.",
           []
         );
       }
 
-      let args: { summary?: unknown; items?: unknown } = {};
-      try {
-        args = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        noteFailure(
-          "tool arguments were not valid JSON",
-          call.function.arguments
-        );
+      if (reading.kind === "unparseable") {
+        noteFailure("tool arguments were not valid JSON", reading.raw);
         return record(
           "degraded",
           null,
@@ -664,56 +497,13 @@ export const planCopilotRouter = router({
         );
       }
 
-      // ── The guardrail, at the model layer ─────────────────────────────────
-      // Every item states an action, and every action goes through canPerform
-      // before it becomes anything. An item naming something outside the
-      // model-invocable set — including any attempt at a writing action — is
-      // dropped and counted, never honoured and never quietly ignored.
-      const rawItems = Array.isArray(args.items) ? args.items : [];
-      let refused = 0;
-      const detections = rawItems.flatMap(item => {
-        if (!item || typeof item !== "object") return [];
-        const entry = item as Record<string, unknown>;
-        const actionId =
-          typeof entry.action === "string"
-            ? entry.action
-            : "propose_stamp"; /* an item with no action is a proposal */
-
-        const verdict = canPerform({
-          actionId,
-          confirmed: false,
-          fromModel: true,
-        });
-        if (!verdict.allowed) {
-          refused += 1;
-          return [];
-        }
-
-        return [
-          {
-            symbol: entry.symbol,
-            x: entry.x,
-            y: entry.y,
-            confidence: entry.confidence,
-            // flag_for_review means "I could not read this", so legibility is
-            // decided by the action rather than by a field the model may not
-            // have set consistently with it. This is what guarantees a flagged
-            // mark lands in the unreadable tier however sure the model claimed
-            // to be — see shared/copilotConfidence.ts.
-            legible:
-              verdict.action.id === "flag_for_review" ? false : entry.legible,
-            note: entry.note,
-          },
-        ];
-      });
-
-      if (refused > 0) {
+      if (reading.refused > 0) {
         noteFailure(
-          `dropped ${refused} item(s) naming an action the model may not take`
+          `dropped ${reading.refused} item(s) naming an action the model may not take`
         );
       }
 
-      const findings = buildFindings(detections, {
+      const findings = buildFindings(reading.detections, {
         symbols,
         corrections: corrections.map(
           (c): CorrectionHint => ({
@@ -726,10 +516,7 @@ export const planCopilotRouter = router({
         pageHeightPoints: input.pageHeightPoints,
       });
 
-      const summary =
-        typeof args.summary === "string" && args.summary.trim()
-          ? args.summary.trim().slice(0, 4000)
-          : null;
+      const summary = reading.summary;
       const totals = summariseFindings(findings);
 
       // Reached the model, got a well-formed answer with nothing usable in it.
@@ -837,6 +624,148 @@ export const planCopilotRouter = router({
     }),
 
   /**
+   * Break the ties the sheet check could not settle by code
+   * (`server/tieBreak.ts`). Small crops in, one closed pick per crop out.
+   * Writes nothing: every pick comes back UNCONFIRMED and the panel shows it
+   * as a suggestion the estimator confirms or not. A button, never an effect.
+   */
+  breakTies: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        items: z
+          .array(
+            z.object({
+              id: z.number().int().positive(),
+              label: z.string().trim().min(1).max(200),
+              picture: tieImage,
+            })
+          )
+          .min(2)
+          .max(TIE_BREAK_MAX_CROPS),
+        crops: z
+          .array(
+            z.object({
+              id: z.number().int().positive(),
+              picture: tieImage,
+              itemIds: z.array(z.number().int().positive()).min(2).max(6),
+            })
+          )
+          .min(1)
+          .max(TIE_BREAK_MAX_CROPS),
+      })
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{
+        picks: Array<{ cropId: number; itemId: number | null }>;
+        message: string | null;
+      }> => {
+        if (!aiFeaturesEnabled()) throw readerSwitchedOff();
+        await requireSheet(input.sheetId, ctx.scope.dataUserId);
+        const none = (message: string) => ({
+          picks: input.crops.map(c => ({ cropId: c.id, itemId: null })),
+          message,
+        });
+        try {
+          const result = await invokeLLM({
+            feature: "plan-read",
+            user: ctx.user,
+            ...tieBreakRequest({
+              model: TIE_BREAK_MODEL,
+              items: input.items,
+              crops: input.crops,
+            }),
+          });
+          const picks = parseTieBreak(result, input.crops);
+          return {
+            picks: input.crops.map(c => ({
+              cropId: c.id,
+              itemId: picks.get(c.id) ?? null,
+            })),
+            message: null,
+          };
+        } catch (error) {
+          if (error instanceof AiLimitReached) return none(error.message);
+          noteFailure(
+            "tie-break request rejected",
+            error instanceof Error ? error.message : error
+          );
+          return none(
+            "The reader could not be reached. Nothing was changed — pick these by eye."
+          );
+        }
+      }
+    ),
+
+  /**
+   * Find all matching on a SCAN: what is written beside each find — the same
+   * tag as the picked one, another tag, an "E", or not this symbol
+   * (`server/tieBreak.ts`, `scanFindsRequest`). Small crops in, one closed
+   * answer per crop out. Writes nothing: every answer is shown on a find that
+   * is still unconfirmed. A button, never an effect.
+   */
+  checkScanFinds: procedure
+    .input(
+      z.object({
+        sheetId: z.number().int().positive(),
+        picked: tieImage,
+        crops: z
+          .array(
+            z.object({ id: z.number().int().positive(), picture: tieImage })
+          )
+          .min(1)
+          .max(TIE_BREAK_MAX_CROPS),
+      })
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{
+        answers: Array<{ cropId: number; answer: ScanFindAnswer | null }>;
+        message: string | null;
+      }> => {
+        if (!aiFeaturesEnabled()) throw readerSwitchedOff();
+        await requireSheet(input.sheetId, ctx.scope.dataUserId);
+        const none = (message: string) => ({
+          answers: input.crops.map(c => ({ cropId: c.id, answer: null })),
+          message,
+        });
+        try {
+          const result = await invokeLLM({
+            feature: "plan-read",
+            user: ctx.user,
+            ...scanFindsRequest({
+              model: TIE_BREAK_MODEL,
+              picked: input.picked,
+              crops: input.crops,
+            }),
+          });
+          const answers = parseScanFinds(result, input.crops);
+          return {
+            answers: input.crops.map(c => ({
+              cropId: c.id,
+              answer: answers.get(c.id) ?? null,
+            })),
+            message: null,
+          };
+        } catch (error) {
+          if (error instanceof AiLimitReached) return none(error.message);
+          noteFailure(
+            "scan finds request rejected",
+            error instanceof Error ? error.message : error
+          );
+          return none(
+            "The reader could not be reached. Nothing was changed — check these by eye."
+          );
+        }
+      }
+    ),
+
+  /**
    * Place the findings the user ticked. **The only procedure here that touches
    * a bid.**
    *
@@ -918,37 +847,63 @@ export const planCopilotRouter = router({
       // and counted on no bid line. A finding whose assembly cannot be found
       // is now refused rather than placed outside a count.
       type Target = { groupId: number; label: string; category: string | null };
-      const targets = new Map<number, Target | null>();
+      //
+      // Keyed by assembly AND legend symbol (2026-10-01, track-b-count-pin-
+      // styles-plan.md § 11.2.4): two symbols linked to one assembly are two
+      // items, each with its own count. Until then this passed no symbol and
+      // every finding of the assembly merged into the first count.
+      const targets = new Map<string, Target | string>();
       const placing: { row: (typeof placeable)[number]; target: Target }[] = [];
+      const missing =
+        "its assembly is no longer in your library, so there is nothing to count it as.";
       for (const row of placeable) {
         // `acceptable` already refused a finding with no assembly; this is the
         // same check restated so the type carries it rather than a `!`.
         if (row.assemblyId === null) continue;
-        if (!targets.has(row.assemblyId)) {
+        const key = `${row.assemblyId}:${row.symbolLinkId ?? "-"}`;
+        if (!targets.has(key)) {
           const assembly = await db.getAssemblyById(
             row.assemblyId,
             ctx.scope.dataUserId
           );
+          const symbol =
+            row.symbolLinkId !== null
+              ? await db.getSymbolLinkById(
+                  row.symbolLinkId,
+                  ctx.scope.dataUserId
+                )
+              : undefined;
           if (!assembly) {
-            targets.set(row.assemblyId, null);
+            targets.set(key, missing);
           } else {
-            const group = await groupForAssembly(
-              run.bidId,
-              ctx.scope.dataUserId,
-              assembly
-            );
-            targets.set(row.assemblyId, {
-              groupId: group.id,
-              label: group.label,
-              category: assembly.category ?? null,
-            });
+            try {
+              const group = await groupForAssembly(
+                run.bidId,
+                ctx.scope.dataUserId,
+                assembly,
+                {
+                  symbol: symbol?.assemblyId === assembly.id ? symbol : null,
+                  // No symbol means nobody can say which item; Place keeps
+                  // the old answer (the first count) rather than failing.
+                  ifSeveral: "first",
+                }
+              );
+              targets.set(key, {
+                groupId: group.id,
+                label: group.label,
+                category: assembly.category ?? null,
+              });
+            } catch (e) {
+              targets.set(
+                key,
+                e instanceof TRPCError ? e.message : "it could not be counted."
+              );
+            }
           }
         }
-        const target = targets.get(row.assemblyId) ?? null;
-        if (target === null) {
-          refusals.push(
-            `${row.rawLabel}: its assembly is no longer in your library, so there is nothing to count it as.`
-          );
+        const target = targets.get(key) ?? missing;
+        if (typeof target === "string") {
+          refusals.push(`${row.rawLabel}: ${target}`);
           continue;
         }
         placing.push({ row, target });

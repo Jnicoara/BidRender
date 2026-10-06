@@ -29,9 +29,27 @@ import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
 import { refuseUnknownKinds } from "../extrasInput";
+import { refuseSendIfLocked } from "../lockGuard";
+import {
+  deleteGroupWithSnapshot,
+  restoreGroup,
+  type GroupSnapshot,
+} from "../takeoffRestore";
+import {
+  GROUP_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
+import { lockedEditRefusal } from "../../shared/quantityLock";
 import { DISTRIBUTION_KIND } from "../../shared/takeoffHeights";
 import { resolveRunType } from "../../shared/runTypeLookup";
+import { symbolCountsOn, symbolLookupKey } from "../../shared/takeoffCounts";
+import { cleanLetter } from "../../shared/pinLetters";
+import { MARK_SHAPES, isMarkColor } from "../../shared/takeoffMarks";
+import { mayShareAssembly } from "../../shared/assemblyCounts";
 import { whipFeetOf } from "../../shared/branchWire";
+import { emptySplit } from "../../shared/markStatus";
 import {
   countsWaitingToSend,
   countsWithNoPrice,
@@ -154,9 +172,12 @@ export const takeoffGroupsRouter = router({
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
       const userId = ctx.scope.dataUserId;
-      const [groups, counts] = await Promise.all([
+      const [groups, counts, splits] = await Promise.all([
         db.getGroupsForBid(input.bidId, userId),
+        // NEW marks only — the quantity (shared/markStatus.ts).
         db.countStampsByGroup(input.bidId, userId),
+        // Every status, for the card's words. Display only.
+        db.statusSplitByGroup(input.bidId, userId),
       ]);
       const lines = await db.getBidLineItems(input.bidId);
       const bridgeLines = lines.map(toBridgeLine);
@@ -209,7 +230,16 @@ export const takeoffGroupsRouter = router({
         materialId: group.materialId,
         unitCost: group.unitCost === null ? null : Number(group.unitCost),
         unitHours: group.unitHours === null ? null : Number(group.unitHours),
+        /** NEW marks: what is priced and what "Send N" sends. */
         count: counts.get(group.id) ?? 0,
+        /** Every mark by status — "12 new · 4 existing". Display only. */
+        split: splits.get(group.id) ?? emptySplit(),
+        /** This job's chosen pin look (shared/pinLetters.ts). NULL = automatic. */
+        look: {
+          shape: group.markShape,
+          letter: group.markLetter,
+          color: group.markColor,
+        },
       }));
       const dropOf = (group: (typeof groups)[number]) => ({
         /** What was stored — the picker opens on these. */
@@ -283,24 +313,73 @@ export const takeoffGroupsRouter = router({
          * earlier, and silently pointing them at it would hide that. The
          * refusal names what is already there, which is the useful answer.
          *
-         * On for ONE caller: recovering clicks queued by a build older than
-         * phase 6 (client/src/pages/TakeoffPage.tsx). That path has no person
-         * to tell, and a refusal there would drop work that exists nowhere
-         * else — so it takes the existing group and adds the marks to it,
-         * which is what the estimator meant when they made both.
+         * On for TWO callers (client/src/pages/TakeoffPage.tsx):
+         * - recovering clicks queued by a build older than phase 6. That path
+         *   has no person to tell, and a refusal there would drop work that
+         *   exists nowhere else — so it takes the existing group and adds the
+         *   marks to it, which is what the estimator meant when they made both;
+         * - clicking an unlinked legend symbol (legend plan § 8a). The name is
+         *   the symbol's, not typed, so a second click on the same symbol
+         *   means "keep counting it" rather than a count somebody lost.
          */
         reuseExisting: z.boolean().default(false),
+        /**
+         * The legend symbol this count is for, when a symbol click made it.
+         * A renamed symbol still owns the count made under its ORIGINAL name
+         * (on a job counted before the rename), and without this the click
+         * would start a second count beside it and split the number in two.
+         */
+        symbolId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
 
       if (input.reuseExisting) {
-        const existing = await db.findGroupByLabel(
-          input.bidId,
-          ctx.scope.dataUserId,
-          input.label
-        );
+        const symbol = input.symbolId
+          ? await db.getSymbolLinkById(input.symbolId, ctx.scope.dataUserId)
+          : undefined;
+        /*
+          A SYMBOL THAT IS LINKED counts its assembly, whichever click asked.
+          The screen picks "by name" or "this assembly" from the symbols it
+          last fetched, so a click straight after "Link" could arrive here
+          asking for a plain count of a symbol the database already has
+          linked — and the count went to the bid as a free count with no
+          price and no hours (the staging smoke test, 2026-10-05, flow 6).
+          The screen now updates its copy at once as well; this is the half
+          that does not depend on timing. server/legendLinkCount.test.ts.
+        */
+        if (symbol && symbol.assemblyId !== null) {
+          const assembly = await db.getAssemblyById(
+            symbol.assemblyId,
+            ctx.scope.dataUserId
+          );
+          if (assembly) {
+            const group = await groupForAssembly(
+              input.bidId,
+              ctx.scope.dataUserId,
+              assembly,
+              { symbol }
+            );
+            return {
+              id: group.id,
+              label: group.label,
+              kind: group.kind,
+              count: 0,
+            };
+          }
+        }
+        const existing =
+          (symbol &&
+            symbolCountsOn(
+              await db.getGroupsForBid(input.bidId, ctx.scope.dataUserId),
+              symbol
+            )[0]) ??
+          (await db.findGroupByLabel(
+            input.bidId,
+            ctx.scope.dataUserId,
+            input.label
+          ));
         if (existing) {
           return {
             id: existing.id,
@@ -325,17 +404,25 @@ export const takeoffGroupsRouter = router({
   /**
    * The group for one library assembly on one bid — found, or made.
    *
-   * Idempotent on purpose, and keyed on the ASSEMBLY rather than on its name:
-   * arming the stamp tool twice in one session must not produce two rows that
-   * split one count in half. A rename in the library afterwards leaves this
-   * group's label as it was, which is the same snapshot rule every other part
-   * of a takeoff follows.
+   * Idempotent on purpose: arming the stamp tool twice in one session must
+   * not produce two rows that split one count in half. A rename in the
+   * library afterwards leaves this group's label as it was, which is the same
+   * snapshot rule every other part of a takeoff follows.
+   *
+   * Keyed on the assembly AND, when a legend symbol was clicked, the symbol
+   * (track-b-count-pin-styles-plan.md § 11.2): several captured items linked
+   * to one assembly each get their own count. With no symbol and several
+   * counts of the assembly, this REFUSES (CONFLICT) rather than guess, and
+   * the picker asks which — unless `ifSeveral: "first"`, which only the
+   * recovered click queue passes, because nobody is there to answer.
    */
   forAssembly: procedure
     .input(
       z.object({
         bidId: z.number().int().positive(),
         assemblyId: z.number().int().positive(),
+        symbolId: z.number().int().positive().optional(),
+        ifSeveral: z.enum(["ask", "first"]).default("ask"),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -350,8 +437,16 @@ export const takeoffGroupsRouter = router({
           message: "Assembly not found.",
         });
 
+      // A symbol linked to some OTHER assembly says nothing about this one.
+      const symbol = input.symbolId
+        ? await db.getSymbolLinkById(input.symbolId, ctx.scope.dataUserId)
+        : undefined;
+
       // Shared with the plan reader's Place, so both reach the same count.
-      return groupForAssembly(input.bidId, ctx.scope.dataUserId, assembly);
+      return groupForAssembly(input.bidId, ctx.scope.dataUserId, assembly, {
+        symbol: symbol?.assemblyId === assembly.id ? symbol : null,
+        ifSeveral: input.ifSeveral,
+      });
     }),
 
   /** Change what a count is called. Every mark follows, because none holds it. */
@@ -374,6 +469,176 @@ export const takeoffGroupsRouter = router({
         label: input.label,
       });
       return { id: input.id, label: input.label };
+    }),
+
+  /**
+   * Choose how a count's pins look — shape, letter, colour (pin plan § 6).
+   *
+   * `where: "job"` saves it on this count, this bid only. `"everyJob"` saves
+   * it on the library row the count comes from — its captured legend symbol
+   * if it has one (the symbol outranks the assembly, § 11.4), else its
+   * assembly, forking a shipped one as any edit does — and clears this
+   * count's own choice so the library look is the one showing. A count typed
+   * by name has no library row (decision 6) and is told so.
+   *
+   * Each field: omitted leaves it, `null` sets it back to automatic. A value
+   * the palette does not hold is refused here, not stored and ignored. Not
+   * refused on a locked bid: a look moves no number, and the lock is about
+   * quantities.
+   */
+  setLook: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        where: z.enum(["job", "everyJob"]).default("job"),
+        shape: z.enum(MARK_SHAPES).nullable().optional(),
+        letter: z
+          .string()
+          .trim()
+          .max(4)
+          .nullable()
+          .optional()
+          .refine(v => v == null || v === "" || cleanLetter(v) !== null, {
+            message:
+              "A pin's letter is up to four letters or digits, like R, S3 or A7.",
+          }),
+        color: z
+          .string()
+          .nullable()
+          .optional()
+          .refine(v => v == null || isMarkColor(v), {
+            message: "Pick one of the six pin colors.",
+          }),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const group = await requireGroup(input.id, userId);
+      const patch: {
+        markShape?: string | null;
+        markLetter?: string | null;
+        markColor?: string | null;
+      } = {};
+      if (input.shape !== undefined) patch.markShape = input.shape;
+      if (input.letter !== undefined)
+        patch.markLetter = input.letter ? cleanLetter(input.letter) : null;
+      if (input.color !== undefined) patch.markColor = input.color;
+
+      if (input.where === "job") {
+        await db.updateTakeoffGroup(group.id, userId, patch);
+        return { savedOn: "count" as const };
+      }
+
+      const key = symbolLookupKey(group.label);
+      const symbol = (await db.getSymbolLinks(userId)).find(
+        s => s.lookupKey === key || symbolLookupKey(s.label) === key
+      );
+      const clearCount = { markShape: null, markLetter: null, markColor: null };
+      if (symbol) {
+        await db.updateSymbolLink(symbol.id, userId, patch);
+        await db.updateTakeoffGroup(group.id, userId, clearCount);
+        return { savedOn: "symbol" as const, name: symbol.label };
+      }
+      if (group.assemblyId !== null) {
+        const assembly = await db.getAssemblyById(group.assemblyId, userId);
+        if (assembly) {
+          // A shipped assembly is shared by every company: choosing a look
+          // writes this company's own copy, never the shared row.
+          const ownId =
+            assembly.userId === null
+              ? await db.forkAssembly(assembly.id, userId)
+              : assembly.id;
+          await db.updateAssembly(ownId, userId, patch);
+          await db.updateTakeoffGroup(group.id, userId, clearCount);
+          return { savedOn: "assembly" as const, name: assembly.name };
+        }
+      }
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "This count was typed by name, so there is no library row to keep its look on. It is kept on this job. Capture its legend symbol to use the look on every job.",
+      });
+    }),
+
+  /**
+   * Link an assembly to a count made without one, or take it off again —
+   * every mark kept (legend plan § 8a; the one-way-door rule in CLAUDE.md).
+   *
+   * Three refusals, each naming the way through:
+   * - a locked bid, which must not change;
+   * - a count already ON the bid. Its line was priced on the bid, and a line's
+   *   snapshot is never rewritten, so linking now would leave the line and
+   *   the count saying different things;
+   * - an assembly this bid already counts under another name, because two
+   *   counts of one assembly split one number in half. NARROWED 2026-10-01
+   *   (track-b-count-pin-styles-plan.md § 11.2.5): a count that is a captured
+   *   legend item may join an assembly another ITEM already counts — two
+   *   items sharing one assembly are two quantities, not one split in half.
+   *   Two plain-named counts of one assembly are still refused
+   *   (`mayShareAssembly`, shared/assemblyCounts.ts).
+   */
+  setSource: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        /** NULL makes it a plain count again: a name and its marks. */
+        assemblyId: z.number().int().positive().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const group = await requireGroup(input.id, userId);
+      const bid = await requireBid(group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be changed"),
+        });
+      if (await db.getBidLineForGroup(group.id))
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            `"${group.label}" is already on the bid as a line, priced there. ` +
+            `Remove that line from the bid first, then link the count and send it again.`,
+        });
+
+      if (input.assemblyId === null) {
+        await db.setGroupSource(group.id, userId, null);
+        return { id: group.id, kind: "plain" as const, assemblyId: null };
+      }
+
+      const assembly = await db.getAssemblyById(input.assemblyId, userId);
+      if (!assembly)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Assembly not found.",
+        });
+      const others = (await db.getGroupsForBid(group.bidId, userId)).filter(
+        other => other.id !== group.id && other.assemblyId === assembly.id
+      );
+      const clash = mayShareAssembly(
+        group,
+        others,
+        await db.getSymbolLinks(userId)
+      )
+        ? undefined
+        : others[0];
+      if (clash)
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `This bid already counts "${assembly.name}" as "${clash.label}". Mark these under that count instead, or link a different assembly.`,
+        });
+
+      await db.setGroupSource(group.id, userId, {
+        id: assembly.id,
+        name: assembly.name,
+        category: assembly.category ?? null,
+      });
+      return {
+        id: group.id,
+        kind: "assembly" as const,
+        assemblyId: assembly.id,
+      };
     }),
 
   /**
@@ -457,6 +722,12 @@ export const takeoffGroupsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      /*
+        Refused on a locked bid since 2026-09-29 (owner). It used to be
+        allowed on purpose — the line arrived frozen at the number it crossed
+        with — but a locked bid must not change, and a new line is a change.
+      */
+      await refuseSendIfLocked(group.bidId, ctx.scope.dataUserId);
       const [counts, lines] = await Promise.all([
         db.countStampsByGroup(group.bidId, ctx.scope.dataUserId),
         db.getBidLineItems(group.bidId),
@@ -531,6 +802,17 @@ export const takeoffGroupsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      /*
+        A locked bid must not change (owner, 2026-09-29) — and this takes
+        every mark of the count off every sheet. It had no lock check at all
+        until then; a count NOT on the bid was removable from a locked one.
+      */
+      const bid = await requireBid(group.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be deleted"),
+        });
 
       const onBid = await db.getBidLineForGroup(group.id);
       if (onBid) {
@@ -542,12 +824,45 @@ export const takeoffGroupsRouter = router({
         });
       }
 
-      const counts = await db.countStampsByGroup(
-        group.bidId,
+      /*
+        Snapshot and delete in one transaction, so Undo can put the count
+        back with the same id and every mark where it was (plan § 1.1:
+        "Toast with Undo" after the confirm).
+      */
+      const result = await deleteGroupWithSnapshot(
+        group.id,
         ctx.scope.dataUserId
       );
-      const removed = counts.get(group.id) ?? 0;
-      await db.deleteTakeoffGroup(input.id, ctx.scope.dataUserId);
-      return { removed };
+      return {
+        removed: result?.removed ?? 0,
+        undo: result
+          ? sealPacket(GROUP_PACKET, ctx.scope.dataUserId, result.snapshot)
+          : null,
+      };
+    }),
+
+  /** Undo of `remove`: the count and its marks, same ids. Not on a locked bid. */
+  restore: procedure
+    .input(z.object({ undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const snapshot = openPacket<GroupSnapshot>(
+        GROUP_PACKET,
+        userId,
+        input.undo
+      );
+      if (!snapshot)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      const bid = await requireBid(snapshot.group.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be put back"),
+        });
+      const restored = await restoreGroup(snapshot, userId);
+      return { restored };
     }),
 });

@@ -117,7 +117,7 @@ export function QuantityDropsReview({
       </div>
 
       {/* What is in the numbers now, before anything is offered. */}
-      <p className="text-[0.7rem] text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         {approvedCount === 0
           ? "Flat footage only — no drops are counted on this trace yet."
           : `${approvedCount} drop${approvedCount === 1 ? "" : "s"} counted, ${approvedFeet.toFixed(2)} ft.`}
@@ -128,9 +128,7 @@ export function QuantityDropsReview({
       {open > 0 && (
         <div className="rounded border border-dashed border-[#F5C518]/60 bg-[#F5C518]/5 px-2 py-1.5 space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <span className="text-[0.7rem] text-muted-foreground">
-              Drops to
-            </span>
+            <span className="text-xs text-muted-foreground">Drops to</span>
             <EndKindSelect
               bidId={bidId}
               value={toKind}
@@ -139,7 +137,7 @@ export function QuantityDropsReview({
               className="h-6 flex-1 text-xs"
             />
           </div>
-          <p className="text-[0.7rem]">
+          <p className="text-xs">
             {proposing
               ? `Proposed: ${said.text}.`
               : `${open} leg end${open === 1 ? "" : "s"} could take a drop — pick what ${open === 1 ? "it goes" : "they go"} to.`}
@@ -147,7 +145,7 @@ export function QuantityDropsReview({
           <div className="flex items-center gap-1.5">
             <Button
               size="sm"
-              className="h-6 px-2 text-[0.7rem]"
+              className="h-6 px-2 text-xs"
               disabled={!proposing || busy}
               onClick={() =>
                 onAnswer(
@@ -164,7 +162,7 @@ export function QuantityDropsReview({
             <Button
               size="sm"
               variant="outline"
-              className="h-6 px-2 text-[0.7rem]"
+              className="h-6 px-2 text-xs"
               disabled={busy}
               onClick={() =>
                 onAnswer(
@@ -280,7 +278,7 @@ function DropEditor({
         is picked here (picking IS approving). A dismissed drop has no kind.
       */}
       <div className="flex items-center gap-1.5">
-        <span className="text-[0.7rem] text-muted-foreground w-10">To</span>
+        <span className="text-xs text-muted-foreground w-10">To</span>
         <EndKindSelect
           bidId={bidId}
           value={
@@ -296,14 +294,12 @@ function DropEditor({
           className="h-6 flex-1 text-xs"
         />
         {row.state === "open" && toKind !== null && (
-          <span className="text-[0.65rem] text-[#F5C518] shrink-0">
-            proposed
-          </span>
+          <span className="text-xs text-[#F5C518] shrink-0">proposed</span>
         )}
       </div>
       {kind !== null && row.state !== "dismissed" && (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.7rem] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             This one sits at
           </span>
           <HeightFields
@@ -329,7 +325,7 @@ function DropEditor({
           <>
             <Button
               size="sm"
-              className="h-6 px-2 text-[0.7rem]"
+              className="h-6 px-2 text-xs"
               disabled={toKind === null || busy}
               onClick={() => onAnswer({ kind: toKind })}
             >
@@ -338,7 +334,7 @@ function DropEditor({
             <Button
               size="sm"
               variant="outline"
-              className="h-6 px-2 text-[0.7rem]"
+              className="h-6 px-2 text-xs"
               disabled={busy}
               onClick={() => onAnswer({ kind: DISTRIBUTION_KIND })}
             >
@@ -350,7 +346,7 @@ function DropEditor({
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 px-2 text-[0.7rem]"
+            className="h-6 px-2 text-xs"
             disabled={busy}
             // Back to NULL: proposed again, like any end nobody has answered.
             onClick={() => onAnswer({ kind: null, heightInches: null })}

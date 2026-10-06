@@ -157,6 +157,19 @@ export const LIFE_SAFETY: BaselineMaterial[] = [
     },
     { name: "Beam detector", slang: "projected beam reflector atrium smoke" },
     { name: "Detector base", slang: "smoke head plug in twist addressable" },
+    /*
+      The commercial head a Detector base takes (starter assemblies plan
+      § Gaps, 2026-09-29). Before it the base shipped with only 120V house
+      alarms to put on it. Starts with "System", not "Smoke", per the note
+      above.
+    */
+    {
+      name: "System smoke detector",
+      slang:
+        "photoelectric photo head addressable conventional commercial fa 2-wire",
+      description:
+        "Fire-alarm panel detector head for a Detector base. Not a 120V house alarm.",
+    },
     {
       name: "Detector mounting bracket",
       slang: "smoke alarm adapter plate ring",
@@ -199,11 +212,22 @@ export const LIFE_SAFETY: BaselineMaterial[] = [
       name: "Emergency exit light combo",
       slang: "egress battery backup running man twin head led",
     },
-  ].map(({ name, slang }) => ({
-    ...item("Life Safety"),
-    name,
-    searchAliases: aliases(slang),
-  })),
+  ].map(
+    ({
+      name,
+      slang,
+      description,
+    }: {
+      name: string;
+      slang: string;
+      description?: string;
+    }) => ({
+      ...item("Life Safety"),
+      name,
+      searchAliases: aliases(slang),
+      ...(description ? { description } : {}),
+    })
+  ),
 ];
 
 export const FASTENERS: BaselineMaterial[] = [

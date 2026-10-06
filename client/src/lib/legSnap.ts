@@ -5,7 +5,9 @@
  *
  *   1. A MARK within reach. If it sits along a leg of this run, the branch
  *      tees off there and the mark IS the box ("mark": nothing new bought).
- *      Otherwise the leg starts at the mark, as a run end links to one.
+ *      Otherwise the leg starts at the mark's CONNECT POINT — at the wall for
+ *      a wall device (shared/connectPoint.ts, 2026-10-01), as a run end
+ *      links to one.
  *   2. An END of a leg of this run: a tee at that end (a box where the route
  *      carries on, or a cross if a tee is already there).
  *   3. A point ALONG a leg of this run: a tee there, cutting the leg.
@@ -20,6 +22,7 @@
  */
 import { projectOntoPath } from "@shared/runNetwork";
 import type { PagePoint } from "@shared/takeoffGeometry";
+import { markIsSnapTarget, type MarkStatus } from "@shared/markStatus";
 
 export type LegSnap =
   | {
@@ -45,7 +48,55 @@ export type LegSnap =
     };
 
 export type SnapLeg = { id: number; points: readonly PagePoint[] };
-export type SnapStamp = { id: number; x: number; y: number };
+export type SnapStamp = {
+  id: number;
+  x: number;
+  y: number;
+  /**
+   * The mark's status (NULL = new). REQUIRED, not optional, on purpose: every
+   * list of snap targets must say it, so a new caller cannot forget it and
+   * quietly let a run snap to an unconfirmed mark (shared/markStatus.ts).
+   */
+  status: MarkStatus | null;
+  /**
+   * Where a run MEETS this device (shared/connectPoint.ts) — at the wall for a
+   * wall receptacle, switch or data outlet whose wall was found in the
+   * drawing. Omitted, the run meets it at the mark, as before.
+   */
+  connect?: PagePoint;
+};
+
+/**
+ * The mark a click lands on, and the point the run takes from it: its connect
+ * point, never blindly its centre. ONE function for every place a run snaps to
+ * a mark — a leg's start, an ordinary trace click and an end dragged and let
+ * go — so a click and a drag can never put the same end in two places.
+ *
+ * Judged by distance to the MARK, which is what the estimator aims at; the
+ * point returned may be a few points away from it, at the wall.
+ */
+export function snapToMark(
+  at: PagePoint,
+  tolerance: number,
+  stamps: readonly SnapStamp[]
+): { stamp: SnapStamp; point: PagePoint } | null {
+  let best: SnapStamp | null = null;
+  let bestD = tolerance;
+  for (const s of stamps) {
+    // Never an UNCONFIRMED mark: a snap copies the mark's spot into the run,
+    // so a misplaced AI mark would become a wrong length (shared/markStatus.ts
+    // rule 2; todo.md WRONG-NUMBER RISK). The click lands where it was made.
+    if (!markIsSnapTarget(s.status)) continue;
+    const d = Math.hypot(at.x - s.x, at.y - s.y);
+    if (d <= bestD && (!best || d < bestD)) {
+      best = s;
+      bestD = d;
+    }
+  }
+  if (!best) return null;
+  const point = best.connect ?? { x: best.x, y: best.y };
+  return { stamp: best, point: { x: point.x, y: point.y } };
+}
 
 export function resolveLegStart(input: {
   at: PagePoint;
@@ -65,11 +116,9 @@ export function resolveLegStart(input: {
       : [leg.points[0], leg.points[leg.points.length - 1]];
 
   // 1. A mark.
-  const stamp = stamps
-    .map(s => ({ s, d: dist(at, s) }))
-    .filter(c => c.d <= tolerance)
-    .sort((a, b) => a.d - b.d)[0]?.s;
-  if (stamp) {
+  const onMark = snapToMark(at, tolerance, stamps);
+  if (onMark) {
+    const stamp = onMark.stamp;
     for (const leg of legs) {
       const hit = projectOntoPath(leg.points, stamp);
       if (!hit || hit.distance > tolerance) continue;
@@ -84,11 +133,9 @@ export function resolveLegStart(input: {
           stampId: stamp.id,
         };
     }
-    return {
-      kind: "stamp",
-      stampId: stamp.id,
-      point: { x: stamp.x, y: stamp.y },
-    };
+    // At its connect point: a leg that starts at a wall receptacle starts at
+    // the box in the wall, not at the middle of the drawing of it.
+    return { kind: "stamp", stampId: stamp.id, point: onMark.point };
   }
 
   // 2. An end of a leg.

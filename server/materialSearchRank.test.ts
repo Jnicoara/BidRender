@@ -588,3 +588,76 @@ describe("PVC sweeps and concrete rings: each found by what it is called", () =>
     expect(first(query)).toBe(expected);
   });
 });
+
+/*
+  A COUNT typed before its noun — "2 gang box", "3 hole", "2 pole 20".
+
+  Both halves of search read the count as "a word starting with the digit"
+  until 2026-09-29, so it matched SIZES: "2" in `1/2"`, "3" in `3/4"`, "2" in
+  `20A`. The matcher and the ranker now share one rule (shared/searchCounts.ts).
+  Before and after are in scripts/searchSpotCheck.mts --counts; the standard
+  sweep did not move. The first five were WRONG before, and "2 gang box" was a
+  regression from the hub-sized weatherproof boxes (8c5c478). The rest were
+  right before and are pinned so the rule cannot cost them.
+*/
+describe("a count before its noun matches that count, never a size", () => {
+  const index = BASELINE_MATERIALS.map((row, i) => ({
+    id: String(i),
+    description: row.name,
+    searchAliases: row.searchAliases,
+  }));
+  const FAMILIES = familySizes(BASELINE_MATERIALS);
+  const NOW = new Date("2026-09-29T12:00:00Z");
+  const ranked = (query: string, limit = 5): string[] => {
+    const { results, searchedQuery } = smartSearchCorrected(index, query, 80);
+    return rankMaterialHits(
+      results.map(hit => ({
+        row: BASELINE_MATERIALS[Number(hit.item.id)],
+        score: hit.score,
+      })),
+      searchedQuery,
+      {
+        families: FAMILIES,
+        commonness: row => commonnessPoints(row.name, undefined, NOW),
+      }
+    )
+      .slice(0, limit)
+      .map(row => row.name);
+  };
+
+  it('"2 gang box" has Double-gang box in its top five', () => {
+    expect(ranked("2 gang box")).toContain("Double-gang box");
+  });
+
+  it.each([
+    // Wrong before.
+    ["1 gang box", "Single-gang box"],
+    ["2 gang box", "Double-gang box"],
+    ["3 hole", '1/2" weatherproof box, single-gang'],
+    ["2 pole 20", "20A 2-Pole breaker"],
+    ["2 pole", "20A 2-Pole breaker"],
+    ["2 hole strap", "EMT strap"],
+    // Right before, and must stay right.
+    ["3 way", "3-way switch"],
+    ["4 gang", "4-gang box"],
+    ["1 hole strap", '1/2" EMT one-hole strap'],
+    ["3 pole 60", "60A 3-Pole breaker"],
+    ["42 space", "200A main panel, 42-space"],
+  ])('"%s" leads with %s', (query, expected) => {
+    expect(ranked(query)[0]).toBe(expected);
+  });
+
+  it.each([
+    // The regression row. `1/2" FS cast box, 2-gang` IS a 2-gang box and may
+    // stay; a single-gang one answering "2 gang" is the fault.
+    ["2 gang box", /single-gang/],
+    ["3 hole", /one-hole strap$/],
+    ["2 pole", /light pole/],
+    ["2 circuit", /^20A /],
+  ])(
+    '"%s" never lists a row whose SIZE only looks like the count',
+    (query, bad) => {
+      expect(ranked(query).filter(name => bad.test(name))).toEqual([]);
+    }
+  );
+});

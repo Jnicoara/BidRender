@@ -26,17 +26,23 @@
  * on a count — becomes two nullable columns on `takeoff_groups` when somebody
  * asks for it, and this file becomes the DEFAULT rather than the answer.
  */
+import { CATEGORY_FAMILY, FAMILY_SHAPE } from "./deviceFamily";
+import { markStatusOf, type MarkStatus } from "./markStatus";
 
 // ─── Shapes ───────────────────────────────────────────────────────────────────
 
 /**
- * Five shapes, and five is not an accident.
+ * Six shapes, and the count is not an accident.
  *
  * They have to be told apart at a glance, at a size measured in millimetres, on
- * top of a black-on-white drawing that is already full of lines. Past five the
- * differences stop being differences: a heptagon and an octagon are both "a
+ * top of a black-on-white drawing that is already full of lines. Past a handful
+ * the differences stop being differences: a heptagon and an octagon are both "a
  * blob with corners" at 14 pixels, and a shape nobody can name is a shape
  * nobody can match to a legend.
+ *
+ * The sixth, `rect` — a 2:1 rectangle — joined 2026-10-01 for panels and
+ * equipment, which plans draw as long rectangles (pin plan § 2, decision 2).
+ * Looked at on screen at the 10 px floor beside a square before adopting it.
  */
 export const MARK_SHAPES = [
   "circle",
@@ -44,26 +50,28 @@ export const MARK_SHAPES = [
   "triangle",
   "diamond",
   "hexagon",
+  "rect",
 ] as const;
 export type MarkShape = (typeof MARK_SHAPES)[number];
 
 /**
- * The five library categories, each with a shape that stays the same across
- * every job — so an estimator who learns "triangles are lighting" keeps that.
+ * Each library category's shape, through its device family
+ * (shared/deviceFamily.ts) — so the category default and a count's own family
+ * cannot disagree about what "lighting" looks like.
  *
- * A count with no category gets one from its id instead (see `shapeFor`), which
- * means a plain count can collide with a category's shape. That is accepted:
- * the shape narrows the field and the COLOUR separates within it, and the two
- * together give thirty combinations, which is more distinct marks than a sheet
- * can usefully carry anyway.
+ * **Overrides § 5e's map (2026-10-01, pin plan § 2):** lighting was a triangle,
+ * panels a square, equipment a diamond, low voltage a hexagon. Now lighting is
+ * a square, panels and equipment a wide rectangle, data a triangle (the plan
+ * symbol for a data outlet), and the diamond belongs to switches.
+ *
+ * Used for a mark whose count is NOT in the bid's pin map; every listed count
+ * takes its shape from `pinStylesForBid`, which reads the count's own name
+ * first.
  */
-const SHAPE_BY_CATEGORY: Record<string, MarkShape> = {
-  Devices: "circle",
-  Lighting: "triangle",
-  Panels: "square",
-  "Equipment Connections": "diamond",
-  "Low Voltage/EMS": "hexagon",
-};
+function shapeForCategory(category: string): MarkShape | undefined {
+  const family = CATEGORY_FAMILY[category];
+  return family ? FAMILY_SHAPE[family] : undefined;
+}
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 
@@ -141,7 +149,7 @@ export function shapeFor(group: {
   assemblyCategory?: string | null;
 }): MarkShape {
   const fromCategory = group.assemblyCategory
-    ? SHAPE_BY_CATEGORY[group.assemblyCategory]
+    ? shapeForCategory(group.assemblyCategory)
     : undefined;
   return fromCategory ?? MARK_SHAPES[spread(group.id, MARK_SHAPES.length)];
 }
@@ -166,16 +174,177 @@ export function colorFor(group: { id: number }): MarkColor {
  * the same position. That is the honest answer: nothing about it says what it
  * is counting, so nothing here can say it is different.
  */
-export function markAppearance(mark: {
-  groupId: number | null;
-  assemblyId: number | null;
-  assemblyCategory?: string | null;
-}): { shape: MarkShape; color: MarkColor } {
+export function markAppearance(
+  mark: {
+    groupId: number | null;
+    assemblyId: number | null;
+    assemblyCategory?: string | null;
+    /** `takeoff_stamps.status` — NULL is new (shared/markStatus.ts). */
+    status?: string | null;
+  },
+  /**
+   * The bid's letters and first-use colours (`pinStylesForBid`,
+   * shared/pinLetters.ts). Since 2026-10-01 the colour comes from there for
+   * every count the bid lists, so two counts on one bid stop sharing a colour
+   * by hash; the id hash below is left for a mark whose count is not in it.
+   * Pass the SAME map to the drawing and the panel, or a swatch and its pins
+   * disagree.
+   */
+  pins?: ReadonlyMap<
+    number,
+    { letter: string; color: MarkColor; shape: MarkShape }
+  >
+): {
+  shape: MarkShape;
+  color: MarkColor;
+  letter: string | null;
+  status: StatusLook;
+} {
   const id = mark.groupId ?? (mark.assemblyId !== null ? -mark.assemblyId : 0);
+  const pin = mark.groupId !== null ? pins?.get(mark.groupId) : undefined;
   return {
-    shape: shapeFor({ id, assemblyCategory: mark.assemblyCategory }),
-    color: colorFor({ id }),
+    status: statusLook(mark.status),
+    // The COUNT's shape (its own name first), not its assembly's category:
+    // two items on one assembly can be a duplex and a switch.
+    shape:
+      pin?.shape ?? shapeFor({ id, assemblyCategory: mark.assemblyCategory }),
+    color: pin?.color ?? colorFor({ id }),
+    letter: pin?.letter ?? null,
   };
+}
+
+/**
+ * How a mark's STATUS is drawn (pin plan § 7, decision 8):
+ *
+ * | Status   | Fill                     | Extra                 |
+ * | -------- | ------------------------ | --------------------- |
+ * | new      | filled (~45%)            | —                     |
+ * | existing | hollow, SOLID outline    | —                     |
+ * | remove   | hollow                   | an X through it       |
+ * | relocate | filled                   | an arrow badge        |
+ *
+ * Hollow is always a SOLID outline: dashed already means provisional (an
+ * unconfirmed match, § 8), and "existing" must never be told apart from
+ * "unconfirmed" by fill alone. The card says the split in words too
+ * (shared/markStatus.ts), because a fill does not survive a printout.
+ */
+export type StatusLook = {
+  status: MarkStatus;
+  filled: boolean;
+  cross: boolean;
+  arrow: boolean;
+  /**
+   * `unconfirmed` (0103): DASHED and hollow — the drawing's one language for
+   * provisional (§ 8). Hollow-solid is "existing"; the two never share a
+   * line style, so they are never told apart by fill alone.
+   */
+  dashed: boolean;
+};
+
+export function statusLook(value: string | null | undefined): StatusLook {
+  const status = markStatusOf(value);
+  return {
+    status,
+    filled: status === "new" || status === "relocate",
+    cross: status === "remove",
+    arrow: status === "relocate",
+    dashed: status === "unconfirmed",
+  };
+}
+
+/**
+ * How strongly a NEW (filled) pin is filled. Pin plan § 7: "the count's
+ * color at ~45%". It was 0.22 until 2026-10-05, and at that strength the
+ * letter's white halo covered most of the tint, so a new pin and an existing
+ * one with a letter looked the same on screen (laptop, high zoom, "Sheet
+ * numbers check" E-200) — the distinction that decides whether a device is
+ * priced. Not opaque: § 4, a pin must not blot out the symbol under it.
+ */
+export const NEW_FILL_OPACITY = 0.5;
+
+/**
+ * How a pin is PAINTED for its status — the numbers TraceLayer draws with,
+ * here so the suite can hold them apart (a React component is out of its
+ * reach).
+ *
+ * Filled and hollow differ in THREE places, so that no one of them has to
+ * carry the difference alone at every zoom:
+ * - the body: a real fill vs none;
+ * - the outline: hollow is 1.5x heavier, so a hollow pin still reads as a
+ *   ring at the 10 px floor where no letter is drawn;
+ * - the letter: on a fill it is dark on a white halo (it sits on color);
+ *   on a hollow pin it is IN the count's color on a thin dark halo, so the
+ *   inside of the pin stays clear — a white halo there filled the hollow
+ *   pin back in, which was the fault.
+ */
+export type MarkPaint = {
+  fillOpacity: number;
+  strokeScale: number;
+  letterFill: string;
+  letterHalo: string;
+  /** Of the stroke width. A dark halo is kept thin so it does not fill. */
+  letterHaloScale: number;
+};
+
+export function markPaint(look: StatusLook, color: string): MarkPaint {
+  return look.filled
+    ? {
+        fillOpacity: NEW_FILL_OPACITY,
+        strokeScale: 1,
+        letterFill: "#0b0b0b",
+        letterHalo: "#ffffff",
+        letterHaloScale: 0.9,
+      }
+    : {
+        fillOpacity: 0,
+        strokeScale: 1.5,
+        letterFill: color,
+        letterHalo: "#0b0b0b",
+        letterHaloScale: 0.5,
+      };
+}
+
+/**
+ * Whether a pin of this on-screen diameter can carry its letter. Below it the
+ * letter is noise on the symbol and shape + colour remain (pin plan § 3).
+ * Looked at 2026-10-01 on the Blueridge set at 1536 px wide: at 92% a pin is
+ * 16 px across and its "L" reads in a screenshot; at Fit (19%) the pin is at
+ * the 10 px floor and no letter is drawn. 14 sits between the two and is a
+ * judgement, not a measured edge — step 0 of the pin plan still owes that.
+ */
+export const LETTER_MIN_PX = 14;
+
+/** Font size for a letter inside a pin of radius `r`, by its length. */
+export function letterSize(r: number, letter: string): number {
+  const scale =
+    letter.length <= 1
+      ? 1.15
+      : letter.length === 2
+        ? 0.9
+        : letter.length === 3
+          ? 0.68
+          : 0.56;
+  return r * scale;
+}
+
+/**
+ * Where a letter sits in a shape, and how big — the shape's own centre is not
+ * always where there is room. A triangle (`markPath`: apex at r above the
+ * centre, base at r/2 below) is narrow at the middle, so a letter centred
+ * there spilled over the base of a 20 px swatch (seen 2026-10-01). It goes
+ * lower and smaller, into the wide part.
+ */
+export function letterFit(
+  shape: MarkShape,
+  r: number,
+  letter: string
+): { dy: number; size: number } {
+  const size = letterSize(r, letter);
+  if (shape === "triangle") return { dy: r * 0.12, size: size * 0.72 };
+  // A 2:1 rectangle is only 0.89r tall (`markPath`), so a letter sized for
+  // the circle would stand out of it top and bottom.
+  if (shape === "rect") return { dy: 0, size: Math.min(size, r * 0.8) };
+  return { dy: 0, size };
 }
 
 // ─── Traced runs ──────────────────────────────────────────────────────────────
@@ -611,6 +780,20 @@ export function markPath(
   if (shape === "circle") {
     // Two arcs, because a circle has no vertices to list.
     return `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0`;
+  }
+
+  if (shape === "rect") {
+    // 2:1, corners on the same circle as every other shape: half-width w and
+    // half-height w/2 with w² + (w/2)² = r², so w = 2r/√5.
+    const w = (2 * r) / Math.sqrt(5);
+    const h = w / 2;
+    const corners = [
+      [cx - w, cy - h],
+      [cx + w, cy - h],
+      [cx + w, cy + h],
+      [cx - w, cy + h],
+    ].map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`);
+    return `M ${corners.join(" L ")} Z`;
   }
 
   const sides =

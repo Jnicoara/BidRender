@@ -35,13 +35,17 @@ import {
 
 describe("shape", () => {
   it("gives each library category a shape that never moves", () => {
-    // An estimator who learns "triangles are lighting" keeps that across jobs,
-    // so these are a contract rather than an implementation detail.
-    expect(shapeFor({ id: 1, assemblyCategory: "Lighting" })).toBe("triangle");
-    expect(shapeFor({ id: 999, assemblyCategory: "Lighting" })).toBe(
+    // An estimator who learns "squares are lighting" keeps that across jobs,
+    // so these are a contract rather than an implementation detail. The map
+    // is pin plan § 2's (2026-10-01), which replaced § 5e's "triangles are
+    // lighting".
+    expect(shapeFor({ id: 1, assemblyCategory: "Lighting" })).toBe("square");
+    expect(shapeFor({ id: 999, assemblyCategory: "Lighting" })).toBe("square");
+    expect(shapeFor({ id: 1, assemblyCategory: "Panels" })).toBe("rect");
+    expect(shapeFor({ id: 1, assemblyCategory: "Low Voltage/EMS" })).toBe(
       "triangle"
     );
-    expect(shapeFor({ id: 1, assemblyCategory: "Panels" })).toBe("square");
+    expect(shapeFor({ id: 1, assemblyCategory: "Devices" })).toBe("circle");
   });
 
   it("gives a count with no category a shape anyway", () => {

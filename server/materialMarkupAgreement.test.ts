@@ -40,6 +40,7 @@ import {
 import type { TrpcContext } from "./_core/context";
 import { buildAccountingExport } from "../shared/accountingExport";
 import { buildProposal } from "../shared/proposal";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 // ─── The mixed bid, priced without a database ─────────────────────────────────
 
@@ -178,6 +179,7 @@ const proposal = buildProposal({
     validDays: 30,
   },
   now: new Date(0),
+  notPriced: rolled.notPriced,
 } as never);
 const unitPrice = (label: string) =>
   proposal.unitPricing.find(u => u.label === label)!.price;
@@ -270,6 +272,7 @@ describe("all five agree with each other and with the bid total", () => {
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const USER = 7878;
+dropFixtureUsersAfterAll([USER]);
 
 const ctxFor = (id: number): TrpcContext =>
   ({

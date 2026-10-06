@@ -22,6 +22,7 @@ import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { bidPdfs, bids, takeoffStamps, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { behindTheLock } from "./behindTheLock.testHelper";
 import { bidNotPricedCount } from "../client/src/lib/notPricedTotal";
 
 const USER = 9911;
@@ -147,7 +148,9 @@ withDb("the card follows the drawing on an unlocked bid", () => {
     await caller().bids.updateLine({ bidId, id: lineId, materialCost: 10 });
     await caller().bids.lockQuantities({ bidId });
 
-    await mark(bidId, sheets[1], f3.id, 6, 2);
+    // Behind the lock: the app refuses new marks on a locked bid since
+    // 2026-09-29; this is a drawing that moved before that rule.
+    await behindTheLock(bidId, () => mark(bidId, sheets[1], f3.id, 6, 2));
 
     const { bid, card } = await bothSides(bidId);
     expect(Number(bid.lines[0].qty)).toBe(3); // held by the lock

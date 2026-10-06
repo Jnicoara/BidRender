@@ -1,5 +1,10 @@
 # Materials catalog — Track C plan (2026-09-27)
 
+> **The next Track C batch (wrong numbers, how search reads a count, tests
+> that leave rows behind) is planned in `references/track-c-next-batch-plan.md`
+> (2026-09-29).** It includes a search regression from § 9b's weatherproof
+> rows: "2 gang box" lost `Double-gang box` from its top five.
+
 Plan only. Nothing here is built. Track C rules apply: no migrations or schema
 changes, no deploys, nothing against the live site.
 
@@ -1069,16 +1074,42 @@ the compression style already ships.
 
 ### 9b. The rest of Tier 3 (from § 6), and what each costs beyond rows
 
-| Group                                           | Rows | What it takes beyond rows                                                               | Recommend    |
-| ----------------------------------------------- | ---- | --------------------------------------------------------------------------------------- | ------------ |
-| More pull-box sizes (10x10, 18x18, 30x30)       | 3    | **Changes `pullBoxFor`'s proposals** (1-1/2" angle pull 12x12 → 10x10). A takeoff call. | Hold (B3)    |
-| Pull-box depths (6x6x4 vs 6x6x6 …)              | 6+   | The lookup keys on side only; depth means teaching it depth.                            | Hold         |
-| Weatherproof boxes by hub size                  | 3–6  | Existing rows are unsized: a rename (`RENAMED_BASELINE_MATERIALS`) plus adds.           | Next, if any |
-| NEMA 4X steel / stainless / fiberglass / hinged | 4–8  | Spec-driven; those jobs price from the spec.                                            | Hold         |
-| FST/FDT tee-through; 1-1/4"+ FS/FD              | 4–6  | Rare.                                                                                   | Hold         |
-| Adjustable-depth device boxes                   | 2    | An ordinary box plus the shipped extender covers it.                                    | Hold         |
-| Masonry deep; old-work 4-gang; metal 4-gang     | 3–5  | Rare.                                                                                   | Hold         |
-| 4-11/16" single-device raised covers            | 2    | The 4" raised covers serve one device.                                                  | Hold         |
+> **Weatherproof boxes by hub size — BUILT 2026-09-29 on `track-c`** (owner:
+> rename the unsized rows to 1/2", no 1", closure plugs yes, "3 hole" /
+> "5 hole" as search terms). Five renames through
+> `RENAMED_BASELINE_MATERIALS`, same ids: `1/2" weatherproof box`
+> single-/double-/triple-gang, `1/2" weatherproof round box`,
+> `1/2" weatherproof box, single-gang, PVC`. Four adds: the 3/4" of each
+> except triple-gang. Two plugs: `1/2"` and `3/4" threaded closure`.
+> Catalog 1,514 → **1,520**, Boxes 93 → **97**, pricing sheet 1,641 →
+> **1,647** (0 typed prices before overwriting). Standard search sweep
+> unchanged. Found on the way:
+>
+> - **The plug is named `threaded closure`, not `closure plug`.** With
+>   "plug" in the name the pair led a bare "plug" search ahead of Duplex
+>   receptacle — the plug-on SPD fault again. "closure plug" and "hub plug"
+>   are aliases; "closure plug" still finds them first.
+> - **The round box lost its "4 inch" aliases.** Carrying a 1/2" hub size,
+>   it broke "a size matches itself, whole" (a "4" search found a 1/2" row)
+>   and pushed the 4" square box off "4 inch box"
+>   (`materialSearchSizes.test.ts` went red). "wp round box" finds it.
+> - **Both single-gangs are "common"**, or "wp box" put the 3/4" double-gang
+>   above the 3/4" single-gang.
+> - **"3 hole" does not find them.** The search reads "3" as a 3" size and
+>   returns one-hole straps. "5 hole" does (after a 500 kcmil lug). The
+>   aliases are there; teaching the query side that "N hole" is not a size is
+>   a search change, not a catalog one — not done.
+
+| Group                                           | Rows | What it takes beyond rows                                                               | Recommend         |
+| ----------------------------------------------- | ---- | --------------------------------------------------------------------------------------- | ----------------- |
+| More pull-box sizes (10x10, 18x18, 30x30)       | 3    | **Changes `pullBoxFor`'s proposals** (1-1/2" angle pull 12x12 → 10x10). A takeoff call. | Hold (B3)         |
+| Pull-box depths (6x6x4 vs 6x6x6 …)              | 6+   | The lookup keys on side only; depth means teaching it depth.                            | Hold              |
+| Weatherproof boxes by hub size                  | 3–6  | Existing rows are unsized: a rename (`RENAMED_BASELINE_MATERIALS`) plus adds.           | **Built** (above) |
+| NEMA 4X steel / stainless / fiberglass / hinged | 4–8  | Spec-driven; those jobs price from the spec.                                            | Hold              |
+| FST/FDT tee-through; 1-1/4"+ FS/FD              | 4–6  | Rare.                                                                                   | Hold              |
+| Adjustable-depth device boxes                   | 2    | An ordinary box plus the shipped extender covers it.                                    | Hold              |
+| Masonry deep; old-work 4-gang; metal 4-gang     | 3–5  | Rare.                                                                                   | Hold              |
+| 4-11/16" single-device raised covers            | 2    | The 4" raised covers serve one device.                                                  | Hold              |
 
 Built the same way as Tiers 1+2 (§ 3, "How it would be built"): rows in
 `boxes.ts`, unpriced, spot-check before and after, pricing sheet regenerated,

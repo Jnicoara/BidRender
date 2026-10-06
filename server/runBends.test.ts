@@ -13,6 +13,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  ELBOW_WORDS,
   MERGE_WITHIN_FEET,
   countBends,
   describeRunBends,
@@ -20,6 +21,8 @@ import {
   legBends,
   placeAnswer,
   resolveBendSettings,
+  STUB_REVIEW_POINTS,
+  stubsToReview,
   turnDegrees,
   walkPullPoints,
   type BendLeg,
@@ -118,7 +121,12 @@ function fittings(legs: readonly FittingLeg[], spec: RacewayFittingSpec) {
   return countFittings(
     legs,
     spec,
-    { method: FACTORY, limit: 360, mergeWithinFeet: MERGE_WITHIN_FEET },
+    {
+      method: FACTORY,
+      limit: 360,
+      mergeWithinFeet: MERGE_WITHIN_FEET,
+      words: ELBOW_WORDS,
+    },
     []
   );
 }
@@ -782,5 +790,95 @@ describe("company settings", () => {
         pullBoxFromSize: null,
       }).pullPointLimit
     ).toBe(360);
+  });
+});
+
+/*
+  THE DOUBLE-CLICK STUB (Track B, 2026-09-29).
+
+  Finishing a trace with a double-click fires two presses, and each appended a
+  point. A mouse that drifts a pixel between them leaves a near-zero stub at the
+  end pointing any direction at all. `turnDegrees` skips only an EXACTLY zero
+  segment, so the turn onto that stub was read as a corner and bought as an
+  elbow. Measured here before it was fixed: these went red.
+*/
+describe("a near-duplicate end point from a double-click", () => {
+  const straight: P[] = [
+    { x: 0, y: 0 },
+    { x: 300, y: 0 },
+  ];
+
+  it("adds no elbow to a straight run, whichever way the stub points", () => {
+    for (const stub of [
+      { x: 300, y: 1 },
+      { x: 299.4, y: -0.6 },
+      { x: 300.3, y: 0.8 },
+    ]) {
+      const r = legBends(bendLeg([...straight, stub]));
+      expect(r.bends).toEqual([]);
+    }
+  });
+
+  it("adds no elbow to a run that already has one", () => {
+    const L: P[] = [
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      { x: 300, y: 170 },
+      { x: 301, y: 170.4 },
+    ];
+    expect(legBends(bendLeg(L)).bends).toHaveLength(1);
+  });
+
+  it("does the same at the START, where a double-click can also land", () => {
+    const r = legBends(bendLeg([{ x: 0.5, y: 0.7 }, ...straight]));
+    expect(r.bends).toEqual([]);
+  });
+});
+
+/*
+  OLD RUNS WHOSE END MAY BE A STUB — listed for review, never changed (owner,
+  2026-09-29). The trace tool now ignores a drifting double-click; runs traced
+  before that can end in a short turning segment that bought an elbow.
+*/
+describe("ends to review as possible double-click stubs", () => {
+  const L = (...xy: number[]) =>
+    Array.from({ length: xy.length / 2 }, (_, i) => ({
+      x: xy[2 * i],
+      y: xy[2 * i + 1],
+    }));
+
+  it("lists a short end segment that turns enough to buy a fitting", () => {
+    const points = L(0, 0, 300, 0, 300, 20);
+    const [stub, ...more] = stubsToReview(points);
+    expect(more).toEqual([]);
+    expect(stub).toMatchObject({ end: "end", vertex: 1, degrees: 90 });
+    expect(stub.segmentPoints).toBeCloseTo(20, 6);
+    expect(stub.point).toEqual({ x: 300, y: 0 });
+  });
+
+  it("lists a short START segment too", () => {
+    expect(stubsToReview(L(0, 20, 0, 0, 300, 0, 300, 300))).toMatchObject([
+      { end: "start", vertex: 1 },
+    ]);
+  });
+
+  it("does not list an end long enough to be drawn on purpose", () => {
+    expect(stubsToReview(L(0, 0, 300, 0, 300, STUB_REVIEW_POINTS + 1))).toEqual(
+      []
+    );
+  });
+
+  it("does not list a turn too small to buy anything, or a sub-3-point stub", () => {
+    // 10 degrees: under MIN_BEND_DEGREES.
+    expect(stubsToReview(L(0, 0, 300, 0, 320, 3.5))).toEqual([]);
+    // 2 points: already collapsed by STUB_POINTS, bought nothing.
+    expect(stubsToReview(L(0, 0, 300, 0, 300, 2))).toEqual([]);
+  });
+
+  it("reads the points and never changes them", () => {
+    const points = L(0, 0, 300, 0, 300, 20);
+    const before = JSON.stringify(points);
+    stubsToReview(points);
+    expect(JSON.stringify(points)).toBe(before);
   });
 });

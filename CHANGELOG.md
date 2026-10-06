@@ -4,13 +4,784 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-06]
+
+- **Fixed: a line with labor but no material could look fully priced.** An
+  assembly with hours and no priced material — a light pole built as labor
+  only — showed its labor as the line's price, and the bid total looked
+  finished with no pole in it. Now the line says "+ material not priced" in
+  amber, every total (including Total due, which never said so before) adds
+  "+ N not priced", the bid explains what to do, and the assembly editor's
+  cost preview says the material is missing.
+
+- **Find all matching uses the drawing's CAD layers when the PDF keeps
+  them.** On plans exported with layers (Weld 1 does), it searches only the
+  electrical layers — about ten times faster, same finds — and a device
+  drawn on a demolition layer is shown as demolition, never as a new
+  device; one on an "existing" layer says so. Plans without usable layers
+  work exactly as before.
+
+- **Find all matching now reads the little labels beside each device.**
+  "USB", "GF", "(E)", a mounting height like 54" or a fixture tag like A2
+  is tied to the nearest find and shown on it. A "GF" beside a plain
+  receptacle shape now flags it as a possible GFCI instead of counting it
+  as a duplex without a word. On the UNCC test plan the USB receptacles
+  went from 0 of 33 recognised to 33 of 33, and the three duplexes the
+  GFCI search used to pick up silently are now flagged.
+
+- **Fixed two faults in this morning's "taps are kept" change, before it
+  reached the live site.** On the test site, taps made before a new plan's
+  sheet was ready could be counted twice (6 marks for 3), and the panel could
+  show "0 marks" for marks that had been saved. Both are fixed, and the
+  browser test now forces the exact timing that caused each one, so it fails
+  if either comes back.
+
+- **Fixed: a freshly uploaded plan could skip reading its printed scale.** On
+  a fast connection the sheet list arrived while the page's text was still
+  being read, and the reading was thrown away, so the sheet sat on "Set
+  scale" instead of picking up the scale printed on it. Nothing was measured
+  wrong (tracing waits for a scale), but the scale had to be typed by hand.
+  The reading now always lands.
+
+- **A click on the plan no longer captures an empty symbol.** With Capture
+  on, a click that is not a drag used to open "Name this symbol" and save an
+  item with no picture, which also skipped every check. Now only a real box
+  opens it, and Capture stays on.
+
+- **Find all matching handles lines running through symbols more safely.**
+  Measured first on the hand-counted Weld 1 power plan: walls and wires
+  crossing devices caused no misses there, and the two known misses are
+  drawing disagreements. For other drawings: a wall or wire passing through
+  the box you draw is no longer taken as part of the symbol, and a device
+  whose own line is cut where another line crosses it is now offered as
+  "maybe — a line crosses it" for you to check, instead of being skipped
+  without a word. Confirm all never takes those.
+
+- **Adding a look compares the little words beside the symbol.** If your
+  other look of an item has "GF" (or WP, IG and the like) beside it and the
+  new one does not — or the other way round — the card says so before saving,
+  with Cancel first. Read from the drawing's own text; no AI involved.
+
+- **The warning also catches a symbol another item already claims by its
+  look.** When you save a symbol, the app searches the sheet with it and with
+  the other items' saved looks on the same plans. Places both find are named
+  in the warning ("3 places a look of Switch also finds"), even where nothing
+  has been counted yet.
+
+- **The look-alike warning now covers a brand-new legend item too.** Saving
+  a new symbol first searches the sheet with it, and if it lands on marks you
+  counted as something else, it asks before creating the item ("Save
+  anyway" or Cancel, Cancel first). Before, only a look added to an existing
+  item was checked.
+
+- **Fixed: taps on a freshly opened plan could be lost on a slow connection.**
+  The counting tool showed as ready, but for a moment after a sheet opened
+  (longer on a plan just uploaded) nothing was listening on the drawing, and
+  the taps disappeared without a word. They are now kept, shown at once, and
+  saved as soon as the sheet is ready. Found by the browser smoke test on
+  staging, and now tested on a deliberately slowed connection.
+
+## [2026-10-05]
+
+- **Conduit waste now covers the drops too.** The conduit allowance used to
+  apply to the traced run length only, while the wire allowance covered the
+  drops as well. Both now use the same footage, on traced runs and on drops
+  to counted devices — so a 40 ft run with 12.5 ft of drops buys 55.13 ft of
+  conduit at 5%, not 54.50 ft. The settings screens say so.
+
+- **Fixed: a device's drop could vanish from the bid.** When a run started
+  or ended on a marked device but counted no drop there itself, the
+  device's own drop was taken off anyway, so neither counted it. Now the
+  run only takes a drop it actually counts.
+- **A single device can have its own mounting height.** Select marks and
+  set a height in the bar that appears (a receptacle at 54" instead of
+  18"); its drop, the count's total and the bid follow. A height read off
+  the plan in Check sheet is offered as "Use 54"" and is only used when
+  you click it.
+- **One device's drop can be left off** with "No drop on these", and the
+  count says how many.
+- **A run ending on an existing device** still prices its drop, says so on
+  the run, and has a one-click "Leave it off".
+
+- **A newly added look cannot fill a count in one click.** In Find all
+  matching, a find that only a recently added look made now says so and
+  needs a look; "Confirm all" leaves it. Confirm one of them by hand and
+  that look is trusted from then on, in this browser. The item's first look
+  and the box you draw are trusted as before.
+
+- **New and existing devices now look different on the drawing at every
+  zoom.** Once a pin was big enough to carry its letter, a new device and
+  an existing one looked the same, and that difference decides what gets
+  priced. New pins are now clearly filled; existing pins are an empty
+  outline with the letter drawn in the count's color.
+
+- **Adding a look warns when it looks like something else you counted.**
+  When you add another look to a legend item, the app first searches the
+  sheet with it. If it lands on marks you counted as a different item, it
+  asks "This look also matches 2 marks counted as Duplex on this sheet. Add
+  it anyway?" — Cancel is the default and nothing is saved until you choose.
+  On a scanned sheet it cannot compare, and the message says so.
+
+- **Breaker search understands "double-pole" and "three-pole" with a
+  hyphen.** They found nothing before. Every common spelling (1P, SP, single
+  pole, 1-pole; 2P, DP, double pole; 3P, three pole) is now checked by a test,
+  against today's names and against the planned "1-Pole" names (owner,
+  2026-10-05; the rename itself waits for the other naming questions).
+
+- **A look saved under the wrong item can be moved.** Each look in a legend
+  item's list has "Move", which lists the other items. The look keeps its
+  picture and box; counted marks stay in their counts on every bid, locked or
+  not. It is refused if the other item already has that same look.
+
+- **Fixed: a legend symbol linked to an assembly could still go to the bid
+  with no price.** Clicking the symbol straight after linking it started a
+  count by name, which reached the bid as a line with no price and no hours.
+  The link now shows at once, and the server counts a linked symbol as its
+  assembly whichever way the click arrives. Found by the first browser smoke
+  test to run on staging.
+
+- **A check that no bid's total moves when a release goes live.** A new
+  read-only tool records every bid's "Total due" and not-priced count before
+  and after a release and lists any that changed. It cannot write to the
+  database even by accident. Rehearsed on a copy of real data: 4,234 bids, no
+  number moved.
+
+- **A wrong look can be removed.** On the Legend tab, "N looks" now opens the
+  item's pictures, each with an × that asks once. Removing a look changes what
+  future searches find and nothing else — no mark, count or bid line moves, on
+  any bid, locked or not. If the removed look was the picture the item shows,
+  it shows its next one. In an open Find all matching, unconfirmed finds that look made
+  are dropped (unless the box drawn on the sheet found them too), and the
+  message says how many.
+
+- **Count a run of existing devices without fixing each one afterwards.**
+  While counting, a New / Existing switch sits beside "Counting …" and stays
+  where you put it until you change it. Marks placed as Existing are saved
+  as existing to remain, so they never reach the bid as parts to buy. A
+  crash or reload in the middle of placing them brings them back as
+  existing too.
+
+- **Mark a device as existing, to be removed or relocated, and it is never
+  priced as new.** Select marks and choose "Mark as…". Existing devices draw
+  as hollow pins, removals get a red X, relocations an arrow badge, and each
+  count's card says the split in words ("1 new · 1 existing · 1 remove").
+  Only new marks reach the bid line, "Send to bid", the supplier list, the
+  takeoff export and the drop footage; the others still show on the drawing.
+  Remove and relocate labor is not on the bid yet, and the card says so.
+- **Choose how a count's pins look.** Click a count's swatch to pick its
+  shape, letter and color, for this job or for every job (on its legend
+  symbol or assembly). Anything left on Automatic keeps today's look.
+- **A legend item can now have several looks (test build, track-c).** When
+  you capture a symbol whose name is already in your legend, the app asks
+  whether it is another look of that item. Yes keeps the new picture, and it
+  is still one item, one count and one price. Find all matching then searches
+  every saved look as well as the one you box. You can also search the saved
+  looks without boxing anything.
+- **A look from another set of plans only suggests.** The same-looking symbol
+  can mean different things on different jobs. On Old Blueridge the
+  half-filled duplex is a duplex above the backsplash, not a GFCI. So a find
+  that only another set's look made is always flagged for you to check, and
+  "Confirm all" never counts it.
+- **The accuracy answer key was corrected for Old Blueridge.** The "point"
+  marks were the 7 occupancy/daylight sensors. The "GFCI" count is the duplex
+  above the backsplash. Names are now matched per plan set.
+- **A run can never attach to an unconfirmed mark.** A run that snaps to a
+  mark copies its position, so a misplaced AI mark used to become a wrong
+  length. An unconfirmed mark is now skipped by the snap, and the server
+  refuses one too, with a plain message.
+- **The database can record whether each run end's wall connection was
+  checked** (migrations 0103–0104). Nothing uses it yet.
+
+## [2026-10-02]
+
+- **The database is ready for pin looks, mark status, mark heights and
+  several pictures per legend symbol** (migrations 0098–0102, plus 0096 and
+  0097 from the password-reset work). Every addition is empty and optional, so
+  nothing on a bid changes until the screens that use them ship. Rehearsed on a
+  restored copy of the staging database before staging itself.
+- **"Forgot password?" is merged** and can be tried on staging (only to the
+  addresses staging is allowed to email). Live still needs its database change
+  and email key before it works there.
+- **The plan reader can no longer be given another plan set's words.** The
+  text read off each sheet (title block, notes, printed scale) was kept by page
+  number only, so page 1 of one plan set could be sent to the reader with page
+  1 of another set's picture — including the wrong printed scale. It is now
+  kept per plan set.
+- **No more lost clicks when you start counting.** Clicking marks straight
+  after choosing a legend symbol (or picking an assembly or typing a new count
+  name) could silently drop some of them while the app was still setting the
+  count up — in one test, none of three clicks were kept. Now the count is
+  ready the instant you pick it and every click is kept. If the count cannot
+  be made, the app says how many marks were not counted and why.
+- **A new plan's printed scale is read straight away.** A sheet with a scale
+  printed on it showed "Set scale" after uploading until you reloaded the
+  page. It is now read as soon as the sheet appears.
+
+## [2026-10-01]
+
+- **Runs that end at a wall receptacle, switch or data outlet now reach the
+  wall.** The symbol is drawn standing off the wall, and a run traced to it
+  used to stop at the middle of the drawing — about half a foot short at
+  each end at 1/8" scale, on every such device. Clicking on one now places
+  the point where the box is, at the wall line beside it, and a small cyan
+  tick shows where the run meets it. Where no wall can be found (a scanned
+  sheet, or nothing beside it), the end stays at the centre and an amber "?"
+  says so. Lights, J-boxes and panels are still met in the middle. Hold Alt
+  (or tap Free) to place a point exactly. Runs traced before this keep
+  their lengths.
+- **The server starts about four seconds faster, and a test that failed at
+  random no longer does.** A start-up check for duplicate catalog rows
+  compared every material against every other one, and took 4.5 seconds at
+  today's catalog size. It now asks the same question in one pass (6 ms).
+  That slowness was why the materials tests sometimes timed out.
+- **Find all matching now works on scanned plans (test build, track-c).** Box
+  one symbol on a scanned sheet and every copy on that plan is found by its
+  picture, with no AI. On Old Blueridge it found 85 of the owner's 86 hand
+  marks. It searches only the plan you boxed on, so a demolition plan drawn
+  on the same sheet is never mixed in. Boxed on the demolition plan itself,
+  every find says "not counted". A scan too coarse to match is refused with
+  its size in pixels. Nothing on a scan counts until someone has checked the
+  tag or the "E" beside it. An optional "Ask AI" button reads those from
+  small pictures, about a cent for twelve.
+
+- **Count pins now take their shape from what the item is.** Receptacles and
+  junction boxes are circles, lights are squares, data outlets are triangles,
+  switches are diamonds, panels and disconnects are wide rectangles, and
+  anything else is a hexagon. Each item's own name decides. So a receptacle
+  and a switch sharing one assembly no longer look alike, and three lights on
+  one assembly differ by letter and colour. **Existing counts may change shape
+  once.** A safety switch now reads DS rather than S, and a data outlet reads
+  D rather than R. Bid numbers are unaffected.
+
+- **Staging now updates itself, and a robot rechecks it.** When a change passes
+  the tests on `local-dev`, it goes to staging automatically — unless it
+  changes the database, which still waits for Track A to apply by hand with a
+  backup. After each staging update, a browser test walks the recheck list on
+  its own throwaway bids: counting, linking, sending, locking, the proposal,
+  every main screen on phone and tablet sizes, and the core flow by touch. It
+  never touches the live site and never spends AI money. Live releases still
+  happen only when Track A does them, and only from a version that passed.
+- **Tablets and phones: two "why" notes on a bid now open with a tap.** "in
+  run rate" beside a coupling, connector or strap, and the note on traced
+  footage bought with extra, used to explain themselves only when a mouse
+  hovered over them. A finger could not read them. Tap the dotted-underlined
+  words and the same explanation opens.
+- **Phones: Supplier pricing shows prices sooner.** The header, tabs and
+  filters used to take up more than half the screen before the first price.
+  The filters now sit in one row that scrolls sideways, and the first price
+  starts about 170 px higher. Tablets and laptops are unchanged.
+- **New: "Check sheet" on the Plans screen.** After reading a legend with
+  Whole legend, one button compares every mark on a sheet with the drawing.
+  It lists the marks that look like something else or have nothing under
+  them, the legend symbols nobody marked, counts whose marks are drawn in
+  more than one way, and heights, (E)/(X) and keynote numbers written beside
+  marks. Each line comes with a picture and a Go to button. Nothing changes
+  until you press Keep, Move, Delete, Count it or Split. On a locked bid it is
+  a report only. It runs without AI. When two legend symbols fit one spot
+  equally well, an optional "Ask AI to pick" button costs about a cent. On a
+  real 243-mark sheet it agreed with 149 hand marks and called none wrong, at
+  no cost. The paid whole-sheet AI reader got 128 right and 33 wrong for $0.61.
+
+- **BidRidge works on a tablet and reads on a phone.** On an iPad or Android
+  tablet, either way round, everything works by finger: two fingers move and
+  zoom the plan, a tap places a mark, and a finger that lands to move the
+  sheet never drops a stray mark (it used to). Shift-select, box-select,
+  removing a run point, a free leg start and cancelling a capture all have
+  on-screen buttons now. Every button is fingertip-sized on a touch screen,
+  and buttons that only appeared under a mouse are always shown. On a phone,
+  every list is a set of readable cards instead of a squashed table, nothing
+  scrolls sideways, the plan's panel is a bottom sheet, and the proposal opens
+  fitted to the screen. The laptop looks exactly as before. Details and before
+  and after screenshots: `references/device-audit.md`.
+- **Every change is now tested automatically on GitHub.** Each push to
+  `local-dev`, a track branch or a Track A branch runs the type check and the
+  full test suite against a brand-new database, built from every migration and
+  seeded the way the app seeds itself. A track branch that tries to change the
+  database migrations is refused, because migrations stay with Track A. This
+  deploys nothing.
+- **Several legend symbols linked to one assembly now keep separate counts.**
+  Three lights linked to the same assembly all landed in one count (22 + 3
+  stored as 25, under one name). Each symbol now counts into its own count,
+  named for the symbol, and goes to the bid as its own line at the same unit
+  price — the bid total is exactly what it was. Counts already merged are left
+  as they are. The toolbar's Count picker asks "Which item?" when an assembly
+  is counted as more than one, instead of guessing.
+- **Count pins carry a letter, and colours no longer repeat on a bid.** Each
+  count gets a letter from its fixture tag ("(A-7)" → A7), else from what its
+  name says (GFCI → G, light → L), else from its assembly; a second count that
+  would share a letter becomes L2, R2, and never takes a code like S3 that
+  means something on plans. Letters show once the pin is big enough to read,
+  and on the count card. Colours go in order of first use, so the first six
+  counts on a bid are all different — existing counts may change colour once.
+- **"Again: <count>" in the toolbar** re-arms the last count with one click (or
+  R) after a sheet change put it down. It never comes back by itself.
+- **Pins no longer float over the wrong sheet.** Changing sheets drew the new
+  sheet's pins over the previous sheet's drawing for most of a second before
+  the new page appeared. Pins now wait for their own page, and a thin bar
+  across the top of the plan shows while the next sheet draws.
+- **The message after capturing a symbol** now says a click starts counting,
+  and that linking an assembly is optional, instead of "click it to choose an
+  assembly".
+
+- **Legend symbols can be renamed.** A pencil beside each captured symbol in
+  the Plans panel (laptop and phone) renames it; Enter saves, Escape cancels,
+  and a blank name is refused. The count of that symbol on the open bid takes
+  the new name too, so the count card, the bid line, the summary and the CSV
+  agree. The name it was captured under is still recognised — a count made
+  under it on another job, the plan reader, and capturing it again all find
+  the same symbol — and "Reset to original" puts it back (in lower case for
+  now). Renaming never touches a linked assembly or its count, and a locked
+  bid refuses it.
+
+- **Changing sheets now puts the count tool down.** A count picked up on one
+  sheet stayed on after switching to another, so a click meant to move the
+  view on the legend sheet dropped a stray mark — a wrong count on the bid.
+  Every way of changing sheet (arrows, keys, the sheet list, a jump from a
+  list, Back) now returns to moving the view; pick the symbol again to count.
+  Starting the Capture box also puts a count down.
+- **A run left half-traced is saved where it was drawn.** Switching sheets
+  mid-trace used to carry the points along, and the autosave could then file
+  them under the new sheet. Now the run is kept as a draft on its own sheet
+  and the trace tool is put down.
+- **Reader-accuracy test: "same as" names.** The AI names what it finds by
+  the captured legend symbol, and many hand counts are named differently
+  ("GFCI receptacle" vs "DUPLEX RECEPTACLE, GFCI"), so right answers were
+  being scored as the wrong symbol. The test's answer-key file can now say
+  which names are the same item. Nothing is renamed.
+
+- **Move marks to another count without clicking them again.** Select marks
+  on a sheet (click, or Shift-drag a box) and pick a count from "Move to…" in
+  the bar that appears. The marks stay exactly where they are and only what
+  they count changes, in one step that Undo takes back. Not allowed on a bid
+  whose quantities are locked. Made for separating devices drawn as
+  existing to remain from new ones.
+- **Reader-accuracy test: existing devices can be counted apart.** The test
+  account now has an "… - EXISTING TO REMAIN" assembly beside each symbol
+  being counted. The accuracy score treats those marks as the same symbol,
+  because the AI reader is not asked to tell new from existing. A real
+  per-mark status (new / existing / remove / relocate) is queued for a
+  database change.
+- **Reader-accuracy test: a smaller answer key, and a review of what the AI
+  found.** Each sheet is now scored only on the 8–10 symbol types counted on
+  it; other types are ignored. Data and telecom get their own score. Every
+  AI find that is not in the hand count is listed on a local review page with
+  a picture and a link that opens that exact spot in BidRidge, and can be
+  marked "my miss" or "AI wrong". Scoring again after fixing the count reuses
+  the saved AI answers, so it costs nothing.
+- **Find all matching (no AI).** While counting something, press "Find
+  all matching" and drag a box round one of that symbol on the sheet. Every
+  copy on the sheet is ringed — turned or mirrored copies too — in about a
+  tenth of a second. Nothing is counted until you confirm it: "Confirm all
+  clear" counts the plain ones, and copies that might be something else
+  (a "GF" beside a duplex, extra lines through it, joined to a bigger
+  symbol) or might be existing ("(E)" beside it, drawn lighter) are flagged
+  for you to decide one at a time, with "Count as existing" when there is an
+  existing-to-remain count. Works on drawings made by CAD; on a scanned
+  sheet it says it cannot see the symbols rather than guessing.
+- **A link can open a plan at one spot.** The Plans address that names a
+  plan set and sheet (`?set=…&sheet=…`) can also carry a point (`&x=…&y=…`):
+  it opens that sheet zoomed to that point with the usual ring. Used by the
+  review page.
+
+## [2026-09-30]
+
+- **A captured symbol links itself to the assembly with the same name.**
+  Capture a symbol named exactly like one of your assemblies (capitals and
+  spacing aside) and it is linked to that assembly straight away, so one
+  click on it in the Legend starts counting. Nothing is guessed: a name that
+  is only similar stays unlinked, an assembly you pick yourself always wins,
+  and a symbol you captured before is never relinked.
+- **Right-click works in the symbol name boxes again.** The plan viewer
+  blocks the right-click menu over the drawing (a right-drag moves the
+  sheet), and that also blocked it in the "Name this symbol" box and the
+  whole-legend name boxes, which sit on top of the drawing. So the browser's
+  spelling suggestions could not be reached. Text boxes now get the normal
+  menu; right-click on the drawing works as before.
+- **Capture a whole legend in one go.** In the Legend panel, "Whole legend"
+  lets you draw one box around a plan's symbol legend. The app reads each
+  symbol's name from the drawing's own text (no AI), cuts a sharp picture of
+  the symbol beside it, and lists them all. Names that match your assemblies
+  are ticked; untick what you do not need, fix a name, and save them all at
+  once. Symbols you have already captured are never saved over. A scanned
+  legend, whose names are only a picture, is not guessed at: it says it
+  cannot be read and to capture those symbols one at a time.
+- **Capture on the legend works again.** After boxing a symbol, the "Name
+  this symbol" box was opening but drawn on the zoomed drawing, so it was a
+  speck at low zoom and off the top of the screen when zoomed in on a legend.
+  Capture looked like it did nothing. The box now always appears at a normal
+  size at the top of the viewer.
+- **Captured legend symbols are now saved sharp.** The picture used to be
+  cut from a low-resolution copy of the sheet and shrunk, so a symbol that
+  was crisp on screen was saved blurry (a 0.4-inch symbol came out about 43
+  pixels wide). It is now drawn fresh from the PDF at 400 pixels per inch, or
+  sharper if you were zoomed in further. Very large pictures are kept small
+  enough for the database, which previously could have refused them.
+- **BidRidge now tells you when there is a newer version.** Someone who had
+  the app open before an update kept running the old version until they
+  refreshed, so a fix did not reach them. Now a bar says "A new version of
+  BidRidge is available" with a Refresh button. It never reloads by itself,
+  so nothing typed is lost. If an out-of-date page can't load part of the
+  app, it says "BidRidge has been updated — Refresh" instead of "This screen
+  stopped working". A browser can also no longer get stuck holding a broken
+  copy of the app's code after an update.
+
+- **The Plans screen's panel works on a phone.** At phone width it used to
+  run off the side of the screen, taking its buttons with it. Now the drawing
+  gets the whole width, a bar along the bottom says what is on this sheet,
+  and tapping it opens the panel full-screen — the same tabs as on a laptop,
+  plus a Sheets tab for picking a sheet. Every button in it is finger-sized,
+  and "← Plan" returns to the drawing exactly where you left it. Moving
+  around the drawing with fingers is not done yet.
+
+- **The Plans screen's right-hand panel is easier to read.** Nearly all of
+  its text was 10–11 px; every number, price and warning is now at least
+  12 px and each line item 14 px. Warnings have their own amber colour on a
+  tinted band, so they no longer look like the yellow that marks what is
+  selected. "Not on the bid yet" now shows one line per reason with a count
+  — "Traced, not sent yet — 10", "No wire in the pipe — 1" — and each line
+  opens to its items, instead of repeating the same reason under every row.
+
+- **Refreshing the Plans screen keeps your place.** F5, or reopening the
+  link, used to jump back to the first page of the first plan set. The
+  address now names the plan set and sheet, so a refresh — or a link you
+  send someone — opens that sheet, and a refresh in the same tab also comes
+  back to the same zoom and position. If that set or sheet has since been
+  deleted, it opens the first sheet instead, with no error. Flipping sheets
+  does not fill the Back button: Back still leaves the screen in one press.
+
+- **The Plans screen's right-hand panel is now tabs: Counts, Runs, Legend,
+  Reader and Totals.** It used to be one long column — about nine screens of
+  scrolling on a small job, with scroll boxes inside it. Now one tab is open
+  at a time and scrolls on its own. A line along the top always says what is
+  on this sheet ("This sheet: 3 marks · 6 items · 358 ft of runs"), replacing
+  a number that added marks to runs and meant nothing. Clicking a run or a
+  mark on the drawing opens its tab, scrolled to it. A tab holding a warning
+  — such as Totals while something is not on the bid — shows an amber mark,
+  so nothing important hides in a closed tab. The panel remembers the tab
+  you last chose. Laptop only for now; the phone comes later.
+
+- **A legend symbol counts the moment you click it, assembly or not.**
+  Clicking a symbol nobody has linked used to stop and ask which assembly it
+  was, so a light fixture a supplier will price as a package could not be
+  counted at all. Now the click starts counting it by name, and "Link" sits
+  beside the symbol for whenever you want it. Any count made by name has a
+  "Link assembly…" control on its card, which turns it into an assembly
+  count with every mark kept.
+- **The materials list has a "Supplier to price" section.** Counts with no
+  assembly behind them — "A1 luminaire: 38" — are listed there by name and
+  quantity, in the dialog, the CSV and the PDF, for the supplier to quote as
+  a package. They used to appear only in a note saying they could not be
+  itemised. They never show a price, and never $0.
+
+- **A sheet's scale no longer sits on top of the next sheet in the sheet
+  list.** Setting a scale grew that row by a line, and for a moment (or for
+  as long as the tab was in the background) the list still had it at its old
+  height, so the scale covered the sheet below. Rows now take their new
+  height the instant a scale is set. On a narrow sheet list the scale also
+  stays on one line rather than breaking in two, and a long one like
+  3/16" = 1'-0" now fits in full even with the list dragged to its narrowest.
+
+- **A proposal for a bid with nothing on it no longer shows the client
+  $0.00.** It says "No work added yet" where the total would be, and Print /
+  Save PDF / Ctrl+P is blocked with a plain message to add work to the bid
+  first — the same way unpriced lines are blocked.
+
+- **"Show me on the drawing" now actually moves the drawing.** Pressing Link or
+  Fix on a plan-reader suggestion, ticking one, or picking a counted item or a
+  drop used to draw a ring where the thing was and leave the view alone, so at
+  full-sheet view (or with the spot off screen) it looked like nothing
+  happened. The drawing now zooms in and centres on the spot.
+
 ## [2026-09-29]
+
+- **The AI reading test now measures WHERE the AI puts its marks, not just
+  whether it found them.** It reports how many inches off each mark lands,
+  whether the error is a stretch or a shift, and whether it is worse toward
+  the bottom of the sheet. It can also ask the AI for positions in pixels
+  instead of fractions of the picture, to see which is more accurate. This
+  follows the marks found landing up to 2.4 inches off.
+
+- **The pricing spreadsheet puts every Home Depot row first.** All 1,867
+  store rows sit in one unbroken block ahead of the 330 supply-house rows,
+  so the store pricing can be done in one sitting. It already held every
+  catalog row (1,554), plus 124 new rows and 519 brand variants.
+
+- **A backup check that fails no longer leaves a half-restored copy
+  behind.** When a backup would not restore, the test copy it was loading
+  into stayed on the database server until the next check cleared it. It is
+  now removed straight away. One slow test was also rewritten to ask the
+  database once rather than two hundred times, instead of just being given
+  longer to finish.
+
+- **Eleven parts the new starter assemblies needed are in the catalog.** A
+  commercial smoke detector head, well-pump drop cable, mini-split cable, a
+  meter hub, mast flashing and riser strap, an SE cable connector, a roof
+  flashing boot for conduit, a Cat6 RJ45 end, and a temporary pole and light
+  string. All unpriced, like every shipped part.
+
+- **The supplier materials list no longer asks for a fraction of an item.**
+  A recipe may use a quarter tube of firestop per hole; the list now adds
+  those up and rounds pieces and boxes UP to whole, so one to four holes
+  order one tube. Footage is unchanged.
+
+- **Flex runs now buy their straps, and #12 and #14 stranded THHN are in
+  the catalog.** A traced flexible metal or liquidtight run used to say "No
+  catalog strap"; it now counts one-hole straps sized to the flex (four new
+  parts). Stranded #12 and #14, common in commercial pipe, sit beside the
+  solid rows.
+
+- **Three-phase panels now come in sizes.** Six 208Y/120V panelboards,
+  100A to 400A, main-lug and main-breaker. Before, one unsized
+  "208V 3-phase panelboard" row stood for every size, so a 100A and a 400A
+  panel got the same price. That row stays for old bids and now says to
+  prefer a sized one.
+
+- **Occupancy sensor power packs and 18/3 control wire are in the
+  catalog.** A low-voltage ceiling sensor needs a power pack per zone and
+  18/3 cable to it; the catalog had the sensor only, so the pack was easy to
+  leave off. The ceiling sensors now say which kind needs the extra parts.
+
+- **12-4 and 14-4 MC cable, and 12-2 isolated-ground MC, are in the
+  catalog.** Three-phase branch circuits are commonly run in 12-4 MC, and
+  without it an estimator picked 12-3 and priced one wire in four too few.
+  The isolated-ground cable is what feeds cash-register receptacles.
+
+- **An MC cable run now buys its connectors and straps.** Each traced MC
+  run adds a connector at each end and a strap near each box and every 6 ft,
+  sized to the cable (3/8" connector and small strap for 12-2, and so on).
+  Before, every MC run was short these parts with nothing saying so. Six new
+  catalog parts: four MC connectors and two MC straps (unpriced, like every
+  shipped item).
+- **A branch on an MC or NM cable run now buys its box.** A tee on a cable
+  run counted the cable but no box at the split; it now adds a 4" square
+  box and blank cover, the same pair a small-pipe tee buys.
+- **A tee shared by two pipe sizes no longer stores two boxes.** Sending
+  each size to the bid separately saved a box for both; the bid screen
+  showed one, but the saved lines said two. Now only the larger pipe's
+  line carries it.
+
+- **The database check no longer gives wrong advice before a deploy.** It
+  used to say a database that could not be reached had "never been
+  migrated", and to call a missing link's migration "already applied" when
+  it simply had not run yet — with hand-written fixes that would have
+  broken the real migration. It now says it could not connect, and names
+  which pending migration will add each missing link.
+
+- **A run type bought as sweeps now says "sweep" under its sweep row.** The
+  count sentence said "At least 2 90° elbows" beside a row that was a 36"
+  sweep. It now names what the type actually buys — sweep or elbow — and
+  says "bend" where no part has been matched yet.
+
+- **Searching a count now finds that count.** "2 gang box" leads with the
+  double-gang box again (a weatherproof-box change earlier today had pushed
+  it out of the top five), "1 gang box" with the single-gang box, "2 pole"
+  and "2 pole 20" with 2-pole breakers instead of a 20 ft light pole, "20
+  space" with 20-space panels, and "3 hole" with the weatherproof boxes
+  rather than 3/4" straps. A number typed before "gang", "pole", "hole" and
+  the like no longer matches a size that merely starts with it.
+
+- **Weatherproof boxes now say their hub size, 1/2" or 3/4"**, and the
+  3/4" single-gang, double-gang, round and PVC boxes are new. The old
+  unsized rows became the 1/2" ones, so anything already using them keeps
+  working. Threaded closure plugs (1/2" and 3/4") are in the catalog too,
+  for the unused hubs (unpriced, like every shipped item).
+- **A proposal can no longer show a client $0.00 or a short total.** If any
+  line on the bid is not priced, the proposal shows "Price pending" where the
+  total (and any subtotal, tax or per-unit price) would be, and Print / Save
+  PDF is blocked with a list of the lines to price first. Before this it
+  asked "Print anyway?" and printed the short total; on a bid with one
+  unpriced line that was $0.00. A scope-only proposal, which shows no money,
+  is unchanged.
+- **The plan reader's Link button now always opens where you can see it.**
+  It used to be invisible until the mouse was over it, and pressing it opened
+  the "what is this really?" picker below the whole list of suggestions, often
+  cut off by the bottom of the pane, so it looked like nothing happened. The
+  picker now opens directly under the suggestion you pressed, and says plainly
+  when you have no legend symbols to pick from yet.
+- **Plan reader suggestions are no longer ticked for you, and ticking one
+  shows you where it is.** Checked on a real sheet, the reader's idea of WHERE
+  a symbol sits can be off by a couple of inches of paper (several feet at
+  1/4" scale), even when it is sure WHAT the symbol is. That is how a mark
+  ended up beside a keynote tag by a door instead of on the light fixture.
+  The app was placing marks exactly where the reader said; the reader was
+  wrong about where. Now nothing is placed until you tick it, and ticking it
+  (or pressing Link) moves the drawing to that spot so you can check it first.
+
+- **Couplings, connectors and straps on a traced run are no longer paid for
+  twice.** A run's labor hours per foot already cover them, so their bid lines
+  now carry the part's cost and no hours of their own — they read "in run
+  rate" — and Send again never adds hours to them. Before, setting hours on
+  both the pipe and its couplings billed that labor once in every foot and
+  again per coupling. Elbows, field bends, LBs, pull boxes and tee boxes still
+  carry their own hours. The run type's labor line now says what it covers.
 
 - **The plan reader no longer reads a sheet just because you opened it.** The
   "Read each sheet as I open it" switch is gone. A sheet is read, and paid for,
   only when you press Read sheet. With the switch on, clicking through a
   forty-sheet set to find the electrical drawings could spend money on every
   sheet you passed.
+- **Deleting on the Plans screen now asks in proportion to what you lose.**
+  One mark, or one count's marks on a sheet, goes at once with an "Undo"
+  button in the message. A whole run asks first and names it ("Delete run
+  Homerun — 88.89 ft?"); a new "Delete count…" removes a count from every
+  sheet after asking, and can be undone too. Clearing a sheet now says how
+  many feet of run go. In these questions Enter never deletes — it has to be
+  a click. A locked bid refuses all of it; deleting a whole count on a
+  locked bid used to be allowed, and is not any more.
+- **The Plans screen now says what is on the bid and what is not, for the
+  whole plan set.** An amber "Not on the bid yet" list names every count and
+  traced run that has not reached the bid, with the reason — not sent, no run
+  type, no scale, an assembly that was deleted, or conduit with no wire in
+  it. "Send N to bid…" shows a preview of what will go and what cannot, then
+  sends it in one press. Sending again never adds a second line, a locked bid
+  refuses, and if the drawing changed while the preview was open it asks you
+  to check again rather than sending something you did not see. Pressing
+  Enter in the preview never sends; it has to be a click.
+- **Sending a count or a run type again, after its bid line had been
+  archived, no longer fails with a database error.** The archived copy was
+  still holding the count's place on the bid; it is now cleared and a fresh
+  line goes on. This had to work before "Send all to bid" could be built.
+- **Two-finger scrolling on a trackpad now moves the sheet.** It used to zoom.
+  A mouse wheel still zooms (like Bluebeam), and pinching still zooms. The app
+  tells the two apart by how the scroll arrives; if your mouse ever pans
+  instead of zooming, say so — that is the one guess in this.
+- **You can move the sheet when zoomed out.** At "Fit" and below, dragging
+  the sheet did nothing — it snapped back to the middle. It now moves a
+  little (up to about a sixth of the view either way) so you can slide a
+  detail out from under a panel. "Fit" and the 0 key still put it back in the
+  middle.
+- **Dragging the sheet no longer picks or nudges things by accident.** A drag
+  that started on a mark used to move the sheet AND select that mark, so the
+  next Delete could remove something you never chose; it now just moves the
+  sheet. A small wobble while clicking no longer moves the sheet, and a click
+  on a run's point handle no longer shifts the point by a hair. Setting a
+  scale by measuring no longer nudges the sheet between the two clicks.
+- **The sheet list's header no longer cuts off its buttons.** When the sheet
+  panel was narrow (or the app's text size was larger), the list/picture
+  buttons were half hidden past the panel's edge. The header now moves them
+  to a second line instead. On a phone-width window, "Add PDF" at the top of
+  the Plans screen was also off the edge; that row now wraps too.
+- **Undo on the Plans screen now survives leaving it.** Going to the bid and
+  back used to wipe the undo history. It now lasts as long as the browser tab
+  (including a reload); a new tab starts with its own empty history, and the
+  button says "Nothing to undo in this tab yet".
+- **Slipped double-clicks no longer add stray elbows, and old ones are
+  flagged.** Finishing a run with a double-click could leave a tiny extra
+  segment when the mouse moved slightly, especially zoomed out, and that
+  turn was counted as an elbow. The trace tool now ignores the second click
+  of a double-click at any zoom. Runs traced before this that may have such
+  an end show "Check this elbow" with a Show button; nothing is changed on
+  them — you decide.
+- **Marks can no longer be counted as the wrong thing after a failed save.**
+  If saving marks failed (a dropped connection) and you then switched to
+  counting something else, the next save could file both sets under the first
+  item. Each count now saves separately, and marks recovered after a crash are
+  put back under the count they were placed with. Checked by making saves fail
+  on purpose: each count kept exactly its own marks.
+- **Traced runs that never reached the bid are now called out.** A run only
+  reaches the bid once its run type is sent, and nothing used to say when that
+  had not happened, so a bid and its quote could look finished with hundreds of
+  feet of pipe missing. The bid page and the quote panel now both say, for
+  example, "3 traced runs not on the bid — not sent yet", and name runs that
+  have no run type. The quote panel also mentions counts not yet sent and pipe
+  with no wire.
+- **A conduit run with no wire in it now says so, in amber.** A traced pipe
+  starts with no wire until wire is added, so it could reach the bid empty with
+  only a grey "none" to show for it. The run now reads "No wire on the bid for
+  this pipe" with a one-tap "Use the run type's wire", and the bid page warns
+  "N conduit runs have no wire". Nothing is added without you pressing it.
+- **A locked bid now refuses the last ways its numbers could still move.**
+  Sending counts or runs to it, changing or clearing a sheet's scale (and
+  applying one read automatically from the sheet), removing a plan set, and
+  removing a bid line that came from the plans are all refused with the same
+  plain "unlock it on the bid first" sentence. Lines you typed in by hand can
+  still be removed. The Send links, the scale chip and the plan's remove
+  button say so before anything happens.
+- **A locked bid's plans can no longer change at all.** Before, a locked
+  bid refused deletes but still let you place new marks, trace new runs, type
+  a run's length, add a leg, answer a pull point or change a run's wires. The
+  quoted numbers held, but the drawing behind them moved, and unlocking later
+  would have pulled those changes onto the bid unnoticed. All of these are now
+  refused with one plain sentence ("This bid's quantities are locked, so new
+  marks cannot be placed. Unlock them on the bid first."). The Count and trace
+  buttons say it before anything starts.
+- **Undo stays where you deleted, even when the count card empties.**
+  Deleting the last mark of a count on a sheet used to make its card (and its
+  undo arrow) disappear, leaving only the toolbar Undo. The card now stays in
+  place, greyed, reading "None left on this sheet", with its undo arrow, until
+  you do something else.
+- **Drops are set in the run card, end by end.** Selecting a run (on the plan
+  or its card) opens "Run ends", listing every end of every leg, branch ends
+  included. Each end has one-tap answers (Device box, Panel, J-box, Fixture,
+  Stub-up, Nothing) that take the drop from heights you already have, and a
+  height you can change for that end alone. Clicking an end on the plan
+  highlights it in the list. The "only one end counted" warning is now a
+  "Set ends" button that takes you to the run. Every end change can be
+  undone.
+- **Fixed: changing a run's end did not update the bid until something else
+  did.** The Send preview, the bid's lines and the materials list kept
+  showing the old drop footage after an end changed. They now update at once.
+- **Trash and undo on every count card, and undo on every run card.** A
+  count card's trash deletes that count's marks on the sheet you are looking
+  at, asking first when there is more than one. The count itself stays, and
+  its bid line follows. Each card's undo arrow takes back the latest change
+  when that change was to this card, and its tooltip names it. It is greyed
+  out when the latest change was somewhere else, so it can never undo out
+  of order.
+- **A Delete button on the Plans toolbar.** It sits beside Undo and Redo and
+  says what it will delete ("Delete 3 marks", "Delete run"). It is greyed
+  out until something is selected, and asks first when more than one mark
+  is selected. The Delete key does the same for a selected run.
+- **A locked bid no longer lets drops change.** What sits at a run's end
+  (and a quantity trace's drop answers) decides how much drop pipe and wire
+  the run needs, and those could still be changed on a locked bid. They are
+  now refused with "unlock them on the bid first", like the other locked
+  edits. A run traced after locking can still be drawn, but its ends wait
+  until the bid is unlocked.
+- **No more white square when a plan opens.** Opening a plan showed a small
+  blank white box in the corner until the first sheet was drawn. The loading
+  panel now stays up ("Opening plan set…", then "Drawing sheet 1…") until
+  the sheet can be shown whole and already fitted to the screen.
+- **You can clear one sheet, and put it back.** The new "…" menu beside the
+  sheet picker has "Clear all marks and runs on this sheet". It first asks
+  with the exact numbers, for example "Remove 12 runs and 40 marks in 5
+  counts from E1.01?", and warns when a count will have no marks left
+  anywhere. One Ctrl+Z puts the whole sheet back as it was. The sheet, its
+  scale and the counts stay. Not available on a locked bid.
+- **"Select text" is now called "Copy text".** It reads words off the drawing
+  for you to copy, and "select" was easily confused with selecting marks.
+- **A finished run's points can now be dragged.** Select a run and its
+  points show as handles. Drag one to move it, drag the faint "+" on a
+  segment to add a point, and right-click a point (or click it, then press
+  Delete) to remove it. The length, elbows and bid follow when you let go,
+  and Ctrl+Z puts the run back. A finished run stays finished and keeps its
+  location. A branch-tee end stays on its tee. If a moved corner loses an LB
+  or pull-box answer, the screen says so. Not available on a locked bid.
+- **Undo and redo on the Plans screen.** Placing marks, deleting marks,
+  finishing a run and deleting a run can each be undone with the new arrow in
+  the toolbar or Ctrl+Z, and redone with Ctrl+Shift+Z. The tooltip names the
+  step ("Undo: 3 marks placed"). Anything put back returns exactly as it was,
+  with the same links: a run that ended on a mark ends on it again, so no
+  vertical or count quietly changes. If something changed since (the count
+  was deleted, or the run was edited), the step is refused with the reason.
+  The history is per bid and lasts until the page is reloaded.
+- **While tracing, the top readout shows only the run total.** It used to
+  show a second, bigger "to cursor" figure that jumped whenever the mouse
+  moved, which read as the run's length. The pill now holds only the clicked
+  points, the same length that gets saved. A small dim "Next" label at the
+  cursor gives the segment you are about to click, and the preview line is
+  thinner and fainter. Settings → Display can turn the "Next" label off.
+- **Finishing a run with a double-click no longer adds a phantom elbow.** The
+  second click of the double-click added a tiny extra point. If the mouse had
+  moved even a pixel, the elbow count read the turn onto it as a corner and
+  put an elbow on the bid that nobody drew. The second click now adds
+  nothing. Runs already saved with a very short stub stop counting it too.
+- **A locked bid can no longer lose marks or runs.** Deleting a mark, a
+  selection of marks or a traced run went straight through on a bid whose
+  quantities were locked. The bid's number held, but the drawing behind it
+  changed, and unlocking later would have re-read the gaps. Those deletes are
+  now refused with "unlock them on the bid first". Placing new marks on a
+  locked bid still works, as before.
 - **Marks placed by the plan reader now count on the bid.** Pressing Place
   drew the marks and added their parts to the materials list, but the count
   and the bid line never moved, so the bid and the supply list disagreed with
@@ -71,6 +842,15 @@ This is the human-readable companion to the git history — read this to see wha
   measured, and the export gives it its own "Typed ft" column. It is the
   flat run only; drops and extra are added on top.
 
+- **"Forgot password?" on the sign-in page.** It emails a link to choose a
+  new password; the link works once, for one hour, and using it signs the
+  account out on every device. Changing your password in Settings now signs
+  out every other device too, while keeping the one you are on. Not live yet —
+  it needs a database change and the email service set up first.
+- **The database can now record a T conduit body at a branch tee as its own
+  bid line** (migration 0096). Nothing uses it yet — the plan viewer still
+  offers only a box at a tee — but the change that does needs the database
+  ready first. Rehearsed on a restored copy of the live database.
 - **Concrete ring boxes for deck pours are in the catalog**: 4" and 6"
   deep, and the backplate that goes with them (unpriced, like every
   shipped item).

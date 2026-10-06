@@ -13,6 +13,7 @@
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import {
+  lineMaterialNotPriced,
   lineNotPriced,
   linePartsNotPriced,
   type PartsLineLike,
@@ -64,7 +65,17 @@ export function LineCost({
     it. Same amber as "Not priced", smaller than the figure, and wrapping
     under it rather than pushing it off a narrow column.
   */
-  const parts = partsNotPricedWords(linePartsNotPriced(line, cost));
+  /*
+    Labor, and NO material at all (owner, 2026-10-05): never fully priced.
+    Said as what it is — "material not priced" — rather than as a part
+    count, because there may be no parts to count: a light pole whose
+    assembly is all labor read "$510.00" and looked finished.
+  */
+  const materialMissing =
+    lineMaterialNotPriced(line, cost) && Math.floor(line.unpricedParts) <= 0;
+  const parts = materialMissing
+    ? "material not priced"
+    : partsNotPricedWords(linePartsNotPriced(line, cost));
   if (parts) {
     return (
       <span
@@ -76,7 +87,11 @@ export function LineCost({
         <span className="font-mono text-sm">{money(cost)}</span>
         <span
           className="text-[11px] text-[#F5C518] whitespace-nowrap"
-          title="This line's price was frozen when it was added, and some of the assembly's parts had no price then. They add nothing to it."
+          title={
+            materialMissing
+              ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
+              : "This line's price was frozen when it was added, and some of the assembly's parts had no price then. They add nothing to it."
+          }
         >
           + {parts}
         </span>

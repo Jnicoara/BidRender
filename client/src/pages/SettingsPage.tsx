@@ -41,7 +41,12 @@ import { BrandingSection } from "@/components/BrandingSection";
 import { SalesTaxSection } from "@/components/SalesTaxSection";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useCrosshairColor, useCrosshairSize } from "@/hooks/useCrosshairColor";
+import {
+  useCrosshairColor,
+  useCrosshairSize,
+  useShowNextSegment,
+} from "@/hooks/useCrosshairColor";
+import { Switch } from "@/components/ui/switch";
 import {
   CROSSHAIR_COLORS,
   CROSSHAIR_SIZES,
@@ -439,7 +444,31 @@ function DisplaySection() {
       </section>
 
       <CrosshairColorSetting />
+      <ShowNextSegmentSetting />
     </div>
+  );
+}
+
+/**
+ * The dim "Next" length beside the cursor while tracing. On by default; off
+ * hides only the label, never the preview line (@/lib/traceReadout).
+ */
+function ShowNextSegmentSetting() {
+  const [show, setShow] = useShowNextSegment();
+  return (
+    <section className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          <label htmlFor="show-next-segment">Show next-segment length</label>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          While tracing a run, a small label at the cursor gives the length of
+          the segment you are about to click. The run total stays at the top
+          either way.
+        </p>
+      </div>
+      <Switch id="show-next-segment" checked={show} onCheckedChange={setShow} />
+    </section>
   );
 }
 
@@ -453,7 +482,7 @@ export default function SettingsPage({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b border-border px-6 py-4">
+      <div className="page-header border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <SettingsIcon className="w-5 h-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
@@ -495,7 +524,7 @@ export default function SettingsPage({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
         <div className="max-w-2xl">
           {section === "pricing" && <BidPricingDefaultsSection />}
           {section === "heights" && <HeightsSection />}

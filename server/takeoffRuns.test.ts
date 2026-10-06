@@ -23,9 +23,11 @@ import { bidPdfSheets, bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { footageByRunType } from "./runTypeFootage";
 import type { RunTypeFootageRow } from "./runTypeFootageCore";
+import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
 const USER = 8383;
 const OTHER_USER = 8384;
+dropFixtureUsersAfterAll([USER, OTHER_USER]);
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -495,7 +497,9 @@ describe.skipIf(!hasDb)("shared runs", () => {
       name: "Ckt 1",
       conductorCount: 2,
     });
-    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(200);
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(
+      200
+    );
 
     const [run] = await caller().takeoffRuns.listForSheet({ sheetId });
     await caller().takeoffRuns.updateCircuit({
@@ -503,11 +507,13 @@ describe.skipIf(!hasDb)("shared runs", () => {
       conductorCount: 4,
     });
 
-    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(400);
-    // The pipe is unchanged — only the wire moved.
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet).toBe(
-      100
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(
+      400
     );
+    // The pipe is unchanged — only the wire moved.
+    expect(
+      (await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet
+    ).toBe(100);
   });
 
   it("drops a circuit's wire when the circuit is removed", async () => {
@@ -522,7 +528,9 @@ describe.skipIf(!hasDb)("shared runs", () => {
       name: "Ckt 2",
       conductorCount: 3,
     });
-    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(600);
+    expect((await caller().takeoffRuns.totals({ bidId })).wireBoughtFeet).toBe(
+      600
+    );
 
     const [run] = await caller().takeoffRuns.listForSheet({ sheetId });
     await caller().takeoffRuns.removeCircuit({ id: run.circuits[0].id });
@@ -697,7 +705,9 @@ describe.skipIf(!hasDb)("shared runs", () => {
 
     expect(totals.conduitBoughtFeet).toBe(sum(r => r.conduitBoughtFeet));
     expect(totals.cableBoughtFeet).toBe(sum(r => r.cableBoughtFeet));
-    expect(totals.wireBoughtFeet).toBe(sum(r => r.insulatedBoughtFeet + r.groundBoughtFeet));
+    expect(totals.wireBoughtFeet).toBe(
+      sum(r => r.insulatedBoughtFeet + r.groundBoughtFeet)
+    );
     // And the sum is not trivially zero: 100 + 50 + 25 ft of pipe.
     expect(totals.conduitBoughtFeet).toBe(175);
   });
@@ -720,14 +730,16 @@ describe.skipIf(!hasDb)("a suggested home run", () => {
       isSuggestion: true,
     });
 
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet).toBe(0);
+    expect(
+      (await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet
+    ).toBe(0);
 
     // Accepting makes it a draft, and a draft is on the bid — so it counts
     // from here, not only once finished (2026-09-27).
     await caller().takeoffRuns.acceptSuggestion({ id: saved.id });
-    expect((await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet).toBe(
-      100
-    );
+    expect(
+      (await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet
+    ).toBe(100);
   });
 
   it("shows as a suggestion until accepted", async () => {

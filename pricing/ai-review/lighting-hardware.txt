@@ -1,5 +1,5 @@
 Category: Lighting Hardware
-Items: 186
+Items: 187
 
 Category | Name | Size
 Lighting Hardware | 3" adjustable trim | 3"
@@ -143,6 +143,7 @@ Lighting Hardware | 5" shower wet-rated trim | 5"
 Lighting Hardware | 6" shower wet-rated trim | 6"
 Lighting Hardware | Surface-mount ceiling fixture | -
 Lighting Hardware | Tape light channel | -
+Lighting Hardware | Temporary light string, 100 ft | 100 ft
 Lighting Hardware | Tenon adapter | -
 Lighting Hardware | Track light connector | -
 Lighting Hardware | Track light end feed | -
