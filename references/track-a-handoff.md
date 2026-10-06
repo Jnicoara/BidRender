@@ -1,5 +1,37 @@
 # Track A handoff — 2026-10-05
 
+## Session 2 (evening, ~23:50 UTC) — read this first, the rest is the earlier state
+
+- **Staging password: fixed.** The new `SMOKE_STAGING_PASSWORD` gets through
+  the gate; the specs now run on staging.
+- **First real bug the smoke found, fixed (`8815e69`):** a legend symbol
+  linked to an assembly went to the bid as a FREE count (no price, no hours)
+  when clicked straight after Link — flow test 6. Server guard in
+  `takeoffGroups.create` (`server/legendLinkCount.test.ts`, red with it off)
+  plus an optimistic legend cache. Flow 6 now PASSES on staging.
+- **Gate: local-dev runs queue instead of cancelling (`d0fca43`).** Two smoke
+  runs were killed by other tracks' merges in one hour. Proven working: run
+  `6bfe956` waited behind `5894efd`, and both finished.
+- **Still red — `touch.spec.ts` "count, link and send by touch"** on both
+  tablet projects in run `37388349708` (`6bfe956`): three taps, 0 marks
+  ("Counting CI TOUCH" did show). It passed in the run before (`5894efd`),
+  whose flow stopped at test 6. Not reproduced: memory was at 0.5 GB and
+  another track's server held 3002. Two suspects: state left by flow tests
+  7–14, which ran on staging for the FIRST time in this run, or my commits
+  (nothing found in the touch path). **Next step: get that run's failure
+  screenshot** (Actions → run 37388349708 → smoke-failures, needs a signed-in
+  browser), or run `pnpm smoke` locally with one server up.
+- **Locally, flow test 2 fails ("0/2 scaled") on a production build against
+  `bidrender_local`**; it passes on staging. Unexplained, local only.
+- **Bid-totals script written and rehearsed** (`scripts/bidTotals.mts`,
+  `live-release-plan.md` § 4 steps 3, 4 and 9). Before-run uses a worktree at
+  the live commit; read only by construction. Found that `companyDefaultsFor`
+  INSERTS a `pricing_defaults` row for an owner without one; the read-only
+  session refuses it and the script reports it.
+- **Owner questions:** `references/owner-questions.md`, question 1 open.
+- Local DBs: `bidrender_local` and `bidrender_test_clean` migrated to 105
+  (both were behind; the test DB being at 0103 made 745 local tests fail).
+
 Written at the end of a session, before a restart. Read this first, then
 `deploying.md` § 11 and `migrations-0098-batch-plan.md` § S (on
 `a-migrations-plan`).

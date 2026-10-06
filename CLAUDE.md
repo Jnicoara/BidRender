@@ -990,6 +990,16 @@ relationship in a Parent column.
 
 ### One convention for single-pole breakers: "Single-Pole" — DONE 2026-09-24
 
+> **TO BE REVERSED — owner, 2026-10-05: breakers will say "1-Pole"**
+> ("20A 1-Pole breaker"), breakers only; a single-pole switch keeps its name.
+> **Not renamed yet**: the rename waits until every naming question in
+> `materials-naming-and-pricing-plan.md` § 8 is answered, and this section,
+> ASSEMBLIES_PLAN.md step 6 and the test change in that same commit. Until
+> then the catalog says "Single-Pole" and this section describes what ships.
+> Search must find a breaker by every supply-house spelling either way
+> (1P, SP, single pole, 1-pole; 2P, DP, double pole; 3P, three pole) —
+> `references/owner-questions.md` § 1.
+
 Every breaker named by its amperage states its pole count:
 `20A Single-Pole breaker`, `20A Single-Pole AFCI breaker`, `20A 2-Pole
 breaker`, `20A 3-Pole breaker`. Brand variants follow the same pattern
