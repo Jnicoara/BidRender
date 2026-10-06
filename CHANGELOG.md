@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Find all matching now reads the little labels beside each device.**
+  "USB", "GF", "(E)", a mounting height like 54" or a fixture tag like A2
+  is tied to the nearest find and shown on it. A "GF" beside a plain
+  receptacle shape now flags it as a possible GFCI instead of counting it
+  as a duplex without a word. On the UNCC test plan the USB receptacles
+  went from 0 of 33 recognised to 33 of 33, and the three duplexes the
+  GFCI search used to pick up silently are now flagged.
+
 - **A click on the plan no longer captures an empty symbol.** With Capture
   on, a click that is not a drag used to open "Name this symbol" and save an
   item with no picture, which also skipped every check. Now only a real box

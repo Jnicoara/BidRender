@@ -983,7 +983,123 @@ async function scale() {
   }
 }
 
+// ── labels: the find's flags and labels, scored (before/after the tie) ─────
+/** Everything a find says in words: flags, and labels where it has them. */
+const said = (m: {
+  needsLook: string[];
+  maybeExisting: string[];
+  labels?: string[];
+}) => [...m.needsLook, ...m.maybeExisting, ...(m.labels ?? [])].join(" | ");
+
+async function labels() {
+  const { findMatching } = await import("../client/src/lib/findMatching");
+  const u = await load("UNCC.pdf", 5);
+  const um = await marksOn(234268);
+  const usbWords = u.words.filter(w => w.text === "USB");
+  const onMark = (m: { x: number; y: number }) =>
+    um.find(h => Math.hypot(h.x - m.x, h.y - m.y) <= 8);
+  // A PLAIN duplex to box: no USB/GF label within 30 pt.
+  const seed = um.find(
+    h =>
+      h.type === "DUPLEX RECEPTACLE" &&
+      !u.words.some(
+        w =>
+          /^(USB|GF|GFI|GFCI)$/.test(w.text) &&
+          Math.hypot(w.cx - h.x, w.cy - h.y) <= 30
+      )
+  )!;
+  const r = findMatching(u.geo, u.words, {
+    x: seed.x - 4.5,
+    y: seed.y - 4.5,
+    width: 9,
+    height: 9,
+  });
+  if (r.kind !== "ok") throw new Error(`duplex box: ${r.kind}`);
+  let usbFound = 0;
+  let usbSaid = 0;
+  let plainFound = 0;
+  let plainSaidUsb = 0;
+  let gfFound = 0;
+  let gfSaid = 0;
+  for (const m of r.matches) {
+    const h = onMark(m);
+    if (!h) continue;
+    const s = said(m);
+    if (h.type === "USB DUPLEX CONVENIENCE OUTLET") {
+      usbFound++;
+      if (/USB/.test(s)) usbSaid++;
+    } else if (h.type === "DUPLEX RECEPTACLE") {
+      plainFound++;
+      if (/USB/.test(s)) plainSaidUsb++;
+    } else if (h.type === "GFCI receptacle") {
+      gfFound++;
+      if (/GF/.test(s)) gfSaid++;
+    }
+  }
+  console.log(
+    `UNCC E111, plain-duplex box at (${seed.x.toFixed(0)}, ${seed.y.toFixed(0)}): ` +
+      `USB devices found ${usbFound}, saying USB ${usbSaid}; plain found ${plainFound}, wrongly saying USB ${plainSaidUsb}; ` +
+      `GFCI found ${gfFound}, saying GF ${gfSaid}  (${usbWords.length} USB labels on the sheet)`
+  );
+  // The GFCI box: duplexes it finds must not come back silent.
+  const g = um.find(h => h.type === "GFCI receptacle")!;
+  const rg = findMatching(u.geo, u.words, {
+    x: g.x - 4.5,
+    y: g.y - 4.5,
+    width: 9,
+    height: 9,
+  });
+  if (rg.kind === "ok") {
+    let onDuplex = 0;
+    let silent = 0;
+    let gfcis = 0;
+    for (const m of rg.matches) {
+      const h = onMark(m);
+      if (h?.type === "GFCI receptacle") gfcis++;
+      else if (h && /DUPLEX/.test(h.type)) {
+        onDuplex++;
+        if (!m.needsLook.length) silent++;
+      }
+    }
+    console.log(
+      `UNCC E111, GFCI box: GFCIs found ${gfcis}/4; duplexes found ${onDuplex}, of them SILENT ${silent}`
+    );
+  }
+
+  // Weld 1 E-200.
+  const w = await load("Weld 1.pdf", 5);
+  const wm = await weldMarks();
+  let flags = 0;
+  for (const [type, t] of Object.entries(TEMPLATES)) {
+    const box = {
+      x: t.at[0] + t.box[0],
+      y: t.at[1] + t.box[1],
+      width: t.box[2] - t.box[0],
+      height: t.box[3] - t.box[1],
+    };
+    const rr = findMatching(w.geo, w.words, box);
+    if (rr.kind !== "ok") continue;
+    const mine = wm.filter(h => h.type === type);
+    const on = rr.matches.filter(m =>
+      mine.some(h => Math.hypot(h.x - m.x, h.y - m.y) <= 6)
+    );
+    flags += rr.matches.filter(m => m.needsLook.length).length;
+    if (type === "TELECOM CABINET, FLUSH MOUNT")
+      console.log(
+        `Weld 1 E-200 telecom (truth 2 x 54", 1 x 36", 2 x (E)): found ${on.length}/10; saying a height ${on.filter(m => /\d{2}"/.test(said(m))).length}; saying (E) ${on.filter(m => /\(E\)/.test(said(m))).length}`
+      );
+    if (type === "DUPLEX RECEPTACLE")
+      console.log(
+        `Weld 1 E-200 duplex: found ${on.length}/9; saying (E) ${on.filter(m => /\(E\)/.test(said(m))).length}`
+      );
+  }
+  console.log(
+    `Weld 1 E-200: finds with a needs-a-look flag, all 7 types: ${flags}`
+  );
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  labels,
   layers,
   matching,
   uncc,

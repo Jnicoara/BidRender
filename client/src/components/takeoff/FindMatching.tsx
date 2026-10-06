@@ -31,6 +31,14 @@ import {
 } from "@/lib/findMatchingSession";
 import { DEMOLITION_REASON } from "@/lib/scanMatching";
 
+/**
+ * The labels tied to a find (@/lib/findMatching, `tieLabels`) — a
+ * suggestion, said as one: heights, tags, (E), GF. What they MEAN for the
+ * count (a GFCI, existing) is already said by its flags.
+ */
+const labelsLine = (labels: readonly string[]) =>
+  `Beside it: ${labels.join(", ")}`;
+
 const RING: Record<ItemKind, { stroke: string; dash: string; tag: string }> = {
   clear: { stroke: "#22D3EE", dash: "5 3", tag: "" },
   needsLook: { stroke: "#F59E0B", dash: "3 2", tag: "?" },
@@ -123,6 +131,7 @@ export function MatchLayer({
                       ...item.needsLook,
                       ...(item.newLooks.length ? [NEW_LOOK_REASON] : []),
                       ...item.maybeExisting,
+                      ...(item.labels?.length ? [labelsLine(item.labels)] : []),
                     ].join("; ") || "Found — not counted yet"}
               </title>
             </g>
@@ -385,6 +394,7 @@ export function MatchPanel({
               ...sel.needsLook,
               ...(sel.newLooks.length ? [NEW_LOOK_REASON] : []),
               ...sel.maybeExisting,
+              ...(sel.labels?.length ? [labelsLine(sel.labels)] : []),
               ...(sel.foundBy && sel.foundBy > 1
                 ? [`Found by ${sel.foundBy} looks.`]
                 : []),

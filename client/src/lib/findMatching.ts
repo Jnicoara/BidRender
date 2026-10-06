@@ -73,6 +73,13 @@ export type Match = {
    * can drop what only it found (multiple-looks-plan.md § 7).
    */
   foundByLooks?: number[];
+  /**
+   * The labels tied to this copy (`tieLabels`): device words, (E)/(X)/(R),
+   * mounting heights, fixture tags — as SUGGESTIONS shown on the find. A
+   * device word that differs from the boxed one's is also a needs-a-look
+   * flag. Absent where nothing is read (scans).
+   */
+  labels?: string[];
 };
 
 export type FindResult =
@@ -160,6 +167,86 @@ const EXISTING_WORDS = new Set([
 ]);
 const REMOVE_WORDS = new Set(["(X)", "(D)", "(RE)"]);
 const RELOCATE_WORDS = new Set(["(R)", "(RL)", "RL"]);
+
+/*
+  LABELS TIED TO DEVICES (code-first-ceiling.md § b, measured 2026-10-06).
+  The ring this matcher used reached ~12.6 pt from a small symbol's centre.
+  On UNCC E111 the USB labels sit a median 14.3 pt out, so it read 0 of 41
+  and a USB duplex was a plain duplex to it; "GF" was read on 1 of 4. Tied
+  to the NEAREST copy within 24 pt instead: USB 38/38, GF 4/4, heights 3/3
+  on Weld 1 E-200 — scored against the owner's hand counts.
+*/
+/** How far a label may sit from its device, in page points. Measured. */
+export const LABEL_REACH = 24;
+/**
+ * A label nearly as close to a second copy (within this factor) belongs to
+ * neither for certain: it is shown on BOTH, flagged, never given to one.
+ */
+export const LABEL_SHARED = 1.25;
+
+/** A mounting height: 54", 18", 48"AFF. */
+const HEIGHT_RE = /^\d{1,3}"(\s?AFF)?$/;
+/**
+ * A fixture or device tag: A2, B12, (A-8), C3a. ONE letter only — two-letter
+ * forms (SL-24 on Weld 1) are circuit numbers, which every device has a
+ * different one of and which must not flag anything.
+ */
+const FIXTURE_TAG_RE = /^\(?[A-Z]-?\d{1,2}[A-Z]?\)?$/;
+
+export type LabelKind =
+  | "device"
+  | "existing"
+  | "remove"
+  | "relocate"
+  | "height"
+  | "fixtureTag";
+
+/** What kind of label a word is, or null when it is not one. */
+export function labelKind(text: string): LabelKind | null {
+  const k = wordKey(text);
+  if (isDeviceWord(k)) return "device";
+  if (EXISTING_WORDS.has(k)) return "existing";
+  if (REMOVE_WORDS.has(k)) return "remove";
+  if (RELOCATE_WORDS.has(k)) return "relocate";
+  if (HEIGHT_RE.test(k)) return "height";
+  if (FIXTURE_TAG_RE.test(k)) return "fixtureTag";
+  return null;
+}
+
+/**
+ * Tie each label word to the copy it belongs to: the NEAREST copy within
+ * LABEL_REACH. A label within LABEL_SHARED of its nearest distance from a
+ * second copy goes to both, marked shared. Words that ARE part of a symbol
+ * (`symbolWords`, the J in a junction box) are never labels.
+ */
+export function tieLabels(
+  words: readonly { text: string; cx: number; cy: number }[],
+  copies: readonly { x: number; y: number }[],
+  symbolWords: ReadonlySet<number>
+): { word: number; shared: boolean }[][] {
+  const out = copies.map(() => [] as { word: number; shared: boolean }[]);
+  words.forEach((w, i) => {
+    if (symbolWords.has(i) || labelKind(w.text) === null) return;
+    const near = copies
+      .map((c, k) => ({ k, d: Math.hypot(c.x - w.cx, c.y - w.cy) }))
+      .filter(c => c.d <= LABEL_REACH)
+      .sort((a, b) => a.d - b.d);
+    if (!near.length) return;
+    const takers = near.filter(c => c.d <= LABEL_SHARED * near[0].d);
+    for (const c of takers)
+      out[c.k].push({ word: i, shared: takers.length > 1 });
+  });
+  return out;
+}
+
+/** The flag for a device word the boxed one lacks, named where it matters. */
+function deviceWordFlag(w: string): string {
+  if (/^GF(I|CI)?$/.test(w))
+    return `"${w}" is written beside it — it may be a GFCI, not the one you boxed`;
+  if (w === "USB")
+    return `"USB" is written beside it — it may be a USB receptacle, not the one you boxed`;
+  return `"${w}" is written beside it — the one you boxed has no "${w}"`;
+}
 
 type Orient = {
   a: number;
@@ -1360,9 +1447,34 @@ export function searchSymbol(
   // ── Flags ───────────────────────────────────────────────────────────────
   // Joined line work and device words, compared with the boxed one's
   // (measured where it was boxed — `symbolFromBox`).
-  const boxedQ = { device: t.boxedDevice };
+  // Labels: each tied to its nearest copy (tieLabels). The boxed one's own
+  // words come from the same rule when it is on this sheet, so it is never
+  // compared with a different reading of itself; a template from a legend
+  // keeps the words read round it there.
+  const symbolWords = new Set<number>();
+  kept.forEach(f => f.usedWords.forEach(i => symbolWords.add(i)));
+  const ties = tieLabels(
+    words,
+    kept.map(f => ({ x: f.tx, y: f.ty })),
+    symbolWords
+  );
+  const boxedAt =
+    opts.boxedHere === true
+      ? kept.findIndex(f => Math.hypot(f.tx - cx, f.ty - cy) <= 2 * tol)
+      : -1;
+  const tiedWords = (k: number) => ties[k].map(t => words[t.word]);
+  const boxedQ = {
+    device:
+      boxedAt >= 0 ? qualifiers(tiedWords(boxedAt)).device : t.boxedDevice,
+    tags:
+      boxedAt >= 0
+        ? tiedWords(boxedAt)
+            .filter(w => labelKind(w.text) === "fixtureTag")
+            .map(w => wordKey(w.text))
+        : [],
+  };
 
-  const matches: Match[] = kept.map(f => {
+  const matches: Match[] = kept.map((f, k) => {
     const turned = f.o.rotation === 90 || f.o.rotation === 270;
     const hw = turned ? halfH : halfW;
     const hh = turned ? halfW : halfH;
@@ -1454,15 +1566,11 @@ export function searchSymbol(
         `"${inside[0].text.trim()}" is written inside it — the one you boxed has no "${inside[0].text.trim()}"`
       );
 
-    // Words beside it.
-    const q = qualifiers(
-      ringWords(words, f.tx, f.ty, hw, hh, size, f.usedWords)
-    );
+    // Words beside it: the labels tied to THIS copy.
+    const mine = tiedWords(k);
+    const q = qualifiers(mine);
     q.device.forEach(w => {
-      if (!boxedQ.device.has(w))
-        needsLook.push(
-          `"${w}" is written beside it — the one you boxed has no "${w}"`
-        );
+      if (!boxedQ.device.has(w)) needsLook.push(deviceWordFlag(w));
     });
     boxedQ.device.forEach(w => {
       if (!q.device.has(w))
@@ -1477,8 +1585,26 @@ export function searchSymbol(
       needsLook.push(`"${q.status.remove[0]}" beside it — maybe to be removed`);
     if (q.status.relocate.length)
       needsLook.push(`"${q.status.relocate[0]}" beside it — maybe relocated`);
+    // A different fixture tag is a different fixture type, drawn alike.
+    const tags = mine
+      .filter(w => labelKind(w.text) === "fixtureTag")
+      .map(w => wordKey(w.text));
+    if (
+      boxedQ.tags.length &&
+      tags.length &&
+      !tags.some(x => boxedQ.tags.includes(x))
+    )
+      needsLook.push(
+        `tag "${tags[0]}" beside it — the one you boxed has "${boxedQ.tags[0]}"`
+      );
+    const shared = ties[k].filter(t => t.shared).map(t => words[t.word].text);
+    if (shared.length)
+      needsLook.push(
+        `"${shared[0]}" sits between this and another find — it may belong to the other`
+      );
 
     return {
+      labels: mine.map(w => w.text.trim()),
       x: f.tx,
       y: f.ty,
       halfWidth: hw,

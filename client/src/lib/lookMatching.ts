@@ -88,6 +88,7 @@ export function mergeLookResults(
         ...s.best,
         needsLook,
         maybeExisting: unique(s.all.flatMap(m => m.maybeExisting)),
+        labels: unique(s.all.flatMap(m => m.labels ?? [])),
         isBoxed: s.all.some(m => m.isBoxed),
         onDemolitionPlan:
           s.all.find(m => m.onDemolitionPlan)?.onDemolitionPlan ?? null,

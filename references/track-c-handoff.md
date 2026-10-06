@@ -160,6 +160,14 @@ item — gives the card its warning in one capture.
   (`@/lib/trustedLooks`), so a colleague's browser asks again — safe, but
   not shared. With the column, `searchLooks` returns it and the browser
   copy goes.
+- **Words on a mark** — `takeoff_stamps.labelWords` (text NULL, additive):
+  the labels Find all matching tied to a device when it was confirmed
+  (`tieLabels`: "USB", `54"`, "(E)", "A2"). Today they show on the FIND
+  only and are gone once the mark is placed, so a mark cannot say "54 inch
+  height" or "tag A2" later, and the bid cannot price by them. NULL = never
+  read (a hand mark, or before the column). If the owner wants heights
+  priced, a dedicated `mountingHeightIn` (int NULL) beside it beats parsing
+  text. Status "existing" needs nothing new: mark status already holds it.
 
 Requests that already stand, unchanged:
 
