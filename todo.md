@@ -102,11 +102,12 @@ Requests waiting for Track A, which numbers and writes the migrations.
 > **ALL NUMBERED 2026-10-06 (Track A), none written yet — see
 > `references/migrations-next-batch.md` on `a-migrations-plan`**, the one
 > list of every track's asks. In short: `distributionHeightInches` is in
-> 0108 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
-> in 0109 (with the remove/relocate hours); `bid_quotes` is 0113; the six
-> `bid_line_items` quote columns go in 0114 with `lineRole`; the quoted-line
-> markup is `pricing_defaults.quotedMarkupPct`, 0115. **`laborOnly` is
-> 0105** (owner YES 2026-10-06: shipped labor-only starters marked, others
+> 0109 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
+> in 0110 (with the remove/relocate hours); `bid_quotes` is 0114; the six
+> `bid_line_items` quote columns go in 0115 with `lineRole`; the quoted-line
+> markup is `pricing_defaults.quotedMarkupPct`, 0116. **`laborOnly` is
+> 0105, its frozen line copy `bid_line_items.snapshotLaborOnly` is 0106**
+> (Track A picked FREEZING, answering B's question below) (owner YES 2026-10-06: shipped labor-only starters marked, others
 > "not priced" until ticked) — first, because it must go live WITH Track B's
 > "labor with $0 material" rule; until then the live release stays on
 > `24105ad`, before that rule (`live-release-plan.md` § 0). Panels: one
@@ -193,8 +194,10 @@ NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
       frozen when it was added. Either freeze it onto the line
       (`bid_line_items.snapshotLaborOnly BOOLEAN NULL`, with the other
       snapshots) or read the assembly live; **freezing is recommended**, so
-      ticking the box later cannot quietly re-mark finished bids. A to pick
-      with B before writing. - A shipped assembly forks on edit, as every shipped edit does. - **Starter assemblies to ship marked labor-only: NONE today.** Checked
+      ticking the box later cannot quietly re-mark finished bids. **Track A
+      picked FREEZING, 2026-10-06: `snapshotLaborOnly` is migration 0106**
+      (`migrations-next-batch.md`); NULL on a line from before the column
+      reads as "not said", so no existing bid changes when it lands. - A shipped assembly forks on edit, as every shipped edit does. - **Starter assemblies to ship marked labor-only: NONE today.** Checked
       2026-10-06: all 8 shipped starters carry 3–6 parts, and every planned
       one in references/starter-assemblies-plan.md has parts too — even the
       demo ones (DR1–DR4 carry blank covers, wire nuts, a filler plate), so
