@@ -457,5 +457,5 @@ Delete the test counts afterwards.
    remove or relocate mark**, which is what the code already does. Nothing
    to build here. The labor lines are `remove-relocate-labor-plan.md`
    (Track A). § 7's two columns are numbered in Track A's
-   `migrations-next-batch.md`: column 1 in 0107, column 2 in 0108 (each
+   `migrations-next-batch.md`: column 1 in 0108, column 2 in 0109 (each
    shares its table's one `ALTER`).

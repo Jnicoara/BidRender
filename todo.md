@@ -102,12 +102,17 @@ Requests waiting for Track A, which numbers and writes the migrations.
 > **ALL NUMBERED 2026-10-06 (Track A), none written yet — see
 > `references/migrations-next-batch.md` on `a-migrations-plan`**, the one
 > list of every track's asks. In short: `distributionHeightInches` is in
-> 0107 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
-> in 0108 (with the remove/relocate hours); `bid_quotes` is 0112; the six
-> `bid_line_items` quote columns go in 0113 with `lineRole`; the quoted-line
-> markup is `pricing_defaults.quotedMarkupPct`, 0114. `laborOnly` joins 0108
-> only if the owner says yes. (An earlier note here said 0108–0112 for
-> fewer items; superseded.)
+> 0108 (with C's `contentHash`); `mountHeightTypeKey` and `materialByQuote`
+> in 0109 (with the remove/relocate hours); `bid_quotes` is 0113; the six
+> `bid_line_items` quote columns go in 0114 with `lineRole`; the quoted-line
+> markup is `pricing_defaults.quotedMarkupPct`, 0115. **`laborOnly` is
+> 0105** (owner YES 2026-10-06: shipped labor-only starters marked, others
+> "not priced" until ticked) — first, because it must go live WITH Track B's
+> "labor with $0 material" rule; until then the live release stays on
+> `24105ad`, before that rule (`live-release-plan.md` § 0). Panels: one
+> `bid_panels` table (+ `bid_panel_circuits`); quotes: B's quote items, H1
+> `quoteBucket` dropped. (An earlier note here said 0108–0112 for fewer
+> items; superseded.)
 
 - [ ] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
       sheet's run height (Track B, owner's answer b, 2026-10-05). ADDITIVE,

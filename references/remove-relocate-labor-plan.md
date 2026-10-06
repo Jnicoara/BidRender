@@ -45,18 +45,18 @@ and has "Leave it off".
 **Numbers from `migrations-next-batch.md` (on `a-migrations-plan`,
 2026-10-06), the one list of every track's asks.** These columns share files
 with other tracks' columns on the same tables (one `ALTER` per table):
-0108 also carries B's `mountHeightTypeKey` and `materialByQuote`; 0113
+0109 also carries B's `mountHeightTypeKey` and `materialByQuote`; 0114
 also carries B's six quote-item columns. (This said 0108–0110 the day
 before; that numbering split `assemblies` and `bid_line_items` across
 several `ALTER`s.)
 
 | #    | Table            | Adds                                                                                           | Why                                                                         |
 | ---- | ---------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 0108 | `assemblies`     | `removeLaborHours`, `relocateLaborHours` decimal(10,4) **NULL**, no default                    | Set once, every job. NULL = not set → "not priced". 0 is a real answer.     |
-| 0109 | `takeoff_groups` | `removeLaborHours`, `relocateLaborHours` decimal(10,4) **NULL**, no default                    | The per-bid override: a count is one assembly on one bid. NULL = follow it. |
-| 0113 | `bid_line_items` | `lineRole` enum('install','remove','relocate') **NOT NULL DEFAULT 'install'**; unique key swap | One count can now own up to three lines.                                    |
+| 0109 | `assemblies`     | `removeLaborHours`, `relocateLaborHours` decimal(10,4) **NULL**, no default                    | Set once, every job. NULL = not set → "not priced". 0 is a real answer.     |
+| 0110 | `takeoff_groups` | `removeLaborHours`, `relocateLaborHours` decimal(10,4) **NULL**, no default                    | The per-bid override: a count is one assembly on one bid. NULL = follow it. |
+| 0114 | `bid_line_items` | `lineRole` enum('install','remove','relocate') **NOT NULL DEFAULT 'install'**; unique key swap | One count can now own up to three lines.                                    |
 
-**0113 is the one to read twice.** A count's line is held unique by
+**0114 is the one to read twice.** A count's line is held unique by
 `bid_line_items_bid_group_uq (bidId, takeoffGroupId)` (0060). A count with
 remove marks needs a second line, so the key becomes `(bidId,
 takeoffGroupId, lineRole)`. `lineRole` is NOT NULL on purpose: MySQL treats
@@ -64,7 +64,7 @@ NULLs in a unique key as all different, so a nullable role would silently
 stop guarding the ordinary one-line-per-count rule. The default is safe
 because every existing line IS an install line. That is its meaning, not a
 placeholder, so no number moves and "not yet migrated" never needs telling
-apart. Order inside 0113: add the column, ADD the new unique key, then DROP
+apart. Order inside 0114: add the column, ADD the new unique key, then DROP
 the old one. Old code never writes a role, so for old code the new key is
 exactly as strict as the old. The rehearsal must confirm the foreign key on
 `bidId` is still backed by an index after the drop. The new key starts with
