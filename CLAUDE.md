@@ -1414,8 +1414,18 @@ conventions and both are load-bearing:**
   > The Materials screen keeps `$0` plus its filter, which is where this rule
   > still applies as written. Which lines count as not priced is decided per
   > kind of line in `shared/lineNotPriced.ts` (a typed 0 on a hand-priced line
-  > is an answer; a labor-only assembly is priced), and the cell is ONE
-  > component, `LineCost`, shared by the bid and Count screens.
+  > is an answer), and the cell is ONE component, `LineCost`, shared by the
+  > bid and Count screens.
+  >
+  > **Narrowed again 2026-10-05, by the owner: labor with $0 or unset
+  > material is NEVER fully priced.** This said "a labor-only assembly is
+  > priced" until then, which let a light-pole assembly with 6 h of labor
+  > and no material read "$510.00" — a pole bid with no pole in it. Now its
+  > labor stays in the total and its material counts as one thing not
+  > priced: "+ material not priced" on the line, "+ N not priced" on the
+  > total (`lineMaterialNotPriced`, and its SQL copy). The assembly editor's
+  > cost preview says the same. There is no "no material, on purpose" flag
+  > for an assembly yet; that needs a column.
 
 - **MEASUREMENT — unset must NEVER render as 0.** Zero is a legitimate answer —
   a floor box really is at 0'-0" — so a zero reads as a considered one. A

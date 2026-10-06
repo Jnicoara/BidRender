@@ -11341,7 +11341,12 @@ function costSums(productivityPct: number) {
       A line from before 0087 has no frozen count; the Dashboard reads its
       recipe live (`liveUnpricedParts`), analytics does not — see BidCostRow.
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}) ELSE 0 END), 0)`,
+    /*
+      A line with $0 or unset material counts at least ONE (its material is
+      missing — `lineMaterialNotPriced`, owner 2026-10-05), never on top of
+      the recipe parts that already say so.
+    */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -11803,6 +11808,9 @@ export async function getDashboardBids(
         bidId: bids.id,
         assemblyId: bidLineItems.assemblyId,
         lines: sql<string>`COUNT(*)`,
+        // Of those, the ones with no material at all — each counts at least
+        // one part not priced (`lineMaterialNotPriced`).
+        noMaterial: sql<string>`SUM(CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END)`,
       })
       .from(bids)
       .innerJoin(bidLineItems, liveLines)
@@ -11823,7 +11831,11 @@ export async function getDashboardBids(
   const liveParts = new Map<number, number>();
   for (const row of unfrozen) {
     if (row.assemblyId === null) continue;
-    const parts = Number(row.lines) * (live.get(row.assemblyId) ?? 0);
+    const recipe = live.get(row.assemblyId) ?? 0;
+    const noMaterial = Number(row.noMaterial);
+    const parts =
+      (Number(row.lines) - noMaterial) * recipe +
+      noMaterial * Math.max(recipe, 1);
     liveParts.set(row.bidId, (liveParts.get(row.bidId) ?? 0) + parts);
   }
 

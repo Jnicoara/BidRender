@@ -17,8 +17,12 @@
  *     (`needsPricing`). Nobody chose that zero. EXCEPT a field bend, which is
  *     labor only: its $0 is by nature, and it is not priced while its HOURS
  *     are NULL (2026-09-26).
- *   • FROM AN ASSEMBLY or a count: a labor-only assembly legitimately carries
- *     no material, so only a line whose WHOLE cost is $0 is not priced.
+ *   • FROM AN ASSEMBLY or a count: only a line whose WHOLE cost is $0 is not
+ *     priced as a whole. Since 2026-10-05 (owner) one with labor but $0
+ *     material is NOT fully priced either: its labor stays in the total and
+ *     its material counts as one part not priced (`lineMaterialNotPriced`).
+ *     This said "a labor-only assembly legitimately carries no material"
+ *     until then — the rule that let a pole bid go out with no pole in it.
  *
  * A zero quantity is never "not priced": nothing is on the line to price, and
  * $0 for nothing is true.
@@ -105,6 +109,41 @@ export function lineHoursUnset(line: {
   );
 }
 
+// ─── Material missing from a line that has labor ─────────────────────────────
+
+/**
+ * An ASSEMBLY or count line that is priced (its labor is in the total) but
+ * carries no material at all — "material not priced", never fully priced.
+ *
+ * ── The trap this closes (owner, 2026-10-05) ────────────────────────────────
+ * `lineNotPriced` calls an assembly line priced whenever its whole cost is
+ * not $0, because "a labor-only assembly legitimately carries no material".
+ * So a light-pole assembly with 6 h of labor and no material read "$510.00",
+ * the bid total looked finished, and it was a pole bid with no pole in it
+ * (references/quote-items-plan.md § 0). The owner's rule: a line with labor
+ * and $0 or unset material must NEVER read as fully priced. Its labor stays
+ * in the total; its material is counted as not priced, once.
+ *
+ * This REVERSES "a labor-only assembly is priced" for the material half:
+ * such a line is now priced for labor and flagged for material. Nothing in
+ * the app can yet say "no material, on purpose" for an assembly — that needs
+ * a column (todo.md, Track A next migration batch). A hand-priced line is
+ * untouched: there a TYPED $0 is an answer (an owner-supplied part).
+ */
+export function lineMaterialNotPriced(
+  line: NotPricedLineLike,
+  directCost: number | null
+): boolean {
+  const qty = Number(line.qty);
+  if (!Number.isFinite(qty) || qty <= 0) return false;
+  if (line.assemblyId === null) return false;
+  // A line the engine cannot price at all says "Can't price" — a different
+  // fault, already said. Counting it here too would say it twice.
+  if (directCost === null) return false;
+  if (lineNotPriced(line, directCost)) return false; // already all of it
+  return Number(line.snapshotMaterialCost ?? 0) === 0;
+}
+
 // ─── Parts not priced, inside a line that is ─────────────────────────────────
 
 /**
@@ -147,7 +186,10 @@ export function linePartsNotPriced(
   if (!Number.isFinite(qty) || qty <= 0) return 0;
   if (line.assemblyId === null) return 0;
   if (lineNotPriced(line, directCost)) return 0;
-  return Math.max(0, Math.floor(line.unpricedParts));
+  const parts = Math.max(0, Math.floor(line.unpricedParts));
+  // Material missing entirely counts once — not on top of $0 recipe parts,
+  // which already say the material is short (2026-10-05).
+  return lineMaterialNotPriced(line, directCost) ? Math.max(parts, 1) : parts;
 }
 
 /**

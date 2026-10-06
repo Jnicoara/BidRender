@@ -114,6 +114,45 @@ Requests waiting for Track A, which numbers and writes the migrations.
       it lands, Track B starts a new count's `dropKind` from it.
       references/vertical-drops-plan.md § 7.
 
+**Quote items** (Track B, owner-answered 2026-10-05;
+references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
+DEFAULT**, no backfill — step 1 of the three-step deploy.
+
+- [ ] **`bid_line_items.bidUnitCost DECIMAL(12,4) NULL`** — material per
+      unit priced ON THIS BID; NULL = none. **SHARED with the price-box item**
+      ("Before beta: price an unpriced line right where it blocks you"):
+      one column for both, never two. Read by `lineNotPriced` AND its SQL copy
+      `lineNotPricedSql` together.
+- [ ] **`bid_line_items.isQuoteItem BOOLEAN NULL`** — this line's material
+      comes from a supplier quote. NULL = no. Starts from the assembly's flag.
+- [ ] **`bid_line_items.quoteId INT NULL`** — FK `bid_quotes.id`, ON DELETE
+      SET NULL.
+- [ ] **`bid_line_items.quoteShare DECIMAL(12,2) NULL`** — a typed share of
+      a package price. NULL = computed by the spread.
+- [ ] **`bid_line_items.quoteItemKey VARCHAR(255) NULL`** — the frozen "same
+      item" key for carrying the last quote forward.
+- [ ] **`bid_line_items.quoteNote VARCHAR(500) NULL`** — notes for the
+      supplier request list (can wait for the first build).
+- [ ] **`assemblies.materialByQuote BOOLEAN NULL`** — new lines from this
+      assembly start as quote items. NULL = no.
+- [ ] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
+      `supplierName VARCHAR(128) NULL` (free text, like
+      `materials.supplierName`), `quotedOn DATE NULL`, `packagePrice
+    DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
+      `carriedFromBidId INT NULL` (provenance only, **no FK** — the old bid may
+      be deleted; set = a carried quote, "not updated"), `note VARCHAR(500)
+    NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
+- [ ] **The company's quoted-line markup %** (material-markup D4; owner
+      answer c: ONE company-wide number) — a nullable decimal beside the
+      company markup default; A picks the table. NULL = no quoted-line rule.
+
+**Also worth a column (Track B, 2026-10-05, not yet owner-asked):** a way to
+say an assembly has **no material on purpose** (labor only). Since today's
+"labor with $0 material is never fully priced" rule, a genuinely labor-only
+assembly reads "+ material not priced" with nothing to clear it. A nullable
+`assemblies.laborOnly BOOLEAN` would let `lineMaterialNotPriced` skip it.
+Owner's call before A builds it.
+
 ### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
 
 Check sheet shipped code-only on track-c without any of these; each is behind

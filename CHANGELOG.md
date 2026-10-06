@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Fixed: a line with labor but no material could look fully priced.** An
+  assembly with hours and no priced material — a light pole built as labor
+  only — showed its labor as the line's price, and the bid total looked
+  finished with no pole in it. Now the line says "+ material not priced" in
+  amber, every total (including Total due, which never said so before) adds
+  "+ N not priced", the bid explains what to do, and the assembly editor's
+  cost preview says the material is missing.
+
 - **A click on the plan no longer captures an empty symbol.** With Capture
   on, a click that is not a drag used to open "Name this symbol" and save an
   item with no picture, which also skipped every check. Now only a real box

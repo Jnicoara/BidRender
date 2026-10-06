@@ -33,6 +33,7 @@
  */
 import {
   countNotPriced,
+  lineMaterialNotPriced,
   type NotPricedTally,
   type PartsLineLike,
 } from "@shared/lineNotPriced";
@@ -109,6 +110,25 @@ export function totalWithNotPriced(
  * them, with the pricing engine's breakdown on each (null when the line could
  * not be priced at all).
  */
+/**
+ * Lines with labor and NO material at all (owner, 2026-10-05) — counted in
+ * the tally's parts, but there is no part to price, so the bid's advice is
+ * different: "price the part on the Materials screen" would send the
+ * estimator looking for a part that does not exist. Same predicate as the
+ * line's own cell (`LineCost`), so the strip and the cell cannot disagree.
+ */
+export function materialMissingLines(
+  lines: readonly (PartsLineLike & {
+    breakdown: { directCost: number } | null;
+  })[]
+): number {
+  return lines.filter(
+    line =>
+      lineMaterialNotPriced(line, line.breakdown?.directCost ?? null) &&
+      Math.floor(line.unpricedParts) <= 0
+  ).length;
+}
+
 export function bidNotPricedCount(
   lines: readonly (PartsLineLike & {
     breakdown: { directCost: number } | null;

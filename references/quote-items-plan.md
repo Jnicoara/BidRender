@@ -205,12 +205,12 @@ the same item**, so bid day starts from a real number, not a blank:
 - **Never on the customer's proposal.** "Last quote", "carried", supplier,
   date and age are estimator words. The proposal, its PDF and the quote-app
   export show the price only. A test asserts it (§ 9).
-- **Owner question 1:** should a carried price go into the total by itself
-  (as above), or sit beside the line until clicked "Use $4,200"? The
-  recommendation is in the total: an amber number that is roughly right
-  beats a blank that prices the pole at nothing; the guard (§ 7) stops it
-  being sent unnoticed. CLAUDE.md's "inert until accepted" rule is for
-  SHIPPED example numbers; this is the contractor's own.
+- **DECIDED (owner, 2026-10-05, answer a): in the total automatically**,
+  amber, with supplier and date. The reasoning: an amber number that is
+  roughly right beats a blank that prices the pole at nothing, and the
+  guard (§ 7) stops it being sent unnoticed. CLAUDE.md's "inert until
+  accepted" rule is for SHIPPED example numbers; this is the contractor's
+  own.
 
 ## 7. The bid-day guard
 
@@ -231,14 +231,12 @@ refuse without it while open/old quotes exist, naming how many. A dialog
 alone is a rule nobody can test (CLAUDE.md: a rule with no red to go to is
 an instruction).
 
-**Owner question 2 — the priced proposal print.** Today an unpriced line
-BLOCKS a priced print with no way past (owner, 2026-09-29). A waiting
-quote is an unpriced material. Recommendation: **keep the block for OPEN
-quotes** (a proposal cannot show a pole with no price in it), and use the
-"send anyway" confirm for OLD/carried ones (they have a price). The
-alternative — open quotes printed as "Price pending" (the document already
-has that phrase) after one confirm — contradicts the 2026-09-29 decision,
-so it needs the owner to say so.
+**The priced proposal print — DECIDED (owner, 2026-10-05, answer b).** An
+unpriced line BLOCKS a priced print with no way past (owner, 2026-09-29),
+and **that stands for OPEN quotes**: a proposal cannot show a pole with no
+price in it. OLD/carried quotes have a price, so they get the "send anyway"
+confirm instead. "Price pending after one confirm" was the alternative and
+was not chosen.
 
 ## 8. Columns for Track A, and the price-box item
 
@@ -342,18 +340,24 @@ Variant: a second bid with Light pole (S1) carries $4,200 · Platt; at 31
 days it reads "31 days old"; Light pole (S1A) starts blank; type A starts
 blank (its last price was a package share).
 
-## 10. Owner questions
+## 10. Owner questions — ANSWERED 2026-10-05
 
-1. A carried last quote: **in the total automatically** (recommended,
-   amber, and still "not updated"), or shown beside the line until clicked?
-2. The priced proposal with an **open** quote: keep today's block
-   (recommended), or allow "Price pending" after one confirm — which
-   reverses the 2026-09-29 decision?
-3. The quoted-line markup % (D4): one company-wide number to start, or
-   per supplier later? (Recommended: one number now.)
-4. Should "Request quotes" group the list by supplier when a line already
-   has a supplier from a carried quote? (Recommended: one list now;
-   grouping later if asked.)
+| Q   | Answer                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| a   | A carried last quote **goes into the total automatically**, shown in amber with supplier and date — and still counts as "not updated" (§ 6).  |
+| b   | An **open** quote **keeps blocking the priced proposal print**. The 2026-09-29 decision stands; old/carried quotes get the one confirm (§ 7). |
+| c   | **One company-wide quoted-line markup %** (D4). Per-supplier is not built.                                                                    |
+| d   | **One request list** for now — not grouped by supplier.                                                                                       |
+
+As asked:
+
+1. A carried last quote: in the total automatically, or shown beside the
+   line until clicked? — **in the total (a)**.
+2. The priced proposal with an open quote: keep the block, or "Price
+   pending" after one confirm? — **keep the block (b)**.
+3. The quoted-line markup %: one company number, or per supplier? —
+   **one company number (c)**.
+4. "Request quotes": grouped by supplier, or one list? — **one list (d)**.
 
 ## 11. Build order (after Track A's columns)
 

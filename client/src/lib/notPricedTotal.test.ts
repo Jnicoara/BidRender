@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   anyNotPriced,
   bidNotPricedCount,
+  materialMissingLines,
   notPricedHeadline,
   notPricedSuffix,
   partsNotPricedWords,
@@ -94,14 +95,17 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
     ...over,
   });
 
-  it("counts an assembly line whose whole cost is $0, not a priced one", () => {
+  it("counts an assembly line whose whole cost is $0 as a LINE, and labor-only as missing material", () => {
     expect(
       bidNotPricedCount([
         line({}),
+        // $12.50 of labor and material "0": until 2026-10-05 this was "a
+        // priced one" and added nothing. Owner: labor with $0 material is
+        // never fully priced — its material counts once.
         line({ breakdown: { directCost: 12.5 } }),
         line({ qty: 0 }),
       ])
-    ).toEqual({ lines: 1, parts: 0 });
+    ).toEqual({ lines: 1, parts: 1 });
   });
 
   it("counts a run-type line off an unpriced catalog row", () => {
@@ -125,5 +129,30 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
         line({ unpricedParts: 2 }),
       ])
     ).toEqual({ lines: 1, parts: 2 });
+  });
+});
+
+describe("lines with labor and no material (owner, 2026-10-05)", () => {
+  const line = (over: Record<string, unknown>) => ({
+    qty: 4,
+    assemblyId: 9,
+    takeoffRunTypeId: null,
+    runMaterialRole: null,
+    snapshotMaterialCost: "0",
+    snapshotLaborHours: "6",
+    unpricedParts: 0,
+    breakdown: { directCost: 1440 },
+    ...over,
+  });
+  it("counts them apart from $0 parts, so the advice can differ", () => {
+    const lines = [
+      line({}), // labor only: material missing entirely
+      line({ unpricedParts: 2 }), // $0 parts: the parts advice
+      line({ snapshotMaterialCost: "42" }), // fully priced
+      line({ breakdown: null }), // cannot be priced at all: neither
+    ];
+    expect(materialMissingLines(lines)).toBe(1);
+    // The tally holds both kinds: 1 (missing) + 2 (parts).
+    expect(bidNotPricedCount(lines)).toEqual({ lines: 0, parts: 3 });
   });
 });

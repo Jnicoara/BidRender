@@ -97,7 +97,7 @@ import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TapExplain } from "@/components/TapExplain";
 import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
-import { bidNotPricedCount } from "@/lib/notPricedTotal";
+import { bidNotPricedCount, materialMissingLines } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 
 /**
@@ -525,6 +525,8 @@ export default function BidsPage({
    * cards use, so this screen and the search result for it cannot disagree.
    */
   const notPricedTally = bidNotPricedCount(lines);
+  /** Of the tally's parts: lines with labor and no material at all. */
+  const materialMissing = materialMissingLines(lines);
   /**
    * Traced lines whose part had no labor unit when sent — labor "Not
    * priced". Their own strip, because the next move is on the Materials
@@ -1418,20 +1420,48 @@ export default function BidsPage({
                 was frozen with the line's price, so pricing the part in the
                 library does not reach this bid — the advice says how to.
               */}
-              {notPricedTally.parts > 0 && (
+              {/*
+                MATERIAL MISSING ENTIRELY (owner, 2026-10-05): a line with
+                labor and no material at all. Counted in the parts above, but
+                its own strip, because there is no part to go and price — the
+                parts advice would send somebody looking for one.
+              */}
+              {materialMissing > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     <span className="text-foreground font-medium">
-                      {notPricedTally.parts} part
-                      {notPricedTally.parts === 1 ? " is" : "s are"} not priced
+                      {materialMissing} line
+                      {materialMissing === 1 ? " has" : "s have"} labor but no
+                      material price
+                    </span>{" "}
+                    — the total above has{" "}
+                    {materialMissing === 1 ? "its" : "their"} labor and none of{" "}
+                    {materialMissing === 1 ? "its" : "their"} material. Add the
+                    material to the assembly, then remove the line and add the
+                    assembly again.
+                  </p>
+                </div>
+              )}
+              {notPricedTally.parts - materialMissing > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {notPricedTally.parts - materialMissing} part
+                      {notPricedTally.parts - materialMissing === 1
+                        ? " is"
+                        : "s are"}{" "}
+                      not priced
                     </span>{" "}
                     inside assembly lines that are otherwise priced — the
                     Materials total above leaves{" "}
-                    {notPricedTally.parts === 1 ? "it" : "them"} out. A line
-                    keeps the price it was added with, so price the part on the
-                    Materials screen, then remove the line and add the assembly
-                    again.
+                    {notPricedTally.parts - materialMissing === 1
+                      ? "it"
+                      : "them"}{" "}
+                    out. A line keeps the price it was added with, so price the
+                    part on the Materials screen, then remove the line and add
+                    the assembly again.
                   </p>
                 </div>
               )}
@@ -1790,9 +1820,12 @@ export default function BidsPage({
                     Total due{" "}
                     <IncompletePriceTag show={incomplete} className="ml-1" />
                   </span>
-                  <span className="font-mono text-base text-[#F5C518]">
-                    {money(totals.totalDue)}
-                  </span>
+                  {/* The bottom line says what it leaves out too (2026-10-05). */}
+                  <NotPricedTotal
+                    amount={money(totals.totalDue)}
+                    notPriced={notPricedTally}
+                    className="font-mono text-base text-[#F5C518]"
+                  />
                 </div>
               )}
 
@@ -1862,9 +1895,16 @@ export default function BidsPage({
                           className="ml-1"
                         />
                       </span>
-                      <span className="font-mono text-base text-[#F5C518]">
-                        {money(totals.totalDue)}
-                      </span>
+                      {/*
+                        The bottom line says what it leaves out, as the Bid
+                        price above does — until 2026-10-05 a labor-only
+                        line left $1,440.00 here with nothing beside it.
+                      */}
+                      <NotPricedTotal
+                        amount={money(totals.totalDue)}
+                        notPriced={notPricedTally}
+                        className="font-mono text-base text-[#F5C518]"
+                      />
                     </div>
                   )}
                 </>

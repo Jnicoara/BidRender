@@ -35,6 +35,7 @@ import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { laborForAssembly } from "@shared/materialLabor";
+import { unpricedPartsIn } from "@shared/lineNotPriced";
 import { LaborRateQuickEdit } from "@/components/LaborRateQuickEdit";
 import { resolveLaborRate } from "@shared/laborRateLookup";
 import {
@@ -306,14 +307,21 @@ function CostPreview({
     );
   }
 
+  /* Labor with no material, or $0 parts: never a clean cost (2026-10-05). */
+  const unpricedParts = unpricedPartsIn(draft.materials);
+  const materialMissing = line.materialCost === 0 && line.laborCost > 0;
+
   const Row = ({
     label,
     value,
     strong,
+    warn,
   }: {
     label: string;
     value: string;
     strong?: boolean;
+    /** Amber: this figure leaves something out. */
+    warn?: boolean;
   }) => (
     <div className="flex items-baseline justify-between gap-3 py-1">
       <span
@@ -327,7 +335,11 @@ function CostPreview({
       <span
         className={cn(
           "font-mono text-sm",
-          strong ? "text-[#F5C518]" : "text-foreground"
+          warn
+            ? "text-[#F5C518]"
+            : strong
+              ? "text-[#F5C518]"
+              : "text-foreground"
         )}
       >
         {value}
@@ -343,8 +355,22 @@ function CostPreview({
 
       <Row
         label={`Materials (${draft.materials.length} lines)`}
-        value={money(line.materialCost)}
+        value={materialMissing ? "not priced" : money(line.materialCost)}
+        warn={materialMissing}
       />
+      {/*
+        NEVER A CLEAN "Direct cost" OVER LABOR ALONE (owner, 2026-10-05): an
+        assembly with labor and $0 material — none at all, or parts nobody
+        priced — says so, the same rule the bid line follows
+        (shared/lineNotPriced.ts `lineMaterialNotPriced`, `unpricedPartsIn`).
+      */}
+      {(materialMissing || unpricedParts > 0) && (
+        <div className="text-xs text-[#F5C518] pl-1 pb-1">
+          {materialMissing
+            ? "No material is priced, so the cost below is labor only — the material is missing from it."
+            : `${unpricedParts} ${unpricedParts === 1 ? "part has" : "parts have"} no price and add nothing below.`}
+        </div>
+      )}
       <Row
         label={
           line.modifierPct !== 0
