@@ -238,6 +238,13 @@ const ALIAS_MAP: Record<string, string[]> = {
   "single pole": ["1-pole", "1P", "SP breaker"],
   "double pole": ["2-pole", "2P", "DP breaker", "240V breaker"],
   "2 pole": ["double pole", "2P", "240V breaker"],
+  // The HYPHENATED spellings, as ONE word each. A query is expanded word by
+  // word, so "double-pole" never reached the two-word key above and found
+  // nothing at all (measured 2026-10-05). Supply houses print both:
+  // Home Depot "Single-Pole", Platt "1P" (references/owner-questions.md § 1).
+  "single-pole": ["1-pole", "1P", "SP breaker"],
+  "double-pole": ["2-pole", "2P", "DP breaker"],
+  "three-pole": ["3-pole", "3P"],
   "gfci breaker": ["GFCI circuit breaker", "ground fault breaker"],
   "afci breaker": ["AFCI circuit breaker", "arc fault breaker"],
   "dual function": ["DFCI", "AFCI/GFCI", "combination breaker"],

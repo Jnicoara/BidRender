@@ -33,6 +33,12 @@ This is the human-readable companion to the git history — read this to see wha
   it anyway?" — Cancel is the default and nothing is saved until you choose.
   On a scanned sheet it cannot compare, and the message says so.
 
+- **Breaker search understands "double-pole" and "three-pole" with a
+  hyphen.** They found nothing before. Every common spelling (1P, SP, single
+  pole, 1-pole; 2P, DP, double pole; 3P, three pole) is now checked by a test,
+  against today's names and against the planned "1-Pole" names (owner,
+  2026-10-05; the rename itself waits for the other naming questions).
+
 - **A look saved under the wrong item can be moved.** Each look in a legend
   item's list has "Move", which lists the other items. The look keeps its
   picture and box; counted marks stay in their counts on every bid, locked or
