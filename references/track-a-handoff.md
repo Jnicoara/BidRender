@@ -1,6 +1,26 @@
 # Track A handoff — 2026-10-05
 
-## Session 2 (evening, ~23:50 UTC) — read this first, the rest is the earlier state
+## Session 3 (2026-10-06, ~03:45 UTC) — read this first
+
+- **First fully green smoke run on staging:** run 37408880584, `44f0f5f`,
+  96 passed, 0 failed, 2 skipped (they skip locally too). This is what
+  Approval A in `live-release-plan.md` needs. Note: the release commit is now
+  `44f0f5f` or later, not `af65f84`.
+- **The touch failure was a real bug:** taps on a freshly opened sheet were
+  lost on a slow connection. The tap layer waited for the measurability
+  query, and a mark had no sheet id until the sheet row arrived. Fixed in
+  `2e5e203` (provisional sheet id, `adoptRealSheet`). `touch.spec` now runs
+  at 300 ms latency and is red without the fix; `markBatches.test` too.
+- **Screenshots now upload** (`f4c444d`, `include-hidden-files`). Before
+  that, no run had ever uploaded one.
+- **Local only:** flow test 2 ("1/2 scaled") fails about 4 runs in 5 on a
+  local production build, with or without this session's changes, and passes
+  on staging. Unexplained.
+- Owner Q1 and Q2 answered (`owner-questions.md`). Q2's plan:
+  `remove-relocate-labor-plan.md`, Batch 2 files 0108–0110, not written.
+  Q3 is open.
+
+## Session 2 (evening, ~23:50 UTC) — the earlier state
 
 - **Staging password: fixed.** The new `SMOKE_STAGING_PASSWORD` gets through
   the gate; the specs now run on staging.
