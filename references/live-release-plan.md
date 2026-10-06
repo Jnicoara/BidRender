@@ -189,9 +189,19 @@ https://bidridge.com/api/version` still `0af50a6`; open a real bid, its
 origin main && git checkout local-dev`. The ruleset accepts it only
    because the gate passed on that exact commit. Watch DigitalOcean →
    Activity (3–6 min); `/api/version` → the commit and a fresh `builtAt`.
-9. **Every live bid's total, AFTER** — the same script, from the released
-   commit (a checkout at `f8fdec3` or later docs on top of it), then
-   `pnpm tsx scripts/bidTotals.mts --compare live-totals-before.json live-totals-after.json`.
+9. **Every live bid's total, AFTER** — the same script, run with the
+   released code. **`f8fdec3` holds the OLDER script**, so copy the
+   2026-10-06 one in exactly as in step 4 (from `a-migrations-plan`
+   `48af57a` or later), or the expected change reads as a FAIL:
+
+   ```bash
+   git worktree add ../bidrender-after f8fdec3
+   cp scripts/bidTotals.mts ../bidrender-after/scripts/
+   cd ../bidrender-after && pnpm install --frozen-lockfile
+   DOTENV_CONFIG_PATH=../BidPhase/.env.production.local pnpm tsx scripts/bidTotals.mts ../bidrender-backups/live-totals-after.json
+   pnpm tsx scripts/bidTotals.mts --compare ../bidrender-backups/live-totals-before.json ../bidrender-backups/live-totals-after.json
+   ```
+
    **Every `totalDue` must equal step 4's, no exceptions.** Not-priced and
    `incomplete` must equal step 4's too, except lines the compare prints as
    **EXPECTED** (§ 1b: labor with $0 material). Last line to expect: `ok all
@@ -202,6 +212,7 @@ N bid(s): totalDue unchanged; …` (with "except K EXPECTED" if any).
    not a fault. `--compare` adds "bid edited at …, after before was measured"
    to such a line; check that bid before rolling anything back.
    → **Approval D.**
+
 10. **Unfreeze; record it** in `deploying.md` § 11 (what printed, the backup
     run id, the times), and mark Batches 1 and 1b live in
     `migrations-0098-batch-plan.md` § S.
