@@ -31,6 +31,36 @@ export function isProvisionalGroup(groupId: number): boolean {
   return groupId < 0;
 }
 
+/*
+  ── The same gap, for the SHEET (staging smoke, 2026-10-06) ──────────────────
+  A freshly uploaded plan is drawn before its sheet ROW exists: the page count
+  is reported, the rows are made, and the list is fetched again — three round
+  trips. A mark is stored against a sheet id, so a tap in that window had
+  nowhere to go and `markForClick` dropped it without a word: 0 of 3 taps kept
+  on staging, four runs in a row, while every laptop passed. Same fix as the
+  count: the tap is kept under a NEGATIVE sheet id, drawn, never sent or
+  mirrored while provisional, and moved onto the real sheet the moment its row
+  arrives (`adoptRealSheet`).
+*/
+
+/** A sheet whose row does not exist yet. Server sheet ids are positive. */
+export function isProvisionalSheet(sheetId: number): boolean {
+  return sheetId < 0;
+}
+
+/** The queued marks of a sheet that had no row yet, moved onto the real one. */
+export function adoptRealSheet<T extends { sheetId: number }>(
+  queue: readonly T[],
+  provisionalSheetId: number,
+  realSheetId: number
+): T[] {
+  return queue.map(mark =>
+    mark.sheetId === provisionalSheetId
+      ? { ...mark, sheetId: realSheetId }
+      : mark
+  );
+}
+
 type Queued = { groupId: number; name: string };
 
 /** The queued marks of a provisional count, moved onto the count the server made. */

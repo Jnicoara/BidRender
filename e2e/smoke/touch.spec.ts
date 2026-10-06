@@ -42,6 +42,24 @@ test("count, link and send by touch", async ({ page }, info) => {
     true
   );
 
+  // A SLOW CONNECTION, on purpose (2026-10-06). On a fast one every query
+  // has answered before the first tap, and that is exactly how a fault stayed
+  // hidden: the layer that takes taps waited for the sheet's measurability
+  // query, and a mark had nowhere to go until the sheet's row arrived — on a
+  // fresh upload, three round trips after the drawing. Taps in that window
+  // were lost without a word: 0–1 of 3 kept on staging, four runs in a row,
+  // while every laptop passed. 300 ms per request reproduces it every time
+  // without the fix (TakeoffPage `overlay` + `provisionalSheetFor`,
+  // client/src/lib/markBatches.test.ts). Chromium only, which every project is.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", {
+    offline: false,
+    latency: 300,
+    downloadThroughput: -1,
+    uploadThroughput: -1,
+  });
+
   await openPlans(page, bidId);
   await uploadFixturePlan(page);
 

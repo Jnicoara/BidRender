@@ -5,6 +5,7 @@ import {
   recoveredMarkKey,
   splitRecoveredMarks,
 } from "./markBatches";
+import { adoptRealSheet, isProvisionalSheet } from "./provisionalCount";
 import type { UserMarkStatus } from "@shared/markStatus";
 
 const mark = (
@@ -29,6 +30,27 @@ describe("the next batch of marks", () => {
     expect(nextMarkBatch(queue).map(m => m.key)).toEqual([1, 2]);
     expect(nextMarkBatch(queue).every(m => m.groupId === 10)).toBe(true);
     expect(hasMoreBatches(queue, nextMarkBatch(queue))).toBe(true);
+  });
+
+  it("holds back taps on a sheet whose row has not arrived, then sends them on the real sheet", () => {
+    // Staging smoke, 2026-10-06: three taps on a freshly uploaded plan, made
+    // before its sheet row existed, were dropped. They are now kept under a
+    // provisional (negative) sheet id — and must not go to the server under it.
+    const queue = [mark(1, 10, -1), mark(2, 10, -1), mark(3, 10, -1)];
+    expect(nextMarkBatch(queue)).toEqual([]);
+
+    const adopted = adoptRealSheet(queue, -1, 77);
+    expect(nextMarkBatch(adopted).map(m => m.key)).toEqual([1, 2, 3]);
+    expect(nextMarkBatch(adopted).every(m => m.sheetId === 77)).toBe(true);
+  });
+
+  it("adopts only the provisional sheet it is told about", () => {
+    const queue = [mark(1, 10, -1), mark(2, 10, -2), mark(3, 10, 5)];
+    expect(adoptRealSheet(queue, -1, 77).map(m => m.sheetId)).toEqual([
+      77, -2, 5,
+    ]);
+    expect(isProvisionalSheet(-2)).toBe(true);
+    expect(isProvisionalSheet(5)).toBe(false);
   });
 
   it("never mixes two sheets of the same count", () => {
