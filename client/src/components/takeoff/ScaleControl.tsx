@@ -52,6 +52,7 @@ import {
 } from "@shared/planScale";
 import { compareToStandardScales } from "@shared/planCalibration";
 import { sheetSizeWarns, type SheetSize } from "@shared/sheetSize";
+import type { ScaleDoubt } from "@/lib/scaleCheck";
 
 const FLASH_MS = 1100;
 
@@ -76,7 +77,16 @@ export function ScaleControl({
   wanted,
   pageSize = null,
   onRefused,
+  doubt = null,
+  onKeepScale,
 }: {
+  /**
+   * What the scale check (@/lib/scaleCheck) made of the scale set, read off
+   * this page's drawing. NULL until it has run, or once kept.
+   */
+  doubt?: ScaleDoubt | null;
+  /** "Keep": the person looked and the set scale stays. */
+  onKeepScale?: () => void;
   /**
    * Set when the scale may not change (a locked bid): opening the popover
    * calls this instead, which says why. At the chip, not after a scale has
@@ -628,6 +638,52 @@ export function ScaleControl({
         >
           Check it
         </button>
+      )}
+
+      {/*
+        ── The scale check (@/lib/scaleCheck): a doubt, never a change ────────
+        Door swings on the drawing (and the sheet's own stated scale) disagree
+        with the scale set. Shown amber with the one sentence that says why,
+        one click to take the scale the evidence points to, and "Keep" to
+        leave it. Nothing here changes the scale by itself.
+      */}
+      {isSet && doubt?.kind === "mayBeWrong" && (
+        <span
+          className="flex items-center gap-1 text-xs text-warning shrink-0"
+          role="status"
+        >
+          <TriangleAlert className="w-3 h-3" />
+          <span title={doubt.message}>Scale may be wrong: {doubt.brief}</span>
+          <span className="sr-only">{doubt.message}</span>
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-warning/80"
+            title={`Set this sheet to ${describeScale(doubt.suggest.ratio)}`}
+            onClick={() =>
+              onRefused ? onRefused() : void pick(doubt.suggest.text)
+            }
+          >
+            Use it
+          </button>
+          {onKeepScale && (
+            <button
+              type="button"
+              className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              title="Keep the scale as it is — this sheet will not ask again this session"
+              onClick={onKeepScale}
+            >
+              Keep
+            </button>
+          )}
+        </span>
+      )}
+      {isSet && doubt?.kind === "cannotCheck" && (
+        <span
+          className="text-[0.65rem] text-muted-foreground shrink-0"
+          title={doubt.message}
+        >
+          · scan, can't check by code
+        </span>
       )}
 
       <span className="sr-only" role="status" aria-live="polite">

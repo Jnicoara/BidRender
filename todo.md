@@ -140,13 +140,45 @@ track-c, each working today without its column). All ADDITIVE, nullable,
       mark cannot say "54 in. height" or "tag A2" later and the bid cannot
       price by them. NULL = never read (a hand mark, or before the column).
       Measured: `references/code-first-ceiling.md` § b.
-- [ ] **`takeoff_stamps.mountingHeightIn INT NULL`** — owner's call, ONLY if
-      heights are to be priced: the height read off a label, as a number,
-      rather than parsing `labelWords`. NULL = none read.
+- ~~`takeoff_stamps.mountingHeightIn`~~ **withdrawn 2026-10-06 — a
+  duplicate.** The mark already has `mountHeightInches` +
+  `mountHeightSource` (0098, on staging; requested by Track C itself on
+  2026-10-01, below). A height read off a label goes THERE.
 - [ ] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
       first confirmed by hand ("from a new look", multiple-looks-plan.md
       § 4). Today kept per browser (`@/lib/trustedLooks`), so a colleague's
       browser asks again — safe, not shared. NULL = never confirmed.
+
+**Panel schedules read from the PDF** (Track C, 2026-10-06; built read-only
+on track-c — `@/lib/panelSchedules`, the "Schedules" view on a sheet — and
+writing NOTHING until these land). **Fits Track A's decision, not a second
+table:** A's clash 5 on `a-migrations-plan` (2026-10-06) picked ONE panel
+table, `bid_panels` (Batch 5, with nullable `bidPdfId` / `sheetId`), and a
+child `bid_panel_circuits`. C's earlier `panel_schedules` / `panel_circuits`
+(`code-first-ceiling.md` § e) are withdrawn. All ADDITIVE, nullable, **no
+DEFAULT**, no backfill. Each column is something the reader already reads
+on UNCC E003 (3 of 3 panels, 42/42 circuits each):
+
+- [ ] **On `bid_panels`, beside A's columns** (`name`, `isExisting`,
+      `bidPdfId`, `sheetId` are already in A's plan — not asked twice):
+      `supplyText VARCHAR(64) NULL` ("208/120V, 3-PH, 4W"),
+      `mainsText VARCHAR(96) NULL` ("225 AMP MAIN LUGS ONLY"),
+      `mainsAmps INT NULL`, `fedFromText VARCHAR(160) NULL`,
+      `connectedKva DECIMAL(9,2) NULL`, `demandKva DECIMAL(9,2) NULL`.
+      NULL = not read, or a panel typed in. All as printed — never a
+      parsed value standing in for what the drawing says.
+- [ ] **`bid_panel_circuits`** (A's child table; these are the columns C
+      fills): `panelId` FK `bid_panels.id` ON DELETE CASCADE,
+      `circuitNumber INT NOT NULL`, `breakerText VARCHAR(16) NULL` (as
+      printed: "20/1", "FEED"), `breakerAmps INT NULL`, `poles TINYINT NULL`,
+      `wireSize VARCHAR(16) NULL`, `description VARCHAR(255) NULL`,
+      `loadKva DECIMAL(7,2) NULL`; unique (`panelId`, `circuitNumber`). NULL
+      breaker / wire / load = the cell is empty on the drawing (a space),
+      which must stay distinct from 0.
+- **Fixture schedule rows: NOT asked yet.** The reader reads them (UNCC
+  E004, 6 of 6 types) and shows them read-only. Where they would live
+  overlaps `fixtureTag`, which A lists as undecided — decide that first,
+  then one table, not two.
 
 **Quote items** (Track B, owner-answered 2026-10-05;
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
@@ -233,8 +265,9 @@ All additive and nullable. Specs are in the plans named.
 - [ ] `symbol_looks` table — a legend look WITH its box, so the check needs no
       "Whole legend" in this tab first (today the boxes live in sessionStorage,
       `@/lib/sheetCheckSession`). `references/multiple-looks-plan.md` § 6.
-- [ ] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
-      `mountHeightSource` — lets a height read beside a mark be SAVED on it
+- [x] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
+      `mountHeightSource` — **landed in 0098 (staging)**; a height tied by
+      `tieLabels` (`54"`) is what fills it. Lets a height read beside a mark be SAVED on it
       (`MARK_HEIGHT_COLUMN`). NULL must stay distinct from 0.
       `references/check-my-marks-plan.md` § 10.
 - [ ] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past

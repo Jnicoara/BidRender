@@ -31,6 +31,25 @@ This is the human-readable companion to the git history — read this to see wha
 - **The quote panel says where to fix each unfinished line** — a missing
   labor rate is fixed on Labor rates, not "on the bid".
 
+- **Panel and fixture schedules on a sheet can now be read without zooming
+  into the drawing.** On a sheet that has a panel schedule or a lighting
+  fixture schedule, a "Schedules" button opens the tables as printed: each
+  panel's name, supply, mains, breakers, wire sizes, descriptions and
+  loads, and each fixture type with its description and watts. It is read
+  from the drawing's own text with no AI, and it is read-only, so nothing
+  is added to the bid. Drawings whose schedules are pictures rather than
+  text show no button.
+
+- **The plans screen now warns when a sheet's scale looks wrong.** Once a
+  scale is set, the app measures the door swings on the drawing: at the
+  right scale they read as normal 30–44" doors, at a wrong one they read as
+  18" or 72". If they disagree with the scale set, an amber "Scale may be
+  wrong" appears beside it with the reason, one click to use the scale the
+  drawing points to, and "Keep" to leave it. It never changes a scale by
+  itself. Scanned sheets say plainly they cannot be checked this way. On
+  the Weld 1 set it questions E-100's own "1/4"" note, which its doors say
+  is 1/8".
+
 - **A device on a demolition plan is never offered as new work.** Find all
   matching now reads each plan's printed title on drawn (non-scanned) plans
   too, as it already did on scans, and every find on a plan titled

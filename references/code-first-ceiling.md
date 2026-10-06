@@ -27,15 +27,15 @@ stop and find out why — either this file is stale or the code changed.
 
 ## Summary table
 
-| Idea                          | Measured (vector)                               | Scans                     | Effort       | Track A columns                                   | Payoff                            |
-| ----------------------------- | ----------------------------------------------- | ------------------------- | ------------ | ------------------------------------------------- | --------------------------------- |
-| a. Symbol finding             | E-200 44/46; UNCC 227/243 (93%, best box)       | 85/85 (picture matcher)   | built        | none                                              | —                                 |
-| b. Text tied to symbols       | USB **0 → 38/38**; GF **1 → 4/4**; heights 3/3  | OCR reads none: 0/73      | **small**    | `takeoff_stamps.labelWords` (or per-kind columns) | **high**                          |
-| c. CAD layers                 | Weld 1: yes, tagged; UNCC: declared, not tagged | none                      | medium       | none (read at view time)                          | **high where present**            |
-| d. Home runs                  | inconclusive (no truth; arrow shape unknown)    | —                         | high         | later                                             | unknown                           |
-| e. Panel schedules from text  | UNCC: 3/3 panels, 42/42 circuits each           | OCR, unmeasured           | medium       | `panel_schedules`, `panel_circuits`               | **high**                          |
-| f. Addenda, line by line      | identical → 0 changes; made-up → exact          | pixel diff instead        | medium       | `bid_pdfs.supersedesId`                           | high, **unproven on a real pair** |
-| g. Scale from the title block | right on 4/4 vector sheets                      | wrong on the scan ("114") | mostly built | none                                              | medium                            |
+| Idea                          | Measured (vector)                               | Scans                     | Effort        | Track A columns                                   | Payoff                            |
+| ----------------------------- | ----------------------------------------------- | ------------------------- | ------------- | ------------------------------------------------- | --------------------------------- |
+| a. Symbol finding             | E-200 44/46; UNCC 227/243 (93%, best box)       | 85/85 (picture matcher)   | built         | none                                              | —                                 |
+| b. Text tied to symbols       | USB **0 → 38/38**; GF **1 → 4/4**; heights 3/3  | OCR reads none: 0/73      | **small**     | `takeoff_stamps.labelWords` (or per-kind columns) | **high**                          |
+| c. CAD layers                 | Weld 1: yes, tagged; UNCC: declared, not tagged | none                      | medium        | none (read at view time)                          | **high where present**            |
+| d. Home runs                  | inconclusive (no truth; arrow shape unknown)    | —                         | high          | later                                             | unknown                           |
+| e. Panel schedules from text  | UNCC: 3/3 panels, 42/42 circuits each           | OCR, unmeasured           | built (view)  | `bid_panels` + `bid_panel_circuits` (A's)         | **high**                          |
+| f. Addenda, line by line      | identical → 0 changes; made-up → exact          | pixel diff instead        | medium        | `bid_pdfs.supersedesId`                           | high, **unproven on a real pair** |
+| g. Scale from the title block | right on 4/4 vector sheets                      | wrong on the scan ("114") | built (check) | none                                              | medium                            |
 
 ---
 
@@ -191,9 +191,35 @@ every row read off those columns.
 - Fixture schedules (UNCC E004): not attempted; same method.
 
 **Payoff:** circuit count, breaker sizes and descriptions are bid lines
-today typed by hand. **Effort: medium. Track A:** `panel_schedules`
+today typed by hand. **Effort: medium.** ~~Track A: `panel_schedules`
 (bid_pdf, sheet, name) and `panel_circuits` (number, breaker, poles,
-description, load).
+description, load).~~
+
+> **Built 2026-10-06, read-only** (`@/lib/panelSchedules`, a "Schedules"
+> view on the sheet; `codeFirstCeiling.mts schedreader` re-measures), and
+> two things above were WRONG:
+>
+> - **The name IS in the text — below the table, not above it** ("EXISTING
+>   PANEL 2B", under the summary block). The study looked above. Read now:
+>   **2A, 2B, 2HA**, each 42/42, with supply, mains, fed-from and the
+>   connected / demand totals. With the name, E111's circuit tags check
+>   against the schedule: **173 of 174 land on a described circuit of the
+>   panel they name** (was 0 — no name to match). "FED FROM PANEL 2HA" is
+>   the panel upstream, and is not taken as the name.
+> - Fixture schedules were attempted: **UNCC E004, 6 of 6 types** (A1, A2,
+>   A3, C1, EXC, UC), wrapped descriptions joined, watts read.
+>
+> Also measured: descriptions read **37 / 41 / 40 of 42** (the rest are
+> spaces with nothing printed); an even side lost its first word until the
+> view was looked at ("- CORR, 213" for "REC - CORR, 213"). **weld2's three
+> PANELBOARD SCHEDULES sheets carry no text at all** (about 44 words each —
+> the title block), so code cannot read them; that would be OCR or AI.
+> Weld 1 E-003 and the Blueridge scans: none found, as before.
+>
+> **Track A: one table, not two** — A's clash 5 picked `bid_panels` + a child
+> `bid_panel_circuits`; the columns the reader fills are in `todo.md`
+> § "Track A next migration batch" (Panel schedules). `panel_schedules` /
+> `panel_circuits` are withdrawn.
 
 ---
 
@@ -225,10 +251,24 @@ is detected.
 
 **Checking against a dimension mostly cannot be done on electrical
 sheets:** they carry almost no dimension strings (1–3 per sheet, and those
-are `1'-0"` — the graphic scale bar's labels). **The scale bar is the
-check to build instead** — its labelled length against its drawn length.
+are `1'-0"`). ~~The scale bar is the check to build instead.~~
 
-**Effort: small** (bar reading). **Track A: none.**
+> **Corrected 2026-10-06, when it was built.** Those `1'-0"` strings are the
+> scale NOTES ("1/8" = 1'-0""), not a scale bar's labels: measured, **no test
+> sheet has a drawn scale bar or a dimension line** (Weld 1, UNCC). A bar
+> check would have had nothing to run against. What every floor plan does
+> carry is door swings — quarter circles 30–44" in radius — so the check
+> built is `@/lib/scaleCheck` against those, with the sheet's stated scale
+> as tie-breaker. Measured (`codeFirstCeiling.mts scalecheck`): set 2x off
+> either way on Weld E-200 / E-100 and UNCC E111 / E121 / ED111, **12 of 12
+> caught with the right suggestion**; at the true scales it agrees, except
+> **Weld 1 E-100, whose "1/4"" note disagrees with its own doors** (71 swings
+> read 18"; same 27 pt radius as E-200 at 1/8") — a real catch, for the
+> owner to confirm. Scans (Blueridge): no line work, so it says plainly it
+> cannot check. Shown amber beside the scale, one click to apply, "Keep" to
+> leave it; never applied by itself.
+
+**Track A: none.**
 
 ---
 

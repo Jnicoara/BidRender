@@ -1307,7 +1307,141 @@ async function demotitles() {
   }
 }
 
+// ── scalecheck: the wrong-length guard, at true and deliberately wrong scales ─
+async function scalecheck() {
+  const { quarterArcRadii, checkScale, doorsAt } = await import(
+    "../client/src/lib/scaleCheck"
+  );
+  const { detectScaleFromText, parseScaleText } = await import(
+    "../shared/planScale"
+  );
+  const { isScan } = await import("../client/src/lib/findMatching");
+  const cases: [string, number, string][] = [
+    ["Weld 1.pdf", 5, '1/8" = 1\'-0"'],
+    ["Weld 1.pdf", 4, '1/4" = 1\'-0"'], // what its notes say
+    ["UNCC.pdf", 5, '1/4" = 1\'-0"'],
+    ["UNCC.pdf", 6, '1/4" = 1\'-0"'],
+    ["UNCC.pdf", 7, '1/8" = 1\'-0"'],
+    ["Old Blueridge school.pdf", 3, '1/4" = 1\'-0"'],
+  ];
+  for (const [file, pageNo, trueText] of cases) {
+    const p = await load(file, pageNo);
+    const scan = isScan(p.geo);
+    const radii = scan ? null : quarterArcRadii(p.geo.segs);
+    const titleScales = detectScaleFromText(
+      p.words.map(w => w.text).join(" ")
+    ).candidates;
+    const trueRatio = parseScaleText(trueText)!.ratio;
+    for (const [label, ratio] of [
+      ["as stated", trueRatio],
+      ["set 2x too fine", trueRatio / 2],
+      ["set 2x too coarse", trueRatio * 2],
+    ] as const) {
+      const r = checkScale({
+        ratio,
+        text: `${ratio}`,
+        arcRadii: radii,
+        titleScales,
+      });
+      console.log(
+        `${file} p${pageNo} ${label} (1:${ratio}): ${r.kind}` +
+          (r.kind === "mayBeWrong"
+            ? ` -> suggests ${r.suggest.text} — "${r.message}"`
+            : "") +
+          (radii
+            ? `  [door-sized arcs at this scale: ${doorsAt(radii, ratio)} of ${radii.length}]`
+            : "")
+      );
+    }
+  }
+}
+
+// ── e, built: the shipped reader (@/lib/panelSchedules) on every page ──────
+/**
+ * Every page of all three sets through `readSchedules`, the product code —
+ * text only, so this is quick. Then UNCC E111's circuit tags ("2B-27")
+ * against the schedule read for that panel, which needs the NAME.
+ */
+async function schedreader() {
+  const { readSchedules } = await import("../client/src/lib/panelSchedules");
+  const wordsOf = async (doc: any, pageNo: number) => {
+    const page = await doc.getPage(pageNo);
+    const viewport = page.getViewport({ scale: 1 });
+    const text = await page.getTextContent();
+    return wordBoxes({
+      items: text.items.flatMap((item: any) =>
+        "str" in item
+          ? [{ str: item.str, transform: item.transform, width: item.width }]
+          : []
+      ),
+      viewportTransform: viewport.transform,
+    });
+  };
+  const read: Record<string, ReturnType<typeof readSchedules>[]> = {};
+  for (const file of ["Weld 1.pdf", "UNCC.pdf", "Old Blueridge school.pdf"]) {
+    const doc = await getDocument({
+      data: new Uint8Array(readFileSync(path.join(PLANS, file))),
+      verbosity: 0,
+    }).promise;
+    read[file] = [];
+    for (let n = 1; n <= doc.numPages; n++) {
+      const words = await wordsOf(doc, n);
+      const s = readSchedules(words);
+      read[file].push(s);
+      if (!s.panels.length && !s.fixtures.length) {
+        console.log(`${file} p${n}: none (${words.length} words of text)`);
+        continue;
+      }
+      for (const p of s.panels) {
+        const nums = p.circuits.map(c => c.number);
+        const max = Math.max(...nums);
+        const missing = Array.from({ length: max }, (_, k) => k + 1).filter(
+          k => !nums.includes(k)
+        );
+        console.log(
+          `${file} p${n}: PANEL ${p.name ?? "(no name)"}${p.existing ? " (existing)" : ""} — ${p.circuits.length} circuits, max ${max}, missing ${missing.join(",") || "none"}; breakers ${p.circuits.filter(c => c.amps !== null).length}, descriptions ${p.circuits.filter(c => c.description).length}, loads ${p.circuits.filter(c => c.loadKva !== null).length}; supply "${p.supply}", mains "${p.mains}" (${p.mainsAmps} A), fed from "${p.fedFrom}", connected ${p.connectedKva} kVA, demand ${p.demandKva} kVA; ckt 1 ${JSON.stringify(p.circuits[0])}`
+        );
+      }
+      for (const f of s.fixtures)
+        console.log(
+          `${file} p${n}: FIXTURES "${f.title}" — ${f.fixtures.map(x => `${x.mark} (${x.watts ?? "-"} W)`).join(", ")}; ${JSON.stringify(f.fixtures[0])}`
+        );
+    }
+  }
+  // E111's circuit tags against the schedule for the panel they name.
+  const e = await load("UNCC.pdf", 5);
+  const rows: { y: number; items: typeof e.words }[] = [];
+  for (const w of [...e.words].sort((a, b) => a.cy - b.cy)) {
+    const r = rows.find(r => Math.abs(r.y - w.cy) <= 2);
+    if (r) r.items.push(w);
+    else rows.push({ y: w.cy, items: [w] });
+  }
+  rows.forEach(r => r.items.sort((a, b) => a.cx - b.cx));
+  const tags: { panel: string; n: number }[] = [];
+  for (const r of rows)
+    r.items.forEach((w, i) => {
+      if (!/^\d[A-Z]{1,2}$/.test(w.text)) return;
+      const dash = r.items[i + 1];
+      const num = r.items[i + 2];
+      if (dash?.text === "-" && num && /^\d{1,3}(,\d{1,3})*$/.test(num.text))
+        num.text
+          .split(",")
+          .forEach(n => tags.push({ panel: w.text, n: Number(n) }));
+    });
+  const panels = read["UNCC.pdf"].flatMap(s => s.panels);
+  const found = tags.filter(t =>
+    panels
+      .find(p => p.name === t.panel)
+      ?.circuits.some(c => c.number === t.n && c.description)
+  ).length;
+  console.log(
+    `UNCC E111: ${tags.length} circuit tags; ${found} land on a described circuit of the panel they name`
+  );
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  schedreader,
+  scalecheck,
   demotitles,
   layered,
   labels,
