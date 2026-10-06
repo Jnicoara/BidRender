@@ -53,7 +53,7 @@ writes "1P". For each pole count:
 
 ---
 
-## 2. What do REMOVE and RELOCATE cost? — OPEN
+## 2. What do REMOVE and RELOCATE cost? — ANSWERED 2026-10-05
 
 **The question.** A mark can now say a device is to be **removed** (demo) or
 **relocated** (moved). Neither buys a new device, so neither is priced as one,
@@ -77,11 +77,18 @@ warning; (c) one lump "demo" line per bid, typed by hand.
 **Source:** `todo.md` "Owner: what do REMOVE and RELOCATE cost?";
 `references/track-b-handoff.md` Open 1.
 
-**Answer:**
+**Answer (owner, 2026-10-05):** yes, one labor line per count for Remove and
+one for Relocate ("Remove duplex receptacle × 4"), **with one change: the
+hours live on the ASSEMBLY** — a remove-hours and a relocate-hours figure,
+set once and reused on every job — **with a per-bid override.** Unset hours
+show "not priced", never a silent $0, and count as unfinished at bid time.
+Relocate is labor only; new wire or boxes are counted as normal new work.
+**Not built yet.** What it needs: `references/remove-relocate-labor-plan.md`
+(three nullable columns in the next migration batch, then code).
 
 ---
 
-## 3. A run that ENDS on an existing device — does it price its drop? — waiting on 2
+## 3. A run that ENDS on an existing device — does it price its drop? — OPEN
 
 **The question.** When a traced conduit or cable run ends on a device marked
 **existing**, the run still prices its own drop there (the vertical piece of
