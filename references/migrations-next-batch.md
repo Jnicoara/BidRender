@@ -2,7 +2,11 @@
 
 ## Status: 0105–0124 written and rehearsed — on NO shared database
 
-**Written 2026-10-06 (Track A), on `local-dev`, applied ONLY to local
+**Written 2026-10-06 (Track A), on branch `a-batch-0105` — NOT merged into
+`local-dev` (owner, 2026-10-06: keep it on the branch, because a drizzle/
+change on local-dev stops staging following it until staging is migrated;
+and B's labor-only code, which 0105/0106 must ship with, is not written
+yet). Applied ONLY to local
 databases** (a copy of `bidrender_local`, `bidrender_test_localdev`).
 **Not on staging, not on live** — the owner approves live. Batch 5 (0125+)
 is not written: its designs are not settled.

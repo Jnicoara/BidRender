@@ -99,8 +99,11 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
-> **0105–0124 WRITTEN 2026-10-06 (Track A) on local-dev — applied to LOCAL
-> databases only, never staging or live (owner approves live).** Rehearsed
+> **0105–0124 WRITTEN 2026-10-06 (Track A) on branch `a-batch-0105`, NOT
+> merged into local-dev — applied to LOCAL databases only, never staging or
+> live (owner approves live). HELD: it lands (staging backup → migrate
+> staging → merge) only once B's labor-only code exists — checked
+> 2026-10-06, it is on no pushed branch.** Rehearsed
 > on a copy of `bidrender_local`: no bid total moved (4,386 bids), 167
 > starters seed (DV34 still held), no NULL hours read as 0. Full record:
 > `references/migrations-next-batch.md` § Status. **For Track B, two things:**
