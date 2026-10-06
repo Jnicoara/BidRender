@@ -13123,7 +13123,14 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
       endStampId: takeoffRuns.endStampId,
     })
     .from(takeoffRuns)
-    .where(and(eq(takeoffRuns.bidId, bidId), eq(takeoffRuns.userId, userId)));
+    .where(
+      and(
+        eq(takeoffRuns.bidId, bidId),
+        eq(takeoffRuns.userId, userId),
+        // A run on a removed plan set links nothing that is priced.
+        onLivePlanSheet(takeoffRuns.sheetId, bidId)
+      )
+    );
   const ids = Array.from(
     new Set(
       runs
@@ -13147,6 +13154,7 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
       and(
         eq(takeoffStamps.userId, userId),
         eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
         inArray(takeoffStamps.id, ids)
       )
     );
