@@ -380,8 +380,33 @@ describe("a line with no price blocks every figure (T3)", () => {
           name: "Panel swap",
           status: "Not priced",
           detail: "labor rate not set",
+          // Audit #17: not "Price them on the bid" — a rate is fixed elsewhere.
+          fix: "Set an hourly rate on the Labor rates screen.",
         },
       ]);
+  });
+
+  it("names a labor-only line's missing material, not a part (2026-10-06)", () => {
+    const { doc } = panelFor(
+      bid,
+      [
+        line({
+          name: "Light pole",
+          assemblyId: 41,
+          cost: "0",
+          hours: "6.0000",
+          rate: "85.0000",
+        }),
+      ],
+      [],
+      TAX_OFF
+    );
+    expect(doc.state).toBe("blocked");
+    if (doc.state === "blocked") {
+      expect(doc.gaps).toHaveLength(1);
+      expect(doc.gaps[0].detail).toBe("no material price");
+      expect(doc.gaps[0].fix).toMatch(/Add the material to the assembly/);
+    }
   });
 
   it("opens with figures once the lines are priced", () => {

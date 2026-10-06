@@ -83,20 +83,20 @@ wrong colour or word each, from the track-b audit
 - [ ] **Draft runs are priced with only a faded grey badge to show it.**
       Make it amber, with a way to jump to each draft · B · small · no ·
       audit #12
-- [ ] **A detected scale applies itself with a quiet grey "Detected".** It
-      should be amber "check it" until checked · B · small · no · audit #10
+- [x] **A detected scale applies itself with a quiet grey "Detected".** It
+      should be amber "check it" until checked · B · small · no · audit #10. **Done 2026-10-06 (Track B).** Amber "Detected", followed by "Check it", until checked.
 - [ ] **A scale kept after a check that disagreed still shows green
       "checked"** · B/A · small · **yes** (a column) · audit #11
-- [ ] **A typed scale the app can't read is dropped silently** and the old
-      scale stays · B · small · no · audit #9
-- [ ] **A run end nobody answered counts no drop but says so in grey**,
-      where the same state on a count is amber · B · small · no · audit #6
-- [ ] **The From/To end choices carry over to the next run**, so a drop can
-      be counted from the previous run's answer · B · small · no · audit #7
-- [ ] **A Send that added nothing shows a green success toast** · B ·
-      small · no · audit #15
-- [ ] **Enter in the run-type search arms the top fuzzy match**, so a typo
-      arms the wrong type · B · small · no · audit #16
+- [x] **A typed scale the app can't read is dropped silently** and the old
+      scale stays · B · small · no · audit #9. **Done 2026-10-06 (Track B).** Says so under the box, names the scale still in effect, keeps the text.
+- [x] **A run end nobody answered counts no drop but says so in grey**,
+      where the same state on a count is amber · B · small · no · audit #6. **Done 2026-10-06 (Track B).** Amber with a triangle.
+- [x] **The From/To end choices carry over to the next run**, so a drop can
+      be counted from the previous run's answer · B · small · no · audit #7. **Done 2026-10-06 (Track B).** The "Run finished" toast names the ends ("Panel → Receptacle"); the choices still carry over, as decided.
+- [x] **A Send that added nothing shows a green success toast** · B ·
+      small · no · audit #15. **Done 2026-10-06 (Track B).** A warning toast whenever anything was not sent.
+- [x] **Enter in the run-type search arms the top fuzzy match**, so a typo
+      arms the wrong type · B · small · no · audit #16. **Done 2026-10-06 (Track B).** Enter picks only an exact name, else makes a new type; the toast names what is armed (`client/src/lib/runTypeEnter.ts`, tested).
 - [ ] **Sheet coverage:** show which sheets were never worked, and warn
       before a bid goes out with untouched sheets (rated Essential) · B/A ·
       medium · maybe · `takeoff-spec.md` V19
@@ -156,8 +156,10 @@ prices ship without them.
       B · small · no · same file § 1.2 m
 - [ ] **Deleting a legend symbol is hover-only and drops learned
       corrections** · B · small · no · same file § 1.2 l
-- [ ] **Deleting a count card isn't lock-checked on the server**
-      (`takeoffGroups.remove`) · B · small · no · same file § 1.2 c′
+- [x] **Deleting a count card isn't lock-checked on the server**
+      (`takeoffGroups.remove`) · B · small · no · same file § 1.2 c′.
+      **Already done** — the lock check went in on 2026-09-29 (owner); this
+      line was stale until 2026-10-06.
 - [ ] Deleted-bids log, so a restored backup can re-apply later deletes.
       Optional: today it is a documented manual step · A · small · **yes** ·
       `track-b-beta-plan.md` "For Track A"
@@ -217,7 +219,7 @@ prices ship without them.
       audit #24
 - [ ] **Unpriced lines follow two policies:** the quote panel blocks, the
       proposal asks, and the block advice is wrong for a labor-rate gap ·
-      B · small · no · audit #17, #25
+      B · small · no · audit #17, #25. **Advice part done 2026-10-06 (Track B):** each gap now says where to fix it (labor rate → Labor rates; traced part → Materials, then Send again). The two policies (#25) are still open.
 - [ ] **Open a just-uploaded plan from the file on this machine** instead of
       downloading it again. This is the biggest time-to-first-sheet win · B
       · medium · no · `origin/track-b:references/track-b-plans-screen-edits-plan.md`

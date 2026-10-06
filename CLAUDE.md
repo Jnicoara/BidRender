@@ -1424,8 +1424,17 @@ conventions and both are load-bearing:**
   > labor stays in the total and its material counts as one thing not
   > priced: "+ material not priced" on the line, "+ N not priced" on the
   > total (`lineMaterialNotPriced`, and its SQL copy). The assembly editor's
-  > cost preview says the same. There is no "no material, on purpose" flag
-  > for an assembly yet; that needs a column.
+  > cost preview says the same.
+  >
+  > **And the way out, decided 2026-10-06 by the owner: `assemblies.laborOnly`.**
+  > An assembly the user ticks "Labor only" in the assembly editor never
+  > shows "not priced" and never blocks the print. Every other assembly with
+  > no parts stays "material not priced" until somebody ticks it — never
+  > inferred from "has no parts", which is the trap above. Starters that are
+  > truly labor-only ship ticked (none today: every shipped and planned
+  > starter has parts). Needs the column — todo.md, "Track A next migration
+  > batch" — so until it lands, a labor-only assembly still reads "material
+  > not priced".
 
 - **MEASUREMENT — unset must NEVER render as 0.** Zero is a legitimate answer —
   a floor box really is at 0'-0" — so a zero reads as a considered one. A

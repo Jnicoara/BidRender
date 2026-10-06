@@ -96,6 +96,8 @@ import {
   type EmtFittingStyle,
 } from "@shared/runFittingMaterials";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { runTypeEnterAction } from "@/lib/runTypeEnter";
 
 export type PickableRunType = {
   id: number;
@@ -1306,11 +1308,15 @@ export function RunTypePicker({
                 onKeyDown={e => {
                   if (e.key === "Escape") setOpen(false);
                   if (e.key === "Enter") {
-                    if (results[0]) {
-                      onPick(results[0]);
+                    // An exact name picks; anything else makes a new type —
+                    // never the top fuzzy match (audit #16, @/lib/runTypeEnter).
+                    const action = runTypeEnterAction(query, results);
+                    if (action.kind === "pick") {
+                      onPick(action.type);
+                      toast.success(`Tracing as ${action.type.label}.`);
                       setOpen(false);
-                    } else if (query.trim()) {
-                      onCreate({ label: query.trim() });
+                    } else if (action.kind === "create") {
+                      onCreate({ label: action.label });
                       setOpen(false);
                     }
                   }

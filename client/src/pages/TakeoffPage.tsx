@@ -6591,12 +6591,20 @@ export default function TakeoffPage({
       // header shows (D20); it named only one leg until 2026-09-26.
       // No scale and nothing typed yet (§ 4c): the run is finished and has no
       // length, so the message says what to do rather than "0 ft".
+      /*
+        AND ITS ENDS, NAMED (audit #7, 2026-10-06). The From/To pickers are
+        sticky, so every new run starts from the last run's answer — and a
+        drop is counted from it. Naming the ends here is where a carried-over
+        choice gets seen, the moment the run lands, in the same words the
+        finished run is called by (`traceEndsLabel`).
+      */
+      const ends = traceEndsLabel(traceEnds, heightsForBid?.types);
       toast.success(
         result.runFeet === null
-          ? "Run finished — no scale on this sheet, so type its length in the run panel."
+          ? `Run finished, ${ends} — no scale on this sheet, so type its length in the run panel.`
           : result.legCount > 1
-            ? `Run finished — ${result.legCount} legs, ${result.runFeet} ft flat.`
-            : `Run finished — ${result.runFeet} ft flat.`
+            ? `Run finished, ${ends} — ${result.legCount} legs, ${result.runFeet} ft flat.`
+            : `Run finished, ${ends} — ${result.runFeet} ft flat.`
       );
     },
     onSettled: refreshRuns,
@@ -7111,7 +7119,12 @@ export default function TakeoffPage({
           the skip explains the add. Saying how many did not go, and then why,
           is the difference between a report and a riddle.
         */
-        toast.success(
+        /*
+          A WARNING whenever anything did not go (audit #15, 2026-10-06). It
+          was a green success toast even when the answer was "Nothing added.
+          2 not sent" — a tick on a Send that put nothing on the bid.
+        */
+        toast.warning(
           `${parts.join(", ") || "Nothing added"}. ${blocked.length} not sent: ` +
             Array.from(new Set(blocked.map(s => s.why))).join(" ")
         );

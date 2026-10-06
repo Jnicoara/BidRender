@@ -294,9 +294,14 @@ function Blocked({ doc }: { doc: Extract<QuoteAppDoc, { state: "blocked" }> }) {
   return (
     <div className="space-y-3">
       {doc.isSample && <SampleWarning />}
+      {/*
+        Advice per gap (audit #17, 2026-10-06). This said "Price them on the
+        bid" for every one — wrong for a $0 labor rate or a traced part,
+        which are fixed somewhere else entirely.
+      */}
       <p className="text-sm">
-        This bid has lines without a price. Price them on the bid, then come
-        back for the figures.
+        Some lines on this bid are not finished. Each one below says where to
+        fix it; then come back for the figures.
       </p>
       <ul className="divide-y divide-border rounded-lg border border-border">
         {doc.gaps.map((gap, i) => (
@@ -307,7 +312,9 @@ function Blocked({ doc }: { doc: Extract<QuoteAppDoc, { state: "blocked" }> }) {
                 {gap.status}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground">{gap.detail}</p>
+            <p className="text-xs text-muted-foreground">
+              {gap.detail} — {gap.fix}
+            </p>
           </li>
         ))}
       </ul>

@@ -29,7 +29,7 @@
  * number rather than a broken screen — see CLAUDE.md § Copying a layout.
  */
 import { trpc } from "@/lib/trpc";
-import { ArrowDown, ArrowUp, Check, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Minus, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -513,15 +513,27 @@ export function RunEndsSection({
                 >
                   {leg.label} · {which}
                 </button>
-                <span className="text-xs text-muted-foreground text-right">
-                  {onTee
-                    ? "branch tee — no drop"
-                    : vertical?.counted
-                      ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft${sourceWords ? ` · ${sourceWords}` : ""}`
-                      : kind === DISTRIBUTION_KIND
-                        ? "no drop — carries on"
-                        : "not set — no drop counted"}
-                </span>
+                {/*
+                  AN END NOBODY ANSWERED IS AMBER (audit #6, 2026-10-06): it
+                  counts no drop, and verticals are the big missed footage.
+                  It was grey here while the same state on a count is amber
+                  with a triangle (GroupDrop.tsx) — one fact, two weights.
+                  "Carries on" and a tee are answers, so they stay grey.
+                */}
+                {!onTee && !vertical?.counted && kind !== DISTRIBUTION_KIND ? (
+                  <span className="text-xs text-[#F5C518] text-right inline-flex items-center gap-1">
+                    <TriangleAlert className="w-3 h-3 shrink-0" />
+                    not set — no drop counted
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground text-right">
+                    {onTee
+                      ? "branch tee — no drop"
+                      : vertical?.counted
+                        ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft${sourceWords ? ` · ${sourceWords}` : ""}`
+                        : "no drop — carries on"}
+                  </span>
+                )}
               </div>
               {/*
                 OPTION C (owner, 2026-10-05): an end on an EXISTING device

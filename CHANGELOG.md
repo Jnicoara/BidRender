@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Small fixes on the Plans screen, so nothing quietly goes wrong:**
+  - A scale you type that the app can't read now says so, and names the
+    scale still in effect, instead of vanishing.
+  - A scale read off the drawing shows "Detected" in amber until you check
+    it.
+  - A run end nobody answered ("no drop counted") is amber, as it already
+    was on a count.
+  - "Run finished" names what the run goes from and to, so a choice carried
+    over from the last run gets noticed.
+  - A Send that left anything off the bid is a warning, not a green tick.
+  - Pressing Enter in the run-type search no longer picks the closest-looking
+    type for a typo; it picks a type only when you typed its name.
+- **The quote panel says where to fix each unfinished line** — a missing
+  labor rate is fixed on Labor rates, not "on the bid".
+
 - **Fixed: a line with labor but no material could look fully priced.** An
   assembly with hours and no priced material — a light pole built as labor
   only — showed its labor as the line's price, and the bid total looked

@@ -146,20 +146,36 @@ DEFAULT**, no backfill — step 1 of the three-step deploy.
 - [ ] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
       `supplierName VARCHAR(128) NULL` (free text, like
       `materials.supplierName`), `quotedOn DATE NULL`, `packagePrice
-  DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
+DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
       `carriedFromBidId INT NULL` (provenance only, **no FK** — the old bid may
       be deleted; set = a carried quote, "not updated"), `note VARCHAR(500)
-  NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
+NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
 - [ ] **The company's quoted-line markup %** (material-markup D4; owner
       answer c: ONE company-wide number) — a nullable decimal beside the
       company markup default; A picks the table. NULL = no quoted-line rule.
 
-**Also worth a column (Track B, 2026-10-05, not yet owner-asked):** a way to
-say an assembly has **no material on purpose** (labor only). Since today's
-"labor with $0 material is never fully priced" rule, a genuinely labor-only
-assembly reads "+ material not priced" with nothing to clear it. A nullable
-`assemblies.laborOnly BOOLEAN` would let `lineMaterialNotPriced` skip it.
-Owner's call before A builds it.
+- [ ] **`assemblies.laborOnly BOOLEAN NULL`** — **owner: YES, 2026-10-06.**
+      This assembly has no material ON PURPOSE (demo, pull wire, a
+      trouble-shoot hour). ADDITIVE, nullable, **no DEFAULT**, no backfill.
+      NULL = not said. - **A ticked labor-only assembly never shows "not priced" and never
+      blocks the print.** `lineMaterialNotPriced` (shared/lineNotPriced.ts)
+      returns false for it, and its SQL copy in server/db.ts follows — both
+      sides of `dashboardNotPriced.test.ts` in one commit. - **Any other assembly with no parts stays "material not priced"**
+      until the user ticks **"Labor only"** in the assembly editor. Never
+      inferred from "has no parts" — that inference is the trap the
+      2026-10-05 rule closed. - **A bid LINE needs the answer too**, because a line keeps what was
+      frozen when it was added. Either freeze it onto the line
+      (`bid_line_items.snapshotLaborOnly BOOLEAN NULL`, with the other
+      snapshots) or read the assembly live; **freezing is recommended**, so
+      ticking the box later cannot quietly re-mark finished bids. A to pick
+      with B before writing. - A shipped assembly forks on edit, as every shipped edit does. - **Starter assemblies to ship marked labor-only: NONE today.** Checked
+      2026-10-06: all 8 shipped starters carry 3–6 parts, and every planned
+      one in references/starter-assemblies-plan.md has parts too — even the
+      demo ones (DR1–DR4 carry blank covers, wire nuts, a filler plate), so
+      they price normally and need no flag. Nothing called "pull wire"
+      exists. Any purely-labor starter added later (pull wire in existing
+      conduit, trouble-shoot hour, core drill) ships with `laborOnly = true`
+      in its seed row.
 
 ### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
 

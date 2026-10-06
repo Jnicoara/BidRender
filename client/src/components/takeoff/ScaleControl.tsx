@@ -34,6 +34,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { Check, Ruler, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,8 @@ export function ScaleControl({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  /** Text typed that does not read as a scale — said under the box. */
+  const [unreadable, setUnreadable] = useState<string | null>(null);
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
   const isSet = sheet.scaleRatio !== null;
@@ -212,11 +215,18 @@ export function ScaleControl({
       return;
     }
     const parsed = parseScaleText(text);
-    // Invalid reverts rather than erroring — there is nowhere here to put a
-    // message, and leaving a bad draft on screen is how someone comes to
-    // believe they set a scale they did not.
+    /*
+      CAN'T READ IT: SAY SO, AND KEEP THE BOX (audit #9, 2026-10-06).
+
+      This used to clear the box and change nothing, on the reasoning that
+      there was nowhere to put a message. There is — the line under the box —
+      and a typo dropped in silence left the OLD scale on the sheet with
+      nothing saying so, which is how somebody measures a whole sheet at a
+      scale they believe they changed. So the text stays for fixing, the box
+      stays open, and the line says what is still in effect.
+    */
     if (!parsed) {
-      setDraft("");
+      setUnreadable(text);
       return;
     }
     if (parsed.text === sheet.scaleText) {
@@ -246,7 +256,21 @@ export function ScaleControl({
             return;
           }
           setOpen(next);
-          if (!next) setDraft("");
+          if (!next) {
+            // Closed by clicking away with unreadable text in the box: the
+            // line under the box goes with it, so say it once here (#9).
+            const left = draft.trim();
+            if (left && !parseScaleText(left))
+              toast.warning(
+                `Couldn't read "${left}" as a scale — ${
+                  sheet.scaleText
+                    ? `the sheet is still at ${sheet.scaleText}`
+                    : "the sheet still has no scale"
+                }.`
+              );
+            setDraft("");
+            setUnreadable(null);
+          }
         }}
       >
         <PopoverTrigger asChild>
@@ -342,7 +366,10 @@ export function ScaleControl({
           <div className="space-y-1">
             <Input
               value={draft}
-              onChange={e => setDraft(e.target.value)}
+              onChange={e => {
+                setDraft(e.target.value);
+                setUnreadable(null);
+              }}
               onFocus={selectOnFocus}
               onBlur={() => void commit()}
               onKeyDown={e => {
@@ -354,13 +381,26 @@ export function ScaleControl({
                   e.preventDefault();
                   e.stopPropagation();
                   setDraft("");
+                  setUnreadable(null);
                   setOpen(false);
                 }
               }}
               placeholder={`Type a scale — 1/4" = 1'-0"`}
-              className="h-8 text-sm font-mono"
+              className={cn(
+                "h-8 text-sm font-mono",
+                unreadable !== null && "border-[#F5C518]"
+              )}
               aria-label={`Type a scale for ${sheet.name}`}
+              aria-invalid={unreadable !== null}
             />
+            {unreadable !== null && (
+              <p className="text-xs text-[#F5C518]" role="alert">
+                Couldn&apos;t read &ldquo;{unreadable}&rdquo; as a scale.{" "}
+                {sheet.scaleText
+                  ? `The sheet is still at ${sheet.scaleText}.`
+                  : "The sheet still has no scale."}
+              </p>
+            )}
             {/*
               These are FORMATS, not alternative scales. It once read "Also
               reads 1" = 20' and 1:100" under a field showing 1/4" = 1'-0",
@@ -545,11 +585,39 @@ export function ScaleControl({
       </Popover>
 
       {/*
+        Labelled, so a scale the app read is never mistaken for one chosen.
+        AMBER until somebody checks it (audit #10, 2026-10-06): a detected
+        scale applies itself, and a sheet with details at several scales can
+        read the wrong one. It was a quiet grey badge, which reads as "fine".
+        Once checked it goes back to grey — a fact, not a warning.
+      */}
+      {isSet && sheet.scaleSource === "detected" && (
+        <Badge
+          variant="outline"
+          className={cn(
+            "text-[0.65rem] px-1.5 py-0",
+            unchecked
+              ? "border-[#F5C518]/60 text-[#F5C518]"
+              : "border-border text-muted-foreground"
+          )}
+          title={
+            unchecked
+              ? "Read from this sheet, not checked yet — measure one known dimension before tracing"
+              : "Read from this sheet, and checked"
+          }
+        >
+          Detected
+        </Badge>
+      )}
+
+      {/*
         ── The whole nudge: a chip that says so, and one link ─────────────────
         Outside the popover, so acting on it costs one click rather than three,
         and outside the trigger so it does not open the popover on the way
         past. This is what REPLACED the overlay that used to open itself the
         moment a scale was saved — see `commit`. Encourage, never hijack.
+        After the Detected badge, so a detected sheet reads "Detected · Check
+        it" rather than saying "check it" twice.
       */}
       {unchecked && (
         <button
@@ -560,17 +628,6 @@ export function ScaleControl({
         >
           Check it
         </button>
-      )}
-
-      {/* Labelled, so a scale the app read is never mistaken for one chosen. */}
-      {isSet && sheet.scaleSource === "detected" && (
-        <Badge
-          variant="outline"
-          className="text-[0.65rem] px-1.5 py-0 border-border text-muted-foreground"
-          title="Read from this sheet — check it before measuring"
-        >
-          Detected
-        </Badge>
       )}
 
       <span className="sr-only" role="status" aria-live="polite">

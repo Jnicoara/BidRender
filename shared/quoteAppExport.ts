@@ -38,10 +38,12 @@ import { apportionWorkPrice, toCents } from "./pricing";
 import { runsNotOnBidText } from "./runsNotOnBid";
 import {
   lineHoursUnset,
+  lineMaterialNotPriced,
   lineNotPriced,
   linePartsNotPriced,
   type PartsLineLike,
 } from "./lineNotPriced";
+import { canPriceByHand } from "./handPricedLines";
 
 // ─── The shape of the quote app ──────────────────────────────────────────────
 
@@ -69,6 +71,13 @@ export type QuoteGap = {
   status: "Not priced" | "Can't price";
   /** What is missing, in words: "no price", "labor hours", "2 parts". */
   detail: string;
+  /**
+   * Where to fix it, per gap (audit #17, 2026-10-06). The panel used to say
+   * "Price them on the bid" for every gap, which is wrong advice for a /usr/bin/bash
+   * labor rate (fixed in Labor rates) or a traced part (fixed on the
+   * Materials screen, then Send again).
+   */
+  fix: string;
 };
 
 /** One of `bidRollup`'s `priced` rows, reduced to what a gap needs. */
@@ -107,6 +116,7 @@ export function quoteGaps(
       name: "This bid's overhead or profit setting",
       status: "Can't price",
       detail: "the setting has no finite price — check it on the bid",
+      fix: "Check overhead and profit on the bid.",
     });
   for (const { line, breakdown, problem } of priced) {
     const name = line.unitLabel ? `${line.unitLabel}: ${line.name}` : line.name;
@@ -117,6 +127,7 @@ export function quoteGaps(
         name,
         status: "Can't price",
         detail: "the bid cannot work this line out",
+        fix: "Open the bid: the line says what is wrong.",
       });
     } else if (lineNotPriced(line, directCost)) {
       gaps.push({
@@ -124,6 +135,11 @@ export function quoteGaps(
         name,
         status: "Not priced",
         detail: "no price",
+        fix: canPriceByHand(line)
+          ? "Type its price on the bid."
+          : line.takeoffRunTypeId !== null
+            ? "Price the part on the Materials screen, then Send again from the Plans screen."
+            : "Price its parts on the Materials screen, then remove the line and add the assembly again.",
       });
     } else if (lineHoursUnset(line)) {
       gaps.push({
@@ -131,6 +147,7 @@ export function quoteGaps(
         name,
         status: "Not priced",
         detail: "labor hours not set",
+        fix: "Give the part labor on the Materials screen, then Send again from the Plans screen.",
       });
     } else if (
       breakdown &&
@@ -148,15 +165,26 @@ export function quoteGaps(
         name,
         status: "Not priced",
         detail: "labor rate not set",
+        fix: "Set an hourly rate on the Labor rates screen.",
       });
     } else {
       const parts = linePartsNotPriced(line, directCost);
+      // Labor and no material at all (2026-10-06): there is no part to
+      // name, so it is said as what it is.
+      const noMaterial =
+        lineMaterialNotPriced(line, directCost) &&
+        Math.floor(line.unpricedParts) <= 0;
       if (parts > 0)
         gaps.push({
           lineId: line.id,
           name,
           status: "Not priced",
-          detail: `${parts} ${parts === 1 ? "part" : "parts"} with no price`,
+          detail: noMaterial
+            ? "no material price"
+            : `${parts} ${parts === 1 ? "part" : "parts"} with no price`,
+          fix: noMaterial
+            ? "Add the material to the assembly, then remove the line and add the assembly again."
+            : "Price the parts on the Materials screen, then remove the line and add the assembly again.",
         });
     }
   }
