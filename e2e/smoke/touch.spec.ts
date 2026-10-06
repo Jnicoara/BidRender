@@ -120,6 +120,8 @@ test("count, link and send by touch", async ({ page }, info) => {
   await legendTab.tap();
   await page
     .getByText(/^CI TOUCH$/)
+    // Visible: a mark's SVG <title> carries the same words (flow.spec.ts).
+    .filter({ visible: true })
     .first()
     .tap();
 
