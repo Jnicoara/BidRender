@@ -2,9 +2,9 @@
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`, branch `track-c`.
 At the time of writing, track-c and local-dev were the same commit, everything
-was committed and pushed, and `main` was untouched (`0af50a6`). C's databases
-`bidrender_local_c` and `bidrender_test_c` have all 105 migrations (through
-0104). If `git log origin/local-dev` or `scripts/schemaDrift.mts` says
+was committed and pushed, and `main` was `24105ad`. C's databases
+`bidrender_local_c` and `bidrender_test_c` had 105 migrations (through 0104) — local-dev has since added at least one more
+(`takeoff_stamps.labelWords`), not applied to C's local DB on 2026-10-06. If `git log origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
@@ -171,6 +171,26 @@ red run is not by itself a red suite:
   inside a sheet BEFORE BETA (todo.md, new table `bid_height_areas`). Not
   built: the footage math waits for Track A's columns. Columns: todo.md
   "Homerun footage".
+- **Homerun footage CALCULATOR, standalone** (2026-10-06,
+  `shared/homerunFootage.ts`, plan § 10 step 1). Pure: devices, panel
+  spot, scale, ceiling, method (Measured default / Average / Measured with
+  a minimum), routing, waste → wire, conduit and labor footage, every piece
+  shown (run, up-drop, down at panel, 5 ft panel makeup, routing, waste).
+  § 11 as answered: routing + waste ADD, waste material only, makeup at the
+  panel only, unconfirmed COUNT ("+ N unconfirmed"). Also the ceiling chain
+  (homerun → area → sheet → job → company), the height-area pick (smaller
+  outline wins; a shared wall is not an overlap) and a traced homerun
+  suppressing the computed one. **Wired to nothing** — no table, no bid, no
+  screen. `server/homerunFootage.test.ts` (44); each owner rule was broken
+  on purpose once and the suite went red. Known answer from UNCC E111
+  circuit 2B-1 (`codeFirstCeiling.mts homerunexample`): 546.24 pt =
+  30.346 ft out, + 12.5 ft drops = 42.846 ft; wire 58.558 ft per
+  conductor, 175.674 ft for 3. **Assumed, not read:** the panel spot is a
+  tap on E111's "existing electrical room … in this vicinity" note (E111
+  draws no panel), and the 10'-0" ceiling and 6'-0" panel are the plan's
+  example heights — E111 states neither. C's local DB is one migration
+  behind local-dev (`takeoff_stamps.labelWords`), which is why that script
+  section reads marks with plain SQL.
 - **Homeruns, read-only** (2026-10-06, `@/lib/homeruns`, worker
   `homeruns`, `HomerunsView`: a "Homeruns N" toggle on a sheet that has
   any, labels beside each arrow). **UNCC draws NO homeruns** (every device
@@ -267,7 +287,10 @@ inside a sheet":
 - Also `takeoff_run_circuits.panelCircuitId` (a traced homerun replaces the
   computed one).
 
-Until they land, C builds nothing of the footage. Once they do: plan § 10.
+Step 1 of plan § 10 (the pure calculator) is DONE and standalone. Until
+the columns land, C wires nothing of it in. Once they do: plan § 10
+steps 2–4, reading `shared/homerunFootage.ts` as the one place the
+arithmetic lives.
 
 **Older next step (still open), item 1, the on-screen pass**, then item 2. For the screen: Weld 1 E-200
 (vector) on "Legend capture check" (bid 1728356) and the trick from
