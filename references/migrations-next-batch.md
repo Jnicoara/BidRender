@@ -210,13 +210,41 @@ index after the drop (the new key starts with `bidId`). Detail:
 | ---- | ----------------------------- | ---------------------------------------------------------------- | -------- | ----------- | -------------------------- |
 | 0124 | `0124_bid_pdf_legend_entries` | Table, **with** `lookId int NULL → symbol_looks, SET NULL` in it | A/C      | No.         | Step 1. After 0102 (done). |
 
-## Batch 5 — before the priced sheet
+## Batch C — 0125–0130, Track C's homerun footage: WRITTEN 2026-10-07, ON A BRANCH ONLY
 
-§ 10d + B2 of the batch plan: brand line ×2, `bid_panels` + FKs, `panelId` +
-FK, `snapshotBrandLine`, example-price ×3 — about ten files, **numbered from
-0125 when written**. Bid numbers: yes by design (brand variants resolve
+Branch `a-batch-c-0125` — **not merged into local-dev, not on staging**
+(owner). Every file additive (step 1), nullable, no defaults:
+
+| #    | File                          | What it is                                                                                                                                                                                                                     |
+| ---- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0125 | `0125_bid_panels`             | Table `bid_panels` — THE panel table (clash 5): § 10d's shape (`name` made nullable — a schedule often prints none) + where its schedule is printed (`bidPdfId`, `sheetId`) + C's plan spot (`planSheetId`, `planX`, `planY`). |
+| 0126 | `0126_bid_panel_circuits`     | Table `bid_panel_circuits` — schedule columns as C's reader produces them + `homerunOverrideFt`, `homerunFromStampId`, `homerunConfirmedAt`, `homerunCeilingInches`.                                                           |
+| 0127 | `0127_bid_homerun_settings`   | `bids`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`, `homerunRoutingPct`, `homerunRunTypeId` (+FK run types, SET NULL; registered "unreviewed" in `forkableReferences.test.ts`).                                   |
+| 0128 | `0128_sheet_homerun_settings` | `bid_pdf_sheets`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`.                                                                                                                                                     |
+| 0129 | `0129_run_circuit_panel`      | `takeoff_run_circuits`: `panelCircuitId` (+FK SET NULL), `conductorSource`.                                                                                                                                                    |
+| 0130 | `0130_bid_height_areas`       | Table `bid_height_areas` (before-beta item, included because it is one plain CREATE).                                                                                                                                          |
+
+**Pairing rule (live-release-plan.md): these reach live only with Track C's
+footage code.** Applying moves no number; C's code then computes homerun
+footage (intended).
+
+**Numbering hazard, written down so it is not discovered:** the migrator
+skips a file numbered below one already applied (§ R.1). If ANY other
+migration is applied to staging or live before this branch merges, these
+six must be renumbered above it first. Nothing is applied anywhere shared,
+so renumbering is still free.
+
+## Batch 5 — before the priced sheet (numbered from 0131 when written)
+
+§ 10d + B2 of the batch plan: brand line ×2 (`pricing_defaults.brandLine`,
+`bids.brandLine`), `bid_line_items.panelId` + FK, `snapshotBrandLine`, and
+the example price ×2 (`materials.isExamplePrice`,
+`bid_line_items.snapshotPriceWasExample` — **narrowed 2026-10-07** from ×3:
+the owner's plain "Example price" tag has no store and no date, so the
+source and as-of columns are gone; batch plan B3). `bid_panels` itself moved
+to Batch C (0125). Bid numbers: yes by design (brand variants resolve
 prices; example prices become non-zero), which is why it waits for the
-"nobody has priced this" signal (example-price) to land first.
+"nobody has priced this" signal (example price) to land first.
 
 ## Step 3 — meaning changes, committed ONLY after their code is LIVE
 

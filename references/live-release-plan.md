@@ -37,6 +37,18 @@ boot after the release: ONE "Holding" line, for DV34 (rehearsed: 167 shared
 starters, 159 with NULL hours, none at 0). **If the boot logs more holds, or
 any new starter has hours 0, stop.**
 
+**Pairing rule 3 — homerun footage (written 2026-10-07).** Migrations
+**0125–0130** (`bid_panels`, `bid_panel_circuits`, the bid and sheet homerun
+settings, `takeoff_run_circuits.panelCircuitId` / `conductorSource`,
+`bid_height_areas`) reach live **only in the same release as Track C's
+homerun footage code** — the code that reads them, computes the footage and
+reads `bids.homerunRunTypeId` through the run-type resolver (its
+`forkableReferences.test.ts` entry must stop being "unreviewed" first).
+**Status 2026-10-07: the files are on branch `a-batch-c-0125` only — not on
+local-dev, not on staging; C's footage code is not written.** If any other
+migration is applied anywhere shared before they merge, renumber them above
+it first (`migrations-next-batch.md`, Batch C).
+
 **Every file 0105–0124 is step 1 (additive).** Apply all twenty BEFORE the
 push, drift before and after, exactly as staging was (`deploying.md` § 11).
 They are one batch on `local-dev`; there is no partial release of them.

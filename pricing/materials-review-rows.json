@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-07T01:45:29.974Z",
+ "generatedAt": "2026-10-07T03:21:45.282Z",
  "review": [
   {
    "category": "Wire & Cable",
@@ -20660,6 +20660,108 @@
    "category": "Equipment & Appliances",
    "item": "5\" insulated flex duct",
    "detail": "insulated flex duct comes in sizes either side of 5\""
+  },
+  {
+   "source": "Typical job",
+   "category": "Wire & Cable",
+   "item": "12/2 MC cable with 16/2 dimming",
+   "detail": "lighting retrofit: 0-10V fixtures are fed with MC carrying a dimming pair",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Wire & Cable",
+   "item": "12/2 MC-AP cable",
+   "detail": "small office TI: aluminum-armor MC with a bonding wire is the common TI cable",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Wire & Cable",
+   "item": "18/2 shielded fire alarm cable, FPLP",
+   "detail": "small office TI: plenum fire-alarm cable above lay-in ceilings (14-2 and 16-2 are listed, 18/2 is not)",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Low Voltage",
+   "item": "Cat6 plenum cable",
+   "detail": "small office TI: data drops above a return-air ceiling must be plenum (CMP); plain Cat6 only lists \"plenum\" as a search word",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit Fittings",
+   "item": "1/2\" EMT insulated set-screw connector",
+   "detail": "small office TI: insulated-throat connectors are spec'd on most TI jobs",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit Fittings",
+   "item": "1/2\" EMT to FMC transition coupling",
+   "detail": "small office TI: EMT drops changing to flex at the fixture",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit",
+   "item": "3/8\" FMC (reduced wall)",
+   "detail": "lighting retrofit: 3/8\" flex is the usual fixture whip conduit",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit Fittings",
+   "item": "1/2\" liquidtight 90-degree connector",
+   "detail": "service upgrade: rooftop unit and condenser whips turn 90° at the unit",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit Fittings",
+   "item": "1/2\" PVC female adapter",
+   "detail": "service upgrade: PVC to a threaded fitting",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit Fittings",
+   "item": "1/2\" PVC expansion fitting",
+   "detail": "service upgrade: exposed outdoor PVC runs need expansion fittings",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Conduit Fittings",
+   "item": "1/2\" EMT offset connector",
+   "detail": "Dollar Tree / retail retrofit: surface EMT into a box without bending an offset",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Strut & Supports",
+   "item": "T-bar box hanger",
+   "detail": "small office TI: boxes in a lay-in grid hang from the T-bar (a grid clip and a fan bar hanger are listed, a box hanger is not)",
+   "prefill": "Add"
+  },
+  {
+   "source": "Typical job",
+   "category": "Lighting Hardware",
+   "item": "Fixture hanging kit, aircraft cable",
+   "detail": "Dollar Tree / retail retrofit: pendant LED strips hung from open structure",
+   "prefill": "Add"
+  }
+ ],
+ "duplicates": [
+  {
+   "a": "2\" riser strap",
+   "aStatus": "Shipped",
+   "aUses": "1 starter",
+   "b": "Riser strap, 2\"",
+   "bStatus": "New — not in catalog yet",
+   "bUses": "—",
+   "why": "same size and the same words (2\"), spelled or ordered differently"
   }
  ],
  "questions": [
