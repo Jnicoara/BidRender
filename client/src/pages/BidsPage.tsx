@@ -101,7 +101,11 @@ import {
   lineNotPriced,
 } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
-import { bidNotPricedCount, materialMissingLines } from "@/lib/notPricedTotal";
+import {
+  bidNotPricedCount,
+  hoursNotSetLines,
+  materialMissingLines,
+} from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 
 /**
@@ -531,6 +535,10 @@ export default function BidsPage({
   const notPricedTally = bidNotPricedCount(lines);
   /** Of the tally's parts: lines with labor and no material at all. */
   const materialMissing = materialMissingLines(lines);
+  /** Of the tally's parts: lines whose assembly hours were not set (D1). */
+  const hoursNotSet = hoursNotSetLines(lines);
+  /** What is left: real PARTS with no price — the Materials screen's job. */
+  const partsNotPriced = notPricedTally.parts - materialMissing - hoursNotSet;
   /**
    * Traced lines whose part had no labor unit when sent — labor "Not
    * priced". Their own strip, because the next move is on the Materials
@@ -1454,25 +1462,36 @@ export default function BidsPage({
                   </p>
                 </div>
               )}
-              {notPricedTally.parts - materialMissing > 0 && (
+              {partsNotPriced > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
                   <p className="text-[11px] leading-snug text-muted-foreground">
                     <span className="text-foreground font-medium">
-                      {notPricedTally.parts - materialMissing} part
-                      {notPricedTally.parts - materialMissing === 1
-                        ? " is"
-                        : "s are"}{" "}
-                      not priced
+                      {partsNotPriced} part
+                      {partsNotPriced === 1 ? " is" : "s are"} not priced
                     </span>{" "}
                     inside assembly lines that are otherwise priced — the
                     Materials total above leaves{" "}
-                    {notPricedTally.parts - materialMissing === 1
-                      ? "it"
-                      : "them"}{" "}
-                    out. A line keeps the price it was added with, so price the
-                    part on the Materials screen, then remove the line and add
-                    the assembly again.
+                    {partsNotPriced === 1 ? "it" : "them"} out. A line keeps the
+                    price it was added with, so price the part on the Materials
+                    screen, then remove the line and add the assembly again.
+                  </p>
+                </div>
+              )}
+
+              {hoursNotSet > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {hoursNotSet} line
+                      {hoursNotSet === 1 ? " has" : "s have"} hours not set
+                    </span>{" "}
+                    — {hoursNotSet === 1 ? "its" : "their"} assembly had no
+                    hours when added, so the Labor total above leaves{" "}
+                    {hoursNotSet === 1 ? "its" : "their"} labor out. Set the
+                    hours on the assembly, then remove the line and add the
+                    assembly again.
                   </p>
                 </div>
               )}

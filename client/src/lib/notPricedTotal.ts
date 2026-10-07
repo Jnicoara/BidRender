@@ -173,6 +173,26 @@ export function materialMissingLines(
   ).length;
 }
 
+/**
+ * Lines whose ASSEMBLY HOURS were not set when added (D1) — counted in the
+ * tally's parts (`linePartsNotPriced` adds one each), but there is no part
+ * to price, so the advice is different: set the assembly's hours. Found on
+ * staging 2026-10-07: without this the bid said "1 part is not priced …
+ * price the part on the Materials screen" for a line whose parts were all
+ * priced and whose HOURS were missing.
+ */
+export function hoursNotSetLines(
+  lines: readonly (PartsLineLike & {
+    breakdown: { directCost: number } | null;
+  })[]
+): number {
+  return lines.filter(
+    line =>
+      lineHoursNotSet(line) &&
+      linePartsNotPriced(line, line.breakdown?.directCost ?? null) > 0
+  ).length;
+}
+
 export function bidNotPricedCount(
   lines: readonly (PartsLineLike & {
     breakdown: { directCost: number } | null;

@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import {
   anyNotPriced,
   bidNotPricedCount,
+  hoursNotSetLines,
   materialMissingLines,
   notPricedHeadline,
   notPricedSuffix,
@@ -156,5 +157,42 @@ describe("lines with labor and no material (owner, 2026-10-05)", () => {
     expect(materialMissingLines(lines)).toBe(1);
     // The tally holds both kinds: 1 (missing) + 2 (parts).
     expect(bidNotPricedCount(lines)).toEqual({ lines: 0, parts: 3 });
+  });
+});
+
+describe("lines whose assembly hours were not set (D1)", () => {
+  /*
+    Found on staging 2026-10-07: a bid with one such line (its parts all
+    priced) said "1 part is not priced … price the part on the Materials
+    screen". The tally counts the hours as one thing not priced; the screen
+    must split it out so the advice says "set the hours".
+  */
+  const line = (over: Record<string, unknown>) => ({
+    qty: 1,
+    assemblyId: 9,
+    takeoffRunTypeId: null,
+    runMaterialRole: null,
+    snapshotMaterialCost: "10",
+    snapshotLaborHours: null,
+    snapshotLaborOnly: null,
+    unpricedParts: 0,
+    breakdown: { directCost: 10 },
+    ...over,
+  });
+  it("counts them apart from parts, so the parts advice is not given for them", () => {
+    const lines = [
+      line({}), // hours not set, parts priced
+      line({ unpricedParts: 1 }), // hours not set AND a $0 part
+      line({ snapshotLaborHours: "1", breakdown: { directCost: 90 } }), // fine
+      // Nothing priced at all: a whole line, not counted here.
+      line({ snapshotMaterialCost: "0", breakdown: { directCost: 0 } }),
+    ];
+    const tally = bidNotPricedCount(lines);
+    expect(tally).toEqual({ lines: 1, parts: 3 });
+    expect(hoursNotSetLines(lines)).toBe(2);
+    // What is left for the "price the part" advice: the one real part.
+    expect(
+      tally.parts - materialMissingLines(lines) - hoursNotSetLines(lines)
+    ).toBe(1);
   });
 });
