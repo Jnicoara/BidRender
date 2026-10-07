@@ -295,6 +295,38 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**Track B's Gap 1 is FIXED on `c-homerun-footage` (2026-10-07)** —
+`references/track-b-plans-screen-gaps-plan.md` on branch `track-b`, which C
+cannot edit: **Track B, mark Gap 1 done there and do not build it again.**
+A run end that is dragged (or moved by removing an end point) now claims the
+mark it is let go on, or nothing in open space. What "claimed" means is
+unchanged: `startStampId` / `endStampId`, the run takes that box's drop and
+the mark's own drop is held back (`endOfRun`, `groupDrops`).
+
+- Client: `endClaimsAfterEdit` (`@/lib/legSnap`) in TraceLayer's one
+  `commitEdit`, same `snapToMark` as a trace click (never an unconfirmed
+  mark); an exact hit on a mark's connect point wins, since the drag snapped
+  there. An end that did not move and a tee end are not sent. Undo and redo
+  carry the claims (`undoStack` `setPoints` / `restorePoints` `ends`).
+- Server: `setPoints` takes optional `startStampId` / `endStampId`, checked by
+  `requireClaimableMarks` (shared with `setEnds`: own sheet, confirmed),
+  refuses a mark on a tee end, and clears that end's `startConnect` /
+  `endConnect` when the claim changes. The end keeps its KIND.
+- Tests: `server/runSetPoints.test.ts` (7 new; 3 go red with the claim write
+  off — off the mark, onto B, connect cleared) and `legSnap.test.ts` (6).
+- **Seen on screen, 1180x820 touch, UNCC E111** (bid 1728359, fixture removed
+  after): a 10 ft run ending on duplex A. Before: run 10 + 8.50 drop,
+  107 duplexes drop on their own (909.50 ft), EMT 928.00 ft. Dragged onto B:
+  claims B, run `13.28 + 8.50`, A drops again, EMT 931.28. Dragged into open
+  space: claim gone, run 17 ft with no drop, 108 duplexes drop (918.00), EMT
+  935.00 — before the fix this read 17 + 8.50 from A and 107. Ctrl+Z:
+  "Undone: run points edited", back on A, `9.98 + 8.50`, 107.
+- **Seen and left as is:** an end dragged off a mark that had no kind of its
+  own (it read the mark's) is "nothing there", so the fittings say "1 run has
+  a drop with no height, so its length is short". True — nobody has said what
+  is at that end — but owner's call whether the end should keep the device's
+  kind instead.
+
 **`c-homerun-footage` IS READY FOR TRACK A** (since 2026-10-07, when
 homerun couplings, connectors and straps landed — the owner's condition:
 "this must be done before Track A merges the branch"). Everything added

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  endClaimsAfterEdit,
   legSnapLabel,
   newRunStart,
   quantitySnap,
@@ -216,5 +217,96 @@ describe("a new run's start (case a: through a box = two drops)", () => {
         quantity: true,
       })
     ).toEqual({ startKind: null, startStampId: null });
+  });
+});
+
+describe("a dragged end claims the mark it now sits on (Track B Gap 1)", () => {
+  // Mark 7 at (100, 0), meeting the run at its wall point (100, 4); mark 8 at
+  // (300, 0). The run ends on mark 7.
+  const stamps = [
+    { id: 7, x: 100, y: 0, status: null, connect: { x: 100, y: 4 } },
+    { id: 8, x: 300, y: 0, status: null },
+    { id: 9, x: 500, y: 0, status: "unconfirmed" as const },
+  ];
+  const before = [
+    { x: 0, y: 0 },
+    { x: 100, y: 4 },
+  ];
+  const claims = (after: { x: number; y: number }[], tee = false) =>
+    endClaimsAfterEdit({
+      before,
+      after,
+      teeEnds: { start: false, end: tee },
+      tolerance: 6,
+      stamps,
+    });
+
+  it("off the mark into open space: null, so the old claim is let go", () => {
+    // Red before: the drag sent no claim at all and the run kept mark 7.
+    expect(
+      claims([
+        { x: 0, y: 0 },
+        { x: 200, y: 80 },
+      ])
+    ).toEqual({ endStampId: null });
+  });
+
+  it("onto another mark: that mark", () => {
+    expect(
+      claims([
+        { x: 0, y: 0 },
+        { x: 300, y: 0 },
+      ])
+    ).toEqual({ endStampId: 8 });
+  });
+
+  it("onto a mark's wall point, further than reach from its centre: that mark", () => {
+    const far = [{ ...stamps[0], connect: { x: 100, y: 20 } }];
+    expect(
+      endClaimsAfterEdit({
+        before: [
+          { x: 0, y: 0 },
+          { x: 50, y: 50 },
+        ],
+        after: [
+          { x: 0, y: 0 },
+          { x: 100, y: 20 },
+        ],
+        teeEnds: { start: false, end: false },
+        tolerance: 6,
+        stamps: far,
+      })
+    ).toEqual({ endStampId: 7 });
+  });
+
+  it("never an unconfirmed mark", () => {
+    expect(
+      claims([
+        { x: 0, y: 0 },
+        { x: 500, y: 0 },
+      ])
+    ).toEqual({ endStampId: null });
+  });
+
+  it("an end that did not move is not sent, so its claim stays", () => {
+    expect(
+      claims([
+        { x: 0, y: 0 },
+        { x: 50, y: 50 },
+        { x: 100, y: 4 },
+      ])
+    ).toEqual({});
+  });
+
+  it("a tee end is never sent", () => {
+    expect(
+      claims(
+        [
+          { x: 0, y: 0 },
+          { x: 300, y: 0 },
+        ],
+        true
+      )
+    ).toEqual({});
   });
 });

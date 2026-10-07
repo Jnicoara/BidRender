@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Dragging a run's end now moves its drop with it (branch
+  `c-homerun-footage`).** A run end dragged off a receptacle used to keep
+  counting that receptacle's drop — and kept the receptacle's own drop
+  switched off — and one dragged onto a different receptacle picked nothing
+  up. The wire footage followed the old box while the drawing showed the new
+  one. Now the end takes the box it is let go on, or none in open space, the
+  totals move at once, and undo puts the old box back. Found by Track B.
+
 - **The materials review sheet is ready to mark** —
   `pricing/materials-review.xlsx`. Every shipped material with its proposed
   new name (wire and cable metal at the end, breakers "1-Pole"), who uses

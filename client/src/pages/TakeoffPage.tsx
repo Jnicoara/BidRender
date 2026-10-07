@@ -3782,6 +3782,7 @@ export default function TakeoffPage({
           const r = await undoSetPoints.mutateAsync({
             id: op.runId,
             points: op.points,
+            ...op.ends,
           });
           return r.undo
             ? {
@@ -3789,12 +3790,18 @@ export default function TakeoffPage({
                 packet: r.undo,
                 runId: op.runId,
                 points: op.points,
+                ends: op.ends,
               }
             : null;
         }
         case "restorePoints":
           await undoRestoreRun.mutateAsync({ undo: op.packet });
-          return { kind: "setPoints", runId: op.runId, points: op.points };
+          return {
+            kind: "setPoints",
+            runId: op.runId,
+            points: op.points,
+            ends: op.ends,
+          };
         case "setEnds": {
           const r = await undoSetEnds.mutateAsync({
             id: op.runId,
@@ -7466,6 +7473,10 @@ export default function TakeoffPage({
             packet: result.undo,
             runId: vars.id,
             points: result.points,
+            ends: {
+              startStampId: vars.startStampId,
+              endStampId: vars.endStampId,
+            },
           },
           redo: null,
           subject: { kind: "run", id: rootOfRun(vars.id) },
@@ -10521,8 +10532,8 @@ export default function TakeoffPage({
                       onPickEnd={(runId, end) =>
                         setEndHighlight({ runId, end })
                       }
-                      onEditPoints={(id, points) =>
-                        editPoints.mutate({ id, points })
+                      onEditPoints={(id, points, ends) =>
+                        editPoints.mutate({ id, points, ...ends })
                       }
                       /*
                         The structural half of "one tool at a time", as for

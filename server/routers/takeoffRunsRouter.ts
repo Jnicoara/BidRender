@@ -216,6 +216,42 @@ async function refuseIfRunLocked(
 }
 
 /**
+ * The marks a run end may claim: on the run's OWN sheet, and confirmed.
+ * One check for `setEnds` and `setPoints`, so a link chosen in the panel and
+ * one made by dragging an end onto a mark cannot be held to different rules.
+ *
+ * Linking across sheets would suppress a vertical somewhere the estimator is
+ * not looking, which is the one thing this link must never do quietly.
+ */
+async function requireClaimableMarks(
+  sheetId: number,
+  ids: readonly (number | null | undefined)[],
+  userId: number
+) {
+  const claiming = ids.filter((id): id is number => typeof id === "number");
+  if (claiming.length === 0) return;
+  const onSheet = await db.getStampsForSheet(sheetId, userId);
+  const byId = new Map(onSheet.map(stamp => [stamp.id, stamp]));
+  for (const stampId of claiming) {
+    const stamp = byId.get(stampId);
+    if (!stamp) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "That mark is not on this sheet.",
+      });
+    }
+    // Rule 2 of shared/markStatus.ts, enforced here as well as in the
+    // client's snap.
+    if (!markIsSnapTarget(stamp.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: UNCONFIRMED_MARK_REFUSAL,
+      });
+    }
+  }
+}
+
+/**
  * An end on a TEE stays on the tee (D20): the tee is where three legs meet,
  * and a leg that drifted off it would still be joined in the counts while
  * visibly apart on the drawing. Pinned here, by construction, rather than
@@ -1196,20 +1232,64 @@ export const takeoffRunsRouter = router({
    * point whose corner moved is dropped so it is proposed again, and the
    * count is returned so the screen can say so. Refused on a locked bid.
    *
+   * ── An end that MOVED says which mark it now sits on ─────────────────────
+   * Track B's Gap 1 (2026-10-07): this wrote the points and nothing else, so
+   * an end dragged OFF a receptacle still claimed it — the run kept that
+   * box's drop and the box's own drop stayed suppressed — and an end dragged
+   * ONTO another mark claimed nothing. The drawing said one thing and the
+   * wire footage another. Now the client sends `startStampId` / `endStampId`
+   * for an end it moved: the mark it landed on, or null for open space.
+   * Omitted means the end did not move and its claim stays. The end keeps
+   * its KIND either way (an end off a mark falls back to its kind's height,
+   * as an end that never had one does), and a changed claim clears that
+   * end's wall-connection answer, which was about the old box.
+   *
    * Returns `undo`: the run's whole network as it was, which puts back the
-   * points AND any pull-point answer the move cleared.
+   * points, the claims AND any pull-point answer the move cleared.
    */
   setPoints: procedure
     .input(
       z.object({
         id: z.number().int().positive(),
         points: pointsSchema.min(2),
+        startStampId: z.number().int().positive().nullable().optional(),
+        endStampId: z.number().int().positive().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const run = await requireRun(input.id, userId);
       await refuseIfLocked(run.bidId, userId);
+      // A tee end belongs to no mark (D20) — the same guard as `setEnds`.
+      if (
+        (run.startTeeId !== null && input.startStampId != null) ||
+        (run.endTeeId !== null && input.endStampId != null)
+      )
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "That end is a branch tee — it carries on at run height, so it has no kind, height or mark.",
+        });
+      await requireClaimableMarks(
+        run.sheetId,
+        [input.startStampId, input.endStampId],
+        userId
+      );
+      const claims: Record<string, unknown> = {};
+      if (
+        input.startStampId !== undefined &&
+        input.startStampId !== run.startStampId
+      ) {
+        claims.startStampId = input.startStampId;
+        claims.startConnect = null;
+      }
+      if (
+        input.endStampId !== undefined &&
+        input.endStampId !== run.endStampId
+      ) {
+        claims.endStampId = input.endStampId;
+        claims.endConnect = null;
+      }
       const sheet = await requireSheet(run.sheetId, userId);
       const measurability = measurabilityOf(sheetScale(sheet));
       const ratio = measurability.ok ? measurability.ratio : null;
@@ -1227,6 +1307,7 @@ export const takeoffRunsRouter = router({
             points,
             lengthInches: inches === null ? null : inches.toFixed(4),
             scaleRatioUsed: ratio === null ? null : String(ratio),
+            ...claims,
           });
           return db.dropOrphanedPullPoints(input.id, userId, points);
         }
@@ -1711,33 +1792,11 @@ export const takeoffRunsRouter = router({
       if (input.endKind !== undefined)
         await requireKnownKind(input.endKind, userId);
 
-      // A stamp may only be claimed by a run on its OWN sheet. Linking across
-      // sheets would suppress a vertical somewhere the estimator is not
-      // looking, which is the one thing this link must never do quietly.
-      const claiming = [input.startStampId, input.endStampId].filter(
-        (id): id is number => typeof id === "number"
+      await requireClaimableMarks(
+        run.sheetId,
+        [input.startStampId, input.endStampId],
+        userId
       );
-      if (claiming.length > 0) {
-        const onSheet = await db.getStampsForSheet(run.sheetId, userId);
-        const byId = new Map(onSheet.map(stamp => [stamp.id, stamp]));
-        for (const stampId of claiming) {
-          const stamp = byId.get(stampId);
-          if (!stamp) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "That mark is not on this sheet.",
-            });
-          }
-          // Rule 2 of shared/markStatus.ts, enforced here as well as in the
-          // client's snap.
-          if (!markIsSnapTarget(stamp.status)) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: UNCONFIRMED_MARK_REFUSAL,
-            });
-          }
-        }
-      }
 
       const patch: Record<string, unknown> = {};
       const fields = [
