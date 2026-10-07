@@ -267,6 +267,14 @@ don't merge." Not written as a file yet; this is the plan.
 
 ## Batch 5 — before the priced sheet (numbered from 0132 when written — 0131 is Track C's, above)
 
+**Added 2026-10-07 — example LOADED labor rates** (owner;
+`references/starter-vs-company-plan.md` § 3b): `labor_rates.isExampleRate`,
+`labor_rates.baseWage`, `payrollTaxPct`, `workersCompPct`, `insurancePct`,
+`benefitsPct`, and `bid_line_items.snapshotLaborRateWasExample`. All additive,
+nullable, no DB default. Same shape and same reason as the example-PRICE pair
+below: the shipped example rates must not land before `isExampleRate`, or
+`needsRate` reads every unconfigured shop as "rate set".
+
 § 10d + B2 of the batch plan: brand line ×2 (`pricing_defaults.brandLine`,
 `bids.brandLine`), `bid_line_items.panelId` + FK, `snapshotBrandLine`, and
 the example price ×2 (`materials.isExamplePrice`,
