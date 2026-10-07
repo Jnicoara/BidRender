@@ -268,3 +268,130 @@ describeDb("a run end on the device drops to the item's type", () => {
     expect(await endFeet()).toBe(8.5);
   });
 });
+
+/*
+  A COUNT'S OWN DROPS (owner, 2026-10-07: "YES"). A count with no "Each drops
+  to" drops to its item's "Mounts at" type — and a box a homerun already
+  rises from carries no count drop, so no box is counted twice. Red before:
+  the count stayed "not answered" whatever its item said.
+*/
+describeDb("a count with no answer drops to its item's type", () => {
+  /** aBid's homerun device, plus a second mark 60 ft out with no homerun. */
+  async function twoMarks(assemblyId: number) {
+    const s = await aBid(assemblyId);
+    await caller().takeoffStamps.drop({
+      bidId: s.bidId,
+      sheetId: s.sheetId,
+      groupId: s.groupId,
+      at: [{ x: ft(60), y: ft(10) }],
+    });
+    const mats = await caller().materials.list();
+    const type = await caller().takeoffRunTypes.create({
+      label: `Drop EMT ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: mats.find(m => m.name === '1/2" EMT')!.id,
+    });
+    // What each drop is made of — the one thing still asked per count.
+    await caller().takeoffGroups.setDrop({
+      id: s.groupId,
+      dropRunTypeId: type.id,
+    });
+    return s;
+  }
+  async function countDrop(bidId: number, groupId: number) {
+    const { groups } = await caller().takeoffGroups.list({ bidId });
+    return groups.find(g => g.id === groupId)!.drop;
+  }
+
+  it("an item that says nothing: no count drop, as before", async () => {
+    const s = await twoMarks(await ownAssembly(null));
+    const drop = await countDrop(s.bidId, s.groupId);
+    expect(drop.result?.status).toBe("not-answered");
+  });
+
+  it("Mounts at: Receptacle — the box with no homerun drops 8.5 ft, said as the item's", async () => {
+    const s = await twoMarks(await ownAssembly("receptacle"));
+    const drop = await countDrop(s.bidId, s.groupId);
+    expect(drop.dropKind).toBeNull(); // the count itself still says nothing
+    expect(drop.result).toMatchObject({
+      status: "counted",
+      dropKind: "receptacle",
+      dropKindFromItem: true,
+      totalDropFeet: 8.5,
+      // The homerun's box: its up-drop is the homerun's, not counted again.
+      homerunClaimedCount: 1,
+    });
+    expect(drop.result!.countedMarks).toHaveLength(1);
+    // And the homerun still rises 8.5 ft there: one drop per box, not two.
+    expect((await homerun(s.bidId)).pieces.upDrop).toMatchObject({
+      counted: true,
+      feet: 8.5,
+    });
+  });
+
+  it("with the homerun refused (no panel spot), its box gets the count drop back", async () => {
+    const s = await twoMarks(await ownAssembly("receptacle"));
+    const database = (await getDb())!;
+    const { bidPanels } = await import("../drizzle/schema");
+    await database
+      .update(bidPanels)
+      .set({ planSheetId: null, planX: null, planY: null })
+      .where(eq(bidPanels.bidId, s.bidId));
+    const drop = await countDrop(s.bidId, s.groupId);
+    expect(drop.result).toMatchObject({
+      homerunClaimedCount: 0,
+      totalDropFeet: 17,
+    });
+  });
+});
+
+describeDb(
+  "the data / TV starters ship Mounts at: Data / TV / Low voltage",
+  () => {
+    it("every starter's Mounts at is a shipped height type", async () => {
+      const { BASELINE_ASSEMBLIES } = await import("./seed/baselineAssemblies");
+      const { shippedHeightType } = await import("../shared/takeoffHeights");
+      const said = BASELINE_ASSEMBLIES.filter(a => a.mountsAt);
+      expect(said.map(a => a.name).sort()).toEqual([
+        "Cable TV drop",
+        "Data drop, Cat6 (commercial)",
+        "Data drop, Cat6 (resi)",
+      ]);
+      for (const a of said)
+        expect(shippedHeightType(a.mountsAt!)).not.toBeNull();
+    });
+
+    it("an existing database gets it on the next start; an answer already given is kept", async () => {
+      const { seedBaselineAssemblies } = await import("./db");
+      const { and, isNull } = await import("drizzle-orm");
+      const database = (await getDb())!;
+      const row = and(
+        isNull(assemblies.userId),
+        eq(assemblies.name, "Cable TV drop")
+      );
+      const keyNow = async () =>
+        (await database.select().from(assemblies).where(row))[0]
+          ?.mountHeightTypeKey;
+      try {
+        await database
+          .update(assemblies)
+          .set({ mountHeightTypeKey: null })
+          .where(row);
+        await seedBaselineAssemblies();
+        expect(await keyNow()).toBe("low-voltage");
+
+        await database
+          .update(assemblies)
+          .set({ mountHeightTypeKey: "receptacle" })
+          .where(row);
+        await seedBaselineAssemblies();
+        expect(await keyNow()).toBe("receptacle");
+      } finally {
+        await database
+          .update(assemblies)
+          .set({ mountHeightTypeKey: "low-voltage" })
+          .where(row);
+      }
+    });
+  }
+);

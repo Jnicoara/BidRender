@@ -44,6 +44,7 @@ const MC_CABLE: DropTypeSpec = { ...EMT_2_AND_GROUND, pathType: "cable" };
 const group = (over: Partial<DropGroup> = {}): DropGroup => ({
   id: 1,
   dropKind: "receptacle",
+  dropKindFromItem: false,
   dropHeightInches: null,
   dropRunTypeId: 7,
   ...over,
@@ -71,6 +72,7 @@ function drops(input: {
   extras?: ExtrasContext;
   type?: DropTypeSpec | null;
   ratio?: number | null;
+  homerunClaims?: ReadonlySet<number>;
 }) {
   return groupDrops({
     groups: input.groups ?? [group()],
@@ -88,6 +90,7 @@ function drops(input: {
     extras: input.extras ?? NO_EXTRAS_CONTEXT,
     typeFor: () => (input.type === undefined ? EMT_2_AND_GROUND : input.type),
     ratioFor: () => (input.ratio === undefined ? RATIO : input.ratio),
+    homerunClaims: input.homerunClaims ?? new Set(),
   });
 }
 
@@ -335,5 +338,52 @@ describe("the export splits drops by sheet", () => {
       [1, 2],
       [2, 3],
     ]);
+  });
+});
+
+/*
+  NO BOX COUNTS ITS DROP TWICE (owner, 2026-10-07). A homerun rising from a
+  box already buys the pipe up from it; a count drop at the same box would be
+  the same vertical counted again. Red before: `homerunClaims` did not exist
+  and every mark carried a count drop whatever rose from it.
+*/
+describe("a box a homerun rises from carries no count drop", () => {
+  it("12 marks, 3 of them homerun boxes: 9 drops, and the row says why", () => {
+    const [d] = drops({ homerunClaims: new Set([100, 101, 102]) });
+    expect(d.countedMarks).toHaveLength(9);
+    expect(d.homerunClaimedCount).toBe(3);
+    expect(d.claimedCount).toBe(0);
+    // 9 × 8.5 ft, not 12 × 8.5.
+    expect(d.totalDropFeet).toBe(76.5);
+  });
+
+  it("a box both a run end and a homerun claim is counted once, as the run's", () => {
+    const [d] = drops({
+      marks: marks(2),
+      homerunClaims: new Set([100]),
+      runs: [
+        {
+          sheetId: 1,
+          points: [
+            { x: 0, y: 0 },
+            { x: 5000, y: 5000 },
+          ],
+          startStampId: null,
+          endStampId: 100,
+          startCountsVertical: false,
+          endCountsVertical: true,
+        },
+      ],
+    });
+    expect(d.claimedCount).toBe(1);
+    expect(d.homerunClaimedCount).toBe(0);
+    expect(d.countedMarks.map(m => m.id)).toEqual([101]);
+  });
+
+  it("passes the item's kind through, said as the item's", () => {
+    const [d] = drops({ groups: [group({ dropKindFromItem: true })] });
+    expect(d.dropKind).toBe("receptacle");
+    expect(d.dropKindFromItem).toBe(true);
+    expect(d.status).toBe("counted");
   });
 });

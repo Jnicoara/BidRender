@@ -237,7 +237,7 @@ function MountsAtField({
   const { data: types = [] } = trpc.assemblies.mountTypes.useQuery();
   const picked = types.find(t => t.typeKey === value);
   return (
-    <div className="flex items-center justify-between gap-3 py-1">
+    <div className="flex flex-col gap-2 py-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span className="text-sm">
         <span className="font-medium">Mounts at</span>
         <span className="block text-xs text-muted-foreground">
@@ -249,7 +249,10 @@ function MountsAtField({
         value={value ?? MOUNT_NOT_SAID}
         onValueChange={next => onChange(next === MOUNT_NOT_SAID ? null : next)}
       >
-        <SelectTrigger className="h-9 w-56" aria-label="Mounts at">
+        <SelectTrigger
+          className="h-9 w-full shrink-0 sm:w-72"
+          aria-label="Mounts at"
+        >
           <SelectValue>
             {value === null
               ? "Not said"

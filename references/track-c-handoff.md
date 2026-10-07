@@ -295,6 +295,49 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**Count drops from the item, Data/TV type, "No drop here" picker — DONE on
+`c-homerun-footage` (2026-10-07, owner's three YESes), no new column.**
+
+- **Count drops:** `loadGroupDrops` resolves each count's kind with
+  `deviceKind` (count's "Each drops to", else its item's "Mounts at"; the
+  row says "— from the item" and "(default height)"). The run type a drop is
+  made of is still asked per count. **No box twice:** a box a computed
+  homerun rises from (up-drop counted) is claimed like a run end's
+  (`groupDrops` `homerunClaims`, REQUIRED); the row says "N marks are where
+  a homerun rises". `takeoffRuns.drops` labels by the resolved kind.
+- **Data / TV / Low voltage:** shipped type `low-voltage`, 18", common.
+  Starters MS6/MS7/MS8 ship `mountsAt: "low-voltage"` (insert, plus a
+  fill-only pass in `seedBaselineAssemblies` — never over an answer).
+- **Wording:** `endKindLabel(distribution)` = `END_NO_DROP_LABEL` ("No drop
+  here"), so the picker beside the chip and the trace toolbar match it; the
+  picker now sizes to its text (it cut "No drop he" at tablet size — seen).
+  The "Mounts at" picker was widened too (cut "Data / TV / Low voltage –").
+- **Measured, old rule vs new on the SAME data** (code switched, all
+  counts given 1/2" EMT as their drop type, items: duplex, double duplex,
+  USB, GFCI → Receptacle; switch → Switch; J-box → wall J-box; data/TV →
+  Data/TV):
+  - UNCC E111: count drops 108 → 205, pipe 918.00 → 1,645.00 ft, wire
+    3,672.00 → 6,580.00 ft; **boxes counted twice 22 → 0**; homeruns
+    76/76 either way (3,996.04 ft).
+  - Weld 1 E-200 (answer-key bid 1728355): count drops 0 → 30, pipe 0 →
+    173.50 ft, wire 0 → 694.00 ft (no homeruns on that bid).
+  - Data/TV on E111: homerun drops 75 → 76 of 76, installed 3,987.54 →
+    3,996.04 ft, wire 11,962.63 → 11,988.13 ft.
+  - Hand checks: E111 190 × 8.5 + 15 × 2 = 1,645; Weld 11 × 2 + 15 × 8.5 +
+    4 × 6 = 173.5.
+- **Seen at 1180x820 touch:** "Mounts at" lists "Data / TV / Low voltage —
+  1'-6"" and saved it on the data item; the five E111 counts read "… — from
+  the item", "(default height)", "22 / 5 / 7 / 1 marks are where a homerun
+  rises"; a run end at "No drop here" shows it on chip and picker.
+- **Left in C's local DB:** the "Mounts at" answers on user 22173517's
+  items (that is the shop library). Every count's drop type and the test
+  runs were put back.
+- **Measuring note:** opening the Circuits panel re-points unconfirmed
+  homeruns, so homerun numbers move between visits (todo.md).
+- Tests: `deviceMountKind.test.ts` +5 (2 red with the change switched off),
+  `groupDrops.test.ts` +3 (homerun claims), `takeoffVerticals.test.ts`
+  (new type; end label — red before).
+
 **Shop default heights + "No drop here" — DONE on `c-homerun-footage`
 (2026-10-07), no new column** (the owner asked for columns; every answer
 already had one — table in `migrations-next-batch.md` § Batch C, todo.md

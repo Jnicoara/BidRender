@@ -3784,6 +3784,27 @@ export async function seedBaselineAssemblies(
     }
 
     /**
+     * "Mounts at" on a shipped starter seeded before it said one (owner,
+     * 2026-10-07: data / TV outlets). Same narrow shape as the passes above:
+     * shared rows only, named in the seed, and only where NOTHING was said —
+     * a company's fork, and a starter somebody already pointed elsewhere,
+     * keep their answer.
+     */
+    for (const spec of specs) {
+      if (!spec.mountsAt) continue;
+      await db
+        .update(assemblies)
+        .set({ mountHeightTypeKey: spec.mountsAt })
+        .where(
+          and(
+            isNull(assemblies.userId),
+            isNull(assemblies.mountHeightTypeKey),
+            eq(assemblies.name, spec.name)
+          )
+        );
+    }
+
+    /**
      * Starters the schema cannot hold yet wait, named, rather than seeding
      * half-built or at a made-up 0 hours. One log line per reason, not one per
      * starter: 160 near-identical warnings on every boot hide the one that
@@ -3852,6 +3873,8 @@ export async function seedBaselineAssemblies(
         laborRateId: defaultRole?.id ?? null,
         // Ships ticked only when the seed says so; otherwise "not said".
         laborOnly: spec.laborOnly === true ? true : null,
+        // The height type its device mounts at, when the seed says one.
+        mountHeightTypeKey: spec.mountsAt ?? null,
       });
       const assemblyId = result.insertId;
 
@@ -13504,15 +13527,42 @@ export async function loadGroupDrops(
   >
 ): Promise<GroupDrop[]> {
   const groups = await getGroupsForBid(bidId, userId);
-  if (!groups.some(g => g.dropKind !== null)) {
-    // Nothing asked for a drop: the common case, and one query.
+  /*
+    A count with no "Each drops to" of its own drops to its ITEM's "Mounts
+    at" type (owner, 2026-10-07; `deviceKind`). The same resolution the
+    homerun and run-end paths use, so one device cannot be a receptacle for
+    its homerun and nothing for its own drop.
+  */
+  const itemKinds = await getAssemblyMountKinds(
+    groups.map(g => g.assemblyId),
+    userId
+  );
+  const kindOf = (g: (typeof groups)[number]) =>
+    deviceKind(
+      g.dropKind,
+      g.assemblyId === null ? null : (itemKinds.get(g.assemblyId) ?? null)
+    );
+  if (!groups.some(g => kindOf(g) !== null)) {
+    // Nothing asked for a drop: the common case, and two queries.
     return groups.map(group => notAnsweredDrop(group.id, group.dropRunTypeId));
   }
-  const stamps = await getStampsForBid(bidId, userId);
+  const [stamps, homeruns] = await Promise.all([
+    getStampsForBid(bidId, userId),
+    // A box a homerun rises from is that homerun's drop: no count drop there.
+    loadBidHomeruns(bidId, userId, heights),
+  ]);
+  const homerunClaims = new Set<number>();
+  for (const row of homeruns?.rows ?? []) {
+    const f = row.footage;
+    if (f.state === "computed" && f.leavingDevice && f.pieces.upDrop.counted)
+      homerunClaims.add(f.leavingDevice.id);
+  }
   return groupDrops({
+    homerunClaims,
     groups: groups.map(g => ({
       id: g.id,
-      dropKind: g.dropKind,
+      dropKind: kindOf(g),
+      dropKindFromItem: g.dropKind === null && kindOf(g) !== null,
       dropHeightInches: g.dropHeightInches,
       dropRunTypeId: g.dropRunTypeId,
     })),

@@ -55,8 +55,13 @@ import { pointsToRealInches } from "./takeoffGeometry";
 /** A counted group, as far as its drops are concerned. */
 export type DropGroup = {
   id: number;
-  /** The height type at the device. NULL is "not answered" — no drop. */
+  /**
+   * The height type at the device — ALREADY resolved: the count's own, else
+   * its item's "Mounts at" (`deviceKind`). NULL is "not answered" — no drop.
+   */
   dropKind: string | null;
+  /** `dropKind` came from the item, not the count — said on the row. */
+  dropKindFromItem: boolean;
   /** This group's own device height, inches. NULL follows the kind. */
   dropHeightInches: number | null;
   /** What the drop is made of — the STORED id, resolved by the caller. */
@@ -150,6 +155,18 @@ export type GroupDrop = {
   markCount: number;
   /** Marks whose drop a run end already counts — left out, by the rule. */
   claimedCount: number;
+  /**
+   * Marks a computed HOMERUN rises from, its up-drop counted — left out the
+   * same way (owner, 2026-10-07: no box counts its drop twice).
+   */
+  homerunClaimedCount: number;
+  /**
+   * The height type the drops go to: the count's "Each drops to", else its
+   * item's "Mounts at" (`deviceKind`). NULL when neither says.
+   */
+  dropKind: string | null;
+  /** True when `dropKind` came from the item, not the count. */
+  dropKindFromItem: boolean;
   /** The marks that each carry a drop, at whatever height. */
   countedMarks: readonly { id: number; sheetId: number }[];
   /**
@@ -284,6 +301,12 @@ export function groupDrops(input: {
   typeFor: (runTypeId: number) => DropTypeSpec | null;
   /** Each sheet's usable scale ratio, for the proximity flag. */
   ratioFor: (sheetId: number) => number | null;
+  /**
+   * Marks a computed homerun rises from, with its up-drop COUNTED. REQUIRED
+   * (owner, 2026-10-07): the homerun already buys the pipe up from that box,
+   * so a count drop there would be the same box counted twice.
+   */
+  homerunClaims: ReadonlySet<number>;
 }): GroupDrop[] {
   const claimed = stampsClaimedByRuns(input.runs);
   // The job's (or company's) ceiling: what a mark outside every area and
@@ -315,14 +338,22 @@ export function groupDrops(input: {
 
   return input.groups.map(group => {
     const marks = input.marks.filter(m => m.groupId === group.id);
-    const unclaimed = marks.filter(m => !claimed.has(m.id));
+    const byHomerun = marks.filter(
+      m => !claimed.has(m.id) && input.homerunClaims.has(m.id)
+    ).length;
+    const unclaimed = marks.filter(
+      m => !claimed.has(m.id) && !input.homerunClaims.has(m.id)
+    );
     // "No drop on these" — skipped like a claimed mark, and said on the row.
     const wanting = unclaimed.filter(m => !m.dropExcluded);
     const base = {
       groupId: group.id,
       runTypeId: group.dropRunTypeId,
       markCount: marks.length,
-      claimedCount: marks.length - unclaimed.length,
+      claimedCount: marks.length - unclaimed.length - byHomerun,
+      homerunClaimedCount: byHomerun,
+      dropKind: group.dropKind,
+      dropKindFromItem: group.dropKindFromItem,
       excludedCount: unclaimed.length - wanting.length,
       distributionInches: distribution,
     };
@@ -491,6 +522,9 @@ export function notAnsweredDrop(
     deviceInches: null,
     markCount: 0,
     claimedCount: 0,
+    homerunClaimedCount: 0,
+    dropKind: null,
+    dropKindFromItem: false,
     excludedCount: 0,
     countedMarks: [],
     buckets: [],

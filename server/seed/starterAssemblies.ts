@@ -1476,20 +1476,35 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
       p("cat6-jack", 1),
       p("keystone-wall-plate-1-port", 1),
       p("j-hook", 3),
-    ]
+    ],
+    { mountsAt: "low-voltage" }
   ),
-  starter("MS7", "Data drop, Cat6 (resi)", "Low Voltage/EMS", "residential", [
-    p("low-voltage-mud-ring", 1),
-    p("cat6-cable", 75),
-    p("cat6-jack", 1),
-    p("keystone-wall-plate-1-port", 1),
-  ]),
-  starter("MS8", "Cable TV drop", "Low Voltage/EMS", "residential", [
-    p("low-voltage-mud-ring", 1),
-    p("rg6-coax-cable", 75),
-    p("coax-f-connector", 2),
-    p("coax-wall-plate", 1),
-  ]),
+  starter(
+    "MS7",
+    "Data drop, Cat6 (resi)",
+    "Low Voltage/EMS",
+    "residential",
+    [
+      p("low-voltage-mud-ring", 1),
+      p("cat6-cable", 75),
+      p("cat6-jack", 1),
+      p("keystone-wall-plate-1-port", 1),
+    ],
+    { mountsAt: "low-voltage" }
+  ),
+  starter(
+    "MS8",
+    "Cable TV drop",
+    "Low Voltage/EMS",
+    "residential",
+    [
+      p("low-voltage-mud-ring", 1),
+      p("rg6-coax-cable", 75),
+      p("coax-f-connector", 2),
+      p("coax-wall-plate", 1),
+    ],
+    { mountsAt: "low-voltage" }
+  ),
   starter("MS9", "Security camera drop", "Low Voltage/EMS", "both", [
     p("security-camera-dome", 1, { fixture: true }),
     p("cat6-cable", 100),

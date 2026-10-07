@@ -92,8 +92,15 @@ export function GroupDrop({
     setUndo(null);
   };
   const r = info.result;
+  /*
+    What the drops go to: the count's own answer, else its ITEM's "Mounts
+    at" (owner, 2026-10-07) — resolved on the server, said here as "from
+    the item" so nobody reads it as an answer given on this job.
+  */
+  const fromItem = info.dropKind === null && r?.dropKindFromItem === true;
+  const kind = info.dropKind ?? (fromItem ? (r?.dropKind ?? null) : null);
 
-  if (info.dropKind === null && !open) {
+  if (kind === null && !open) {
     if (locked) return null;
     return (
       <button
@@ -107,9 +114,7 @@ export function GroupDrop({
   }
 
   const typeLabel =
-    heightTypes.find(t => t.typeKey === info.dropKind)?.label ??
-    info.dropKind ??
-    "";
+    heightTypes.find(t => t.typeKey === kind)?.label ?? kind ?? "";
   const runType = runTypes.find(t => t.id === info.dropRunTypeId);
   // From the buckets, never "one drop × marks": a mark at its own height
   // drops a different length (vertical-drops-plan § 2).
@@ -132,7 +137,9 @@ export function GroupDrop({
             set({ dropKind: e.target.value === "" ? null : e.target.value })
           }
         >
-          <option value="">no drop</option>
+          <option value="">
+            {fromItem ? `${typeLabel} — from the item` : "no drop"}
+          </option>
           <option value={DISTRIBUTION}>nothing — at run height</option>
           {heightTypes
             .filter(t => t.typeKey !== DISTRIBUTION)
@@ -179,7 +186,7 @@ export function GroupDrop({
         </button>
       )}
 
-      {info.dropKind !== null && info.dropKind !== DISTRIBUTION && (
+      {kind !== null && kind !== DISTRIBUTION && (
         <div className="flex items-center gap-2 text-xs">
           <span className="text-muted-foreground shrink-0">
             Height for this count
@@ -214,7 +221,8 @@ export function GroupDrop({
                   {r.distributionInches !== null
                     ? ` from run height ${formatElevation(r.distributionInches)}`
                     : ""}{" "}
-                  · {r.perDropFeet.toFixed(2)} ft × {atCountHeight}
+                  {info.dropHeightInches === null ? " (default height)" : ""} ·{" "}
+                  {r.perDropFeet.toFixed(2)} ft × {atCountHeight}
                 </>
               )}
               {r.ownHeightCount > 0 &&
@@ -257,6 +265,14 @@ export function GroupDrop({
               {r.claimedCount} {r.claimedCount === 1 ? "mark is" : "marks are"}{" "}
               at a run's end, and the run counts{" "}
               {r.claimedCount === 1 ? "its" : "their"} drop.
+            </p>
+          )}
+          {r.homerunClaimedCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {r.homerunClaimedCount}{" "}
+              {r.homerunClaimedCount === 1 ? "mark is" : "marks are"} where a
+              homerun rises, and the homerun counts{" "}
+              {r.homerunClaimedCount === 1 ? "its" : "their"} drop.
             </p>
           )}
           {r.mayDoubleCount > 0 && (

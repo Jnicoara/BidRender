@@ -2108,10 +2108,8 @@ export const takeoffRunsRouter = router({
           groupId: d.groupId,
           groupLabel: groupLabel.get(d.groupId) ?? "Count",
           label:
-            heightTypeLabel(
-              groups.find(g => g.id === d.groupId)?.dropKind ?? "",
-              heights.types
-            ) ?? "",
+            // The RESOLVED kind: the count's, else its item's "Mounts at".
+            heightTypeLabel(d.dropKind ?? "", heights.types) ?? "",
           count: d.countedMarks.length,
           // One length only when every mark drops the same: a mark at its
           // own height makes "N × one drop" false, so it is never sent.

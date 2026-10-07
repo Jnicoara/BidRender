@@ -202,6 +202,7 @@ describe("the ceiling at each END of a regular run", () => {
         {
           id: 1,
           dropKind: "receptacle",
+          dropKindFromItem: false,
           dropHeightInches: null,
           dropRunTypeId: 7,
         },
@@ -245,6 +246,7 @@ describe("the ceiling at each END of a regular run", () => {
         },
       }),
       ratioFor: () => 48,
+      homerunClaims: new Set(),
     });
     // Before: two drops of 8.5 = 17 ft. After: 16.5 + 8.5 = 25 ft.
     expect(d.totalDropFeet).toBe(25);

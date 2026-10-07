@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { heightSourceWords } from "@/lib/heightSourceWords";
 import {
   DISTRIBUTION_KIND,
+  END_NO_DROP_LABEL,
   NOT_ANSWERED_LABEL,
   endKindLabel,
   formatElevation,
@@ -106,7 +107,7 @@ export function EndKindSelect({
       <SelectContent>
         <SelectItem value={NOT_ANSWERED}>{NOT_ANSWERED_LABEL}</SelectItem>
         <SelectItem value={DISTRIBUTION_KIND}>
-          Continues at run height
+          {END_NO_DROP_LABEL} — continues at run height
         </SelectItem>
         {types.map(row => (
           <SelectItem key={row.typeKey} value={row.typeKey}>
@@ -676,7 +677,7 @@ export function RunEndsSection({
                         })
                       }
                       ariaLabel={`Something else at the ${which} of ${leg.label}`}
-                      className="h-6 w-28 text-xs"
+                      className="h-6 w-auto min-w-28 max-w-full gap-1 text-xs"
                     />
                   </div>
                   {kind !== null && kind !== DISTRIBUTION_KIND && !locked && (

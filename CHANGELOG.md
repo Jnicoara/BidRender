@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Counts drop to their item's type, data/TV outlets have a height, and no
+  box is counted twice (branch `c-homerun-footage`).** A count nobody set a
+  drop on now drops to what its item "Mounts at", said as "from the item"
+  and "default height". A box a homerun already rises from no longer gets a
+  second drop from its count — on UNCC E111 the old rule counted 22 boxes
+  twice. A "Data / TV / Low voltage" height ships at 18" and the data and TV
+  starters use it, which brings E111 to 76 of 76 homerun drops. The run-end
+  picker now says "No drop here", like the button beside it.
+
 - **A device takes its type's default height, and an open run end can say
   "No drop here" (branch `c-homerun-footage`).** An assembly can now say what
   it "Mounts at" (receptacle, switch, wall J-box…), once in the library, and

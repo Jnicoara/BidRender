@@ -186,6 +186,17 @@ export const SHIPPED_HEIGHT_TYPES: readonly ShippedHeightType[] = [
     note: "Mounted for a reachable handle",
   },
   {
+    // Owner, 2026-10-07: data, TV and other low-voltage outlets had no type,
+    // so their homeruns and drops counted nothing. Shipped at receptacle
+    // height; a wall-mounted TV outlet up high is a per-count or per-mark
+    // height, or the shop's own number here.
+    key: "low-voltage",
+    label: "Data / TV / Low voltage",
+    startingInches: 18,
+    common: true,
+    note: "Usually beside the receptacles — set yours",
+  },
+  {
     key: "floor-box",
     label: "Floor box",
     startingInches: 0,
@@ -567,6 +578,14 @@ export function heightTypeLabel(
 export const NOT_ANSWERED_LABEL = "Not set";
 
 /**
+ * What an END that carries on at run height is called — the same words as
+ * the one-tap chip beside the picker (owner, 2026-10-07). It read "Run
+ * height" (`DISTRIBUTION_LABEL`, which still names the height itself), so
+ * one answer had two names side by side.
+ */
+export const END_NO_DROP_LABEL = "No drop here";
+
+/**
  * What ONE end of a run is called on a closed control or a readout.
  *
  * ── Three kinds of answer, and the first two are not types ─────────────────
@@ -593,7 +612,7 @@ export function endKindLabel(
 ): string {
   if (kind === null || kind === undefined || kind === "")
     return NOT_ANSWERED_LABEL;
-  if (kind === DISTRIBUTION_KIND) return DISTRIBUTION_LABEL;
+  if (kind === DISTRIBUTION_KIND) return END_NO_DROP_LABEL;
   return heightTypeLabel(kind, types) ?? kind;
 }
 

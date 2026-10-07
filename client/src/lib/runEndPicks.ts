@@ -14,7 +14,7 @@
  * runEndPicks.test.ts fails if a key here stops being a shipped kind — a quick
  * pick pointing at nothing would set an end the counts cannot read.
  */
-import { DISTRIBUTION_KIND } from "@shared/takeoffHeights";
+import { DISTRIBUTION_KIND, END_NO_DROP_LABEL } from "@shared/takeoffHeights";
 
 export type RunEndPick = { label: string; kind: string };
 
@@ -24,7 +24,8 @@ export const RUN_END_PICKS: readonly RunEndPick[] = [
   { label: "J-box", kind: "junction-box-wall" },
   { label: "Fixture", kind: "ceiling-box" },
   { label: "Stub-up", kind: "underground" },
-  { label: "No drop here", kind: DISTRIBUTION_KIND },
+  // The SAME words the picker beside it shows for this answer.
+  { label: END_NO_DROP_LABEL, kind: DISTRIBUTION_KIND },
 ];
 
 /**

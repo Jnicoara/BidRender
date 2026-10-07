@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest";
 import {
   DISTRIBUTION_KIND,
   DISTRIBUTION_LABEL,
+  END_NO_DROP_LABEL,
   SHIPPED_HEIGHT_TYPES,
   heightList,
   heightTypeLabel,
@@ -142,7 +143,18 @@ describe("the shipped height types", () => {
       "ceiling-box",
       "junction-box-wall",
       "disconnect",
+      // Owner, 2026-10-07: data / TV outlets are on most jobs, above the fold.
+      "low-voltage",
     ]);
+  });
+
+  it('ships Data / TV / Low voltage at 18" (owner, 2026-10-07)', () => {
+    // Red before: no such type, so a data outlet's homerun had no rise.
+    expect(resolveMountingHeight("low-voltage", noLayers, null)).toEqual({
+      inches: 18,
+      source: "shipped",
+    });
+    expect(heightTypeLabel("low-voltage")).toBe("Data / TV / Low voltage");
   });
 
   it("has no duplicate keys — a run points at one of these forever", () => {
@@ -1658,9 +1670,12 @@ describe("what the ARMED ENDS are called over the drawing", () => {
     expect(endKindLabel("")).toBe(NOT_ANSWERED_LABEL);
   });
 
-  it("calls run height by its SHORT name, not the picker's sentence", () => {
-    // The open list says "Continues at run height" because it has the room.
-    expect(endKindLabel(DISTRIBUTION_KIND)).toBe(DISTRIBUTION_LABEL);
+  it("calls an end at run height 'No drop here', the chip's words", () => {
+    // Owner, 2026-10-07: the picker said "Run height" beside a chip saying
+    // "No drop here" — one answer, two names. Red before: DISTRIBUTION_LABEL.
+    // The open list adds "— continues at run height" because it has the room.
+    expect(endKindLabel(DISTRIBUTION_KIND)).toBe("No drop here");
+    expect(endKindLabel(DISTRIBUTION_KIND)).toBe(END_NO_DROP_LABEL);
     expect(endKindLabel(DISTRIBUTION_KIND)).not.toMatch(/continues/i);
   });
 
@@ -1690,7 +1705,7 @@ describe("what the ARMED ENDS are called over the drawing", () => {
     // "carries on at run height" with nothing said about where it finishes.
     expect(
       traceEndsLabel({ startKind: DISTRIBUTION_KIND, endKind: null })
-    ).toBe(`${DISTRIBUTION_LABEL} → ${NOT_ANSWERED_LABEL}`);
+    ).toBe(`${END_NO_DROP_LABEL} → ${NOT_ANSWERED_LABEL}`);
   });
 
   it("agrees with the run row about what an end is called", () => {

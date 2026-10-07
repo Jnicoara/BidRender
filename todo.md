@@ -242,17 +242,30 @@ is). Shop height per type = `takeoff_mounting_heights`; per device =
 `c-homerun-footage`); "No drop here" = run end kind `'distribution'`.
 Search those before asking for a height column.
 
-- [ ] **Owner's call:** the TV data outlet on UNCC E111 has no height type
-      to pick (none ships for low-voltage / TV outlets), so its homerun
-      still has no up-drop. A shop adds its own type in Settings › Heights,
-      or one ships — not decided.
-- [ ] **Owner's call:** a count's OWN drops ("Each drops to") still start
-      unanswered even when its item says "Mounts at". Starting them answered
-      from the item is the plan's "Track B after A" line (vertical-drops-plan
-      § 7) and would add count drops to every such job at once.
-- [ ] The run-end dropdown's closed label for the "No drop here" answer reads
-      "Run height" (the shared `endKindLabel`, also the toolbar's "From").
-      Same meaning, two names side by side — rename with the toolbar in view.
+- [x] **Decided 2026-10-07 (owner), built on `c-homerun-footage`:** a
+      "Data / TV / Low voltage" height type ships at 18" (`low-voltage`,
+      common), and the data / TV starters (MS6, MS7, MS8) ship "Mounts at"
+      it — seeded on new databases, and filled on existing ones only where
+      nothing was said. UNCC E111: 76 of 76 homerun drops.
+- [x] **Decided 2026-10-07 (owner: YES), built:** a count's OWN drops follow
+      its item's "Mounts at" when the count has no "Each drops to"; the row
+      says "— from the item" and "(default height)". A drop still needs its
+      "made of" run type, asked per count as before. **And no box counts
+      twice:** a box a computed homerun rises from (up-drop counted) carries
+      no count drop (`homerunClaims`, beside the run-end claim). The old rule
+      double-counted 22 duplex boxes on E111.
+- [x] The run-end dropdown says "No drop here" like the chip beside it
+      (`END_NO_DROP_LABEL` via `endKindLabel` — every END label, the trace
+      toolbar's included). `DISTRIBUTION_LABEL` ("Run height") still names
+      the height itself.
+- [ ] **Still two names, found 2026-10-07, not asked:** a finished run's NAME
+      ("Panel → Run height", `endsName` via `heightTypeLabel`) still calls an
+      end at run height "Run height", while its Run ends row says "No drop
+      here". Changing it renames every run row; owner's call.
+- [ ] **Homerun numbers move when the Circuits panel opens:** it re-points
+      every UNCONFIRMED homerun to the device now closest (by design). Any
+      before/after must be measured without opening it in between — the
+      2026-10-07 E111 figures moved 4,119.31 → 3,987.54 ft that way.
 
 **Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
 `references/homerun-footage-plan.md`; nothing computes footage yet). Owner:

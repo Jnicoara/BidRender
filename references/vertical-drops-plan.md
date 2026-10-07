@@ -143,6 +143,14 @@ an assembly or a legend symbol to a height type today (§ 7 option B).
 > its "Each drops to"; starting those answered from the key is still
 > Track B's, and still open (todo.md). A height from the type says "default
 > height" on screen. UNCC E111: 14 homeruns with no up-drop → 1.
+>
+> **Extended the same day (owner: YES): a count's OWN drops read it too**
+> when the count has no "Each drops to" ("— from the item" on the row). This
+> replaces the "a NEW count starts with dropKind answered" half of § 7's
+> Track B line: read live, so existing counts follow too. The run type a
+> drop is made of is still asked per count. **The claim rule grew one
+> case:** a box a computed homerun rises from carries no count drop
+> (`groupDrops` `homerunClaims`), as a run end's box already did not.
 
 ### The run end — the gate
 
