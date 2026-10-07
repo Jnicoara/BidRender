@@ -87,6 +87,54 @@ describe("aughts without #", () => {
   });
 });
 
+describe('ground rods — "5/8\\" x 8 ft" (owner, 2026-10-07)', () => {
+  it("read their length, with the diameter breaking a tie", () => {
+    expect(hasSize('Ground rod, 5/8" x 8 ft')).toBe(true);
+    expect(materialTypeName('Ground rod, 5/8" x 8 ft')).toBe("Ground rod");
+    expect(
+      sorted(
+        'Ground rod, 3/4" x 10 ft',
+        'Ground rod, 5/8" x 10 ft',
+        'Ground rod, 5/8" x 8 ft'
+      )
+    ).toEqual([
+      'Ground rod, 5/8" x 8 ft',
+      'Ground rod, 5/8" x 10 ft',
+      'Ground rod, 3/4" x 10 ft',
+    ]);
+    // the old names, unchanged
+    expect(sorted("Ground rod, 10 ft", "Ground rod, 8 ft")).toEqual([
+      "Ground rod, 8 ft",
+      "Ground rod, 10 ft",
+    ]);
+    expect(materialTypeName("Bath exhaust fan, 50 CFM")).toBe(
+      "Bath exhaust fan"
+    );
+  });
+});
+
+describe("SER with the full conductor set (owner, 2026-10-07)", () => {
+  it("groups by type and orders by gauge, copper and aluminum", () => {
+    expect(materialTypeName("4/0-4/0-4/0-2/0 SER Aluminum")).toBe(
+      "SER Aluminum"
+    );
+    expect(materialTypeName("8-8-8-8 SER Copper")).toBe("SER Copper");
+    expect(
+      sorted(
+        "2/0-2/0-2/0-1 SER Aluminum",
+        "4-4-4-6 SER Aluminum",
+        "4/0-4/0-4/0-2/0 SER Aluminum",
+        "2-2-2-4 SER Aluminum"
+      )
+    ).toEqual([
+      "4-4-4-6 SER Aluminum",
+      "2-2-2-4 SER Aluminum",
+      "2/0-2/0-2/0-1 SER Aluminum",
+      "4/0-4/0-4/0-2/0 SER Aluminum",
+    ]);
+  });
+});
+
 describe("what must NOT change", () => {
   it("a tandem breaker is still not a size", () => {
     expect(materialTypeName("15/20 tandem breaker")).toBeNull();

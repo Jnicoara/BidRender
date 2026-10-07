@@ -101,8 +101,15 @@ A shop with no lists never sees a difference.
 4. The shipped price on the baseline row — tagged "Example price" (§ 4.3).
 5. Nothing → "Not priced", as today (`shared/lineNotPriced.ts`).
 
-Step 2 falling through to 3 is **open question Q1**, because it changes a
-number.
+Step 2 falling through to 3 was **open question Q1** — **answered yes,
+2026-10-07** (owner): fall through to your own price, **and the line SAYS
+so, visibly, on the bid.** A part priced from the company's own price on a
+bid that has a supplier is marked on its line — "your price, not from
+Graybar" — and the bid totals say how many ("2 parts not from Graybar"),
+the same shape as the "not priced" count. It reads the line's frozen parts
+(`snapshotPriceParts` records which step priced each part), so the mark
+cannot change after the fact and cannot be inferred wrong from today's
+lists. Never on the customer quote (internal, § 7).
 
 ### 3.2 Who a supplier is: a small table, not free text
 
@@ -221,6 +228,19 @@ item 1, 2026-09-29): **flag, plus one explicit button. Never silent.**
   freezes how many, and this is what it costs.
 - No column for the flag: it is a comparison at read time, like the brand
   flag.
+- **Markup is applied EXACTLY ONCE — owner, 2026-10-07 (Q4).** Re-pricing
+  starts from the supplier's RAW price and resolves markup on it, the same
+  path as adding the line fresh; it never reads the line's already-marked
+  cost back in. The trap is real: if the re-price fed the old marked-up
+  `snapshotMaterialCost` (or a marked-up part) into the markup step, a 25%
+  rule would land as 56.25%, and a second press would compound it again.
+  So the re-price function takes only raw inputs (supplier price, quantity,
+  rules) and has no parameter that could carry a marked-up number in.
+  **Test, required with the build:** price a fixture part $10.00 with a 25%
+  rule → $12.50; re-price from a second supplier at $10.00 → still $12.50,
+  not $15.63; press re-price twice → still $12.50; switch to a supplier at
+  $8.00 → $10.00. Each assertion goes red on a version that re-marks the
+  frozen cost.
 
 ## 4. How it fits what is already there or planned
 
@@ -404,9 +424,12 @@ the switch (read-time comparison), a per-line "parts off supplier" count
   are internal and never print.
 - **Materials list for a supplier:** unchanged (quantities, no prices).
 
-## 8. Open questions for the owner
+## 8. Questions for the owner — ALL ANSWERED 2026-10-07: yes to Q1–Q4
 
-Only ones that change a number or cannot be undone.
+The owner took every recommendation below. Two additions came with the
+answers: Q1's own-price parts are **visibly marked on the bid** (§ 3.1),
+and Q4's re-price applies markup **exactly once, never twice, with a test**
+(§ 3.6). Plan only — nothing built.
 
 | #   | Question                                                                                                               | Recommended                                                                                                            |
 | --- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |

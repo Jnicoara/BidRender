@@ -109,6 +109,11 @@ describe("keeps different parts apart", () => {
 describe("reading a name", () => {
   it("separates size from words", () => {
     expect(sizeTokens('1-1/4" EMT')).toEqual(['1-1/4"']);
+    // "#3/4" is one size (a #3 four-wire), not "#3" plus a word "4".
+    expect(signature("#3/4 MC cable Copper")).toEqual({
+      words: expect.not.arrayContaining(["4"]),
+      sizes: ["#3/4"],
+    });
     expect(signature("20A Single-Pole breaker")).toEqual({
       words: ["1pole", "breaker"],
       sizes: ["20a"],

@@ -122,20 +122,38 @@ export const WIRE_AND_CABLE_PROPOSALS: readonly {
   { current: "#2 bare CU, stranded", proposed: "#2 bare stranded Copper" },
   { current: "#1/0 bare CU, stranded", proposed: "#1/0 bare stranded Copper" },
   { current: "#2/0 bare CU, stranded", proposed: "#2/0 bare stranded Copper" },
-  { current: "8-8-8-8 SER CU", proposed: "8/3 SER Copper" },
-  { current: "6-6-6-6 SER CU", proposed: "6/3 SER Copper" },
-  { current: "4-4-4-6 SER CU", proposed: "4/3 SER Copper" },
-  { current: "2-2-2-4 SER CU", proposed: "2/3 SER Copper" },
-  { current: "1-1-1-3 SER CU", proposed: "1/3 SER Copper" },
-  { current: "4-4-4-6 SER AL", proposed: "4/3 SER Aluminum" },
-  { current: "2-2-2-4 SER AL", proposed: "2/3 SER Aluminum" },
-  { current: "1/0-1/0-1/0-2 SER AL", proposed: "1/0-3 SER Aluminum" },
-  { current: "2/0-2/0-2/0-1 SER AL", proposed: "2/0-3 SER Aluminum" },
-  { current: "3/0-3/0-3/0-1/0 SER AL", proposed: "3/0-3 SER Aluminum" },
-  // Q2 answered Yes 2026-10-07: the two three-conductor rows keep their
-  // full set.
+  // SER names SPELL OUT THE FULL CONDUCTOR SET (owner, 2026-10-07, second
+  // answers): "4/0-4/0-4/0-2/0 SER Aluminum", never the "4/0-3" shorthand.
+  // This replaced the "N/3" short form these rows were first proposed with
+  // ("8/3 SER Copper"). The shorthand was also a real hazard: "4/0-3 SER
+  // Aluminum" differed only by capitals from the RETIRED "4/0-3 SER
+  // aluminum", which the seed's case-blind SQL turned into a row deleted on
+  // every start (server/seedNameCase.test.ts). The shorthand stays findable
+  // as a search word on each row.
+  { current: "8-8-8-8 SER CU", proposed: "8-8-8-8 SER Copper" },
+  { current: "6-6-6-6 SER CU", proposed: "6-6-6-6 SER Copper" },
+  { current: "4-4-4-6 SER CU", proposed: "4-4-4-6 SER Copper" },
+  { current: "2-2-2-4 SER CU", proposed: "2-2-2-4 SER Copper" },
+  { current: "1-1-1-3 SER CU", proposed: "1-1-1-3 SER Copper" },
+  { current: "4-4-4-6 SER AL", proposed: "4-4-4-6 SER Aluminum" },
+  { current: "2-2-2-4 SER AL", proposed: "2-2-2-4 SER Aluminum" },
+  {
+    current: "1/0-1/0-1/0-2 SER AL",
+    proposed: "1/0-1/0-1/0-2 SER Aluminum",
+  },
+  {
+    current: "2/0-2/0-2/0-1 SER AL",
+    proposed: "2/0-2/0-2/0-1 SER Aluminum",
+  },
+  {
+    current: "3/0-3/0-3/0-1/0 SER AL",
+    proposed: "3/0-3/0-3/0-1/0 SER Aluminum",
+  },
   { current: "4/0-4/0-2/0 SER AL", proposed: "4/0-4/0-2/0 SER Aluminum" },
-  { current: "4/0-4/0-4/0-2/0 SER AL", proposed: "4/0-3 SER Aluminum" },
+  {
+    current: "4/0-4/0-4/0-2/0 SER AL",
+    proposed: "4/0-4/0-4/0-2/0 SER Aluminum",
+  },
   { current: "250-250-250 SER AL", proposed: "250-250-250 SER Aluminum" },
   { current: "4-4-6 SEU AL", proposed: "4-4-6 SEU Aluminum" },
   { current: "2-2-4 SEU AL", proposed: "2-2-4 SEU Aluminum" },

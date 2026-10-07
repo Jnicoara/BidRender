@@ -1432,11 +1432,20 @@ async function dedupeBaselineRows(
   const db = await getDb();
   if (!db) return;
   // Table name is a compile-time constant from the union above, never user input.
+  //
+  // ── BINARY: a duplicate is the SAME name, not the same name ignoring case ───
+  // The columns are utf8mb4_unicode_ci, so a plain GROUP BY folds case: a
+  // shipped "4/0-3 SER Aluminum" and a retired "4/0-3 SER aluminum" grouped
+  // as one name, and the higher id was DELETED — cascading its starter recipe
+  // lines with it — then re-inserted by the seed and deleted again on the next
+  // start (audit 2026-10-07, references/materials-review-sheet-plan.md). The
+  // seed itself matches names exactly (JS Sets), so this must too.
+  // server/seedNameCase.test.ts goes red without the BINARY.
   const result = await db.execute(
     sql.raw(
       `SELECT 1 FROM \`${table}\`
      WHERE userId IS NULL
-     GROUP BY name HAVING COUNT(*) > 1
+     GROUP BY BINARY name HAVING COUNT(*) > 1
      LIMIT 1`
     )
   );
@@ -1451,11 +1460,11 @@ async function dedupeBaselineRows(
     sql.raw(
       `DELETE dupe FROM \`${table}\` dupe
      JOIN (
-       SELECT name, MIN(id) AS keepId FROM \`${table}\`
+       SELECT BINARY name AS exactName, MIN(id) AS keepId FROM \`${table}\`
        WHERE userId IS NULL
-       GROUP BY name HAVING COUNT(*) > 1
+       GROUP BY BINARY name HAVING COUNT(*) > 1
      ) keeper
-       ON dupe.name = keeper.name AND dupe.id > keeper.keepId
+       ON BINARY dupe.name = keeper.exactName AND dupe.id > keeper.keepId
      WHERE dupe.userId IS NULL`
     )
   );
@@ -1968,14 +1977,18 @@ async function renameBaselineMaterials(): Promise<void> {
   const entries = Object.entries(RENAMED_BASELINE_MATERIALS);
   if (entries.length === 0) return;
 
-  const baselineNames = new Set(
-    (
-      await db
-        .select({ name: materials.name })
-        .from(materials)
-        .where(isNull(materials.userId))
-    ).map(row => row.name)
-  );
+  // Matched in JS, exactly, and written BY ID: the column ignores case, so
+  // `WHERE name = from` would also rename a row whose name differs from
+  // `from` only in capitals (see dedupeBaselineRows).
+  const baselineRows = await db
+    .select({ id: materials.id, name: materials.name })
+    .from(materials)
+    .where(isNull(materials.userId));
+  const idsByName = new Map<string, number[]>();
+  for (const row of baselineRows) {
+    idsByName.set(row.name, [...(idsByName.get(row.name) ?? []), row.id]);
+  }
+  const baselineNames = new Set(idsByName.keys());
 
   for (const [from, to] of entries) {
     if (!baselineNames.has(from)) continue; // already renamed, or never existed
@@ -1990,12 +2003,15 @@ async function renameBaselineMaterials(): Promise<void> {
       );
       continue;
     }
+    const ids = idsByName.get(from) ?? [];
     await db
       .update(materials)
       .set({ name: to })
-      .where(and(eq(materials.name, from), isNull(materials.userId)));
+      .where(and(inArray(materials.id, ids), isNull(materials.userId)));
     baselineNames.delete(from);
     baselineNames.add(to);
+    idsByName.delete(from);
+    idsByName.set(to, ids);
   }
 }
 
@@ -2016,16 +2032,22 @@ async function retireBaselineMaterials(retired: string[]): Promise<number> {
   if (!db) return 0;
   if (retired.length === 0) return 0;
 
-  const due = await db
-    .select({ id: materials.id })
-    .from(materials)
-    .where(
-      and(
-        isNull(materials.userId),
-        inArray(materials.name, retired),
-        eq(materials.isActive, true)
+  // The SQL match ignores case (utf8mb4_unicode_ci), so it is narrowed to the
+  // exact name here: retiring "4/0-3 SER aluminum" must not switch off a
+  // shipped "4/0-3 SER Aluminum" (see dedupeBaselineRows).
+  const exact = new Set(retired);
+  const due = (
+    await db
+      .select({ id: materials.id, name: materials.name })
+      .from(materials)
+      .where(
+        and(
+          isNull(materials.userId),
+          inArray(materials.name, retired),
+          eq(materials.isActive, true)
+        )
       )
-    );
+  ).filter(row => exact.has(row.name));
   if (due.length === 0) return 0;
 
   await db

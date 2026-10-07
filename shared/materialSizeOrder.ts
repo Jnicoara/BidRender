@@ -144,7 +144,12 @@ const DIMENSION = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?=\s)/i;
  * 10 ft" is a diameter and a length, and reading only the length would file it
  * as the plain 10 ft rod.
  */
-const TRAILING = /,\s*(\d+(?:\.\d+)?)\s*(CFM|ft)$/i;
+// An optional diameter before the length — "Ground rod, 5/8\" x 8 ft" (owner,
+// 2026-10-07: three rods, 5/8" x 8, 5/8" x 10, 3/4" x 10). The length leads
+// the order and the diameter breaks a tie, so 5/8" x 10 sorts before 3/4" x
+// 10, which a name tiebreak ("3" < "5") would get backwards.
+const TRAILING =
+  /,\s*(?:(\d+(?:-\d+\/\d+)?(?:\/\d+)?)"\s*x\s*)?(\d+(?:\.\d+)?)\s*(CFM|ft)$/i;
 
 type SizeKey = {
   scale: number;
@@ -301,10 +306,13 @@ function readSize(name: string): SizeKey | null {
   // Last, because it reads the END of the name: a leading size always wins.
   const trailing = name.match(TRAILING);
   if (trailing) {
-    const value = Number(trailing[1]);
-    return trailing[2].toLowerCase() === "cfm"
+    const value = Number(trailing[2]);
+    // Thousandths of an inch, so the diameter tiebreak is an integer.
+    const diameter = trailing[1] ? inchesOf(trailing[1]) : null;
+    const count = diameter === null ? 0 : Math.round(diameter * 1000);
+    return trailing[3].toLowerCase() === "cfm"
       ? { scale: SCALE.airflow, value, count: 0 }
-      : { scale: SCALE.length, value: value * 12, count: 0 };
+      : { scale: SCALE.length, value: value * 12, count };
   }
 
   return null;

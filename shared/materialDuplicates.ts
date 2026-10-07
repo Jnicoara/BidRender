@@ -157,6 +157,9 @@ function fold(text: string): string {
 
 /** The size tokens a name carries: #12, 1/2", 20A, 4 ft, 250 kcmil, 12/2 … */
 const SIZE_PATTERNS = [
+  // A hashed cable spec — "#3/4 MC cable": a #3 four-wire, ONE size. Before
+  // the gauge, which would take "#3" and leave "/4" behind as a word.
+  /#\d{1,2}\/[1-9](?![\d/])/g,
   /#\s?\d+(?:\/0)?/g, // wire gauge
   /\b\d+(?:-\d+\/\d+|\/\d+)?"/g, // trade size / inches
   /\b\d+(?:\/\d+)?-?\d*\s?a\b/g, // amps: 20a, 15/20a
