@@ -116,6 +116,14 @@ export type HomerunEntry = {
   sheetId: number;
   line: HomerunLineFootage;
   confirmed: boolean;
+  /** The circuit — names the homerun's own fitting leg and its two ends. */
+  circuitId: number;
+  /**
+   * A drop at either end could not be counted (no ceiling, no height), so
+   * the feet are a floor and every fitting counted on them is "at least" —
+   * the rule `legFromRun` applies to a traced run's ends.
+   */
+  feetIsFloor: boolean;
 };
 
 export type BidHomeruns = {
@@ -290,6 +298,14 @@ export function bidHomeruns(input: {
         sheetId: mark.sheetId,
         line,
         confirmed: footage.state === "computed" && footage.confirmed,
+        circuitId: circuit.id,
+        // A typed length replaces the drops, so nothing about it is a floor.
+        feetIsFloor:
+          footage.state === "computed" &&
+          !footage.overridden &&
+          [footage.pieces.upDrop, footage.pieces.downAtPanel].some(
+            v => !v.counted && v.reason !== "level"
+          ),
       });
 
     rows.push({

@@ -295,6 +295,13 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**`c-homerun-footage` IS READY FOR TRACK A** (since 2026-10-07, when
+homerun couplings, connectors and straps landed — the owner's condition:
+"this must be done before Track A merges the branch"). Track A merges it
+together with 0125–0130; nothing after that point on the branch is a
+precondition. Height areas (being built next on the same branch) are
+additive work, not a blocker.
+
 **Homerun footage steps 2–4 are BUILT on branch `c-homerun-footage`
 (2026-10-07), on Track A's 0125–0130 (`a-batch-c-0125`). DO NOT merge that
 branch into track-c or local-dev:** staging would get code that asks for
@@ -313,8 +320,9 @@ code, which is fine (additive). The server tests for the branch need
 `server/homerunsCore.test.ts` (22), `server/homerunFootage.test.ts` (44),
 plus `client/src/lib/homerunSync.test.ts` and `homerunText.test.ts`.
 
-Next on homeruns, when the owner says: fittings for homeruns; the height
-area drawing tool (table exists, nothing writes it); tying a traced run
+Homerun fittings: DONE (plan § 10; elbows deliberately not counted, and
+said). Next on homeruns, when the owner says: the height area drawing
+tool (in progress after the fittings); tying a traced run
 to a circuit (`panelCircuitId` is read, nothing sets it); per-sheet
 average/minimum amounts on screen.
 

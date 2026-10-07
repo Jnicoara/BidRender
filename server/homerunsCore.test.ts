@@ -17,6 +17,12 @@ import { EMPTY_HEIGHT_CONTEXT, type HeightContext } from "./runVerticals";
 import { groupRunFootage } from "./runTypeFootageCore";
 import type { DropTypeSpec } from "../shared/groupDrops";
 import { wireCircuitsFor } from "../shared/traceMode";
+import {
+  countFittings,
+  type FittingLeg,
+  type RacewayFittingSpec,
+} from "../shared/runFittings";
+import { ELBOW_WORDS } from "../shared/runBends";
 
 const TYPE_ID = 40;
 /** 1/4" = 1'-0": 18 page points to the foot. */
@@ -323,6 +329,109 @@ describe("ceiling: homerun → sheet → job", () => {
       reason: "no-distribution-height",
     });
     expect(f.pieces.installedFt).toBeCloseTo(40, 6);
+  });
+});
+
+/**
+ * COUPLINGS, CONNECTORS AND STRAPS (owner, 2026-10-07): a homerun adds what
+ * a run of its type adds, by the same rules and the same raceway settings
+ * — never a rate of its own. So each case compares against a TRACED leg of
+ * the same length counted by the same `countFittings`.
+ */
+describe("homerun fittings: the same as a run of that type", () => {
+  const EMT: RacewayFittingSpec = {
+    name: '1/2" EMT',
+    stickLengthFeet: 10,
+    stickJoint: "coupling",
+    strapSpacingFeet: 10,
+    strapFromBoxFeet: 3,
+    lbHubsTakeConnectors: true,
+    teeCoverIncluded: false,
+  };
+  const BENDS = {
+    method: { method: "factory" as const, why: "factory elbows" },
+    limit: 360,
+    mergeWithinFeet: 3,
+    words: ELBOW_WORDS,
+  };
+  const traced = (feet: number, feetIsFloor = false): FittingLeg => ({
+    id: "run:1",
+    runId: "run:1",
+    from: "a",
+    to: "b",
+    feet,
+    feetIsFloor,
+    points: [],
+    feetPerPoint: null,
+    startDrop: { state: "none" },
+    endDrop: { state: "none" },
+    answers: [],
+  });
+  const qty = (c: { status: string; qty?: number }) =>
+    c.status === "counted" ? c.qty : null;
+
+  it("one leg per homerun, on its run + drops with routing, no waste", () => {
+    const row = footageRow(run().entries);
+    expect(row.legs).toHaveLength(1);
+    // (40 + 8.5 + 4) × 1.15 = 60.375 — the routed pipe actually installed.
+    expect(row.legs[0].feet).toBeCloseTo(60.375, 1);
+  });
+
+  it("couplings, connectors and straps equal a traced 60.38 ft run's", () => {
+    const row = footageRow(run().entries);
+    const fromHomerun = countFittings(row.legs, EMT, BENDS, []);
+    const fromRun = countFittings([traced(60.38)], EMT, BENDS, []);
+    expect(qty(fromHomerun.coupling)).toBe(qty(fromRun.coupling));
+    expect(qty(fromHomerun.connector)).toBe(qty(fromRun.connector));
+    expect(qty(fromHomerun.strap)).toBe(qty(fromRun.strap));
+    // 7 sticks → 6 couplings; 2 ends → 2 connectors; 2 + 5 straps.
+    expect(qty(fromHomerun.coupling)).toBe(6);
+    expect(qty(fromHomerun.connector)).toBe(2);
+    expect(qty(fromHomerun.strap)).toBe(7);
+  });
+
+  it("two homeruns are two legs: their ends never merge into one box", () => {
+    const row = footageRow(
+      run({
+        circuits: [circuit(), circuit({ id: 71, circuitNumber: 3 })],
+      }).entries
+    );
+    expect(row.legs).toHaveLength(2);
+    expect(qty(countFittings(row.legs, EMT, BENDS, []).connector)).toBe(4);
+  });
+
+  it("no elbows are counted for a homerun — it has no drawn path", () => {
+    const row = footageRow(run().entries);
+    expect(qty(countFittings(row.legs, EMT, BENDS, []).elbow90)).toBe(0);
+  });
+
+  it("an uncounted drop makes every count 'at least'", () => {
+    const row = footageRow(run({ heights: { jobInches: null } }).entries);
+    expect(row.legs[0].feetIsFloor).toBe(true);
+    const strap = countFittings(row.legs, EMT, BENDS, []).strap;
+    expect(strap.status === "counted" && strap.atLeast).toBe(true);
+  });
+
+  it("a cable homerun is a cable leg: connectors and straps, no couplings", () => {
+    const row = footageRow(
+      run({
+        heights: {
+          dropTypeFor: () => ({ ...conduitType, pathType: "cable" }),
+        },
+      }).entries
+    );
+    expect(row.legs).toHaveLength(0);
+    expect(row.cableLegs).toHaveLength(1);
+  });
+
+  it("a refused homerun adds no fittings", () => {
+    const row = footageRow(
+      run({
+        circuits: [circuit(), circuit({ id: 71, circuitNumber: 3 })],
+        panel: { planSheetId: null, planX: null, planY: null },
+      }).entries
+    );
+    expect(row).toBeUndefined();
   });
 });
 

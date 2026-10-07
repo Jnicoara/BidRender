@@ -157,6 +157,42 @@ export type RunTypeFootageRow = {
   tees: TeeRef[];
 };
 
+/** Node key prefix for a homerun's two ends — its own, never a mark's. */
+export const HOMERUN_NODE = "homerun:";
+
+/**
+ * A computed homerun as ONE fitting leg (owner, 2026-10-07: homerun
+ * footage adds the couplings, connectors and straps a run of that type
+ * adds — the same rules, never new rates).
+ *
+ * - `feet`: the routed run + drops, WITHOUT waste — what is installed, as a
+ *   traced leg's `feet` is traced + counted verticals.
+ * - Two ends of its own: the device box and the panel. Never the mark's
+ *   node, so a traced run ending on the same device cannot make it read as
+ *   an in-and-out box; each conduit end takes a connector either way.
+ * - No points and no drops: a homerun has no drawn path, so BENDS are not
+ *   counted for it. Its drops' elbows and its corner exist on the job but
+ *   counting only the drops would be half an answer said as a whole one
+ *   (homerun-footage-plan.md § 10).
+ */
+export function homerunFittingLeg(entry: HomerunEntry): FittingLeg {
+  const id = `${HOMERUN_NODE}${entry.circuitId}`;
+  return {
+    id,
+    runId: id,
+    from: `${id}:device`,
+    to: `${id}:panel`,
+    feet: round2(entry.line.homerunFeet + entry.line.routingFeet),
+    feetIsFloor: entry.feetIsFloor,
+    points: [],
+    feetPerPoint: null,
+    startDrop: { state: "none" },
+    endDrop: { state: "none" },
+    answers: [],
+    noPullPoints: true,
+  };
+}
+
 /** A run row, as far as grouping its footage is concerned. */
 export type GroupableRun = {
   id: number;
@@ -478,6 +514,10 @@ export function groupRunFootage(input: {
     const row = rowFor(byType, entry.runTypeId, f.pathType);
     row.homerunFeet += f.homerunFeet;
     row.homerunCount += 1;
+    // Its couplings, connectors and straps: one LEG, counted by the same
+    // rules and the same raceway settings as every traced run of this type.
+    if (f.pathType === "cable") row.cableLegs.push(homerunFittingLeg(entry));
+    else row.legs.push(homerunFittingLeg(entry));
     if (!entry.confirmed) row.homerunUnconfirmedCount += 1;
     row.conduitBoughtFeet += f.conduitBoughtFeet;
     row.conduitInstalledFeet += f.conduitInstalledFeet;

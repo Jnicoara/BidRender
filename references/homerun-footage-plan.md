@@ -272,8 +272,25 @@ and migrates them together (pairing rule 3).
   the conduit's labour; for wire it would have been the only footage line
   leaving makeup out of labour. Routing is installed footage (real route);
   waste never is.
-- **Not built:** fittings for homeruns (couplings, straps — "Nothing
-  traced", as for count drops, Q8); height areas' drawing tool (the table
+- **Couplings, connectors and straps — BUILT 2026-10-07 (owner: "the
+  same fitting/support materials a normal run of that run type adds, …
+  don't invent new rates").** Each homerun is ONE fitting leg on its run
+  type (`homerunFittingLeg`, `server/runTypeFootageCore.ts`): feet = its
+  routed run + drops, no waste; two ends of its own (device box, panel),
+  so 2 connectors each; counted by the same `countFittings` /
+  `countCableFittings` with the raceway's own stick length and strap
+  spacing. A drop that could not be counted makes the counts "at least",
+  as on a traced run. **Elbows are NOT counted for homeruns** — a homerun
+  has no drawn path, and counting only its two drops' 90s while missing
+  the corner would be half an answer said as a whole one; the Totals tab
+  and the materials list say so. Seen on UNCC E111: 38 homeruns → 429
+  couplings, 76 connectors, 482 straps on the Totals tab, equal to a hand
+  count from each homerun's own pipe. The Totals tab and the materials
+  list now include homerun footage too (`totalQuantities` takes
+  `homeruns`, required): it read "Conduit 0 ft" beside 4,476 ft of
+  homerun pipe until then. Wording left as it is: the homerun type's rows
+  sit under "Traced, not sent yet" though nothing was traced.
+- **Not built:** height areas' drawing tool (the table
   is read, nothing writes it); setting `takeoff_run_circuits.panelCircuitId`
   (read — a traced homerun suppresses the computed one — but no screen
   ties a trace to a circuit yet); the per-sheet method has no "average" /

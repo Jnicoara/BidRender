@@ -13,6 +13,14 @@ This is the human-readable companion to the git history — read this to see wha
   catalog is missing; and five naming questions. Only the yellow columns are
   typed in. Once it is marked and checked, material names freeze.
 
+- **Homeruns buy their couplings, connectors and straps (same branch).**
+  Each homerun now adds the fittings a run of its type adds — counted from
+  the pipe's own stick length and strap spacing, two connectors per
+  homerun — so a bid priced by homeruns is not short of the small parts.
+  Elbows for homeruns are not counted yet, and the screen and the
+  materials list say so. The plan's footage totals also include homeruns
+  now; they had read 0 ft beside them.
+
 - **Homeruns are priced (on a branch, waiting for its database changes).**
   The Circuits panel now shows each circuit's homerun — "42.8 ft: 30.3 ft
   run + 8.5 ft up + 4 ft down at the panel" — with Confirm, a typed length

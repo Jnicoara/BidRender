@@ -1566,11 +1566,16 @@ export const takeoffRunsRouter = router({
         await db.getSheetScalesForBid(input.bidId, ctx.scope.dataUserId)
       );
       const dropEntries = markDropEntries(drops);
+      // Homeruns too, as the bid line has them (homerun plan § 10).
+      const homerunEntries =
+        (await db.loadBidHomeruns(input.bidId, ctx.scope.dataUserId, heights))
+          ?.entries ?? [];
 
       const measure = (
         rows: typeof runs,
         withWire: (id: number) => boolean,
-        markDrops: typeof dropEntries
+        markDrops: typeof dropEntries,
+        homeruns: typeof homerunEntries
       ) =>
         totalQuantities(
           rows.map(run => ({
@@ -1586,13 +1591,19 @@ export const takeoffRunsRouter = router({
             // A branched run is several rows and ONE run in the counts (D20).
             runKey: rootOf(run),
           })),
-          markDrops
+          markDrops,
+          homeruns
         );
 
-      const totals = measure(runs, id => wireCounts.has(id), dropEntries);
-      // Untyped RUNS only: a drop with no type is not footage anybody can
-      // price, and is counted below as its own note.
-      const untyped = measure(noType, () => true, []);
+      const totals = measure(
+        runs,
+        id => wireCounts.has(id),
+        dropEntries,
+        homerunEntries
+      );
+      // Untyped RUNS only: a drop or homerun with no type is not footage
+      // anybody can price, and is counted elsewhere.
+      const untyped = measure(noType, () => true, [], []);
       const roots = (rows: typeof allRuns) => new Set(rows.map(rootOf)).size;
       const leftOut: RunTotalsLeftOut = {
         noType: {

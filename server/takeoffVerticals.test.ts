@@ -61,9 +61,10 @@ import {
 function totalsOf(
   runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
 ) {
-  // No drops from marks here — those have their own suite (groupDrops).
+  // No drops from marks or homeruns here — those have their own suites.
   return totalQuantities(
     runs.map((entry, i) => ({ ...entry, runKey: i })),
+    [],
     []
   );
 }
@@ -801,7 +802,7 @@ describe("a bid with no heights set reads exactly as it did before", () => {
       runKey: 40,
       extras: NO_EXTRAS,
     };
-    const flat = totalQuantities([leg, leg, leg], []);
+    const flat = totalQuantities([leg, leg, leg], [], []);
     expect(flat.conduitBoughtFeet).toBe(300);
     expect(flat.flatOnlyCount).toBe(1);
 
@@ -810,6 +811,7 @@ describe("a bid with no heights set reads exactly as it did before", () => {
         { ...leg, ratio: null },
         { ...leg, ratio: null },
       ],
+      [],
       []
     );
     expect(unscaled.unmeasurableCount).toBe(1);

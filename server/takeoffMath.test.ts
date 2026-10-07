@@ -52,9 +52,10 @@ import {
 function totalsOf(
   runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
 ) {
-  // No drops from marks here — those have their own suite (groupDrops).
+  // No drops from marks or homeruns here — those have their own suites.
   return totalQuantities(
     runs.map((entry, i) => ({ ...entry, runKey: i })),
+    [],
     []
   );
 }
@@ -789,9 +790,11 @@ describe("a shared run across a whole takeoff", () => {
       wireMakeupFeet: 0,
       // No runs, so none carries an unset extra.
       noExtraCount: 0,
-      // No drops from marks were passed.
+      // No drops from marks or homeruns were passed.
       markDropCount: 0,
       markDropFeet: 0,
+      homerunCount: 0,
+      homerunFeet: 0,
       unmeasurableCount: 0,
       flatOnlyCount: 0,
       partialVerticalCount: 0,
@@ -1023,6 +1026,8 @@ describe("a realistic takeoff, checked by hand", () => {
       noExtraCount: 2,
       markDropCount: 0,
       markDropFeet: 0,
+      homerunCount: 0,
+      homerunFeet: 0,
       flatOnlyCount: 2,
       // Neither run has ONE end answered — they have none — so nothing is
       // half-counted. This is the pair that must not be confused: flat-only

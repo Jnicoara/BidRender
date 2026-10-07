@@ -110,7 +110,7 @@ describe("thirty receptacles at 18 inches under a 10 ft run height", () => {
     const [entry] = markDropEntries([d]);
     expect(entry.count).toBe(30);
     // § 2.4's own example: 255 ft of pipe.
-    const totals = totalQuantities([], markDropEntries([d]));
+    const totals = totalQuantities([], markDropEntries([d]), []);
     expect(totals.conduitBoughtFeet).toBe(255);
     // Three wires down each drop (2 + a ground).
     expect(totals.wireBoughtFeet).toBe(765);
@@ -139,7 +139,7 @@ describe("a mark's own height, and a mark with its drop left off", () => {
     const [d] = drops({ marks: withHeight(marks(3), 0, 54, "typed") });
     expect(d.ownHeightCount).toBe(1);
     expect(d.totalDropFeet).toBe(8.5 + 8.5 + 5.5);
-    const totals = totalQuantities([], markDropEntries([d]));
+    const totals = totalQuantities([], markDropEntries([d]), []);
     expect(totals.conduitBoughtFeet).toBe(22.5); // NOT 25.5
     expect(totals.markDropCount).toBe(3);
     expect(d.buckets.map(b => [b.deviceInches, b.marks.length]).sort()).toEqual(
@@ -186,9 +186,9 @@ describe("a mark's own height, and a mark with its drop left off", () => {
     const [d] = drops({ marks: list });
     expect(d.excludedCount).toBe(1);
     expect(d.countedMarks).toHaveLength(29);
-    expect(totalQuantities([], markDropEntries([d])).conduitBoughtFeet).toBe(
-      246.5
-    );
+    expect(
+      totalQuantities([], markDropEntries([d]), []).conduitBoughtFeet
+    ).toBe(246.5);
   });
 });
 
@@ -226,9 +226,9 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
     const [d] = drops({ marks: marks(3), runs: [leg] });
     expect(d.claimedCount).toBe(0);
     expect(d.countedMarks).toHaveLength(3);
-    expect(totalQuantities([], markDropEntries([d])).conduitBoughtFeet).toBe(
-      25.5
-    );
+    expect(
+      totalQuantities([], markDropEntries([d]), []).conduitBoughtFeet
+    ).toBe(25.5);
   });
 
   it("FLAGS a mark near an unlinked run end, and still counts it", () => {

@@ -447,7 +447,11 @@ export const materialsListRouter = router({
             runKey: rootOf(run),
           };
         }),
-        markDrops
+        markDrops,
+        // Homeruns, as the bid prices them — and as `footage` above already
+        // counts their couplings, connectors and straps.
+        (await db.loadBidHomeruns(input.bidId, ctx.scope.dataUserId, heights))
+          ?.entries ?? []
       );
 
       // ── Notes: everything the reader needs to read the list correctly ──────
@@ -461,6 +465,17 @@ export const materialsListRouter = router({
           } to counted devices (${totals.markDropFeet.toLocaleString("en-US", {
             maximumFractionDigits: 2,
           })} ft of raceway or cable). Connectors and elbows for those drops are NOT counted — add them by hand.`
+        );
+      }
+      // Homeruns: their couplings, connectors and straps ARE above (with
+      // their type's fittings); their elbows are not — said, as for drops.
+      if (totals.homerunCount > 0) {
+        notes.push(
+          `Includes ${totals.homerunCount} ${
+            totals.homerunCount === 1 ? "homerun" : "homeruns"
+          } (${totals.homerunFeet.toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+          })} ft of run and drops, before routing, waste and makeup). Their couplings, connectors and straps are counted; elbows for homeruns are NOT — add them by hand.`
         );
       }
       if (untypedRuns > 0) {

@@ -279,6 +279,124 @@ describeDb("homerun rows: confirm and override (step 3)", () => {
   });
 });
 
+describeDb(
+  "homerun couplings, connectors and straps (owner, 2026-10-07)",
+  () => {
+    it("the bridge offers them and Send puts them on the bid, from the raceway's own settings", async () => {
+      const { bidId, sheetId, near } = await aBid();
+      const emt = (await caller().materials.list()).find(
+        m => m.name === '1/2" EMT'
+      )!;
+      const stick = Number(emt.stickLengthFeet);
+      const spacing = Number(emt.strapSpacingFeet);
+      const fromBox = Number(emt.strapFromBoxFeet);
+      expect(stick).toBeGreaterThan(0);
+      expect(spacing).toBeGreaterThan(0);
+      const type = await caller().takeoffRunTypes.create({
+        label: `1/2" EMT homerun ${Date.now()}${Math.random()}`,
+        pathType: "conduit",
+        racewayMaterialId: emt.id,
+        conductorCount: 2,
+      });
+      await caller().homeruns.setBidSettings({
+        bidId,
+        runTypeId: type.id,
+        routingPct: 0.15,
+      });
+      await caller().homeruns.syncSheet({
+        bidId,
+        sheetId,
+        circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
+      });
+      await caller().homeruns.placePanel({
+        bidId,
+        panel: "2B",
+        spot: { sheetId, x: 0, y: ft(10) },
+      });
+
+      // The pipe a homerun installs: (40 + 8.5 + 4) × 1.15.
+      const feet = 52.5 * 1.15;
+      const sticks = Math.ceil(feet / stick - 1e-9);
+      const straps =
+        feet <= 2 * fromBox
+          ? 1
+          : 2 +
+            Math.max(0, Math.ceil((feet - 2 * fromBox) / spacing - 1e-9) - 1);
+
+      const [entry] = (
+        await caller().takeoffRunTypes.bridgeForBid({ bidId })
+      ).filter(t => t.runTypeId === type.id);
+      const byRole = new Map(entry.fittings.map(f => [f.role, f]));
+      expect(byRole.get("coupling")).toMatchObject({ qty: sticks - 1 });
+      expect(byRole.get("connector")).toMatchObject({ qty: 2 });
+      expect(byRole.get("strap")).toMatchObject({ qty: straps });
+
+      const result = await caller().takeoffRunTypes.sendToBid({
+        bidId,
+        runTypeId: type.id,
+      });
+      expect(result.sent).toEqual(
+        expect.arrayContaining(["raceway", "coupling", "connector", "strap"])
+      );
+      const { lines } = await caller().bids.get({ id: bidId });
+      const qtyOf = (role: string) =>
+        Number(lines.find(l => l.runMaterialRole === role)?.qty);
+      expect(qtyOf("coupling")).toBe(sticks - 1);
+      expect(qtyOf("connector")).toBe(2);
+      expect(qtyOf("strap")).toBe(straps);
+
+      // And they follow the drawing: a second homerun moves them.
+      await caller().homeruns.syncSheet({
+        bidId,
+        sheetId,
+        circuits: [
+          { panel: "2B", circuits: [1], leavingStampId: near },
+          { panel: "2B", circuits: [3], leavingStampId: near },
+        ],
+      });
+      const again = (await caller().bids.get({ id: bidId })).lines;
+      expect(
+        Number(again.find(l => l.runMaterialRole === "connector")?.qty)
+      ).toBe(4);
+      expect(
+        Number(again.find(l => l.runMaterialRole === "coupling")?.qty)
+      ).toBe(2 * (sticks - 1));
+    });
+  }
+);
+
+describeDb("every total the bid line agrees with includes homeruns", () => {
+  it("the Totals tab and the materials list carry the homerun pipe", async () => {
+    const { bidId, sheetId, near } = await aBid();
+    const type = await caller().takeoffRunTypes.create({
+      label: `3/4" EMT totals ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      conductorCount: 2,
+    });
+    await caller().homeruns.setBidSettings({
+      bidId,
+      runTypeId: type.id,
+      routingPct: 0.15,
+    });
+    await caller().homeruns.syncSheet({
+      bidId,
+      sheetId,
+      circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
+    });
+    await caller().homeruns.placePanel({
+      bidId,
+      panel: "2B",
+      spot: { sheetId, x: 0, y: ft(10) },
+    });
+    // Seen on screen 2026-10-07: "Conduit 0 ft" beside 4,476 ft of homerun pipe.
+    const totals = await caller().takeoffRuns.totals({ bidId });
+    expect(totals.homerunCount).toBe(1);
+    expect(totals.conduitBoughtFeet).toBeCloseTo(52.5 * 1.15, 1);
+    const list = await caller().materialsList.get({ bidId });
+    expect(list.notes.join(" ")).toMatch(/Includes 1 homerun/);
+  });
+});
+
 describeDb("the bid line (step 4)", () => {
   it("homeruns land on the homerun type's line: routing + waste added, makeup at the panel", async () => {
     const { bidId, sheetId, near } = await aBid();
