@@ -10,6 +10,47 @@ that Track C's `c-homerun-footage` also changes, so it waits for C to land
 (owner, 2026-10-07: build only in files C does not touch). Gap 1, a run end
 dragged off its mark keeping the old claim, is **Track C's**, not B's.
 
+- [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
+      2026-10-07). **Reproduced on staging** at laptop and tablet
+      (1180x820, touch) with `scripts/stagingOpenFlash.mts`, which prints
+      `FLASH` today. Screencast frame:
+      `laptop-renewed-0239` — a blank 58x29 white box at the sheet's corner
+      for 1.0–1.2 s, then the full sheet.
+  - **Cause:** `PlanPane`'s load effect (`TakeoffPage.tsx`, the
+    `setLoading(true)` at ~1894) re-runs whenever `doc.url` changes. That
+    happens when a signed link is renewed, or when the plan list refetches
+    with a new link after the cached one has already drawn sheet 1 (leave
+    Plans and come back on a slow connection).
+    - While loading, the canvas wrapper is unmounted (`loading ? null : …`),
+      so a NEW, blank canvas mounts after.
+    - `canvasSize` and `drawnPage` still hold the old raster's values, so
+      `planLoadState({ drawn: canvasSize.width > 0 })` says "sheet" at once.
+    - The browser draws an undrawn canvas at its default 300x150, white from
+      `bg-white`, scaled by the fit zoom, at the sheet's top-left, until the
+      new raster lands.
+    - **The same stale `drawnPage` lets the count pins draw over that blank**
+      (`marksMayShow`), and taps land on it.
+  - **Not reached by a fresh open**, a sheet change, zoom (up to the sharp
+    patch) or a reload with the view restored. All were clean frame by frame
+    on staging, layout AND painted pixels. That is why `2a939d2` looked done:
+    it fixed the first open, and this is the reopen.
+  - **Fix (one place):** in that effect, beside `setLoading(true)`, also
+    `setCanvasSize({ width: 0, height: 0 })` and `setDrawnPage(null)`. The
+    panel then says "Opening plan set…" → "Drawing sheet N…" and the pins
+    wait. Better still, have `planLoadState` take `drawnPage` instead of the
+    canvas size, so the one reset covers both.
+    - Alternative, if a reload should not blank the sheet at all: keep the
+      wrapper mounted across a reload of the SAME document, so the old raster
+      stays in place under the thin "drawing" bar. Bigger change; only if the
+      owner wants no panel on a renewal.
+  - **Tests:**
+    - a `planLoadState.test.ts` case: after a reload starts, the state is
+      "opening", not "sheet", even though a sheet was drawn before;
+    - `stagingOpenFlash.mts` must print "No flash" at both sizes.
+  - **Why not now:** `TakeoffPage.tsx` is on `c-homerun-footage`. A CSS-only
+    workaround (hide a canvas with no `width`) would hide the box and leave
+    the pins floating, so it was not done.
+
 - [ ] **Gap 2: `takeoffRuns.setLocation` has no lock check** — the one run
       mutation without `refuseIfLocked` (`server/routers/takeoffRunsRouter.ts`).
       One line. Test: refused on a locked bid. A label, not a number.
@@ -1035,7 +1076,7 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       `Ground rod, 5/8" x 8 ft`, `#4 bare stranded Copper`,
       `4/0-4/0-4/0-2/0 SER Aluminum`, `4" canless wafer LED downlight` (the
       SAME row as LT8 — the new 4" wafer assembly uses it), `2/0 XHHW
-    Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
+  Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       drafts marked missing now ship: `Underground warning tape`,
       `Concrete pole base`, `320A meter base`. Full list:
       `pricing/frozen-names.json`; what is NOT shipped and why:

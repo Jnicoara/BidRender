@@ -6,6 +6,20 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-07 (night) — the white box at the top-left on open
+
+- **Reproduced on staging** (laptop + 1180x820 touch), cause found. The fix
+  waits for Track C because it is in `TakeoffPage.tsx`. todo.md, first item
+  under "after Track C merges", has the cause, the one-place fix and the
+  tests.
+- **`scripts/stagingOpenFlash.mts`** records every frame (layout boxes plus
+  Chrome's painted screencast). It walks the paths: open by address, open
+  from the bid, zoom, next sheet zoomed, reload with the view restored, and
+  link renewed. Only the last flashes. It prints `FLASH` today and must print
+  "No flash" after the fix.
+- Left on staging: seven more throwaway `example.com` accounts. Their plan
+  sets were removed and their bids archived.
+
 ## Session 2026-10-07 (late) — Plans screen gaps, staging upload timing
 
 - **On local-dev as `1fcb2e7`**, and green: tests, staging deploy, smoke.
