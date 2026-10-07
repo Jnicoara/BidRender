@@ -74,30 +74,42 @@ export type BaselineRunType = {
   groundMaterialName: string | null;
 };
 
+/*
+  The *MaterialName fields are matched EXACTLY against shipped names when a
+  database is first seeded (server/db.ts, seedBaselineRunTypes) — no rename
+  map — so a catalog rename edits them in the same commit, or a fresh
+  database ships these types with no wire. server/frozenMaterialNames.test.ts
+  fails if one stops naming a shipped row.
+
+  The LABELS do not follow a rename, on purpose: a shipped type is keyed by
+  `pathType:label`, so a new label would insert a second copy of the type on
+  every existing database. "12-2 MC cable" stays the label of the type whose
+  cable is now "12/2 MC cable Copper".
+*/
 export const BASELINE_RUN_TYPES: BaselineRunType[] = [
   {
     label: '1/2" EMT, 2 #12 + ground',
     pathType: "conduit",
     racewayMaterialName: '1/2" EMT',
-    conductorMaterialName: "#12 THHN",
+    conductorMaterialName: "#12 THHN Copper",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 bare CU, solid",
+    groundMaterialName: "#12 bare solid Copper",
   },
   {
     label: '3/4" EMT, 3 #12 + ground',
     pathType: "conduit",
     racewayMaterialName: '3/4" EMT',
-    conductorMaterialName: "#12 THHN",
+    conductorMaterialName: "#12 THHN Copper",
     conductorCount: 3,
     groundCount: 1,
-    groundMaterialName: "#12 bare CU, solid",
+    groundMaterialName: "#12 bare solid Copper",
   },
   {
     label: "12-2 MC cable",
     pathType: "cable",
     racewayMaterialName: null,
-    conductorMaterialName: "12-2 MC cable",
+    conductorMaterialName: "12/2 MC cable Copper",
     // 12-2 is two insulated and a ground, all inside one jacket.
     conductorCount: 2,
     groundCount: 1,
@@ -107,7 +119,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     label: "12-3 MC cable",
     pathType: "cable",
     racewayMaterialName: null,
-    conductorMaterialName: "12-3 MC cable",
+    conductorMaterialName: "12/3 MC cable Copper",
     // 12-3 is three insulated and a ground, all inside one jacket.
     conductorCount: 3,
     groundCount: 1,

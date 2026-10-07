@@ -97,6 +97,27 @@ describe("the labor-unit sheet import", () => {
     expect(p.changes).toHaveLength(1);
   });
 
+  it("matches a company copy still under its OLD name, named by the NEW one on the sheet", () => {
+    // A fork is never renamed by the seed, so after the 2026-10-07 rename a
+    // company's copy of "Half inch EMT" keeps that name while a freshly
+    // printed sheet says '1/2" EMT' for the same id. Refused as "another
+    // database" until the import accepted the rename in both directions.
+    const fork: ImportMaterial = { ...EMT, id: 303, name: "Half inch EMT" };
+    const p = planLaborImport(
+      (() => {
+        const parsed = parseLaborSheet(
+          sheet(["303", '1/2" EMT', "per 100 ft", "4", "", "", ""])
+        );
+        if (parsed.kind !== "materials") throw new Error(parsed.kind);
+        return parsed.rows;
+      })(),
+      id => (id === fork.id ? fork : null),
+      n => (n === "Half inch EMT" ? '1/2" EMT' : null)
+    );
+    expect(p.unmatched).toEqual([]);
+    expect(p.changes).toHaveLength(1);
+  });
+
   it("never creates: an unknown ID or a 'missing from catalog' row is listed", () => {
     const p = plan(
       sheet(

@@ -472,14 +472,25 @@ describe("the real catalog", () => {
   });
 
   it("orders the real THHN family thinnest to thickest", () => {
+    // The solid rows and the stranded sizes (no "stranded" in the name),
+    // named "… THHN Copper" since 2026-10-07, aughts without the "#".
     const thhn = BASELINE_MATERIALS.filter(
-      m => /^#?\d.* THHN$/.test(m.name) || /kcmil THHN$/.test(m.name)
+      m =>
+        /^#?\d.* THHN Copper$/.test(m.name) || /kcmil THHN Copper$/.test(m.name)
     )
       .map(m => m.name)
       .sort(compareBySize);
-    expect(thhn[0]).toBe("#14 THHN");
-    expect(thhn[thhn.length - 1]).toBe("500 kcmil THHN");
-    expect(thhn.indexOf("#1 THHN")).toBeLessThan(thhn.indexOf("#1/0 THHN"));
+    expect(thhn[0]).toBe("#14 THHN Copper");
+    expect(thhn[thhn.length - 1]).toBe("500 kcmil THHN Copper");
+    expect(thhn.indexOf("#1 THHN Copper")).toBeLessThan(
+      thhn.indexOf("1/0 THHN Copper")
+    );
+    expect(thhn.indexOf("1/0 THHN Copper")).toBeLessThan(
+      thhn.indexOf("4/0 THHN Copper")
+    );
+    expect(thhn.indexOf("4/0 THHN Copper")).toBeLessThan(
+      thhn.indexOf("250 kcmil THHN Copper")
+    );
   });
 
   it("orders the real EMT family smallest to largest", () => {

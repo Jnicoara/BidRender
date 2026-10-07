@@ -187,18 +187,21 @@ describe("counts and cable specs keep working", () => {
   });
 
   it("a cable spec typed with a space, and a conductor inside a spec", () => {
-    expect(search("6 3")[0]).toBe("6-3 NM-B");
-    expect(search("12 2")[0]).toBe("12-2 NM-B");
-    expect(search("2/0 ser")).toContain("2/0-2/0-2/0-1 SER AL");
+    expect(search("6 3")[0]).toBe("6/3 NM-B Copper");
+    expect(search("12 2")[0]).toBe("12/2 NM-B Copper");
+    expect(search("2/0 ser")).toContain("2/0-2/0-2/0-1 SER Aluminum");
   });
 
   it('"12" still finds #12 wire, and "#12" is only the gauge', () => {
-    expect(search("12 thhn")[0]).toBe("#12 THHN");
+    expect(search("12 thhn")[0]).toBe("#12 THHN Copper");
     expect(search("#12").some(n => /under-cabinet/.test(n))).toBe(false);
   });
 
-  it('a dual size is both: "6 wafer" finds the 5"/6" wafer', () => {
-    expect(search("6 wafer")).toContain('5"/6" wafer LED downlight');
+  it('"6 wafer" finds the 6" wafer, and "4 wafer" the 4" — two rows since 2026-10-07', () => {
+    // Was 'a dual size is both: "6 wafer" finds the 5"/6" wafer' while one
+    // row covered both openings. The owner split them (4" and 6").
+    expect(search("6 wafer")[0]).toBe('6" canless wafer LED downlight');
+    expect(search("4 wafer")[0]).toBe('4" canless wafer LED downlight');
   });
 });
 

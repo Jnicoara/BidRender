@@ -562,7 +562,22 @@ const HAS_DIGIT = /\d/;
  * typed "#12" is a gauge and does not match a 12" light bar.
  */
 function sameSize(typed: string, item: string): boolean {
-  return item === typed || (!typed.startsWith("#") && item === "#" + typed);
+  return (
+    item === typed ||
+    (!typed.startsWith("#") && item === "#" + typed) ||
+    item === unhashedAught(typed)
+  );
+}
+
+/**
+ * "#1/0" -> "1/0", and null for anything else. An aught is written WITHOUT
+ * the "#" in the catalog since 2026-10-07 ("1/0 THHN Copper"), and people
+ * still type it with one — the old name, "#1/0 THHN", found nothing at all
+ * until this (server/materialSearchRank.test.ts, the renamed-names sweep).
+ * Only aughts: "#12" is still a gauge and never a 12" anything.
+ */
+function unhashedAught(typed: string): string | null {
+  return /^#\d\/0$/.test(typed) ? typed.slice(1) : null;
 }
 
 /** A size word written in inches: a digit, then the mark. */
@@ -604,8 +619,11 @@ function sizeTier(term: string, indexed: IndexedItem<SearchableItem>): number {
       3-4 MC cable is spelled, and "three quarter inch" listed it. A bare
       "3/4" still matches both, as it always did.
     */
+    const aught = unhashedAught(key);
     const inSet = (set: Set<string>) =>
-      set.has(key) || (!key.startsWith("#") && set.has("#" + key));
+      set.has(key) ||
+      (!key.startsWith("#") && set.has("#" + key)) ||
+      (aught !== null && set.has(aught));
     if (isInches(term)) {
       if (sameSize(key, descSizes[0] ?? "") && inSet(indexed.descInches))
         return 2;

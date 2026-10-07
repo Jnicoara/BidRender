@@ -16,10 +16,14 @@
  * "20A breaker" form it defended is why a single-pole row and its brand
  * variants could not be named from one pattern, and why "15A breaker" sat
  * beside "15A 1-Pole breaker" in the pricing sheet as two rows for one part.
- * Every breaker now states its pole count, and a one-pole breaker says
- * "Single-Pole" rather than "1-Pole" because that is how it is said and
- * written. The old names are in RENAMED_BASELINE_MATERIALS, and "20A breaker"
- * still finds the row, because every word of it is still in the name.
+ * Every breaker now states its pole count. A one-pole breaker said
+ * "Single-Pole" from 2026-09-24 to 2026-10-07, and says **"1-Pole"** since
+ * ("20A 1-Pole breaker") — the owner's call (2026-10-05), applied with the
+ * frozen review-sheet names: it matches "2-Pole" and "3-Pole" beside it, and
+ * it is how a supply-house ticket writes it. Breakers only: a single-pole
+ * SWITCH keeps its name. The old names are in RENAMED_BASELINE_MATERIALS,
+ * and every supply-house spelling — single pole, single-pole, 1P, SP, one
+ * pole — is a search word on the row (SINGLE_POLE_SLANG).
  *
  * ── Panels and Breakers are separate shelves ─────────────────────────────────
  * A panel is a box you hang once; a breaker is a part you stock by the dozen.
@@ -39,6 +43,8 @@ const gear = (category: "Panels" | "Breakers" | "Distribution Equipment") => ({
 const BREAKER_SLANG = "circuit cb ocpd bolt on plug in load center";
 /** Said out loud and written on takeoff sheets; kept findable after the rename. */
 const TWO_POLE_SLANG = "2 pole double pole two pole dp 240 volt 240v";
+/** Every spelling of a one-pole breaker that is not "1-Pole", which the name says. */
+const SINGLE_POLE_SLANG = "single pole single-pole one pole 1p sp";
 
 /*
   Sizes: 15–50A, the run every plug-on and bolt-on line makes. 60A and 70A
@@ -57,12 +63,8 @@ const singlePole: BaselineMaterial[] = [
   "50",
 ].map(amps => ({
   ...gear("Breakers"),
-  name: `${amps}A Single-Pole breaker`,
-  searchAliases: aliases(
-    `${amps} amp`,
-    "single pole one pole 1p sp 1-pole",
-    BREAKER_SLANG
-  ),
+  name: `${amps}A 1-Pole breaker`,
+  searchAliases: aliases(`${amps} amp`, SINGLE_POLE_SLANG, BREAKER_SLANG),
 }));
 
 /*
@@ -172,10 +174,10 @@ const PROTECTED_TYPES: Protected[] = [
 const protectedSingle: BaselineMaterial[] = PROTECTED_TYPES.flatMap(type =>
   ["15", "20"].map(amps => ({
     ...gear("Breakers"),
-    name: `${amps}A Single-Pole ${type.suffix} breaker`,
+    name: `${amps}A 1-Pole ${type.suffix} breaker`,
     searchAliases: aliases(
       `${amps} amp`,
-      "single pole one pole 1p sp 1-pole",
+      SINGLE_POLE_SLANG,
       type.slang,
       BREAKER_SLANG
     ),
@@ -221,10 +223,10 @@ const protectedSingleLarge: BaselineMaterial[] = [
   { amps: "30", type: PROTECTED_TYPES[1] },
 ].map(({ amps, type }) => ({
   ...gear("Breakers"),
-  name: `${amps}A Single-Pole ${type.suffix} breaker`,
+  name: `${amps}A 1-Pole ${type.suffix} breaker`,
   searchAliases: aliases(
     `${amps} amp`,
-    "single pole one pole 1p sp 1-pole",
+    SINGLE_POLE_SLANG,
     type.slang,
     BREAKER_SLANG
   ),
@@ -238,8 +240,8 @@ const protectedSingleLarge: BaselineMaterial[] = [
 const halfSize: BaselineMaterial[] = [
   ...["15", "20", "30"].map(amps => ({
     amps,
-    pole: "Single-Pole",
-    slang: "single pole one pole 1p sp",
+    pole: "1-Pole",
+    slang: SINGLE_POLE_SLANG,
   })),
   ...["15", "20", "30", "40", "50"].map(amps => ({
     amps,

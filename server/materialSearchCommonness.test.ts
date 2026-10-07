@@ -66,7 +66,7 @@ describe("a generic query puts the common part first", () => {
   const search = searcher(byName);
 
   it('"20A breaker" leads with the plain single-pole breaker', () => {
-    expect(search("20A breaker")[0]).toBe("20A Single-Pole breaker");
+    expect(search("20A breaker")[0]).toBe("20A 1-Pole breaker");
   });
 
   it("does not depend on the order the rows arrived in", () => {
@@ -84,7 +84,8 @@ describe("a generic query puts the common part first", () => {
     // single-pole, double-gang over single-gang, MC over NM-B.
     expect(search("switch")[0]).toBe("Single-pole switch");
     expect(search("box")[0]).toBe("Single-gang box");
-    expect(search("12-2")[0]).toBe("12-2 NM-B");
+    expect(search("12-2")[0]).toBe("12/2 NM-B Copper");
+    expect(search("12/2")[0]).toBe("12/2 NM-B Copper");
   });
 
   it("puts a row whose WHOLE name was typed first", () => {
@@ -199,17 +200,17 @@ describe("this company's own use settles ties", () => {
     //
     // The query was "20A breaker" until 2026-09-26, when it stopped being a
     // tie: it is the plain row's FORMER NAME, and a former name now counts as
-    // an exact match (shared/materialSearchRank.ts, phraseTier). "20a single
-    // pole" is what both rows' names begin with, so it still ties.
+    // an exact match (shared/materialSearchRank.ts, phraseTier). What both
+    // rows' names begin with still ties: "20a single pole" until the names
+    // said "1-Pole" (2026-10-07), "20a 1-pole" since — "single pole" now
+    // also matches the single-pole SWITCH by name, so it no longer ties.
     const usage = new Map<string, MaterialUsage>([
-      ["20A Single-Pole AFCI breaker", { bids: 5, lastUsedAt: NOW }],
+      ["20A 1-Pole AFCI breaker", { bids: 5, lastUsedAt: NOW }],
     ]);
     const search = searcher(byName, usage);
-    expect(search("20a single pole")[0]).toBe("20A Single-Pole AFCI breaker");
+    expect(search("20a 1-pole")[0]).toBe("20A 1-Pole AFCI breaker");
     // And the tie is real: without the usage, the plain row leads.
-    expect(searcher(byName)("20a single pole")[0]).toBe(
-      "20A Single-Pole breaker"
-    );
+    expect(searcher(byName)("20a 1-pole")[0]).toBe("20A 1-Pole breaker");
   });
 
   it("but never lifts a worse match over a better one", () => {
@@ -217,23 +218,25 @@ describe("this company's own use settles ties", () => {
       ["20A 2-Pole breaker", { bids: 500, lastUsedAt: NOW }],
     ]);
     // Named outright: the single-pole row, however much 2-pole is used.
-    expect(searcher(byName, usage)("20a single-pole breaker")[0]).toBe(
-      "20A Single-Pole breaker"
+    expect(searcher(byName, usage)("20a 1-pole breaker")[0]).toBe(
+      "20A 1-Pole breaker"
     );
     // Named by what it USED to be called counts the same (owner,
-    // 2026-09-26): usage of the AFCI does not lift it over "20A breaker".
+    // 2026-09-26): usage of the AFCI does not lift it over "20A breaker" —
+    // nor over "20A Single-Pole breaker", the name before 2026-10-07.
     const afci = new Map<string, MaterialUsage>([
-      ["20A Single-Pole AFCI breaker", { bids: 500, lastUsedAt: NOW }],
+      ["20A 1-Pole AFCI breaker", { bids: 500, lastUsedAt: NOW }],
     ]);
-    expect(searcher(byName, afci)("20A breaker")[0]).toBe(
-      "20A Single-Pole breaker"
+    expect(searcher(byName, afci)("20A breaker")[0]).toBe("20A 1-Pole breaker");
+    expect(searcher(byName, afci)("20A Single-Pole breaker")[0]).toBe(
+      "20A 1-Pole breaker"
     );
   });
 });
 
 describe("commonness points", () => {
   it("ranks core over common over unlisted", () => {
-    const core = commonnessPoints("20A Single-Pole breaker", undefined, NOW);
+    const core = commonnessPoints("20A 1-Pole breaker", undefined, NOW);
     const common = commonnessPoints("40A 2-Pole breaker", undefined, NOW);
     // Was the 70A 2-Pole until it became "common" (2026-09-24).
     const none = commonnessPoints("150A 3-Pole breaker", undefined, NOW);

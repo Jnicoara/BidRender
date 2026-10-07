@@ -112,9 +112,9 @@ async function sentRun() {
     label: `Extras EMT ${Date.now()}${Math.random()}`,
     pathType: "conduit",
     racewayMaterialId: await priceMaterial('1/2" EMT', 1.25, 0.05),
-    conductorMaterialId: await priceMaterial("#12 THHN", 0.18, 0.01),
+    conductorMaterialId: await priceMaterial("#12 THHN Copper", 0.18, 0.01),
     conductorCount: 2,
-    groundMaterialId: await priceMaterial("#12 bare CU, solid", 0.12, 0.01),
+    groundMaterialId: await priceMaterial("#12 bare solid Copper", 0.12, 0.01),
     groundCount: 1,
   });
   const saved = await caller().takeoffRuns.save({

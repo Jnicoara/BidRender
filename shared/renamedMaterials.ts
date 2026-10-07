@@ -11,6 +11,7 @@
  */
 import { TRADE_SIZES } from "./tradeSizes";
 import { emtStyledFittingName } from "./runFittingMaterials";
+import { FROZEN_RENAMES_2026_10_07 } from "./frozenMaterialNames";
 
 /**
  * Baseline rows to rename in place, old name -> new name.
@@ -25,8 +26,12 @@ import { emtStyledFittingName } from "./runFittingMaterials";
  * renamed is a no-op, because nothing matches the old name any more. Do not
  * delete one to tidy up: a database that has not booted since before the rename
  * still needs it.
+ *
+ * This is the HISTORY as each rename was written. What the seeder applies is
+ * RENAMED_BASELINE_MATERIALS below, which points each of these at today's
+ * name.
  */
-export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
+const RENAMED_BEFORE_2026_10_07: Record<string, string> = {
   '1/2" PVC': '1/2" PVC Sch 40',
   // Straight to the set-screw name (2026-09-26, below), not via the
   // intermediate `1/2" EMT connector`, so no database depends on the pass
@@ -167,6 +172,37 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   "Weatherproof round box": '1/2" weatherproof round box',
   "Weatherproof box, single-gang, PVC":
     '1/2" weatherproof box, single-gang, PVC',
+};
+
+const FROZEN_FINAL: Record<string, string> = Object.fromEntries(
+  FROZEN_RENAMES_2026_10_07.map(r => [r.current, r.final])
+);
+
+/**
+ * Baseline rows to rename in place, old name -> new name: every rename above,
+ * plus the names frozen from the owner's review sheet on 2026-10-07
+ * (shared/frozenMaterialNames.ts) — with every older spelling pointed
+ * STRAIGHT at its final name.
+ *
+ * ── Why repointed, not chained ───────────────────────────────────────────────
+ * The seed pass applies each entry once and in no particular order, and the
+ * search ranking (`renamedTo`) and the supplier price import follow ONE hop.
+ * "20A breaker" -> "20A Single-Pole breaker" -> "20A 1-Pole breaker" as a
+ * chain would leave a database that missed both releases on the middle name
+ * after one pass, and a supplier sheet saying "20A breaker" unmatched. So the
+ * history above keeps what each old name WAS renamed to, and this map sends
+ * it to what it is NOW (audit 2026-10-07, references/materials-review-sheet-
+ * plan.md item 6). renamedMaterials.test.ts fails on any value that is
+ * itself a key.
+ */
+export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(RENAMED_BEFORE_2026_10_07).map(([from, to]) => [
+      from,
+      FROZEN_FINAL[to] ?? to,
+    ])
+  ),
+  ...FROZEN_FINAL,
 };
 
 /** An old spelling, normalised the way search ranking compares names. */

@@ -228,6 +228,29 @@ describe("rolling assemblies into one list", () => {
     expect(entries[0].sources).toEqual(["Receptacle", "Switch"]);
   });
 
+  it("sums a company copy under the OLD name with the renamed shipped row", () => {
+    // A fork keeps the name it was forked under; the shipped row was renamed
+    // in place on 2026-10-07. Same cable, so one line on the supplier's list.
+    const entries = aggregateMaterials([
+      {
+        name: "Kitchen circuit",
+        count: 1,
+        materials: [
+          { name: "12-2 NM-B", unit: "foot", category: null, qty: 40 },
+        ],
+      },
+      {
+        name: "Bath circuit",
+        count: 1,
+        materials: [
+          { name: "12/2 NM-B Copper", unit: "foot", category: null, qty: 25 },
+        ],
+      },
+    ]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].qty).toBe(65);
+  });
+
   it("keeps two units of the same name apart rather than adding feet to pieces", () => {
     const entries = aggregateMaterials([
       {

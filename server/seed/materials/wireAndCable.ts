@@ -21,20 +21,33 @@
  * feeder price from a catalog they last touched in spring needs to be told, at
  * the moment they look at it, that this is the number most likely to be stale.
  *
- * ── The metal is written AL / CU in a name ───────────────────────────────────
- * Decided by the owner 2026-09-25: "#4/0 XHHW AL", "#12 bare CU, solid", "8-3
- * SER CU" — the short form a supply house writes. Every row that states its
- * metal does it this way; a row that does not (THHN, NM-B) is copper and says
- * nothing, as it always has. The full words stay findable as aliases (AL_WORDS,
- * CU_WORDS), and the rows were renamed in place through
- * RENAMED_BASELINE_MATERIALS, so every id — and everything pointing at one —
- * is the row it was.
+ * ── EVERY wire and cable states its metal, spelled out, at the END ──────────
+ * "#12 THHN Copper", "12/2 NM-B Copper", "4/0 XHHW Aluminum" — the owner's
+ * naming rule, frozen 2026-10-07 from the materials review sheet
+ * (pricing/frozen-names.json). It REPLACES the 2026-09-25 rule that wrote the
+ * metal as AL / CU and left copper unsaid ("#12 THHN", "8-3 SER CU"), which is
+ * history now and stays in RENAMED_BASELINE_MATERIALS so every older database
+ * renames in place. With it:
+ *   - a multi-conductor cable is written with a SLASH, "12/2", the way the
+ *     trade writes it; the dash form ("12-2") stays a search word on the row;
+ *   - a #3 four-wire is "#3/4", so it never reads as 3/4 inch;
+ *   - aughts drop the "#" — "1/0", not "#1/0";
+ *   - SER spells out the FULL conductor set (owner, 2026-10-07): see below.
+ * The size reader understands every one of these (shared/materialSizeOrder.ts,
+ * server/sizeReadingNewNames.test.ts). The short words AL / CU stay findable
+ * as aliases on every row whose name used to carry them.
  */
 import { aliases, UNPRICED, type BaselineMaterial } from "./types";
 
-/** What an estimator types for a metal the name writes as AL / CU. */
-const AL_WORDS = "aluminum aluminium alum";
-const CU_WORDS = "copper";
+/** What an estimator types for a metal — the word the name spells out, and its shorthand. */
+const AL_WORDS = "al aluminium alum";
+const CU_WORDS = "cu";
+
+/** "12-2" -> "12/2": the slash form a name is written in. */
+const slashed = (size: string) => size.replace("-", "/");
+
+/** "#1/0" -> "1/0": aughts are written without the "#". */
+const gaugeLabel = (gauge: string) => gauge.replace(/^#(\d\/0)$/, "$1");
 
 // ─── THHN/THWN copper ─────────────────────────────────────────────────────────
 
@@ -78,9 +91,10 @@ const KCMIL = ["250", "300", "350", "400", "500"];
 
 const copperThhn: BaselineMaterial[] = [
   ...COPPER_SOLID.map(gauge => ({
-    // #14, #12 and #10 keep the plain names the catalog shipped with, so the
-    // starter assemblies that reference them by name keep resolving.
-    name: `${gauge} THHN`,
+    // The SOLID rows: #14, #12 and #10 with no "stranded" in the name. Starter
+    // assemblies reach them by part key (server/seed/starterParts.ts), which
+    // follows the rename map, so the 2026-10-07 rename moved nothing there.
+    name: `${gauge} THHN Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -89,7 +103,7 @@ const copperThhn: BaselineMaterial[] = [
   })),
   // The two stranded sizes added 2026-09-29 (§ R6); #10's is below.
   ...["#14", "#12"].map(gauge => ({
-    name: `${gauge} THHN stranded`,
+    name: `${gauge} THHN stranded Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -98,7 +112,10 @@ const copperThhn: BaselineMaterial[] = [
   })),
   ...COPPER_STRANDED.map(gauge => ({
     // Only 10 AWG needs the suffix — it is the single size stocked both ways.
-    name: gauge === "#10" ? "#10 THHN stranded" : `${gauge} THHN`,
+    name:
+      gauge === "#10"
+        ? "#10 THHN stranded Copper"
+        : `${gaugeLabel(gauge)} THHN Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -112,7 +129,7 @@ const copperThhn: BaselineMaterial[] = [
       : {}),
   })),
   ...KCMIL.map(size => ({
-    name: `${size} kcmil THHN`,
+    name: `${size} kcmil THHN Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -152,7 +169,9 @@ const ALUMINUM_NOTE =
 const aluminumFeeder: BaselineMaterial[] = ALUMINUM_SIZES.map(size => {
   const isKcmil = !size.startsWith("#");
   return {
-    name: isKcmil ? `${size} kcmil XHHW AL` : `${size} XHHW AL`,
+    name: isKcmil
+      ? `${size} kcmil XHHW Aluminum`
+      : `${gaugeLabel(size)} XHHW Aluminum`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -195,13 +214,15 @@ const NM_SIZES = [
 const nmb: BaselineMaterial[] = NM_SIZES.map(size => {
   const gauge = size.split("-")[0];
   return {
-    name: `${size} NM-B`,
+    name: `${slashed(size)} NM-B Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
     searchAliases: aliases(
       "romex",
-      size.replace("-", "/"),
+      // The dash spelling the row was named in until 2026-10-07, and what
+      // plenty of people still type.
+      size,
       "nm nonmetallic sheathed house wire with ground",
       NM_COLOURS[gauge]
     ),
@@ -259,13 +280,19 @@ const MC_DESCRIPTIONS: Record<string, string> = {
 const mcCable: BaselineMaterial[] = [
   ...MC_SIZES.map(
     (size): BaselineMaterial => ({
-      name: `${size} MC cable`,
+      // "#3/4", never "3/4": a #3 four-wire must not read as 3/4 inch (Q2d).
+      name:
+        size === "3-4"
+          ? "#3/4 MC cable Copper"
+          : `${slashed(size)} MC cable Copper`,
       unitOfSale: "foot",
       costPerUnit: UNPRICED,
       category: "Wire & Cable",
-      // "BX" is the older armoured-cable name people still use for MC.
+      // "BX" is the older armoured-cable name people still use for MC. The
+      // dash spelling is the old name's; there is no "3/4" alias on the
+      // #3/4 row, which would answer a 3/4" conduit search.
       searchAliases: aliases(
-        size.replace("-", "/"),
+        size,
         "metal clad armored armoured bx flexible feeder"
       ),
       ...(MC_DESCRIPTIONS[size] ? { description: MC_DESCRIPTIONS[size] } : {}),
@@ -278,12 +305,12 @@ const mcCable: BaselineMaterial[] = [
     the jacket, so nothing counts them apart.
   */
   {
-    name: "12-2 MC cable, isolated ground",
+    name: "12/2 MC cable isolated ground Copper",
     unitOfSale: "foot",
     costPerUnit: UNPRICED,
     category: "Wire & Cable",
     searchAliases: aliases(
-      "12/2 ig orange computer register cash wrap dedicated insulated green metal clad armored armoured bx"
+      "12-2 ig orange computer register cash wrap dedicated insulated green metal clad armored armoured bx"
     ),
     description:
       "Two conductors, an insulated ground for the IG receptacle, and the bond.",
@@ -293,18 +320,18 @@ const mcCable: BaselineMaterial[] = [
 // ─── UF-B and fixture wire ────────────────────────────────────────────────────
 
 const ufb: BaselineMaterial[] = ["14-2", "12-2", "10-2", "8-2"].map(size => ({
-  name: `${size} UF-B`,
+  name: `${slashed(size)} UF-B Copper`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
   category: "Wire & Cable",
   searchAliases: aliases(
-    size.replace("-", "/"),
+    size,
     "underground feeder direct burial grey gray outdoor wet buried"
   ),
 }));
 
 const fixtureWire: BaselineMaterial[] = ["#16", "#18"].map(gauge => ({
-  name: `${gauge} fixture wire`,
+  name: `${gauge} fixture wire Copper`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
   category: "Wire & Cable",
@@ -316,19 +343,30 @@ const fixtureWire: BaselineMaterial[] = ["#16", "#18"].map(gauge => ({
 
 // ─── Fire alarm cable, portable cord and tray cable ───────────────────────────
 // Moved from the pricing sheet, 2026-09-25. Named the way the rest of this file
-// names a multi-conductor cable — "14-2 …" — with the slash form as an alias.
+// names a multi-conductor cable — "14/2 … Copper" — with the dash form as an
+// alias.
+//
+// The size is its OWN argument. It used to be read back out of the name with
+// `name.match(/^\d+-\d+/)!`, which throws on a slash name while this module
+// loads — taking the whole catalog, and the server boot, down with it
+// (audit 2026-10-07).
 
-const cable = (name: string, slang: string): BaselineMaterial => ({
-  name,
+const cable = (
+  size: string,
+  kind: string,
+  slang: string
+): BaselineMaterial => ({
+  name: `${slashed(size)} ${kind} Copper`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
   category: "Wire & Cable",
-  searchAliases: aliases(name.match(/^\d+-\d+/)![0].replace("-", "/"), slang),
+  searchAliases: aliases(size, slang),
 });
 
 const fireAlarmCable: BaselineMaterial[] = ["14-2", "16-2"].map(size =>
   cable(
-    `${size} fire alarm cable`,
+    size,
+    "fire alarm cable",
     "fplp fplr fpl red plenum riser shielded fa power limited"
   )
 );
@@ -338,13 +376,13 @@ const fireAlarmCable: BaselineMaterial[] = ["14-2", "16-2"].map(size =>
  * SJOOW differ in jacket rating (600V against 300V), which is why both exist.
  */
 const portableCord: BaselineMaterial[] = [
-  cable("14-3 SJOOW cord", "sj 300v junior hard service portable flexible"),
-  cable("12-3 SOOW cord", "so 600v hard service portable flexible rubber"),
-  cable("10-3 SOOW cord", "so 600v hard service portable flexible rubber"),
+  cable("14-3", "SJOOW cord", "sj 300v junior hard service portable flexible"),
+  cable("12-3", "SOOW cord", "so 600v hard service portable flexible rubber"),
+  cable("10-3", "SOOW cord", "so 600v hard service portable flexible rubber"),
 ];
 
 const trayCable: BaselineMaterial[] = [
-  cable("12-3 tray cable", "tc tc-er power control cable tray industrial"),
+  cable("12-3", "tray cable", "tc tc-er power control cable tray industrial"),
 ];
 
 /*
@@ -356,14 +394,16 @@ const trayCable: BaselineMaterial[] = [
 const equipmentCable: BaselineMaterial[] = [
   {
     ...cable(
-      "12-2 submersible pump cable",
+      "12-2",
+      "submersible pump cable",
       "well drop flat jacketed direct burial 600v ground"
     ),
     description: "Well-pump drop cable: two conductors and a ground.",
   },
   {
     ...cable(
-      "14-4 mini-split cable",
+      "14-4",
+      "mini-split cable",
       "minisplit ductless split system interconnect communication stranded heat pump"
     ),
     description: "Between a mini-split's outdoor and indoor units. Not MC.",
@@ -374,7 +414,7 @@ const equipmentCable: BaselineMaterial[] = [
 
 const bareCopper: BaselineMaterial[] = [
   ...["#14", "#12", "#10", "#8"].map(gauge => ({
-    name: `${gauge} bare CU, solid`,
+    name: `${gauge} bare solid Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -387,7 +427,7 @@ const bareCopper: BaselineMaterial[] = [
     ),
   })),
   ...["#10", "#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(gauge => ({
-    name: `${gauge} bare CU, stranded`,
+    name: `${gaugeLabel(gauge)} bare stranded Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -418,6 +458,10 @@ const SE_SLANG = "service entrance seu se cable feeder";
  * cable. The shorthand stays an alias, in both spellings, so "6-3" and "6/3"
  * still find the row.
  *
+ * **Re-confirmed by the owner 2026-10-07**, when the review sheet had proposed
+ * the "/3" short form back ("8/3 SER Copper"): SER names spell out the full
+ * set, now with the metal spelled out too — "4/0-4/0-4/0-2/0 SER Aluminum".
+ *
  * The sets are the manufacturers', not derived: Southwire SPEC 10040 (copper
  * 6-6-6-6, 4-4-4-6, 2-2-2-4, 1-1-1-3) and its aluminum SER product pages
  * (1/0-1/0-1/0-2, 2/0-2/0-2/0-1, 3/0-3/0-3/0-1/0); Southwire makes no #8
@@ -434,7 +478,7 @@ const serCopper: BaselineMaterial[] = [
   { size: "2-2-2-4", shorthand: "2-3" },
   { size: "1-1-1-3", shorthand: "1-3" },
 ].map(({ size, shorthand }) => ({
-  name: `${size} SER CU`,
+  name: `${size} SER Copper`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
   category: "Wire & Cable",
@@ -494,7 +538,7 @@ const serAluminum: BaselineMaterial[] = [
     shorthand?: string;
     note?: string;
   }) => ({
-    name: `${size} SER AL`,
+    name: `${size} SER Aluminum`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
     category: "Wire & Cable" as const,
@@ -517,7 +561,7 @@ const serAluminum: BaselineMaterial[] = [
  * Added from the pricing sheet, 2026-09-25, aluminum as it is stocked.
  */
 const seuAluminum: BaselineMaterial[] = ["4-4-6", "2-2-4"].map(size => ({
-  name: `${size} SEU AL`,
+  name: `${size} SEU Aluminum`,
   unitOfSale: "foot" as const,
   costPerUnit: UNPRICED,
   category: "Wire & Cable" as const,
@@ -537,7 +581,7 @@ const seuAluminum: BaselineMaterial[] = ["4-4-6", "2-2-4"].map(size => ({
  */
 const undergroundService: BaselineMaterial[] = [
   {
-    name: "#4/0 USE-2 AL",
+    name: "4/0 USE-2 Aluminum",
     unitOfSale: "foot",
     costPerUnit: UNPRICED,
     category: "Wire & Cable",
@@ -549,7 +593,7 @@ const undergroundService: BaselineMaterial[] = [
     description: ALUMINUM_NOTE,
   },
   {
-    name: "1/0 URD triplex AL",
+    name: "1/0 URD triplex Aluminum",
     unitOfSale: "foot",
     costPerUnit: UNPRICED,
     category: "Wire & Cable",
