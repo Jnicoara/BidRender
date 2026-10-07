@@ -12,15 +12,41 @@ const proposed = BASELINE_MATERIALS.map(m => ({
 }));
 
 describe("the decided wire and cable names", () => {
-  it("cover every Wire & Cable row in the catalog, and nothing else", () => {
+  it("are APPLIED: every Wire & Cable row is exactly one decided name", () => {
+    // Before the 2026-10-07 rename this asserted the proposals covered the
+    // catalog's CURRENT names. They have been applied since, so the same
+    // coverage is asserted the other way round: every shipped Wire & Cable
+    // row is the proposed name of exactly one proposal, and nothing shipped
+    // still carries a proposal's old name.
     const wire = BASELINE_MATERIALS.filter(m => m.category === "Wire & Cable");
-    const covered = new Set(WIRE_AND_CABLE_PROPOSALS.map(r => r.current));
-    expect(wire.filter(m => !covered.has(m.name)).map(m => m.name)).toEqual([]);
+    // What the rules produce from each old name — the table's own proposal
+    // with the aught rule applied on top ("#1/0 THHN Copper" -> "1/0 …").
+    const finals = WIRE_AND_CABLE_PROPOSALS.map(
+      r =>
+        proposeMaterialName({ name: r.current, category: "Wire & Cable" })
+          .proposed
+    );
+    expect(wire.filter(m => !finals.includes(m.name)).map(m => m.name)).toEqual(
+      []
+    );
     const names = new Set(wire.map(m => m.name));
+    expect(finals.filter(f => !names.has(f))).toEqual([]);
+    const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
     expect(
-      WIRE_AND_CABLE_PROPOSALS.filter(r => !names.has(r.current)).map(
+      WIRE_AND_CABLE_PROPOSALS.filter(r => shipped.has(r.current)).map(
         r => r.current
       )
+    ).toEqual([]);
+  });
+
+  it("are a fixed point: the naming rules propose NOTHING for the shipped catalog", () => {
+    // If a rule still wanted to change a shipped name, the next regenerated
+    // review or pricing sheet would propose a second rename ("Copper Copper")
+    // of names the owner already froze.
+    expect(
+      proposed
+        .filter(m => m.proposal.proposed !== m.name)
+        .map(m => `${m.name} -> ${m.proposal.proposed}`)
     ).toEqual([]);
   });
 
@@ -88,15 +114,24 @@ describe("aughts without # (owner, 2026-10-07)", () => {
 
 describe("the other decided rules", () => {
   it("make every Single-Pole BREAKER 1-Pole, and leave single-pole switches alone (owner Q1)", () => {
-    const breakers = proposed.filter(
-      m => m.category === "Breakers" && /Single-Pole/.test(m.name)
-    );
-    expect(breakers.length).toBeGreaterThan(0);
-    for (const b of breakers) expect(b.proposal.proposed).toMatch(/1-Pole/);
-    for (const s of proposed.filter(
+    // Applied 2026-10-07, so no shipped breaker says Single-Pole any more; the
+    // rule is checked on the old spelling, and on the catalog as shipped.
+    expect(
+      proposeMaterialName({
+        name: "20A Single-Pole AFCI breaker",
+        category: "Breakers",
+      }).proposed
+    ).toBe("20A 1-Pole AFCI breaker");
+    expect(
+      BASELINE_MATERIALS.filter(
+        m => m.category === "Breakers" && /Single-Pole/.test(m.name)
+      )
+    ).toEqual([]);
+    const switches = proposed.filter(
       m => m.category !== "Breakers" && /single-pole/i.test(m.name)
-    ))
-      expect(s.proposal.proposed).toBe(s.name);
+    );
+    expect(switches.length).toBeGreaterThan(0);
+    for (const s of switches) expect(s.proposal.proposed).toBe(s.name);
   });
 
   it("puts a space between a size and its unit", () => {

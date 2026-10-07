@@ -81,7 +81,7 @@ async function mcType() {
   return caller().takeoffRunTypes.create({
     label: `12-2 MC ${Date.now()}${Math.random()}`,
     pathType: "cable",
-    conductorMaterialId: (await shipped("12-2 MC cable")).id,
+    conductorMaterialId: (await shipped("12/2 MC cable Copper")).id,
   });
 }
 

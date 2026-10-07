@@ -19,6 +19,20 @@ This is the human-readable companion to the git history — read this to see wha
   appears once the company has three bids — before that nothing extra
   shows. It hides as soon as you start typing.
 
+- **151 catalog items have their final names** (frozen from the owner's
+  review sheet). Every wire states its metal at the end ("#12 THHN Copper",
+  "12/2 NM-B Copper", "4/0 XHHW Aluminum"). Breakers say "1-Pole". SER cable
+  spells out every conductor ("4/0-4/0-4/0-2/0 SER Aluminum"). The ground rods
+  state their diameter, and the wafers are separate 4" and 6" items. Every
+  item keeps its identity, so saved bids, assemblies and counts are untouched.
+  Typing an old name still finds the item: "12-2", "#1/0 THHN", "20A
+  Single-Pole breaker", "6ft whip".
+- **Fixed a restart hazard:** two catalog names differing only by capital
+  letters could make the app delete one of them, along with the assembly lines
+  using it, on every restart. Names now have to match exactly.
+- **Supplier price imports and labor-sheet imports recognise a renamed item
+  under either name.** A company's own copy that still has an old name stays
+  one line on a supplier's materials list, not two.
 - **The app now reads sizes in the catalog's new wire names** — "12/2",
   "#3/4" (a #3 four-wire, not 3/4 inch) and "1/0" without the "#" — so they
   sort and group correctly. The current names still read exactly as before.

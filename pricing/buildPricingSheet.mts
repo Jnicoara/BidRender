@@ -26,6 +26,7 @@ import { BASELINE_MATERIALS as SHIPPED_CATALOG } from "../server/seed/materials/
 import type { BaselineMaterial } from "../server/seed/materials/types";
 import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
 import { compareMaterials } from "../shared/materialOrder";
+import { RENAMED_BASELINE_MATERIALS } from "../shared/renamedMaterials";
 import {
   DROPPED_FROM_SHEET,
   MOVED_FROM_SHEET,
@@ -94,10 +95,8 @@ const SAME_AS: Record<string, string> = {
   "20/15 tandem breaker": "15/20 tandem breaker",
   // "Dual function" is the makers' word for AFCI + GFCI in one breaker; the
   // shipped combo row already carries it as a search alias.
-  "15A Single-Pole dual-function breaker":
-    "15A Single-Pole AFCI/GFCI combo breaker",
-  "20A Single-Pole dual-function breaker":
-    "20A Single-Pole AFCI/GFCI combo breaker",
+  "15A Single-Pole dual-function breaker": "15A 1-Pole AFCI/GFCI combo breaker",
+  "20A Single-Pole dual-function breaker": "20A 1-Pole AFCI/GFCI combo breaker",
 };
 /*
   Rows that have since moved into the catalog under another name, or were
@@ -105,6 +104,26 @@ const SAME_AS: Record<string, string> = {
   wins, and a brand variant naming the old one as its parent follows it.
 */
 Object.assign(SAME_AS, MOVED_FROM_SHEET);
+/*
+  Every shipped row's OLD name folds into the row it became — the catalog
+  rename frozen 2026-10-07 and every one before it. Without this, a name this
+  script still generates the old way ("20A Single-Pole breaker", from the
+  brand loops below) reads as a NEW row beside the renamed shipped one, and
+  the part gets priced twice (rename audit, item 9). The old names are
+  RENAMED_BASELINE_MATERIALS' keys, so this list cannot drift from the one
+  the seeder applies. Regenerating the sheet's own names to the new style is
+  the naming plan's § 5.1 step, which carries typed prices over.
+*/
+for (const [from, to] of Object.entries(RENAMED_BASELINE_MATERIALS)) {
+  // Only into a row this catalog has: the scale test reads a synthetic one.
+  if (
+    !(from in SAME_AS) &&
+    !BASELINE_MATERIALS.some(m => m.name === from) &&
+    BASELINE_MATERIALS.some(m => m.name === to)
+  ) {
+    SAME_AS[from] = to;
+  }
+}
 const canonical = (name: string) => SAME_AS[name] ?? name;
 
 const add = (

@@ -200,8 +200,12 @@ variant does. So pricing resolves parent → preferred brand → variant, and:
   than silently picking the cheapest or the first. A plausible number nobody
   chose is the failure the whole $0 convention exists to prevent.
 
-**6. The single-pole rename — DONE 2026-09-24, ahead of this step and in a
-different word.** "20A breaker" became "20A Single-Pole breaker", not "20A
+**6. The single-pole rename — DONE, twice. Today's name is "20A 1-Pole
+breaker" (2026-10-07),** applied with the names frozen from the owner's review
+sheet: the owner reversed "Single-Pole" to "1-Pole" on 2026-10-05, which is
+what this step originally said. Every older spelling — "20A breaker" and "20A
+Single-Pole breaker" — renames straight to it, in place. The history: on
+2026-09-24 "20A breaker" became "20A Single-Pole breaker", not "20A
 1-Pole breaker", and the protected single-pole rows became "20A Single-Pole
 AFCI breaker" and so on. It shipped on its own because the bare name was
 already producing duplicate rows in the pricing sheet. CLAUDE.md § "One

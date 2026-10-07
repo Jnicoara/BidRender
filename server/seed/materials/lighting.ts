@@ -24,23 +24,24 @@ const fixture = {
  * "5/6" reads as the fraction five-sixths to anything parsing sizes, which put
  * it below the 4" wafer in the size order.
  *
- * ── TO BE REVERSED — owner, 2026-10-07 (materials review sheet) ─────────────
- * "We use 4" and 6" separately": the rows become `4" canless wafer LED
- * downlight` and `6" canless wafer LED downlight`. The 5"/6" row is RENAMED
+ * ── REVERSED — owner, 2026-10-07 (materials review sheet) ──────────────────
+ * "We use 4" and 6" separately": the rows are `4" canless wafer LED
+ * downlight` and `6" canless wafer LED downlight`. The 5"/6" row was RENAMED
  * into the 6" one (same id, so starter LT7 — "Wafer LED downlight, 6"
- * (canless)" — keeps pricing from it), not cut. Not renamed here yet: it
- * goes with the catalog rename (shared/materialRenameProposals.ts,
- * OWNER_RENAMES) after the size-reading change.
+ * (canless)" — keeps pricing from it), not cut; the 4" row likewise, so LT8
+ * and Track B's 4" wafer assembly price from it. The two-size reasoning
+ * above is history: a 5" opening is no longer offered.
  */
 const recessed: BaselineMaterial[] = [
   { size: '4"', slang: "4 four" },
-  { size: '5"/6"', slang: "5 6 five six 5/6" },
+  // The old combined row's spelling, so typing its name still finds it.
+  { size: '6"', slang: '6 six 5"/6" 5/6 5 6' },
 ].map(({ size, slang }) => ({
   ...fixture,
-  name: `${size} wafer LED downlight`,
+  name: `${size} canless wafer LED downlight`,
   searchAliases: aliases(
     slang,
-    "recessed can pot light slim canless retrofit trim housing"
+    "recessed can pot light slim retrofit trim housing"
   ),
 }));
 
@@ -638,13 +639,14 @@ export const LIGHTING: BaselineMaterial[] = [
   },
   {
     ...fixture,
-    name: "6ft MC whip",
+    // "6 ft" since 2026-10-07 — it was the one length written "6ft".
+    name: "6 ft MC whip",
     searchAliases: aliases(
-      "fixture light 6 foot flex armored metal clad pigtail greenfield"
+      "6ft fixture light 6 foot flex armored metal clad pigtail greenfield"
     ),
   },
   // Moved from the pricing sheet, 2026-09-25. "4 ft", not "4ft": the catalog
-  // writes a length with a space everywhere but the one shipped row above.
+  // writes a length with a space everywhere.
   ...["4 ft", "8 ft"].map(length => ({
     ...fixture,
     name: `${length} MC whip`,

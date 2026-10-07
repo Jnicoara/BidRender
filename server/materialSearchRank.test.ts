@@ -356,18 +356,24 @@ describe("the searches that must not regress, against the shipped catalog", () =
     expect(hits.some(name => /Wire nuts|fixture wire/i.test(name))).toBe(false);
   });
 
-  it("gives bare copper wire for copper, though the name now says CU", () => {
+  it("gives copper WIRE for copper, never a copper-clad ground rod", () => {
     // After the AL/CU rename (2026-09-25) "copper" survived only as an alias
-    // and three ground rods ("copper clad") led the search. The ranker reads
-    // CU in a name as the word; this is what goes red if it stops.
-    expect(top("copper")[0]).toMatch(/bare CU/);
-    expect(top("aluminum")[0]).toMatch(/ AL$/);
+    // and three ground rods ("copper clad") led the search; the ranker learned
+    // to read CU in a name as the word, and this pinned "bare CU" first.
+    // Since 2026-10-07 every copper wire SAYS "Copper" at the end of its name
+    // (frozen names), so the top hit is a copper wire of any kind — the fault
+    // this guards is a rod or a clamp leading, and that still goes red here.
+    const copper = top("copper", 5);
+    expect(copper[0]).toMatch(/ Copper$/);
+    expect(copper.some(name => /Ground rod/.test(name))).toBe(false);
+    const aluminum = top("aluminum", 5);
+    expect(aluminum[0]).toMatch(/ Aluminum$/);
   });
 
   it("answers the SER shorthand 4/0-3 with the four-wire cable", () => {
     // "-3" is three insulated conductors plus a ground; the three-wire
     // 4/0-4/0-2/0 is a different cable and must not lead.
-    expect(top("4/0-3")[0]).toBe("4/0-4/0-4/0-2/0 SER AL");
+    expect(top("4/0-3")[0]).toBe("4/0-4/0-4/0-2/0 SER Aluminum");
   });
 
   it("still answers slang with the material that carries it", () => {
@@ -457,7 +463,9 @@ describe("an old name finds the row it was renamed to, first", () => {
   });
 
   it("typed loosely — lower case, no inch mark — it still counts", () => {
-    expect(renamedTo("30a BREAKER")).toBe("30A Single-Pole breaker");
+    // Straight to TODAY's name — "30A breaker" was renamed twice, and the map
+    // points every old spelling at the final one (no chains).
+    expect(renamedTo("30a BREAKER")).toBe("30A 1-Pole breaker");
     expect(renamedTo("1/2 pvc")).toBe('1/2" PVC Sch 40');
     expect(renamedTo("30A breaker extra")).toBeNull();
   });

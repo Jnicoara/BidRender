@@ -223,19 +223,21 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
 
   it('prices a renamed row under its old name, and says "priced as"', async () => {
     // A supplier's sheet lags the catalog: it still says "20A breaker" after
-    // the row became "20A Single-Pole breaker" (RENAMED_BASELINE_MATERIALS).
+    // the row became "20A 1-Pole breaker" — TWO renames later (2026-09-24
+    // and 2026-10-07). The import follows one hop, so this is also what goes
+    // red if the rename map ever chains again (RENAMED_BASELINE_MATERIALS).
     const result = await caller().materials.importPrices({
       supplierName: "Platt",
       rows: [{ name: "20a BREAKER", costPerUnit: 6.4 }],
     });
 
     expect(result.unmatched).toEqual([]);
-    expect(result.priced).toEqual(["20A Single-Pole breaker"]);
+    expect(result.priced).toEqual(["20A 1-Pole breaker"]);
     expect(result.renamed).toEqual([
-      { from: "20a BREAKER", to: "20A Single-Pole breaker" },
+      { from: "20a BREAKER", to: "20A 1-Pole breaker" },
     ]);
     const row = (await caller().materials.list()).find(
-      m => m.name === "20A Single-Pole breaker"
+      m => m.name === "20A 1-Pole breaker"
     )!;
     expect(row.userId).toBe(USER);
     expect(Number(row.costPerUnit)).toBeCloseTo(6.4, 4);
@@ -252,11 +254,11 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
     });
 
     expect(result.renamed.map(r => r.to)).toEqual([
-      "1/0-1/0-1/0-2 SER AL",
-      "1/0-1/0-1/0-2 SER AL",
+      "1/0-1/0-1/0-2 SER Aluminum",
+      "1/0-1/0-1/0-2 SER Aluminum",
     ]);
     const rows = (await caller().materials.list()).filter(
-      m => m.name === "1/0-1/0-1/0-2 SER AL"
+      m => m.name === "1/0-1/0-1/0-2 SER Aluminum"
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].userId).toBe(USER);
@@ -278,7 +280,7 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
     const own = list.find(m => m.name === "30A breaker")!;
     expect(Number(own.costPerUnit)).toBeCloseTo(8, 4);
     // The shipped row was not touched, let alone forked.
-    const shipped = list.find(m => m.name === "30A Single-Pole breaker")!;
+    const shipped = list.find(m => m.name === "30A 1-Pole breaker")!;
     expect(shipped.userId).toBeNull();
   });
 

@@ -19,7 +19,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BASELINE_MATERIALS } from "./seed/materials";
+import {
+  BASELINE_MATERIALS,
+  RENAMED_BASELINE_MATERIALS,
+} from "./seed/materials";
 import { mcFittingNames } from "../shared/runFittingMaterials";
 
 const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
@@ -30,12 +33,21 @@ const plan = readFileSync(
 const tables = plan.split("## Gaps")[0].split("## DV — Devices")[1] ?? "";
 
 describe("the starter assemblies plan", () => {
-  it("names only parts the catalog ships", () => {
+  it("names only parts the catalog ships — directly, or through a recorded rename", () => {
+    // The plan is a dated record (2026-09-29) and keeps the names of its day.
+    // A part renamed since (the frozen names, 2026-10-07) still resolves the
+    // way the seeder resolves it: through RENAMED_BASELINE_MATERIALS, which
+    // points every old spelling straight at the shipped row. A name that is
+    // neither shipped nor renamed is still a failure.
     const named = Array.from(
       new Set(Array.from(tables.matchAll(/`([^`]+)`/g), match => match[1]))
     );
     expect(named.length).toBeGreaterThan(250);
-    expect(named.filter(name => !shipped.has(name))).toEqual([]);
+    expect(
+      named.filter(
+        name => !shipped.has(RENAMED_BASELINE_MATERIALS[name] ?? name)
+      )
+    ).toEqual([]);
   });
 
   it("leaves only surface raceway waiting on a missing part", () => {
@@ -51,8 +63,8 @@ describe("the starter assemblies plan", () => {
 */
 const GAP_ROWS: Array<[string, string]> = [
   ["System smoke detector", "Life Safety"],
-  ["12-2 submersible pump cable", "Wire & Cable"],
-  ["14-4 mini-split cable", "Wire & Cable"],
+  ["12/2 submersible pump cable Copper", "Wire & Cable"],
+  ["14/4 mini-split cable Copper", "Wire & Cable"],
   ['2" meter hub', "Panels"],
   ['2" mast roof flashing', "Conduit Fittings"],
   ['2" riser strap', "Conduit Fittings"],
@@ -72,7 +84,10 @@ describe("the rows built for the plan's gaps", () => {
   });
 
   it("the two new cables sell by the foot", () => {
-    for (const name of ["12-2 submersible pump cable", "14-4 mini-split cable"])
+    for (const name of [
+      "12/2 submersible pump cable Copper",
+      "14/4 mini-split cable Copper",
+    ])
       expect(BASELINE_MATERIALS.find(m => m.name === name)?.unitOfSale).toBe(
         "foot"
       );
@@ -80,8 +95,8 @@ describe("the rows built for the plan's gaps", () => {
 
   // The seed comment says neither is read as MC; this is what makes it true.
   it("neither new cable buys MC connectors or straps", () => {
-    expect(mcFittingNames("12-2 submersible pump cable")).toBeNull();
-    expect(mcFittingNames("14-4 mini-split cable")).toBeNull();
-    expect(mcFittingNames("14-4 MC cable")).not.toBeNull();
+    expect(mcFittingNames("12/2 submersible pump cable Copper")).toBeNull();
+    expect(mcFittingNames("14/4 mini-split cable Copper")).toBeNull();
+    expect(mcFittingNames("14/4 MC cable Copper")).not.toBeNull();
   });
 });

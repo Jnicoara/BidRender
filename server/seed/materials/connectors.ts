@@ -251,7 +251,8 @@ const terminations: BaselineMaterial[] = [
   */
   ...["#2", "#4/0"].map(gauge => ({
     ...CONN,
-    name: `${gauge} crimp sleeve`,
+    // Aughts without the "#" (owner, 2026-10-07): "4/0 crimp sleeve".
+    name: `${gauge.replace(/^#(\d\/0)$/, "$1")} crimp sleeve`,
     searchAliases: aliases(
       gauge.includes("/0") ? "aught ought" : "",
       "compression splice butt barrel inline service copper"

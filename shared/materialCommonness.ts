@@ -91,11 +91,11 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // First, so every entry below for the same name wins. See the function.
   ...rigidRacewaysAndTheirNineties(),
   // ── Breakers ──
-  "15A Single-Pole breaker": "core",
-  "20A Single-Pole breaker": "core",
+  "15A 1-Pole breaker": "core",
+  "20A 1-Pole breaker": "core",
   "20A 2-Pole breaker": "core",
   "30A 2-Pole breaker": "core",
-  "30A Single-Pole breaker": "common",
+  "30A 1-Pole breaker": "common",
   "40A 2-Pole breaker": "common",
   "50A 2-Pole breaker": "common",
   "60A 2-Pole breaker": "common",
@@ -108,11 +108,11 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "100A 2-Pole breaker": "common",
   "110A 2-Pole breaker": "common",
   "125A 2-Pole breaker": "common",
-  "15A Single-Pole AFCI breaker": "common",
-  "20A Single-Pole AFCI breaker": "common",
-  "20A Single-Pole GFCI breaker": "common",
-  "15A Single-Pole AFCI/GFCI combo breaker": "common",
-  "20A Single-Pole AFCI/GFCI combo breaker": "common",
+  "15A 1-Pole AFCI breaker": "common",
+  "20A 1-Pole AFCI breaker": "common",
+  "20A 1-Pole GFCI breaker": "common",
+  "15A 1-Pole AFCI/GFCI combo breaker": "common",
+  "20A 1-Pole AFCI/GFCI combo breaker": "common",
   "50A 2-Pole GFCI breaker": "common",
   "15/15 tandem breaker": "common",
   "20/20 tandem breaker": "common",
@@ -129,20 +129,20 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "100A meter base": "common",
 
   // ── Wire & Cable ──
-  "14-2 NM-B": "core",
-  "12-2 NM-B": "core",
-  "12-2 MC cable": "core",
-  "#12 THHN": "core",
-  "14-3 NM-B": "common",
-  "12-3 NM-B": "common",
-  "10-2 NM-B": "common",
-  "10-3 NM-B": "common",
-  "6-3 NM-B": "common",
-  "12-3 MC cable": "common",
-  "#14 THHN": "common",
-  "#10 THHN": "common",
-  "#8 THHN": "common",
-  "#6 THHN": "common",
+  "14/2 NM-B Copper": "core",
+  "12/2 NM-B Copper": "core",
+  "12/2 MC cable Copper": "core",
+  "#12 THHN Copper": "core",
+  "14/3 NM-B Copper": "common",
+  "12/3 NM-B Copper": "common",
+  "10/2 NM-B Copper": "common",
+  "10/3 NM-B Copper": "common",
+  "6/3 NM-B Copper": "common",
+  "12/3 MC cable Copper": "common",
+  "#14 THHN Copper": "common",
+  "#10 THHN Copper": "common",
+  "#8 THHN Copper": "common",
+  "#6 THHN Copper": "common",
 
   // ── Conduit ──
   '1/2" EMT': "core",
@@ -241,8 +241,8 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // ── Lighting: the residential downlight ──
   // Added 2026-09-25, when "LED cylinder downlight" arrived from the pricing
   // sheet and led "downlight" on the alphabet.
-  '5"/6" wafer LED downlight': "common",
-  '4" wafer LED downlight': "common",
+  '6" canless wafer LED downlight': "common",
+  '4" canless wafer LED downlight': "common",
 
   // ── Life safety: what a residential and a small commercial job count ──
   // Added 2026-09-25 with the duct smoke detector, beam detector and FA
@@ -259,7 +259,7 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "Generator interlock kit": "common",
 
   // ── Grounding: on every service ──
-  "Ground rod, 8 ft": "common",
+  'Ground rod, 5/8" x 8 ft': "common",
 };
 
 /**
