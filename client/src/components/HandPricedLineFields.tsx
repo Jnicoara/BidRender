@@ -41,20 +41,14 @@ import {
   lineNeedsPrice,
   saveAsAssemblyRefusal,
 } from "@shared/handPricedLines";
+import { ASSEMBLY_CATEGORY_ORDER } from "@shared/assemblyCategories";
 
 /**
- * The assembly shelves, as the Library screen lists them. A copy rather than an
- * import because the client does not load drizzle/schema; the server validates
- * against the real enum, so a drift here fails the save out loud rather than
- * filing anything on the wrong shelf.
+ * The assembly shelves, as the Library screen lists them — the ONE shared
+ * list, pinned to the schema by a test (@shared/assemblyCategories). This
+ * was a hand-kept copy until 2026-10-07 and lagged 0122's two new shelves.
  */
-const ASSEMBLY_CATEGORIES = [
-  "Devices",
-  "Lighting",
-  "Panels",
-  "Equipment Connections",
-  "Low Voltage/EMS",
-] as const;
+const ASSEMBLY_CATEGORIES = ASSEMBLY_CATEGORY_ORDER;
 
 export type HandPricedLine = {
   id: number;

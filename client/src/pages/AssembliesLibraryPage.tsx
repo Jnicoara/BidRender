@@ -99,19 +99,20 @@ import { isPlaceholderHours } from "@shared/laborHourDefaults";
 import { HourSuggestions } from "@/components/HourSuggestions";
 import { money } from "@/lib/money";
 import {
+  ASSEMBLY_CATEGORY_ORDER,
+  groupByCategory,
+} from "@shared/assemblyCategories";
+import {
   MaterialPicker,
   type PickableMaterial,
 } from "@/components/MaterialPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-const CATEGORIES = [
-  "Devices",
-  "Lighting",
-  "Panels",
-  "Equipment Connections",
-  "Low Voltage/EMS",
-] as const;
+// One list for every screen, pinned to the schema (@shared/assemblyCategories).
+// This page kept its own copy until 2026-10-07, which lagged 0122 and hid 29
+// starters.
+const CATEGORIES = ASSEMBLY_CATEGORY_ORDER;
 type Category = (typeof CATEGORIES)[number];
 
 const PROJECT_TYPES = ["residential", "commercial", "both"] as const;
@@ -1347,18 +1348,8 @@ export default function AssembliesLibraryPage() {
     );
   }, [assemblies, query, scope]);
 
-  const grouped = useMemo(() => {
-    const byCategory = new Map<string, Assembly[]>();
-    for (const assembly of visible) {
-      const bucket = byCategory.get(assembly.category);
-      if (bucket) bucket.push(assembly);
-      else byCategory.set(assembly.category, [assembly]);
-    }
-    return CATEGORIES.map(category => ({
-      category,
-      items: byCategory.get(category) ?? [],
-    })).filter(group => group.items.length > 0);
-  }, [visible]);
+  // Never drops a row whose category is not on the list (it used to).
+  const grouped = useMemo(() => groupByCategory(visible), [visible]);
 
   // ── Builder mode ──
   if (creating) {
