@@ -249,7 +249,27 @@ red run is not by itself a red suite:
 
 ## The exact next step
 
-**Item 1, the on-screen pass**, then item 2. For the screen: Weld 1 E-200
+**Homerun footage: C IS WAITING ON TRACK A'S COLUMNS** before any footage
+math is built (`references/homerun-footage-plan.md`, all owner questions
+answered 2026-10-06). The columns, as listed in todo.md § "Track A next
+migration batch" → "Homerun footage" and § "Before beta: height areas
+inside a sheet":
+
+- `bids`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`,
+  `homerunRoutingPct`, `homerunRunTypeId`.
+- `bid_pdf_sheets`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`
+  (the area override; the sheet's ceiling is 0108's
+  `distributionHeightInches`, already numbered).
+- `bid_panels`: `planSheetId`, `planX`, `planY` (where the panel sits).
+- `bid_panel_circuits`: `homerunOverrideFt`, `homerunFromStampId`,
+  `homerunConfirmedAt`, `homerunCeilingInches`.
+- New table `bid_height_areas` (before beta).
+- Also `takeoff_run_circuits.panelCircuitId` (a traced homerun replaces the
+  computed one).
+
+Until they land, C builds nothing of the footage. Once they do: plan § 10.
+
+**Older next step (still open), item 1, the on-screen pass**, then item 2. For the screen: Weld 1 E-200
 (vector) on "Legend capture check" (bid 1728356) and the trick from
 2026-10-05 — a mark on a tag square, then box the same square as another
 item — gives the card its warning in one capture.
