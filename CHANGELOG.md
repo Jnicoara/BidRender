@@ -4,6 +4,15 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-07]
+
+- **The materials review sheet is ready to mark** —
+  `pricing/materials-review.xlsx`. Every shipped material with its proposed
+  new name (wire and cable metal at the end, breakers "1-Pole"), who uses
+  it, and a pre-filled decision; the new rows waiting to be added; what the
+  catalog is missing; and five naming questions. Only the yellow columns are
+  typed in. Once it is marked and checked, material names freeze.
+
 ## [2026-10-06]
 
 - **The server now notes any request that takes over 5 seconds** — which
