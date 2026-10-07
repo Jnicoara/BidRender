@@ -23,6 +23,14 @@ const fixture = {
  * Written 5"/6" rather than 5/6" so the leading measurement is a real 5 inches;
  * "5/6" reads as the fraction five-sixths to anything parsing sizes, which put
  * it below the 4" wafer in the size order.
+ *
+ * ── TO BE REVERSED — owner, 2026-10-07 (materials review sheet) ─────────────
+ * "We use 4" and 6" separately": the rows become `4" canless wafer LED
+ * downlight` and `6" canless wafer LED downlight`. The 5"/6" row is RENAMED
+ * into the 6" one (same id, so starter LT7 — "Wafer LED downlight, 6"
+ * (canless)" — keeps pricing from it), not cut. Not renamed here yet: it
+ * goes with the catalog rename (shared/materialRenameProposals.ts,
+ * OWNER_RENAMES) after the size-reading change.
  */
 const recessed: BaselineMaterial[] = [
   { size: '4"', slang: "4 four" },

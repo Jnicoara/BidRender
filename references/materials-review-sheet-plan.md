@@ -27,6 +27,39 @@ gained rules 4 and 5 and a canless = wafer fold after the owner caught the
 ground-rod pair; it now finds 6 pairs. Next: the read-back freezes names.
 Known for the rename step: the size parser must learn `#3/4`.
 
+**Owner's second answers, 2026-10-07 — applied to the sheet, still NOT
+frozen, nothing renamed.**
+
+- **Ground rods are three items, not two.** Main item `Ground rod, 5/8" x 8
+ft` (renamed from `Ground rod, 8 ft`); the plain `Ground rod, 10 ft`
+  becomes `Ground rod, 5/8" x 10 ft`; `Ground rod, 3/4" x 10 ft` stays. So
+  the cut in the paragraph above is withdrawn: **no shipped row is cut.**
+- **Canless wafers: separate 4" and 6", not folded.** Both RENAMED IN PLACE
+  (`OWNER_RENAMES`, `shared/materialRenameProposals.ts`): `4" wafer LED
+downlight` → `4" canless wafer LED downlight`, `5"/6" wafer LED downlight`
+  → `6" canless wafer LED downlight`. Renaming keeps the ids, so starter LT8
+  (4") and LT7 (5"/6", the ONLY starter using the combined row — measured on
+  local and staging; no company assembly or run line uses it, and live has
+  neither starter yet) follow automatically through `STARTER_PARTS`. The
+  waiting 4" and 6" canless rows drop as duplicates; the waiting 5" is cut
+  (owner: 4" and 6" only). Track B's new 4" wafer assembly uses the 4" row.
+- **Approved:** the 13 3-1/2" adds, DV34's raceway Skip (todo line added),
+  the skipped small sizes — **except `#3 XHHW Aluminum`, added back**.
+- **Owner adds on Missing:** concrete pole base, 320A meter base.
+  Underground warning tape was already a waiting row (Add), not added twice.
+- **The size parser change is DONE** (`shared/materialSizeOrder.ts`,
+  `mcFittingNames`): `12/2`, `#3/4`, bare aughts and 22 AWG read; old names
+  read exactly as before. `server/sizeReadingNewNames.test.ts` — 9 of its
+  cases fail on the old code.
+
+**Measured from the written workbook, then recalculated in Excel (all four
+warnings 0):** Review — **151 renames**, 1,403 unchanged, 120 waiting rows
+added, 5 waiting rows dropped (4 duplicates of shipped rows — mast
+flashing, riser strap, 4" and 6" canless — and the 5" canless); Missing — **33 added**, 67 skipped, 25 blank. **0 shipped rows cut;
+153 materials added in all.** If these numbers differ when you re-run the
+writer, stop and find out why before freezing — either the marks changed or
+this line is stale.
+
 **Two checks added 2026-10-07 (owner), still review-only — no name or row
 changed:**
 
@@ -198,10 +231,35 @@ duplicate rows once). The naming plan assigns the catalog edit to Track C.
 
 ## Order
 
-1. **Owner OKs this layout** (or changes it). ← here
-2. A: the generator (`pricing/buildMaterialsReview.mts`), sheet to owner.
-3. Owner marks it (Review + Missing + Questions).
-4. A: read-back, `frozen-names.json`, names frozen.
-5. Parser change, then the rename commit (C, or A if asked).
-6. Regenerate the pricing sheet with the final names, carrying typed prices
-   over (naming plan § 5.1), and pricing can start.
+1. ~~Owner OKs this layout.~~ Done 2026-10-07.
+2. ~~A: the generator, sheet to owner.~~ Done.
+3. ~~Owner marks it.~~ Done, two rounds (2026-10-07).
+4. ~~Parser change.~~ Done 2026-10-07, on local-dev, ahead of any rename.
+5. **Read-back and freeze** — `pricing/readMaterialsReview.mts` writes
+   `pricing/frozen-names.json`; committing it freezes the names. Local
+   only, touches no database. ← next, after the owner OKs this order.
+6. **Fix every lookup BY NAME** found in § "What looks materials up by
+   name" below, in the SAME commit as the rename — a lookup fixed earlier
+   would point at a name that does not exist yet, and one fixed later
+   leaves a window where it points at a name that no longer does.
+7. **The rename commit** (local-dev only): seed names +
+   `RENAMED_BASELINE_MATERIALS` (one edit per file with `pnpm dev`
+   STOPPED), old spellings into `searchAliases`, the 153 adds in their
+   seed modules, run types' `racewayMaterialName` / `conductorMaterialName`
+   / `groundMaterialName`, tests that assert names, CLAUDE.md's "1-Pole"
+   section + ASSEMBLIES_PLAN.md step 6 + the pole test. Gate green.
+8. **Rehearse on a local copy of staging's data** (no staging write):
+   start once, read back — every renamed id kept, no duplicate row, every
+   starter seeded (count LT7/LT8 and the GR/GC drafts that are in), every
+   run type still resolves its three materials, an old bid line still
+   shows its old name. Before-and-after of the same queries, not a count
+   of rows "to rename".
+9. **Staging — only with the owner's OK.** Back up, push local-dev; the
+   rename runs on server start, there is no migration. Repeat step 8's
+   read-back against staging.
+10. **Live** rides a normal release, later, with the owner's yes. Live has
+    neither wafer starter today (0122/0123 not applied), so its order there
+    is the release plan's, not this file's.
+11. Regenerate the pricing sheet with the final names, carrying typed
+    prices over (naming plan § 5.1), and pricing can start. Track B's
+    drafted recipes switch to `STARTER_PARTS` keys before they load.

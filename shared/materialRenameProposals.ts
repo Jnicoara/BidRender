@@ -142,3 +142,28 @@ export const WIRE_AND_CABLE_PROPOSALS: readonly {
   { current: "#4/0 USE-2 AL", proposed: "#4/0 USE-2 Aluminum" },
   { current: "1/0 URD triplex AL", proposed: "1/0 URD triplex Aluminum" },
 ];
+
+/**
+ * Renames the OWNER decided row by row, on the review sheet (2026-10-07).
+ * Same rename-in-place as the rest: the row keeps its id, so every recipe
+ * pointing at it (starter LT7, LT8) follows without an edit.
+ *
+ * - Ground rods are three items, not duplicates: 5/8" x 8 ft is the one
+ *   usually used; the plain 10 ft is a 5/8" rod; 3/4" x 10 ft stays.
+ * - Wafers: 4" and 6" separately, as canless wafers. The combined 5"/6" row
+ *   BECOMES the 6" item (starter LT7, "Wafer LED downlight, 6" (canless)",
+ *   already prices from it) — this reverses the 5"/6" decision recorded in
+ *   server/seed/materials/lighting.ts, which says so.
+ */
+export const OWNER_RENAMES: readonly { current: string; proposed: string }[] = [
+  { current: "Ground rod, 8 ft", proposed: 'Ground rod, 5/8" x 8 ft' },
+  { current: "Ground rod, 10 ft", proposed: 'Ground rod, 5/8" x 10 ft' },
+  {
+    current: '4" wafer LED downlight',
+    proposed: '4" canless wafer LED downlight',
+  },
+  {
+    current: '5"/6" wafer LED downlight',
+    proposed: '6" canless wafer LED downlight',
+  },
+];

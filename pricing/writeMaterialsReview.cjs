@@ -196,6 +196,8 @@ data.review.forEach((r, i) => {
   const n = i + 2;
   const key = r.current || r.proposed;
   const keptAs = droppedFor.get(key);
+  // A direct Review mark (the owner's row-by-row call) wins over both.
+  const direct = markFor("review", key);
   const row = review.addRow({
     n: i + 1,
     category: r.category,
@@ -205,13 +207,15 @@ data.review.forEach((r, i) => {
     why: r.why,
     usedBy: r.usedBy,
     status: r.status,
-    decision: keptAs ? "Cut" : r.decision,
+    decision: direct ? direct[0] : keptAs ? "Cut" : r.decision,
     yourName: "",
-    note: keptAs
-      ? `Same part as "${keptAs}" (Possible duplicates tab) — anything using this moves to it.`
-      : r.question
-        ? `Decided by ${r.question} (Questions tab)`
-        : "",
+    note: direct
+      ? direct[1]
+      : keptAs
+        ? `Same part as "${keptAs}" (Possible duplicates tab) — anything using this moves to it.`
+        : r.question
+          ? `Decided by ${r.question} (Questions tab)`
+          : "",
     uses: r.usedByCount,
     question: r.question,
   });
@@ -248,6 +252,14 @@ header(missing, [
 ]);
 const missingRows = [
   ...data.missing,
+  // Rows the owner asked for by name, after the generated ones.
+  ...(marks.extraMissing || []).map(x => ({
+    source: "Owner",
+    category: x.category,
+    item: x.item,
+    detail: x.detail,
+    prefill: x.decision,
+  })),
   ...Array.from({ length: 25 }, () => ({
     source: "Your row",
     category: "",
@@ -391,7 +403,13 @@ warn(
 );
 
 const unmatched = [];
-for (const kind of ["duplicates", "questions", "questionNotes", "missing"]) {
+for (const kind of [
+  "duplicates",
+  "questions",
+  "questionNotes",
+  "missing",
+  "review",
+]) {
   for (const key of Object.keys(marks[kind] || {})) {
     if (!usedMarks.has(`${kind}:${key}`)) unmatched.push(`${kind}: ${key}`);
   }
