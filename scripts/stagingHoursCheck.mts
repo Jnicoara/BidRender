@@ -361,6 +361,34 @@ try {
         .length;
       console.log(`laptop chip click: lines ${before} -> ${after}`);
     }
+
+    // Quick bid ("Count"): the same row, the same rules.
+    await go(page, `/bids/${bid.id}/count`);
+    console.log(
+      `${size.name} quick bid most used: ${JSON.stringify(await mostUsedRow(page))}`
+    );
+    await page.screenshot({ path: `${OUT}/${size.name}-quick-bid.png` });
+    await page.getByLabel("Search assemblies to count").fill("x");
+    await page.waitForTimeout(400);
+    console.log(
+      `${size.name} quick bid while typing: ${JSON.stringify(await mostUsedRow(page))}`
+    );
+    await page.getByLabel("Search assemblies to count").fill("");
+    await page.waitForTimeout(400);
+    if (size === laptop) {
+      // Quick bid MERGES a repeat into its line, so the quantity rises.
+      const qtyOf = async () =>
+        (await trpc(api, "bids.get", { id: bid.id }, false)).lines.reduce(
+          (s: number, l: { qty: string }) => s + Number(l.qty),
+          0
+        );
+      const before = await qtyOf();
+      await page.getByRole("button", { name: LABOR_ONLY }).first().click();
+      await page.waitForTimeout(1500);
+      console.log(
+        `laptop quick bid chip click: total qty ${before} -> ${await qtyOf()}`
+      );
+    }
     await ctx.close();
   }
 } finally {

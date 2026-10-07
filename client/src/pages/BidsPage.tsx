@@ -94,6 +94,7 @@ import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { MostUsedRow } from "@/components/MostUsedRow";
 import { TapExplain } from "@/components/TapExplain";
 import {
   lineHoursNotSet,
@@ -877,27 +878,11 @@ export default function BidsPage({
                 the company has 3 bids (the server returns []), so a new
                 account sees no empty row.
               */}
-              {!assemblyQuery.trim() && mostUsed.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="text-[11px] text-muted-foreground">
-                    Most used
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {mostUsed.map(item => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => addHighlighted(item.id)}
-                        title={`Used on ${item.bids} bid${item.bids === 1 ? "" : "s"} in the last 12 months — click to add`}
-                        className="inline-flex items-center gap-1 max-w-full rounded-full border border-border bg-muted/30 px-2.5 h-8 [@media(pointer:coarse)]:h-11 text-xs hover:bg-[#F5C518]/10 hover:border-[#F5C518]/40 transition-colors"
-                      >
-                        <Plus className="w-3 h-3 text-muted-foreground shrink-0" />
-                        <span className="truncate">{item.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <MostUsedRow
+                items={mostUsed}
+                query={assemblyQuery}
+                onAdd={addHighlighted}
+              />
 
               {assemblyResults.length > 0 && (
                 <div className="rounded-lg border border-border overflow-hidden">

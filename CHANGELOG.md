@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Quick bid has the "Most used" row too** — the same one as the bid
+  screen: your company's most-used assemblies, one tap to count onto the
+  bid, hidden while you type, and nothing extra until the company has three
+  bids.
+
 - **"Most used" assemblies, one click to add.** Under the bid's "Add an
   assembly" box, a row shows the eight assemblies your company has put on
   the most bids in the last year; click one to add it with the quantity and
