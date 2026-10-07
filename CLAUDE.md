@@ -1004,23 +1004,36 @@ safe:
 before the pricing list uploads, because the list already carries the
 relationship in a Parent column.
 
-### One convention for single-pole breakers: "Single-Pole" — DONE 2026-09-24
+### One convention for single-pole breakers: "1-Pole" — DONE 2026-10-07
 
-> **TO BE REVERSED — owner, 2026-10-05: breakers will say "1-Pole"**
-> ("20A 1-Pole breaker"), breakers only; a single-pole switch keeps its name.
-> **Not renamed yet**: the rename waits until every naming question in
-> `materials-naming-and-pricing-plan.md` § 8 is answered, and this section,
-> ASSEMBLIES_PLAN.md step 6 and the test change in that same commit. Until
-> then the catalog says "Single-Pole" and this section describes what ships.
-> Search must find a breaker by every supply-house spelling either way
-> (1P, SP, single pole, 1-pole; 2P, DP, double pole; 3P, three pole) —
-> `references/owner-questions.md` § 1.
+> **REVERSED as decided — owner, 2026-10-05; applied 2026-10-07 with the
+> names frozen from the review sheet (`pricing/frozen-names.json`).**
+> Breakers say "1-Pole" ("20A 1-Pole breaker"), breakers only; a single-pole
+> switch keeps its name. Search finds a breaker by every supply-house
+> spelling (1P, SP, single pole, single-pole, 1-pole; 2P, DP, double pole;
+> 3P, three pole) — `references/owner-questions.md` § 1, pinned in
+> `server/materialsCatalog.test.ts`. The pricing sheet's brand variants still
+> say "Single-Pole" until it is regenerated (naming plan § 5.1); its builder
+> folds every old name into the renamed row so nothing is priced twice.
+> The text below, from 2026-09-24, records why "Single-Pole" was chosen then.
 
 Every breaker named by its amperage states its pole count:
-`20A Single-Pole breaker`, `20A Single-Pole AFCI breaker`, `20A 2-Pole
+`20A 1-Pole breaker`, `20A 1-Pole AFCI breaker`, `20A 2-Pole
 breaker`, `20A 3-Pole breaker`. Brand variants follow the same pattern
-(`Square D QO 20A Single-Pole breaker`). The amperage stays `20A`, as it is
+(`Square D QO 20A 1-Pole breaker`). The amperage stays `20A`, as it is
 everywhere else in the catalog, and it is the only form the size parser reads.
+
+**The same 2026-10-07 rename spelled every wire's metal out at the end**
+(`#12 THHN Copper`, `12/2 NM-B Copper`, `4/0 XHHW Aluminum`), wrote cable
+specs with a slash and aughts without the `#`, and gave SER its full
+conductor set with the metal spelled out. 151 rows, renamed in place; every
+older spelling points STRAIGHT at the final name in
+`RENAMED_BASELINE_MATERIALS` (no chains — search and the price import follow
+one hop). `server/frozenMaterialNames.test.ts` fails if the seed drifts from
+the frozen names, if the map chains, or if two names differ only by capitals
+— which the database (`utf8mb4_unicode_ci`) treats as ONE name; the seed's
+duplicate repair, retire and rename passes match exactly since that day
+(`server/seedNameCase.test.ts`).
 
 **This overrides the entry that stood here from 2026-09-21**, which chose
 "1-Pole" and said the rename would wait for the parent/variant work. Two things
@@ -1043,6 +1056,13 @@ also turned up "20/2 breaker" still named there, a spelling retired by the
 two-pole rename, which had been silently skipping the "200A main panel furnish
 and install" starter on every database seeded since then. A test now fails on
 any starter line that names a renamed spelling.
+
+> **Since then (2026-09-29), starter recipes name a KEY** from
+> `server/seed/starterParts.ts`, which resolves through the rename map, so a
+> rename can no longer skip a starter. **Shipped run types still match by
+> exact name** (`server/seed/baselineRunTypes.ts`), and so do the commonness
+> table and the pricing tools — a rename edits them in the same commit.
+> `server/frozenMaterialNames.test.ts` checks the run types.
 
 **Edit the seed name and the rename entry in ONE edit, or stop `pnpm dev`
 first.** `tsx watch` restarts on each save. On 2026-09-24 a restart between

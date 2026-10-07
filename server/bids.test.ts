@@ -319,7 +319,7 @@ describe.skipIf(!hasDb)("snapshot at add time", () => {
     const before = await caller().bids.get({ id: bid.id });
 
     const list = await caller().materials.list();
-    const romex = list.find(m => m.name === "12-2 NM-B")!;
+    const romex = list.find(m => m.name === "12/2 NM-B Copper")!;
     await caller().materials.update({ id: romex.id, costPerUnit: 9.99 });
 
     const after = await caller().bids.get({ id: bid.id });
@@ -1010,7 +1010,7 @@ describe.skipIf(!hasDb)("mass duplicate", () => {
     // library moved between the first add and the duplicate.
     const bid = await bidWithTemplate();
     const list = await caller().materials.list();
-    const romex = list.find(m => m.name === "12-2 NM-B")!;
+    const romex = list.find(m => m.name === "12/2 NM-B Copper")!;
     await caller().materials.update({ id: romex.id, costPerUnit: 99 });
 
     await caller().bids.duplicateUnit({

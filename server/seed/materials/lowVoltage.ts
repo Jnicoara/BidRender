@@ -34,18 +34,31 @@ const part = (name: string, slang: string): BaselineMaterial => ({
   name,
   searchAliases: aliases(slang),
 });
+/*
+  ── Copper cable states its metal, spelled out at the end (owner, frozen
+  2026-10-07) ── the same rule as every wire in wireAndCable.ts, applied to
+  low-voltage cable too: "Cat6 cable Copper", "18/2 control wire Copper".
+  Renamed in place (RENAMED_BASELINE_MATERIALS), so ids are unchanged. Fiber
+  is glass and says nothing.
+*/
 const lvFromSheet: BaselineMaterial[] = [
-  cable("18/5 control wire", "18-5 18 gauge thermostat hvac five conductor"),
-  cable("18/8 control wire", "18-8 18 gauge thermostat hvac eight conductor"),
-  cable("22/2 security cable", "22-2 alarm burglar sensor contact cl2"),
-  cable("22/4 security cable", "22-4 alarm burglar keypad cl2"),
-  cable("Cat5e cable", "cat 5e cat5 ethernet data network utp lan"),
-  cable("Cat6 shielded cable", "cat 6 stp ftp ethernet data network"),
+  cable(
+    "18/5 control wire Copper",
+    "18-5 18 gauge thermostat hvac five conductor"
+  ),
+  cable(
+    "18/8 control wire Copper",
+    "18-8 18 gauge thermostat hvac eight conductor"
+  ),
+  cable("22/2 security cable Copper", "22-2 alarm burglar sensor contact cl2"),
+  cable("22/4 security cable Copper", "22-4 alarm burglar keypad cl2"),
+  cable("Cat5e cable Copper", "cat 5e cat5 ethernet data network utp lan"),
+  cable("Cat6 shielded cable Copper", "cat 6 stp ftp ethernet data network"),
   // "Cat6A" is its own row now; the Cat6 cable no longer answers to it.
-  cable("Cat6A cable", "cat 6a 10g ethernet data network augmented"),
+  cable("Cat6A cable Copper", "cat 6a 10g ethernet data network augmented"),
   cable("Fiber optic cable", "fibre single mode multimode om3 om4 os2"),
-  cable("RG11 coax cable", "rg-11 coaxial tv satellite long run trunk"),
-  cable("Security camera cable", "siamese rg59 power video cctv"),
+  cable("RG11 coax cable Copper", "rg-11 coaxial tv satellite long run trunk"),
+  cable("Security camera cable Copper", "siamese rg59 power video cctv"),
   part("Cat5e jack", "cat 5e keystone rj45 insert data network"),
   part("Cat6A jack", "cat 6a keystone rj45 insert data network"),
   part("Cat5e patch panel", "cat 5e rack 24 port 48 port punch down"),
@@ -90,7 +103,7 @@ const lvFromSheet: BaselineMaterial[] = [
 export const LOW_VOLTAGE: BaselineMaterial[] = [
   {
     ...lv("foot"),
-    name: "Cat6 cable",
+    name: "Cat6 cable Copper",
     searchAliases: aliases(
       // No "cat6a" since 2026-09-25: Cat6A cable is its own row.
       "cat 6 ethernet data network utp riser plenum blue lan"
@@ -125,7 +138,7 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
   },
   {
     ...lv("foot"),
-    name: "RG6 coax cable",
+    name: "RG6 coax cable Copper",
     searchAliases: aliases(
       "rg-6 coaxial tv cable satellite catv quad shield video"
     ),
@@ -140,21 +153,21 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
   },
   {
     ...lv("foot"),
-    name: "16/2 speaker wire",
+    name: "16/2 speaker wire Copper",
     searchAliases: aliases(
       "16-2 16 gauge audio in wall cl2 cl3 two conductor sound"
     ),
   },
   {
     ...lv("foot"),
-    name: "14/2 speaker wire",
+    name: "14/2 speaker wire Copper",
     searchAliases: aliases(
       "14-2 14 gauge audio in wall cl2 cl3 two conductor sound"
     ),
   },
   {
     ...lv("foot"),
-    name: "18/2 control wire",
+    name: "18/2 control wire Copper",
     searchAliases: aliases(
       "18-2 18 gauge thermostat bell doorbell signal class 2 two conductor"
     ),
@@ -162,7 +175,7 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
   {
     ...lv("foot"),
     // Retail catalog plan § R4: what an occupancy sensor is wired in.
-    name: "18/3 control wire",
+    name: "18/3 control wire Copper",
     searchAliases: aliases(
       "18-3 18 gauge occupancy sensor power pack signal class 2 three conductor"
     ),
@@ -170,14 +183,14 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
   },
   {
     ...lv("foot"),
-    name: "18/4 control wire",
+    name: "18/4 control wire Copper",
     searchAliases: aliases(
       "18-4 18 gauge thermostat signal class 2 four conductor hvac"
     ),
   },
   {
     ...lv("foot"),
-    name: "Landscape lighting cable",
+    name: "Landscape lighting cable Copper",
     searchAliases: aliases(
       "low voltage direct burial 12/2 14/2 outdoor yard garden buried"
     ),

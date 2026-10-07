@@ -69,7 +69,7 @@ export const TYPICAL_ITEMS: TypicalItem[] = [
     true
   ),
   item(
-    "#10 THHN stranded",
+    "#10 THHN stranded Copper",
     "Wire & Cable",
     ["thhn", "stranded"],
     `${PANEL}: stranded is pulled through conduit for 30A circuits`

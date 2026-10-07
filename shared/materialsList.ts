@@ -52,6 +52,7 @@
  */
 
 import { csvRow } from "./csvWrite";
+import { renamedTo } from "./renamedMaterials";
 
 /** How a material is bought. Mirrors MATERIAL_UNITS_OF_SALE. */
 export type MaterialUnit = "each" | "foot" | "box";
@@ -226,7 +227,13 @@ export function aggregateMaterials(
           : raw;
       if (per === 0) continue;
 
-      const key = `${material.name.trim().toLowerCase()} ${material.unit}`;
+      // Keyed by the CURRENT name of the part: a company's own copy keeps the
+      // name it was forked under (the seed never renames a fork), so after a
+      // catalog rename "12-2 NM-B" and the shipped "12/2 NM-B Copper" are one
+      // product and must be one line on the supplier's list, not two halves
+      // of the order (rename audit 2026-10-07, item 10).
+      const current = renamedTo(material.name) ?? material.name;
+      const key = `${current.trim().toLowerCase()} ${material.unit}`;
       const existing = byKey.get(key);
       if (existing) {
         existing.qty += per * count;

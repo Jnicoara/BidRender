@@ -49,6 +49,7 @@ import {
   pickIsPriced,
 } from "../../shared/runFittingMaterials";
 import { materialItemKey } from "../../shared/materialMarkup";
+import { renamedTo } from "../../shared/renamedMaterials";
 import { isFittingRole, laborInRunRate } from "../../shared/runFittings";
 import { resendPlan, swapText, type ResendPlan } from "../../shared/resendLine";
 import { footageByRunType } from "../runTypeFootage";
@@ -128,7 +129,13 @@ const fittingFields = {
  * name lines and must name them the same way.
  */
 function runLineName(typeLabel: string, materialName: string | null): string {
-  return materialName && materialName !== typeLabel
+  // A shipped type's label is the cable's OLD name ("12-2 MC cable" — labels
+  // never follow a rename, see baselineRunTypes.ts), so "says it twice"
+  // includes the label renaming to the material: "12-2 MC cable — 12/2 MC
+  // cable Copper" is the same words twice (rename audit 2026-10-07).
+  const sameThing =
+    materialName === typeLabel || renamedTo(typeLabel) === materialName;
+  return materialName && !sameThing
     ? typeLabel + " — " + materialName
     : typeLabel;
 }

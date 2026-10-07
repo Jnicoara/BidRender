@@ -238,10 +238,17 @@ export function planLaborImport(
       miss(row, `no material with ID ${row.id} in this database`);
       continue;
     }
+    // A rename in EITHER direction is the same row: a sheet printed before a
+    // rename names the old spelling, and a company's own copy (a fork is
+    // never renamed by the seed) still carries the old spelling under an id
+    // a sheet printed after the rename names by the NEW one (audit
+    // 2026-10-07, item 10).
     const renamed = renamedTo(row.name);
+    const forkWasRenamed = renamedTo(m.name);
     if (
       norm(m.name) !== norm(row.name) &&
-      !(renamed !== null && norm(renamed) === norm(m.name))
+      !(renamed !== null && norm(renamed) === norm(m.name)) &&
+      !(forkWasRenamed !== null && norm(forkWasRenamed) === norm(row.name))
     ) {
       miss(
         row,

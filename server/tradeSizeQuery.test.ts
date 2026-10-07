@@ -135,9 +135,9 @@ describe("against the real catalog", () => {
       just the first one. NM-B, MC and UF are all stocked at 10-2.
     */
     const found = hits("10/2");
-    expect(found).toContain("10-2 NM-B");
-    expect(found).toContain("10-2 MC cable");
-    expect(found).toContain("10-2 UF-B");
+    expect(found).toContain("10/2 NM-B Copper");
+    expect(found).toContain("10/2 MC cable Copper");
+    expect(found).toContain("10/2 UF-B Copper");
   });
 
   it('gives the same answer for "10-2" as for "10/2"', () => {
@@ -145,10 +145,13 @@ describe("against the real catalog", () => {
   });
 
   it.each([
-    ["12/2", "12-2 NM-B"],
-    ["14/2", "14-2 NM-B"],
-    ["12/3", "12-3 NM-B"],
-    ["14/3", "14-3 MC cable"],
+    ["12/2", "12/2 NM-B Copper"],
+    ["14/2", "14/2 NM-B Copper"],
+    ["12/3", "12/3 NM-B Copper"],
+    ["14/3", "14/3 MC cable Copper"],
+    // The dash form names the same rows (the old names' spelling).
+    ["12-2", "12/2 NM-B Copper"],
+    ["14-3", "14/3 MC cable Copper"],
   ])("%s finds %s", (query, wanted) => {
     expect(hits(query)).toContain(wanted);
   });
@@ -213,10 +216,10 @@ describe("against the real catalog", () => {
   it("does not break a cable spec, whose digits are not a fraction", () => {
     // 10-2 has a dash in the middle; the boundary rule must read the whole
     // token rather than stopping at it.
-    expect(hits("10/2")).toContain("10-2 NM-B");
-    expect(hits("12-3")).toContain("12-3 NM-B");
-    // And "2" alone must not drag in every 12-2 on the shelf.
-    expect(hits("2 nm-b")).not.toContain("12-2 NM-B");
+    expect(hits("10/2")).toContain("10/2 NM-B Copper");
+    expect(hits("12-3")).toContain("12/3 NM-B Copper");
+    // And "2" alone must not drag in every 12/2 on the shelf.
+    expect(hits("2 nm-b")).not.toContain("12/2 NM-B Copper");
   });
 
   it("still needs every word, so a size alone does not match the shelf", () => {

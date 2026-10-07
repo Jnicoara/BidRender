@@ -251,7 +251,7 @@ beforeEach(async () => {
 
 withDb("an MC run on a bid", () => {
   it("counts two connectors and its straps, and every surface agrees", async () => {
-    const mc = await cableType("12-2 MC cable");
+    const mc = await cableType("12/2 MC cable Copper");
     const { bidId, sheetId } = await aBid();
     await homerun(bidId, sheetId, mc.id);
 
@@ -318,7 +318,7 @@ withDb("an MC run on a bid", () => {
   });
 
   it("a bigger MC cable takes the bigger parts", async () => {
-    const mc = await cableType("8-3 MC cable");
+    const mc = await cableType("8/3 MC cable Copper");
     const { bidId, sheetId } = await aBid();
     await homerun(bidId, sheetId, mc.id);
     const [entry] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
@@ -330,7 +330,7 @@ withDb("an MC run on a bid", () => {
   });
 
   it("an NM run is left as it was: no connector, no strap", async () => {
-    const nm = await cableType("12-2 NM-B");
+    const nm = await cableType("12/2 NM-B Copper");
     const { bidId, sheetId } = await aBid();
     await homerun(bidId, sheetId, nm.id);
     const [entry] = await caller().takeoffRunTypes.bridgeForBid({ bidId });
