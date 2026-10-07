@@ -3039,8 +3039,8 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       service, 50A generator inlet, detached-garage feeder, kitchen and bath
       20A circuits). Their part names are TODAY's; re-check each against the
       frozen catalog before seeding (the doc's check script pattern), and add
-      the four ‡ parts (concrete pole base, underground warning tape ×2 uses,
-      320A class meter base) to the catalog first or leave those starters
+      the three ‡ parts (concrete pole base, underground warning tape — used
+      twice — and a 320A class meter base) to the catalog first or leave those starters
       held. Hours stay not set.
 - [ ] **Starter assemblies: the 168 are IN THE SEED (Track B, 2026-10-06);
       160 are held until Track A's 0122 and 0123.**
