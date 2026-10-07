@@ -163,7 +163,14 @@ red run is not by itself a red suite:
   existing drop rule; routing factor ADDED to waste on material, never
   multiplied; overridable, starts unconfirmed. Overrides "no per-area /
   ceiling heights" — noted in vertical-drops-plan § 2 and overhaul § 6.
-  Four owner questions in § 11. Columns: todo.md "Homerun footage".
+  Four owner questions in § 11 — **ANSWERED 2026-10-06**: routing + waste
+  ADD (25%), waste material only; makeup at the panel end only; unconfirmed
+  homeruns COUNT with "+ N unconfirmed"; per sheet for now, BUT retail
+  sheets mix drop ceiling and open deck, so a one-tap homerun height
+  override (§ 6, `bid_panel_circuits.homerunCeilingInches`) and height areas
+  inside a sheet BEFORE BETA (todo.md, new table `bid_height_areas`). Not
+  built: the footage math waits for Track A's columns. Columns: todo.md
+  "Homerun footage".
 - **Homeruns, read-only** (2026-10-06, `@/lib/homeruns`, worker
   `homeruns`, `HomerunsView`: a "Homeruns N" toggle on a sheet that has
   any, labels beside each arrow). **UNCC draws NO homeruns** (every device

@@ -99,19 +99,34 @@ from `vertical-drops-plan.md` § 3, applied to a homerun's two ends:
   its drop down, not up.
 - **Panel end**: the `panel` height type (or the panel's own, if A gives
   panels a height later — not asked now).
-- **Ceiling** = the area's run height, through the chain run → **sheet** →
-  job → company. **Unset stays unset**: no ceiling, no vertical, said in
-  amber ("Ceiling height not set — no drops on homeruns"), exactly as the
-  drops gate already does. Never zero.
+- **Ceiling** = the first that is set, in this order: **this homerun's own
+  height** (§ 6) → the **height area** it leaves from (below, before beta)
+  → the **sheet** → the job → the company. **Unset stays unset**: no
+  ceiling, no vertical, said in amber ("Ceiling height not set — no drops on
+  homeruns"), exactly as the drops gate already does. Never zero.
 
-**Area = a sheet, first.** The per-sheet run height (A's 0108,
-`bid_pdf_sheets.distributionHeightInches`) is already queued and is a
-ceiling height per floor plan, which is the multi-storey case that made the
-owner approve it. So the per-area override needs no new area model: the
-method, average and minimum overrides go on the same sheet row (§ 9). A
-true sub-sheet area (a wing, a mezzanine) would be `bid_areas` with a
-region per sheet — **not proposed now**; `unitLabel` already groups scope by
-area in text, and two area models are worse than one.
+**Area = a sheet, first — DECIDED (owner, Q4, 2026-10-06).** The per-sheet
+run height (A's 0108, `bid_pdf_sheets.distributionHeightInches`) is already
+queued and is a ceiling height per floor plan. The method, average and
+minimum overrides go on the same sheet row (§ 9). The owner confirmed that
+"ceiling height per area" replaces the old "no per-area heights" notes —
+`vertical-drops-plan.md` § 2 and overhaul § 6 say so.
+
+**But one sheet often has two ceilings — owner, 2026-10-06:** "mixed
+ceilings on one sheet are common on my retail jobs (sales floor drop
+ceiling vs stockroom open to deck)." So, two things:
+
+1. **Now (with the footage build): a homerun's height is quick and obvious
+   to override** — § 6.
+2. **Before beta: height areas INSIDE a sheet.** The estimator draws a box
+   (or polygon) on the sheet — "Stockroom, open to deck, 18'-0"" — and every
+   homerun leaving a device inside it uses that height. A device in no area
+   follows the sheet. Two areas overlapping: the smaller one wins (a
+   stockroom drawn inside a sales floor). Columns for Track A in `todo.md`
+   (§ 9); the same areas later give count drops their height, which is why
+   they are their own table rather than a homerun field. `unitLabel` stays
+   what it is (scope grouping in text) — an area here is a height region,
+   not a scope label, and the two are not merged.
 
 ## 5. The routing factor — added, not multiplied
 
@@ -125,14 +140,14 @@ nothing").
 
 R and W **add**: +15% routing and +10% waste is +25%, never 1.15 × 1.10 =
 +26.5% — the same rule as job-condition modifiers (`modifiers` table
-comment). That is how this plan reads "added like other difficulty factors,
-not multiplied"; **owner to confirm** (Q1).
+comment). **DECIDED (owner, Q1, 2026-10-06): add, 15% + 10% = 25%, waste on
+material only.**
 
 **Waste stays material only**: W never enters the labor footage.
 **Makeup stays separate**: `makeupPanelInches` (starter 60 in = 5 ft) per
 conductor at the panel end, added after the percentages and never scaled by
-them. Device-end makeup is not added to a homerun (the device's own branch
-wiring carries it) — **owner to confirm** (Q2).
+them. **DECIDED (owner, Q2, 2026-10-06): makeup at the PANEL END only.**
+Box-end makeup stays with the device; a homerun never adds it.
 
 **Worked example** (to become the known-answer test): closest device 40 ft
 from the panel at right angles; receptacle at 18", ceiling 10'-0", panel
@@ -151,10 +166,20 @@ Average 25 ft instead: L = 25, the rest the same. Minimum 50 ft: L = 50.
 - **Confirm** without changing — one tap per row, and "Confirm all on this
   sheet" for the circuits whose method needed nothing guessed (Average, or
   Measured with the panel placed by a label).
-- **Do unconfirmed homeruns count?** Proposed: yes, in the total, with the
-  total saying "+ N homeruns unconfirmed" beside it — the "N not priced"
-  pattern (`shared/lineNotPriced.ts`), so nothing is silently left out and
-  nothing silently trusted. **Owner to confirm** (Q3).
+- **Unconfirmed homeruns COUNT — DECIDED (owner, Q3, 2026-10-06):** in the
+  total, with "+ N unconfirmed" beside it — the "N not priced" pattern
+  (`shared/lineNotPriced.ts`), so nothing is silently left out and nothing
+  silently trusted.
+- **The height, overridden in one tap — owner, 2026-10-06 ("make overriding
+  a homerun's height quick and obvious").** Every homerun row shows its
+  ceiling and where it came from, as a control, not a caption: "Ceiling
+  10'-0" · from the sheet ▾". Tapping it offers the heights already on this
+  job — the sheet's, each height area's, the job's — plus a typed one, so a
+  stockroom homerun on a drop-ceiling sheet is one tap ("18'-0" · typed").
+  The same control on a group of picked rows sets them all. It shares
+  `HeightFields` (CLAUDE.md: two places showing the same thing share the
+  component), with "follows the sheet" as its unset wording, never "not
+  set". Setting it confirms that homerun, like any override.
 - A re-read (a mark moved, a panel moved, the scale changed) re-computes an
   UNCONFIRMED homerun and leaves a confirmed or overridden one alone, but
   marks it "inputs changed since confirmed".
@@ -181,9 +206,11 @@ schedule says `#10` does not silently change the type — it is flagged
 `todo.md` § "Track A next migration batch" → "Homerun footage". In short:
 the method, average, minimum and routing factor on `bids`; the method,
 average and minimum overrides on `bid_pdf_sheets` (the area); the panel's
-spot on `bid_panels`; override + confirmed + leaving device on
-`bid_panel_circuits` (one homerun per circuit). Ceiling height per area is
-**already queued** (0108) and is not asked twice.
+spot on `bid_panels`; override + confirmed + leaving device + **own
+ceiling height** on `bid_panel_circuits` (one homerun per circuit). Ceiling
+height per sheet is **already queued** (0108) and is not asked twice.
+Height areas inside a sheet (before beta) are a new table,
+`bid_height_areas` — also in `todo.md`.
 
 ## 10. Build order (when told to build)
 
@@ -193,13 +220,25 @@ spot on `bid_panels`; override + confirmed + leaving device on
 3. Homerun rows on the Circuits panel: method, footage, confirm/override.
 4. Bid summary line and export; the bid line with its snapshot rules.
 
-## 11. Questions for the owner
+## 11. Questions for the owner — ANSWERED 2026-10-06
 
-1. **Q1** Routing and waste add (+25%), as § 5 reads it — right?
-2. **Q2** Makeup at the panel end only on a homerun, none at the device?
-3. **Q3** Unconfirmed homeruns counted in the total with "+ N unconfirmed"
-   beside it, or left out until confirmed?
-4. **Q4** Area = sheet for now (no sub-sheet areas) — enough?
+1. **Q1** Routing and waste add (+25%)? — **Yes: add, 15% + 10% = 25%,
+   waste on material only.** (§ 5)
+2. **Q2** Makeup at the panel end only? — **Yes: 5 ft per wire at the
+   panel; box-end makeup stays with the device.** (§ 5)
+3. **Q3** Unconfirmed homeruns counted? — **Yes: counted, with "+ N
+   unconfirmed" beside the total.** (§ 6)
+4. **Q4** Area = sheet for now? — **Yes, per sheet for now. But mixed
+   ceilings on one sheet are common on retail jobs (sales floor drop
+   ceiling vs stockroom open to deck), so: a homerun's height is quick and
+   obvious to override (§ 6), and height areas inside a sheet are a
+   BEFORE-BETA item (§ 4, todo.md).**
+5. "Ceiling height per area" **replaces** the old "no per-area heights"
+   notes — confirmed by the owner; the edits to `vertical-drops-plan.md`
+   and overhaul § 6 stand.
+
+**Still waiting:** the footage math is not built. It waits for Track A's
+columns (§ 9).
 
 ## 12. Test plan
 
@@ -208,6 +247,11 @@ spot on `bid_panels`; override + confirmed + leaving device on
   on fixtures shaped like their container).
 - No scale → no measured number; no ceiling → no vertical; never zero.
 - Area override beats bid; bid beats default; Average needs no panel spot.
+- Ceiling: homerun's own → height area → sheet → job → company; an empty
+  homerun height reads "follows the sheet", never "not set" and never 0.
+- A device inside two height areas takes the smaller one's height.
+- Makeup at the panel end only; unconfirmed homeruns in the total with the
+  "+ N unconfirmed" count beside it.
 - Routing and waste add; waste absent from labor; makeup unscaled.
 - A traced homerun suppresses the computed one for that circuit.
 - A confirmed homerun survives a moved mark; an unconfirmed one moves.
