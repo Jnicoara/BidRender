@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **A bid cannot print a price while drops are unpriced (branch
+  `c-homerun-footage`).** Drops whose material was never picked now count as
+  "not priced" on the bid itself: the totals read "+ 205 drops not priced",
+  the bid page says why and where to fix it, and the proposal shows "Price
+  pending" and will not print until they are priced. Also written: notes for
+  the patent attorney on exactly how homerun lengths are worked out today
+  (`references/homerun-patent-notes.md`).
+
 - **Looking at a sheet no longer changes its homerun numbers (branch
   `c-homerun-footage`).** Opening the Circuits panel used to re-point every
   unconfirmed homerun to whichever device was now closest, so the bid's

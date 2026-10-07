@@ -241,9 +241,53 @@ export function linePartsNotPriced(
  * from lines that are otherwise priced. Two numbers, not one, because they
  * are different things — "+ 2 lines, 3 parts not priced".
  */
-export type NotPricedTally = { lines: number; parts: number };
+export type NotPricedTally = {
+  lines: number;
+  parts: number;
+  /**
+   * Drops to counted devices NOT PRICED because their count has no drop
+   * material ("drop material not set", `GroupDrop.notPricedDrops`; owner,
+   * 2026-10-07: "a bid can never print a price while drops are missing").
+   * Not a line — they come from the takeoff — so `countNotPriced` cannot
+   * see them; the BID's loaders add them (`withDropsNotPriced`: bids.get,
+   * the proposal). Optional, absent = 0, ONLY so the many lines-only tallies
+   * (and Track B's tests building them) need no edit — the bid page and the
+   * print are pinned by `server/dropsNotPriced.test.ts` instead.
+   */
+  drops?: number;
+};
 
 export const NOTHING_NOT_PRICED: NotPricedTally = { lines: 0, parts: 0 };
+
+/**
+ * Whether a total leaves ANYTHING out. The one rule the print's "Price
+ * pending" reads, so a kind of gap counted in the tally cannot be forgotten
+ * by a caller that checked fields by hand.
+ *
+ * MERGE NOTE (Track C, 2026-10-07): local-dev has its own `tallyLeavesOut`
+ * (Track B, with `hours`). The merged one must read lines, parts, hours AND
+ * drops — `server/dropsNotPriced.test.ts` goes red if drops fall out.
+ */
+export function tallyLeavesOut(notPriced: NotPricedTally): boolean {
+  return (
+    notPriced.lines > 0 || notPriced.parts > 0 || (notPriced.drops ?? 0) > 0
+  );
+}
+
+/**
+ * A lines-only tally with the bid's unpriced drops added. With none, the
+ * tally comes back AS IT WAS — no `drops: 0` — so a bid with no takeoff gaps
+ * reads exactly like the lines-only tally every other surface builds (the
+ * dashboard card is compared to the bid screen field for field).
+ */
+export function withDropsNotPriced(
+  tally: NotPricedTally,
+  drops: number
+): NotPricedTally {
+  const add = Number.isFinite(drops) ? Math.max(0, Math.floor(drops)) : 0;
+  if (add === 0) return tally;
+  return { ...tally, drops: (tally.drops ?? 0) + add };
+}
 
 /**
  * The lines a total leaves something out of, by name, for a warning that has

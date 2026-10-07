@@ -34,7 +34,7 @@
 
 import { PROPOSAL_LAYOUTS, type ProposalLayout } from "../drizzle/schema";
 import { roundMoney } from "./pricing";
-import type { NotPricedTally } from "./lineNotPriced";
+import { tallyLeavesOut, type NotPricedTally } from "./lineNotPriced";
 import {
   groupScopeNotes,
   sectionAllowedInMode,
@@ -676,7 +676,8 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
   // which a client reads as a price.
   const noWork = mode === "full" && input.lines.length === 0;
   const pricePending =
-    noWork || (mode === "full" && (notPriced.lines > 0 || notPriced.parts > 0));
+    // Lines, parts AND drops with no material (owner, 2026-10-07).
+    noWork || (mode === "full" && tallyLeavesOut(notPriced));
 
   /**
    * A section appears when the user has not hidden it AND the mode allows it.

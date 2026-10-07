@@ -99,37 +99,46 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
 
   it("counts an assembly line whose whole cost is $0 as a LINE, and labor-only as missing material", () => {
     expect(
-      bidNotPricedCount([
-        line({}),
-        // $12.50 of labor and material "0": until 2026-10-05 this was "a
-        // priced one" and added nothing. Owner: labor with $0 material is
-        // never fully priced — its material counts once.
-        line({ breakdown: { directCost: 12.5 } }),
-        line({ qty: 0 }),
-      ])
+      bidNotPricedCount(
+        [
+          line({}),
+          // $12.50 of labor and material "0": until 2026-10-05 this was "a
+          // priced one" and added nothing. Owner: labor with $0 material is
+          // never fully priced — its material counts once.
+          line({ breakdown: { directCost: 12.5 } }),
+          line({ qty: 0 }),
+        ],
+        0
+      )
     ).toEqual({ lines: 1, parts: 1 });
   });
 
   it("counts a run-type line off an unpriced catalog row", () => {
     expect(
-      bidNotPricedCount([
-        line({
-          assemblyId: null,
-          takeoffRunTypeId: 3,
-          runMaterialRole: "raceway",
-          snapshotMaterialCost: "0",
-          breakdown: { directCost: 4 },
-        }),
-      ])
+      bidNotPricedCount(
+        [
+          line({
+            assemblyId: null,
+            takeoffRunTypeId: 3,
+            runMaterialRole: "raceway",
+            snapshotMaterialCost: "0",
+            breakdown: { directCost: 4 },
+          }),
+        ],
+        0
+      )
     ).toEqual({ lines: 1, parts: 0 });
   });
 
   it("counts the parts of a priced assembly line, and not of a $0 one", () => {
     expect(
-      bidNotPricedCount([
-        line({ unpricedParts: 2, breakdown: { directCost: 25 } }),
-        line({ unpricedParts: 2 }),
-      ])
+      bidNotPricedCount(
+        [
+          line({ unpricedParts: 2, breakdown: { directCost: 25 } }),
+          line({ unpricedParts: 2 }),
+        ],
+        0
+      )
     ).toEqual({ lines: 1, parts: 2 });
   });
 });
@@ -156,7 +165,7 @@ describe("lines with labor and no material (owner, 2026-10-05)", () => {
     ];
     expect(materialMissingLines(lines)).toBe(1);
     // The tally holds both kinds: 1 (missing) + 2 (parts).
-    expect(bidNotPricedCount(lines)).toEqual({ lines: 0, parts: 3 });
+    expect(bidNotPricedCount(lines, 0)).toEqual({ lines: 0, parts: 3 });
   });
 });
 
@@ -187,7 +196,7 @@ describe("lines whose assembly hours were not set (D1)", () => {
       // Nothing priced at all: a whole line, not counted here.
       line({ snapshotMaterialCost: "0", breakdown: { directCost: 0 } }),
     ];
-    const tally = bidNotPricedCount(lines);
+    const tally = bidNotPricedCount(lines, 0);
     expect(tally).toEqual({ lines: 1, parts: 3 });
     expect(hoursNotSetLines(lines)).toBe(2);
     // What is left for the "price the part" advice: the one real part.

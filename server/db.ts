@@ -13501,6 +13501,27 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
 }
 
 /**
+ * How many drops on this bid are NOT PRICED because their count has no drop
+ * material ("drop material not set"). The bid's half of the not-priced tally
+ * (`withDropsNotPriced`): read by `bids.get` and the proposal, so the bid
+ * page says it and a priced print is blocked (owner, 2026-10-07).
+ */
+export async function bidDropsNotPriced(
+  bidId: number,
+  userId: number
+): Promise<number> {
+  const bid = await getBidById(bidId, userId);
+  if (!bid) return 0;
+  const [heights, runs, scales] = await Promise.all([
+    heightContextForBid(bidId, userId, bid.distributionHeightInches),
+    getRunsForBid(bidId, userId),
+    getSheetScalesForBid(bidId, userId),
+  ]);
+  const drops = await loadGroupDrops(bidId, userId, heights, runs, scales);
+  return drops.reduce((n, d) => n + d.notPricedDrops, 0);
+}
+
+/**
  * Every counted group's DROPS on one bid (held-migrations plan § 3) — loaded
  * here, computed in shared/groupDrops.ts.
  *

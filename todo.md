@@ -273,10 +273,29 @@ Search those before asking for a height column.
       not set — N drops not priced" on its row, "N drops not priced — drop
       material not set on M counted items" on the Totals tab, and "NOT on this
       list: N drops …" in the materials list notes (`notPricedDrops`).
-- [ ] **Not on the BID page yet:** drops not priced for want of a material are
-      said on the Plans screen and the materials list, but the bid's own
-      "+ N not priced" counts bid LINES, and these drops are not a line.
-      Owner's call whether the bid page should say it too.
+- [x] **Decided 2026-10-07 (owner: YES), built on `c-homerun-footage`:** drops
+      with no material are in the bid's not-priced tally (`NotPricedTally.drops`,
+      `withDropsNotPriced`), so the totals read "+ N drops not priced", the
+      bid page says "N drops not priced — drop material not set", the
+      proposal says "Price pending" and Print is blocked (its dialog points
+      at the Plans screen when drops are the gap).
+- [ ] **FOR TRACK B — merge note for the not-priced check (small, on purpose).**
+      C's branch touched B-owned files: `shared/lineNotPriced.ts` (optional
+      `drops` on the tally, `tallyLeavesOut`, `withDropsNotPriced`),
+      `client/src/lib/notPricedTotal.ts` (suffix/headline say drops;
+      `bidNotPricedCount(lines, dropsNotPriced)` — second argument REQUIRED),
+      `shared/proposal.ts` (pricePending via `tallyLeavesOut`), `BidsPage.tsx`
+      (the strip), `ProposalPage.tsx` (dialog wording), and one-token edits
+      in `notPricedTotal.test.ts` / `dashboardFollowsDrawing.test.ts`.
+      **local-dev already has its own `tallyLeavesOut` (with `hours`): the
+      merged one must read lines, parts, hours AND drops** —
+      `server/dropsNotPriced.test.ts` goes red if drops fall out.
+- [ ] **Drops not priced are NOT in analytics or the dashboard cards** — those
+      list many bids and do not load each one's takeoff. A bid card can still
+      read complete while its bid page says drops are not priced. Owner's call.
+- [ ] **Patent review (US 11,120,171):** `references/homerun-patent-notes.md`
+      for the attorney — plan only. Waiting on the owner/attorney before
+      changing anything (options A–C there).
 
 **Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
 `references/homerun-footage-plan.md`; nothing computes footage yet). Owner:

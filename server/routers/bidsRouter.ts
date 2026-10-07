@@ -848,6 +848,17 @@ export const bidsRouter = router({
          */
         fromPlans: await planAttentionFor(bid.id, ctx.scope.dataUserId, lines),
         /**
+         * Drops NOT PRICED for want of a drop material (owner, 2026-10-07).
+         * The bid page adds this to its not-priced tally
+         * (`withDropsNotPriced`), the same way the proposal does, so the
+         * totals say it and a priced print is blocked. Returned with the bid
+         * so every mutation that refreshes `bids.get` refreshes it.
+         */
+        dropsNotPriced: await db.bidDropsNotPriced(
+          bid.id,
+          ctx.scope.dataUserId
+        ),
+        /**
          * Assembly lines frozen at a labor rate their role no longer has —
          * "$68/hr where Journeyman is $43/hr now". Flagged, never changed:
          * the freeze is by design (R4). Only on a bid still being priced; on

@@ -497,6 +497,7 @@ export default function BidsPage({
     incomplete,
     problems,
     staleRates,
+    dropsNotPriced,
   } = detailQuery.data;
 
   /**
@@ -538,7 +539,7 @@ export default function BidsPage({
    * lines that are otherwise priced (0087). Through the same rule the server's
    * cards use, so this screen and the search result for it cannot disagree.
    */
-  const notPricedTally = bidNotPricedCount(lines);
+  const notPricedTally = bidNotPricedCount(lines, dropsNotPriced);
   /** "Homeruns: Measured, +15% routing · 12 homeruns", when there are any. */
   const homerunLine = homeruns?.rows.length
     ? {
@@ -1443,6 +1444,31 @@ export default function BidsPage({
                 hand-priced line can take a typed price and a line sent from
                 the plans froze its price when it was sent.
               */}
+              {/*
+                DROPS NOT PRICED (owner, 2026-10-07): a count whose drops have
+                no material leaves them out of every figure here, and they are
+                not lines, so the strip above cannot list them. Said under the
+                totals they are missing from, with where to fix it; they are
+                in `notPricedTally` too, so the totals carry "+ N drops not
+                priced" and a priced print is blocked until they are priced.
+              */}
+              {dropsNotPriced > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {dropsNotPriced} drop{dropsNotPriced === 1 ? "" : "s"} not
+                      priced — drop material not set
+                    </span>{" "}
+                    — the totals above leave{" "}
+                    {dropsNotPriced === 1 ? "it" : "them"} out, and a priced
+                    proposal cannot print until{" "}
+                    {dropsNotPriced === 1 ? "it is" : "they are"} priced. Pick
+                    what each drop is made of on its count, on the{" "}
+                    <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
               {notPriced.length > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />

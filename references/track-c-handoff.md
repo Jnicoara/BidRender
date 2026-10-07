@@ -295,6 +295,26 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**Drops not priced are in the bid's not-priced check — DONE on
+`c-homerun-footage` (2026-10-07, owner YES).** `NotPricedTally.drops`
+(optional, so B's lines-only tallies need no edit), `withDropsNotPriced`
+(adds nothing when 0), `tallyLeavesOut` (the print's gate),
+`db.bidDropsNotPriced` → `bids.get.dropsNotPriced` and the proposal's tally.
+`bidNotPricedCount(lines, dropsNotPriced)` takes it as a REQUIRED argument.
+Seen at 1180x820 touch on E111 (a $100 line added for the check, removed
+after): totals "$100.00 + 205 drops not priced", strip "205 drops not priced
+— drop material not set …", proposal "Price pending", Print blocked:
+"205 drops are not priced … until they are priced on the Plans screen".
+**Merge hazard for A/B:** local-dev's own `tallyLeavesOut` (with `hours`)
+must keep drops — `server/dropsNotPriced.test.ts` guards it (todo.md).
+Not in analytics or dashboard cards (todo, owner's call).
+
+**Patent notes — PLAN ONLY:** `references/homerun-patent-notes.md` for the
+attorney (US 11,120,171): how each method gets its length (right-angle
+distance, no route stored, one dashed display line when a circuit is
+picked), nothing like avoid-areas or tray-following, and options A (drop the
+display line), B (user traces every homerun), C (typed lengths only).
+
 **Viewing never changes a saved number; drop material not set is said; run
 names say "No drop here" — DONE on `c-homerun-footage` (2026-10-07).**
 
