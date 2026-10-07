@@ -204,9 +204,10 @@ const REGISTRY: Record<string, Entry> = {
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
   "bids.homerunRunTypeId": {
-    kind: "unreviewed",
-    since: "2026-10-07",
-    why: "Migration 0127 (Track C's homerun footage): the run type a computed homerun is made of. NOTHING reads or writes it yet. Run types fork — the 2026-09-20 instance of this bug was run types — so C's footage code must read it through the run-type resolver before it prices a single homerun.",
+    kind: "resolver",
+    resolver: "resolveRunType",
+    readBy: "server/runVerticals.ts",
+    note: "Migration 0127 (Track C's homerun footage). Registered 'unreviewed' by Track A before its code existed; resolved 2026-10-07 by that code: server/homerunsCore.ts reaches the type ONLY through `HeightContext.dropTypeFor`, which follows the stored id through resolveRunType — so a homerun on a forked shipped type prices from the fork, as a traced run and a count drop do. The bid line records the stored id, like takeoff_runs.runTypeId.",
   },
   "materials.parentId": {
     kind: "unreviewed",
@@ -397,7 +398,9 @@ describe("every stored id into a forkable row is accounted for", () => {
     // takeoff_groups.materialId and .laborRateId reviewed and exempt.
     // 6 → 7 on 2026-10-07 (Track A): bids.homerunRunTypeId (0127), added
     // before its code exists; its entry says what C's footage code owes.
-    expect(unreviewed.length).toBeLessThanOrEqual(7);
+    // 7 → 6 on 2026-10-07 (Track C): that code reads it through
+    // resolveRunType, so it is a resolver now.
+    expect(unreviewed.length).toBeLessThanOrEqual(6);
   });
 
   it("unused group labor rate: nothing on the server reads takeoff_groups.laborRateId", () => {

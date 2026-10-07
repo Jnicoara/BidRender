@@ -43,6 +43,7 @@ import {
 } from "./runVerticals";
 import type { ExtrasRow } from "../shared/runExtras";
 import { dropsFootage, type MarkDropEntry } from "../shared/groupDrops";
+import type { HomerunEntry } from "./homerunsCore";
 import type { TraceMode, WireCircuits } from "../shared/traceMode";
 
 export type RunTypeFootageRow = {
@@ -90,6 +91,15 @@ export type RunTypeFootageRow = {
    */
   markDropFeet: number;
   markDropCount: number;
+  /**
+   * COMPUTED HOMERUNS on this type (homerun-footage-plan.md § 10): their run
+   * + drops before routing, waste and makeup — already INSIDE the figures
+   * above — how many, and how many nobody has confirmed. Unconfirmed ones
+   * count (owner Q3); the screen says "+ N unconfirmed".
+   */
+  homerunFeet: number;
+  homerunCount: number;
+  homerunUnconfirmedCount: number;
   /** Runs of this type that could not be measured, so are NOT in the above. */
   unmeasurableCount: number;
   /** Runs of this type nobody has answered the branch question for. */
@@ -233,6 +243,13 @@ export function groupRunFootage(input: {
    * `[]` where a caller genuinely has none.
    */
   markDrops: readonly MarkDropEntry[];
+  /**
+   * COMPUTED HOMERUNS (homerun-footage-plan.md § 10 step 4), on the bid's
+   * homerun run type. REQUIRED for the same reason as `markDrops`; `[]`
+   * where a caller has none. Unconfirmed ones COUNT (owner Q3) and are
+   * tallied on the row so a screen can say "+ N unconfirmed".
+   */
+  homeruns: readonly HomerunEntry[];
 }): Map<number, RunTypeFootageRow> {
   const byType = new Map<number, RunTypeFootageRow>();
 
@@ -456,7 +473,36 @@ export function groupRunFootage(input: {
     }
   }
 
+  for (const entry of input.homeruns) {
+    const f = entry.line;
+    const row = rowFor(byType, entry.runTypeId, f.pathType);
+    row.homerunFeet += f.homerunFeet;
+    row.homerunCount += 1;
+    if (!entry.confirmed) row.homerunUnconfirmedCount += 1;
+    row.conduitBoughtFeet += f.conduitBoughtFeet;
+    row.conduitInstalledFeet += f.conduitInstalledFeet;
+    row.cableBoughtFeet += f.cableBoughtFeet;
+    row.cableInstalledFeet += f.cableInstalledFeet;
+    row.groundBoughtFeet += f.groundBoughtFeet;
+    row.groundInstalledFeet += f.groundInstalledFeet;
+    row.insulatedBoughtFeet += Math.max(
+      0,
+      f.wireBoughtFeet - f.groundBoughtFeet
+    );
+    row.insulatedInstalledFeet += Math.max(
+      0,
+      f.wireInstalledFeet - f.groundInstalledFeet
+    );
+    row.makeupFeet += f.makeupFeet;
+    if (f.pathType === "cable") row.racewayExtraFeet += f.wireExtraFeet;
+    else {
+      row.wireExtraFeet += f.wireExtraFeet;
+      row.racewayExtraFeet += f.conduitExtraFeet;
+    }
+  }
+
   for (const row of Array.from(byType.values())) {
+    row.homerunFeet = round2(row.homerunFeet);
     row.markDropFeet = round2(row.markDropFeet);
     row.conduitBoughtFeet = round2(row.conduitBoughtFeet);
     row.conduitInstalledFeet = round2(row.conduitInstalledFeet);
@@ -505,6 +551,9 @@ function rowFor(
       noExtraCount: 0,
       markDropFeet: 0,
       markDropCount: 0,
+      homerunFeet: 0,
+      homerunCount: 0,
+      homerunUnconfirmedCount: 0,
       unmeasurableCount: 0,
       unansweredCount: 0,
       branchCount: 0,

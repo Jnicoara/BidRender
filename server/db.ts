@@ -190,7 +190,16 @@ import {
   type BidMountingHeight,
   type InsertTakeoffMountingHeight,
   type RunMaterialRole,
+  bidPanels,
+  bidPanelCircuits,
+  bidHeightAreas,
 } from "../drizzle/schema";
+import {
+  bidHomeruns,
+  type BidHomeruns,
+  type HomerunMark,
+  type HomerunSheet,
+} from "./homerunsCore";
 import { ENV } from "./_core/env";
 import { sessionCutoff } from "../shared/sessionValidity";
 import { FILE_SOURCES } from "./backup/collectFiles";
@@ -5544,6 +5553,9 @@ async function withTracedFootage(
     markDrops: markDropEntries(
       await loadGroupDrops(bidId, bid.userId, heights, runs, scales)
     ),
+    // Computed homeruns land on the bid's homerun type (homerun plan § 10).
+    homeruns:
+      (await loadBidHomeruns(bidId, bid.userId, heights))?.entries ?? [],
   });
   // Only when a fitting line is actually on the bid: it costs three queries.
   const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
@@ -13808,4 +13820,433 @@ export async function countPricingProblemReports(): Promise<{
     })
     .from(pricingProblemReports);
   return { open: Number(row?.open ?? 0), resolved: Number(row?.resolved ?? 0) };
+}
+
+// ─── Homeruns (homerun-footage-plan.md § 10, migrations 0125–0130) ──────────
+
+/** A bid's panels — one row per panel a circuit tag named. */
+export async function getHomerunPanels(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(bidPanels)
+    .where(and(eq(bidPanels.bidId, bidId), eq(bidPanels.userId, userId)));
+}
+
+/** Every circuit of every panel on a bid. */
+export async function getHomerunCircuits(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ circuit: bidPanelCircuits })
+    .from(bidPanelCircuits)
+    .innerJoin(bidPanels, eq(bidPanelCircuits.panelId, bidPanels.id))
+    .where(
+      and(eq(bidPanels.bidId, bidId), eq(bidPanelCircuits.userId, userId))
+    );
+  return rows.map(r => r.circuit);
+}
+
+/**
+ * The panel named `name` on this bid, made if it is not there. A panel a tag
+ * names with no schedule behind it is Track A's "typed in" case (0125).
+ * Matched ignoring case: "2b" on one sheet is "2B" on another.
+ */
+export async function ensureHomerunPanel(
+  bidId: number,
+  userId: number,
+  name: string
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = (await getHomerunPanels(bidId, userId)).find(
+    p => (p.name ?? "").toUpperCase() === name.toUpperCase()
+  );
+  if (existing) return existing.id;
+  const [result] = await db.insert(bidPanels).values({ bidId, userId, name });
+  return result.insertId;
+}
+
+/** Where a panel sits on the plan, or NULL to take it off. */
+export async function setHomerunPanelSpot(
+  panelId: number,
+  userId: number,
+  spot: { sheetId: number; x: number; y: number } | null
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(bidPanels)
+    .set(
+      spot
+        ? {
+            planSheetId: spot.sheetId,
+            planX: spot.x.toFixed(2),
+            planY: spot.y.toFixed(2),
+          }
+        : { planSheetId: null, planX: null, planY: null }
+    )
+    .where(and(eq(bidPanels.id, panelId), eq(bidPanels.userId, userId)));
+}
+
+/**
+ * Circuit `circuitNumber` of a panel, made if missing, and — WHILE IT IS
+ * UNCONFIRMED — pointed at `leavingStampId`, the device the browser just read
+ * as closest. A confirmed homerun is never re-pointed (plan § 6): the guard
+ * is in the WHERE, so no caller can forget it.
+ */
+export async function syncHomerunCircuit(
+  panelId: number,
+  userId: number,
+  circuitNumber: number,
+  poles: number,
+  leavingStampId: number | null
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [existing] = await db
+    .select({ id: bidPanelCircuits.id })
+    .from(bidPanelCircuits)
+    .where(
+      and(
+        eq(bidPanelCircuits.panelId, panelId),
+        eq(bidPanelCircuits.userId, userId),
+        eq(bidPanelCircuits.circuitNumber, circuitNumber)
+      )
+    )
+    .limit(1);
+  if (!existing) {
+    const [result] = await db.insert(bidPanelCircuits).values({
+      panelId,
+      userId,
+      circuitNumber,
+      poles,
+      homerunFromStampId: leavingStampId,
+    });
+    return result.insertId;
+  }
+  await db
+    .update(bidPanelCircuits)
+    .set({ homerunFromStampId: leavingStampId, poles })
+    .where(
+      and(
+        eq(bidPanelCircuits.id, existing.id),
+        eq(bidPanelCircuits.userId, userId),
+        isNull(bidPanelCircuits.homerunConfirmedAt)
+      )
+    );
+  return existing.id;
+}
+
+/** A homerun's own settings. Omitted leaves a field; NULL clears it. */
+export async function updateHomerunCircuit(
+  circuitId: number,
+  userId: number,
+  patch: {
+    homerunOverrideFt?: number | null;
+    homerunFromStampId?: number | null;
+    homerunConfirmedAt?: Date | null;
+    homerunCeilingInches?: number | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const set: Partial<typeof bidPanelCircuits.$inferInsert> = {};
+  if (patch.homerunOverrideFt !== undefined)
+    set.homerunOverrideFt =
+      patch.homerunOverrideFt === null
+        ? null
+        : patch.homerunOverrideFt.toFixed(2);
+  if (patch.homerunFromStampId !== undefined)
+    set.homerunFromStampId = patch.homerunFromStampId;
+  if (patch.homerunConfirmedAt !== undefined)
+    set.homerunConfirmedAt = patch.homerunConfirmedAt;
+  if (patch.homerunCeilingInches !== undefined)
+    set.homerunCeilingInches = patch.homerunCeilingInches;
+  if (Object.keys(set).length === 0) return;
+  await db
+    .update(bidPanelCircuits)
+    .set(set)
+    .where(
+      and(
+        eq(bidPanelCircuits.id, circuitId),
+        eq(bidPanelCircuits.userId, userId)
+      )
+    );
+}
+
+/** A circuit and the bid it is on, or null if not this company's. */
+export async function getHomerunCircuit(circuitId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select({ circuit: bidPanelCircuits, bidId: bidPanels.bidId })
+    .from(bidPanelCircuits)
+    .innerJoin(bidPanels, eq(bidPanelCircuits.panelId, bidPanels.id))
+    .where(
+      and(
+        eq(bidPanelCircuits.id, circuitId),
+        eq(bidPanelCircuits.userId, userId)
+      )
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** Marks by id, this company's only — a device a homerun may leave from. */
+export async function getStampsByIds(ids: readonly number[], userId: number) {
+  const db = await getDb();
+  if (!db || ids.length === 0) return [];
+  return db
+    .select({
+      id: takeoffStamps.id,
+      bidId: takeoffStamps.bidId,
+      sheetId: takeoffStamps.sheetId,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(inArray(takeoffStamps.id, [...ids]), eq(takeoffStamps.userId, userId))
+    );
+}
+
+/** The bid's homerun settings (0127). Omitted leaves a field; NULL clears. */
+export async function setBidHomerunSettings(
+  bidId: number,
+  userId: number,
+  patch: {
+    homerunMethod?: string | null;
+    homerunAverageFt?: number | null;
+    homerunMinimumFt?: number | null;
+    homerunRoutingPct?: number | null;
+    homerunRunTypeId?: number | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const dec = (v: number | null, places: number) =>
+    v === null ? null : v.toFixed(places);
+  const set: Partial<typeof bids.$inferInsert> = {};
+  if (patch.homerunMethod !== undefined)
+    set.homerunMethod = patch.homerunMethod;
+  if (patch.homerunAverageFt !== undefined)
+    set.homerunAverageFt = dec(patch.homerunAverageFt, 2);
+  if (patch.homerunMinimumFt !== undefined)
+    set.homerunMinimumFt = dec(patch.homerunMinimumFt, 2);
+  if (patch.homerunRoutingPct !== undefined)
+    set.homerunRoutingPct = dec(patch.homerunRoutingPct, 4);
+  if (patch.homerunRunTypeId !== undefined)
+    set.homerunRunTypeId = patch.homerunRunTypeId;
+  if (Object.keys(set).length === 0) return;
+  await db
+    .update(bids)
+    .set(set)
+    .where(and(eq(bids.id, bidId), eq(bids.userId, userId)));
+}
+
+/** An area's (a sheet's) override of the bid's method. NULL follows the bid. */
+export async function setSheetHomerunMethod(
+  sheetId: number,
+  userId: number,
+  patch: {
+    homerunMethod?: string | null;
+    homerunAverageFt?: number | null;
+    homerunMinimumFt?: number | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const set: Partial<typeof bidPdfSheets.$inferInsert> = {};
+  if (patch.homerunMethod !== undefined)
+    set.homerunMethod = patch.homerunMethod;
+  if (patch.homerunAverageFt !== undefined)
+    set.homerunAverageFt =
+      patch.homerunAverageFt === null
+        ? null
+        : patch.homerunAverageFt.toFixed(2);
+  if (patch.homerunMinimumFt !== undefined)
+    set.homerunMinimumFt =
+      patch.homerunMinimumFt === null
+        ? null
+        : patch.homerunMinimumFt.toFixed(2);
+  if (Object.keys(set).length === 0) return;
+  await db
+    .update(bidPdfSheets)
+    .set(set)
+    .where(and(eq(bidPdfSheets.id, sheetId), eq(bidPdfSheets.userId, userId)));
+}
+
+const numOrNull = (v: string | number | null): number | null =>
+  v === null ? null : Number(v);
+
+/**
+ * Every homerun on a bid, computed (`bidHomeruns`). Loaded by BOTH footage
+ * paths — the bid line on read, and the bridge — so they cannot differ.
+ * One query, and nothing more, when the bid has no circuits.
+ */
+export async function loadBidHomeruns(
+  bidId: number,
+  userId: number,
+  heights: HeightContext
+): Promise<BidHomeruns | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const circuits = await getHomerunCircuits(bidId, userId);
+  if (circuits.length === 0) return null;
+  const bid = await getBidById(bidId, userId);
+  if (!bid) return null;
+
+  const stampIds = circuits
+    .map(c => c.homerunFromStampId)
+    .filter((id): id is number => id !== null);
+  const [panels, sheetRows, stampRows, tracedRows, areaRows] =
+    await Promise.all([
+      getHomerunPanels(bidId, userId),
+      db
+        .select({
+          id: bidPdfSheets.id,
+          scaleRatio: bidPdfSheets.scaleRatio,
+          scaleSource: bidPdfSheets.scaleSource,
+          notToScale: bidPdfSheets.notToScale,
+          distributionHeightInches: bidPdfSheets.distributionHeightInches,
+          homerunMethod: bidPdfSheets.homerunMethod,
+          homerunAverageFt: bidPdfSheets.homerunAverageFt,
+          homerunMinimumFt: bidPdfSheets.homerunMinimumFt,
+        })
+        .from(bidPdfSheets)
+        .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
+        .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId))),
+      stampIds.length === 0
+        ? Promise.resolve([])
+        : db
+            .select({
+              id: takeoffStamps.id,
+              sheetId: takeoffStamps.sheetId,
+              x: takeoffStamps.x,
+              y: takeoffStamps.y,
+              mountHeightInches: takeoffStamps.mountHeightInches,
+              mountHeightSource: takeoffStamps.mountHeightSource,
+              dropKind: takeoffGroups.dropKind,
+              dropHeightInches: takeoffGroups.dropHeightInches,
+            })
+            .from(takeoffStamps)
+            .leftJoin(
+              takeoffGroups,
+              eq(takeoffStamps.groupId, takeoffGroups.id)
+            )
+            .where(
+              and(
+                inArray(takeoffStamps.id, stampIds),
+                eq(takeoffStamps.userId, userId),
+                eq(takeoffStamps.bidId, bidId)
+              )
+            ),
+      // A TRACED homerun replaces the computed one (plan § 2). A suggestion
+      // is nobody's trace yet.
+      db
+        .select({ panelCircuitId: takeoffRunCircuits.panelCircuitId })
+        .from(takeoffRunCircuits)
+        .innerJoin(takeoffRuns, eq(takeoffRunCircuits.runId, takeoffRuns.id))
+        .where(
+          and(
+            eq(takeoffRuns.bidId, bidId),
+            eq(takeoffRunCircuits.userId, userId),
+            eq(takeoffRuns.isSuggestion, false),
+            isNotNull(takeoffRunCircuits.panelCircuitId)
+          )
+        ),
+      db
+        .select()
+        .from(bidHeightAreas)
+        .where(
+          and(
+            eq(bidHeightAreas.bidId, bidId),
+            eq(bidHeightAreas.userId, userId)
+          )
+        ),
+    ]);
+
+  const sheets = new Map<number, HomerunSheet>(
+    sheetRows.map(s => [
+      s.id,
+      {
+        id: s.id,
+        scaleRatio: numOrNull(s.scaleRatio),
+        // The same rule `loadGroupDrops` uses for a sheet's ratio.
+        measurable: !(s.notToScale && s.scaleSource !== "manual"),
+        distributionHeightInches: s.distributionHeightInches,
+        homerunMethod: s.homerunMethod,
+        homerunAverageFt: numOrNull(s.homerunAverageFt),
+        homerunMinimumFt: numOrNull(s.homerunMinimumFt),
+      },
+    ])
+  );
+  const marks = new Map<number, HomerunMark>(
+    stampRows.map(s => [
+      s.id,
+      {
+        id: s.id,
+        sheetId: s.sheetId,
+        x: Number(s.x),
+        y: Number(s.y),
+        height: {
+          inches: numOrNull(s.mountHeightInches),
+          source: s.mountHeightSource,
+        },
+        countKind: s.dropKind ?? null,
+        countInches: numOrNull(s.dropHeightInches ?? null),
+      },
+    ])
+  );
+
+  return bidHomeruns({
+    bid: {
+      homerunMethod: bid.homerunMethod,
+      homerunAverageFt: numOrNull(bid.homerunAverageFt),
+      homerunMinimumFt: numOrNull(bid.homerunMinimumFt),
+      homerunRoutingPct: numOrNull(bid.homerunRoutingPct),
+      homerunRunTypeId: bid.homerunRunTypeId,
+    },
+    sheets,
+    panels: panels.map(p => ({
+      id: p.id,
+      name: p.name,
+      planSheetId: p.planSheetId,
+      planX: numOrNull(p.planX),
+      planY: numOrNull(p.planY),
+    })),
+    circuits: circuits.map(c => ({
+      id: c.id,
+      panelId: c.panelId,
+      circuitNumber: c.circuitNumber,
+      poles: c.poles,
+      homerunOverrideFt: numOrNull(c.homerunOverrideFt),
+      homerunFromStampId: c.homerunFromStampId,
+      homerunConfirmedAt: c.homerunConfirmedAt,
+      homerunCeilingInches: c.homerunCeilingInches,
+    })),
+    marks,
+    tracedCircuitIds: new Set(
+      tracedRows
+        .map(r => r.panelCircuitId)
+        .filter((id): id is number => id !== null)
+    ),
+    // An area with no height yet follows the sheet: no area at all here.
+    areas: areaRows.flatMap(a =>
+      a.distributionHeightInches === null
+        ? []
+        : [
+            {
+              id: a.id,
+              sheetId: a.sheetId,
+              ceilingInches: a.distributionHeightInches,
+              outline: (a.region as [number, number][]).map(([x, y]) => ({
+                x,
+                y,
+              })),
+            },
+          ]
+    ),
+    heights,
+  });
 }

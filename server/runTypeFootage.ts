@@ -51,13 +51,18 @@ export async function loadRunFootageInput(
   const markDrops = markDropEntries(
     await db.loadGroupDrops(bidId, userId, heights, runs, scales)
   );
-  if (runs.length === 0 && markDrops.length === 0) return null;
+  // Homeruns too: a bid priced by homeruns alone has no traced run either.
+  const homeruns =
+    (await db.loadBidHomeruns(bidId, userId, heights))?.entries ?? [];
+  if (runs.length === 0 && markDrops.length === 0 && homeruns.length === 0)
+    return null;
 
   // A quantity trace's wire comes from its type (D21).
   const circuitsByRun = await db.getWireCircuitsForRuns(runs, userId);
 
   return {
     markDrops,
+    homeruns,
     runs,
     circuitsByRun,
     scales,

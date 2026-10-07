@@ -38,7 +38,24 @@ type Pt = { x: number; y: number };
 
 // ── Method ─────────────────────────────────────────────────────────────────
 
-export type HomerunMethod = "measured" | "average" | "measured-minimum";
+/** The stored values of `bids.homerunMethod` / `bid_pdf_sheets.homerunMethod` (0127, 0128). */
+export const HOMERUN_METHODS = ["measured", "average", "measuredMin"] as const;
+export type HomerunMethod = (typeof HOMERUN_METHODS)[number];
+
+/** A stored value, or NULL for anything this build does not know. */
+export function parseHomerunMethod(
+  raw: string | null | undefined
+): HomerunMethod | null {
+  return (HOMERUN_METHODS as readonly string[]).includes(raw ?? "")
+    ? (raw as HomerunMethod)
+    : null;
+}
+
+export const HOMERUN_METHOD_LABELS: Record<HomerunMethod, string> = {
+  measured: "Measured",
+  average: "Average",
+  measuredMin: "Measured with a minimum",
+};
 
 /** The default when neither the area nor the bid says. */
 export const DEFAULT_HOMERUN_METHOD: HomerunMethod = "measured";
@@ -178,8 +195,11 @@ export type HomerunDevice = {
   id: number;
   x: number;
   y: number;
-  /** Height-type key, for the drop rule: "receptacle", "floor-box", … */
-  kind: string;
+  /**
+   * Height-type key, for the drop rule: "receptacle", "floor-box", … NULL =
+   * the count never said what it is: the up-drop is "no kind", never guessed.
+   */
+  kind: string | null;
   /** Through `resolveDeviceHeight`. NULL = never set anywhere. */
   heightInches: number | null;
 };
@@ -342,7 +362,7 @@ export function homerunFootage(input: HomerunInput): HomerunFootage {
         return { state: "refused", reason: "no-scale", confirmed };
       measuredFt = inchesToFeet(inches);
       runFt = measuredFt;
-      if (method === "measured-minimum") {
+      if (method === "measuredMin") {
         if (input.method.minimumFt === null)
           return { state: "refused", reason: "no-minimum", confirmed };
         if (measuredFt < input.method.minimumFt) {
@@ -469,6 +489,104 @@ export function homerunTotals(
     else totals.wireFt += h.wireFt;
   }
   return totals;
+}
+
+/**
+ * ONE homerun as a run-type line reads it: installed and bought feet per
+ * role, the same split every traced run and count drop lands in
+ * (`server/runTypeFootageCore.ts`).
+ *
+ * ── Installed = what is put in; bought = installed + waste ────────────────
+ * The owner's Q5 (2026-09-28) for every footage line: material is BOUGHT
+ * footage, labour is INSTALLED footage, and makeup is installed work. So:
+ *
+ *   routed     = (L + V) × (1 + routing)    — routing is real route, so
+ *                                             it is installed, on labour too
+ *   conduit    installed routed, bought routed + (L + V) × conduit extra
+ *   wire/wire  installed routed + makeup,  bought + (L + V) × wire extra
+ *   cable      the cable is the wire: one tail of makeup, wire extra (Q3)
+ *
+ * Plan § 5 wrote labour as (L + V) × (1 + R) with no makeup. That is the
+ * conduit's labour; for WIRE it would have been the only footage line on a
+ * bid whose labour left the makeup out, so wire follows Q5 instead —
+ * recorded in homerun-footage-plan.md § 10.
+ */
+export type HomerunLineFootage = {
+  pathType: "conduit" | "cable";
+  /** L + V, before anything is added — what "Homeruns" shows apart. */
+  homerunFeet: number;
+  conduitInstalledFeet: number;
+  conduitBoughtFeet: number;
+  cableInstalledFeet: number;
+  cableBoughtFeet: number;
+  /** Every wire, ground included — as `DropFootage` counts it. */
+  wireInstalledFeet: number;
+  wireBoughtFeet: number;
+  groundInstalledFeet: number;
+  groundBoughtFeet: number;
+  routingFeet: number;
+  conduitExtraFeet: number;
+  wireExtraFeet: number;
+  makeupFeet: number;
+  /** A conduit homerun whose type has no conductor count: no wire on it. */
+  wireNotCounted: boolean;
+};
+
+export function homerunLineFootage(
+  h: Extract<HomerunFootage, { state: "computed" }>,
+  input: Pick<
+    HomerunInput,
+    | "routingPct"
+    | "wireExtraPct"
+    | "conduitExtraPct"
+    | "conductorCount"
+    | "groundCount"
+  >
+): HomerunLineFootage {
+  const base = h.pieces.installedFt;
+  const routed = base * (1 + input.routingPct);
+  const makeup = h.pieces.makeupFt;
+  const wireWaste = base * input.wireExtraPct;
+  if (input.conduitExtraPct === null) {
+    return {
+      pathType: "cable",
+      homerunFeet: base,
+      conduitInstalledFeet: 0,
+      conduitBoughtFeet: 0,
+      cableInstalledFeet: routed + makeup,
+      cableBoughtFeet: routed + makeup + wireWaste,
+      wireInstalledFeet: 0,
+      wireBoughtFeet: 0,
+      groundInstalledFeet: 0,
+      groundBoughtFeet: 0,
+      routingFeet: routed - base,
+      conduitExtraFeet: 0,
+      wireExtraFeet: wireWaste,
+      makeupFeet: makeup,
+      wireNotCounted: false,
+    };
+  }
+  const grounds = input.groundCount ?? 0;
+  const wires =
+    input.conductorCount === null ? 0 : input.conductorCount + grounds;
+  const groundWires = input.conductorCount === null ? 0 : grounds;
+  return {
+    pathType: "conduit",
+    homerunFeet: base,
+    conduitInstalledFeet: routed,
+    conduitBoughtFeet: routed + base * input.conduitExtraPct,
+    cableInstalledFeet: 0,
+    cableBoughtFeet: 0,
+    wireInstalledFeet: wires * (routed + makeup),
+    wireBoughtFeet: wires * (routed + makeup + wireWaste),
+    groundInstalledFeet: groundWires * (routed + makeup),
+    groundBoughtFeet: groundWires * (routed + makeup + wireWaste),
+    routingFeet: routed - base,
+    conduitExtraFeet: base * input.conduitExtraPct,
+    wireExtraFeet: wires * wireWaste,
+    makeupFeet: wires * makeup,
+    wireNotCounted: input.conductorCount === null,
+  };
 }
 
 /** "+ 3 unconfirmed", or nothing when all are confirmed. */

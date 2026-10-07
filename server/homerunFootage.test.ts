@@ -99,7 +99,7 @@ describe("the plan's § 5 worked example, all three methods", () => {
   it("Measured with a minimum of 50 ft: L = 50", () => {
     const h = computed(
       homerunFootage(
-        base({ method: method("measured-minimum", { minimumFt: 50 }) })
+        base({ method: method("measuredMin", { minimumFt: 50 }) })
       )
     );
     expect(h.pieces.measuredFt).toBeCloseTo(40, 3);
@@ -110,7 +110,7 @@ describe("the plan's § 5 worked example, all three methods", () => {
   it("a minimum below the measured length changes nothing", () => {
     const h = computed(
       homerunFootage(
-        base({ method: method("measured-minimum", { minimumFt: 30 }) })
+        base({ method: method("measuredMin", { minimumFt: 30 }) })
       )
     );
     expect(h.pieces.minimumApplied).toBe(false);
@@ -418,9 +418,9 @@ describe("method resolution: area → bid → Measured", () => {
   it("the bid beats the default", () => {
     const m = resolveHomerunMethod({
       area: { method: null, averageFt: null, minimumFt: null },
-      bid: { method: "measured-minimum", averageFt: null, minimumFt: 20 },
+      bid: { method: "measuredMin", averageFt: null, minimumFt: 20 },
     });
-    expect(m.method).toBe("measured-minimum");
+    expect(m.method).toBe("measuredMin");
     expect(m.methodFrom).toBe("bid");
   });
 
