@@ -228,6 +228,24 @@ Branch `a-batch-c-0125` — **not merged into local-dev, not on staging**
 footage code.** Applying moves no number; C's code then computes homerun
 footage (intended).
 
+**Track C's code for this batch: branch `c-homerun-footage`, pushed
+2026-10-07** (homerun-footage-plan.md § 10). Merge it WITH this branch,
+never before the migrations. Every column is read and written as A wrote
+it — **no column is missing or wrong.** Two notes for A, neither a new
+migration:
+
+- **0126's comment on `homerunFromStampId` says "NULL = closest"; the code
+  stores the closest.** The server cannot work out "closest" (it keeps a
+  page's text, not word positions), so the browser writes the closest
+  device while the homerun is UNCONFIRMED and the server re-points it on
+  every re-read; once confirmed (or picked) it is left alone. NULL now
+  means "the device was deleted" (SET NULL), and that homerun gets no
+  number. Please reword the comment in `0126` and in `drizzle/schema.ts`
+  when convenient — a comment edit, no SQL change.
+- **`bids.homerunRunTypeId` is resolved** — `forkableReferences.test.ts`
+  moved it from "unreviewed" to `resolveRunType` (via `dropTypeFor`), and
+  the unreviewed ceiling from 7 back to 6.
+
 **Numbering hazard, written down so it is not discovered:** the migrator
 skips a file numbered below one already applied (§ R.1). If ANY other
 migration is applied to staging or live before this branch merges, these

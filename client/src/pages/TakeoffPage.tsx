@@ -92,11 +92,12 @@ import {
   markIsSnapTarget,
   type UserMarkStatus,
 } from "@shared/markStatus";
+import { groupByCircuit } from "@/lib/circuitGroups";
 import {
-  groupByCircuit,
-  readPanelSpots,
-  rememberPanelSpot,
-} from "@/lib/circuitGroups";
+  confirmableHomeruns,
+  homerunSyncPayload,
+  syncSignature,
+} from "@/lib/homerunSync";
 import {
   CircuitLayer,
   CircuitsPanel,
@@ -3666,6 +3667,9 @@ export default function TakeoffPage({
         case "takeoffHeights.forBid":
           void utils.takeoffHeights.forBid.invalidate({ bidId });
           return;
+        case "homeruns.forBid":
+          void utils.homeruns.forBid.invalidate({ bidId });
+          return;
         case "bidPdfs.list":
           void utils.bidPdfs.list.invalidate({ bidId });
           return;
@@ -4297,15 +4301,27 @@ export default function TakeoffPage({
   const [showCircuits, setShowCircuits] = useState(false);
   const [circuitPick, setCircuitPick] = useState<CircuitPick>(null);
   const [placingPanel, setPlacingPanel] = useState<string | null>(null);
-  const [panelSpots, setPanelSpots] = useState<
-    Record<string, { x: number; y: number }>
-  >({});
+  /*
+    HOMERUNS (homerun-footage-plan.md § 10). The panels' spots live on the
+    server now (`bid_panels`, 0125) — they were kept per browser until
+    2026-10-07, so a colleague's tablet never saw them and nothing could be
+    priced from them. Per BID: the footage on every sheet lands on one line.
+  */
+  const homerunsQuery = trpc.homeruns.forBid.useQuery({ bidId });
+  const homerunData = homerunsQuery.data ?? null;
+  const panelSpots = useMemo(() => {
+    const spots: Record<string, { x: number; y: number }> = {};
+    for (const p of homerunData?.panels ?? [])
+      if (
+        p.name &&
+        p.planSheetId === activeSheet?.id &&
+        p.planX !== null &&
+        p.planY !== null
+      )
+        spots[p.name] = { x: p.planX, y: p.planY };
+    return spots;
+  }, [homerunData, activeSheet?.id]);
   useEffect(() => {
-    setPanelSpots(
-      circuitDocId === null
-        ? {}
-        : readPanelSpots(browserStorage(), circuitDocId, page)
-    );
     setCircuitPick(null);
     setPlacingPanel(null);
   }, [circuitDocId, page]);
@@ -4324,15 +4340,113 @@ export default function TakeoffPage({
         : null,
     [circuitText, stamps, panelSpots]
   );
+  const placePanel = trpc.homeruns.placePanel.useMutation({
+    // Applied at once; the server write follows (CLAUDE.md § Responsiveness).
+    onMutate: async input => {
+      await utils.homeruns.forBid.cancel({ bidId });
+      const before = utils.homeruns.forBid.getData({ bidId });
+      utils.homeruns.forBid.setData({ bidId }, data => {
+        if (!data) return data;
+        const spot = input.spot;
+        const at = {
+          planSheetId: spot?.sheetId ?? null,
+          planX: spot?.x ?? null,
+          planY: spot?.y ?? null,
+        };
+        const known = data.panels.some(
+          p => (p.name ?? "").toUpperCase() === input.panel.toUpperCase()
+        );
+        return {
+          ...data,
+          panels: known
+            ? data.panels.map(p =>
+                (p.name ?? "").toUpperCase() === input.panel.toUpperCase()
+                  ? { ...p, ...at }
+                  : p
+              )
+            : [...data.panels, { id: -1, name: input.panel, ...at }],
+        };
+      });
+      return { before };
+    },
+    onError: (error, _input, context) => {
+      if (context?.before)
+        utils.homeruns.forBid.setData({ bidId }, context.before);
+      toast.error(error.message);
+    },
+    onSettled: () => refreshFor("homerun"),
+  });
   const placePanelSpot = useCallback(
     (panel: string, spot: { x: number; y: number } | null) => {
-      if (circuitDocId === null) return;
-      setPanelSpots(
-        rememberPanelSpot(browserStorage(), circuitDocId, page, panel, spot)
-      );
+      if (!activeSheet) return;
+      placePanel.mutate({
+        bidId,
+        panel,
+        spot: spot ? { sheetId: activeSheet.id, ...spot } : null,
+      });
     },
-    [circuitDocId, page]
+    [activeSheet, bidId, placePanel]
   );
+  /*
+    SYNC THE CIRCUITS READ HERE (plan § 10 step 2). Whenever this sheet's
+    circuits change — a mark placed, moved or deleted, a panel placed — the
+    server is told each circuit and the device its homerun leaves from, so
+    the bid line can price it. Only on a real change (`syncSignature`), and
+    never on a locked bid, whose quantities do not move.
+
+    A panel found by its "PANEL 2B" LABEL is a spot only this browser can
+    read, so it is saved too; otherwise Measured would show a number here
+    and price none on the bid.
+  */
+  const syncHomeruns = trpc.homeruns.syncSheet.useMutation({
+    onSuccess: () => refreshFor("homerun"),
+  });
+  const homerunSaved = {
+    onError: (e: { message: string }) => toast.error(e.message),
+    onSettled: () => refreshFor("homerun"),
+  };
+  const setHomerunSettings =
+    trpc.homeruns.setBidSettings.useMutation(homerunSaved);
+  const updateHomerun = trpc.homeruns.update.useMutation(homerunSaved);
+  const confirmHomeruns = trpc.homeruns.confirmMany.useMutation(homerunSaved);
+  const setSheetHomerunMethod =
+    trpc.homeruns.setSheetMethod.useMutation(homerunSaved);
+  const lastHomerunSync = useRef<string | null>(null);
+  useEffect(() => {
+    if (!circuitReport || !activeSheet || !homerunData || homerunData.locked)
+      return;
+    const sheetId = activeSheet.id;
+    for (const p of circuitReport.panels) {
+      if (p.spot?.source !== "label") continue;
+      const saved = homerunData.panels.find(
+        s => (s.name ?? "").toUpperCase() === p.name.toUpperCase()
+      );
+      // Within a hundredth: the column keeps two places, the label does not.
+      if (
+        saved?.planSheetId === sheetId &&
+        saved.planX !== null &&
+        saved.planY !== null &&
+        Math.abs(saved.planX - p.spot.x) < 0.01 &&
+        Math.abs(saved.planY - p.spot.y) < 0.01
+      )
+        continue;
+      placePanel.mutate({
+        bidId,
+        panel: p.name,
+        spot: { sheetId, x: p.spot.x, y: p.spot.y },
+      });
+    }
+    const payload = homerunSyncPayload(circuitReport);
+    const signature = syncSignature(sheetId, payload);
+    if (signature === lastHomerunSync.current) return;
+    const timer = window.setTimeout(() => {
+      lastHomerunSync.current = signature;
+      syncHomeruns.mutate({ bidId, sheetId, circuits: payload });
+    }, 600);
+    return () => window.clearTimeout(timer);
+    // Not the mutation objects: their state changes with every call, and an
+    // effect re-run per call would sync again on its own success.
+  }, [circuitReport, activeSheet?.id, homerunData, bidId]);
 
   const { data: symbols = [] } = trpc.takeoffStamps.symbols.useQuery();
   const { data: allAssemblies = [] } = trpc.assemblies.list.useQuery();
@@ -9393,7 +9507,7 @@ export default function TakeoffPage({
               />
             )}
 
-            {/* Devices grouped by circuit tag, read-only; only where tagged. */}
+            {/* Devices grouped by circuit tag, with each circuit's homerun. */}
             {!phone && circuitReport && (
               <CircuitsToggle
                 count={circuitReport.circuits.length}
@@ -9409,6 +9523,40 @@ export default function TakeoffPage({
             )}
             {!phone && showCircuits && circuitReport && (
               <CircuitsPanel
+                homeruns={
+                  homerunData && activeSheet
+                    ? {
+                        data: homerunData,
+                        sheetMethod:
+                          homerunData.sheetMethods.find(
+                            s => s.sheetId === activeSheet.id
+                          )?.method ?? null,
+                        runTypes: (runTypes.data ?? []).map(t => ({
+                          id: t.id,
+                          label: t.label,
+                        })),
+                        confirmable: confirmableHomeruns(
+                          homerunData.rows,
+                          activeSheet.id,
+                          circuitReport.panels
+                            .filter(p => p.spot?.source === "label")
+                            .map(p => p.name)
+                        ),
+                        onBid: patch =>
+                          setHomerunSettings.mutate({ bidId, ...patch }),
+                        onSheet: method =>
+                          setSheetHomerunMethod.mutate({
+                            bidId,
+                            sheetId: activeSheet.id,
+                            method,
+                          }),
+                        onUpdate: (circuitId, patch) =>
+                          updateHomerun.mutate({ circuitId, ...patch }),
+                        onConfirmAll: circuitIds =>
+                          confirmHomeruns.mutate({ bidId, circuitIds }),
+                      }
+                    : null
+                }
                 report={circuitReport}
                 pick={circuitPick}
                 onPick={setCircuitPick}

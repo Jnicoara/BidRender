@@ -68,10 +68,11 @@ export const homerunsRouter = router({
         userId,
         bid.distributionHeightInches
       );
-      const [computed, panels, circuits] = await Promise.all([
+      const [computed, panels, circuits, sheetMethods] = await Promise.all([
         db.loadBidHomeruns(input.bidId, userId, heights),
         db.getHomerunPanels(input.bidId, userId),
         db.getHomerunCircuits(input.bidId, userId),
+        db.getSheetHomerunMethods(input.bidId, userId),
       ]);
       const rows = computed?.rows ?? [];
       const byId = new Map(circuits.map(c => [c.id, c]));
@@ -92,6 +93,8 @@ export const homerunsRouter = router({
         type: computed?.type ?? null,
         noExtraSet: computed?.noExtraSet ?? false,
         locked: bid.quantitiesLockedAt !== null,
+        /** Sheets with their own method (an area override); others follow. */
+        sheetMethods: sheetMethods.filter(s => s.method !== null),
         panels: panels.map(p => ({
           id: p.id,
           name: p.name,

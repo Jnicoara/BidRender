@@ -98,9 +98,7 @@ describe("the plan's § 5 worked example, all three methods", () => {
 
   it("Measured with a minimum of 50 ft: L = 50", () => {
     const h = computed(
-      homerunFootage(
-        base({ method: method("measuredMin", { minimumFt: 50 }) })
-      )
+      homerunFootage(base({ method: method("measuredMin", { minimumFt: 50 }) }))
     );
     expect(h.pieces.measuredFt).toBeCloseTo(40, 3);
     expect(h.pieces.minimumApplied).toBe(true);
@@ -109,9 +107,7 @@ describe("the plan's § 5 worked example, all three methods", () => {
 
   it("a minimum below the measured length changes nothing", () => {
     const h = computed(
-      homerunFootage(
-        base({ method: method("measuredMin", { minimumFt: 30 }) })
-      )
+      homerunFootage(base({ method: method("measuredMin", { minimumFt: 30 }) }))
     );
     expect(h.pieces.minimumApplied).toBe(false);
     expect(h.pieces.installedFt).toBeCloseTo(52.5, 3);
@@ -240,7 +236,10 @@ describe("unconfirmed homeruns count (owner Q3)", () => {
       homerunFootage(base({ conductorCount: null })),
     ]);
     expect(t.notCounted).toBe(2);
-    expect(t.unconfirmed).toBe(2);
+    // Only the one IN the total is "unconfirmed"; the refused one is not in
+    // it. This asserted 2 until 2026-10-07, when the screen read "0
+    // homeruns + 38 unconfirmed" on a sheet with no scale.
+    expect(t.unconfirmed).toBe(1);
   });
 });
 

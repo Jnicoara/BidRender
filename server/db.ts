@@ -14044,6 +14044,20 @@ export async function setBidHomerunSettings(
     .where(and(eq(bids.id, bidId), eq(bids.userId, userId)));
 }
 
+/** Each sheet's own homerun method on a bid, for the panel's "This sheet". */
+export async function getSheetHomerunMethods(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      sheetId: bidPdfSheets.id,
+      method: bidPdfSheets.homerunMethod,
+    })
+    .from(bidPdfSheets)
+    .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
+    .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId)));
+}
+
 /** An area's (a sheet's) override of the bid's method. NULL follows the bid. */
 export async function setSheetHomerunMethod(
   sheetId: number,

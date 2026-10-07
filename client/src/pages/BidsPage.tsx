@@ -107,6 +107,11 @@ import {
   materialMissingLines,
 } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
+import {
+  parseHomerunMethod,
+  resolveHomerunMethod,
+} from "@shared/homerunFootage";
+import { homerunSummaryLine } from "@/lib/homerunText";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -256,6 +261,7 @@ export default function BidsPage({
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
+  const { data: homeruns } = trpc.homeruns.forBid.useQuery({ bidId });
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
   const { data: units = [] } = trpc.bids.units.useQuery({ bidId });
   const { data: unitStates = [] } = trpc.bids.unitStates.useQuery({ bidId });
@@ -533,6 +539,45 @@ export default function BidsPage({
    * cards use, so this screen and the search result for it cannot disagree.
    */
   const notPricedTally = bidNotPricedCount(lines);
+  /** "Homeruns: Measured, +15% routing · 12 homeruns", when there are any. */
+  const homerunLine = homeruns?.rows.length
+    ? {
+        text: homerunSummaryLine({
+          method: resolveHomerunMethod({
+            area: null,
+            bid: {
+              method: parseHomerunMethod(homeruns.settings.method),
+              averageFt: homeruns.settings.averageFt,
+              minimumFt: homeruns.settings.minimumFt,
+            },
+          }),
+          routing: {
+            pct: homeruns.settings.routingPct ?? 0,
+            applied: homeruns.settings.routingPct !== null,
+          },
+          counted: homeruns.rows.filter(r => r.footage.state === "computed")
+            .length,
+          // Said beside the line in amber, not inside it.
+          unconfirmed: 0,
+          sheetsDiffering: homeruns.sheetMethods.length,
+        }),
+        unconfirmed: homeruns.totals.unconfirmed,
+        /*
+          Whether that footage is IN the total above. A line says "38
+          homeruns" whether or not the homerun type was ever sent, and on
+          a bid where it was not, that read as priced (seen on screen,
+          2026-10-07). So it says which.
+        */
+        offBid:
+          homeruns.settings.runTypeId === null
+            ? "no run type picked, so none of it is on this bid"
+            : lines.some(
+                  l => l.takeoffRunTypeId === homeruns.settings.runTypeId
+                )
+              ? null
+              : "not on this bid yet — send the homerun type from the",
+      }
+    : null;
   /** Of the tally's parts: lines with labor and no material at all. */
   const materialMissing = materialMissingLines(lines);
   /** Of the tally's parts: lines whose assembly hours were not set (D1). */
@@ -1655,6 +1700,33 @@ export default function BidsPage({
                     <PlansLink bidId={bidId} />.
                   </p>
                 </div>
+              )}
+
+              {/*
+                HOMERUNS (homerun-footage-plan.md § 7): one line saying how
+                they were made — the method, the routing, how many — and the
+                unconfirmed ones, which ARE in the total (owner Q3), tallied
+                beside it so nothing is silently trusted.
+              */}
+              {homerunLine && (
+                <p className="text-[11px] leading-snug text-muted-foreground my-1 px-0.5">
+                  {homerunLine.text}
+                  {homerunLine.unconfirmed > 0 && (
+                    <span className="text-[#B45309] dark:text-[#F59E0B]">
+                      {" "}
+                      + {homerunLine.unconfirmed} unconfirmed
+                    </span>
+                  )}
+                  {homerunLine.offBid ? (
+                    <span className="text-[#B45309] dark:text-[#F59E0B]">
+                      {" — "}
+                      {homerunLine.offBid}{" "}
+                    </span>
+                  ) : (
+                    " — "
+                  )}
+                  <PlansLink bidId={bidId} />
+                </p>
               )}
 
               {/*

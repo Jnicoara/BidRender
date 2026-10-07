@@ -37,6 +37,7 @@ export type TakeoffQuery =
   | "takeoffGroups.list"
   | "takeoffSummary.forBid"
   | "takeoffHeights.forBid"
+  | "homeruns.forBid"
   | "bidPdfs.list"
   | "bidPdfs.sheetJumpList"
   // The bid's own lines, and the materials list built from them.
@@ -70,6 +71,13 @@ export const BID_QUANTITY_QUERIES = [
     mutation (CLAUDE.md, the staleness class).
   */
   "takeoffSummary.forBid",
+  /*
+    ADDED 2026-10-07 with homerun footage (homerun-footage-plan § 10). A
+    homerun leaves from a MARK and is measured on the sheet's SCALE to a
+    ceiling HEIGHT, so a moved mark, a new scale or a new height all move
+    it — and every one of those changes already refreshes this list.
+  */
+  "homeruns.forBid",
 ] as const satisfies readonly TakeoffQuery[];
 
 const RUN_QUERIES = [
@@ -197,7 +205,13 @@ export type TakeoffChange =
    * them move, though no number does. The legend's own `symbols` query is not
    * per bid and is the caller's to drop.
    */
-  | "countRenamed";
+  | "countRenamed"
+  /**
+   * A homerun synced, placed, confirmed or overridden, or the bid's homerun
+   * settings changed. Its footage lands on the homerun type's bid lines, so
+   * every bid quantity moves with it.
+   */
+  | "homerun";
 
 /**
  * Which sheets' own lists (marks, runs) a change must refresh.
@@ -262,4 +276,5 @@ export const QUERIES_MOVED_BY: Readonly<
   sentToBid: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
   countSource: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
   countRenamed: unique([...MARK_QUERIES, ...BID_QUANTITY_QUERIES]),
+  homerun: unique(BID_QUANTITY_QUERIES),
 };

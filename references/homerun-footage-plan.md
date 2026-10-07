@@ -236,6 +236,54 @@ Height areas inside a sheet (before beta) are a new table,
 3. Homerun rows on the Circuits panel: method, footage, confirm/override.
 4. Bid summary line and export; the bid line with its snapshot rules.
 
+**Steps 2–4 BUILT 2026-10-07 on branch `c-homerun-footage`** (track-c +
+Track A's `a-batch-c-0125`). **Not on local-dev or track-c, on purpose:**
+staging would get code asking for columns it does not have. Track A merges
+and migrates them together (pairing rule 3).
+
+- **2 — saved.** "Place panel" writes `bid_panels.planSheetId/X/Y`; a panel
+  found by its printed "PANEL 2B" label is saved too (only the browser can
+  read it). The browser `syncSheet`s each sheet's circuits — the server
+  keeps page TEXT, not word positions, so it cannot read the "2B-1" tags
+  itself. `homerunFromStampId` holds the leaving device: the closest as
+  last read while UNCONFIRMED (re-pointed on every re-read), left alone
+  once confirmed — the guard is in the UPDATE's WHERE
+  (`syncHomerunCircuit`). With no panel placed, the circuit's first device,
+  so Average still has a sheet. A two-pole tag is one row, on its first
+  circuit. The old per-browser spots (`bidridge:panel-spots:`) are not
+  carried over.
+- **3 — rows.** `HomerunControls`: per circuit "Homerun 42.8 ft — 30.3 ft
+  run + 8.5 ft up + 4 ft down at the panel · unconfirmed", Confirm; picked,
+  a typed length and the homerun's own ceiling (`HeightFields`, "follows the
+  job, 10'-0""). Bid settings fold to one line once a run type is picked.
+  "Confirm N on this sheet" takes only Average, or Measured to a LABELLED
+  panel (§ 6). A refused homerun says its fix ("Set this sheet's scale to
+  measure it") and is NOT counted as unconfirmed — it is "no number yet";
+  counting it as both read "0 homeruns + 38 unconfirmed" on screen.
+- **4 — the bid line.** Homeruns join `groupRunFootage` as a REQUIRED input
+  (like count drops) and land on the bid's homerun run type's existing
+  lines: live quantity, frozen pricing, sent with the ordinary "Send to
+  bid". The bid page says "Homeruns: Measured, +15% routing · 38 homeruns
+  - 37 unconfirmed", and whether the type is on the bid at all. The takeoff
+    export splits them per sheet.
+- **Labour on WIRE includes the panel makeup** — the owner's Q5
+  (2026-09-28: labour on installed footage, makeup is installed work),
+  which every footage line follows. § 5's "labour = (L + V) × (1 + R)" is
+  the conduit's labour; for wire it would have been the only footage line
+  leaving makeup out of labour. Routing is installed footage (real route);
+  waste never is.
+- **Not built:** fittings for homeruns (couplings, straps — "Nothing
+  traced", as for count drops, Q8); height areas' drawing tool (the table
+  is read, nothing writes it); setting `takeoff_run_circuits.panelCircuitId`
+  (read — a traced homerun suppresses the computed one — but no screen
+  ties a trace to a circuit yet); the per-sheet method has no "average" /
+  "minimum" amounts of its own on screen (the bid's are used).
+- **Seen on screen** (UNCC E111, laptop and 1180×820): 2B-1 = 42.8 ft, the
+  hand-worked known answer; Confirm moved "+ 38" to "+ 37" on the panel
+  and the bid page; Send put raceway 4,476.42 / conductor 8,952.85 /
+  ground 4,476.42 ft on the bid, conductor + ground = the panel's 13,429.3
+  ft of wire. Fixture values were put back afterwards.
+
 ## 11. Questions for the owner — ANSWERED 2026-10-06
 
 1. **Q1** Routing and waste add (+25%)? — **Yes: add, 15% + 10% = 25%,

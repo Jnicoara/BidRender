@@ -1,10 +1,12 @@
 /**
  * CircuitsView — the sheet's marks grouped by the circuit tag beside each
- * one (@/lib/circuitGroups), READ-ONLY: which devices are on 2B-14, what
- * 2B's schedule says about it, and which device sits closest to the panel —
- * where that circuit's homerun would leave from
- * (references/homerun-footage-plan.md). Nothing is priced, nothing saved,
- * except where a panel was placed on this sheet, which this browser keeps.
+ * one (@/lib/circuitGroups): which devices are on 2B-14, what 2B's schedule
+ * says about it, and which device sits closest to the panel — where that
+ * circuit's homerun leaves from (references/homerun-footage-plan.md).
+ *
+ * Since 2026-10-07 the HOMERUN is priced: each circuit row shows the
+ * server's footage for it (HomerunControls), and the panel's spot is saved
+ * on the bid (`bid_panels`), no longer in this browser.
  *
  * Flags, without nagging: marks of a circuited item with no tag; tags whose
  * circuit is not on a schedule that WAS read. An item that is never tagged
@@ -22,6 +24,14 @@ import { cn } from "@/lib/utils";
 import type { CircuitReport } from "@/lib/circuitGroups";
 import type { HomerunWord } from "@/lib/homeruns";
 import type { PanelSchedule } from "@/lib/panelSchedules";
+import { homerunKey, homerunKeyForCircuit } from "@/lib/homerunSync";
+import type { HomerunMethod } from "@shared/homerunFootage";
+import {
+  HomerunLine,
+  HomerunSettings,
+  type BidHomerunPatch,
+  type HomerunsData,
+} from "./HomerunControls";
 
 /** What the worker reads for one page. */
 export type SheetCircuitText = {
@@ -62,6 +72,26 @@ export function CircuitsToggle({
   );
 }
 
+/** The homerun half of the panel (homerun-footage-plan.md § 10 step 3). */
+export type CircuitHomeruns = {
+  data: HomerunsData;
+  sheetMethod: string | null;
+  runTypes: readonly { id: number; label: string }[];
+  /** Unconfirmed on this sheet with nothing guessed (plan § 6). */
+  confirmable: number[];
+  onBid: (patch: BidHomerunPatch) => void;
+  onSheet: (method: HomerunMethod | null) => void;
+  onUpdate: (
+    circuitId: number,
+    patch: {
+      overrideFt?: number | null;
+      ceilingInches?: number | null;
+      confirmed?: boolean;
+    }
+  ) => void;
+  onConfirmAll: (ids: number[]) => void;
+};
+
 export function CircuitsPanel({
   report,
   pick,
@@ -71,7 +101,9 @@ export function CircuitsPanel({
   onUnplace,
   onClose,
   feetPerPoint,
+  homeruns,
 }: {
+  homeruns: CircuitHomeruns | null;
   report: CircuitReport;
   pick: CircuitPick;
   onPick: (pick: CircuitPick) => void;
@@ -87,6 +119,12 @@ export function CircuitsPanel({
   // ("584 pt right-angle", seen on a tablet), so without one: no number.
   const distance = (d: number) => `${Math.round(d * (feetPerPoint ?? 0))} ft`;
   const offSchedule = report.circuits.filter(c => c.offSchedule);
+  const homerunByKey = new Map(
+    (homeruns?.data.rows ?? []).map(r => [
+      homerunKey(r.panelName, r.circuitNumber),
+      r,
+    ])
+  );
   return createPortal(
     <div
       className="fixed right-3 top-28 bottom-3 z-40 w-[min(340px,calc(100vw-24px))] flex flex-col rounded-lg border border-border bg-background shadow-xl"
@@ -97,8 +135,8 @@ export function CircuitsPanel({
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium">Circuits on this sheet</div>
           <div className="text-xs text-muted-foreground">
-            Read from the tags beside each mark. Read-only — nothing here is
-            priced.
+            Read from the tags beside each mark. Each circuit's homerun is
+            priced on the bid's homerun run type.
           </div>
         </div>
         <Button
@@ -129,6 +167,18 @@ export function CircuitsPanel({
           </div>
         )}
 
+        {homeruns && (
+          <HomerunSettings
+            data={homeruns.data}
+            sheetMethod={homeruns.sheetMethod}
+            runTypes={homeruns.runTypes}
+            onBid={homeruns.onBid}
+            onSheet={homeruns.onSheet}
+            confirmable={homeruns.confirmable}
+            onConfirmAll={homeruns.onConfirmAll}
+          />
+        )}
+
         {report.panels.map(p => (
           <div key={p.name} className="rounded-md border border-border p-2">
             <div className="flex items-center gap-2">
@@ -143,7 +193,7 @@ export function CircuitsPanel({
                     ? "not on this sheet yet"
                     : p.spot.source === "label"
                       ? `from the "PANEL ${p.name}" label`
-                      : "placed by you, this browser"}
+                      : "placed on this sheet, saved with the bid"}
                 </div>
               </div>
               {p.spot?.source !== "label" && (
@@ -262,6 +312,20 @@ export function CircuitsPanel({
                     </div>
                   )}
                 </button>
+                {homeruns && (
+                  <div className="px-2 pt-1 pb-2">
+                    <HomerunLine
+                      row={homerunByKey.get(homerunKeyForCircuit(c)) ?? null}
+                      panel={c.panel}
+                      expanded={active}
+                      locked={homeruns.data.locked}
+                      onUpdate={patch => {
+                        const row = homerunByKey.get(homerunKeyForCircuit(c));
+                        if (row) homeruns.onUpdate(row.circuitId, patch);
+                      }}
+                    />
+                  </div>
+                )}
               </li>
             );
           })}

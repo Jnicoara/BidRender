@@ -1,11 +1,13 @@
 # Track C — handoff, 2026-10-06
 
-Written for a restart. Worktree `C:\dev\BidPhase-C`, branch `track-c`.
-At the time of writing, track-c and local-dev were the same commit, everything
-was committed and pushed, and `main` was `24105ad`. C's databases
-`bidrender_local_c` and `bidrender_test_c` had 105 migrations (through
-0104); `bidrender_local_c` was brought to all 125 (through 0124) on
-2026-10-06 to run the Plans screen, `bidrender_test_c` was not. If `git log origin/local-dev` or `scripts/schemaDrift.mts` says
+Written for a restart. Worktree `C:\dev\BidPhase-C`. **Two branches now
+(2026-10-07):** `track-c` (= local-dev `87affe0` when written, green) and
+`c-homerun-footage` (track-c + Track A's `a-batch-c-0125` + the homerun
+footage work — NOT for local-dev, see "The exact next step"). The worktree
+was left on `c-homerun-footage`; `git checkout track-c` for anything else.
+`main` was `24105ad`. C's databases `bidrender_local_c` and
+`bidrender_test_c` both have 131 migrations (through 0130). If `git log
+origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
@@ -293,28 +295,28 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
-**Homerun footage: C IS WAITING ON TRACK A'S COLUMNS** before any footage
-math is built (`references/homerun-footage-plan.md`, all owner questions
-answered 2026-10-06). The columns, as listed in todo.md § "Track A next
-migration batch" → "Homerun footage" and § "Before beta: height areas
-inside a sheet":
+**Homerun footage steps 2–4 are BUILT on branch `c-homerun-footage`
+(2026-10-07), on Track A's 0125–0130 (`a-batch-c-0125`). DO NOT merge that
+branch into track-c or local-dev:** staging would get code that asks for
+columns it does not have. Track A merges it WITH the migrations (pairing
+rule 3). What is on it, and what is not, is in
+`homerun-footage-plan.md` § 10; the two notes for A are in
+`migrations-next-batch.md` § Batch C. **track-c itself does not have this
+work** — anything new on track-c meanwhile must not touch
+`groupRunFootage`'s inputs, or the merge will conflict (the branch makes
+`homeruns` a required input).
 
-- `bids`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`,
-  `homerunRoutingPct`, `homerunRunTypeId`.
-- `bid_pdf_sheets`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`
-  (the area override; the sheet's ceiling is 0108's
-  `distributionHeightInches`, already numbered).
-- `bid_panels`: `planSheetId`, `planX`, `planY` (where the panel sits).
-- `bid_panel_circuits`: `homerunOverrideFt`, `homerunFromStampId`,
-  `homerunConfirmedAt`, `homerunCeilingInches`.
-- New table `bid_height_areas` (before beta).
-- Also `takeoff_run_circuits.panelCircuitId` (a traced homerun replaces the
-  computed one).
+C's two local databases (`bidrender_local_c`, `bidrender_test_c`) are at
+**131 migrations** (through 0130) since 2026-10-07 — ahead of track-c's
+code, which is fine (additive). The server tests for the branch need
+`bidrender_test_c`: `server/homerunsRouter.test.ts` (12),
+`server/homerunsCore.test.ts` (22), `server/homerunFootage.test.ts` (44),
+plus `client/src/lib/homerunSync.test.ts` and `homerunText.test.ts`.
 
-Step 1 of plan § 10 (the pure calculator) is DONE and standalone. Until
-the columns land, C wires nothing of it in. Once they do: plan § 10
-steps 2–4, reading `shared/homerunFootage.ts` as the one place the
-arithmetic lives.
+Next on homeruns, when the owner says: fittings for homeruns; the height
+area drawing tool (table exists, nothing writes it); tying a traced run
+to a circuit (`panelCircuitId` is read, nothing sets it); per-sheet
+average/minimum amounts on screen.
 
 **Older next step (still open), item 1, the on-screen pass**, then item 2. For the screen: Weld 1 E-200
 (vector) on "Legend capture check" (bid 1728356) and the trick from

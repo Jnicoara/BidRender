@@ -13,6 +13,18 @@ This is the human-readable companion to the git history — read this to see wha
   catalog is missing; and five naming questions. Only the yellow columns are
   typed in. Once it is marked and checked, material names freeze.
 
+- **Homeruns are priced (on a branch, waiting for its database changes).**
+  The Circuits panel now shows each circuit's homerun — "42.8 ft: 30.3 ft
+  run + 8.5 ft up + 4 ft down at the panel" — with Confirm, a typed length
+  and its own ceiling. The bid picks how homeruns are measured (Measured by
+  default, Average, or Measured with a minimum), a routing factor, and what
+  they are made of; a sheet can use its own method. Where a panel sits is
+  saved with the bid instead of in one browser. Homerun footage lands on
+  the bid's lines like any traced run: routing and waste add, waste never
+  touches labor, 5 ft of makeup per wire at the panel, and unconfirmed
+  homeruns count with "+ N unconfirmed" beside them. A homerun with no
+  panel or no scale gets no number and says what is missing.
+
 ## [2026-10-06]
 
 - **Plans screen and Dashboard are easier to use.** Layers (show or hide

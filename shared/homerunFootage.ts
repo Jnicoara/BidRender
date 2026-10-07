@@ -478,11 +478,17 @@ export function homerunTotals(
       totals.traced++;
       continue;
     }
-    if (!h.confirmed) totals.unconfirmed++;
+    /*
+      "+ N unconfirmed" counts homeruns IN the total that nobody confirmed.
+      A refused one is not in the total, so it is not "unconfirmed" — it is
+      "no number yet". Counting it as both read "0 homeruns + 38
+      unconfirmed" on UNCC E111 (seen on screen, 2026-10-07).
+    */
     if (h.state === "refused") {
       totals.notCounted++;
       continue;
     }
+    if (!h.confirmed) totals.unconfirmed++;
     totals.laborFt += h.laborFt;
     totals.conduitFt += h.conduitFt ?? 0;
     if (h.wireFt === null) totals.notCounted++;
