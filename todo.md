@@ -996,7 +996,9 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       edits that price. One column, `materials.isExamplePrice`, plus the
       line's frozen `snapshotPriceWasExample` (Batch 5;
       `migrations-0098-batch-plan.md` B3, overridden there; CLAUDE.md
-      § "Where a priced catalog lands").
+      § "Where a priced catalog lands"). **Where it shows (owner, Q3,
+      2026-10-07): the bid screen only, never the customer quote; printing
+      or sending warns first when example-priced lines remain.**
 
 - [x] **400 kcmil lug ADDED 2026-09-26 (Track B)** — a single size, because
       above 350 kcmil a compression lug is sold per conductor size (Crescent

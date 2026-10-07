@@ -1,0 +1,125 @@
+{
+  "_about": "Decisions applied on top of the generated sheet by pricing/writeMaterialsReview.cjs. Owner's marks 2026-10-07 (duplicates: riser strap; all five questions) plus Track A's marks for the blank rows, made on the owner's instruction (small commercial / retail: Dollar Tree remodels, office TI, lighting retrofits, panel changes). Review-tab decisions are the pre-filled ones, unchanged.",
+  "duplicates": {
+    "2\" riser strap|Riser strap, 2\"": ["Same - keep A", "Owner, 2026-10-07."],
+    "2\" mast roof flashing|Mast roof flashing": [
+      "Same - keep A",
+      "The new row is the shipped 2\" part with its size left off."
+    ],
+    "4\" wafer LED downlight|4\" canless LED downlight": [
+      "Same - keep A",
+      "Canless and wafer are two names for one fixture; the shipped row is used by a starter."
+    ],
+    "5\"/6\" wafer LED downlight|5\" canless LED downlight": [
+      "Same - keep A",
+      "The shipped 5\"/6\" wafer fits both cutouts; the new 5\" row would split it. UNSURE — see summary."
+    ],
+    "5\"/6\" wafer LED downlight|6\" canless LED downlight": [
+      "Same - keep A",
+      "As the 5\" row. UNSURE — see summary."
+    ],
+    "Ground rod, 10 ft|Ground rod, 3/4\" x 10 ft": [
+      "Same - keep B",
+      "Keep the name that states the diameter; neither is used by a starter. UNSURE — see summary."
+    ]
+  },
+  "questions": {
+    "Q2": "Yes",
+    "Q2d": "Yes",
+    "Q3": "Yes on my bid screen, not on the customer quote. Warn me before printing instead.",
+    "Q4": "Yes",
+    "Q5": "Yes"
+  },
+  "questionNotes": {
+    "Q2d": "Use \"#3/4\" (owner).",
+    "Q3": "Recorded: the tag shows on the bid screen only; the customer quote never shows it; printing warns first."
+  },
+  "missing": {
+    "Surface raceway, 10 ft": [
+      "Skip",
+      "Covered by the waiting Surface Raceway rows (base/cover 500 and 700 series, 1500 series). DV34's recipe must be pointed at those names when they are added."
+    ],
+    "Surface raceway device box": [
+      "Skip",
+      "Covered by the waiting \"Raceway device box, 1-gang\"."
+    ],
+    "Surface raceway cover plate": [
+      "Skip",
+      "A standard wall plate fits the raceway device box."
+    ],
+    "Surface raceway entrance fitting": [
+      "Skip",
+      "Covered by the waiting \"Raceway entrance end fitting\"."
+    ],
+    "#3 XHHW Aluminum": [
+      "Skip",
+      "Not a size small commercial feeders use; #2 and #1 AL are listed."
+    ],
+    "#3 bare stranded Copper": [
+      "Skip",
+      "#4 and #2 bare are the grounding sizes used."
+    ],
+    "#1 bare stranded Copper": ["Skip", "Rare on small commercial work."],
+    "3-1/2\" EMT set-screw connector": [
+      "Skip",
+      "The waiting \"3-1/2\" EMT connector\" already adds it."
+    ],
+    "3-1/2\" EMT set-screw coupling": [
+      "Skip",
+      "The waiting \"3-1/2\" EMT coupling\" already adds it."
+    ],
+    "3-1/2\" EMT LB conduit body": [
+      "Skip",
+      "The waiting \"Conduit body, 3-1/2\" LB\" already adds it."
+    ],
+    "3-1/2\" PVC Sch 40 LB conduit body": [
+      "Skip",
+      "The waiting \"Conduit body, 3-1/2\" LB\" covers it."
+    ],
+    "3-1/2\" EMT 90-degree elbow": [
+      "Add",
+      "3-1/2\" EMT is being added (pricing sheet); a run needs its elbows."
+    ],
+    "3-1/2\" EMT 45-degree elbow": ["Add", "As the 90."],
+    "3-1/2\" PVC Sch 40 connector": [
+      "Add",
+      "3-1/2\" PVC Sch 40 is being added; a run needs its fittings."
+    ],
+    "3-1/2\" PVC Sch 40 coupling": ["Add", "As the connector."],
+    "3-1/2\" PVC Sch 40 90-degree elbow": ["Add", "As the connector."],
+    "3-1/2\" PVC Sch 40 45-degree elbow": ["Add", "As the connector."],
+    "3-1/2\" PVC Sch 40 90-degree sweep, 24\" radius": [
+      "Add",
+      "Underground service runs at 3-1/2\" turn with sweeps."
+    ],
+    "3-1/2\" PVC Sch 40 90-degree sweep, 36\" radius": [
+      "Add",
+      "As the 24\" sweep."
+    ],
+    "3-1/2\" EMT one-hole strap": [
+      "Add",
+      "Supports the 3-1/2\" EMT being added."
+    ],
+    "3-1/2\" PVC one-hole strap": [
+      "Add",
+      "Supports the 3-1/2\" PVC being added."
+    ],
+    "3-1/2\" conduit bushing": ["Add", "Goes with the 3-1/2\" connectors."],
+    "3-1/2\" conduit locknut": ["Add", "Goes with the 3-1/2\" connectors."],
+    "3-1/2\" strut conduit strap": [
+      "Add",
+      "Supports 3-1/2\" conduit on strut."
+    ],
+    "#1 crimp sleeve": [
+      "Add",
+      "Splicing service and feeder conductors in panel changes and upgrades."
+    ],
+    "1/0 crimp sleeve": ["Add", "As #1."],
+    "2/0 crimp sleeve": ["Add", "As #1."],
+    "3/0 crimp sleeve": ["Add", "As #1."]
+  },
+  "missingDefault": [
+    "Skip",
+    "3-1/2\" in a type that is not being added (Sch 80, rigid, IMC, compression/raintight, other conduit bodies, 45 sweeps, weatherheads), a sized nail plate (not sold by trade size), or a 5\" duct part (4\" and 6\" are the sizes used)."
+  ]
+}

@@ -13,6 +13,20 @@ Q2/Q2d, 17 on Q4); 313 rows used by a starter or run type; Missing 85
 and recalculated: totals add up, and each warning fires on a test mark
 (cut of a used row, rename with no name, duplicate final name) and clears.
 
+**MARKED 2026-10-07 — NOT frozen, nothing renamed.** The owner's answers
+(duplicate riser strap; Q2 yes, Q2d "#3/4", Q3 bid screen only + warn before
+printing, Q4 yes, Q5 yes; aughts written 1/0…4/0 without "#") are in the
+naming rules (`shared/materialNaming.ts`, `materialRenameProposals.ts`); the
+remaining decisions (Track A, on the owner's instruction) are in
+`pricing/materials-review-marks.json`, which the writer applies and REFUSES to
+run if any mark matches no row. Counts tab clean in Excel (all four warnings
+0). If applied: **147 renames, 1 shipped cut (`Ground rod, 10 ft` → keep
+`3/4" x 10 ft`), 5 waiting rows dropped as duplicates, 150 materials added
+(120 waiting + 30 from Missing), 1,406 unchanged.** The duplicate finder
+gained rules 4 and 5 and a canless = wafer fold after the owner caught the
+ground-rod pair; it now finds 6 pairs. Next: the read-back freezes names.
+Known for the rename step: the size parser must learn `#3/4`.
+
 **Two checks added 2026-10-07 (owner), still review-only — no name or row
 changed:**
 

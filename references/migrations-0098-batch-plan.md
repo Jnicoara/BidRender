@@ -1021,7 +1021,8 @@ three-step deploy. Numbers are given at write time, after 0105.
    > `examplePriceSource` and `examplePriceAsOf` below are NOT needed: the
    > one fact is "is this still our example price", a single column. See the
    > note under § 10b Option A, and CLAUDE.md § "Where a priced catalog
-   > lands".
+   > lands". **And where (Q3, same day): on the contractor's bid screen
+   > only, never on the customer quote; printing or sending warns first.**
 
 **Read first:** CLAUDE.md § Brands (brand exists on PANELS and BREAKERS only;
 an assembly points at the parent), `ASSEMBLIES_PLAN.md` § "Parent items and

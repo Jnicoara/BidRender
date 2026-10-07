@@ -75,11 +75,10 @@ export const WIRE_AND_CABLE_PROPOSALS: readonly {
   { current: "4-2 MC cable", proposed: "4/2 MC cable Copper" },
   { current: "4-3 MC cable", proposed: "4/3 MC cable Copper" },
   { current: "3-3 MC cable", proposed: "3/3 MC cable Copper" },
-  {
-    current: "3-4 MC cable",
-    proposed: "3/4 MC cable Copper",
-    openQuestion: "Q2d",
-  },
+  // Q2d answered 2026-10-07: "#3/4", so a #3 four-wire does not read as
+  // 3/4 inch. The size parser does not read "#3/4" yet — the rename step's
+  // parser change must (references/materials-review-sheet-plan.md).
+  { current: "3-4 MC cable", proposed: "#3/4 MC cable Copper" },
   { current: "2-2 MC cable", proposed: "2/2 MC cable Copper" },
   { current: "2-3 MC cable", proposed: "2/3 MC cable Copper" },
   {
@@ -133,17 +132,11 @@ export const WIRE_AND_CABLE_PROPOSALS: readonly {
   { current: "1/0-1/0-1/0-2 SER AL", proposed: "1/0-3 SER Aluminum" },
   { current: "2/0-2/0-2/0-1 SER AL", proposed: "2/0-3 SER Aluminum" },
   { current: "3/0-3/0-3/0-1/0 SER AL", proposed: "3/0-3 SER Aluminum" },
-  {
-    current: "4/0-4/0-2/0 SER AL",
-    proposed: "4/0-4/0-2/0 SER Aluminum",
-    openQuestion: "Q2",
-  },
+  // Q2 answered Yes 2026-10-07: the two three-conductor rows keep their
+  // full set.
+  { current: "4/0-4/0-2/0 SER AL", proposed: "4/0-4/0-2/0 SER Aluminum" },
   { current: "4/0-4/0-4/0-2/0 SER AL", proposed: "4/0-3 SER Aluminum" },
-  {
-    current: "250-250-250 SER AL",
-    proposed: "250-250-250 SER Aluminum",
-    openQuestion: "Q2",
-  },
+  { current: "250-250-250 SER AL", proposed: "250-250-250 SER Aluminum" },
   { current: "4-4-6 SEU AL", proposed: "4-4-6 SEU Aluminum" },
   { current: "2-2-4 SEU AL", proposed: "2-2-4 SEU Aluminum" },
   { current: "#4/0 USE-2 AL", proposed: "#4/0 USE-2 Aluminum" },

@@ -55,6 +55,37 @@ describe("every proposal across the catalog", () => {
   });
 });
 
+describe("aughts without # (owner, 2026-10-07)", () => {
+  it("leaves no proposed name in the catalog with #1/0, #2/0, #3/0 or #4/0", () => {
+    expect(
+      proposed
+        .filter(m => /#[1-4]\/0/.test(m.proposal.proposed))
+        .map(m => m.proposal.proposed)
+    ).toEqual([]);
+  });
+
+  it("writes them bare, and keeps # on #14 to #1", () => {
+    expect(
+      proposeMaterialName({ name: "#1/0 THHN", category: "Wire & Cable" })
+        .proposed
+    ).toBe("1/0 THHN Copper");
+    expect(
+      proposeMaterialName({ name: "#2 THHN", category: "Wire & Cable" })
+        .proposed
+    ).toBe("#2 THHN Copper");
+  });
+
+  it("does it in any category, saying why", () => {
+    expect(
+      proposeMaterialName({ name: "#2/0 lug", category: "Connectors" })
+    ).toEqual({
+      proposed: "2/0 lug",
+      why: 'aughts written without "#" (owner)',
+      openQuestion: null,
+    });
+  });
+});
+
 describe("the other decided rules", () => {
   it("make every Single-Pole BREAKER 1-Pole, and leave single-pole switches alone (owner Q1)", () => {
     const breakers = proposed.filter(
@@ -75,7 +106,7 @@ describe("the other decided rules", () => {
     ).toBe("6 ft MC whip");
   });
 
-  it("asks Q4 rather than deciding it for low-voltage cable, and never adds Copper to fibre", () => {
+  it("adds Copper to low-voltage cable (Q4: yes), and never to fibre", () => {
     const lv = proposeMaterialName({
       name: "Cat6 cable",
       category: "Low Voltage",
@@ -83,8 +114,8 @@ describe("the other decided rules", () => {
     });
     expect(lv).toEqual({
       proposed: "Cat6 cable Copper",
-      why: "metal at the end, if Q4 is yes",
-      openQuestion: "Q4",
+      why: "metal at the end (Q4: yes)",
+      openQuestion: null,
     });
     expect(
       proposeMaterialName({

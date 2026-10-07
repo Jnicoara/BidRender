@@ -957,6 +957,14 @@ shrinks the signal to one column, `materials.isExamplePrice`, with the line's
 frozen `snapshotPriceWasExample` beside it. A supplier price a shop enters or
 imports is the shop's own and is never tagged (`multi-supplier-plan.md`).
 
+**Where the tag shows — owner, 2026-10-07 (review-sheet Q3): on the
+contractor's OWN bid screen only, NEVER on the customer quote.** Instead, printing
+or sending a quote that still holds example-priced lines WARNS first ("N lines
+are priced from example prices — check them before this goes out"), the same
+shape as the not-priced block but a warning, not a refusal. Read from the
+line's frozen `snapshotPriceWasExample`, so the warning cannot change after
+the fact.
+
 ## Brands — generic everywhere except panels and breakers
 
 **Decided 2026-09-17, in conversation, and it never reached the repo until
