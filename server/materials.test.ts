@@ -24,11 +24,15 @@ function isMissingPrice(m: Parameters<typeof effectivePrice>[0]): boolean {
 
 // ─── Age indicator logic ──────────────────────────────────────────────────────
 
+// The clock is a PARAMETER: reading Date.now() here as well as in the test
+// made "exactly 30 days" 30 days and a millisecond whenever the clock ticked
+// between the two reads — red on local-dev run for 74a2ade, 2026-10-07.
 function ageClass(
-  lastUpdated: Date | null
+  lastUpdated: Date | null,
+  now: number = Date.now()
 ): "green" | "yellow" | "red" | "none" {
   if (!lastUpdated) return "none";
-  const days = (Date.now() - lastUpdated.getTime()) / 86_400_000;
+  const days = (now - lastUpdated.getTime()) / 86_400_000;
   if (days <= 30) return "green";
   if (days <= 90) return "yellow";
   return "red";
@@ -183,13 +187,17 @@ describe("age indicator", () => {
   });
 
   it("boundary: exactly 30 days is green", () => {
-    const boundary = new Date(Date.now() - 30 * 86_400_000);
-    expect(ageClass(boundary)).toBe("green");
+    const now = Date.now();
+    const boundary = new Date(now - 30 * 86_400_000);
+    expect(ageClass(boundary, now)).toBe("green");
+    // ...and one millisecond past it is not: the boundary is real.
+    expect(ageClass(boundary, now + 1)).toBe("yellow");
   });
 
   it("boundary: exactly 91 days is red", () => {
-    const boundary = new Date(Date.now() - 91 * 86_400_000);
-    expect(ageClass(boundary)).toBe("red");
+    const now = Date.now();
+    const boundary = new Date(now - 91 * 86_400_000);
+    expect(ageClass(boundary, now)).toBe("red");
   });
 });
 

@@ -4,17 +4,26 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 ~01:10 UTC (session 7) — read this first
+## UPDATE 2026-10-07 ~02:30 UTC (session 8) — read this first
 
-| What          | State                                                                                                                                                                                                                         |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Live**      | Unchanged: `24105ad`, 105 migrations. **Not touched.**                                                                                                                                                                        |
-| **Staging**   | **`932cb53`**, database **125 migrations** (0105–0124 applied 00:16 UTC; backup `staging-2026-10-07T00-13-36Z-before-0105-0124.sql`, restored and counted). Gate + deploy-staging + smoke green (run 37553791194).            |
-| **local-dev** | `932cb53` = the batch + slow-request logging (`3a173a0`, its own green run 37550736540) + the Assemblies-screen fix (29 starters in the two new shelves were hidden; found on the staging spot-check).                        |
-| Spot-check    | Staging Assemblies screen: 167 starters, 7 shelves incl. Demo & Retrofit (20) and General (9); every new starter "hours not set"; the original 8 show their hours; none 0.                                                    |
-| Next release  | **Gated** at the top of `live-release-plan.md`: 0105–0106 only with B's labor rule + "Labor only" tick + reading code (B building); 0122–0123 only with B's hours code (on local-dev); LT1/LT2 repair NOT on live as written. |
-| Open risk     | `todo.md` "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE" — freeze `snapshotUnpricedParts` before any recipe/price change reaches live.                                                                |
-| Waiting       | Owner's OK on `materials-review-sheet-plan.md` (layout).                                                                                                                                                                      |
+| What              | State                                                                                                                                                                                                                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Live**          | Unchanged: `24105ad`, 105 migrations. Only a READ-ONLY count was run (below).                                                                                                                                                                                                           |
+| **Staging**       | **`2f469e5`**, database **125 migrations**. Green: tests, deploy-staging, smoke (run 37559170943).                                                                                                                                                                                      |
+| **local-dev**     | `2f469e5` = everything below + **B's Labor-only tick and reading code** (`d8a0235`).                                                                                                                                                                                                    |
+| Pairing rules     | **Both now met on local-dev**: 0105–0106 + B's rule + tick + reading code; 0122–0123 + B's hours code. `live-release-plan.md` (top) says what to re-check on the day. LT1/LT2 repair still NOT on live as written.                                                                      |
+| Live-recipe lines | **Live: 0** (read-only session, 2026-10-07 — live has 0 assembly lines at all). Checklist line added: recount before release; must be 0, otherwise freeze first.                                                                                                                        |
+| Review sheet      | **Built: `pricing/materials-review.xlsx`** — 1,679 rows, 146 proposed names, 20 "Your call", 85 missing + 25 blank, 5 questions. Opened in Excel, warnings tested. **Waiting for the owner to mark it**; then the read-back (`readMaterialsReview.mts`, not written) freezes the names. |
+| Open risk         | `todo.md` "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE" — report only.                                                                                                                                                                                         |
+
+## UPDATE 2026-10-07 ~01:10 UTC (session 7)
+
+| What          | State                                                                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Live**      | Unchanged: `24105ad`, 105 migrations. **Not touched.**                                                                                                                                                             |
+| **Staging**   | **`932cb53`**, database **125 migrations** (0105–0124 applied 00:16 UTC; backup `staging-2026-10-07T00-13-36Z-before-0105-0124.sql`, restored and counted). Gate + deploy-staging + smoke green (run 37553791194). |
+| **local-dev** | `932cb53` = the batch + slow-request logging (`3a173a0`, its own green run 37550736540) + the Assemblies-screen fix (29 starters in the two new shelves were hidden; found on the staging spot-check).             |
+| Spot-check    | Staging Assemblies screen: 167 starters, 7 shelves incl. Demo & Retrofit (20) and General (9); every new starter "hours not set"; the original 8 show their hours; none 0.                                         |
 
 Note: Track C's run 37552978452 (`722ca8f`) went red at deploy-staging only
 because `staging` had been pushed by hand to a newer commit (§ 11 step 3);

@@ -18,10 +18,13 @@ the SAME release as ALL of:
 
 The rule must never reach live without the tick and the reading code: the
 priced print refuses a "not priced" line with no way past (§ 0 below).
-**Status 2026-10-06: the rule is on `local-dev`; the tick and the reading
-code are NOT on any pushed branch (B is building them).** Check before the
-window: `git grep -n snapshotLaborOnly <candidate> -- shared server client/src`
-must show B's readers, not only the snapshot copy in `pricingSnapshotOf`.
+**Status 2026-10-07: ALL THREE are on `local-dev`** — the rule (`5c98bd1`)
+and the tick + reading code (`d8a0235`, merged in `2f469e5`):
+`shared/lineNotPriced.ts` reads `snapshotLaborOnly`, the SQL copies in
+`server/db.ts` do too, adding a line freezes it, `server/laborOnly.test.ts`.
+`2f469e5` green on `local-dev` (tests, staging deploy, smoke — run 37559170943) and on `track-b` (tests, drizzle-guard — run 37559168601).
+Still check on the day: `git grep -n snapshotLaborOnly <candidate> -- shared
+server client/src` must show those readers, not only `pricingSnapshotOf`.
 
 **Pairing rule 2 — hours not set.** Live gets migrations **0122–0123** only
 in the SAME release as Track B's starter seeding and "Hours not set" code
