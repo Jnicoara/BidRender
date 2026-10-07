@@ -1693,6 +1693,8 @@ export const takeoffRunsRouter = router({
          */
         markDropNotes: {
           noTypeGroups: drops.filter(d => d.status === "no-type").length,
+          /** Drops NOT PRICED for want of a drop material — said, never 0 ft. */
+          notPricedDrops: drops.reduce((n, d) => n + d.notPricedDrops, 0),
           noHeightGroups: drops.filter(d => d.status === "no-height").length,
           mayDoubleCount: drops.reduce((n, d) => n + d.mayDoubleCount, 0),
         },

@@ -1391,6 +1391,7 @@ export function RunsPanel({
           noTypeGroups: number;
           noHeightGroups: number;
           mayDoubleCount: number;
+          notPricedDrops: number;
         };
       })
     | undefined;
@@ -3391,17 +3392,27 @@ export function RunsPanel({
                 bends per homerun for corners.
               </p>
             )}
-            {(totals.markDropNotes?.noTypeGroups ?? 0) +
-              (totals.markDropNotes?.noHeightGroups ?? 0) >
-              0 && (
+            {/*
+              NO DROP MATERIAL, counted as NOT PRICED (owner, 2026-10-07):
+              how many drops, and why, beside the totals they are missing
+              from — a sentence about items alone hid the size of it.
+            */}
+            {(totals.markDropNotes?.notPricedDrops ?? 0) > 0 && (
               <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
                 <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
-                {(totals.markDropNotes?.noTypeGroups ?? 0) +
-                  (totals.markDropNotes?.noHeightGroups ?? 0)}{" "}
-                counted item
-                {(totals.markDropNotes?.noTypeGroups ?? 0) +
-                  (totals.markDropNotes?.noHeightGroups ?? 0) ===
-                1
+                {totals.markDropNotes?.notPricedDrops} drop
+                {totals.markDropNotes?.notPricedDrops === 1 ? "" : "s"} not
+                priced — drop material not set on{" "}
+                {totals.markDropNotes?.noTypeGroups} counted item
+                {totals.markDropNotes?.noTypeGroups === 1 ? "" : "s"}. Not in
+                these totals.
+              </p>
+            )}
+            {(totals.markDropNotes?.noHeightGroups ?? 0) > 0 && (
+              <p className="mt-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1.5">
+                <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+                {totals.markDropNotes?.noHeightGroups} counted item
+                {totals.markDropNotes?.noHeightGroups === 1
                   ? " asks"
                   : "s ask"}{" "}
                 for a drop that is not counted — see the item for why.

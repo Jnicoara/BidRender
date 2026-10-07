@@ -395,3 +395,34 @@ describeDb(
     });
   }
 );
+
+describeDb(
+  "a count with no drop material is said, not priced, never 0 ft",
+  () => {
+    it("the Totals tab and the materials list both say how many drops", async () => {
+      const s = await aBid(await ownAssembly("receptacle"));
+      // A second box with no homerun; no drop material picked on the count.
+      await caller().takeoffStamps.drop({
+        bidId: s.bidId,
+        sheetId: s.sheetId,
+        groupId: s.groupId,
+        at: [{ x: ft(60), y: ft(10) }],
+      });
+      const { groups } = await caller().takeoffGroups.list({ bidId: s.bidId });
+      expect(groups.find(g => g.id === s.groupId)!.drop.result).toMatchObject({
+        status: "no-type",
+        reason: "drop material not set",
+        // The homerun's box is the homerun's; the other one is unpriced.
+        notPricedDrops: 1,
+        totalDropFeet: null,
+      });
+      const totals = await caller().takeoffRuns.totals({ bidId: s.bidId });
+      expect(totals.markDropNotes.notPricedDrops).toBe(1);
+      expect(totals.markDropCount).toBe(0);
+      const list = await caller().materialsList.get({ bidId: s.bidId });
+      expect(list.notes.join(" ")).toMatch(
+        /NOT on this list: 1 drop to counted devices — drop material not set/
+      );
+    });
+  }
+);

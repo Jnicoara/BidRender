@@ -237,8 +237,9 @@ migration:
 - **0126's comment on `homerunFromStampId` says "NULL = closest"; the code
   stores the closest.** The server cannot work out "closest" (it keeps a
   page's text, not word positions), so the browser writes the closest
-  device while the homerun is UNCONFIRMED and the server re-points it on
-  every re-read; once confirmed (or picked) it is left alone. NULL now
+  device when the homerun is made; since 2026-10-07 only "Re-match
+  homeruns" or a hand-placed panel re-points an UNCONFIRMED one (a visit no
+  longer does); once confirmed (or picked) it is left alone. NULL now
   means "the device was deleted" (SET NULL), and that homerun gets no
   number. Please reword the comment in `0126` and in `drizzle/schema.ts`
   when convenient — a comment edit, no SQL change.

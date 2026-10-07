@@ -419,14 +419,18 @@ export const materialsListRouter = router({
       );
       // Drops from counted marks (§ 3) — what the bid prices, so the list a
       // supplier orders from has them too. Claimed against every run.
-      const markDrops = markDropEntries(
-        await db.loadGroupDrops(
-          input.bidId,
-          ctx.scope.dataUserId,
-          heights,
-          runs,
-          scales
-        )
+      const groupDropRows = await db.loadGroupDrops(
+        input.bidId,
+        ctx.scope.dataUserId,
+        heights,
+        runs,
+        scales
+      );
+      const markDrops = markDropEntries(groupDropRows);
+      // Drops left unpriced for want of a material — said, never 0 ft.
+      const notPricedDrops = groupDropRows.reduce(
+        (n, d) => n + d.notPricedDrops,
+        0
       );
       const totals = totalQuantities(
         realRuns.map(run => {
@@ -465,6 +469,13 @@ export const materialsListRouter = router({
           } to counted devices (${totals.markDropFeet.toLocaleString("en-US", {
             maximumFractionDigits: 2,
           })} ft of raceway or cable). Connectors and elbows for those drops are NOT counted — add them by hand.`
+        );
+      }
+      if (notPricedDrops > 0) {
+        notes.push(
+          `NOT on this list: ${notPricedDrops} ${
+            notPricedDrops === 1 ? "drop" : "drops"
+          } to counted devices — drop material not set. Pick what each drop is made of on its count.`
         );
       }
       // Homeruns: their couplings, connectors, straps AND bends are above

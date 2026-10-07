@@ -4392,9 +4392,17 @@ export default function TakeoffPage({
     },
     onSettled: () => refreshFor("homerun"),
   });
+  /*
+    Placing a panel BY HAND is a person's action, so the homeruns it moves
+    may be re-pointed (owner, 2026-10-07). The device closest to the new
+    spot is only known once the circuit read re-runs with it, so this arms
+    the NEXT sync to be a re-match rather than re-matching on the old read.
+  */
+  const rematchOnNextSync = useRef(false);
   const placePanelSpot = useCallback(
     (panel: string, spot: { x: number; y: number } | null) => {
       if (!activeSheet) return;
+      rematchOnNextSync.current = true;
       placePanel.mutate({
         bidId,
         panel,
@@ -4492,6 +4500,27 @@ export default function TakeoffPage({
     setAreaError(null);
   };
   const lastHomerunSync = useRef<string | null>(null);
+  /** "Re-match homeruns on this sheet" — the person's own action. */
+  const rematchHomeruns = () => {
+    if (!circuitReport || !activeSheet) return;
+    syncHomeruns.mutate(
+      {
+        bidId,
+        sheetId: activeSheet.id,
+        circuits: homerunSyncPayload(circuitReport),
+        rematch: true,
+      },
+      {
+        onSuccess: r =>
+          toast.message(
+            r.repointed === 0
+              ? "Every unconfirmed homerun already leaves from the closest device."
+              : `${r.repointed} homerun${r.repointed === 1 ? "" : "s"} re-matched to the device now closest.`
+          ),
+        onError: e => toast.error(e.message),
+      }
+    );
+  };
   useEffect(() => {
     if (!circuitReport || !activeSheet || !homerunData || homerunData.locked)
       return;
@@ -4501,15 +4530,13 @@ export default function TakeoffPage({
       const saved = homerunData.panels.find(
         s => (s.name ?? "").toUpperCase() === p.name.toUpperCase()
       );
-      // Within a hundredth: the column keeps two places, the label does not.
-      if (
-        saved?.planSheetId === sheetId &&
-        saved.planX !== null &&
-        saved.planY !== null &&
-        Math.abs(saved.planX - p.spot.x) < 0.01 &&
-        Math.abs(saved.planY - p.spot.y) < 0.01
-      )
-        continue;
+      /*
+        A label FILLS a panel with no spot; it never moves a saved one
+        (owner, 2026-10-07: viewing must never change a saved number). It
+        used to re-save whenever the two differed, so a panel moved by hand
+        went back to the label on the next visit — and every homerun with it.
+      */
+      if (saved?.planSheetId != null) continue;
       placePanel.mutate({
         bidId,
         panel: p.name,
@@ -4521,7 +4548,14 @@ export default function TakeoffPage({
     if (signature === lastHomerunSync.current) return;
     const timer = window.setTimeout(() => {
       lastHomerunSync.current = signature;
-      syncHomeruns.mutate({ bidId, sheetId, circuits: payload });
+      /*
+        A visit only CREATES the circuits it has not seen; the server leaves
+        every existing homerun as it is. The one exception is the sync right
+        after a panel was placed by hand (`rematchOnNextSync`).
+      */
+      const rematch = rematchOnNextSync.current;
+      rematchOnNextSync.current = false;
+      syncHomeruns.mutate({ bidId, sheetId, circuits: payload, rematch });
     }, 600);
     return () => window.clearTimeout(timer);
     // Not the mutation objects: their state changes with every call, and an
@@ -9682,6 +9716,7 @@ export default function TakeoffPage({
                           updateHomerun.mutate({ circuitId, ...patch }),
                         onConfirmAll: circuitIds =>
                           confirmHomeruns.mutate({ bidId, circuitIds }),
+                        onRematch: () => rematchHomeruns(),
                       }
                     : null
                 }

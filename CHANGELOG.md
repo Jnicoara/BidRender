@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Looking at a sheet no longer changes its homerun numbers (branch
+  `c-homerun-footage`).** Opening the Circuits panel used to re-point every
+  unconfirmed homerun to whichever device was now closest, so the bid's
+  totals could move just from viewing. Now each homerun keeps the device it
+  was made with until someone presses "Re-match homeruns" or moves the panel
+  by hand. Also: a count with no drop material now says "drop material not
+  set" and how many drops that leaves unpriced — on the count, the Totals
+  tab and the materials list — and a run's name says "No drop here" for an
+  end with no drop, like the rest of the screen.
+
 - **Counts drop to their item's type, data/TV outlets have a height, and no
   box is counted twice (branch `c-homerun-footage`).** A count nobody set a
   drop on now drops to what its item "Mounts at", said as "from the item"

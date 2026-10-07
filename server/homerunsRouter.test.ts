@@ -165,18 +165,51 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
     expect(rows[0].method.method).toBe("measured");
   });
 
-  it("a re-read re-points an UNCONFIRMED homerun and leaves a confirmed one", async () => {
+  /*
+    VIEWING NEVER CHANGES A SAVED NUMBER (owner, 2026-10-07). The Circuits
+    panel sends this on every visit; it used to re-point every unconfirmed
+    homerun to whatever the browser now read as closest, so E111's totals
+    moved 4,119.31 → 3,987.54 ft from looking. Red before: the re-read below
+    moved circuit 1 to `far`.
+  */
+  it("a re-read (a visit) changes NOTHING — three visits, the same totals", async () => {
     const { bidId, sheetId, near, far } = await aBid();
     const sync = (stamp: number) =>
       caller().homeruns.syncSheet({
         bidId,
         sheetId,
+        circuits: [{ panel: "2B", circuits: [1], leavingStampId: stamp }],
+      });
+    await sync(near);
+    await caller().homeruns.placePanel({
+      bidId,
+      panel: "2B",
+      spot: { sheetId, x: 0, y: ft(10) },
+    });
+    const first = await homeruns(bidId);
+    for (let visit = 0; visit < 3; visit++) {
+      // The browser reads a different "closest" each time — it must not move.
+      const result = await sync(visit % 2 === 0 ? far : near);
+      expect(result).toMatchObject({ created: 0, repointed: 0 });
+      const now = await homeruns(bidId);
+      expect(now.rows[0].leavingStampId).toBe(near);
+      expect(now.totals).toEqual(first.totals);
+    }
+  });
+
+  it("Re-match re-points an UNCONFIRMED homerun and leaves a confirmed one", async () => {
+    const { bidId, sheetId, near, far } = await aBid();
+    const sync = (stamp: number, rematch: boolean) =>
+      caller().homeruns.syncSheet({
+        bidId,
+        sheetId,
+        rematch,
         circuits: [
           { panel: "2B", circuits: [1], leavingStampId: stamp },
           { panel: "2B", circuits: [3], leavingStampId: stamp },
         ],
       });
-    await sync(near);
+    expect(await sync(near, false)).toMatchObject({ created: 2 });
     const [first, second] = (await homeruns(bidId)).rows.sort(
       (a, b) => a.circuitNumber - b.circuitNumber
     );
@@ -184,13 +217,15 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
       circuitId: second.circuitId,
       confirmed: true,
     });
-    await sync(far);
+    expect(await sync(far, true)).toMatchObject({ created: 0, repointed: 1 });
     const after = (await homeruns(bidId)).rows.sort(
       (a, b) => a.circuitNumber - b.circuitNumber
     );
     expect(after[0].circuitId).toBe(first.circuitId);
     expect(after[0].leavingStampId).toBe(far);
     expect(after[1].leavingStampId).toBe(near);
+    // Asked again with nothing to move: says so.
+    expect(await sync(far, true)).toMatchObject({ repointed: 0 });
   });
 
   it("a two-pole tag is ONE homerun", async () => {

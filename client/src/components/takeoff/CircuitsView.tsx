@@ -90,6 +90,8 @@ export type CircuitHomeruns = {
     }
   ) => void;
   onConfirmAll: (ids: number[]) => void;
+  /** Re-point unconfirmed homerun devices — a person's action, never a view. */
+  onRematch: () => void;
 };
 
 export function CircuitsPanel({
@@ -176,6 +178,7 @@ export function CircuitsPanel({
             onSheet={homeruns.onSheet}
             confirmable={homeruns.confirmable}
             onConfirmAll={homeruns.onConfirmAll}
+            onRematch={homeruns.onRematch}
           />
         )}
 

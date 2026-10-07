@@ -295,6 +295,38 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**Viewing never changes a saved number; drop material not set is said; run
+names say "No drop here" — DONE on `c-homerun-footage` (2026-10-07).**
+
+- **Homeruns:** `syncHomerunCircuit` takes `repoint` (required). A visit's
+  `homeruns.syncSheet` only creates circuits it has not seen (leaving device
+  written once); `rematch: true` re-points UNCONFIRMED ones (confirmed never)
+  and returns `{ created, repointed }`. Sent by "Re-match homeruns on this
+  sheet" (Circuits panel, beside Confirm) and by the first sync after a
+  panel is placed or removed BY HAND (`rematchOnNextSync`). A "PANEL 2B"
+  label only fills a panel with no saved spot — it used to move a
+  hand-placed one back on every visit.
+- **Seen at 1180x820 touch, UNCC E111:** three open/close visits — totals
+  identical (38 homeruns, 3,996.04 ft pipe, 11,988.13 ft wire, same leaving
+  devices). Then 3 unconfirmed homerun devices pointed elsewhere by SQL (as an
+  old sync left them): 3 visits identical at 4,271.28 / 12,813.84 ft (the old
+  code moved them on the first); "Re-match" → toast "3 homeruns re-matched
+  to the device now closest", 3,996.04 / 11,988.13 ft; 3 more visits
+  identical.
+- **No drop material:** `groupDrops` reason is `DROP_MATERIAL_NOT_SET`
+  ("drop material not set") with `notPricedDrops` (wanted, with a height,
+  not claimed); row "Drop material not set — 86 drops not priced";
+  Totals "205 drops not priced — drop material not set on 5 counted items.
+  Not in these totals."; materials list "NOT on this list: …". Never 0 ft.
+  The BID page does not say it yet (todo, owner's call).
+- **Run name:** `runNameParts` names an end at run height
+  `END_NO_DROP_LABEL` — "Panel → No drop here" (owner wrote "No drop";
+  kept the full phrase so name, row, chip and picker are one string).
+- Tests: `homerunsRouter.test.ts` (three visits identical — red with the old
+  re-pointing; Re-match re-points unconfirmed only), `groupDrops.test.ts`
+  +3 (+1 reworded), `deviceMountKind.test.ts` +1 (Totals + materials list),
+  `takeoffVerticals.test.ts` run name.
+
 **Count drops from the item, Data/TV type, "No drop here" picker — DONE on
 `c-homerun-footage` (2026-10-07, owner's three YESes), no new column.**
 

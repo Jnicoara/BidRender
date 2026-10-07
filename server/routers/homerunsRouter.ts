@@ -156,9 +156,14 @@ export const homerunsRouter = router({
 
   /**
    * The circuits the browser read on one sheet. Each panel is made if it is
-   * new, each circuit made if new, and an UNCONFIRMED homerun is pointed at
-   * the device now closest (`syncHomerunCircuit` keeps a confirmed one).
+   * new, each circuit made if new — with its leaving device, written once.
    * A leaving device not on this bid and sheet is refused, not stored.
+   *
+   * VIEWING NEVER CHANGES A SAVED NUMBER (owner, 2026-10-07): the page sends
+   * this on every visit, so an existing homerun is left as it is. Only
+   * `rematch: true` — a person pressing "Re-match homeruns", or placing the
+   * panel by hand — re-points the UNCONFIRMED ones to the device now closest
+   * (`syncHomerunCircuit` never moves a confirmed one).
    */
   syncSheet: procedure
     .input(
@@ -174,6 +179,8 @@ export const homerunsRouter = router({
             })
           )
           .max(2000),
+        /** A person asked to re-point unconfirmed homerun devices. */
+        rematch: z.boolean().default(false),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -187,6 +194,8 @@ export const homerunsRouter = router({
       );
       const panelIds = new Map<string, number>();
       let synced = 0;
+      let created = 0;
+      let repointed = 0;
       for (const c of input.circuits) {
         if (c.leavingStampId !== null && !marks.has(c.leavingStampId))
           throw new TRPCError({
@@ -200,16 +209,19 @@ export const homerunsRouter = router({
           panelIds.set(key, panelId);
         }
         // A two-pole "2B-36,38" is ONE homerun, kept on its first circuit.
-        await db.syncHomerunCircuit(
+        const result = await db.syncHomerunCircuit(
           panelId,
           userId,
           Math.min(...c.circuits),
           c.circuits.length,
-          c.leavingStampId
+          c.leavingStampId,
+          input.rematch
         );
         synced++;
+        if (result.created) created++;
+        if (result.repointed) repointed++;
       }
-      return { synced };
+      return { synced, created, repointed };
     }),
 
   /** Where a panel sits on a sheet — the Measured method's other end. */

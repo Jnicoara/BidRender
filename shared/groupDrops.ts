@@ -195,7 +195,15 @@ export type GroupDrop = {
   mayDoubleCount: number;
   /** One drop's footage; null unless counted. */
   perDrop: DropFootage | null;
+  /**
+   * Drops that are wanted, with a height, but NOT PRICED because the count
+   * has no drop material ("no-type"). 0 otherwise. Said, never a silent 0 ft.
+   */
+  notPricedDrops: number;
 };
+
+/** The words for a count whose drops have no material — one string everywhere. */
+export const DROP_MATERIAL_NOT_SET = "drop material not set";
 
 /** Drops at one device height. */
 export type DropBucket = {
@@ -374,6 +382,7 @@ export function groupDrops(input: {
       uncounted: null,
       mayDoubleCount: 0,
       perDrop: null,
+      notPricedDrops: 0,
     });
 
     if (group.dropKind === null) return none("not-answered", null, null);
@@ -415,10 +424,24 @@ export function groupDrops(input: {
 
     const type =
       group.dropRunTypeId === null ? null : input.typeFor(group.dropRunTypeId);
+    /*
+      NO DROP MATERIAL (owner, 2026-10-07): the drops are wanted and have a
+      height, but nothing says what they are made of, so none can be priced.
+      Counted as NOT PRICED — how many, said on the row, the totals and the
+      materials list — never as 0 ft.
+    */
     if (!type)
       return {
-        ...none("no-type", "say what the drop is made of", device),
+        ...none("no-type", DROP_MATERIAL_NOT_SET, device),
         perDropFeet: vertical.counted ? vertical.feet : null,
+        notPricedDrops: wanting.filter(
+          mark =>
+            verticalAtEnd({
+              kind,
+              endInches: heightFor(mark.height).inches,
+              distributionInches: ceilingOf(mark),
+            }).counted
+        ).length,
       };
 
     const wirePct =
@@ -499,6 +522,7 @@ export function groupDrops(input: {
       perDrop: vertical.counted
         ? oneDrop(vertical.feet, type, wirePct, makeup, conduitPct)
         : null,
+      notPricedDrops: 0,
     };
   });
 }
@@ -533,6 +557,7 @@ export function notAnsweredDrop(
     uncounted: null,
     mayDoubleCount: 0,
     perDrop: null,
+    notPricedDrops: 0,
   };
 }
 

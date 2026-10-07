@@ -258,14 +258,25 @@ Search those before asking for a height column.
       (`END_NO_DROP_LABEL` via `endKindLabel` — every END label, the trace
       toolbar's included). `DISTRIBUTION_LABEL` ("Run height") still names
       the height itself.
-- [ ] **Still two names, found 2026-10-07, not asked:** a finished run's NAME
-      ("Panel → Run height", `endsName` via `heightTypeLabel`) still calls an
-      end at run height "Run height", while its Run ends row says "No drop
-      here". Changing it renames every run row; owner's call.
-- [ ] **Homerun numbers move when the Circuits panel opens:** it re-points
-      every UNCONFIRMED homerun to the device now closest (by design). Any
-      before/after must be measured without opening it in between — the
-      2026-10-07 E111 figures moved 4,119.31 → 3,987.54 ft that way.
+- [x] **Fixed 2026-10-07 (owner):** a finished run's NAME says "No drop
+      here" for an end at run height ("Panel → No drop here",
+      `runNameParts`), the same words as its Run ends row, chip and picker.
+      Owner's example said "No drop"; the full phrase was kept so all four
+      read identically.
+- [x] **Fixed 2026-10-07 — WRONG-NUMBER RISK: viewing re-pointed homeruns.**
+      Opening the Circuits panel re-pointed every UNCONFIRMED homerun to the
+      device now closest, so totals moved from looking (E111: 4,119.31 →
+      3,987.54 ft). Now a visit only CREATES circuits (leaving device written
+      once); re-pointing is "Re-match homeruns on this sheet" or placing a
+      panel by hand. A "PANEL 2B" label only fills a panel with no spot.
+- [x] **Fixed 2026-10-07:** a count with no drop material says "Drop material
+      not set — N drops not priced" on its row, "N drops not priced — drop
+      material not set on M counted items" on the Totals tab, and "NOT on this
+      list: N drops …" in the materials list notes (`notPricedDrops`).
+- [ ] **Not on the BID page yet:** drops not priced for want of a material are
+      said on the Plans screen and the materials list, but the bid's own
+      "+ N not priced" counts bid LINES, and these drops are not a line.
+      Owner's call whether the bid page should say it too.
 
 **Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
 `references/homerun-footage-plan.md`; nothing computes footage yet). Owner:

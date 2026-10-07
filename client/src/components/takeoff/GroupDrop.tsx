@@ -285,10 +285,22 @@ export function GroupDrop({
           )}
         </>
       )}
-      {(r?.status === "no-height" || r?.status === "no-type") && (
+      {r?.status === "no-height" && (
         <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1">
           <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
           No drop counted — {r.reason}.
+        </p>
+      )}
+      {/*
+        NO DROP MATERIAL (owner, 2026-10-07): said with HOW MANY drops it
+        leaves unpriced, never a quiet 0 ft. The fix is the picker above.
+      */}
+      {r?.status === "no-type" && (
+        <p className="text-xs text-warning bg-warning/10 rounded px-2 py-1 flex items-start gap-1">
+          <TriangleAlert className="w-3 h-3 mt-0.5 shrink-0" />
+          Drop material not set — {r.notPricedDrops}{" "}
+          {r.notPricedDrops === 1 ? "drop" : "drops"} not priced. Pick what each
+          drop is made of.
         </p>
       )}
       {locked && (

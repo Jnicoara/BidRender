@@ -12,7 +12,7 @@
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../../server/routers";
 import { useState } from "react";
-import { Check, ChevronDown, ChevronRight } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { HeightFields } from "@/components/HeightFields";
@@ -61,6 +61,7 @@ export function HomerunSettings({
   onSheet,
   confirmable,
   onConfirmAll,
+  onRematch,
 }: {
   data: HomerunsData;
   /** This sheet's own method override; NULL follows the bid. */
@@ -71,6 +72,7 @@ export function HomerunSettings({
   /** Unconfirmed homeruns on this sheet whose method guessed nothing. */
   confirmable: number[];
   onConfirmAll: (ids: number[]) => void;
+  onRematch: () => void;
 }) {
   const s = data.settings;
   const method = parseHomerunMethod(s.method) ?? "measured";
@@ -329,6 +331,29 @@ export function HomerunSettings({
           <Check className="w-3.5 h-3.5" /> Confirm {confirmable.length} on this
           sheet
         </Button>
+      )}
+      {/*
+        RE-MATCH (owner, 2026-10-07): viewing never moves a homerun, so the
+        device each one leaves from is chosen once, when it is made. This is
+        the one way to point the UNCONFIRMED ones at the device now closest
+        — a person's action, and the result is saved. Confirmed ones stay.
+      */}
+      {t.unconfirmed > 0 && !locked && (
+        <div className="space-y-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-11 w-full text-xs gap-1"
+            onClick={onRematch}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Re-match homeruns on this
+            sheet
+          </Button>
+          <div className="text-muted-foreground">
+            Points each unconfirmed homerun at the device now closest to its
+            panel. Confirmed ones stay as they are.
+          </div>
+        </div>
       )}
     </div>
   );

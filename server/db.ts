@@ -14036,22 +14036,34 @@ export async function setHomerunPanelSpot(
 }
 
 /**
- * Circuit `circuitNumber` of a panel, made if missing, and — WHILE IT IS
- * UNCONFIRMED — pointed at `leavingStampId`, the device the browser just read
- * as closest. A confirmed homerun is never re-pointed (plan § 6): the guard
- * is in the WHERE, so no caller can forget it.
+ * Circuit `circuitNumber` of a panel, made if missing, with `leavingStampId`
+ * — the device the browser read as closest — written ONCE, when it is made.
+ *
+ * ── Viewing must never change a saved number (owner, 2026-10-07) ─────────
+ * This ran on every visit to the Circuits panel and re-pointed every
+ * unconfirmed homerun to whatever the browser now read as closest, so the
+ * bid's totals moved just from looking (E111: 4,119.31 → 3,987.54 ft). An
+ * existing circuit is now left exactly as it is unless `repoint` — a person
+ * pressing "Re-match homeruns", or placing the panel by hand. Even then a
+ * CONFIRMED homerun is never re-pointed (plan § 6): that guard is in the
+ * WHERE, so no caller can forget it.
  */
 export async function syncHomerunCircuit(
   panelId: number,
   userId: number,
   circuitNumber: number,
   poles: number,
-  leavingStampId: number | null
-): Promise<number> {
+  leavingStampId: number | null,
+  repoint: boolean
+): Promise<{ id: number; created: boolean; repointed: boolean }> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const [existing] = await db
-    .select({ id: bidPanelCircuits.id })
+    .select({
+      id: bidPanelCircuits.id,
+      from: bidPanelCircuits.homerunFromStampId,
+      confirmedAt: bidPanelCircuits.homerunConfirmedAt,
+    })
     .from(bidPanelCircuits)
     .where(
       and(
@@ -14069,8 +14081,13 @@ export async function syncHomerunCircuit(
       poles,
       homerunFromStampId: leavingStampId,
     });
-    return result.insertId;
+    return { id: result.insertId, created: true, repointed: false };
   }
+  const moves =
+    repoint &&
+    existing.confirmedAt === null &&
+    existing.from !== leavingStampId;
+  if (!moves) return { id: existing.id, created: false, repointed: false };
   await db
     .update(bidPanelCircuits)
     .set({ homerunFromStampId: leavingStampId, poles })
@@ -14081,7 +14098,7 @@ export async function syncHomerunCircuit(
         isNull(bidPanelCircuits.homerunConfirmedAt)
       )
     );
-  return existing.id;
+  return { id: existing.id, created: false, repointed: true };
 }
 
 /** A homerun's own settings. Omitted leaves a field; NULL clears it. */

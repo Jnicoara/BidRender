@@ -1038,14 +1038,16 @@ describe("what a run is called, ends and all", () => {
     ).toBe('Panel → Pull can, high bay, 1/2" EMT, 2 #12 + ground');
   });
 
-  it("says the pipe carries on, rather than showing the slug", () => {
+  it("names an end at run height 'No drop here', as its Run ends row does", () => {
+    // Owner, 2026-10-07. Red before: "Run height → Switch" on the run's name
+    // beside "no drop here" on its own Run ends row.
     expect(
       runDisplayName({
         ...conduit,
         startKind: DISTRIBUTION_KIND,
         endKind: "switch",
       })
-    ).toBe('Run height → Switch, 1/2" EMT, 2 #12 + ground');
+    ).toBe('No drop here → Switch, 1/2" EMT, 2 #12 + ground');
   });
 
   it("drops BOTH ends when only one is answered", () => {

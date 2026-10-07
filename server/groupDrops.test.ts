@@ -14,6 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  DROP_MATERIAL_NOT_SET,
   groupDrops,
   markDropEntries,
   type DropGroup,
@@ -314,7 +315,8 @@ describe("a drop that is wanted but cannot be counted says why", () => {
   it("names a missing run type", () => {
     const [d] = drops({ type: null });
     expect(d.status).toBe("no-type");
-    expect(d.reason).toMatch(/made of/);
+    // Owner, 2026-10-07: the words are "drop material not set".
+    expect(d.reason).toBe("drop material not set");
     expect(markDropEntries([d])).toEqual([]);
   });
 
@@ -385,5 +387,32 @@ describe("a box a homerun rises from carries no count drop", () => {
     expect(d.dropKind).toBe("receptacle");
     expect(d.dropKindFromItem).toBe(true);
     expect(d.status).toBe("counted");
+  });
+});
+
+/*
+  NO DROP MATERIAL (owner, 2026-10-07): "drop material not set", counted as
+  NOT PRICED — never a silent 0 ft. Red before: the reason read "say what the
+  drop is made of" and nothing said how many drops it left out.
+*/
+describe("a count with no drop material", () => {
+  it("says 'drop material not set' and how many drops it leaves unpriced", () => {
+    const [d] = drops({ type: null });
+    expect(d.status).toBe("no-type");
+    expect(d.reason).toBe(DROP_MATERIAL_NOT_SET);
+    expect(d.reason).toBe("drop material not set");
+    expect(d.notPricedDrops).toBe(12);
+    // Nothing reaches a bid line, and no footage is claimed as 0.
+    expect(d.totalDropFeet).toBeNull();
+    expect(markDropEntries([d])).toEqual([]);
+  });
+
+  it("leaves claimed and level boxes out of the unpriced count", () => {
+    const [d] = drops({ type: null, homerunClaims: new Set([100, 101]) });
+    expect(d.notPricedDrops).toBe(10);
+  });
+
+  it("a counted drop has none unpriced", () => {
+    expect(drops({})[0].notPricedDrops).toBe(0);
   });
 });

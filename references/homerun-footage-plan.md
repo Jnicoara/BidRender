@@ -188,6 +188,11 @@ Average 25 ft instead: L = 25, the rest the same. Minimum 50 ft: L = 50.
 - A re-read (a mark moved, a panel moved, the scale changed) re-computes an
   UNCONFIRMED homerun and leaves a confirmed or overridden one alone, but
   marks it "inputs changed since confirmed".
+  > **Narrowed 2026-10-07 (owner): viewing never changes a saved number.**
+  > A re-read still re-computes the length from the saved leaving device,
+  > but no longer PICKS a new device — that happens once, when the homerun
+  > is made, and again only on "Re-match homeruns" or a panel placed by
+  > hand (§ 10, track-c-handoff.md).
 
 ## 7. What the bid shows
 
@@ -246,7 +251,9 @@ and migrates them together (pairing rule 3).
   read it). The browser `syncSheet`s each sheet's circuits — the server
   keeps page TEXT, not word positions, so it cannot read the "2B-1" tags
   itself. `homerunFromStampId` holds the leaving device: the closest as
-  last read while UNCONFIRMED (re-pointed on every re-read), left alone
+  read when the homerun was MADE (until 2026-10-07 re-pointed on every
+  re-read, which moved totals from viewing — now only "Re-match homeruns"
+  or a hand-placed panel re-points an unconfirmed one), left alone
   once confirmed — the guard is in the UPDATE's WHERE
   (`syncHomerunCircuit`). With no panel placed, the circuit's first device,
   so Average still has a sheet. A two-pole tag is one row, on its first
