@@ -1253,6 +1253,13 @@ reached for**. Hovering, focusing or clicking a gated trace button raises it to
 amber with its triangle, as does starting a calibration. The ScaleControl also
 absorbed the not-to-scale note, so nothing was lost by deleting the second chip.
 
+> **Narrowed 2026-10-06, by the owner:** "make Set scale bright and obvious on
+> an unscaled sheet, quiet once set". The chip is now a YELLOW BUTTON on any
+> sheet with no scale (grey only where the sheet says NOT TO SCALE), and muted
+> once a scale is set (`ScaleControl.tsx`). It is an ask, not a warning — the
+> amber triangle still appears only when a measuring tool is reached for, so
+> the principle below stands for warnings.
+
 > **The principle, because it generalises past this bar:** a warning shown where
 > there is no problem teaches people to skip warnings, including the one that
 > matters. The scale is not a problem on a sheet nobody will measure — it is

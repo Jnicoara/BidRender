@@ -13,11 +13,16 @@
  *                    with high confidence, and labelled so nobody mistakes it
  *                    for something they chose.
  *   set + manual   — the same, with no badge. The user's own answer.
- *   not set        — plain grey, saying "Set scale" and nothing more. It is
- *                    only a problem on a sheet somebody wants to measure, and
- *                    on a specifications or legend sheet there is nothing to
- *                    measure at all. A warning shown where there is no
- *                    problem is a warning people learn to scroll past.
+ *   not set        — a yellow "Set scale" button, the screen's call to act.
+ *                    Not a warning: no amber, no triangle. CHANGED
+ *                    2026-10-06 by the owner ("bright and obvious on an
+ *                    unscaled sheet, quiet once set") — it was plain grey,
+ *                    because a WARNING on a legend sheet is one people learn
+ *                    to skip (plan-viewer-overhaul.md § 4a.2). That reasoning
+ *                    still holds for the warning, which still waits for a
+ *                    measuring tool; the ask was too quiet to find. A sheet
+ *                    that says NOT TO SCALE stays grey.
+ *   set            — muted, stepping back. Its own warnings keep their colour.
  *
  * The amber and the triangle come back the moment a measuring tool is
  * reached for — `wanted` — because that is the moment the missing scale is
@@ -129,6 +134,14 @@ export function ScaleControl({
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
   const isSet = sheet.scaleRatio !== null;
+  /**
+   * No scale, and nothing on the sheet says it has none: the chip ASKS, in
+   * the screen's own yellow (owner, 2026-10-06: "bright and obvious on an
+   * unscaled sheet, quiet once set"). A prompt, not a warning — the amber
+   * triangle still waits for a measuring tool (`wanted`), so it is not the
+   * alarm-on-every-sheet that plan-viewer-overhaul.md § 4a.2 removed.
+   */
+  const asking = !isSet && !notToScale && !flash;
 
   /*
     The scale in plain words, from the RATIO rather than the stored text.
@@ -286,13 +299,20 @@ export function ScaleControl({
         <PopoverTrigger asChild>
           <Button
             size="sm"
-            variant="ghost"
+            variant={asking ? "default" : "ghost"}
             className={cn(
               "h-7 gap-1.5 text-xs transition-colors",
               flash &&
                 "border border-emerald-500 bg-emerald-500/10 text-emerald-300",
-              !isSet && !flash && !wanted && "text-muted-foreground",
-              !isSet && !flash && wanted && "text-warning hover:text-warning"
+              asking && "font-semibold",
+              // Set, it steps back: the warnings carry their own colour.
+              isSet && !flash && "text-muted-foreground",
+              !isSet &&
+                !asking &&
+                !flash &&
+                (wanted
+                  ? "text-warning hover:text-warning"
+                  : "text-muted-foreground")
             )}
             title={
               isSet

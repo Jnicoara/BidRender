@@ -152,6 +152,14 @@ export function StartBidCards({
  * and the wording is the same, so what someone learned from the cards still
  * describes what the menu does. The app already knows when to switch: the
  * checklist is decided from real data, never from screens visited.
+ *
+ * ── Upload stays OUT of the menu as well — owner, 2026-10-06 ────────────────
+ * "Make Plans/upload easier to find from the Dashboard." Folded into the menu,
+ * the commonest way a job arrives was two clicks and a guess away for exactly
+ * the people who use it most. So "Upload a plan" is its own yellow button
+ * beside the menu, sharing the menu's file input, and "New bid" steps down to
+ * an outline. The menu still lists all three routes, so nothing it taught
+ * moved.
  */
 export function NewBidMenu({
   onUploadPlan,
@@ -179,10 +187,20 @@ export function NewBidMenu({
           if (file) onUploadPlan(file);
         }}
       />
+      <Button
+        size="sm"
+        className="h-8 gap-1.5 text-xs shrink-0"
+        disabled={busy}
+        onClick={() => fileInput.current?.click()}
+        title={`Start a bid from a drawing set — PDF, up to ${formatBytes(MAX_PDF_BYTES)}`}
+      >
+        <FileUp className="w-3.5 h-3.5" /> Upload a plan
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             size="sm"
+            variant="outline"
             className="h-8 gap-1.5 text-xs shrink-0"
             disabled={busy}
           >

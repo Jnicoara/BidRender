@@ -10873,22 +10873,24 @@ export default function TakeoffPage({
                   : (stamps.find(s => selectedStampIds.has(s.id))?.groupId ??
                     null)
               }
+              layers={
+                <LayersPanel
+                  present={present}
+                  state={effectiveLayers}
+                  onChange={update =>
+                    setLayerState(previous =>
+                      update(
+                        previous ??
+                          allLayersOn([...layeredStamps, ...layeredRuns])
+                      )
+                    )
+                  }
+                  filtered={hiddenCount > 0}
+                  hiddenCount={hiddenCount}
+                />
+              }
               legend={
                 <>
-                  <LayersPanel
-                    present={present}
-                    state={effectiveLayers}
-                    onChange={update =>
-                      setLayerState(previous =>
-                        update(
-                          previous ??
-                            allLayersOn([...layeredStamps, ...layeredRuns])
-                        )
-                      )
-                    }
-                    filtered={hiddenCount > 0}
-                    hiddenCount={hiddenCount}
-                  />
                   <LegendPanel
                     symbols={symbols}
                     assemblies={allAssemblies.map(a => ({

@@ -168,12 +168,17 @@ export function LayersPanel({
   return (
     <div className="border-t border-border shrink-0">
       {/*
-        Shut by default, like the Co-pilot panel above it.
+        Shut by default. Layers is a filter — set occasionally, read rarely —
+        so open it would cost the most vertical space per glance of anything
+        in the pane.
 
-        The work pane stacked Co-pilot, Layers and Legend above the counted
-        items in a 32%-wide column, and only Co-pilot could be put away. Layers
-        is a filter — set occasionally, read rarely — so it costs the most
-        vertical space per glance of anything in the pane.
+        ── Pinned above the tabs since 2026-10-06 ────────────────────────────
+        It moved out of the Legend tab to sit under "This sheet" on every tab
+        (owner: "move Layers higher"). That puts it OUTSIDE the panel's one
+        scroll region, which is how the bid totals were once cut in half
+        (RunsPanel, "ONE scroll region"). So the open body is capped at 40%
+        of the window and scrolls inside that cap: past the cap a second
+        scroller is the lesser fault, beside a pane pushed off the screen.
 
         ── The hidden-count warning is NOT collapsible ────────────────────────
         It moves into the header rather than folding away with the rest. A
@@ -200,7 +205,7 @@ export function LayersPanel({
       </button>
 
       {!open ? null : (
-        <>
+        <div className="max-h-[40dvh] overflow-y-auto">
           <Axis
             title="System"
             entries={present.systems}
@@ -263,11 +268,11 @@ export function LayersPanel({
           job gets quoted missing half its devices. */}
           {filtered && (
             <p className="mx-3 mb-2 rounded bg-warning/10 px-2 py-1 text-xs text-warning">
-              Showing part of this sheet. Totals below cover the whole bid
+              Showing part of this sheet. The Totals tab covers the whole bid
               regardless.
             </p>
           )}
-        </>
+        </div>
       )}
     </div>
   );

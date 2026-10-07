@@ -3,8 +3,9 @@
 Written for a restart. Worktree `C:\dev\BidPhase-C`, branch `track-c`.
 At the time of writing, track-c and local-dev were the same commit, everything
 was committed and pushed, and `main` was `24105ad`. C's databases
-`bidrender_local_c` and `bidrender_test_c` had 105 migrations (through 0104) — local-dev has since added at least one more
-(`takeoff_stamps.labelWords`), not applied to C's local DB on 2026-10-06. If `git log origin/local-dev` or `scripts/schemaDrift.mts` says
+`bidrender_local_c` and `bidrender_test_c` had 105 migrations (through
+0104); `bidrender_local_c` was brought to all 125 (through 0124) on
+2026-10-06 to run the Plans screen, `bidrender_test_c` was not. If `git log origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
@@ -266,6 +267,29 @@ red run is not by itself a red suite:
    `scaleTemplate` (already in `findMatching.ts`, used by the sheet check)
    at a few sizes, with every such find staying a suggestion under the
    per-set rule.
+
+## Plans screen polish — DONE 2026-10-06
+
+Asked by the owner as three items; none was written in this file before.
+
+1. **Layers higher**: out of the Legend tab (4th of 5) to under "This
+   sheet", pinned on every tab (`RunsPanel` `layers` slot). It filters marks
+   AND runs, so it could not go in one tab. Still shut by default with
+   "N hidden" in its header; the open body is capped at 40dvh because it
+   sits outside the panel's one scroller.
+2. **Set scale**: a yellow button on a sheet with no scale (grey where the
+   sheet says NOT TO SCALE), muted once set. Narrows overhaul § 4a.2 —
+   noted there and in `ScaleControl`'s header. Trade-off seen: E0.01, a
+   notes sheet with nothing to measure, shows it yellow too.
+3. **Dashboard**: "Recent plans" moved up under the start cards; once
+   graduated, "Upload a plan" is its own yellow button and "New bid ▾" is
+   outline (`NewBidMenu`). The sidebar Plans entry stays deferred (todo.md,
+   owner 2026-09-27).
+
+Seen on screen with playwright (laptop, tablet, phone; graduated header
+seen by giving user 1 a labor rate for the shot, then setting it back to
+0); `pnpm device:audit --check` 0 hard faults on dashboard / plans /
+totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 

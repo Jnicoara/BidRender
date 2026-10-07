@@ -2489,10 +2489,11 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       is in `references/track-b-beta-plan.md` § 3 (a `/plans` index screen,
       not a dead end), and it means rewriting CLAUDE.md's "none of them is in
       the nav" and the eight-destination comments in the same change.
-- [ ] **Not checked at phone width:** the Dashboard's "Recent plans" row and
-      the card chip (checked at 1536 px only; `flex-wrap`, so expected fine).
-      And on an account still showing the getting-started checklist, the row
-      sits near the fold — worth a look if Phase 1 still feels hidden.
+- [x] **Checked at phone width 2026-10-06 (Track C, playwright at 390x844):**
+      the Dashboard's "Recent plans" row wraps cleanly. It sat near the fold
+      under the checklist, so it MOVED UP to just under the start cards, and
+      a graduated account's "Upload a plan" is now its own button beside
+      "New bid ▾" (owner: "make Plans/upload easier to find").
 - [x] **MEASURED 2026-09-28 and left alone: `lastUsedAt` is right.** The
       entry below guessed it read 7 hours out like the Dashboard's
       newest-plan date. Asked the driver instead: `db.execute` returns a raw

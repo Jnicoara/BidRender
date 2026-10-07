@@ -15,6 +15,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Plans screen and Dashboard are easier to use.** Layers (show or hide
+  marks and runs) now sits right under "This sheet" on every tab instead of
+  inside the Legend tab. "Set scale" is a bright yellow button on a sheet
+  with no scale and steps back once a scale is set. On the Dashboard,
+  "Recent plans" moved up under the ways to start a bid, and once the
+  getting-started list is done "Upload a plan" is its own button beside
+  "New bid" instead of hidden inside its menu.
+
 - **Homerun footage, the arithmetic only — nothing on a bid yet.** A
   calculator that turns a circuit's devices, the panel's spot, the sheet
   scale and the ceiling height into wire, conduit and labor footage, showing

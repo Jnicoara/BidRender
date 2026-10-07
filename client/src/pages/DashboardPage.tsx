@@ -375,8 +375,9 @@ export default function DashboardPage({
             date and a client before any pricing exists. Three loud buttons
             would be no emphasis at all.
 
-            Once the checklist is done the cards go, and this becomes the one
-            control that carries all three routes. See NewBidMenu.
+            Once the checklist is done the cards go, and this becomes the
+            control that carries all three routes — with "Upload a plan" also
+            its own button beside it (2026-10-06). See NewBidMenu.
           */}
           {graduated ? (
             <NewBidMenu
@@ -448,6 +449,46 @@ export default function DashboardPage({
               busy={startFromPlan.isPending || startCounting.isPending}
             />
           )}
+          {/*
+            RECENT PLANS — back to the drawings in one click (2026-09-27).
+            The bids whose plans were attached most recently, from the same
+            query as the board, so a card's chip and this row cannot disagree.
+            Shown only when there is something in it: an empty "Recent plans"
+            heading is a door to nowhere.
+
+            MOVED UP 2026-10-06 (owner: "make Plans easier to find from the
+            Dashboard"). It sat under the checklist, the helper and the search
+            — near the fold on any account still setting up (todo.md had
+            flagged exactly that). Now it is the first thing after the ways
+            to start one.
+          */}
+          {recentPlans.length > 0 && (
+            <div>
+              <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1.5 px-1">
+                Recent plans
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {recentPlans.map(bid => (
+                  <button
+                    key={bid.id}
+                    onClick={() => onOpenPlans(bid.id)}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-muted/20 hover:border-[#F5C518]/60 transition-colors min-w-0 max-w-full sm:max-w-[16rem]"
+                    title={`Open the plans for ${bid.name}`}
+                  >
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-medium truncate">
+                        {bid.name}
+                      </span>
+                      <span className="block text-[0.7rem] text-muted-foreground">
+                        {planCountLabel(bid.plans)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <SampleBidCard onOpenBid={onOpenBid} />
           <GettingStartedChecklist />
           <NavigationHelper className="max-w-xl" />
@@ -495,41 +536,6 @@ export default function DashboardPage({
             </button>
           )}
         </div>
-
-        {/*
-          RECENT PLANS — back to the drawings in one click (2026-09-27).
-          The bids whose plans were attached most recently, from the same
-          query as the board, so a card's chip and this row cannot disagree.
-          Shown only when there is something in it: an empty "Recent plans"
-          heading is a door to nowhere.
-        */}
-        {recentPlans.length > 0 && (
-          <div className="mb-4">
-            <div className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1.5 px-1">
-              Recent plans
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {recentPlans.map(bid => (
-                <button
-                  key={bid.id}
-                  onClick={() => onOpenPlans(bid.id)}
-                  className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left hover:bg-muted/20 hover:border-[#F5C518]/60 transition-colors min-w-0 max-w-full sm:max-w-[16rem]"
-                  title={`Open the plans for ${bid.name}`}
-                >
-                  <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-xs font-medium truncate">
-                      {bid.name}
-                    </span>
-                    <span className="block text-[0.7rem] text-muted-foreground">
-                      {planCountLabel(bid.plans)}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {isLoading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">

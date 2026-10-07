@@ -1177,6 +1177,7 @@ export function RunsPanel({
   onJumpTo,
   onRemoveStamp,
   legend,
+  layers,
   reader,
   summary,
   tab,
@@ -1318,8 +1319,14 @@ export function RunsPanel({
   /** Move the viewer to a mark on the drawing and highlight it. */
   onJumpTo: (at: { x: number; y: number }) => void;
   onRemoveStamp: (id: number) => void;
-  /** The Legend tab: layers and captured symbols. */
+  /** The Legend tab: captured symbols. */
   legend?: React.ReactNode;
+  /**
+   * The Layers filter, pinned under "This sheet" on every tab (owner,
+   * 2026-10-06: "move Layers higher"). It filters marks AND runs, so it
+   * belongs above the tabs rather than inside one of them.
+   */
+  layers?: React.ReactNode;
   /** The Reader tab's content, when the reader exists (§ 1 rule 6). */
   reader?: React.ReactNode;
   /**
@@ -1564,6 +1571,13 @@ export function RunsPanel({
           </p>
         )}
       </div>
+
+      {/*
+        LAYERS, pinned with the line above (2026-10-06). It sat at the top of
+        the Legend tab, the fourth of five, so a filter that hides marks and
+        runs on EVERY tab could only be reached, or seen to be on, from one.
+      */}
+      {layers}
 
       {/*
         ONE scroll region, holding the list AND the legend beneath it.
