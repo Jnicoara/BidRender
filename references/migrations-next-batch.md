@@ -270,6 +270,29 @@ byte-identical, second run no-op, edited row skipped) and on a throwaway copy
 of `bidrender_local_b_new` (report: LT1, LT2 `would add`; apply: `added`;
 again: `already has it`; original untouched; copy dropped).
 
+## Requests from Track B, 2026-10-07 — for A to number (residential / commercial filter)
+
+Plan: `references/top-assemblies-draft.md` § 5. **Not built**; B builds the
+filter once these exist. Both ADDITIVE, nullable, **no DEFAULT**, no
+backfill — step 1 of the three. Bid number: **no** — the tag decides what
+the picker SHOWS, never what a line costs.
+
+| Column                                                                                                                       | Meaning                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `bids.projectType ENUM('residential','commercial','both') NULL`                                                              | The bid's work type; the picker shows matching + both + untagged. NULL = follow the company default. |
+| Company default, e.g. `pricing_defaults.defaultProjectType ENUM('residential','commercial','both') NULL` (A picks the table) | The shop's default for new bids. NULL = show everything, i.e. today.                                 |
+
+**NOT an assemblies column.** The owner's request said "the tag needs a new
+assemblies column"; it does not — `assemblies.projectType` (the same enum,
+nullable) already exists and every shipped starter is seeded with it (51
+residential, 81 commercial, 36 both). Writing a second one would be two
+tags that can disagree.
+
+**No index needed** for the "most used" row (§ 4 of the same plan):
+`bid_line_items.assemblyId` is a foreign key to `assemblies`, and MySQL
+indexes a foreign key column itself (checked in `drizzle/schema.ts`,
+2026-10-07).
+
 ## Not numbered — and why
 
 | Item                                                                          | Asked by                 | Why not numbered                                                                                                                                                                                |
