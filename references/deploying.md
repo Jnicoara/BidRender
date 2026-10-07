@@ -1587,6 +1587,43 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0105–0124 (done 2026-10-07) — NOT on live
+
+All twenty step-1 files (`migrations-next-batch.md`). Owner, 2026-10-06:
+the pairing rules (labor only; hours not set) are for the LIVE release, so
+staging takes the batch now; the live gates are at the top of
+`live-release-plan.md`.
+
+1. **Drift before** (from the batch's code): 105 recorded; every difference
+   listed is this batch's — nothing else.
+2. **Backup**: `staging-2026-10-07T00-13-36Z-before-0105-0124.sql` (65
+   tables, `--single-transaction`, verified TLS) in
+   `C:\dev\bidrender-backups\`; restored locally as
+   `bidrender_staging_restore`; **all 65 table counts equal staging's**.
+3. **Rehearsal on that copy**: `bidTotals` before (code `3a173a0`), **20
+   applied**, rerun "Nothing to apply", "Database matches the schema",
+   foreign keys 159/159, `bidTotals` after (batch code): **all 242 bids
+   unchanged**.
+4. **Gate green** on the merged batch `af235b2` (full suite on a fresh
+   database through 0124), after a first run's 8 guard failures were
+   answered (`0be70ad`).
+5. **Staging**, 00:16 UTC: **20 applied**, 125; "matches", 159/159; second
+   run nothing. The old code (`60ae696`) answered throughout — every file is
+   additive.
+6. **Code**: `e042dc1` pushed to `staging` by hand, then `local-dev`;
+   staging served it at 00:42 UTC. First boot: **167 shared starters, 159
+   with hours NULL, 0 at 0 h**, 29 in the new shelves (read-only query) —
+   the rehearsal's numbers exactly.
+7. **Spot-check on screen found a fault**: the Assemblies screen showed 138
+   of 167 — it grouped by a hand-kept copy of the five old categories and
+   dropped the rest. Fixed in `932cb53` (one shared list pinned to the
+   schema; grouping never drops a row). **`932cb53`: test, deploy-staging
+   and smoke all green (run 37553791194)**; the screen then showed all 167,
+   "hours not set" on every new starter, none 0.
+8. Side effect, harmless: Track C's queued run for `722ca8f` failed its
+   deploy-staging step ("staging has commits local-dev does not"), because
+   staging had been pushed by hand ahead of it. Its tests passed.
+
 ### Staging: migrations 0103–0104 (done 2026-10-05) — on live since 2026-10-06 (`24105ad`, entry above)
 
 Batch 1b (`migrations-0098-batch-plan.md` § S): `'unconfirmed'` appended to

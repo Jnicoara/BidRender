@@ -1,3 +1,60 @@
+# NEXT live release — the gates that must hold (written 2026-10-06, Track A)
+
+**Read this before planning the next live window.** Staging has migrations
+0105–0124 (applied 2026-10-07 00:16 UTC, backup
+`C:\dev\bidrender-backups\staging-2026-10-07T00-13-36Z-before-0105-0124.sql`).
+Live has 0000–0104. The pairing rules below are for LIVE; staging may run
+ahead of them (owner, 2026-10-06). **If any line below is not true on the
+day, the release does not go out — stop and find out why.**
+
+**Pairing rule 1 — labor only.** Live gets migrations **0105–0106** only in
+the SAME release as ALL of:
+
+- Track B's labor rule (`5c98bd1` — "labor with $0 material is not
+  priced"; already on `local-dev`);
+- Track B's **"Labor only" tick box** in the assembly editor;
+- Track B's **reading code**: `lineMaterialNotPriced` AND its SQL copy read
+  the line's frozen `snapshotLaborOnly`, and adding a line freezes it.
+
+The rule must never reach live without the tick and the reading code: the
+priced print refuses a "not priced" line with no way past (§ 0 below).
+**Status 2026-10-06: the rule is on `local-dev`; the tick and the reading
+code are NOT on any pushed branch (B is building them).** Check before the
+window: `git grep -n snapshotLaborOnly <candidate> -- shared server client/src`
+must show B's readers, not only the snapshot copy in `pricingSnapshotOf`.
+
+**Pairing rule 2 — hours not set.** Live gets migrations **0122–0123** only
+in the SAME release as Track B's starter seeding and "Hours not set" code
+(`882ee8e` H2 step 2, `1d4c322`; on `local-dev` since 2026-10-06):
+`shared/assemblyHours.ts`, `assemblyHoursColumnValue`, `starterHolds`, and
+the `drizzle/schema.ts` edit that makes `baseLaborHours` nullable. That edit
+seeds 159 starter assemblies with hours NULL on the first boot, so without
+the reading code a reader could price them at 0 h. Expected on the first
+boot after the release: ONE "Holding" line, for DV34 (rehearsed: 167 shared
+starters, 159 with NULL hours, none at 0). **If the boot logs more holds, or
+any new starter has hours 0, stop.**
+
+**Every file 0105–0124 is step 1 (additive).** Apply all twenty BEFORE the
+push, drift before and after, exactly as staging was (`deploying.md` § 11).
+They are one batch on `local-dev`; there is no partial release of them.
+
+**The LT1/LT2 repair script does NOT run on live as written.**
+`scripts/repairStarterFixtureLines.mts --apply` MOVES A NUMBER on any bid
+line from before 0087: such a line reads its recipe live, so the added $0
+fixture becomes "+1 part not priced" (measured: bid 1728273, 35 → 36). It
+waits for the one-time freeze of `snapshotUnpricedParts` (todo.md, "WRONG-
+NUMBER RISK: older bid lines read their assembly's recipe LIVE") — and so
+does ANY change to a shipped recipe or price, including the priced catalog.
+
+**Measure, not trust:** `bidTotals.mts` before and after on live, as in
+§ 4. Expected: no total moves. With B's labor rule in, a not-priced rise on
+labor-with-$0-material lines is EXPECTED and labelled; anything else is a
+FAIL. First, read-only, count live lines with `assemblyId IS NOT NULL AND
+snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — the lines the
+recipe-live risk applies to.
+
+---
+
 # Live release: `24105ad` and migrations 0096–0104. DONE 2026-10-06
 
 > **RELEASED 2026-10-06 on `24105ad`** with the owner's four approvals —

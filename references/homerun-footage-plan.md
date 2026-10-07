@@ -121,8 +121,11 @@ ceiling vs stockroom open to deck)." So, two things:
 2. **Before beta: height areas INSIDE a sheet.** The estimator draws a box
    (or polygon) on the sheet — "Stockroom, open to deck, 18'-0"" — and every
    homerun leaving a device inside it uses that height. A device in no area
-   follows the sheet. Two areas overlapping: the smaller one wins (a
-   stockroom drawn inside a sales floor). Columns for Track A in `todo.md`
+   follows the sheet. **Two areas overlapping: the one with the smaller
+   OUTLINE wins — the more specific one** (a stockroom drawn inside a sales
+   floor), **never just the lower height** (owner, 2026-10-06). Overlapping
+   areas show a warning on the sheet, so an overlap is seen, not silently
+   resolved. Columns for Track A in `todo.md`
    (§ 9); the same areas later give count drops their height, which is why
    they are their own table rather than a homerun field. `unitLabel` stays
    what it is (scope grouping in text) — an area here is a height region,
@@ -249,7 +252,10 @@ columns (§ 9).
 - Area override beats bid; bid beats default; Average needs no panel spot.
 - Ceiling: homerun's own → height area → sheet → job → company; an empty
   homerun height reads "follows the sheet", never "not set" and never 0.
-- A device inside two height areas takes the smaller one's height.
+- A device inside two height areas takes the height of the area with the
+  smaller outline, even when that height is the HIGHER one (a fixture where
+  the small area is 18' inside a 10' area — fails if "lower height wins").
+- Overlapping areas raise the warning on the sheet.
 - Makeup at the panel end only; unconfirmed homeruns in the total with the
   "+ N unconfirmed" count beside it.
 - Routing and waste add; waste absent from labor; makeup unscaled.

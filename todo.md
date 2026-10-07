@@ -99,11 +99,11 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
-> **0105–0124 WRITTEN 2026-10-06 (Track A) on branch `a-batch-0105`, NOT
-> merged into local-dev — applied to LOCAL databases only, never staging or
-> live (owner approves live). HELD: it lands (staging backup → migrate
-> staging → merge) only once B's labor-only code exists — checked
-> 2026-10-06, it is on no pushed branch.** Rehearsed
+> **0105–0124 ON STAGING (2026-10-07 00:16 UTC) and on local-dev — NOT on
+> live.** Owner: the pairing rules are for the LIVE release, which is gated
+> in `references/live-release-plan.md` (top). B's labor-only tick and
+> reading code are still on no pushed branch (2026-10-06) — live waits for
+> them. Rehearsed
 > on a copy of `bidrender_local`: no bid total moved (4,386 bids), 167
 > starters seed (DV34 still held), no NULL hours read as 0. Full record:
 > `references/migrations-next-batch.md` § Status. **For Track B, two things:**
@@ -425,6 +425,67 @@ All additive and nullable. Specs are in the plans named.
       their soft picture, because a re-capture never replaces an existing
       thumbnail; remove the symbol and capture it again to get a sharp one.
 
+### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed
+
+**Found** rehearsing the LT1/LT2 repair: adding a $0 fixture line to the
+shared LT1 recipe changed an EXISTING bid — not-priced parts 35 → 36 on bid
+1728273 (local copy), total due unchanged. Nothing on that bid was edited.
+
+**Which bid-line fields are frozen and which are read live** (from the code,
+`server/db.ts` and `shared/lineNotPriced.ts`):
+
+| Field on a bid line                                        | Frozen when the line is added   | Read live                                                                                                                                                                                                     |
+| ---------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Material cost (`snapshotMaterialCost`)                     | yes                             | —                                                                                                                                                                                                             |
+| Labor hours (`snapshotLaborHours`; NULL = hours not set)   | yes                             | —                                                                                                                                                                                                             |
+| Modifier %, labor rate, modifier names                     | yes                             | —                                                                                                                                                                                                             |
+| Markup % and its source (since 0078)                       | yes                             | —                                                                                                                                                                                                             |
+| **Parts not priced** (`snapshotUnpricedParts`, since 0087) | yes — on lines added since 0087 | **on lines from before 0087 (NULL)**: `withUnpricedParts` → `liveUnpricedParts` counts the $0 parts in the recipe AS IT IS NOW, through `getAssemblyForStoredReference` — so the company's FORK of it, if any |
+| Labor only (`snapshotLaborOnly`, 0106)                     | yes, once B's code writes it    | NULL is read as "not said", never looked up live                                                                                                                                                              |
+| Quantity of a takeoff-linked line                          | —                               | yes, from the marks — by design (`shared/takeoffBridge.ts`)                                                                                                                                                   |
+
+So the live read is ONE number on ONE kind of line: the "+ N parts not
+priced" count of a pre-0087 line. The rollup and the dashboard share it.
+
+**What a change to a starter (or a company's fork) does to an existing bid:**
+
+- **Change a part's PRICE** (a contractor prices a $0 part, or the priced
+  seed lands): every pre-0087 line on that assembly loses "+1 part not
+  priced" — **while its frozen material cost still holds $0 for that part.**
+  The bid then reads fully priced and is short by that part. This is the
+  wrong-number direction: a quiet UNDER-statement, and it will happen to
+  every such line the day the priced catalog ships.
+- **Change the RECIPE** (add/remove a $0 part — the LT1/LT2 repair): the
+  count moves up or down with no change to the frozen cost. Up is noisy but
+  honest; down hides a gap.
+- **Change HOURS:** no effect — hours are frozen (and NULL stays "not set").
+- **Total due:** never moves — it is built only from frozen fields.
+
+**How many lines take the live path, measured 2026-10-06:** staging 0 (of
+100 assembly lines); local `bidrender_local` 26 lines on 9 bids, 7 of them
+on shared starters. **Live: not counted** (owner: do not touch live) — the
+next live release counts it read-only first: `bid_line_items` with
+`assemblyId IS NOT NULL AND snapshotUnpricedParts IS NULL AND archivedAt IS
+NULL`.
+
+**Short fix plan (for decision, not started):**
+
+1. **Freeze the count once, from the recipe as it stood** — a step-3
+   backfill: for each NULL line, write today's `unpricedPartsIn(recipe)`
+   into `snapshotUnpricedParts`. It changes no number on the day it runs
+   (it writes exactly what is read now), and from then nothing moves with
+   the library. Rehearse with `bidTotals.mts` before/after: must be
+   identical. **Must run BEFORE the LT1/LT2 repair and before any priced
+   seed** — after either, "the recipe as it stood" is already gone.
+2. **Then drop the live path:** `withUnpricedParts` keeps NULL → live only
+   as a fallback that should never fire; a test asserts no NULL remains on
+   an assembly line after the backfill.
+3. **The LT1/LT2 repair then moves nothing** and may run as written.
+
+Until 1 is done, **no change to a shipped recipe or price may reach live**:
+not the LT1/LT2 repair, not the priced catalog. Listed in
+`live-release-plan.md` § 0 with the pairing rules.
+
 ### WRONG-NUMBER RISK: a run snaps onto a misplaced AI mark — fix after the reader accuracy test
 
 - [ ] **Tracing snaps a run end onto a nearby mark's spot (`legSnap.ts`). An
@@ -549,8 +610,12 @@ Design: `references/homerun-footage-plan.md` § 4.
 - [ ] **Build (Track C, after the columns):** draw a box or polygon on a
       sheet, name it, give it a ceiling ("Stockroom — open to deck, 18'-0"").
       Every homerun leaving a device inside it uses that height; a device in
-      no area follows the sheet; where two areas overlap, the smaller wins.
-      Chain: homerun's own → height area → sheet → job → company. Unset
+      no area follows the sheet. **Where two areas overlap, the area with
+      the smaller OUTLINE (the more specific one) wins — never just the
+      lower height** (owner, 2026-10-06): a 18'-0" stockroom drawn inside a
+      10'-0" sales floor gives its devices 18'-0". **Overlapping areas show
+      a warning on the sheet.** Chain: homerun's own → height area → sheet →
+      job → company. Unset
       stays unset — never 0. Works on a tablet (draw by drag, 44 px targets).
       Later, the same areas give count drops their height.
 - [ ] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
