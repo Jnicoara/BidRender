@@ -3709,6 +3709,40 @@ export async function seedBaselineAssemblies(
     const alreadySeeded = new Set(existingRows.map(row => row.name));
 
     /**
+     * RE-STAMP the residential / commercial / both tag (`projectType`) on
+     * the SHARED starter rows from the seed, so a tag fixed in the seed file
+     * reaches databases already seeded (owner, 2026-10-07: DR1, DR2, DR16,
+     * DR17 → both). Same shape as the materials re-stamp of `category`:
+     * shared rows only (`userId IS NULL`) — a company's fork keeps its own
+     * tag — and only where it differs. Safe to repeat every start: the tag
+     * decides what a picker SHOWS, never what anything costs.
+     */
+    // One UPDATE per tag, not one per starter: this runs on every start.
+    const namesByTag = new Map<
+      NonNullable<BaselineAssembly["projectType"]>,
+      string[]
+    >();
+    for (const spec of specs) {
+      if (!alreadySeeded.has(spec.name) || spec.projectType === null) continue;
+      namesByTag.set(spec.projectType, [
+        ...(namesByTag.get(spec.projectType) ?? []),
+        spec.name,
+      ]);
+    }
+    for (const [tag, names] of Array.from(namesByTag.entries())) {
+      await db
+        .update(assemblies)
+        .set({ projectType: tag })
+        .where(
+          and(
+            isNull(assemblies.userId),
+            inArray(assemblies.name, names),
+            sql`NOT (${assemblies.projectType} <=> ${tag})`
+          )
+        );
+    }
+
+    /**
      * Tick "Labor only" on a shipped starter that ships ticked but was seeded
      * before it did (0105). Same narrow shape as the role and whip passes:
      * shared rows only, named in the seed, and only where NOTHING was said

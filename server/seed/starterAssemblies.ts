@@ -1272,14 +1272,14 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
   ),
 
   // ── DR — Demo / retrofit ──
-  starter(
-    "DR1",
-    "Demo fixture, blank the box",
-    "Demo & Retrofit",
-    "commercial",
-    [p("4in-square-blank-cover", 1), p("wire-nuts", 3)]
-  ),
-  starter("DR2", "Demo device, blank plate", "Demo & Retrofit", "commercial", [
+  // DR1, DR2, DR16, DR17 are BOTH (owner, 2026-10-07; top-assemblies-draft.md
+  // § 3): demoing a device, blanking a box and replacing a receptacle are
+  // everyday residential remodel and service work too, not only retail.
+  starter("DR1", "Demo fixture, blank the box", "Demo & Retrofit", "both", [
+    p("4in-square-blank-cover", 1),
+    p("wire-nuts", 3),
+  ]),
+  starter("DR2", "Demo device, blank plate", "Demo & Retrofit", "both", [
     p("1-gang-blank-plate", 1),
     p("wire-nuts", 3),
   ]),
@@ -1383,16 +1383,13 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "DR16",
     "Replace receptacle like-for-like",
     "Demo & Retrofit",
-    "commercial",
+    "both",
     [p("20a-duplex-receptacle", 1), p("wall-plate", 1)]
   ),
-  starter(
-    "DR17",
-    "Replace receptacle with GFCI",
-    "Demo & Retrofit",
-    "commercial",
-    [p("20a-gfci-receptacle", 1), p("wall-plate", 1)]
-  ),
+  starter("DR17", "Replace receptacle with GFCI", "Demo & Retrofit", "both", [
+    p("20a-gfci-receptacle", 1),
+    p("wall-plate", 1),
+  ]),
   starter(
     "DR18",
     "Replace switch with occupancy sensor",

@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **"Hours not set" now appears on the Labor line of a bid's totals, not on
+  Materials**, on the bid screen and in the proposal's own figures. And
+  "Direct cost", "Bid price" and "Total due" no longer break onto two lines
+  when the not-priced note sits beside them.
+- **Four demo/replace starters show on residential jobs too** — demo a
+  fixture, demo a device, replace a receptacle, replace with a GFCI are now
+  tagged for both residential and commercial work, including on databases
+  that already have them.
+
 - **Bid totals say missing hours apart from unpriced parts.** A total now
   reads "+ 1 part not priced, 1 line hours not set" instead of lumping both
   into "parts", so it is clear what to fix where: a part on the Materials

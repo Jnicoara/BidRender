@@ -42,7 +42,12 @@ import { clientFigure } from "@shared/proposal";
 import { ProposalDesignControls } from "@/components/proposal/ProposalDesignControls";
 import { money } from "@/lib/money";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
-import { anyNotPriced, notPricedHeadline } from "@/lib/notPricedTotal";
+import {
+  anyNotPriced,
+  laborShare,
+  materialsShare,
+  notPricedHeadline,
+} from "@/lib/notPricedTotal";
 import { NOTHING_NOT_PRICED } from "@shared/lineNotPriced";
 import {
   AlertDialog,
@@ -535,13 +540,24 @@ export default function ProposalPage({
                 key={label as string}
                 className="flex items-baseline justify-between gap-3"
               >
-                <span className="text-xs text-muted-foreground">{label}</span>
-                {/* Materials and Direct cost say what they leave out, as on
-                    the bid screen. The client's copy never does. */}
-                {label === "Materials" || label === "Direct cost" ? (
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                  {label}
+                </span>
+                {/* Materials, Labor and Direct cost say what they leave out,
+                    as on the bid screen — hours on Labor only, never on
+                    Materials (2026-10-07). The client's copy never does. */}
+                {label === "Materials" ||
+                label === "Labor" ||
+                label === "Direct cost" ? (
                   <NotPricedTotal
                     amount={money(value as number)}
-                    notPriced={notPriced}
+                    notPriced={
+                      label === "Materials"
+                        ? materialsShare(notPriced)
+                        : label === "Labor"
+                          ? laborShare(notPriced)
+                          : notPriced
+                    }
                     className="font-mono text-xs"
                   />
                 ) : (
@@ -559,7 +575,9 @@ export default function ProposalPage({
                 marked-up charge, not the number the bid screen gives that
                 name. */}
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-medium">Bid price</span>
+              <span className="text-xs font-medium shrink-0 whitespace-nowrap">
+                Bid price
+              </span>
               <NotPricedTotal
                 amount={money(internalTotals.workPrice)}
                 notPriced={notPriced}
@@ -585,7 +603,9 @@ export default function ProposalPage({
               </div>
             )}
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-medium">Total due</span>
+              <span className="text-xs font-medium shrink-0 whitespace-nowrap">
+                Total due
+              </span>
               <NotPricedTotal
                 amount={money(internalTotals.totalDue)}
                 notPriced={notPriced}
@@ -593,7 +613,9 @@ export default function ProposalPage({
               />
             </div>
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs font-medium">On the proposal</span>
+              <span className="text-xs font-medium shrink-0 whitespace-nowrap">
+                On the proposal
+              </span>
               <span className="font-mono text-sm">
                 {clientFigure(doc.investment, doc.investment.total, money)}
               </span>

@@ -101,7 +101,12 @@ import {
   lineNotPriced,
 } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
-import { bidNotPricedCount, materialMissingLines } from "@/lib/notPricedTotal";
+import {
+  bidNotPricedCount,
+  laborShare,
+  materialMissingLines,
+  materialsShare,
+} from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 
 /**
@@ -1337,20 +1342,27 @@ export default function BidsPage({
                 </div>
               )}
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs text-muted-foreground">Materials</span>
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                  Materials
+                </span>
+                {/* Lines and parts only — hours belong on Labor below. */}
                 <NotPricedTotal
                   amount={money(totals.materialCost)}
-                  notPriced={notPricedTally}
+                  notPriced={materialsShare(notPricedTally)}
                   className="font-mono text-sm"
                 />
               </div>
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
                   Labor ({round(totals.totalLaborHours, 2)} h)
                 </span>
-                <span className="font-mono text-sm">
-                  {money(totals.laborCost)}
-                </span>
+                {/* "+ 1 line hours not set" lives HERE, on the labor it is
+                    missing from (staging check, 2026-10-07). */}
+                <NotPricedTotal
+                  amount={money(totals.laborCost)}
+                  notPriced={laborShare(notPricedTally)}
+                  className="font-mono text-sm"
+                />
               </div>
               {/*
                 The third part of Direct cost, named so the rows add up. A
@@ -1728,7 +1740,12 @@ export default function BidsPage({
               )}
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs font-medium">Direct cost</span>
+                {/* nowrap + shrink-0: the amber caveat beside the figure
+                    must not squeeze the label onto two lines (staging,
+                    2026-10-07). The caveat wraps under the figure instead. */}
+                <span className="text-xs font-medium shrink-0 whitespace-nowrap">
+                  Direct cost
+                </span>
                 <NotPricedTotal
                   amount={money(totals.directCost)}
                   notPriced={notPricedTally}
@@ -1810,7 +1827,7 @@ export default function BidsPage({
               </div>
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-sm font-medium">
+                <span className="text-sm font-medium shrink-0 whitespace-nowrap">
                   Bid price
                   {/* On the headline number itself: the one figure people
                       read without reading anything else on the card. */}
@@ -1842,7 +1859,7 @@ export default function BidsPage({
                   with nothing tying them together. This is that total. */}
               {totals.expensesTotal > 0 && salesTax.status === "disabled" && (
                 <div className="flex items-baseline justify-between gap-3 py-1">
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium shrink-0 whitespace-nowrap">
                     Total due{" "}
                     <IncompletePriceTag show={incomplete} className="ml-1" />
                   </span>
@@ -1914,7 +1931,7 @@ export default function BidsPage({
 
                   {salesTax.status !== "no-rate" && (
                     <div className="flex items-baseline justify-between gap-3 py-1">
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-medium shrink-0 whitespace-nowrap">
                         Total due{" "}
                         <IncompletePriceTag
                           show={incomplete}

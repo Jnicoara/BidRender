@@ -92,6 +92,44 @@ async function settled(page: Page) {
   await page.waitForTimeout(1500);
 }
 
+/**
+ * MEASURED, not eyeballed: how many lines each totals label renders on (1 =
+ * no wrap — "Direct cost" and "Bid price" wrapped on laptop, 2026-10-07),
+ * and the text of the Materials and Labor rows (hours belong on Labor only).
+ */
+async function labelLines(page: Page) {
+  return page.evaluate(() => {
+    const out: Record<string, unknown> = {};
+    // Only inside the totals card — the sidebar also says "Materials" and
+    // "Labor rates", and the first version of this read those.
+    const heading = Array.from(
+      document.querySelectorAll("div, h2, h3, p")
+    ).find(el =>
+      /^(bid total|your figures)$/i.test((el.textContent ?? "").trim())
+    );
+    let card: Element | null | undefined = heading?.parentElement;
+    while (card && !/Direct cost/.test(card.textContent ?? ""))
+      card = card.parentElement;
+    if (!card) return { error: "no totals card found" };
+    const labels = ["Materials", "Direct cost", "Bid price", "Total due"];
+    for (const el of Array.from(card.querySelectorAll("span"))) {
+      const text = (el.textContent ?? "").trim();
+      const label = labels.find(l => text === l || text.startsWith(`${l} `));
+      if (!label || out[label] !== undefined) continue;
+      if (el.children.length > 1) continue;
+      const lh = parseFloat(getComputedStyle(el).lineHeight) || 16;
+      out[label] = Math.round(el.getBoundingClientRect().height / lh);
+      if (label === "Materials")
+        out.materialsRow = el.parentElement?.textContent?.trim();
+    }
+    const labor = Array.from(card.querySelectorAll("span")).find(s =>
+      (s.textContent ?? "").trim().startsWith("Labor")
+    );
+    out.laborRow = labor?.parentElement?.textContent?.trim();
+    return out;
+  });
+}
+
 const browser = await launchChrome();
 const laptop = {
   name: "laptop",
@@ -183,6 +221,9 @@ try {
     // "Bid price" is always there; "Total due" only once sales tax is set up.
     await page.getByText("Bid price").first().scrollIntoViewIfNeeded();
     await shot("bid-totals");
+    console.log(
+      `${size.name} bid totals: ${JSON.stringify(await labelLines(page))}`
+    );
 
     await page.getByRole("button", { name: /^Send/ }).click();
     // "quoteapp.panel" is an INTERNAL-tier feature: a fresh account does not
@@ -208,6 +249,9 @@ try {
 
     await go(page, `/bids/${bid.id}/proposal`);
     await shot("proposal");
+    console.log(
+      `${size.name} proposal figures: ${JSON.stringify(await labelLines(page))}`
+    );
 
     await go(page, "/library/assemblies");
     await page.getByPlaceholder("Search assemblies…").fill(`${stamp}`);

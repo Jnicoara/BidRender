@@ -149,6 +149,21 @@ export function hoursNotSetWords(assemblies: number): string {
   return `${n} ${n === 1 ? "assembly" : "assemblies"} with hours not set`;
 }
 
+/**
+ * The part of a bid's tally that belongs on its MATERIALS row: lines and
+ * parts nobody priced — never the hours, which are labor (found on staging
+ * 2026-10-07: "Materials $10.00 + 1 line hours not set"). The whole-bid rows
+ * (Direct cost, Bid price, Total due) keep the full tally.
+ */
+export function materialsShare(notPriced: NotPricedTally): NotPricedTally {
+  return { lines: notPriced.lines, parts: notPriced.parts, hours: 0 };
+}
+
+/** The part that belongs on its LABOR row: lines whose hours are not set. */
+export function laborShare(notPriced: NotPricedTally): NotPricedTally {
+  return { lines: 0, parts: 0, hours: notPriced.hours };
+}
+
 /** Whether a total leaves anything out at all. */
 export function anyNotPriced(notPriced: NotPricedTally): boolean {
   return notPricedSuffix(notPriced) !== "";

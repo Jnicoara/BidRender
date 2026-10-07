@@ -248,6 +248,26 @@ describe.skipIf(!hasDb)("seeding a database", () => {
     }
   });
 
+  it("re-stamps every shared starter's residential/commercial tag from the seed", async () => {
+    // DR1, DR2, DR16, DR17 moved commercial → both on 2026-10-07; a
+    // database seeded before must follow on the next start, not keep the
+    // old tag for ever. Forks are the company's and are not checked here.
+    const db = (await getDb())!;
+    const rows = await db
+      .select({ name: assemblies.name, projectType: assemblies.projectType })
+      .from(assemblies)
+      .where(isNull(assemblies.userId));
+    const tagOf = new Map(rows.map(r => [r.name, r.projectType]));
+    const wrong = BASELINE_ASSEMBLIES.filter(
+      a => tagOf.has(a.name) && tagOf.get(a.name) !== a.projectType
+    ).map(a => `${a.ref}: ${tagOf.get(a.name)} ≠ ${a.projectType}`);
+    expect(wrong).toEqual([]);
+    for (const ref of ["DR1", "DR2", "DR16", "DR17"]) {
+      const spec = BASELINE_ASSEMBLIES.find(a => a.ref === ref)!;
+      expect(spec.projectType, ref).toBe("both");
+    }
+  });
+
   it("finds every part of every starter in this database — held ones too", async () => {
     // So a hold lifting later cannot reveal a part that never resolved.
     const db = (await getDb())!;
