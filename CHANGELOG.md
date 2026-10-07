@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **"Most used" assemblies, one click to add.** Under the bid's "Add an
+  assembly" box, a row shows the eight assemblies your company has put on
+  the most bids in the last year; click one to add it with the quantity and
+  unit already typed. It counts bids, not lines, counts your edited copy of
+  a starter together with the starter, leaves out the sample bid, and only
+  appears once the company has three bids — before that nothing extra
+  shows. It hides as soon as you start typing.
+
 - **"Hours not set" now appears on the Labor line of a bid's totals, not on
   Materials**, on the bid screen and in the proposal's own figures. And
   "Direct cost", "Bid price" and "Total due" no longer break onto two lines

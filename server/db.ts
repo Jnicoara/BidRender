@@ -3014,6 +3014,63 @@ export type AssemblyDetail = Assembly & {
 };
 
 /** Starter assemblies plus the user's own, forked starters collapsed away. */
+/**
+ * The raw facts behind "Most used" (shared/mostUsed.ts): each assembly used
+ * on each of the company's bids since `since`, and how many bids the company
+ * has made in that time (the 3-bid threshold).
+ *
+ * Archived lines, archived bids and the SAMPLE bid are left out — a sample
+ * every new account gets would otherwise put its assemblies on top for
+ * everyone. Grouped per (assembly, bid) so the ranking counts BIDS, not
+ * lines. `bid_line_items.assemblyId` is a foreign key, so it is indexed.
+ */
+export async function getAssemblyUses(
+  userId: number,
+  since: Date
+): Promise<{
+  uses: { assemblyId: number; bidId: number; usedAt: Date }[];
+  bidCount: number;
+}> {
+  const db = await getDb();
+  if (!db) return { uses: [], bidCount: 0 };
+  const liveBid = and(
+    eq(bids.userId, userId),
+    isNull(bids.archivedAt),
+    eq(bids.isSample, false)
+  );
+  const [rows, [count]] = await Promise.all([
+    db
+      .select({
+        assemblyId: bidLineItems.assemblyId,
+        bidId: bidLineItems.bidId,
+        usedAt: sql<Date | string>`MAX(${bidLineItems.snapshotAt})`,
+      })
+      .from(bidLineItems)
+      .innerJoin(bids, eq(bids.id, bidLineItems.bidId))
+      .where(
+        and(
+          liveBid,
+          isNull(bidLineItems.archivedAt),
+          isNotNull(bidLineItems.assemblyId),
+          gte(bidLineItems.snapshotAt, since)
+        )
+      )
+      .groupBy(bidLineItems.assemblyId, bidLineItems.bidId),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(bids)
+      .where(and(liveBid, gte(bids.createdAt, since))),
+  ]);
+  return {
+    uses: rows.map(row => ({
+      assemblyId: row.assemblyId as number,
+      bidId: row.bidId,
+      usedAt: new Date(row.usedAt),
+    })),
+    bidCount: Number(count?.n ?? 0),
+  };
+}
+
 export async function getLibraryAssemblies(
   userId: number,
   status: LibraryStatus = "active"

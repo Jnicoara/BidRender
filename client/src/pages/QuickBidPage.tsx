@@ -91,6 +91,8 @@ export default function QuickBidPage({
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
+    // Adding here moves the bid screen's "Most used" row too.
+    void utils.assemblies.mostUsed.invalidate();
     void utils.bids.units.invalidate({ bidId });
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
