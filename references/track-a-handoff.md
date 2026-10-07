@@ -4,17 +4,36 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 10) — read this first
+## UPDATE 2026-10-07 (session 11) — read this first
+
+- **STOPPED BEFORE STAGING, as asked. The rename is on branch `a-rename`
+  (`3a6423e`), NOT on local-dev** — pushing local-dev deploys staging, and
+  the rename runs on a server start. Gate on `a-rename` green (no deploy).
+  To ship it to staging (owner's OK first): back up staging, merge
+  `a-rename` into local-dev, push, then re-run the compare against staging
+  (`materials-review-sheet-plan.md` § Order, step 9).
+- **On local-dev and staging (`a0ac3f6`, Gate + deploy + smoke green):** the
+  names freeze (`pricing/frozen-names.json`, read back by
+  `pricing/readMaterialsReview.mts`), the root fix for case-only name twins
+  (`server/seedNameCase.test.ts`, red on the old code), the size reader for
+  `5/8" x 8 ft`, and the multi-supplier answers (plan only).
+- **Rehearsed on a local copy of staging's data: VERDICT CLEAN** — 151 rows
+  renamed by id, nothing added or deleted, all 839 starter lines and the run
+  types' wire on the same ids, 209 saved bid lines byte-identical, a second
+  boot changes nothing; 257 of 258 old spellings find the renamed row first.
+- **Next for A:** owner's OK for staging; then the 153 adds (todo.md); then
+  regenerate the pricing sheet (naming plan § 5.1).
+- `fe2d3c0`'s Gate rerun: tests green; its deploy step correctly refused
+  (staging had moved past it). Every later run includes it.
+
+## UPDATE 2026-10-07 (session 10)
 
 - **Size reader landed** (`d86043b`, local-dev): 12/2, #3/4, bare 1/0 and
-  22 AWG read; the current names are unchanged. **Nothing is renamed or
-  frozen.**
+  22 AWG read; the current names are unchanged.
 - **Sheet:** the owner's second answers are marked. Measured: 151 renames,
   153 adds, 0 shipped rows cut, all Excel warnings 0.
 - **Name-lookup audit and the freeze/rename ORDER** are in
-  `materials-review-sheet-plan.md`. **Waiting for the owner's OK on the
-  order.** One owner question blocks the freeze: `4/0-3 SER Aluminum`
-  collides with a retired row by letter case only.
+  `materials-review-sheet-plan.md` (approved in session 11).
 - **Wafers:** 4" → `4" canless wafer LED downlight` and 5"/6" → `6" canless
 wafer LED downlight`, both renamed in place. LT8 and LT7 follow through
   their ids; LT7 is the only user of the 5"/6" row.

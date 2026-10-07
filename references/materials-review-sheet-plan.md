@@ -315,34 +315,43 @@ weaken them.
 2. ~~A: the generator, sheet to owner.~~ Done.
 3. ~~Owner marks it.~~ Done, two rounds (2026-10-07).
 4. ~~Parser change.~~ Done 2026-10-07, on local-dev, ahead of any rename.
-   4b. **Before freezing:** owner picks a name for `4/0-4/0-4/0-2/0 SER AL`
-   that is not a case variant of the retired `4/0-3 SER aluminum` (item 1
-   above); teach the parser `Ground rod, 5/8" x 8 ft` (item 8).
-5. **Read-back and freeze** — `pricing/readMaterialsReview.mts` writes
-   `pricing/frozen-names.json`; committing it freezes the names. Local
-   only, touches no database. ← next, after the owner OKs this order.
-6. **Fix every lookup BY NAME** found in § "What looks materials up by
-   name" below, in the SAME commit as the rename — a lookup fixed earlier
-   would point at a name that does not exist yet, and one fixed later
-   leaves a window where it points at a name that no longer does.
-7. **The rename commit** (local-dev only): seed names +
-   `RENAMED_BASELINE_MATERIALS` (one edit per file with `pnpm dev`
-   STOPPED), old spellings into `searchAliases`, the 153 adds in their
-   seed modules, run types' `racewayMaterialName` / `conductorMaterialName`
-   / `groundMaterialName`, tests that assert names, CLAUDE.md's "1-Pole"
-   section + ASSEMBLIES_PLAN.md step 6 + the pole test. Gate green.
-8. **Rehearse on a local copy of staging's data** (no staging write):
-   start once, read back — every renamed id kept, no duplicate row, every
-   starter seeded (count LT7/LT8 and the GR/GC drafts that are in), every
-   run type still resolves its three materials, an old bid line still
-   shows its old name. Before-and-after of the same queries, not a count
-   of rows "to rename".
-9. **Staging — only with the owner's OK.** Back up, push local-dev; the
-   rename runs on server start, there is no migration. Repeat step 8's
-   read-back against staging.
-10. **Live** rides a normal release, later, with the owner's yes. Live has
-    neither wafer starter today (0122/0123 not applied), so its order there
-    is the release plan's, not this file's.
-11. Regenerate the pricing sheet with the final names, carrying typed
+   4b. ~~Before freezing~~ Done 2026-10-07. The owner's SER rule: names
+   spell out the FULL conductor set, so the cable is `4/0-4/0-4/0-2/0 SER
+Aluminum` (and every SER row likewise, "8-8-8-8 SER Copper"). The root
+   problem is fixed too: the seed's duplicate repair, retire and rename
+   match names EXACTLY (`server/seedNameCase.test.ts`, red on the old
+   code). The size reader reads `Ground rod, 5/8" x 8 ft`.
+5. ~~Read-back and freeze~~ **Done, `8529629` on local-dev.**
+   `pricing/frozen-names.json`: 151 renames, 1,403 unchanged, 0 shipped
+   cuts, 5 waiting rows dropped, 153 adds.
+6. ~~Fix every lookup by name~~ and 7. ~~the rename commit~~ — **done
+   together, `3a6423e` on branch `a-rename`, NOT on local-dev**, because
+   pushing local-dev deploys staging (`.github/workflows/gate.yml`,
+   deploy-staging) and the rename runs on a server start. Gate on
+   `a-rename` green (tests only, no deploy). Full suite 5,518 passed.
+   **The 153 adds are NOT in it** — they need units, slang and raceway
+   facts per row, and go in their own commit next (todo.md).
+7. ~~Rehearse on a local copy of staging's data~~ **Done 2026-10-07.**
+   Staging dumped read-only (`C:\dev\bidrender-backups\staging-2026-10-07T19-20-24Z-before-rename-rehearsal.sql`,
+   69 tables), restored locally, the `a-rename` boot seed run TWICE.
+   `scripts/catalogRehearsal.mts compare`: **VERDICT CLEAN** — 1,554 ->
+   1,554 rows, 151 renamed by id, 0 added / retired / deleted, 0 old
+   spellings still active, 0 duplicate names, every reference identical
+   (839 starter recipe lines, run-type wire). LT8 -> #871 `4" canless
+wafer LED downlight`, LT7 -> #872 `6" canless wafer LED downlight`, same
+   ids. The four shipped run types resolve to the renamed wire, same ids.
+   209 saved bid lines byte-identical (digest of id, name and frozen cost).
+   Second boot: nothing changed. Search: 258 old spellings, the renamed row
+   first for every one but `5/6" wafer LED downlight` — the pre-2026-09-25
+   spelling, already a known fraction-reading miss. 167 starters, DV34 held
+   as before (its raceway parts are adds).
+8. **Staging — only with the owner's OK.** ← HERE. Back up staging, merge
+   `a-rename` into local-dev and push (that deploys staging; the rename runs
+   on its server start — there is no migration). Then repeat step 8's
+   compare and probe against staging.
+9. **Live** rides a normal release, later, with the owner's yes. Live has
+   neither wafer starter today (0122/0123 not applied), so its order there
+   is the release plan's, not this file's.
+10. Regenerate the pricing sheet with the final names, carrying typed
     prices over (naming plan § 5.1), and pricing can start. Track B's
     drafted recipes switch to `STARTER_PARTS` keys before they load.

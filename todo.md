@@ -993,13 +993,25 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
 - [ ] **Track B: drafted recipes name parts by names the rename will change**
       (references/top-assemblies-draft.md, checked 2026-10-07): e.g.
       `Ground rod, 8 ft` → `Ground rod, 5/8" x 8 ft`, `#4 bare CU, stranded`
-      → `#4 bare stranded Copper`, `4/0-4/0-4/0-2/0 SER AL` → `4/0-3 SER
-    Aluminum`, `4" wafer LED downlight` → `4" canless wafer LED downlight`.
+      → `#4 bare stranded Copper`, `4/0-4/0-4/0-2/0 SER AL` →
+      `4/0-4/0-4/0-2/0 SER Aluminum` (full set — owner, 2026-10-07),
+      `4" wafer LED downlight` → `4" canless wafer LED downlight`. The full
+      list is `pricing/frozen-names.json` (renames on branch `a-rename`).
       Write recipes through `STARTER_PARTS` keys (they follow
       RENAMED_BASELINE_MATERIALS), never by display name. The new 4" wafer
       assembly B is adding uses the SAME row as LT8 (renamed in place).
       `Underground warning tape` is already a waiting row (Add); the concrete
       pole base and 320A meter base are owner adds on the review sheet.
+- [ ] **Seed the 153 frozen ADDS** (`pricing/frozen-names.json` → `adds`:
+      120 waiting rows + 33 from Missing, incl. `#3 XHHW Aluminum`, the
+      3-1/2" EMT/PVC fittings, concrete pole base, 320A meter base). Not in
+      the rename commit (`a-rename`) because each needs a unit, trade slang
+      (CLAUDE.md § Materials) and, for 3-1/2" raceway, stick/strap facts.
+      Three wire adds do not end with their metal — `12/2 MC cable with
+    16/2 dimming`, `12/2 MC-AP cable`, `18/2 shielded fire alarm cable,
+    FPLP` — and would fail the "metal at the end" catalog test as named:
+      ask the owner before seeding (e.g. "… Copper"). After the adds: point
+      DV34 at the surface raceway rows (line above).
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while
