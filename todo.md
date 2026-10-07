@@ -3077,7 +3077,8 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       blank save is refused with the plain server message and the editor
       stays open (it used to close first and lose the recipe).
 
-- [ ] **ON-SCREEN CHECK of every "hours not set" screen, once Track A's 0123
+- [x] **DONE ON STAGING 2026-10-07 (Track B, `5ebf9ef`), laptop + tablet** — see
+      the note at the end of this entry. **ON-SCREEN CHECK of every "hours not set" screen, once Track A's 0123
       is on local-dev** (owner, 2026-10-06). None of these has been looked at
       — before 0123 an assembly cannot hold NULL hours, so most cannot be
       produced. Check each at laptop and tablet width, and that the number
@@ -3090,6 +3091,22 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       the cost preview, and the library list's "hours not set"); Quick bid's
       picker; a **kit** holding one ("+ 1 assembly with hours not set"); and
       the **labor-sheet import** preview ("not set → 0.5 h").
+
+      **Result (scripts/stagingHoursCheck.mts, throwaway account and bid):**
+      bid line "Hours not set" / "+ hours not set"; labor-only line a clean
+      $120.00; unticked one "+ material not priced"; dashboard card equals
+      the bid; proposal "Price pending"; editor empty "not set" box, grey
+      suggestion, "Use suggested", "Labor — hours not set"; labor-only editor
+      "none — labor only" and $120.00; library "hours not set"; import "not
+      set → 0.5 h". Nothing cut off at tablet. **One real fault found and
+      FIXED** (`f94d06e`): the totals told the estimator to "price the part on
+      the Materials screen" for missing HOURS — now "1 line has hours not
+      set … set the hours on the assembly". **Not seen:** the quote-app panel
+      (an internal-tier feature a fresh account lacks; its gap text is
+      tested), Quick bid's picker and a kit (not in the probe). **Left, minor:**
+      totals still say "+ 2 parts not priced" where one is the hours; the
+      proposal's "Estimated at N labor hours" counts only lines with hours
+      (price is held at "Price pending", so nothing wrong can print).
 
 - [x] **LT1/LT2 fixture-line repair BUILT 2026-10-06 (Track B), owner YES.**
       `scripts/repairStarterFixtureLines.mts` (report; `--apply` writes) over

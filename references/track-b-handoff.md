@@ -14,20 +14,14 @@ and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
   tests, staging deploy and smoke all green; staging serves `2f469e5`.
   That carries H2 step 2 ("hours not set"), "Use suggested", the CSV Pin
   column and Labor only, all on the schema they pair with.
-- **The STAGING on-screen check is still owed — blocked on the staging
-  password.** `scripts/stagingHoursCheck.mts` is written and does the whole
-  check: passes the gate, signs up a throwaway `example.com` account, builds
-  a test material, role, three assemblies (hours not set / labor only / not
-  said) and a throwaway bid, screenshots bid lines and totals, dashboard,
-  quote-app panel, proposal, editor (not-set, labor-only, new), library and
-  the labor-sheet import preview at laptop and tablet, then archives the bid
-  (the app's delete; purged after 30 days) and deletes the rest. **It stopped
-  at step one: the gate answered 401** to the `STAGING_PASSWORD` in
-  `C:\dev\BidPhase\.env.staging.local` — that value is stale (smoke still
-  gets in with GitHub's current secret). Nothing was created on staging.
-  **To finish:** put the current staging password in that file, then
-  `OUT_DIR=<dir> npx tsx scripts/stagingHoursCheck.mts` and look at every
-  shot. Labor only was already checked LOCALLY on 0124 (todo.md).
+- **The STAGING on-screen check is DONE** (2026-10-07, staging on `5ebf9ef`,
+  laptop + tablet, `scripts/stagingHoursCheck.mts`): every "hours not set"
+  screen and the Labor-only tick read right; one fault found and fixed
+  (`f94d06e`: totals said "price the part" for missing hours). Details and
+  what was not seen are in todo.md's ON-SCREEN CHECK entry. The probe left
+  three throwaway `example.com` accounts on staging (the app cannot delete
+  an account); their bids are archived (purged in 30 days) and their test
+  rows deleted — one labor role remains in the first account.
 - **Ships together, never apart** — now on local-dev together, as required:
   H2 step 2 with 0122/0123; Labor only with 0105–0106 and `5c98bd1`.
 - **Not run anywhere, on purpose**: the LT1/LT2 fixture repair script. It

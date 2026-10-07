@@ -80,6 +80,18 @@ async function go(page: Page, hash: string) {
   await page.waitForTimeout(900);
 }
 
+/**
+ * After opening an editor: wait for its queries (roles, modifiers) to land.
+ * A fixed 0.9 s on staging caught the role picker still empty and the
+ * preview pricing labor at $0 — a screenshot of loading, not of the screen.
+ */
+async function settled(page: Page) {
+  await page
+    .waitForLoadState("networkidle", { timeout: 15000 })
+    .catch(() => undefined);
+  await page.waitForTimeout(1500);
+}
+
 const browser = await launchChrome();
 const laptop = {
   name: "laptop",
@@ -173,9 +185,18 @@ try {
     await shot("bid-totals");
 
     await page.getByRole("button", { name: /^Send/ }).click();
-    await page.getByText("For your quote app").click();
-    await page.waitForTimeout(1200);
-    await shot("quote-panel");
+    // "quoteapp.panel" is an INTERNAL-tier feature: a fresh account does not
+    // have it, so the item is absent and the panel cannot be shot from here.
+    const quoteItem = page.getByText("For your quote app");
+    if ((await quoteItem.count()) > 0) {
+      await quoteItem.click();
+      await page.waitForTimeout(1200);
+      await shot("quote-panel");
+    } else {
+      console.log(
+        `${size.name}: quote panel not shown (internal-tier feature)`
+      );
+    }
     await page.keyboard.press("Escape");
 
     await go(page, "/");
@@ -193,7 +214,7 @@ try {
     await page.waitForTimeout(800);
     await shot("library");
     await page.getByText(NOT_SET, { exact: true }).first().click();
-    await page.waitForTimeout(900);
+    await settled(page);
     await page.getByLabel("Base labor hours").scrollIntoViewIfNeeded();
     await shot("editor-not-set");
 
@@ -201,7 +222,7 @@ try {
     await page.getByPlaceholder("Search assemblies…").fill(`${stamp}`);
     await page.waitForTimeout(800);
     await page.getByText(LABOR_ONLY, { exact: true }).first().click();
-    await page.waitForTimeout(900);
+    await settled(page);
     await page
       .getByText("Labor only", { exact: true })
       .first()
