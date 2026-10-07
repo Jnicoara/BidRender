@@ -53,6 +53,13 @@ FAIL. First, read-only, count live lines with `assemblyId IS NOT NULL AND
 snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — the lines the
 recipe-live risk applies to.
 
+**Counted 2026-10-07 (read-only session, Track A): live has 0 such lines**
+— 0 assembly lines on live at all, archived included; 105 migrations.
+**Recount before release; must be 0, otherwise freeze first** (the one-time
+`snapshotUnpricedParts` freeze in `todo.md`, "WRONG-NUMBER RISK: older bid
+lines read their assembly's recipe LIVE"), and only then run the LT1/LT2
+repair or any recipe/price change.
+
 ---
 
 # Live release: `24105ad` and migrations 0096–0104. DONE 2026-10-06
