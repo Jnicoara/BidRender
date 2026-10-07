@@ -122,7 +122,27 @@ moved off the top 30 to make room.
 
 ---
 
-## 2b. Drafted recipes for the gaps — NOT in the seed yet
+## 2b. Drafted recipes for the gaps — LOADED 2026-10-07
+
+> **LOADED 2026-10-07** (owner: names frozen, A's items on staging), by part
+> KEY with the final names, hours not set, as GC1–GC5 and GR1–GR7 in
+> `server/seed/starterAssemblies.ts`; the recipes as loaded are in
+> `references/starter-assemblies-plan.md` § "GC / GR". Every part below now
+> ships — the three ‡ parts were added by Track A. Two lines differ from this
+> draft, on purpose: **GR3 uses `320A meter base`** (the 400A was a stand-in
+> until it existed), and **GR2/GR5 leave out `Underground warning tape`**,
+> which the catalog sells BY THE FOOT, so "1" would buy one foot of tape for
+> a whole trench (owner question in todo.md). The text below is the draft as
+> written, kept as the record.
+>
+> **Also loaded (owner, 2026-10-07):**
+>
+> - **Wafers at 2", 4", 6", 8" only.** LT31 (2") and LT32 (8") were added,
+>   each on its own plain canless wafer. LT8 (4") and LT7 (6") are
+>   unchanged. The 3" and 5" materials stay in the catalog with no starter.
+> - **Can lights at 4" and 6", new construction and remodel.** LT33 (4"
+>   remodel) was added beside LT5, LT4 and LT6. No housing or trim was
+>   missing.
 
 **Owner, 2026-10-07: draft only, load after material names freeze, using
 the final names** (todo.md). Every part below is an exact shipped catalog
@@ -210,6 +230,34 @@ run (not a whip), like DV3.
 
 **Missing from the catalog, all recipes:** ‡ concrete pole base (GC3),
 ‡ underground warning tape (GR2, GR5), ‡ 320A class meter base (GR3).
+_(All three ship since 2026-10-07 — see the note at the top of § 2b.)_
+
+### The one flagged gap left — DV34, surface raceway — DRAFT, NOT LOADED
+
+The last gap the top-30 lists flagged. DV34 is in the seed but **held** for
+missing parts, and Track A's new items now carry a surface raceway family
+(500/700 two-piece base + cover, 1500, 2400, boxes and fittings). Drafted
+against those names, **for owner review — not loaded**:
+
+**DV34 — Surface raceway receptacle (block wall)** · Commercial · Devices
+`Raceway device box, 1-gang` 1 · `20A duplex receptacle` 1 · `Wall plate` 1 ·
+`Surface raceway base, 700 series` 10 · `Surface raceway cover, 700 series`
+10 · `Raceway entrance end fitting` 1 · `Wire nuts` 3
+
+**Questions before it loads** (each changes a line, none is guessed):
+
+1. **Which series?** 700 is drafted as the common power size; 500 is the
+   small one. The catalog's 500/700 are two-piece (base and cover as
+   separate per-foot rows), so a one-piece choice changes the lines.
+2. **Raceway length in the assembly, or traced?** 10 ft per device is the
+   old placeholder. If raceway runs are traced like conduit, both per-foot
+   lines come out (as conduit does in every starter).
+3. **Cover plate:** the old missing-parts note asked for a "Surface raceway
+   cover plate". The catalog has no such row. A 1-gang raceway device box
+   normally takes a standard plate, so `Wall plate` is drafted — confirm, or
+   a raceway-specific plate is a new catalog item (Track A).
+4. **Wire:** DV34 has no conductors, like the other MC/raceway devices that
+   leave wire to the traced run. Confirm that holds for surface raceway.
 
 ## 3. Residential / Commercial / Both — every starter
 

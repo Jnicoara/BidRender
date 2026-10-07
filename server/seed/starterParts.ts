@@ -357,6 +357,33 @@ export const STARTER_PARTS = {
   "well-pump-pressure-switch": "Well pump pressure switch",
   "whole-house-surge-protector": "Whole-house surge protector",
   "wire-nuts": "Wire nuts",
+
+  // ── Added 2026-10-07 for the top-30 gap starters (GC1–GC5, GR1–GR7) and
+  // the 2"/8" wafers and the 4" remodel can (LT31–LT33), against the FROZEN
+  // names. Keys follow the
+  // final name; none of these existed before the freeze, so there is no older
+  // spelling to keep a key for.
+  "100a-main-panel-24-space": "100A main panel, 24-space",
+  "1in-pvc-sch-40-connector": '1" PVC Sch 40 connector',
+  "20-ft-light-pole": "20 ft light pole",
+  "20a-1-pole-afci-breaker": "20A 1-Pole AFCI breaker",
+  "2in-canless-wafer-led-downlight": '2" canless wafer LED downlight',
+  "2in-pvc-sch-40": '2" PVC Sch 40',
+  "2in-pvc-sch-40-90-degree-elbow": '2" PVC Sch 40 90-degree elbow',
+  "2in-pvc-sch-40-connector": '2" PVC Sch 40 connector',
+  "320a-meter-base": "320A meter base",
+  "50a-generator-cord": "50A generator cord",
+  "50a-power-inlet-box": "50A power inlet box",
+  "4in-recessed-can-remodel-ic": '4" recessed can, remodel IC',
+  "8in-canless-wafer-led-downlight": '8" canless wafer LED downlight',
+  "concrete-pole-base": "Concrete pole base",
+  "emergency-battery-backup-pack": "Emergency battery backup pack",
+  "emergency-light-remote-head": "Emergency light remote head",
+  "led-area-light": "LED area light",
+  "pole-anchor-bolt-kit": "Pole anchor bolt kit",
+  "pole-base-cover": "Pole base cover",
+  "pole-base-grout": "Pole base grout",
+  "pole-handhole-cover": "Pole handhole cover",
 } as const satisfies Record<string, string>;
 
 export type StarterPart = keyof typeof STARTER_PARTS;

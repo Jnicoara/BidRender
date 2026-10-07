@@ -3,7 +3,8 @@
 > **STATUS, 2026-10-07 (later) — owner: build only in files Track C does not
 > touch.**
 >
-> - **Gap 1 is Track C's.**
+> - **Gap 1 is DONE — by Track C on `c-homerun-footage`** (owner,
+>   2026-10-07). Not built by B.
 > - **Gap 5 is BUILT:** `server/previewNeverSaved.test.ts` and
 >   `client/src/lib/traceSavePath.test.ts`. Each was shown red against a
 >   mutation.
@@ -72,6 +73,9 @@ silently. One small test is proposed (Gap 5).
 ## The gaps still open
 
 ### Gap 1 — WRONG NUMBER: dragging a run's END leaves it on its old mark
+
+> **DONE 2026-10-07 by Track C** on `c-homerun-footage` (owner). B did not
+> build it; the plan below is kept as the record of what was found.
 
 **Found 2026-10-07 by reading `setPoints`.** It writes `points`,
 `lengthInches` and `scaleRatioUsed`, and nothing else. A run's end can be

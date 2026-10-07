@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **15 more starter assemblies.** These are the jobs the top-30 lists found
+  missing, plus the wafer and can light sizes:
+  - commercial: an emergency battery pack, a 3-phase panelboard change, a
+    parking-lot pole light, an emergency remote head, and a 120V feed for
+    door hardware;
+  - residential: an old-work switch, a 200A underground service, a 320A
+    service, a 50A generator inlet, a detached garage feeder, and kitchen
+    and bathroom 20A circuits;
+  - canless wafer lights at 2" and 8", so wafers now come in 2", 4", 6"
+    and 8";
+  - a 4" remodel can light, so can lights now come in 4" and 6", each as
+    new construction or remodel.
+
+  Each starts with hours not set, for you to fill in.
+
 - **Searching "6 wafer" (any size) now leads with the plain canless wafer.**
   The slim, gimbal, wet-rated and color-selectable versions are named after
   it ("6" canless wafer LED downlight, slim") and follow it.

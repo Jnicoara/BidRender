@@ -6,6 +6,30 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-07 (late night) — 15 more starters, by key, hours not set
+
+- **Loaded:** GC1–GC5 and GR1–GR7 (top-assemblies-draft.md § 2b), LT31 (2")
+  and LT32 (8") wafers, and LT33, the 4" remodel can. 183 starters now.
+- **Owner changes, mid-session:**
+  - wafers only at 2", 4", 6", 8": the 3"/5" starters made earlier were
+    removed before merging; the materials stay;
+  - can lights at 4" and 6" × new construction/remodel: three already
+    shipped (LT5, LT4, LT6).
+- **Every part exists.** Two deliberate differences from the draft, both in
+  todo.md as owner questions or notes:
+  - GR3 is on the 320A meter base;
+  - GR2/GR5 leave out Underground warning tape (sold by the foot; "1" would
+    be one foot).
+- **Can light names:** the owner suggested '4" can light, remodel'. Starters
+  cannot be renamed in place, so LT33 matches its siblings. That's a
+  question in todo.md.
+- **DV34 surface raceway:** drafted against A's new raceway items, NOT
+  loaded, with 4 questions (top-assemblies-draft.md § 2b).
+- **The Residential/Commercial picker filter is NOT built.** It is a plan
+  (draft § 5) waiting on A's `bids.projectType`. The tags show on the
+  Assemblies list today.
+- **Staging check:** `scripts/stagingStartersCheck.mts`.
+
 ## Session 2026-10-07 (night) — the white box at the top-left on open
 
 - **Reproduced on staging** (laptop + 1180x820 touch), cause found. The fix

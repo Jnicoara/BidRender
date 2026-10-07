@@ -88,17 +88,26 @@ only two groups have no home:
 | Group                  | Assemblies | of which ship today (★) |
 | ---------------------- | ---------- | ----------------------- |
 | DV Devices             | 34         | 5                       |
-| LT Lighting            | 30         | 2                       |
+| LT Lighting            | 33         | 2                       |
 | RS Resi specials       | 20         | 0                       |
 | CS Commercial specials | 16         | 0                       |
 | PG Power / gear        | 20         | 1                       |
 | MH Motor / HVAC        | 14         | 0                       |
 | DR Demo / retrofit     | 20         | 0                       |
 | MS Misc                | 14         | 0                       |
-| **Total**              | **168**    | **8**                   |
+| GC Commercial gaps     | 5          | 0                       |
+| GR Residential gaps    | 7          | 0                       |
+| **Total**              | **183**    | **8**                   |
 
 168 by decision (D4): the commercial MC device versions, DV20–DV34, ship
-alongside the resi devices.
+alongside the resi devices. **183 since 2026-10-07** (owner):
+
+- **Wafers at 2", 4", 6" and 8" only.** LT8 (4") and LT7 (6") already
+  existed, so this adds LT31 (2") and LT32 (8"). The 3" and 5" wafer
+  materials stay in the catalog with no starter.
+- **Can lights at 4" and 6", in both new construction and remodel.** LT5,
+  LT4 and LT6 already existed, so this adds LT33, the 4" remodel.
+- **GC1–GC5 and GR1–GR7**, the top-30 gaps (§ "GC / GR").
 
 ---
 
@@ -162,6 +171,9 @@ Resi (F = the fixture line; D2).
 | LT6  | Recessed can retrofit, 6"         | Both | F `6" recessed can, remodel IC` 1 · `5"/6" LED retrofit trim` 1 · `14-2 NM-B` 20 whip · `Wire nuts` 3                                                                             |
 | LT7  | Wafer LED downlight, 6" (canless) | Both | F `5"/6" wafer LED downlight` 1 · `14-2 NM-B` 20 whip · `Wire nuts` 2                                                                                                             |
 | LT8  | Wafer LED downlight, 4" (canless) | Both | F `4" wafer LED downlight` 1 · `14-2 NM-B` 20 whip · `Wire nuts` 2                                                                                                                |
+| LT31 | Wafer LED downlight, 2" (canless) | Both | F `2" canless wafer LED downlight` 1 · `14/2 NM-B Copper` 20 whip · `Wire nuts` 2 — added 2026-10-07 (owner: wafers at 2", 4", 6", 8" only)                                       |
+| LT32 | Wafer LED downlight, 8" (canless) | Both | F `8" canless wafer LED downlight` 1 · `14/2 NM-B Copper` 20 whip · `Wire nuts` 2 — added 2026-10-07                                                                              |
+| LT33 | Recessed can retrofit, 4"         | Both | F `4" recessed can, remodel IC` 1 · `4" LED retrofit trim` 1 · `14/2 NM-B Copper` 20 whip · `Wire nuts` 3 — added 2026-10-07, the 4" twin of LT6                                  |
 | LT9  | Shower light, wet-rated           | Resi | F `4" recessed can, new construction IC` 1 · `4" shower wet-rated trim` 1 · `LED PAR20 bulb` 1 · `14-2 NM-B` 20 whip · `Wire nuts` 3                                              |
 | LT10 | Pendant light                     | Resi | `Octagon box, plastic` 1 · F `LED pendant fixture` 1 · `14-2 NM-B` 20 whip · `Wire nuts` 3                                                                                        |
 | LT11 | Chandelier, heavy bracing         | Resi | `Ceiling fan brace box` 1 · F `Chandelier` 1 · `14-2 NM-B` 20 whip · `Wire nuts` 3                                                                                                |
@@ -326,6 +338,30 @@ opening needs to be made safe.
 | MS12 | Structured media enclosure (resi)        | Resi | `Structured media enclosure` 1 · `Duplex receptacle` 1 · `Single-gang box` 1 · `12-2 NM-B` 25                                                        |
 | MS13 | Panel labelling (existing panel)         | Both | `Panel directory label` 1 · `Arc flash label` 1                                                                                                      |
 | MS14 | Temporary lighting string, per 100 ft    | Both | `Temporary light string, 100 ft` 1                                                                                                                   |
+
+## GC / GR — gaps the top-30 lists found (added 2026-10-07)
+
+Drafted in references/top-assemblies-draft.md § 2b and loaded after the
+names froze, with the FINAL names. Hours not set (D1). Two differences from
+the draft, both on purpose: GR3 uses the `320A meter base` (the draft's
+`400A meter base` was a stand-in "until it is in the catalog"), and GR2/GR5
+leave out `Underground warning tape` — the draft gave 1, the catalog sells it
+by the foot, and its length is the trench's (owner question, todo.md).
+
+| #   | Assembly                                          | Type | Parts                                                                                                                                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GC1 | Emergency battery pack added to a troffer         | Comm | `Emergency battery backup pack` 1 · `Wire nuts` 4                                                                                                                                                                                                                                                                                                              |
+| GC2 | Panelboard replacement, 3-phase, existing feeders | Comm | `225A panelboard, 3-phase main, 42-space` 1 · `#12 THHN Copper` 40 · `Wire nuts` 20 · `Panel knockout seal` 4 · `Panel directory label` 1 · `Arc flash label` 1                                                                                                                                                                                                |
+| GC3 | Site / parking lot pole light                     | Comm | `20 ft light pole` 1 · F `LED area light` 1 · `Pole anchor bolt kit` 1 · `Pole base cover` 1 · `Pole base grout` 1 · `Pole handhole cover` 1 · `Ground rod, 5/8" x 8 ft` 1 · `Ground rod clamp` 1 · `Wire nuts` 3 · `Concrete pole base` 1                                                                                                                     |
+| GC4 | Emergency light, remote head                      | Comm | `4" square box` 1 · `4" square mud ring, fixture` 1 · F `Emergency light remote head` 1 · `18/2 control wire Copper` 25 · `Wire nuts` 2                                                                                                                                                                                                                        |
+| GC5 | 120V feed for door hardware / access control      | Comm | `4" square box` 1 · `4" square blank cover` 1 · `12/2 MC cable Copper` 40 · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `20A 1-Pole breaker` 1 · `Wire nuts` 3                                                                                                                                                                                         |
+| GR1 | Single-pole switch, old work                      | Resi | `Single-gang old-work box` 1 · `Single-pole switch` 1 · `Wall plate` 1 · `14/2 NM-B Copper` 20 whip · `Wire nuts` 3                                                                                                                                                                                                                                            |
+| GR2 | Service upgrade 200A, underground                 | Resi | `200A meter base` 1 · `200A main panel, 40-space` 1 · `2" PVC Sch 40` 10 · `2" PVC Sch 40 90-degree elbow` 1 · `2" PVC Sch 40 connector` 2 · `4/0-4/0-4/0-2/0 SER Aluminum` 10 · `Ground rod, 5/8" x 8 ft` 2 · `Ground rod clamp` 2 · `#4 bare stranded Copper` 30 · `Water pipe bonding clamp` 1 · `Intersystem bonding bridge` 1 · `Panel directory label` 1 |
+| GR3 | Service 320A / 400A residential (two 200A panels) | Resi | `320A meter base` 1 · `200A main panel, 40-space` 2 · `4/0-4/0-4/0-2/0 SER Aluminum` 20 · `Ground rod, 5/8" x 8 ft` 2 · `Ground rod clamp` 2 · `#4 bare stranded Copper` 30 · `Water pipe bonding clamp` 1 · `Intersystem bonding bridge` 1 · `Panel directory label` 2                                                                                        |
+| GR4 | Generator inlet and interlock, 50A                | Resi | `Generator interlock kit` 1 · `50A power inlet box` 1 · `50A 2-Pole breaker` 1 · `6/3 NM-B Copper` 25 · `1" cable connector` 1 · F `50A generator cord` 1                                                                                                                                                                                                      |
+| GR5 | Detached garage / shop feeder and panel           | Resi | `100A main panel, 24-space` 1 · `60A 2-Pole breaker` 1 · `Ground rod, 5/8" x 8 ft` 2 · `Ground rod clamp` 2 · `#6 bare stranded Copper` 20 · `1" PVC Sch 40 connector` 2 · `Panel directory label` 1                                                                                                                                                           |
+| GR6 | Kitchen countertop 20A circuit                    | Resi | `Single-gang box` 1 · `20A GFCI receptacle` 1 · `Wall plate` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole AFCI breaker` 1 · `Wire nuts` 3 — own home run, like DV3                                                                                                                                                                                                  |
+| GR7 | Bathroom 20A circuit                              | Resi | `Single-gang box` 1 · `20A GFCI receptacle` 1 · `Wall plate` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole breaker` 1 · `Wire nuts` 3 — own home run, like DV3                                                                                                                                                                                                       |
 
 ---
 

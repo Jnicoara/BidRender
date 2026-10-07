@@ -8,7 +8,30 @@ left as written rather than rewritten to match the rename.
 From `references/track-b-plans-screen-gaps-plan.md`. Each item needs a file
 that Track C's `c-homerun-footage` also changes, so it waits for C to land
 (owner, 2026-10-07: build only in files C does not touch). Gap 1, a run end
-dragged off its mark keeping the old claim, is **Track C's**, not B's.
+dragged off its mark keeping the old claim, is **DONE by Track C** on
+`c-homerun-footage` (owner, 2026-10-07).
+
+- [ ] **Delete the throwaway `example.com` test accounts from staging before
+      stress testing** (owner, 2026-10-07). Track B's on-screen probes signed
+      up about twenty (`track-b-check-*`, `track-b-upload-*`,
+      `track-b-flash-*`, `track-b-starters-*`); their bids are archived and
+      their plan sets removed, but the app cannot delete an account, so
+      they need removing on the staging database itself, by whoever owns it.
+- [ ] **Owner question: can light names.** You suggested names like
+      '4" can light, new construction' / '4" can light, remodel'. Three of
+      the four can lights already shipped under 'Recessed can new
+      construction, 4"/6"' and 'Recessed can retrofit, 6"' (LT5, LT4, LT6),
+      so the new 4" remodel (LT33) is 'Recessed can retrofit, 4"' to match.
+      A starter cannot be renamed in place today: the seeder matches
+      starters by NAME, so a rename adds a second row and leaves the old one
+      on every database, including staging. Renaming all four means a
+      starter-rename path first (like `RENAMED_BASELINE_MATERIALS`, for
+      assemblies). Say if you want it.
+- [ ] **Owner question: Underground warning tape on GR2 and GR5.** The draft
+      gave 1, but the catalog sells it by the foot, so it was left OUT of
+      both (a per-foot line of 1 is now a failing test). Either the length
+      is the trench's and stays with the traced run, or the starter carries
+      a typical length — the owner says which.
 
 - [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet
