@@ -511,8 +511,12 @@ Design: `references/homerun-footage-plan.md` § 4.
 - [ ] **Build (Track C, after the columns):** draw a box or polygon on a
       sheet, name it, give it a ceiling ("Stockroom — open to deck, 18'-0"").
       Every homerun leaving a device inside it uses that height; a device in
-      no area follows the sheet; where two areas overlap, the smaller wins.
-      Chain: homerun's own → height area → sheet → job → company. Unset
+      no area follows the sheet. **Where two areas overlap, the area with
+      the smaller OUTLINE (the more specific one) wins — never just the
+      lower height** (owner, 2026-10-06): a 18'-0" stockroom drawn inside a
+      10'-0" sales floor gives its devices 18'-0". **Overlapping areas show
+      a warning on the sheet.** Chain: homerun's own → height area → sheet →
+      job → company. Unset
       stays unset — never 0. Works on a tablet (draw by drag, 44 px targets).
       Later, the same areas give count drops their height.
 - [ ] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
