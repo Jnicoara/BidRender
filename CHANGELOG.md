@@ -13,6 +13,19 @@ This is the human-readable companion to the git history — read this to see wha
   catalog is missing; and five naming questions. Only the yellow columns are
   typed in. Once it is marked and checked, material names freeze.
 
+- **Every drop reads the right ceiling, and drops through a box count
+  twice (same branch).** Regular runs and counted drops now climb to the
+  ceiling of the height area their box sits in, then the sheet's own
+  ceiling, then the job's — before, only homeruns did, so a stockroom box
+  could drop 16.5 ft on its homerun and 8.5 ft on the run beside it. A
+  sheet's ceiling and its areas are set from a new "Ceilings" button on
+  every scaled sheet. A run that starts by tapping onto a device now
+  starts at that box, so a run passing through a receptacle counts the
+  drop down and the rise back up. Homeruns count their bends: one at each
+  drop plus one per homerun for corners, marked "not confirmed" until set.
+  Two choices — box-to-box runs with no drops, and changing the bends per
+  homerun — are on screen and wait for the next database update.
+
 - **Height areas (same branch).** On a sheet with two ceilings — a sales
   floor and a stockroom open to deck — draw the stockroom by tapping its
   corners and give it its own height; every homerun leaving a device inside

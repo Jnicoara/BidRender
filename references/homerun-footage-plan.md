@@ -307,6 +307,36 @@ and migrates them together (pairing rule 3).
   a sheet with circuit tags; an outline cannot be reshaped after drawing
   (remove and redraw); count drops do not read areas yet (plan § 4 says
   they later will).
+- **Homerun BENDS — BUILT 2026-10-07 (owner-approved).** A 90 at each
+  COUNTED drop (up at the device, down at the panel), plus the bid's
+  "extra bends per homerun" for corners — starter 1, applied, and said
+  "not confirmed" until set. Elbow or field bend and the hours follow the
+  run type exactly as a traced run's bends do (a field bend's hours are the
+  raceway's `fieldBendLaborHours`). The setting needs
+  `bids.homerunExtraBends` (asked of Track A); until it lands the stepper
+  shows 1 and is held. **UNCC E111, 38 homeruns on 1/2" EMT (bent in the
+  field):** before 0 bends; after **98 field bends** = 60 at drops (76 ends,
+  16 with no device height so no drop) + 38 corners. Hours: 0 before;
+  after, 98 × the 1/2" EMT field-bend hours — UNSET in the shipped catalog
+  (starter labour ships unpriced), so the bid line reads hours not set
+  rather than inventing one.
+- **One ceiling for every drop — BUILT 2026-10-07** (owner):
+  `shared/ceilingHeights.ts`. Per box: run's own → height area → sheet →
+  job → company. Regular runs read it at each END, count drops at each
+  MARK, homeruns at their device. `HeightContext.companyInches/jobInches`
+  were removed so nothing reads a ceiling around it. **UNCC E111, seen at
+  1180×820:** a run ending at 2B-1's receptacle: 8.5 ft (job 10'-0") →
+  10.5 (sheet 12'-0") → **16.5** (18'-0" area drawn by taps); a run ending
+  outside the area stays 10.5.
+- **Drops on regular runs — the four cases (2026-10-07):** (a) through a
+  box: was ONE drop (the leaving run took the toolbar's "From": Nothing),
+  now TWO — a run whose first click snaps onto a mark starts at that box
+  (`newRunStart`); E111: 8.5 → 17 ft at the box (16.5 + 10.5 in the area
+  test). (b) ends at a box: one drop — unchanged, 8.5 ft. (c) a switch leg
+  off a tee: none at the tee, its own at the switch — unchanged, 6 ft. (d)
+  box to box at one height: was 8.5 + 8.5 = 17 ft of drops, becomes 0 with
+  "Box to box, same height" — built and tested, held until
+  `takeoff_runs.runsAt` (asked of Track A).
 - **Not built:** setting `takeoff_run_circuits.panelCircuitId`
   (read — a traced homerun suppresses the computed one — but no screen
   ties a trace to a circuit yet); the per-sheet method has no "average" /

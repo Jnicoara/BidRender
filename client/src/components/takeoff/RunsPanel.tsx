@@ -3378,14 +3378,17 @@ export function RunsPanel({
               </p>
             )}
             {/* Homeruns (homerun plan § 10): in the figures above, as the
-              bid line has them; their fittings counted, their elbows not. */}
+              bid line has them. Their bends ARE counted since 2026-10-07
+              (owner): one at each counted drop, plus the bid's extra bends
+              per homerun for corners — this said "elbows are not" before. */}
             {totals.homerunCount > 0 && (
               <p className="text-xs text-muted-foreground pt-1">
                 Includes {totals.homerunCount} homerun
                 {totals.homerunCount === 1 ? "" : "s"} (
                 {totals.homerunFeet.toFixed(2)} ft of run and drops, before
-                routing, waste and makeup). Their couplings, connectors and
-                straps are counted; elbows are not.
+                routing, waste and makeup). Their couplings, connectors, straps
+                and bends are counted: a bend at each drop, plus the bid's extra
+                bends per homerun for corners.
               </p>
             )}
             {(totals.markDropNotes?.noTypeGroups ?? 0) +

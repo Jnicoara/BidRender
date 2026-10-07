@@ -365,6 +365,8 @@ export function RunEndsEditor({
         unlabelled-until-used, because it is the exception rather than the
         routine — the sliders are for the run that differs (§ 2.5).
       */}
+      <RunsAtChoice />
+
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-xs text-muted-foreground">This run sits at</span>
         <HeightFields
@@ -378,12 +380,61 @@ export function RunEndsEditor({
               ? () => save({ distributionHeightInches: null })
               : undefined
           }
-          clearLabel="Follow the job"
-          // Empty here means "follows the job", and a real height IS in
-          // effect. "Not set" would read as "nothing applies to this run".
-          unsetLabel="the job's run height"
+          clearLabel="Follow the ceiling"
+          // Empty here means a real height IS in effect — the ceiling at
+          // each box: its height area, else the sheet's, else the job's
+          // (shared/ceilingHeights.ts). This said "the job's run height"
+          // until 2026-10-07, when that stopped being the whole answer.
+          unsetLabel="the ceiling at each box"
           setLabel="Override"
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HOW THIS RUN GETS BETWEEN ITS BOXES (owner, 2026-10-07, case d):
+ *   Through ceiling          up and down at every box — the drops counted
+ *   Box to box, same height  along the wall — flat length, no drops
+ *
+ * The arithmetic is built and tested (`runsAt` in server/runVerticals.ts),
+ * but the choice needs a place to be KEPT — `takeoff_runs.runsAt`, asked of
+ * Track A (migrations-next-batch.md). Until it lands every run is through
+ * the ceiling, and this says so rather than offering a switch that would
+ * forget itself. Two large buttons, for a finger on a tablet.
+ */
+function RunsAtChoice() {
+  return (
+    <div className="space-y-1 pt-1">
+      <div className="text-xs text-muted-foreground">
+        Between its boxes this run goes
+      </div>
+      <div className="grid grid-cols-2 gap-1.5" role="radiogroup">
+        <Button
+          size="sm"
+          variant="secondary"
+          className="min-h-11 text-xs whitespace-normal"
+          role="radio"
+          aria-checked
+        >
+          Through ceiling
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-11 text-xs whitespace-normal"
+          role="radio"
+          aria-checked={false}
+          disabled
+          title="Waiting for the next database update"
+        >
+          Box to box, same height
+        </Button>
+      </div>
+      <div className="text-[0.7rem] text-muted-foreground">
+        Box to box (no drops, flat length) arrives with the next database
+        update; until then every run drops at its boxes.
       </div>
     </div>
   );

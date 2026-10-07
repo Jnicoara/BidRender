@@ -14,7 +14,8 @@
  * amber, naming both. A shared wall is not an overlap and says nothing.
  */
 import { useRef, useState } from "react";
-import { Square, Trash2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ArrowUpToLine, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { HeightFields } from "@/components/HeightFields";
@@ -36,7 +37,108 @@ export type HeightAreaView = {
 const AREA = "#0284C7";
 const WARN = "#F59E0B";
 
-/** The section on the Circuits panel: this sheet's areas, and the tool. */
+/** The toolbar button: on every scaled sheet (owner, 2026-10-07). */
+export function CeilingsToggle({
+  on,
+  onChange,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      variant={on ? "secondary" : "ghost"}
+      className="h-7 gap-1.5 text-xs shrink-0"
+      aria-pressed={on}
+      title="This sheet's ceiling, and height areas inside it"
+      onClick={() => onChange(!on)}
+    >
+      <ArrowUpToLine className="w-3.5 h-3.5" />
+      Ceilings
+    </Button>
+  );
+}
+
+/**
+ * CEILINGS ON THIS SHEET — the sheet's own ceiling and its height areas.
+ * Every drop on the sheet reads them: regular runs at each end's box, count
+ * drops at each mark, homeruns at their device (shared/ceilingHeights.ts).
+ * Its own panel since 2026-10-07 — it lived on the Circuits panel, which
+ * exists only where a sheet has circuit tags.
+ */
+export function CeilingsPanel({
+  sheetCeiling,
+  aboveLabel,
+  locked,
+  onSheetCeiling,
+  onClose,
+  children,
+}: {
+  sheetCeiling: number | null;
+  /** What an empty sheet ceiling follows: "the job, 10'-0"". */
+  aboveLabel: string;
+  locked: boolean;
+  onSheetCeiling: (inches: number | null) => void;
+  onClose: () => void;
+  /** The height-areas section. */
+  children: React.ReactNode;
+}) {
+  return createPortal(
+    <div
+      className="fixed right-3 top-28 bottom-3 z-40 w-[min(340px,calc(100vw-24px))] flex flex-col rounded-lg border border-border bg-background shadow-xl"
+      role="dialog"
+      aria-label="Ceilings on this sheet"
+    >
+      <div className="shrink-0 flex items-center gap-2 border-b border-border px-3 py-2">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium">Ceilings on this sheet</div>
+          <div className="text-xs text-muted-foreground">
+            Every drop on this sheet climbs to the ceiling of the area its box
+            sits in, else this sheet's.
+          </div>
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-11 w-11 shrink-0"
+          aria-label="Close ceilings"
+          onClick={onClose}
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-3 text-sm">
+        <div className="rounded-md border border-border p-2 space-y-1.5 text-xs">
+          <div className="font-medium text-sm">This sheet's ceiling</div>
+          {locked ? (
+            <div className="text-muted-foreground">
+              {sheetCeiling === null
+                ? `Follows ${aboveLabel}`
+                : formatElevation(sheetCeiling)}
+            </div>
+          ) : (
+            <HeightFields
+              value={sheetCeiling}
+              belowFloor={false}
+              ariaPrefix="This sheet's ceiling"
+              compact
+              setLabel="Set this sheet's"
+              clearLabel="Clear"
+              unsetLabel={`follows ${aboveLabel}`}
+              onSave={inches => onSheetCeiling(inches)}
+              onClear={() => onSheetCeiling(null)}
+            />
+          )}
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/** The section on the Ceilings panel: this sheet's areas, and the tool. */
 export function HeightAreasSection({
   areas,
   warnings,

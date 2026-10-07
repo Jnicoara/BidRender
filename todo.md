@@ -618,6 +618,15 @@ Design: `references/homerun-footage-plan.md` § 4.
       job → company. Unset
       stays unset — never 0. Works on a tablet (draw by drag, 44 px targets).
       Later, the same areas give count drops their height.
+      **BUILT 2026-10-07 on branch `c-homerun-footage`** (by taps, not drag —
+      a drag pans), and since the same day EVERY drop reads it: regular runs
+      at each end's box, count drops at each mark, homeruns at their device
+      (`shared/ceilingHeights.ts`). Reached from "Ceilings" on every scaled
+      sheet.
+- [ ] **Reshape a height area after drawing — BEFORE BETA** (owner,
+      2026-10-07). Today an outline is fixed once drawn: remove and redraw.
+      Drag a corner (tablet: tap a corner, tap where it goes), add or drop a
+      corner; the server already takes `outline` on `updateHeightArea`.
 - [ ] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
       else changes):
   - `id`; `bidId` FK `bids.id` ON DELETE CASCADE; `userId` (the company

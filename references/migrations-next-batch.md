@@ -246,6 +246,29 @@ migration:
   moved it from "unreviewed" to `resolveRunType` (via `dropTypeFor`), and
   the unreviewed ceiling from 7 back to 6.
 
+**Two NEW columns asked of Track A (Track C, 2026-10-07)** — both owner-
+approved features whose arithmetic is built and tested on the branch and
+whose control is on screen but held until the column exists. Both ADDITIVE,
+nullable, **no DEFAULT**, no backfill (step 1). They can join Batch C (it is
+not applied anywhere) or follow it:
+
+| Column                   | Type             | NULL means                                     | Owner's words                                                   |
+| ------------------------ | ---------------- | ---------------------------------------------- | --------------------------------------------------------------- |
+| `bids.homerunExtraBends` | INT NULL         | not set: counted as 1 and said "not confirmed" | "Extra bends per homerun … starting at 1, shown as unconfirmed" |
+| `takeoff_runs.runsAt`    | VARCHAR(16) NULL | `'ceiling'` — drops at every box, as today     | "'Through ceiling' (default) or 'Box to box, same height'"      |
+
+- `runsAt` values: `'ceiling'` | `'boxToBox'` (varchar, like `homerunMethod`,
+  so a third is code rather than a migration). Like `traceMode` it describes
+  the whole run: C's code will keep it equal on the root and every leg.
+- What C's code owes when they land: read `bids.homerunExtraBends` in
+  `loadBidHomeruns` (now a literal NULL) and add it to `setBidSettings`;
+  carry `runsAt` on the run rows (`RunEnds.runsAt` is optional ONLY until
+  then — make it required) and add it to `setEnds`; enable the two held
+  controls (`RunsAtChoice` in runEnds.tsx, the stepper in
+  HomerunControls.tsx). Nothing reads a column that does not exist.
+- Bid numbers: `homerunExtraBends` moves none on its own (1 is already
+  counted); `runsAt` moves none until somebody picks box to box.
+
 **Numbering hazard, written down so it is not discovered:** the migrator
 skips a file numbered below one already applied (§ R.1). If ANY other
 migration is applied to staging or live before this branch merges, these

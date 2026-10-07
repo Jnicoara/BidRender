@@ -297,10 +297,34 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 **`c-homerun-footage` IS READY FOR TRACK A** (since 2026-10-07, when
 homerun couplings, connectors and straps landed — the owner's condition:
-"this must be done before Track A merges the branch"). Track A merges it
-together with 0125–0130; nothing after that point on the branch is a
-precondition. Height areas (being built next on the same branch) are
-additive work, not a blocker.
+"this must be done before Track A merges the branch"). Everything added
+since (height areas; one ceiling rule for every drop; pass-through drops;
+homerun bends) is on the same branch and ready with it.
+
+**THE MERGE RULE — for Track A:**
+
+1. **The branch merges TOGETHER WITH A's migrations 0125–0130**
+   (`a-batch-c-0125`, already merged into the branch). Never the branch
+   without them: its code reads `bid_panels`, `bid_panel_circuits`,
+   `bid_height_areas`, the `bids` / `bid_pdf_sheets` homerun columns and
+   `takeoff_run_circuits.panelCircuitId`, and a bare `select()` on a
+   database without them takes the Plans screen down. Never the migrations
+   without the code either (pairing rule).
+2. **If ANY other migration lands on staging or live first, A renumbers
+   0125–0130 above it before merging.** The migrator skips a file numbered
+   below one already applied (§ R.1 in migrations-next-batch.md), so a
+   0125 behind an applied 0131 is silently never run. Checked 2026-10-07:
+   local-dev still ends at 0124, so no renumbering yet.
+3. **Two more columns are asked** (migrations-next-batch.md § Batch C):
+   `bids.homerunExtraBends` and `takeoff_runs.runsAt`. The branch does NOT
+   need them to merge — it treats them as not set (1 extra bend,
+   unconfirmed; every run through the ceiling) and holds their two
+   controls. When they land, C wires them (the list of what is owed is in
+   that section).
+4. **These change bid numbers** (owner-approved): runs and count drops now
+   read the sheet's ceiling and height areas; a pass-through box counts two
+   drops; homeruns count bends. Before/after for UNCC E111 are in
+   homerun-footage-plan.md § 10.
 
 **Homerun footage steps 2–4 are BUILT on branch `c-homerun-footage`
 (2026-10-07), on Track A's 0125–0130 (`a-batch-c-0125`). DO NOT merge that
@@ -320,9 +344,10 @@ code, which is fine (additive). The server tests for the branch need
 `server/homerunsCore.test.ts` (22), `server/homerunFootage.test.ts` (44),
 plus `client/src/lib/homerunSync.test.ts` and `homerunText.test.ts`.
 
-Homerun fittings: DONE (plan § 10; elbows deliberately not counted, and
-said). Height areas: DONE on the same branch (plan § 10, with its limits).
-Next on homeruns, when the owner says: tying a traced run
+Homerun fittings: DONE (plan § 10), bends included since 2026-10-07.
+Height areas: DONE, reachable from "Ceilings" on every scaled sheet, read
+by every drop. Reshaping an area is a before-beta todo. Next on homeruns,
+when the owner says: tying a traced run
 to a circuit (`panelCircuitId` is read, nothing sets it); per-sheet
 average/minimum amounts on screen.
 

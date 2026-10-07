@@ -164,6 +164,23 @@ Once A adds the column (§ 7), the run height chain becomes
 sheet's own height is set on the sheet row with the same `HeightFields`
 control ("follows the job" when empty).
 
+> **Overridden 2026-10-07 by the owner, for ALL drops** ("regular runs,
+> count drops and homeruns all read the ceiling height of the area each box
+> sits in"). The "nothing here changes for runs" above, and "Per-AREA
+> heights … stay out", no longer hold. The chain, per BOX, is now:
+> **run's own → the height area the box sits in (smaller outline wins) →
+> sheet → job → company** — `shared/ceilingHeights.ts`, read by every run
+> END, every count drop's MARK and every homerun. Built on branch
+> `c-homerun-footage` (homerun-footage-plan.md § 10). The sheet's own
+> height is set on the "Ceilings" panel, not the sheet row.
+>
+> **And two drop rules, same day:** (a) a run whose first click snaps onto
+> a mark starts AT that box — linked to it, no kind — so a run passing
+> through a box counts TWO drops there (§ 3 had one: the leaving run took
+> the sticky "From", Nothing). (d) a per-run "Box to box, same height"
+> makes both ends level with their kinds kept — waiting on Track A's
+> `takeoff_runs.runsAt`.
+
 ## 3. How a drop adds to a run
 
 Unchanged from what is built, written down here so the test plan has one

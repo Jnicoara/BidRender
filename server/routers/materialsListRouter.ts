@@ -467,15 +467,16 @@ export const materialsListRouter = router({
           })} ft of raceway or cable). Connectors and elbows for those drops are NOT counted — add them by hand.`
         );
       }
-      // Homeruns: their couplings, connectors and straps ARE above (with
-      // their type's fittings); their elbows are not — said, as for drops.
+      // Homeruns: their couplings, connectors, straps AND bends are above
+      // with their type's fittings (bends since 2026-10-07, owner: one at
+      // each counted drop + the bid's extra bends per homerun).
       if (totals.homerunCount > 0) {
         notes.push(
           `Includes ${totals.homerunCount} ${
             totals.homerunCount === 1 ? "homerun" : "homeruns"
           } (${totals.homerunFeet.toLocaleString("en-US", {
             maximumFractionDigits: 2,
-          })} ft of run and drops, before routing, waste and makeup). Their couplings, connectors and straps are counted; elbows for homeruns are NOT — add them by hand.`
+          })} ft of run and drops, before routing, waste and makeup). Their couplings, connectors, straps and bends are counted — a bend at each drop, plus the bid's extra bends per homerun for corners (1 each unless set).`
         );
       }
       if (untypedRuns > 0) {

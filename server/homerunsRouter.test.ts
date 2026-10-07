@@ -595,6 +595,60 @@ describeDb("height areas inside a sheet (0130)", () => {
   });
 });
 
+describeDb(
+  "regular runs read the area and the sheet ceiling (2026-10-07)",
+  () => {
+    it("a run ending in an 18'-0\" area drops 16.5 ft; the sheet's 12'-0\" gives 10.5; none gives the job's 8.5", async () => {
+      const { bidId, sheetId } = await aBid();
+      const type = await caller().takeoffRunTypes.create({
+        label: `Run type ${Date.now()}${Math.random()}`,
+        pathType: "conduit",
+        conductorCount: 2,
+      });
+      // 40 ft along y = 10 ft, ending at (40 ft, 10 ft) on a receptacle.
+      await caller().takeoffRuns.save({
+        bidId,
+        sheetId,
+        name: "Run",
+        pathType: "conduit",
+        points: [
+          { x: 0, y: ft(10) },
+          { x: ft(40), y: ft(10) },
+        ],
+        status: "committed",
+        startKind: "distribution",
+        endKind: "receptacle",
+        runTypeId: type.id,
+      });
+      const conduit = async () =>
+        (await caller().takeoffRuns.totals({ bidId })).conduitBoughtFeet;
+      // Job 10'-0": 40 + 8.5 (no waste set here).
+      expect(await conduit()).toBeCloseTo(48.5, 2);
+
+      await caller().homeruns.setSheetCeiling({ bidId, sheetId, inches: 144 });
+      expect(await conduit()).toBeCloseTo(40 + 10.5, 2);
+
+      await caller().homeruns.createHeightArea({
+        bidId,
+        sheetId,
+        name: "Stockroom",
+        outline: [
+          { x: ft(35), y: ft(5) },
+          { x: ft(45), y: ft(15) },
+        ],
+        heightInches: 216,
+      });
+      expect(await conduit()).toBeCloseTo(40 + 16.5, 2);
+
+      // The sheet ceiling cleared: the area still answers for its box.
+      await caller().homeruns.setSheetCeiling({ bidId, sheetId, inches: null });
+      expect(await conduit()).toBeCloseTo(40 + 16.5, 2);
+      const { sheetCeilings } = await caller().homeruns.heightAreas({ bidId });
+      expect(sheetCeilings.find(s => s.sheetId === sheetId)?.inches).toBeNull();
+    });
+  }
+);
+
 describeDb("refusals", () => {
   it("a locked bid's homeruns do not move", async () => {
     const { bidId, sheetId, near } = await aBid();

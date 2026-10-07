@@ -94,9 +94,12 @@ import {
 } from "@shared/markStatus";
 import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
+import { formatElevation } from "@shared/takeoffHeights";
 import {
   HeightAreasLayer,
   HeightAreasSection,
+  CeilingsPanel,
+  CeilingsToggle,
 } from "@/components/takeoff/HeightAreas";
 import {
   confirmableHomeruns,
@@ -4423,6 +4426,7 @@ export default function TakeoffPage({
     leaving a device inside it, so each change refreshes the homeruns too.
   */
   const heightAreasQuery = trpc.homeruns.heightAreas.useQuery({ bidId });
+  const [showCeilings, setShowCeilings] = useState(false);
   const [drawingArea, setDrawingArea] = useState(false);
   const [areaTaps, setAreaTaps] = useState<{ x: number; y: number }[]>([]);
   const [areaError, setAreaError] = useState<string | null>(null);
@@ -4430,9 +4434,21 @@ export default function TakeoffPage({
     onError: (e: { message: string }) => toast.error(e.message),
     onSettled: () => {
       void utils.homeruns.heightAreas.invalidate({ bidId });
-      refreshFor("homerun");
+      // A ceiling moves EVERY drop now — runs, count drops and homeruns
+      // (shared/ceilingHeights.ts) — so the heights change, not "homerun".
+      refreshFor("heights");
     },
   };
+  const setSheetCeiling = trpc.homeruns.setSheetCeiling.useMutation(areaSaved);
+  const sheetCeiling =
+    heightAreasQuery.data?.sheetCeilings.find(
+      s => s.sheetId === activeSheet?.id
+    )?.inches ?? null;
+  const above = heightAreasQuery.data?.above;
+  const aboveCeilingLabel =
+    above && above.inches !== null
+      ? `the ${above.source}, ${formatElevation(above.inches)}`
+      : "the job — not set, no drops counted";
   const createHeightArea =
     trpc.homeruns.createHeightArea.useMutation(areaSaved);
   const updateHeightArea =
@@ -9590,11 +9606,14 @@ export default function TakeoffPage({
                 on={showCircuits}
                 onChange={on => {
                   setShowCircuits(on);
-                  if (!on) {
-                    setCircuitPick(null);
-                    setPlacingPanel(null);
+                  if (on) {
+                    // One panel docks on the right at a time.
+                    setShowCeilings(false);
                     setDrawingArea(false);
                     setAreaTaps([]);
+                  } else {
+                    setCircuitPick(null);
+                    setPlacingPanel(null);
                   }
                 }}
               />
@@ -9650,48 +9669,88 @@ export default function TakeoffPage({
                   setShowCircuits(false);
                   setCircuitPick(null);
                   setPlacingPanel(null);
-                  // A tap after closing must not add a corner nobody sees.
-                  setDrawingArea(false);
-                  setAreaTaps([]);
                 }}
                 feetPerPoint={
                   activeSheet?.scaleRatio != null
                     ? Number(activeSheet.scaleRatio) / 72 / 12
                     : null
                 }
-                heightAreas={
-                  <HeightAreasSection
-                    areas={sheetAreas}
-                    warnings={sheetAreaWarnings}
-                    drawing={drawingArea}
-                    taps={areaTaps}
-                    locked={homerunData?.locked ?? false}
-                    sheetHeightLabel="the sheet"
-                    finishError={areaError}
-                    onStartDraw={() => {
-                      // One tool at a time: a tap is either a corner or a panel.
-                      setPlacingPanel(null);
-                      setAreaTaps([]);
-                      setAreaError(null);
-                      setDrawingArea(true);
-                    }}
-                    onUndoTap={() => setAreaTaps(t => t.slice(0, -1))}
-                    onFinish={finishArea}
-                    onCancel={() => {
-                      setDrawingArea(false);
-                      setAreaTaps([]);
-                      setAreaError(null);
-                    }}
-                    onRename={(id, name) =>
-                      updateHeightArea.mutate({ id, name })
-                    }
-                    onHeight={(id, inches) =>
-                      updateHeightArea.mutate({ id, heightInches: inches })
-                    }
-                    onRemove={id => removeHeightArea.mutate({ id })}
-                  />
-                }
               />
+            )}
+
+            {/*
+              CEILINGS — the sheet's own and its height areas, on EVERY scaled
+              sheet (owner, 2026-10-07). It sat on the Circuits panel, which
+              only a sheet with circuit tags has; every drop reads it now.
+            */}
+            {!phone && activeSheet?.scaleRatio != null && (
+              <CeilingsToggle
+                on={showCeilings}
+                onChange={on => {
+                  setShowCeilings(on);
+                  if (on) {
+                    // One panel docks on the right at a time.
+                    setShowCircuits(false);
+                    setPlacingPanel(null);
+                  } else {
+                    // A tap after closing must not add a corner nobody sees.
+                    setDrawingArea(false);
+                    setAreaTaps([]);
+                  }
+                }}
+              />
+            )}
+            {!phone && showCeilings && activeSheet && (
+              <CeilingsPanel
+                sheetCeiling={sheetCeiling}
+                aboveLabel={aboveCeilingLabel}
+                locked={homerunData?.locked ?? false}
+                onSheetCeiling={inches =>
+                  setSheetCeiling.mutate({
+                    bidId,
+                    sheetId: activeSheet.id,
+                    inches,
+                  })
+                }
+                onClose={() => {
+                  setShowCeilings(false);
+                  setDrawingArea(false);
+                  setAreaTaps([]);
+                }}
+              >
+                <HeightAreasSection
+                  areas={sheetAreas}
+                  warnings={sheetAreaWarnings}
+                  drawing={drawingArea}
+                  taps={areaTaps}
+                  locked={homerunData?.locked ?? false}
+                  sheetHeightLabel={
+                    sheetCeiling === null
+                      ? aboveCeilingLabel
+                      : `this sheet, ${formatElevation(sheetCeiling)}`
+                  }
+                  finishError={areaError}
+                  onStartDraw={() => {
+                    // One tool at a time: a tap is either a corner or a panel.
+                    setPlacingPanel(null);
+                    setAreaTaps([]);
+                    setAreaError(null);
+                    setDrawingArea(true);
+                  }}
+                  onUndoTap={() => setAreaTaps(t => t.slice(0, -1))}
+                  onFinish={finishArea}
+                  onCancel={() => {
+                    setDrawingArea(false);
+                    setAreaTaps([]);
+                    setAreaError(null);
+                  }}
+                  onRename={(id, name) => updateHeightArea.mutate({ id, name })}
+                  onHeight={(id, inches) =>
+                    updateHeightArea.mutate({ id, heightInches: inches })
+                  }
+                  onRemove={id => removeHeightArea.mutate({ id })}
+                />
+              </CeilingsPanel>
             )}
 
             {/* Homeruns read off the sheet, read-only; only where it has one. */}
@@ -10653,20 +10712,21 @@ export default function TakeoffPage({
                           />
                         </>
                       )}
-                    {showCircuits && (drawingArea || sheetAreas.length > 0) && (
-                      <HeightAreasLayer
-                        width={size.width}
-                        height={size.height}
-                        renderScale={size.renderScale}
-                        areas={sheetAreas}
-                        drawing={drawingArea}
-                        taps={areaTaps}
-                        onTap={at => {
-                          setAreaError(null);
-                          setAreaTaps(t => [...t, at]);
-                        }}
-                      />
-                    )}
+                    {(showCeilings || showCircuits) &&
+                      (drawingArea || sheetAreas.length > 0) && (
+                        <HeightAreasLayer
+                          width={size.width}
+                          height={size.height}
+                          renderScale={size.renderScale}
+                          areas={sheetAreas}
+                          drawing={drawingArea}
+                          taps={areaTaps}
+                          onTap={at => {
+                            setAreaError(null);
+                            setAreaTaps(t => [...t, at]);
+                          }}
+                        />
+                      )}
                     {showCircuits && circuitReport && (
                       <CircuitLayer
                         width={size.width}

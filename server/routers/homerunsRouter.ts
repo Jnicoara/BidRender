@@ -24,7 +24,8 @@ import {
   homerunTotals,
   outlineFromTaps,
 } from "../../shared/homerunFootage";
-import { ROUTING_STARTER_PCT } from "../homerunsCore";
+import { DEFAULT_EXTRA_BENDS, ROUTING_STARTER_PCT } from "../homerunsCore";
+import { ceilingAt, NO_CEILINGS } from "../../shared/ceilingHeights";
 
 const procedure = scoped("bids.view", "bids.edit");
 
@@ -111,8 +112,12 @@ export const homerunsRouter = router({
               ? null
               : Number(bid.homerunRoutingPct),
           runTypeId: bid.homerunRunTypeId,
+          // No column yet (bids.homerunExtraBends, asked of Track A):
+          // NULL = not set, counted as the starter and said unconfirmed.
+          extraBends: null as number | null,
         },
         routingStarterPct: ROUTING_STARTER_PCT,
+        extraBendsDefault: DEFAULT_EXTRA_BENDS,
         type: computed?.type ?? null,
         noExtraSet: computed?.noExtraSet ?? false,
         locked: bid.quantitiesLockedAt !== null,
@@ -358,8 +363,12 @@ export const homerunsRouter = router({
     .input(z.object({ bidId: z.number().int() }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.scope.dataUserId;
-      await requireBid(input.bidId, userId);
-      const rows = await db.getHeightAreas(input.bidId, userId);
+      const bid = await requireBid(input.bidId, userId);
+      const [rows, sheetRows, defaults] = await Promise.all([
+        db.getHeightAreas(input.bidId, userId),
+        db.getSheetCeilings(input.bidId, userId),
+        db.getHeightDefaults(userId),
+      ]);
       const areas = rows.map(a => ({
         id: a.id,
         sheetId: a.sheetId,
@@ -369,14 +378,52 @@ export const homerunsRouter = router({
       }));
       // Warnings per sheet: areas on two sheets never overlap.
       const sheets = Array.from(new Set(areas.map(a => a.sheetId)));
+      // What a sheet with no ceiling of its own follows: the job, then the
+      // company — said by name on the panel, never as "not set".
+      const above = ceilingAt(
+        {
+          ...NO_CEILINGS,
+          job: bid.distributionHeightInches,
+          company: defaults?.distributionHeightInches ?? null,
+        },
+        null,
+        null
+      );
       return {
         areas,
+        sheetCeilings: sheetRows.map(s => ({
+          sheetId: s.id,
+          inches: s.distributionHeightInches,
+        })),
+        above: { inches: above.inches, source: above.source },
         warnings: sheets.flatMap(sheetId =>
           heightAreaWarnings(areas.filter(a => a.sheetId === sheetId)).map(
             text => ({ sheetId, text })
           )
         ),
       };
+    }),
+
+  /**
+   * A sheet's own ceiling (0109), or NULL to follow the job. The level a box
+   * reads when it sits in no height area — runs, count drops and homeruns
+   * alike (shared/ceilingHeights.ts). Nothing wrote this column until
+   * 2026-10-07; only homeruns read it.
+   */
+  setSheetCeiling: procedure
+    .input(
+      z.object({
+        bidId: z.number().int(),
+        sheetId: z.number().int(),
+        inches: heightSchema.nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.scope.dataUserId;
+      await requireOpenBid(input.bidId, userId);
+      await requireSheetOnBid(input.bidId, input.sheetId, userId);
+      await db.setSheetCeiling(input.sheetId, userId, input.inches);
+      return { ok: true };
     }),
 
   createHeightArea: procedure

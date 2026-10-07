@@ -226,6 +226,52 @@ export function HomerunSettings({
             )}
           </div>
 
+          {/*
+            EXTRA BENDS PER HOMERUN (owner, 2026-10-07): its corners, which
+            nobody drew. Starts at 1 and says "not confirmed" until set. The
+            number is applied today; SETTING it waits on Track A's
+            `bids.homerunExtraBends`, so the stepper is shown and held.
+          */}
+          <div className="flex items-center gap-2">
+            <span className="w-24 shrink-0 text-muted-foreground">
+              Extra bends
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-11 w-11"
+                aria-label="One fewer extra bend per homerun"
+                disabled
+              >
+                −
+              </Button>
+              <span className="w-8 text-center text-sm font-medium">
+                {s.extraBends ?? data.extraBendsDefault}
+              </span>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-11 w-11"
+                aria-label="One more extra bend per homerun"
+                disabled
+              >
+                +
+              </Button>
+            </div>
+            <span className="min-w-0 text-[#B45309] dark:text-[#F59E0B]">
+              {s.extraBends === null
+                ? "per homerun · not confirmed"
+                : "per homerun"}
+            </span>
+          </div>
+          {s.extraBends === null && (
+            <div className="text-[0.7rem] text-muted-foreground -mt-1">
+              For each homerun's corners, on top of a bend at each drop.
+              Changing it arrives with the next database update.
+            </div>
+          )}
+
           <label className="flex items-center gap-2">
             <span className="w-24 shrink-0 text-muted-foreground">Made of</span>
             <select
