@@ -153,11 +153,11 @@ export type HeightArea = {
  * sales floor — never just the lower height (owner, 2026-10-06). A device
  * in no area returns null and follows the sheet.
  */
-export function heightAreaAt(
+export function heightAreaAt<A extends Pick<HeightArea, "outline">>(
   point: Pt,
-  areas: readonly HeightArea[]
-): HeightArea | null {
-  let best: HeightArea | null = null;
+  areas: readonly A[]
+): A | null {
+  let best: A | null = null;
   let bestSize = Infinity;
   for (const area of areas) {
     if (!insidePolygon(point, area.outline)) continue;

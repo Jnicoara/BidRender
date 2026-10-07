@@ -22,6 +22,7 @@ import {
   type DropTypeSpec,
 } from "../shared/groupDrops";
 import { NO_EXTRAS_CONTEXT, type ExtrasContext } from "../shared/runExtras";
+import { NO_CEILINGS, type CeilingLayers } from "../shared/ceilingHeights";
 import { totalQuantities } from "../shared/takeoffQuantities";
 
 const RATIO = 48; // 1/4" = 1'-0": 1 page point = 48/72 real inches
@@ -65,6 +66,8 @@ function drops(input: {
   marks?: DropMark[];
   runs?: DropRunEnd[];
   companyInches?: number | null;
+  /** Sheet heights and height areas, over the company ceiling. */
+  ceilings?: Partial<CeilingLayers>;
   extras?: ExtrasContext;
   type?: DropTypeSpec | null;
   ratio?: number | null;
@@ -76,9 +79,11 @@ function drops(input: {
     heights: {
       // Receptacle ships at 1'-6"; the run height is set here.
       layers: { company: new Map(), job: new Map() },
-      companyInches:
-        input.companyInches === undefined ? 120 : input.companyInches,
-      jobInches: null,
+      ceilings: {
+        ...NO_CEILINGS,
+        company: input.companyInches === undefined ? 120 : input.companyInches,
+        ...(input.ceilings ?? {}),
+      },
     },
     extras: input.extras ?? NO_EXTRAS_CONTEXT,
     typeFor: () => (input.type === undefined ? EMT_2_AND_GROUND : input.type),

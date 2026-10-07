@@ -51,6 +51,7 @@ import {
 } from "../shared/takeoffQuantities";
 import type { PagePoint } from "../shared/takeoffGeometry";
 import { runDisplayName, runNameParts } from "../shared/takeoffCounts";
+import { NO_CEILINGS } from "../shared/ceilingHeights";
 import {
   EMPTY_HEIGHT_CONTEXT,
   verticalsForRunRow,
@@ -1186,13 +1187,16 @@ describe("resolving a stored run's verticals", () => {
     // became part of it — harmlessly, since verticalsForRunRow never reads
     // `types`, but unseen, because pnpm check skips tests.
     ...EMPTY_HEIGHT_CONTEXT,
-    companyInches: 120,
+    // The ceiling a run end reads (shared/ceilingHeights.ts, 2026-10-07).
+    ceilings: { ...NO_CEILINGS, company: 120 },
     // Fresh maps rather than the constant's, so no test can write into a
     // module-level value shared by every other test.
     layers: { company: new Map(), job: new Map() },
   };
 
   const PANEL_TO_RECEPTACLE = {
+    sheetId: 1,
+    points: null,
     startKind: DISTRIBUTION_KIND,
     endKind: "receptacle",
     startHeightInches: null,
@@ -1308,7 +1312,7 @@ describe("resolving a stored run's verticals", () => {
     // run, without anybody editing a run.
     const verticals = verticalsForRunRow(PANEL_TO_RECEPTACLE, {
       ...COMPANY,
-      jobInches: 144,
+      ceilings: { ...COMPANY.ceilings, job: 144 },
     });
     expect(verticals.feet).toBe(10.5);
   });
@@ -1316,7 +1320,7 @@ describe("resolving a stored run's verticals", () => {
   it("lets one run sit at its own elevation", () => {
     const verticals = verticalsForRunRow(
       { ...PANEL_TO_RECEPTACLE, distributionHeightInches: 96 },
-      { ...COMPANY, jobInches: 144 }
+      { ...COMPANY, ceilings: { ...COMPANY.ceilings, job: 144 } }
     );
     expect(verticals.feet).toBe(6.5);
   });

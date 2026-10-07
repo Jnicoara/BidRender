@@ -33,7 +33,7 @@ import {
 import { runOnBid } from "../shared/runOnBid";
 import { legFromRun, type FittingLeg } from "../shared/runFittings";
 import type { TeeRef } from "../shared/runNetwork";
-import type { PullPointAnswer } from "../shared/runBends";
+import { endDropOf, type PullPointAnswer } from "../shared/runBends";
 import { pointsToRealInches } from "../shared/takeoffGeometry";
 import { uncountedEnds } from "../shared/takeoffHeights";
 import {
@@ -170,10 +170,11 @@ export const HOMERUN_NODE = "homerun:";
  * - Two ends of its own: the device box and the panel. Never the mark's
  *   node, so a traced run ending on the same device cannot make it read as
  *   an in-and-out box; each conduit end takes a connector either way.
- * - No points and no drops: a homerun has no drawn path, so BENDS are not
- *   counted for it. Its drops' elbows and its corner exist on the job but
- *   counting only the drops would be half an answer said as a whole one
- *   (homerun-footage-plan.md § 10).
+ * - Bends: a 90 at each counted drop, plus the bid's "extra bends per
+ *   homerun" for its corners (owner, 2026-10-07). This said "bends are not
+ *   counted for it" until then — the owner approved counting drops from the
+ *   verticals and corners from a per-bid number rather than leaving both
+ *   out (homerun-footage-plan.md § 10).
  */
 export function homerunFittingLeg(entry: HomerunEntry): FittingLeg {
   const id = `${HOMERUN_NODE}${entry.circuitId}`;
@@ -184,12 +185,22 @@ export function homerunFittingLeg(entry: HomerunEntry): FittingLeg {
     to: `${id}:panel`,
     feet: round2(entry.line.homerunFeet + entry.line.routingFeet),
     feetIsFloor: entry.feetIsFloor,
-    points: [],
+    /*
+      BENDS (owner, 2026-10-07). Its two real ends as a straight path, so
+      the bend count adds a 90 at each COUNTED drop — up at the device,
+      down at the panel — by the same rule a traced run's drops use, and
+      reads no corner off the line. Its corners come from the bid's "extra
+      bends per homerun" (`extraCorners`), because a homerun has no drawn
+      path to read them from. Elbow or field bend, and the hours, follow
+      the type exactly as a traced run's do.
+    */
+    points: [entry.from, entry.to ?? entry.from],
     feetPerPoint: null,
-    startDrop: { state: "none" },
-    endDrop: { state: "none" },
+    startDrop: endDropOf(entry.upDrop),
+    endDrop: endDropOf(entry.downAtPanel),
     answers: [],
     noPullPoints: true,
+    extraCorners: entry.extraCorners,
   };
 }
 

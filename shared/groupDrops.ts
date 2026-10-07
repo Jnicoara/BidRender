@@ -34,9 +34,9 @@
  * because a run's flat length is unknown; a mark has no flat length to be
  * unknown, and its drop is arithmetic between two heights the estimator set.
  */
+import { ceilingAt, type CeilingLayers } from "./ceilingHeights";
 import {
   resolveDeviceHeight,
-  resolveDistributionHeight,
   stampsClaimedByRuns,
   SUGGEST_WITHIN_INCHES,
   verticalAtEnd,
@@ -272,8 +272,12 @@ export function groupDrops(input: {
   runs: readonly DropRunEnd[];
   heights: {
     layers: HeightLayers;
-    companyInches: number | null;
-    jobInches: number | null;
+    /**
+     * Every ceiling layer: each MARK's drop reads the area it sits in, then
+     * its sheet, job, company (shared/ceilingHeights.ts, owner 2026-10-07).
+     * Until then a count's drops read job → company only.
+     */
+    ceilings: CeilingLayers;
   };
   extras: ExtrasContext;
   /** The run type a STORED id means, fork followed; null when gone. */
@@ -282,10 +286,11 @@ export function groupDrops(input: {
   ratioFor: (sheetId: number) => number | null;
 }): GroupDrop[] {
   const claimed = stampsClaimedByRuns(input.runs);
-  const distribution = resolveDistributionHeight({
-    company: input.heights.companyInches,
-    job: input.heights.jobInches,
-  }).inches;
+  // The job's (or company's) ceiling: what a mark outside every area and
+  // on a sheet with no height of its own reads, and what the row leads with.
+  const distribution = ceilingAt(input.heights.ceilings, null, null).inches;
+  const ceilingOf = (mark: DropMark) =>
+    ceilingAt(input.heights.ceilings, mark.sheetId, mark).inches;
 
   // Unclaimed run ends, for the proximity flag.
   const openEnds: { sheetId: number; x: number; y: number }[] = [];
@@ -362,9 +367,19 @@ export function groupDrops(input: {
       r === "no-distribution-height"
         ? "no run height set for this job"
         : "no height set for that type";
-    if (!vertical.counted && vertical.reason === "level")
+    /*
+      The count-wide answers hold only where EVERY mark agrees: a mark in a
+      height area, or on a sheet with its own ceiling, has a drop the
+      job-level answer cannot see.
+    */
+    const allAtJobCeiling = wanting.every(m => ceilingOf(m) === distribution);
+    if (!vertical.counted && vertical.reason === "level" && allAtJobCeiling)
       return none("level", null, device);
-    if (!vertical.counted && vertical.reason === "no-distribution-height")
+    if (
+      !vertical.counted &&
+      vertical.reason === "no-distribution-height" &&
+      allAtJobCeiling
+    )
       return none("no-height", reasonOf(vertical.reason), device);
 
     const type =
@@ -385,7 +400,7 @@ export function groupDrops(input: {
         .value ?? 0;
 
     // Each mark at its own height where it has one, else the count's.
-    const buckets = new Map<number, DropBucket>();
+    const buckets = new Map<string, DropBucket>();
     let uncountedMarks = 0;
     let ownHeightCount = 0;
     const countedMarks: DropMark[] = [];
@@ -394,7 +409,8 @@ export function groupDrops(input: {
       const at = verticalAtEnd({
         kind,
         endInches: own.inches,
-        distributionInches: distribution,
+        // This mark's own ceiling — its area, its sheet, then the job's.
+        distributionInches: ceilingOf(mark),
       });
       if (!at.counted) {
         // Level is an answer (a mark at run height); anything else is a
@@ -405,14 +421,17 @@ export function groupDrops(input: {
       if (own.source === "mark-typed" || own.source === "mark-read")
         ownHeightCount += 1;
       countedMarks.push(mark);
-      const bucket = buckets.get(at.endInches) ?? {
+      // Keyed by the DROP, device and ceiling both: two marks at 18" under
+      // different ceilings are two different drops.
+      const key = `${at.endInches}:${at.distributionInches}`;
+      const bucket = buckets.get(key) ?? {
         deviceInches: at.endInches,
         source: own.source,
         perDropFeet: at.feet,
         perDrop: oneDrop(at.feet, type, wirePct, makeup, conduitPct),
         marks: [],
       };
-      buckets.set(at.endInches, {
+      buckets.set(key, {
         ...bucket,
         marks: [...bucket.marks, { id: mark.id, sheetId: mark.sheetId }],
       });

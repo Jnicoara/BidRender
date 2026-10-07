@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   legSnapLabel,
+  newRunStart,
   quantitySnap,
   resolveLegStart,
   snapToMark,
@@ -183,5 +184,37 @@ describe("the same snap on a quantity trace (D21)", () => {
     expect(onMark).toEqual({ kind: "free", point: { x: 701, y: 700 } });
     const free = snap({ x: 900, y: 900 });
     expect(quantitySnap(free)).toBe(free);
+  });
+});
+
+describe("a new run's start (case a: through a box = two drops)", () => {
+  it("snapped onto a mark: linked to it, with no kind of its own", () => {
+    expect(
+      newRunStart({
+        snap: { kind: "stamp", stampId: 41, point: { x: 1, y: 1 } },
+        fromKind: "distribution",
+        quantity: false,
+      })
+    ).toEqual({ startKind: null, startStampId: 41 });
+  });
+
+  it("anywhere else: the toolbar's From, no link", () => {
+    expect(
+      newRunStart({
+        snap: { kind: "free", point: { x: 1, y: 1 } },
+        fromKind: "distribution",
+        quantity: false,
+      })
+    ).toEqual({ startKind: "distribution", startStampId: null });
+  });
+
+  it("a quantity trace is never linked (D21)", () => {
+    expect(
+      newRunStart({
+        snap: { kind: "stamp", stampId: 41, point: { x: 1, y: 1 } },
+        fromKind: "distribution",
+        quantity: true,
+      })
+    ).toEqual({ startKind: null, startStampId: null });
   });
 });

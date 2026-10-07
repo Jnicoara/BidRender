@@ -474,6 +474,8 @@ describe("fittings are counted over INSTALLED pipe, not bought", () => {
         extraDefaults: undefined,
         runTypes: [],
         linkedMarks: [],
+        sheetCeilings: [],
+        heightAreas: [],
       }),
       pullPointAnswersByRun: new Map(),
       teesById: new Map(),

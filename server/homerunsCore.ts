@@ -21,15 +21,13 @@
  *   routing      `bids.homerunRoutingPct`; NULL = none applied. The +15%
  *                starter is only SHOWN until somebody uses it.
  */
+import { ceilingAt } from "../shared/ceilingHeights";
 import {
-  heightAreaAt,
   homerunFootage,
   homerunLineFootage,
   parseHomerunMethod,
-  resolveHomerunCeiling,
   resolveHomerunMethod,
   type CeilingSource,
-  type HeightArea,
   type HomerunFootage,
   type HomerunLineFootage,
   type ResolvedHomerunMethod,
@@ -37,6 +35,7 @@ import {
 import {
   resolveDeviceHeight,
   resolveMountingHeight,
+  type EndVertical,
   type MarkHeight,
 } from "../shared/takeoffHeights";
 import { resolveExtraPct, resolveMakeup } from "../shared/runExtras";
@@ -45,12 +44,27 @@ import type { HeightContext } from "./runVerticals";
 /** The +15% routing starter (plan § 5): shown, dated, inert until used. */
 export const ROUTING_STARTER_PCT = 0.15;
 
+/**
+ * Corners a homerun turns that nobody drew (owner, 2026-10-07: "starting
+ * at 1, shown as unconfirmed until the user sets it"). Unlike the routing
+ * starter this one IS applied — the owner chose that — and every sentence
+ * that counts it says it is not confirmed.
+ */
+export const DEFAULT_EXTRA_BENDS = 1;
+
 export type HomerunBidSettings = {
   homerunMethod: string | null;
   homerunAverageFt: number | null;
   homerunMinimumFt: number | null;
   homerunRoutingPct: number | null;
   homerunRunTypeId: number | null;
+  /**
+   * Corners per homerun (owner, 2026-10-07). NULL = nobody set it: counted
+   * as `DEFAULT_EXTRA_BENDS` and said "not confirmed". No column holds it
+   * yet — `bids.homerunExtraBends` is asked of Track A
+   * (migrations-next-batch.md); until it lands the loader passes NULL.
+   */
+  homerunExtraBends: number | null;
 };
 
 export type HomerunSheet = {
@@ -58,7 +72,6 @@ export type HomerunSheet = {
   scaleRatio: number | null;
   /** A "not to scale" sheet measures nothing unless the scale was typed. */
   measurable: boolean;
-  distributionHeightInches: number | null;
   homerunMethod: string | null;
   homerunAverageFt: number | null;
   homerunMinimumFt: number | null;
@@ -118,6 +131,14 @@ export type HomerunEntry = {
   confirmed: boolean;
   /** The circuit — names the homerun's own fitting leg and its two ends. */
   circuitId: number;
+  /** Where it leaves and where it arrives, page points — its two ends. */
+  from: { x: number; y: number };
+  to: { x: number; y: number } | null;
+  /** The two verticals, for the drop BENDS (a 90 at each counted drop). */
+  upDrop: EndVertical;
+  downAtPanel: EndVertical;
+  /** Its corners nobody drew (owner, 2026-10-07): per bid, starter 1. */
+  extraCorners: { count: number; confirmed: boolean };
   /**
    * A drop at either end could not be counted (no ceiling, no height), so
    * the feet are a floor and every fitting counted on them is "at least" —
@@ -150,7 +171,7 @@ export function bidHomeruns(input: {
   marks: ReadonlyMap<number, HomerunMark>;
   /** Circuits a TRACED run is tied to (`takeoff_run_circuits.panelCircuitId`). */
   tracedCircuitIds: ReadonlySet<number>;
-  areas: readonly (HeightArea & { sheetId: number })[];
+  /** Heights, extras AND every ceiling layer (areas, sheets) — `ceilings`. */
   heights: HeightContext;
 }): BidHomeruns {
   const { bid, heights } = input;
@@ -206,19 +227,21 @@ export function bidHomeruns(input: {
       },
     });
 
-    const area = mark
-      ? heightAreaAt(
-          mark,
-          input.areas.filter(a => a.sheetId === mark.sheetId)
-        )
-      : null;
-    const ceiling = resolveHomerunCeiling({
-      homerun: circuit.homerunCeilingInches,
-      area: area?.ceilingInches,
-      sheet: sheet?.distributionHeightInches,
-      job: heights.jobInches,
-      company: heights.companyInches,
-    });
+    /*
+      The homerun's own ceiling, else the ONE rule every drop on the bid
+      reads: the area its device sits in → its sheet → job → company
+      (shared/ceilingHeights.ts, 2026-10-07). This resolved the area and
+      sheet itself until then, which is how runs came to miss them.
+    */
+    const shared = ceilingAt(
+      heights.ceilings,
+      mark?.sheetId ?? null,
+      mark ?? null
+    );
+    const ceiling: { inches: number | null; source: CeilingSource } =
+      circuit.homerunCeilingInches !== null
+        ? { inches: circuit.homerunCeilingInches, source: "homerun" }
+        : { inches: shared.inches, source: shared.source };
 
     // The panel's spot counts only on the leaving device's sheet.
     const panelSpot =
@@ -292,13 +315,26 @@ export function bidHomeruns(input: {
             groundCount: spec.groundCount,
           })
         : null;
-    if (line && mark && bid.homerunRunTypeId !== null)
+    if (
+      line &&
+      mark &&
+      footage.state === "computed" &&
+      bid.homerunRunTypeId !== null
+    )
       entries.push({
         runTypeId: bid.homerunRunTypeId,
         sheetId: mark.sheetId,
         line,
         confirmed: footage.state === "computed" && footage.confirmed,
         circuitId: circuit.id,
+        from: { x: mark.x, y: mark.y },
+        to: panelSpot,
+        upDrop: footage.pieces.upDrop,
+        downAtPanel: footage.pieces.downAtPanel,
+        extraCorners: {
+          count: bid.homerunExtraBends ?? DEFAULT_EXTRA_BENDS,
+          confirmed: bid.homerunExtraBends !== null,
+        },
         // A typed length replaces the drops, so nothing about it is a floor.
         feetIsFloor:
           footage.state === "computed" &&

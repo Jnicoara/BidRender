@@ -13308,18 +13308,30 @@ export async function heightContextForBid(
   userId: number,
   bidDistributionInches: number | null
 ): Promise<HeightContext> {
-  const [defaults, company, job, extraDefaults, runTypes, linkedMarks] =
-    await Promise.all([
-      getHeightDefaults(userId),
-      getMountingHeights(userId),
-      getBidMountingHeights(bidId, userId),
-      // Extra and makeup ride on this context so no caller can load the heights
-      // and forget them (server/runVerticals.ts, `HeightContext.extras`).
-      getExtraDefaults(userId),
-      getRunTypesFor(userId, true),
-      // A linked run end reads its mark's height (vertical-drops-plan § 2).
-      getMarksLinkedByRuns(bidId, userId),
-    ]);
+  const [
+    defaults,
+    company,
+    job,
+    extraDefaults,
+    runTypes,
+    linkedMarks,
+    sheetCeilings,
+    heightAreas,
+  ] = await Promise.all([
+    getHeightDefaults(userId),
+    getMountingHeights(userId),
+    getBidMountingHeights(bidId, userId),
+    // Extra and makeup ride on this context so no caller can load the heights
+    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
+    getExtraDefaults(userId),
+    getRunTypesFor(userId, true),
+    // A linked run end reads its mark's height (vertical-drops-plan § 2).
+    getMarksLinkedByRuns(bidId, userId),
+    // The ceiling at every box: sheet heights and height areas
+    // (shared/ceilingHeights.ts, owner 2026-10-07).
+    getSheetCeilings(bidId, userId),
+    getHeightAreas(bidId, userId),
+  ]);
   return buildHeightContext({
     defaults,
     company,
@@ -13328,7 +13340,37 @@ export async function heightContextForBid(
     extraDefaults,
     runTypes,
     linkedMarks,
+    sheetCeilings,
+    heightAreas,
   });
+}
+
+/** Each sheet's own ceiling on a bid (0109). NULL follows the job. */
+export async function getSheetCeilings(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: bidPdfSheets.id,
+      distributionHeightInches: bidPdfSheets.distributionHeightInches,
+    })
+    .from(bidPdfSheets)
+    .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
+    .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId)));
+}
+
+/** A sheet's own ceiling, or NULL to follow the job. */
+export async function setSheetCeiling(
+  sheetId: number,
+  userId: number,
+  inches: number | null
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(bidPdfSheets)
+    .set({ distributionHeightInches: inches })
+    .where(and(eq(bidPdfSheets.id, sheetId), eq(bidPdfSheets.userId, userId)));
 }
 
 /**
@@ -13453,8 +13495,8 @@ export async function loadGroupDrops(
       }),
     heights: {
       layers: heights.layers,
-      companyInches: heights.companyInches,
-      jobInches: heights.jobInches,
+      // Each mark's ceiling: its area, its sheet, the job, the company.
+      ceilings: heights.ceilings,
     },
     extras: heights.extras,
     typeFor: id => heights.dropTypeFor(id),
@@ -14183,72 +14225,62 @@ export async function loadBidHomeruns(
   const stampIds = circuits
     .map(c => c.homerunFromStampId)
     .filter((id): id is number => id !== null);
-  const [panels, sheetRows, stampRows, tracedRows, areaRows] =
-    await Promise.all([
-      getHomerunPanels(bidId, userId),
-      db
-        .select({
-          id: bidPdfSheets.id,
-          scaleRatio: bidPdfSheets.scaleRatio,
-          scaleSource: bidPdfSheets.scaleSource,
-          notToScale: bidPdfSheets.notToScale,
-          distributionHeightInches: bidPdfSheets.distributionHeightInches,
-          homerunMethod: bidPdfSheets.homerunMethod,
-          homerunAverageFt: bidPdfSheets.homerunAverageFt,
-          homerunMinimumFt: bidPdfSheets.homerunMinimumFt,
-        })
-        .from(bidPdfSheets)
-        .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
-        .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId))),
-      stampIds.length === 0
-        ? Promise.resolve([])
-        : db
-            .select({
-              id: takeoffStamps.id,
-              sheetId: takeoffStamps.sheetId,
-              x: takeoffStamps.x,
-              y: takeoffStamps.y,
-              mountHeightInches: takeoffStamps.mountHeightInches,
-              mountHeightSource: takeoffStamps.mountHeightSource,
-              dropKind: takeoffGroups.dropKind,
-              dropHeightInches: takeoffGroups.dropHeightInches,
-            })
-            .from(takeoffStamps)
-            .leftJoin(
-              takeoffGroups,
-              eq(takeoffStamps.groupId, takeoffGroups.id)
+  const [panels, sheetRows, stampRows, tracedRows] = await Promise.all([
+    getHomerunPanels(bidId, userId),
+    db
+      .select({
+        id: bidPdfSheets.id,
+        scaleRatio: bidPdfSheets.scaleRatio,
+        scaleSource: bidPdfSheets.scaleSource,
+        notToScale: bidPdfSheets.notToScale,
+        homerunMethod: bidPdfSheets.homerunMethod,
+        homerunAverageFt: bidPdfSheets.homerunAverageFt,
+        homerunMinimumFt: bidPdfSheets.homerunMinimumFt,
+      })
+      .from(bidPdfSheets)
+      .innerJoin(bidPdfs, eq(bidPdfSheets.bidPdfId, bidPdfs.id))
+      .where(and(eq(bidPdfs.bidId, bidId), eq(bidPdfSheets.userId, userId))),
+    stampIds.length === 0
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: takeoffStamps.id,
+            sheetId: takeoffStamps.sheetId,
+            x: takeoffStamps.x,
+            y: takeoffStamps.y,
+            mountHeightInches: takeoffStamps.mountHeightInches,
+            mountHeightSource: takeoffStamps.mountHeightSource,
+            dropKind: takeoffGroups.dropKind,
+            dropHeightInches: takeoffGroups.dropHeightInches,
+          })
+          .from(takeoffStamps)
+          .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
+          .where(
+            and(
+              inArray(takeoffStamps.id, stampIds),
+              eq(takeoffStamps.userId, userId),
+              eq(takeoffStamps.bidId, bidId),
+              // A mark on a removed plan set leaves no homerun behind
+              // (found by quantitiesIgnoreDeletedPlans, 2026-10-07).
+              onLivePlanSheet(takeoffStamps.sheetId, bidId)
             )
-            .where(
-              and(
-                inArray(takeoffStamps.id, stampIds),
-                eq(takeoffStamps.userId, userId),
-                eq(takeoffStamps.bidId, bidId)
-              )
-            ),
-      // A TRACED homerun replaces the computed one (plan § 2). A suggestion
-      // is nobody's trace yet.
-      db
-        .select({ panelCircuitId: takeoffRunCircuits.panelCircuitId })
-        .from(takeoffRunCircuits)
-        .innerJoin(takeoffRuns, eq(takeoffRunCircuits.runId, takeoffRuns.id))
-        .where(
-          and(
-            eq(takeoffRuns.bidId, bidId),
-            eq(takeoffRunCircuits.userId, userId),
-            eq(takeoffRuns.isSuggestion, false),
-            isNotNull(takeoffRunCircuits.panelCircuitId)
-          )
-        ),
-      db
-        .select()
-        .from(bidHeightAreas)
-        .where(
-          and(
-            eq(bidHeightAreas.bidId, bidId),
-            eq(bidHeightAreas.userId, userId)
-          )
-        ),
-    ]);
+          ),
+    // A TRACED homerun replaces the computed one (plan § 2). A suggestion
+    // is nobody's trace yet.
+    db
+      .select({ panelCircuitId: takeoffRunCircuits.panelCircuitId })
+      .from(takeoffRunCircuits)
+      .innerJoin(takeoffRuns, eq(takeoffRunCircuits.runId, takeoffRuns.id))
+      .where(
+        and(
+          eq(takeoffRuns.bidId, bidId),
+          eq(takeoffRunCircuits.userId, userId),
+          eq(takeoffRuns.isSuggestion, false),
+          isNotNull(takeoffRunCircuits.panelCircuitId),
+          onLivePlanSheet(takeoffRuns.sheetId, bidId)
+        )
+      ),
+  ]);
 
   const sheets = new Map<number, HomerunSheet>(
     sheetRows.map(s => [
@@ -14258,7 +14290,6 @@ export async function loadBidHomeruns(
         scaleRatio: numOrNull(s.scaleRatio),
         // The same rule `loadGroupDrops` uses for a sheet's ratio.
         measurable: !(s.notToScale && s.scaleSource !== "manual"),
-        distributionHeightInches: s.distributionHeightInches,
         homerunMethod: s.homerunMethod,
         homerunAverageFt: numOrNull(s.homerunAverageFt),
         homerunMinimumFt: numOrNull(s.homerunMinimumFt),
@@ -14290,6 +14321,9 @@ export async function loadBidHomeruns(
       homerunMinimumFt: numOrNull(bid.homerunMinimumFt),
       homerunRoutingPct: numOrNull(bid.homerunRoutingPct),
       homerunRunTypeId: bid.homerunRunTypeId,
+      // No column yet: `bids.homerunExtraBends` is asked of Track A. NULL
+      // is "nobody set it" — the starter 1, said "not confirmed".
+      homerunExtraBends: null,
     },
     sheets,
     panels: panels.map(p => ({
@@ -14315,22 +14349,7 @@ export async function loadBidHomeruns(
         .map(r => r.panelCircuitId)
         .filter((id): id is number => id !== null)
     ),
-    // An area with no height yet follows the sheet: no area at all here.
-    areas: areaRows.flatMap(a =>
-      a.distributionHeightInches === null
-        ? []
-        : [
-            {
-              id: a.id,
-              sheetId: a.sheetId,
-              ceilingInches: a.distributionHeightInches,
-              outline: (a.region as [number, number][]).map(([x, y]) => ({
-                x,
-                y,
-              })),
-            },
-          ]
-    ),
+    // Areas and sheet ceilings arrive in `heights.ceilings`, the one rule.
     heights,
   });
 }

@@ -205,6 +205,31 @@ export function quantitySnap(snap: LegSnap): LegSnap {
   return { kind: "free", point: { ...snap.point } };
 }
 
+/**
+ * How a NEW run's start is saved (owner, 2026-10-07, case a: "run passes
+ * THROUGH a box = TWO drops there").
+ *
+ * A first click that snapped onto a MARK starts at that box: the start is
+ * linked to the mark and saved with NO kind, so it reads what the mark's
+ * count says the device is and counts the rise back up — the second of the
+ * two drops a pass-through makes. Any other start keeps the toolbar's
+ * "From". A quantity trace is level at every unanswered end (D21) and is
+ * never linked here.
+ *
+ * Until 2026-10-07 every start took the sticky "From" (Nothing by default),
+ * so a run through a receptacle counted one drop.
+ */
+export function newRunStart(input: {
+  snap: LegSnap | null;
+  fromKind: string | null;
+  quantity: boolean;
+}): { startKind: string | null; startStampId: number | null } {
+  if (input.quantity) return { startKind: null, startStampId: null };
+  if (input.snap?.kind === "stamp")
+    return { startKind: null, startStampId: input.snap.stampId };
+  return { startKind: input.fromKind, startStampId: null };
+}
+
 export function legSnapLabel(snap: LegSnap): string {
   switch (snap.kind) {
     case "free":

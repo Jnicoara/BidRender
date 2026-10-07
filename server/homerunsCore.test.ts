@@ -14,6 +14,7 @@ import {
   type HomerunSheet,
 } from "./homerunsCore";
 import { EMPTY_HEIGHT_CONTEXT, type HeightContext } from "./runVerticals";
+import { NO_CEILINGS } from "../shared/ceilingHeights";
 import { groupRunFootage } from "./runTypeFootageCore";
 import type { DropTypeSpec } from "../shared/groupDrops";
 import { wireCircuitsFor } from "../shared/traceMode";
@@ -45,7 +46,7 @@ const conduitType: DropTypeSpec = {
 function heights(over: Partial<HeightContext> = {}): HeightContext {
   return {
     ...EMPTY_HEIGHT_CONTEXT,
-    jobInches: 120,
+    ceilings: { ...NO_CEILINGS, job: 120 },
     layers: {
       company: new Map([["panel", 72]]),
       job: new Map(),
@@ -61,6 +62,7 @@ const bid = (over: Partial<HomerunBidSettings> = {}): HomerunBidSettings => ({
   homerunMinimumFt: null,
   homerunRoutingPct: 0.15,
   homerunRunTypeId: TYPE_ID,
+  homerunExtraBends: null,
   ...over,
 });
 
@@ -68,7 +70,6 @@ const sheet = (over: Partial<HomerunSheet> = {}): HomerunSheet => ({
   id: 1,
   scaleRatio: 48,
   measurable: true,
-  distributionHeightInches: null,
   homerunMethod: null,
   homerunAverageFt: null,
   homerunMinimumFt: null,
@@ -128,7 +129,6 @@ function run(
     circuits: over.circuits ?? [circuit()],
     marks: new Map([[m.id, m]]),
     tracedCircuitIds: new Set(over.traced ?? []),
-    areas: [],
     heights: heights(over.heights),
   });
 }
@@ -310,19 +310,25 @@ describe("what keeps a homerun off the bid", () => {
 describe("ceiling: homerun → sheet → job", () => {
   it("a homerun's own ceiling beats the sheet's", () => {
     const r = run({
-      sheet: { distributionHeightInches: 144 },
+      heights: {
+        ceilings: { ...NO_CEILINGS, job: 120, sheets: new Map([[1, 144]]) },
+      },
       circuits: [circuit({ homerunCeilingInches: 216 })],
     });
     expect(r.rows[0].ceiling).toEqual({ inches: 216, source: "homerun" });
   });
 
   it("the sheet's beats the job's", () => {
-    const r = run({ sheet: { distributionHeightInches: 144 } });
+    const r = run({
+      heights: {
+        ceilings: { ...NO_CEILINGS, job: 120, sheets: new Map([[1, 144]]) },
+      },
+    });
     expect(r.rows[0].ceiling).toEqual({ inches: 144, source: "sheet" });
   });
 
   it("no ceiling anywhere: no drops, named — never a zero drop", () => {
-    const r = run({ heights: { jobInches: null } });
+    const r = run({ heights: { ceilings: NO_CEILINGS } });
     const f = computed(r);
     expect(f.pieces.upDrop).toMatchObject({
       counted: false,
@@ -400,13 +406,56 @@ describe("homerun fittings: the same as a run of that type", () => {
     expect(qty(countFittings(row.legs, EMT, BENDS, []).connector)).toBe(4);
   });
 
-  it("no elbows are counted for a homerun — it has no drawn path", () => {
+  /*
+    BENDS (owner, 2026-10-07). This said "no elbows are counted for a
+    homerun" until then; the owner approved: a 90 at each counted drop, and
+    the bid's "extra bends per homerun" for its corners, starter 1.
+  */
+  it("bends: a 90 at each counted drop + 1 unconfirmed corner = 3", () => {
     const row = footageRow(run().entries);
-    expect(qty(countFittings(row.legs, EMT, BENDS, []).elbow90)).toBe(0);
+    const elbows = countFittings(row.legs, EMT, BENDS, []).elbow90;
+    expect(qty(elbows)).toBe(3);
+    expect(elbows.why).toMatch(
+      /2 drops \+ 1 homerun corner set on the bid \(not confirmed\)/
+    );
+  });
+
+  it("no drop bend where the drop is not counted", () => {
+    const row = footageRow(
+      run({ heights: { layers: { company: new Map(), job: new Map() } } })
+        .entries
+    );
+    // No panel height: the panel drop is not counted, so no bend there.
+    expect(qty(countFittings(row.legs, EMT, BENDS, []).elbow90)).toBe(2);
+  });
+
+  it("a SET number of corners is used and said as set", () => {
+    const row = footageRow(run({ bid: { homerunExtraBends: 2 } }).entries);
+    const elbows = countFittings(row.legs, EMT, BENDS, []).elbow90;
+    expect(qty(elbows)).toBe(4);
+    expect(elbows.why).not.toMatch(/not confirmed/);
+  });
+
+  it("field bends on a small raceway: the same rule a traced run uses", () => {
+    const row = footageRow(run().entries);
+    const counts = countFittings(
+      row.legs,
+      EMT,
+      {
+        ...BENDS,
+        method: {
+          method: "field" as const,
+          why: 'bent in the field below 1-1/4"',
+        },
+      },
+      []
+    );
+    expect(qty(counts.fieldBend)).toBe(3);
+    expect(counts.elbow90.status).toBe("included");
   });
 
   it("an uncounted drop makes every count 'at least'", () => {
-    const row = footageRow(run({ heights: { jobInches: null } }).entries);
+    const row = footageRow(run({ heights: { ceilings: NO_CEILINGS } }).entries);
     expect(row.legs[0].feetIsFloor).toBe(true);
     const strap = countFittings(row.legs, EMT, BENDS, []).strap;
     expect(strap.status === "counted" && strap.atLeast).toBe(true);

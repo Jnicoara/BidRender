@@ -447,6 +447,7 @@ import {
 } from "@/lib/traceDraft";
 import {
   legSnapLabel,
+  newRunStart,
   quantitySnap,
   resolveLegStart,
   type LegSnap,
@@ -7861,6 +7862,20 @@ export default function TakeoffPage({
     // A quantity trace has no ends to answer (D21): its drops are proposed
     // afterwards, so nothing from the ends pickers is written onto it.
     const quantity = activeTraceMode === "quantity";
+    /*
+      A RUN THAT STARTS ON A BOX (owner, 2026-10-07, case a): its first
+      click snapped onto a mark, so it leaves THAT box — down to it and back
+      up is two drops, one on the run that arrived and one here. Until then
+      the start took the toolbar's sticky "From" (Nothing), so a run passing
+      through a receptacle counted ONE drop. The start is linked to the mark
+      and given no kind of its own, so it reads what the count says the
+      device is (`endOfRun`) and claims the mark (no count drop twice).
+    */
+    const start0 = newRunStart({
+      snap: legStart,
+      fromKind: traceEnds.startKind,
+      quantity,
+    });
     if (rootId === null) {
       const saved = await saveRun.mutateAsync({
         bidId,
@@ -7870,13 +7885,18 @@ export default function TakeoffPage({
         pathType: tracePathType,
         points: tracePoints,
         status: "draft",
-        startKind: quantity ? null : traceEnds.startKind,
+        startKind: start0.startKind,
         endKind: quantity ? null : traceEnds.endKind,
         runTypeId: armedRunType[tracePathType]?.id ?? null,
         traceMode,
       });
       rootId = saved.id;
       setLegRootMode(traceMode);
+      if (start0.startStampId !== null)
+        await saveEnds.mutateAsync({
+          id: saved.id,
+          startStampId: start0.startStampId,
+        });
     } else {
       const start = legStart ?? {
         kind: "free" as const,
