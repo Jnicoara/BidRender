@@ -18,6 +18,7 @@ import {
 } from "drizzle-orm";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
+import { timePool } from "./slowRequests";
 import {
   QUANTITY_MARK_STATUSES,
   emptySplit,
@@ -334,7 +335,8 @@ export async function getDb() {
     try {
       // The pool is built from mysqlConnection rather than the URL directly, so
       // a managed host's TLS certificate is honoured. See databaseConnection.ts.
-      _pool = createPool(mysqlConnection(process.env.DATABASE_URL));
+      // Timed per request, for the slow-request line (server/slowRequests.ts).
+      _pool = timePool(createPool(mysqlConnection(process.env.DATABASE_URL)));
       _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);

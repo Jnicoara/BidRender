@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **The server now notes any request that takes over 5 seconds** — which
+  part of the app it was, how long it took, and whether the time went to the
+  database, to waiting for a database connection, or somewhere else. Nothing
+  private is recorded: no bid names, no search text, no file names. Twice
+  today the test site stalled and nothing could say why; the next stall will
+  leave its own explanation.
+
 - **A new assembly starts with its hours empty.** The suggested figure is
   shown in grey beside the box with a "Use suggested" button, and is only
   saved if you click it or type a number, so nobody saves a guess by not
