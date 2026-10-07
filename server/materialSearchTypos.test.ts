@@ -171,10 +171,11 @@ describe("rule 2: numbers and sizes are never fuzzed", () => {
   });
 
   it("a size the catalog does not have finds nothing, rather than a neighbour", () => {
-    // "175a", not "225a": a 225A panel joined the catalog on 2026-09-25, so a
-    // 225A row now genuinely exists (its aliases say "main breaker") and the
-    // query stopped being about a size the catalog lacks. Nothing ships at 175A.
-    for (const q of ["7/8 emt", "175a brakr", "#13 thhn"]) {
+    // "185a", not "225a" or "175a": a 225A panel joined the catalog on
+    // 2026-09-25 and a 175A 2-Pole breaker on 2026-10-07 (owner: 150A+
+    // two-pole ship), so each time the query stopped being about a size the
+    // catalog lacks. Nothing ships at 185A.
+    for (const q of ["7/8 emt", "185a brakr", "#13 thhn"]) {
       const r = search(q, 50);
       expect(r.all, q).toEqual([]);
       expect(r.correctedQuery, q).toBeNull();

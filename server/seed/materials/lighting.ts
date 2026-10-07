@@ -94,7 +94,7 @@ const cctDiscs: BaselineMaterial[] = [
   name: `${size} LED disc light, CCT selectable`,
   searchAliases: aliases(
     slang,
-    "color temperature colour switchable 3cct 5cct 2700k 3000k 4000k 5000k",
+    "color temperature switchable 3cct 5cct 2700k 3000k 4000k 5000k",
     DISC_SLANG
   ),
 }));
@@ -114,8 +114,7 @@ const WAFER_SIZES: { size: string; slang: string }[] = [
 const WAFER_VARIANTS: { variant: string; slang: string }[] = [
   {
     variant: "CCT selectable",
-    slang:
-      "color temperature colour switchable 3cct 5cct 2700k 3000k 4000k 5000k",
+    slang: "color temperature switchable 3cct 5cct 2700k 3000k 4000k 5000k",
   },
   { variant: "gimbal", slang: "adjustable aim tilt directional accent" },
   { variant: "slim", slang: "thin ultra thin low profile shallow joist" },
