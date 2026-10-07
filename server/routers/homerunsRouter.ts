@@ -18,12 +18,35 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
 import { lockedEditRefusal } from "../../shared/quantityLock";
-import { HOMERUN_METHODS, homerunTotals } from "../../shared/homerunFootage";
+import {
+  HOMERUN_METHODS,
+  heightAreaWarnings,
+  homerunTotals,
+  outlineFromTaps,
+} from "../../shared/homerunFootage";
 import { ROUTING_STARTER_PCT } from "../homerunsCore";
 
 const procedure = scoped("bids.view", "bids.edit");
 
 const feetSchema = z.number().min(0).max(10000);
+const pointSchema = z.object({
+  x: z.number().finite().min(0).max(100000),
+  y: z.number().finite().min(0).max(100000),
+});
+/** A ceiling in inches: the same believable range as every height. */
+const heightSchema = z.number().int().min(-240).max(1200);
+
+/** The outline the screen would make of these taps, or a refusal. */
+function requireOutline(taps: { x: number; y: number }[]) {
+  const outline = outlineFromTaps(taps);
+  if (!outline)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "That area is too small to be a room — tap its corners further apart.",
+    });
+  return outline;
+}
 
 async function requireBid(bidId: number, userId: number) {
   const bid = await db.getBidById(bidId, userId);
@@ -321,6 +344,101 @@ export const homerunsRouter = router({
         homerunRoutingPct: input.routingPct,
         homerunRunTypeId: input.runTypeId,
       });
+      return { ok: true };
+    }),
+
+  /**
+   * HEIGHT AREAS (0130; plan § 4, owner 2026-10-06): an outline on a sheet
+   * with its own ceiling — "Stockroom, open to deck, 18'-0"". A homerun
+   * leaving a device inside it climbs to that height; where two overlap,
+   * the SMALLER outline wins (never just the lower height), and the overlap
+   * is warned about on the sheet. A shared wall is not an overlap.
+   */
+  heightAreas: procedure
+    .input(z.object({ bidId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.scope.dataUserId;
+      await requireBid(input.bidId, userId);
+      const rows = await db.getHeightAreas(input.bidId, userId);
+      const areas = rows.map(a => ({
+        id: a.id,
+        sheetId: a.sheetId,
+        name: a.name,
+        heightInches: a.distributionHeightInches,
+        outline: a.region.map(([x, y]) => ({ x, y })),
+      }));
+      // Warnings per sheet: areas on two sheets never overlap.
+      const sheets = Array.from(new Set(areas.map(a => a.sheetId)));
+      return {
+        areas,
+        warnings: sheets.flatMap(sheetId =>
+          heightAreaWarnings(areas.filter(a => a.sheetId === sheetId)).map(
+            text => ({ sheetId, text })
+          )
+        ),
+      };
+    }),
+
+  createHeightArea: procedure
+    .input(
+      z.object({
+        bidId: z.number().int(),
+        sheetId: z.number().int(),
+        name: z.string().trim().min(1).max(64),
+        outline: z.array(pointSchema).min(2).max(200),
+        heightInches: heightSchema.nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.scope.dataUserId;
+      await requireOpenBid(input.bidId, userId);
+      await requireSheetOnBid(input.bidId, input.sheetId, userId);
+      const outline = requireOutline(input.outline);
+      const id = await db.createHeightArea({
+        bidId: input.bidId,
+        userId,
+        sheetId: input.sheetId,
+        name: input.name,
+        region: outline.map(p => [p.x, p.y]),
+        distributionHeightInches: input.heightInches,
+      });
+      return { id };
+    }),
+
+  updateHeightArea: procedure
+    .input(
+      z.object({
+        id: z.number().int(),
+        name: z.string().trim().min(1).max(64).optional(),
+        outline: z.array(pointSchema).min(2).max(200).optional(),
+        heightInches: heightSchema.nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.scope.dataUserId;
+      const area = await db.getHeightArea(input.id, userId);
+      if (!area)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Area not found." });
+      await requireOpenBid(area.bidId, userId);
+      await db.updateHeightArea(input.id, userId, {
+        name: input.name,
+        region: input.outline
+          ? requireOutline(input.outline).map(p => [p.x, p.y])
+          : undefined,
+        distributionHeightInches: input.heightInches,
+      });
+      return { ok: true };
+    }),
+
+  removeHeightArea: procedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.scope.dataUserId;
+      const area = await db.getHeightArea(input.id, userId);
+      if (!area)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Area not found." });
+      await requireOpenBid(area.bidId, userId);
+      await db.deleteHeightArea(input.id, userId);
       return { ok: true };
     }),
 

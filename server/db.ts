@@ -14044,6 +14044,76 @@ export async function setBidHomerunSettings(
     .where(and(eq(bids.id, bidId), eq(bids.userId, userId)));
 }
 
+/** A bid's height areas (0130), every sheet. */
+export async function getHeightAreas(bidId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(bidHeightAreas)
+    .where(
+      and(eq(bidHeightAreas.bidId, bidId), eq(bidHeightAreas.userId, userId))
+    );
+}
+
+/** One height area, this company's only. */
+export async function getHeightArea(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select()
+    .from(bidHeightAreas)
+    .where(and(eq(bidHeightAreas.id, id), eq(bidHeightAreas.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function createHeightArea(area: {
+  bidId: number;
+  userId: number;
+  sheetId: number;
+  name: string;
+  region: [number, number][];
+  distributionHeightInches: number | null;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(bidHeightAreas).values(area);
+  return result.insertId;
+}
+
+/** Omitted leaves a field; NULL clears the height (it follows the sheet). */
+export async function updateHeightArea(
+  id: number,
+  userId: number,
+  patch: {
+    name?: string;
+    region?: [number, number][];
+    distributionHeightInches?: number | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const set: Partial<typeof bidHeightAreas.$inferInsert> = {};
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.region !== undefined) set.region = patch.region;
+  if (patch.distributionHeightInches !== undefined)
+    set.distributionHeightInches = patch.distributionHeightInches;
+  if (Object.keys(set).length === 0) return;
+  await db
+    .update(bidHeightAreas)
+    .set(set)
+    .where(and(eq(bidHeightAreas.id, id), eq(bidHeightAreas.userId, userId)));
+}
+
+export async function deleteHeightArea(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .delete(bidHeightAreas)
+    .where(and(eq(bidHeightAreas.id, id), eq(bidHeightAreas.userId, userId)));
+}
+
 /** Each sheet's own homerun method on a bid, for the panel's "This sheet". */
 export async function getSheetHomerunMethods(bidId: number, userId: number) {
   const db = await getDb();

@@ -460,6 +460,141 @@ describeDb("the bid line (step 4)", () => {
   });
 });
 
+describeDb("height areas inside a sheet (0130)", () => {
+  async function placed() {
+    const b = await aBid();
+    await caller().homeruns.syncSheet({
+      bidId: b.bidId,
+      sheetId: b.sheetId,
+      circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
+    });
+    await caller().homeruns.placePanel({
+      bidId: b.bidId,
+      panel: "2B",
+      spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
+    });
+    return b;
+  }
+  // The leaving device sits at (40 ft, 10 ft) — 720, 180 page points.
+  const around = (pad: number) => [
+    { x: ft(40) - pad, y: ft(10) - pad },
+    { x: ft(40) + pad, y: ft(10) + pad },
+  ];
+
+  it("a homerun leaving a device inside an area climbs to its height", async () => {
+    const { bidId, sheetId } = await placed();
+    await caller().homeruns.createHeightArea({
+      bidId,
+      sheetId,
+      name: "Stockroom",
+      outline: around(90),
+      heightInches: 216,
+    });
+    const [row] = (await homeruns(bidId)).rows;
+    expect(row.ceiling).toEqual({ inches: 216, source: "area" });
+    const f = computed(row);
+    // 18'-0" ceiling: 16.5 ft up from the receptacle, 12 ft down to the panel.
+    expect(f.pieces.installedFt).toBeCloseTo(40 + 16.5 + 12, 6);
+  });
+
+  it("two overlapping: the SMALLER wins, even with the LOWER height, and it warns", async () => {
+    const { bidId, sheetId } = await placed();
+    await caller().homeruns.createHeightArea({
+      bidId,
+      sheetId,
+      name: "Sales floor",
+      outline: around(160),
+      heightInches: 216,
+    });
+    await caller().homeruns.createHeightArea({
+      bidId,
+      sheetId,
+      name: "Office",
+      outline: around(60),
+      heightInches: 108,
+    });
+    expect((await homeruns(bidId)).rows[0].ceiling.inches).toBe(108);
+    const { warnings } = await caller().homeruns.heightAreas({ bidId });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].text).toMatch(/"Office" is smaller/);
+  });
+
+  it("two sharing a wall do not warn", async () => {
+    const { bidId, sheetId } = await placed();
+    for (const [name, x0, x1] of [
+      ["Sales", 0, 400],
+      ["Stock", 400, 800],
+    ] as const)
+      await caller().homeruns.createHeightArea({
+        bidId,
+        sheetId,
+        name,
+        outline: [
+          { x: x0, y: 0 },
+          { x: x1, y: 300 },
+        ],
+        heightInches: 120,
+      });
+    expect((await caller().homeruns.heightAreas({ bidId })).warnings).toEqual(
+      []
+    );
+  });
+
+  it("an area with no height follows the sheet; a height set later moves it", async () => {
+    const { bidId, sheetId } = await placed();
+    const { id } = await caller().homeruns.createHeightArea({
+      bidId,
+      sheetId,
+      name: "Open to deck",
+      outline: around(90),
+      heightInches: null,
+    });
+    expect((await homeruns(bidId)).rows[0].ceiling.source).toBe("job");
+    await caller().homeruns.updateHeightArea({ id, heightInches: 240 });
+    expect((await homeruns(bidId)).rows[0].ceiling).toEqual({
+      inches: 240,
+      source: "area",
+    });
+    await caller().homeruns.removeHeightArea({ id });
+    expect((await homeruns(bidId)).rows[0].ceiling.source).toBe("job");
+  });
+
+  it("refuses a sliver, a locked bid and another company", async () => {
+    const { bidId, sheetId } = await placed();
+    await expect(
+      caller().homeruns.createHeightArea({
+        bidId,
+        sheetId,
+        name: "Sliver",
+        outline: [
+          { x: 10, y: 10 },
+          { x: 12, y: 12 },
+        ],
+        heightInches: 120,
+      })
+    ).rejects.toThrow(/too small/);
+    await expect(
+      callerFor(STRANGER).homeruns.createHeightArea({
+        bidId,
+        sheetId,
+        name: "Theirs",
+        outline: around(90),
+        heightInches: 120,
+      })
+    ).rejects.toThrow(/not found/i);
+    await caller().bids.lockQuantities({ bidId });
+    await expect(
+      caller().homeruns.createHeightArea({
+        bidId,
+        sheetId,
+        name: "Late",
+        outline: around(90),
+        heightInches: 120,
+      })
+    ).rejects.toThrow(/locked/i);
+  });
+});
+
 describeDb("refusals", () => {
   it("a locked bid's homeruns do not move", async () => {
     const { bidId, sheetId, near } = await aBid();

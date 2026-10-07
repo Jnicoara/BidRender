@@ -102,8 +102,11 @@ export function CircuitsPanel({
   onClose,
   feetPerPoint,
   homeruns,
+  heightAreas,
 }: {
   homeruns: CircuitHomeruns | null;
+  /** The sheet's height areas and their tool (HeightAreasSection). */
+  heightAreas: React.ReactNode;
   report: CircuitReport;
   pick: CircuitPick;
   onPick: (pick: CircuitPick) => void;
@@ -178,6 +181,7 @@ export function CircuitsPanel({
             onConfirmAll={homeruns.onConfirmAll}
           />
         )}
+        {heightAreas}
 
         {report.panels.map(p => (
           <div key={p.name} className="rounded-md border border-border p-2">

@@ -13,6 +13,13 @@ This is the human-readable companion to the git history — read this to see wha
   catalog is missing; and five naming questions. Only the yellow columns are
   typed in. Once it is marked and checked, material names freeze.
 
+- **Height areas (same branch).** On a sheet with two ceilings — a sales
+  floor and a stockroom open to deck — draw the stockroom by tapping its
+  corners and give it its own height; every homerun leaving a device inside
+  it climbs to that height. Where two areas overlap, the smaller one wins
+  and the sheet says so; two areas that only share a wall say nothing.
+  Works by tapping, so it works on a tablet.
+
 - **Homeruns buy their couplings, connectors and straps (same branch).**
   Each homerun now adds the fittings a run of its type adds — counted from
   the pipe's own stick length and strap spacing, two connectors per

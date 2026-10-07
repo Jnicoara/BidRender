@@ -178,7 +178,7 @@ export function heightAreaAt(
  * one lying strictly inside the other (containment, either way round).
  */
 export function overlappingHeightAreas(
-  areas: readonly HeightArea[]
+  areas: readonly Pick<HeightArea, "id" | "outline">[]
 ): [number, number][] {
   const out: [number, number][] = [];
   for (let i = 0; i < areas.length; i++)
@@ -186,6 +186,64 @@ export function overlappingHeightAreas(
       if (polygonsOverlap(areas[i].outline, areas[j].outline))
         out.push([areas[i].id, areas[j].id]);
   return out;
+}
+
+/**
+ * The smallest outline worth keeping, in square page points: a 12 pt box
+ * (about 4 in on paper at 1/4" — under a foot of building). A tap that
+ * wandered, or two taps on one spot, is not an area anybody meant.
+ */
+export const MIN_AREA_POINTS2 = 144;
+
+/**
+ * An outline from the corners somebody tapped (the drawing tool, tablet
+ * first: taps, not drags). TWO taps are opposite corners of a box; three or
+ * more are the outline's corners in order. NULL when it would be nothing —
+ * fewer than two taps, or smaller than `MIN_AREA_POINTS2`.
+ */
+export function outlineFromTaps(taps: readonly Pt[]): Pt[] | null {
+  if (taps.length < 2) return null;
+  const outline =
+    taps.length === 2
+      ? [
+          {
+            x: Math.min(taps[0].x, taps[1].x),
+            y: Math.min(taps[0].y, taps[1].y),
+          },
+          {
+            x: Math.max(taps[0].x, taps[1].x),
+            y: Math.min(taps[0].y, taps[1].y),
+          },
+          {
+            x: Math.max(taps[0].x, taps[1].x),
+            y: Math.max(taps[0].y, taps[1].y),
+          },
+          {
+            x: Math.min(taps[0].x, taps[1].x),
+            y: Math.max(taps[0].y, taps[1].y),
+          },
+        ]
+      : taps.map(t => ({ x: t.x, y: t.y }));
+  return polygonArea(outline) >= MIN_AREA_POINTS2 ? outline : null;
+}
+
+/**
+ * Each overlap as the sentence the sheet shows: which two, and which one
+ * wins (the smaller outline). Shared walls never appear here.
+ */
+export function heightAreaWarnings(
+  areas: readonly (Pick<HeightArea, "id" | "outline"> & { name: string })[]
+): string[] {
+  const byId = new Map(areas.map(a => [a.id, a]));
+  return overlappingHeightAreas(areas).map(([a, b]) => {
+    const one = byId.get(a)!;
+    const two = byId.get(b)!;
+    const [small, big] =
+      polygonArea(one.outline) <= polygonArea(two.outline)
+        ? [one, two]
+        : [two, one];
+    return `"${small.name}" and "${big.name}" overlap — "${small.name}" is smaller, so its height wins where they overlap`;
+  });
 }
 
 // ── The calculator ─────────────────────────────────────────────────────────

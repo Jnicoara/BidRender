@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import {
   heightAreaAt,
+  heightAreaWarnings,
+  outlineFromTaps,
   homerunFootage,
   homerunTotals,
   overlappingHeightAreas,
@@ -522,5 +524,78 @@ describe("height areas inside a sheet", () => {
     const h = computed(homerunFootage(base({ ceiling })));
     expect(h.pieces.upDrop.counted && h.pieces.upDrop.feet).toBe(16.5);
     expect(h.confirmed).toBe(false);
+  });
+});
+
+describe("drawing a height area by taps (tablet first)", () => {
+  it("two taps are opposite corners of a box, either way round", () => {
+    expect(
+      outlineFromTaps([
+        { x: 300, y: 50 },
+        { x: 100, y: 200 },
+      ])
+    ).toEqual([
+      { x: 100, y: 50 },
+      { x: 300, y: 50 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ]);
+  });
+
+  it("three or more taps are the outline, in order", () => {
+    const taps = [
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 0, y: 200 },
+    ];
+    expect(outlineFromTaps(taps)).toEqual(taps);
+  });
+
+  it("one tap, two taps on one spot, or a sliver is nothing", () => {
+    expect(outlineFromTaps([{ x: 5, y: 5 }])).toBeNull();
+    expect(
+      outlineFromTaps([
+        { x: 5, y: 5 },
+        { x: 5, y: 5 },
+      ])
+    ).toBeNull();
+    expect(
+      outlineFromTaps([
+        { x: 0, y: 0 },
+        { x: 500, y: 0.2 },
+      ])
+    ).toBeNull();
+  });
+});
+
+describe("the overlap warning names the pair and which one wins", () => {
+  const box = (
+    id: number,
+    name: string,
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number
+  ) => ({
+    id,
+    name,
+    outline: outlineFromTaps([
+      { x: x0, y: y0 },
+      { x: x1, y: y1 },
+    ])!,
+  });
+  const sales = box(1, "Sales floor", 0, 0, 1000, 600);
+  const stock = box(2, "Stockroom", 600, 300, 900, 550);
+
+  it("nested: the smaller outline is named as the winner", () => {
+    expect(heightAreaWarnings([sales, stock])).toEqual([
+      '"Stockroom" and "Sales floor" overlap — "Stockroom" is smaller, so its height wins where they overlap',
+    ]);
+  });
+
+  it("a shared wall does not warn", () => {
+    expect(
+      heightAreaWarnings([sales, box(3, "Office", 1000, 0, 1400, 600)])
+    ).toEqual([]);
   });
 });

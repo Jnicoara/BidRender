@@ -290,8 +290,24 @@ and migrates them together (pairing rule 3).
   `homeruns`, required): it read "Conduit 0 ft" beside 4,476 ft of
   homerun pipe until then. Wording left as it is: the homerun type's rows
   sit under "Traced, not sent yet" though nothing was traced.
-- **Not built:** height areas' drawing tool (the table
-  is read, nothing writes it); setting `takeoff_run_circuits.panelCircuitId`
+- **Height areas — BUILT 2026-10-07** (§ 4; `bid_height_areas`, 0130).
+  On the Circuits panel: "Draw", then TAP the corners on the sheet — two
+  taps are opposite corners of a box, three or more an outline
+  (`outlineFromTaps`; a drag still pans) — then Finish. Saved at once as
+  "Area N" with no height ("follows the sheet"); name and ceiling are
+  edited on its row (`HeightFields`), Remove beside it. On the sheet each
+  area is outlined and labelled; where two overlap both turn amber and
+  dashed, and the panel says which wins (`heightAreaWarnings`: the SMALLER
+  outline, never the lower height). A shared wall does not warn. The
+  server checks the outline with the same rule. Seen at 1180×820 with
+  touch on UNCC E111: a box round 2B-1's device set to 18'-0" moved it to
+  58.8 ft (30.3 + 16.5 up + 12 down); a bigger 9'-0" area over it left
+  18'-0" in force and warned "Area 1 is smaller"; a third sharing a wall
+  added no warning. **Limits:** reached from the Circuits panel, so only on
+  a sheet with circuit tags; an outline cannot be reshaped after drawing
+  (remove and redraw); count drops do not read areas yet (plan § 4 says
+  they later will).
+- **Not built:** setting `takeoff_run_circuits.panelCircuitId`
   (read — a traced homerun suppresses the computed one — but no screen
   ties a trace to a circuit yet); the per-sheet method has no "average" /
   "minimum" amounts of its own on screen (the bid's are used).

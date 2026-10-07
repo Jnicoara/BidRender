@@ -321,8 +321,8 @@ code, which is fine (additive). The server tests for the branch need
 plus `client/src/lib/homerunSync.test.ts` and `homerunText.test.ts`.
 
 Homerun fittings: DONE (plan § 10; elbows deliberately not counted, and
-said). Next on homeruns, when the owner says: the height area drawing
-tool (in progress after the fittings); tying a traced run
+said). Height areas: DONE on the same branch (plan § 10, with its limits).
+Next on homeruns, when the owner says: tying a traced run
 to a circuit (`panelCircuitId` is read, nothing sets it); per-sheet
 average/minimum amounts on screen.
 

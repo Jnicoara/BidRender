@@ -93,6 +93,11 @@ import {
   type UserMarkStatus,
 } from "@shared/markStatus";
 import { groupByCircuit } from "@/lib/circuitGroups";
+import { outlineFromTaps } from "@shared/homerunFootage";
+import {
+  HeightAreasLayer,
+  HeightAreasSection,
+} from "@/components/takeoff/HeightAreas";
 import {
   confirmableHomeruns,
   homerunSyncPayload,
@@ -4411,6 +4416,57 @@ export default function TakeoffPage({
   const confirmHomeruns = trpc.homeruns.confirmMany.useMutation(homerunSaved);
   const setSheetHomerunMethod =
     trpc.homeruns.setSheetMethod.useMutation(homerunSaved);
+  /*
+    HEIGHT AREAS (0130, plan § 4): drawn by taps on the sheet while the
+    Circuits panel is open. An area moves the ceiling of every homerun
+    leaving a device inside it, so each change refreshes the homeruns too.
+  */
+  const heightAreasQuery = trpc.homeruns.heightAreas.useQuery({ bidId });
+  const [drawingArea, setDrawingArea] = useState(false);
+  const [areaTaps, setAreaTaps] = useState<{ x: number; y: number }[]>([]);
+  const [areaError, setAreaError] = useState<string | null>(null);
+  const areaSaved = {
+    onError: (e: { message: string }) => toast.error(e.message),
+    onSettled: () => {
+      void utils.homeruns.heightAreas.invalidate({ bidId });
+      refreshFor("homerun");
+    },
+  };
+  const createHeightArea =
+    trpc.homeruns.createHeightArea.useMutation(areaSaved);
+  const updateHeightArea =
+    trpc.homeruns.updateHeightArea.useMutation(areaSaved);
+  const removeHeightArea =
+    trpc.homeruns.removeHeightArea.useMutation(areaSaved);
+  const sheetAreas = (heightAreasQuery.data?.areas ?? []).filter(
+    a => a.sheetId === activeSheet?.id
+  );
+  const sheetAreaWarnings = (heightAreasQuery.data?.warnings ?? [])
+    .filter(w => w.sheetId === activeSheet?.id)
+    .map(w => w.text);
+  useEffect(() => {
+    setDrawingArea(false);
+    setAreaTaps([]);
+    setAreaError(null);
+  }, [activeSheet?.id]);
+  const finishArea = () => {
+    if (!activeSheet) return;
+    const outline = outlineFromTaps(areaTaps);
+    if (!outline) {
+      setAreaError("Too small to be a room — tap its corners further apart.");
+      return;
+    }
+    createHeightArea.mutate({
+      bidId,
+      sheetId: activeSheet.id,
+      name: `Area ${sheetAreas.length + 1}`,
+      outline,
+      heightInches: null,
+    });
+    setDrawingArea(false);
+    setAreaTaps([]);
+    setAreaError(null);
+  };
   const lastHomerunSync = useRef<string | null>(null);
   useEffect(() => {
     if (!circuitReport || !activeSheet || !homerunData || homerunData.locked)
@@ -9517,6 +9573,8 @@ export default function TakeoffPage({
                   if (!on) {
                     setCircuitPick(null);
                     setPlacingPanel(null);
+                    setDrawingArea(false);
+                    setAreaTaps([]);
                   }
                 }}
               />
@@ -9561,17 +9619,57 @@ export default function TakeoffPage({
                 pick={circuitPick}
                 onPick={setCircuitPick}
                 placing={placingPanel}
-                onPlace={setPlacingPanel}
+                onPlace={panel => {
+                  // One tool at a time: placing a panel ends drawing an area.
+                  setDrawingArea(false);
+                  setAreaTaps([]);
+                  setPlacingPanel(panel);
+                }}
                 onUnplace={panel => placePanelSpot(panel, null)}
                 onClose={() => {
                   setShowCircuits(false);
                   setCircuitPick(null);
                   setPlacingPanel(null);
+                  // A tap after closing must not add a corner nobody sees.
+                  setDrawingArea(false);
+                  setAreaTaps([]);
                 }}
                 feetPerPoint={
                   activeSheet?.scaleRatio != null
                     ? Number(activeSheet.scaleRatio) / 72 / 12
                     : null
+                }
+                heightAreas={
+                  <HeightAreasSection
+                    areas={sheetAreas}
+                    warnings={sheetAreaWarnings}
+                    drawing={drawingArea}
+                    taps={areaTaps}
+                    locked={homerunData?.locked ?? false}
+                    sheetHeightLabel="the sheet"
+                    finishError={areaError}
+                    onStartDraw={() => {
+                      // One tool at a time: a tap is either a corner or a panel.
+                      setPlacingPanel(null);
+                      setAreaTaps([]);
+                      setAreaError(null);
+                      setDrawingArea(true);
+                    }}
+                    onUndoTap={() => setAreaTaps(t => t.slice(0, -1))}
+                    onFinish={finishArea}
+                    onCancel={() => {
+                      setDrawingArea(false);
+                      setAreaTaps([]);
+                      setAreaError(null);
+                    }}
+                    onRename={(id, name) =>
+                      updateHeightArea.mutate({ id, name })
+                    }
+                    onHeight={(id, inches) =>
+                      updateHeightArea.mutate({ id, heightInches: inches })
+                    }
+                    onRemove={id => removeHeightArea.mutate({ id })}
+                  />
                 }
               />
             )}
@@ -10535,6 +10633,20 @@ export default function TakeoffPage({
                           />
                         </>
                       )}
+                    {showCircuits && (drawingArea || sheetAreas.length > 0) && (
+                      <HeightAreasLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        areas={sheetAreas}
+                        drawing={drawingArea}
+                        taps={areaTaps}
+                        onTap={at => {
+                          setAreaError(null);
+                          setAreaTaps(t => [...t, at]);
+                        }}
+                      />
+                    )}
                     {showCircuits && circuitReport && (
                       <CircuitLayer
                         width={size.width}
