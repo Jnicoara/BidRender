@@ -2161,6 +2161,24 @@ export const bids = mysqlTable(
      */
     quantitiesLockedAt: timestamp("quantitiesLockedAt"),
 
+    /**
+     * How this bid prices its homeruns (0127, Track C, homerun-footage-plan).
+     * `homerunMethod` 'measured' | 'average' | 'measuredMin'; NULL =
+     * Measured. The rest NULL = not set; routing NULL = none applied.
+     */
+    homerunMethod: varchar("homerunMethod", { length: 16 }),
+    homerunAverageFt: decimal("homerunAverageFt", { precision: 8, scale: 2 }),
+    homerunMinimumFt: decimal("homerunMinimumFt", { precision: 8, scale: 2 }),
+    homerunRoutingPct: decimal("homerunRoutingPct", {
+      precision: 6,
+      scale: 4,
+    }),
+    /** The run type a computed homerun is made of (plan § 8). */
+    homerunRunTypeId: int("homerunRunTypeId").references(
+      (): AnyMySqlColumn => takeoffRunTypes.id,
+      { onDelete: "set null" }
+    ),
+
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -2360,6 +2378,10 @@ export const bidPdfSheets = mysqlTable(
      * follows the job — distinguishable from any answer, so never 0.
      */
     distributionHeightInches: int("distributionHeightInches"),
+    /** This area's override of the bid's homerun method (0128). NULL = follow. */
+    homerunMethod: varchar("homerunMethod", { length: 16 }),
+    homerunAverageFt: decimal("homerunAverageFt", { precision: 8, scale: 2 }),
+    homerunMinimumFt: decimal("homerunMinimumFt", { precision: 8, scale: 2 }),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -3091,6 +3113,20 @@ export const takeoffRunCircuits = mysqlTable(
      * through `circuitWire`, like every other column here.
      */
     separateGround: boolean("separateGround"),
+    /**
+     * The schedule row this circuit is (0129, Track C): "Homerun to 2B-14" →
+     * 2B's circuit 14. NULL = not tied. Lets a traced homerun replace the
+     * computed one for its circuit.
+     */
+    panelCircuitId: int("panelCircuitId").references(
+      (): AnyMySqlColumn => bidPanelCircuits.id,
+      { onDelete: "set null" }
+    ),
+    /**
+     * Where `conductorCount` / `groundCount` came from when the drawing said:
+     * 'ticks' or 'note'. NULL = entered by the estimator, as every row today.
+     */
+    conductorSource: varchar("conductorSource", { length: 8 }),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -5454,3 +5490,125 @@ export const bidPdfLegendEntries = mysqlTable(
 );
 
 export type BidPdfLegendEntry = typeof bidPdfLegendEntries.$inferSelect;
+
+// ─── Migrations 0125, 0126, 0130 (Track A, 2026-10-07) ───────────────────────
+// Track C's homerun-footage tables (homerun-footage-plan.md § 9). They reach
+// live only with C's footage code (live-release-plan.md). Nothing reads them
+// yet. Each mirrors its .sql file — server/schemaDrift.test.ts compares.
+
+/**
+ * THE panels on a bid — one table whatever put a panel there: typed in, read
+ * off a schedule (Track C), or the one a breaker line hangs on (brand line,
+ * migrations-0098-batch-plan.md § 10d). `name` NULL = the schedule printed
+ * none near its table. `bidPdfId`/`sheetId` = where its SCHEDULE is printed;
+ * `planSheetId`/`planX`/`planY` = where the PANEL sits on the plan (NULL =
+ * not placed, so Measured gives no number).
+ */
+export const bidPanels = mysqlTable(
+  "bid_panels",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 64 }),
+    /** NULL = follow the bid, then the company (§ 10d). */
+    brandLine: varchar("brandLine", { length: 64 }),
+    /** true = already on site, nothing to buy. NULL = not said. */
+    isExisting: boolean("isExisting"),
+    lineItemId: int("lineItemId").references(() => bidLineItems.id, {
+      onDelete: "set null",
+    }),
+    bidPdfId: int("bidPdfId").references(() => bidPdfs.id, {
+      onDelete: "set null",
+    }),
+    sheetId: int("sheetId").references(() => bidPdfSheets.id, {
+      onDelete: "set null",
+    }),
+    planSheetId: int("planSheetId").references(() => bidPdfSheets.id, {
+      onDelete: "set null",
+    }),
+    planX: decimal("planX", { precision: 10, scale: 2 }),
+    planY: decimal("planY", { precision: 10, scale: 2 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [index("bid_panels_userId_bidId_idx").on(t.userId, t.bidId)]
+);
+
+export type BidPanel = typeof bidPanels.$inferSelect;
+
+/**
+ * One circuit of a panel, as Track C's schedule reader produces it
+ * (`PanelCircuit`), with its HOMERUN. Every homerun column NULL = "not said,
+ * follow the level above" — `homerunCeilingInches` follows the height area,
+ * sheet, job, company; never 0 for unset.
+ */
+export const bidPanelCircuits = mysqlTable(
+  "bid_panel_circuits",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    panelId: int("panelId")
+      .notNull()
+      .references(() => bidPanels.id, { onDelete: "cascade" }),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    circuitNumber: int("circuitNumber").notNull(),
+    /** As printed — "20/1", "FEED". */
+    breaker: varchar("breaker", { length: 16 }),
+    amps: int("amps"),
+    poles: int("poles"),
+    /** Wire size as printed ("12", "EX"). */
+    wire: varchar("wire", { length: 16 }),
+    description: varchar("description", { length: 255 }),
+    loadKva: decimal("loadKva", { precision: 10, scale: 3 }),
+    /** A typed length (replaces L + V). NULL = computed. */
+    homerunOverrideFt: decimal("homerunOverrideFt", { precision: 8, scale: 2 }),
+    /** The leaving device when not the closest. NULL = closest. */
+    homerunFromStampId: int("homerunFromStampId").references(
+      () => takeoffStamps.id,
+      { onDelete: "set null" }
+    ),
+    /** NULL = unconfirmed, how every homerun starts. */
+    homerunConfirmedAt: timestamp("homerunConfirmedAt"),
+    homerunCeilingInches: int("homerunCeilingInches"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [index("bid_panel_circuits_userId_idx").on(t.userId)]
+);
+
+export type BidPanelCircuit = typeof bidPanelCircuits.$inferSelect;
+
+/**
+ * A height AREA inside a sheet (0130; owner 2026-10-06): an 18'-0" stockroom
+ * drawn inside a 10'-0" sales floor. `region` is the outline in page points.
+ * `distributionHeightInches` NULL = drawn, no height yet → follows the sheet.
+ */
+export const bidHeightAreas = mysqlTable(
+  "bid_height_areas",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sheetId: int("sheetId")
+      .notNull()
+      .references(() => bidPdfSheets.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 64 }).notNull(),
+    region: json("region").$type<[number, number][]>().notNull(),
+    distributionHeightInches: int("distributionHeightInches"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [index("bid_height_areas_userId_sheetId_idx").on(t.userId, t.sheetId)]
+);
+
+export type BidHeightArea = typeof bidHeightAreas.$inferSelect;

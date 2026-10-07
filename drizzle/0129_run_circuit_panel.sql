@@ -1,0 +1,16 @@
+-- Ties a TRACED run's circuit to its schedule row, so a traced homerun
+-- replaces the computed one for that circuit (Track C, todo.md "Homeruns read
+-- from the plan"):
+--
+--   panelCircuitId   the schedule row this run's circuit is ("Homerun to
+--                    2B-14" -> 2B's circuit 14). NULL = not tied (typed by
+--                    hand, or no schedule for that panel). SET NULL.
+--   conductorSource  'ticks' | 'note' when the drawing said how many wires;
+--                    NULL = entered by the estimator, as every row is today.
+--
+-- Deliberately NOT here: `conductorCount` nullable — that would change what
+-- an existing column means (todo.md says why).
+--
+-- ── ADDITIVE. STEP 1. After 0126 (the FK target) ─────────────────────────────
+-- Pairing rule: as 0125. Hand-written, not generated.
+ALTER TABLE `takeoff_run_circuits` ADD `panelCircuitId` int, ADD `conductorSource` varchar(8), ADD CONSTRAINT `takeoff_run_circuits_panelCircuitId_bid_panel_circuits_id_fk` FOREIGN KEY (`panelCircuitId`) REFERENCES `bid_panel_circuits`(`id`) ON DELETE set null ON UPDATE no action;

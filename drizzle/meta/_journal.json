@@ -876,6 +876,48 @@
       "when": 1789961400000,
       "tag": "0124_bid_pdf_legend_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "5",
+      "when": 1789961500000,
+      "tag": "0125_bid_panels",
+      "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "5",
+      "when": 1789961600000,
+      "tag": "0126_bid_panel_circuits",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "5",
+      "when": 1789961700000,
+      "tag": "0127_bid_homerun_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "5",
+      "when": 1789961800000,
+      "tag": "0128_sheet_homerun_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "5",
+      "when": 1789961900000,
+      "tag": "0129_run_circuit_panel",
+      "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "5",
+      "when": 1789962000000,
+      "tag": "0130_bid_height_areas",
+      "breakpoints": true
     }
   ]
 }
