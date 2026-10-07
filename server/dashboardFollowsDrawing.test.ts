@@ -136,7 +136,7 @@ withDb("the card follows the drawing on an unlocked bid", () => {
     expect(Number(bid.lines[0].qty)).toBe(0);
     // What the bid screen shows, counted the way it counts it.
     const onScreen = bidNotPricedCount(bid.lines);
-    expect(onScreen).toEqual({ lines: 0, parts: 0 });
+    expect(onScreen).toEqual({ lines: 0, parts: 0, hours: 0 });
     expect(card.notPriced).toEqual(onScreen);
   });
 

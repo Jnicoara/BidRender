@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Bid totals say missing hours apart from unpriced parts.** A total now
+  reads "+ 1 part not priced, 1 line hours not set" instead of lumping both
+  into "parts", so it is clear what to fix where: a part on the Materials
+  screen, hours on the assembly. The same goes for the dashboard, the
+  proposal's warning list and the reports.
+- **The proposal no longer prints a short labor-hours figure.** While any
+  line's hours are not set, it says "Labor hours: Hours pending" (and the
+  price says "Price pending") instead of "Estimated at 2.5 labor hours"
+  that silently left a line out.
+
 - **The materials review sheet is ready to mark** —
   `pricing/materials-review.xlsx`. Every shipped material with its proposed
   new name (wire and cable metal at the end, breakers "1-Pole"), who uses

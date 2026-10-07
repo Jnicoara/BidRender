@@ -58,7 +58,7 @@ describe("counting unpriced parts", () => {
   it("counts the parts of a line that is otherwise priced", () => {
     expect(
       countNotPriced([{ line: line({ unpricedParts: 2 }), directCost: 35 }])
-    ).toEqual({ lines: 0, parts: 2 });
+    ).toEqual({ lines: 0, parts: 2, hours: 0 });
   });
 
   it("does not count parts twice on a line that is already Not priced", () => {
@@ -71,7 +71,7 @@ describe("counting unpriced parts", () => {
           directCost: 0,
         },
       ])
-    ).toEqual({ lines: 1, parts: 0 });
+    ).toEqual({ lines: 1, parts: 0, hours: 0 });
   });
 
   it("counts nothing on a line with no quantity", () => {
@@ -79,7 +79,7 @@ describe("counting unpriced parts", () => {
       countNotPriced([
         { line: line({ qty: 0, unpricedParts: 3 }), directCost: 0 },
       ])
-    ).toEqual({ lines: 0, parts: 0 });
+    ).toEqual({ lines: 0, parts: 0, hours: 0 });
   });
 });
 
@@ -186,6 +186,6 @@ describe.skipIf(!hasDb)("an assembly line with a $0 part, end to end", () => {
   it("counts toward the bid's not-priced total", async () => {
     const page = await caller().bids.search({ text: "Parts probe bid" });
     const row = page.items.find(b => b.id === bidId)!;
-    expect(row.notPriced).toEqual({ lines: 0, parts: 1 });
+    expect(row.notPriced).toEqual({ lines: 0, parts: 1, hours: 0 });
   });
 });

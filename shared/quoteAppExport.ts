@@ -37,7 +37,7 @@
 import { apportionWorkPrice, toCents } from "./pricing";
 import { runsNotOnBidText } from "./runsNotOnBid";
 import {
-  lineHoursNotSet,
+  lineHoursMissing,
   lineHoursUnset,
   lineMaterialNotPriced,
   lineNotPriced,
@@ -169,11 +169,10 @@ export function quoteGaps(
         fix: "Set an hourly rate on the Labor rates screen.",
       });
     } else {
-      // Hours not set (D1) is counted in `linePartsNotPriced` and said apart:
-      // the fix is the assembly's hours, not a part.
-      const hoursNotSet = lineHoursNotSet(line);
-      const parts =
-        linePartsNotPriced(line, directCost) - (hoursNotSet ? 1 : 0);
+      // Hours not set (D1) is its own count (`lineHoursMissing`), said apart
+      // from parts: the fix is the assembly's hours, not a part.
+      const hoursNotSet = lineHoursMissing(line, directCost);
+      const parts = linePartsNotPriced(line, directCost);
       // Labor and no material at all (2026-10-06): there is no part to
       // name, so it is said as what it is.
       const noMaterial =

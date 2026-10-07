@@ -355,8 +355,8 @@ describe("layout and accent", () => {
 describe("what leaves the building", () => {
   it("prints 'Price pending', never a short figure, while anything is not priced", () => {
     for (const notPriced of [
-      { lines: 1, parts: 0 },
-      { lines: 0, parts: 2 },
+      { lines: 1, parts: 0, hours: 0 },
+      { lines: 0, parts: 2, hours: 0 },
     ]) {
       const doc = buildProposal(input({ notPriced }));
       expect(doc.investment.pricePending).toBe(true);
@@ -403,9 +403,30 @@ describe("what leaves the building", () => {
     // A bid with lines is not "no work", priced or not.
     expect(buildProposal(input()).investment.noWork).toBe(false);
     expect(
-      buildProposal(input({ notPriced: { lines: 1, parts: 0 } })).investment
-        .noWork
+      buildProposal(input({ notPriced: { lines: 1, parts: 0, hours: 0 } }))
+        .investment.noWork
     ).toBe(false);
+  });
+
+  it("holds BOTH the price and the labor hours while a line's hours are not set", () => {
+    // Found on staging 2026-10-07: "Estimated at 2.5 labor hours" printed
+    // while one line's hours were not set — a short number read as the job's.
+    // Hours are their own count since that day, so the price must hold on
+    // them too, not only on lines and parts.
+    const hoursOnly = { lines: 0, parts: 0, hours: 1 };
+    const full = buildProposal(input({ notPriced: hoursOnly }));
+    expect(full.laborHours).toBeNull();
+    expect(full.investment.pricePending).toBe(true);
+    const scope = buildProposal(
+      input({ notPriced: hoursOnly, mode: "scope-only" })
+    );
+    expect(scope.laborHours).toBeNull();
+    // A part not priced holds the price but not the hours, which are whole.
+    const partOnly = buildProposal(
+      input({ notPriced: { lines: 0, parts: 1, hours: 0 } })
+    );
+    expect(partOnly.investment.pricePending).toBe(true);
+    expect(partOnly.laborHours).not.toBeNull();
   });
 
   it("lists unpriced lines by name, agreeing with the count", () => {
@@ -427,8 +448,8 @@ describe("what leaves the building", () => {
         { line: line("Short a lug", 10, 2), directCost: 10 },
       ])
     ).toEqual([
-      { name: "Nothing priced", wholeLine: true, parts: 0 },
-      { name: "Short a lug", wholeLine: false, parts: 2 },
+      { name: "Nothing priced", wholeLine: true, parts: 0, hoursNotSet: false },
+      { name: "Short a lug", wholeLine: false, parts: 2, hoursNotSet: false },
     ]);
   });
 
@@ -658,7 +679,7 @@ describe.skipIf(!hasDb)("proposals end to end", () => {
       )
     ).toBe(PRICE_PENDING);
     expect(full.notPricedLines).toEqual([
-      { name: unpricedName, wholeLine: true, parts: 0 },
+      { name: unpricedName, wholeLine: true, parts: 0, hoursNotSet: false },
     ]);
 
     // Scope-only prints no money, so it is never pending.

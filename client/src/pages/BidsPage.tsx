@@ -101,11 +101,7 @@ import {
   lineNotPriced,
 } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
-import {
-  bidNotPricedCount,
-  hoursNotSetLines,
-  materialMissingLines,
-} from "@/lib/notPricedTotal";
+import { bidNotPricedCount, materialMissingLines } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 
 /**
@@ -535,10 +531,10 @@ export default function BidsPage({
   const notPricedTally = bidNotPricedCount(lines);
   /** Of the tally's parts: lines with labor and no material at all. */
   const materialMissing = materialMissingLines(lines);
-  /** Of the tally's parts: lines whose assembly hours were not set (D1). */
-  const hoursNotSet = hoursNotSetLines(lines);
+  /** Lines whose assembly hours were not set (D1) — the tally's own count. */
+  const hoursNotSet = notPricedTally.hours;
   /** What is left: real PARTS with no price — the Materials screen's job. */
-  const partsNotPriced = notPricedTally.parts - materialMissing - hoursNotSet;
+  const partsNotPriced = notPricedTally.parts - materialMissing;
   /**
    * Traced lines whose part had no labor unit when sent — labor "Not
    * priced". Their own strip, because the next move is on the Materials
