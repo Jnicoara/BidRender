@@ -41,7 +41,7 @@ function computed(over: Partial<HomerunInput> = {}) {
 
 describe("the breakdown adds up to its total", () => {
   it("measured: run + up + down", () => {
-    expect(homerunBreakdown(computed())).toBe(
+    expect(homerunBreakdown(computed(), "mark-typed")).toBe(
       "52.5 ft — 40 ft run + 8.5 ft up + 4 ft down at the panel"
     );
   });
@@ -53,19 +53,19 @@ describe("the breakdown adds up to its total", () => {
         bid: { method: "measuredMin", averageFt: null, minimumFt: 50 },
       }),
     });
-    expect(homerunBreakdown(h)).toBe(
+    expect(homerunBreakdown(h, "mark-typed")).toBe(
       "62.5 ft — 50 ft minimum (measured 40 ft) + 8.5 ft up + 4 ft down at the panel"
     );
   });
 
   it("a drop with no height is SAID, never a zero", () => {
-    expect(homerunBreakdown(computed({ panelHeightInches: null }))).toBe(
-      "48.5 ft — 40 ft run + 8.5 ft up + down at the panel not counted"
-    );
+    expect(
+      homerunBreakdown(computed({ panelHeightInches: null }), "mark-typed")
+    ).toBe("48.5 ft — 40 ft run + 8.5 ft up + down at the panel not counted");
   });
 
   it("a typed length says so", () => {
-    expect(homerunBreakdown(computed({ overrideFt: 75 }))).toBe(
+    expect(homerunBreakdown(computed({ overrideFt: 75 }), "mark-typed")).toBe(
       "75 ft — typed"
     );
   });
@@ -119,5 +119,26 @@ describe("the summary line (plan § 7)", () => {
         })
       )
     ).toBe("Average 20 ft, this sheet");
+  });
+});
+
+describe("the up-drop says when it is a default height (owner, 2026-10-07)", () => {
+  it("a type's height says so; the device's own does not", () => {
+    expect(homerunBreakdown(computed(), "shipped")).toBe(
+      "52.5 ft — 40 ft run + 8.5 ft up (default height) + 4 ft down at the panel"
+    );
+    expect(homerunBreakdown(computed(), "company")).toMatch(
+      /8\.5 ft up \(default height\)/
+    );
+    expect(homerunBreakdown(computed(), "mark-typed")).not.toMatch(/default/);
+  });
+
+  it("a device nobody has said the type of names that fix", () => {
+    const h = computed({
+      devices: [{ id: 1, x: 720, y: 0, kind: null, heightInches: null }],
+    });
+    expect(homerunBreakdown(h, null)).toBe(
+      "44 ft — 40 ft run + up not counted — device type not said + 4 ft down at the panel"
+    );
   });
 });

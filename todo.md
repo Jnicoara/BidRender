@@ -233,6 +233,27 @@ asks for a column on `takeoff_run_circuits`.
   marked" never creates a circuit row; the count stays the estimator's, as
   the column's own comment in `drizzle/schema.ts` requires.
 
+**Shop default heights + "No drop here" (Track C, 2026-10-07): NO new
+column for Track A** — asked alongside `bids.homerunExtraBends` and
+`takeoff_runs.runsAt` (migrations-next-batch.md § Batch C, where the table
+is). Shop height per type = `takeoff_mounting_heights`; per device =
+`takeoff_stamps.mountHeightInches` (0098); which type a device is =
+`assemblies.mountHeightTypeKey` (0110, now read and set on
+`c-homerun-footage`); "No drop here" = run end kind `'distribution'`.
+Search those before asking for a height column.
+
+- [ ] **Owner's call:** the TV data outlet on UNCC E111 has no height type
+      to pick (none ships for low-voltage / TV outlets), so its homerun
+      still has no up-drop. A shop adds its own type in Settings › Heights,
+      or one ships — not decided.
+- [ ] **Owner's call:** a count's OWN drops ("Each drops to") still start
+      unanswered even when its item says "Mounts at". Starting them answered
+      from the item is the plan's "Track B after A" line (vertical-drops-plan
+      § 7) and would add count drops to every such job at once.
+- [ ] The run-end dropdown's closed label for the "No drop here" answer reads
+      "Run height" (the shared `endKindLabel`, also the toolbar's "From").
+      Same meaning, two names side by side — rename with the toolbar in view.
+
 **Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
 `references/homerun-footage-plan.md`; nothing computes footage yet). Owner:
 method per bid with a per-area override, ceiling height per area, a per-job

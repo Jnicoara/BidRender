@@ -5,7 +5,9 @@
  * Each is a kind the app already ships (`SHIPPED_HEIGHT_TYPES`), so the drop
  * comes from that kind's existing height — the company's, or the job's — and
  * nothing new is stored: an end already holds a kind and an optional height of
- * its own. "Nothing" is carrying on at run height, which is no drop. Anything
+ * its own. "No drop here" is carrying on at run height, which is no drop —
+ * it was labelled "Nothing" until 2026-10-07, which read the same as an end
+ * nobody has answered ("nothing there") and is the opposite answer. Anything
  * else (a switch, a disconnect, a type the company added) is in the full
  * picker beside these.
  *
@@ -22,12 +24,12 @@ export const RUN_END_PICKS: readonly RunEndPick[] = [
   { label: "J-box", kind: "junction-box-wall" },
   { label: "Fixture", kind: "ceiling-box" },
   { label: "Stub-up", kind: "underground" },
-  { label: "Nothing", kind: DISTRIBUTION_KIND },
+  { label: "No drop here", kind: DISTRIBUTION_KIND },
 ];
 
 /**
  * The picks this company can use: a kind it has retired is left out, the same
- * rule the full picker follows. "Nothing" is always there.
+ * rule the full picker follows. "No drop here" is always there.
  */
 export function availablePicks(activeKinds: ReadonlySet<string>): RunEndPick[] {
   return RUN_END_PICKS.filter(

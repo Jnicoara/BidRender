@@ -489,4 +489,44 @@ withDb("an end dragged off or onto a mark", () => {
     expect(after.points).toEqual(before.points);
     expect(after.endStampId).toBe(s.a);
   });
+
+  /*
+    OPEN SPACE (owner, 2026-10-07): an end let go on no mark, with no type of
+    its own, is "nothing there" — no drop, and the fittings say the length
+    is short. "No drop here" is the answer for an end meant to have none: it
+    is saved ON the end (the "at run height" kind, which already means no
+    drop) and the warning goes. Before 2026-10-07 that chip read "Nothing",
+    the same word as the unanswered state it clears.
+  */
+  it("open space: warned until 'No drop here' is picked, which is saved on the end", async () => {
+    const s = await withMarks();
+    // The fixture's start is unanswered too; answer it, so only the END is
+    // under test here.
+    await caller().takeoffRuns.setEnds({
+      id: s.runId,
+      startKind: "distribution",
+    });
+    await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: offTheMark,
+      endStampId: null,
+    });
+    const strapWhy = async () => {
+      const [entry] = await caller().takeoffRunTypes.bridgeForBid({
+        bidId: s.bidId,
+      });
+      return entry.fittings.find(f => f.role === "strap")?.why ?? "";
+    };
+    expect((await row(s.runId)).endKind).toBeNull();
+    expect(await strapWhy()).toMatch(/a drop with no height/);
+
+    // The "No drop here" chip: the end says it carries on at run height.
+    await caller().takeoffRuns.setEnds({
+      id: s.runId,
+      endKind: "distribution",
+    });
+    expect((await row(s.runId)).endKind).toBe("distribution");
+    expect(await strapWhy()).not.toMatch(/a drop with no height/);
+    expect(await drops(s.bidId)).toEqual({ runEndFeet: 0, markDrops: 2 });
+  });
 });

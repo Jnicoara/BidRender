@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **A device takes its type's default height, and an open run end can say
+  "No drop here" (branch `c-homerun-footage`).** An assembly can now say what
+  it "Mounts at" (receptacle, switch, wall J-box…), once in the library, and
+  every homerun or run end at that device uses the shop's height for that
+  type — on UNCC E111 the homeruns with no rise from their device went from
+  14 to 1. Where a type's height is used, the screen says "default height".
+  An end left in open space says "nothing there" until someone picks what is
+  there or taps "No drop here" (the chip that used to read "Nothing").
+
 - **Dragging a run's end now moves its drop with it (branch
   `c-homerun-footage`).** A run end dragged off a receptacle used to keep
   counting that receptacle's drop — and kept the receptacle's own drop

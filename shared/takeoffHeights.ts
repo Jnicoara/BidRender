@@ -289,6 +289,32 @@ export type MarkHeight = {
 };
 
 /**
+ * WHAT A DEVICE IS, for its height: its count's answer ("Each drops to"),
+ * else the height type its ITEM mounts at (`assemblies.mountHeightTypeKey`,
+ * vertical-drops-plan § 7 col 2) — set once in the library, so every count
+ * of that item on every job knows it is a receptacle and takes the shop's
+ * receptacle height (owner, 2026-10-07: "a device with no height uses its
+ * type's default, so every drop counts"). NULL when neither has been said:
+ * never guessed from the item's name (overhaul § 6).
+ *
+ * The count's answer wins, so one job can still say otherwise. Read here
+ * for homeruns and linked run ends; a count's OWN drops stay off until its
+ * "Each drops to" is answered — whether a count drops at all is a separate
+ * question from how high its devices are.
+ */
+export function deviceKind(
+  countKind: string | null,
+  itemKind: string | null
+): string | null {
+  return countKind ?? itemKind;
+}
+
+/** A height that came from the TYPE's setting, not from this device. */
+export function isDefaultHeight(source: DeviceHeightSource): boolean {
+  return source === "job" || source === "company" || source === "shipped";
+}
+
+/**
  * THE DEVICE HEIGHT AT A MARK — the one order, for a run end and for a
  * count's drop alike (references/vertical-drops-plan.md § 2):
  *

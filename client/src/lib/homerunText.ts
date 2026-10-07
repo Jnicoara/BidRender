@@ -9,7 +9,11 @@ import {
   type HomerunRefusal,
   type ResolvedHomerunMethod,
 } from "@shared/homerunFootage";
-import type { EndVertical } from "@shared/takeoffHeights";
+import {
+  isDefaultHeight,
+  type DeviceHeightSource,
+  type EndVertical,
+} from "@shared/takeoffHeights";
 
 /** Feet to one decimal, the way a homerun row shows them. */
 export function ft(value: number): string {
@@ -32,9 +36,17 @@ export function refusalText(reason: HomerunRefusal, panel: string): string {
   }
 }
 
-function dropText(v: EndVertical, what: string): string | null {
-  if (v.counted) return `${ft(v.feet)} ${what}`;
+function dropText(
+  v: EndVertical,
+  what: string,
+  defaultHeight = false
+): string | null {
+  if (v.counted)
+    return `${ft(v.feet)} ${what}${defaultHeight ? " (default height)" : ""}`;
   if (v.reason === "level") return null;
+  // The fix, named: a device nobody has said the type of has no height.
+  if (v.reason === "no-kind")
+    return `${what} not counted — device type not said`;
   return `${what} not counted`;
 }
 
@@ -42,9 +54,14 @@ function dropText(v: EndVertical, what: string): string | null {
  * "52.5 ft — 40 ft run + 8.5 ft up + 4 ft down at the panel". The pieces
  * BEFORE routing, waste and makeup: what was measured or typed, which is
  * what an estimator checks against the drawing.
+ *
+ * `deviceHeightSource` is REQUIRED: an up-drop measured from the TYPE's
+ * height (job, shop or shipped) says "(default height)" (owner, 2026-10-07),
+ * so a borrowed 18" is never read as this device's own.
  */
 export function homerunBreakdown(
-  footage: Extract<HomerunFootage, { state: "computed" }>
+  footage: Extract<HomerunFootage, { state: "computed" }>,
+  deviceHeightSource: DeviceHeightSource | null
 ): string {
   const p = footage.pieces;
   if (footage.overridden) return `${ft(p.installedFt)} — typed`;
@@ -55,7 +72,11 @@ export function homerunBreakdown(
       : `${ft(p.runFt)} run`;
   const parts = [
     run,
-    dropText(p.upDrop, "up"),
+    dropText(
+      p.upDrop,
+      "up",
+      deviceHeightSource !== null && isDefaultHeight(deviceHeightSource)
+    ),
     dropText(p.downAtPanel, "down at the panel"),
   ].filter((x): x is string => x !== null);
   return `${ft(p.installedFt)} — ${parts.join(" + ")}`;

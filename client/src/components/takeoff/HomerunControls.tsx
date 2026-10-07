@@ -378,7 +378,7 @@ export function HomerunLine({
         <div className="flex-1 min-w-0">
           {f.state === "computed" ? (
             <>
-              Homerun {homerunBreakdown(f)} · {status}
+              Homerun {homerunBreakdown(f, row.deviceHeightSource)} · {status}
             </>
           ) : (
             <span className="text-[#B45309] dark:text-[#F59E0B]">

@@ -202,6 +202,7 @@ import {
 } from "./homerunsCore";
 import { ENV } from "./_core/env";
 import { sessionCutoff } from "../shared/sessionValidity";
+import { deviceKind } from "../shared/takeoffHeights";
 import { FILE_SOURCES } from "./backup/collectFiles";
 import type { PlanCounts } from "../shared/planCounts";
 import {
@@ -3300,6 +3301,48 @@ export async function currentAssemblyRates(
     rates.set(id, hourlyCostFor(roles, resolved.laborRateId));
   }
   return rates;
+}
+
+/**
+ * The height type each of these STORED assembly ids mounts at
+ * (`assemblies.mountHeightTypeKey`) — resolved like `currentAssemblyRates`,
+ * so the company's fork of a shipped row answers for a count that still
+ * points at the shipped id. Ids that resolve to nothing, or say nothing,
+ * are left out.
+ */
+export async function getAssemblyMountKinds(
+  storedIds: readonly (number | null)[],
+  userId: number
+): Promise<Map<number, string>> {
+  const kinds = new Map<number, string>();
+  const wanted = Array.from(
+    new Set(storedIds.filter((id): id is number => id !== null))
+  );
+  if (wanted.length === 0) return kinds;
+  const db = await getDb();
+  if (!db) return kinds;
+  const candidates = await db
+    .select()
+    .from(assemblies)
+    .where(
+      or(
+        and(
+          inArray(assemblies.id, wanted),
+          or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+        ),
+        and(
+          eq(assemblies.userId, userId),
+          inArray(assemblies.baselineId, wanted)
+        )
+      )
+    );
+  // MERGE BEFORE RESOLVING, as getAssemblyForStoredReference does.
+  const visible = mergeLibraryRows(candidates, userId);
+  for (const id of wanted) {
+    const key = resolveAssembly(visible, id)?.mountHeightTypeKey ?? null;
+    if (key !== null) kinds.set(id, key);
+  }
+  return kinds;
 }
 
 export async function getAssemblyDetail(
@@ -13403,7 +13446,7 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
     )
   );
   if (ids.length === 0) return [];
-  return db
+  const rows = await db
     .select({
       id: takeoffStamps.id,
       mountHeightInches: takeoffStamps.mountHeightInches,
@@ -13411,6 +13454,7 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
       status: takeoffStamps.status,
       dropKind: takeoffGroups.dropKind,
       dropHeightInches: takeoffGroups.dropHeightInches,
+      assemblyId: takeoffGroups.assemblyId,
     })
     .from(takeoffStamps)
     .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
@@ -13422,6 +13466,15 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
         inArray(takeoffStamps.id, ids)
       )
     );
+  // What each device IS, when its count has not said: its item's type.
+  const itemKinds = await getAssemblyMountKinds(
+    rows.map(r => r.assemblyId),
+    userId
+  );
+  return rows.map(({ assemblyId, ...r }) => ({
+    ...r,
+    itemKind: assemblyId === null ? null : (itemKinds.get(assemblyId) ?? null),
+  }));
 }
 
 /**
@@ -14252,6 +14305,7 @@ export async function loadBidHomeruns(
             mountHeightSource: takeoffStamps.mountHeightSource,
             dropKind: takeoffGroups.dropKind,
             dropHeightInches: takeoffGroups.dropHeightInches,
+            assemblyId: takeoffGroups.assemblyId,
           })
           .from(takeoffStamps)
           .leftJoin(takeoffGroups, eq(takeoffStamps.groupId, takeoffGroups.id))
@@ -14296,6 +14350,13 @@ export async function loadBidHomeruns(
       },
     ])
   );
+  // What each leaving device IS, when its count has not said: its item's
+  // type (`deviceKind`) — so a duplex whose count never answered "Each drops
+  // to" still rises at the shop's receptacle height.
+  const itemKinds = await getAssemblyMountKinds(
+    stampRows.map(s => s.assemblyId ?? null),
+    userId
+  );
   const marks = new Map<number, HomerunMark>(
     stampRows.map(s => [
       s.id,
@@ -14308,7 +14369,10 @@ export async function loadBidHomeruns(
           inches: numOrNull(s.mountHeightInches),
           source: s.mountHeightSource,
         },
-        countKind: s.dropKind ?? null,
+        countKind: deviceKind(
+          s.dropKind ?? null,
+          s.assemblyId == null ? null : (itemKinds.get(s.assemblyId) ?? null)
+        ),
         countInches: numOrNull(s.dropHeightInches ?? null),
       },
     ])

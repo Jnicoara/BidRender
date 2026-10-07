@@ -41,6 +41,7 @@ import {
 import { HeightFields } from "@/components/HeightFields";
 import { availablePicks } from "@/lib/runEndPicks";
 import { cn } from "@/lib/utils";
+import { heightSourceWords } from "@/lib/heightSourceWords";
 import {
   DISTRIBUTION_KIND,
   NOT_ANSWERED_LABEL,
@@ -451,19 +452,7 @@ export type EndAbout = {
   onExisting: boolean;
 };
 
-/** Words for a height that did not come from the type's own setting. */
-export function heightSourceWords(source: string): string | null {
-  switch (source) {
-    case "mark-typed":
-      return "this mark's height";
-    case "mark-read":
-      return "read from the plan";
-    case "count":
-      return "the count's height";
-    default:
-      return null;
-  }
-}
+export { heightSourceWords };
 
 /** One end of one leg, as the Run ends section lists it. */
 export type RunEndsLeg = {
@@ -574,7 +563,9 @@ export function RunEndsSection({
                 {!onTee && !vertical?.counted && kind !== DISTRIBUTION_KIND ? (
                   <span className="text-xs text-[#F5C518] text-right inline-flex items-center gap-1">
                     <TriangleAlert className="w-3 h-3 shrink-0" />
-                    not set — no drop counted
+                    {kind === null
+                      ? "nothing there — no drop counted"
+                      : "no height for this type — no drop counted"}
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground text-right">
@@ -582,7 +573,7 @@ export function RunEndsSection({
                       ? "branch tee — no drop"
                       : vertical?.counted
                         ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft${sourceWords ? ` · ${sourceWords}` : ""}`
-                        : "no drop — carries on"}
+                        : "no drop here"}
                   </span>
                 )}
               </div>
@@ -637,6 +628,20 @@ export function RunEndsSection({
                 <TeeEnd />
               ) : (
                 <>
+                  {/*
+                    THE TWO WAYS OUT of "nothing there" (owner, 2026-10-07):
+                    say what is here — it then drops to that type's default
+                    height — or "No drop here" for an end meant to have none
+                    (measuring, an unmarked ceiling box, continues as another
+                    run), which is saved on the end and clears the warning.
+                    Neither is chosen for you: the warning stays until one is.
+                  */}
+                  {kind === null && !locked && (
+                    <p className="text-xs text-muted-foreground">
+                      Pick what is here — it drops to that type's default height
+                      — or <span className="font-medium">No drop here</span>.
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-1">
                     {picks.map(pick => (
                       <button

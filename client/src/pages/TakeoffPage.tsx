@@ -7490,6 +7490,26 @@ export default function TakeoffPage({
           `${result.clearedAnswers} pull-point ${result.clearedAnswers === 1 ? "answer" : "answers"} cleared — the corner moved. Ctrl+Z puts ${result.clearedAnswers === 1 ? "it" : "them"} back.`
         );
       const run = runs.find(r => r.id === vars.id);
+      /*
+        An end let go in OPEN SPACE with no type of its own is "nothing
+        there" and counts no drop (owner, 2026-10-07). Said now, with that
+        end lit in Run ends where its two answers are — a type, or "No drop
+        here" — rather than left for the totals to come up short.
+      */
+      // A quantity trace's unanswered end is level by decision (D21).
+      const leftBare = (["start", "end"] as const).find(end =>
+        run?.traceMode === "quantity"
+          ? false
+          : end === "start"
+            ? vars.startStampId === null && run?.ends?.startKind == null
+            : vars.endStampId === null && run?.ends?.endKind == null
+      );
+      if (leftBare) {
+        setEndHighlight({ runId: vars.id, end: leftBare });
+        toast.message(
+          "Nothing there — that end counts no drop. Pick what is there in Run ends, or No drop here."
+        );
+      }
       if (run?.typedLengthInches != null)
         toast.message(
           "This run has a typed length, and that is still what the bid uses — the drawing changed, the bid did not."

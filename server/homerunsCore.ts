@@ -35,6 +35,7 @@ import {
 import {
   resolveDeviceHeight,
   resolveMountingHeight,
+  type DeviceHeightSource,
   type EndVertical,
   type MarkHeight,
 } from "../shared/takeoffHeights";
@@ -121,6 +122,12 @@ export type HomerunRow = {
   footage: HomerunFootage;
   /** What lands on the homerun type's bid lines; NULL when nothing does. */
   line: HomerunLineFootage | null;
+  /**
+   * Where the leaving device's height came from; NULL with no height. A
+   * type default (job, company, shipped) is said on the row as "default
+   * height" (owner, 2026-10-07), so a borrowed 18" is never read as measured.
+   */
+  deviceHeightSource: DeviceHeightSource | null;
 };
 
 export type HomerunEntry = {
@@ -252,15 +259,16 @@ export function bidHomeruns(input: {
         ? { x: panel.planX, y: panel.planY }
         : null;
 
-    const deviceHeight = mark
+    const deviceHeightResolved = mark
       ? resolveDeviceHeight({
           kind: mark.countKind,
           layers: heights.layers,
           runEndInches: null,
           mark: mark.height,
           countInches: mark.countInches,
-        }).inches
+        })
       : null;
+    const deviceHeight = deviceHeightResolved?.inches ?? null;
 
     /*
       NO LEAVING DEVICE, NO HOMERUN — under every method, Average included.
@@ -355,6 +363,8 @@ export function bidHomeruns(input: {
       ceiling,
       footage,
       line,
+      deviceHeightSource:
+        deviceHeight === null ? null : (deviceHeightResolved?.source ?? null),
     });
   }
 

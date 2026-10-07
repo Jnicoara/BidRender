@@ -19,6 +19,7 @@
  * the double-count rule all live there, tested.
  */
 import {
+  deviceKind,
   heightList,
   resolveDeviceHeight,
   resolveDistributionHeight,
@@ -188,6 +189,8 @@ export function buildHeightContext(input: {
     status: string | null;
     dropKind: string | null;
     dropHeightInches: number | null;
+    /** The type its ITEM mounts at (`assemblies.mountHeightTypeKey`). */
+    itemKind: string | null;
   }[];
   /**
    * Each sheet's own ceiling (0109) and the bid's height areas (0130).
@@ -226,7 +229,7 @@ export function buildHeightContext(input: {
             m.mountHeightInches === null ? null : Number(m.mountHeightInches),
           source: m.mountHeightSource,
         },
-        countKind: m.dropKind,
+        countKind: deviceKind(m.dropKind, m.itemKind),
         countInches: m.dropHeightInches,
         status: m.status,
       },

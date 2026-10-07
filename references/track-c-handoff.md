@@ -295,6 +295,45 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**Shop default heights + "No drop here" — DONE on `c-homerun-footage`
+(2026-10-07), no new column** (the owner asked for columns; every answer
+already had one — table in `migrations-next-batch.md` § Batch C, todo.md
+beside it).
+
+- **Device type from the item:** `deviceKind(dropKind, assemblies.mountHeightTypeKey)`
+  (0110, unread until now) for homeruns (`loadBidHomeruns`) and linked run
+  ends (`getMarksLinkedByRuns`), resolved through forks
+  (`getAssemblyMountKinds`). Set as "Mounts at" in the assembly editor
+  (`assemblies.mountTypes`, library permission); refused if not a height
+  type (`server/knownHeightKind.ts`, shared with run ends). Count drops
+  unchanged (todo, owner's call).
+- **"default height"** where the type's height is in use: homerun rows
+  ("8.5 ft up (default height)", `homerunBreakdown` takes the source,
+  required) and run ends (`@/lib/heightSourceWords`). A device with no type:
+  "up not counted — device type not said".
+- **Open space:** the chip "Nothing" is now **"No drop here"** (same saved
+  answer: end kind `distribution`); an unanswered end reads "nothing there —
+  no drop counted" with "Pick what is here … or No drop here"; a drag that
+  leaves an end bare lights it in Run ends and says so in a toast.
+- **UNCC E111 (bid 1728359), duplex count answered as Receptacle, panel
+  6'-0" on the bid:** before 62 of 76 homerun drops (14 up missing: 7 USB,
+  3 GFCI, 3 J-box, 1 TV data), 4,028.31 ft pipe, 12,084.94 ft wire. After
+  "Mounts at" (USB by tablet screen; GFCI — a shipped item, forked — and
+  J-box by API): 75 of 76, 4,119.31 ft (+91.00 = 10 × 8.5 + 3 × 2), wire
+  12,357.94. The 16 in the earlier note could not be reproduced: the
+  leaving devices have been re-synced since. Circuits panel on screen: 37
+  rows "(default height)", 1 "device type not said".
+- **Open-space end, on screen at 1180x820 touch:** a run onto duplex A,
+  8.5 ft drop, 3 straps. Dragged into open space: end lit, "nothing there —
+  no drop counted", 17 ft, "At least 3 straps … (1 run has a drop with no
+  height …)". "No drop here": "no drop here", warning gone, 3 straps, kind
+  `distribution` saved. Fixture run removed; the homerun setup on the bid
+  (scale, panel spot, homerun type, duplex Receptacle, panel 6'-0", the
+  three "Mounts at") is LEFT for the next check.
+- Tests: `server/deviceMountKind.test.ts` (8; 5 red with `deviceKind`
+  ignoring the item), runSetPoints +1, `heightSourceWords.test.ts`,
+  homerunText +2, runEndPicks label.
+
 **Track B's Gap 1 is FIXED on `c-homerun-footage` (2026-10-07)** —
 `references/track-b-plans-screen-gaps-plan.md` on branch `track-b`, which C
 cannot edit: **Track B, mark Gap 1 done there and do not build it again.**

@@ -22,12 +22,16 @@ describe("the quick picks for a run's end", () => {
       "J-box",
       "Fixture",
       "Stub-up",
-      "Nothing",
+      "No drop here",
     ]);
   });
 
-  it("leaves out a kind the company retired, but always offers Nothing", () => {
+  it("leaves out a kind the company retired, but always offers No drop here", () => {
     const picks = availablePicks(new Set(["receptacle", "panel"]));
-    expect(picks.map(p => p.label)).toEqual(["Device box", "Panel", "Nothing"]);
+    expect(picks.map(p => p.label)).toEqual([
+      "Device box",
+      "Panel",
+      "No drop here",
+    ]);
   });
 });

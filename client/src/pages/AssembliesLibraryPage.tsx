@@ -90,6 +90,7 @@ import {
 } from "@/components/ui/select";
 import { addAssemblyOverheadHours, calculateBidPrice } from "@shared/pricing";
 import { assemblyHours, previewAssembly } from "@shared/assemblyHours";
+import { formatElevation } from "@shared/takeoffHeights";
 import {
   hoursOffer,
   hoursToSave,
@@ -182,6 +183,11 @@ type Draft = {
    * every field the form can edit (rule 7).
    */
   laborOnly: boolean;
+  /**
+   * The height type this device mounts at (0110): a key, so it follows the
+   * shop's height for that type. NULL is "not said". Round-trips (rule 7).
+   */
+  mountHeightTypeKey: string | null;
 };
 
 const round = (value: number, places = 2) => {
@@ -206,7 +212,70 @@ const emptyDraft = (): Draft => ({
   modifierIds: [],
   // Never ticked for you: "not said" until the contractor ticks it.
   laborOnly: false,
+  // Never guessed from the name (overhaul § 6): "not said" until picked.
+  mountHeightTypeKey: null,
 });
+
+// ─── Mounts at ────────────────────────────────────────────────────────────────
+
+const MOUNT_NOT_SAID = "__not_said__";
+
+/**
+ * "Mounts at" (0110, vertical-drops-plan § 7 col 2; owner 2026-10-07): which
+ * height TYPE this device is, so every count of it on every job takes the
+ * shop's height for that type — a homerun rises from it, a run end on it
+ * drops to it — without anyone answering per job. A count's own "Each drops
+ * to" still wins. Optional, and never guessed from the name.
+ */
+function MountsAtField({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (key: string | null) => void;
+}) {
+  const { data: types = [] } = trpc.assemblies.mountTypes.useQuery();
+  const picked = types.find(t => t.typeKey === value);
+  return (
+    <div className="flex items-center justify-between gap-3 py-1">
+      <span className="text-sm">
+        <span className="font-medium">Mounts at</span>
+        <span className="block text-xs text-muted-foreground">
+          The height type this device is. It then uses your height for that type
+          on every job.
+        </span>
+      </span>
+      <Select
+        value={value ?? MOUNT_NOT_SAID}
+        onValueChange={next => onChange(next === MOUNT_NOT_SAID ? null : next)}
+      >
+        <SelectTrigger className="h-9 w-56" aria-label="Mounts at">
+          <SelectValue>
+            {value === null
+              ? "Not said"
+              : picked
+                ? mountTypeLabel(picked)
+                : value}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={MOUNT_NOT_SAID}>Not said</SelectItem>
+          {types.map(t => (
+            <SelectItem key={t.typeKey} value={t.typeKey}>
+              {mountTypeLabel(t)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function mountTypeLabel(t: { label: string; heightInches: number | null }) {
+  return t.heightInches === null
+    ? `${t.label} — no height set`
+    : `${t.label} — ${formatElevation(t.heightInches)}`;
+}
 
 // ─── Origin badge ─────────────────────────────────────────────────────────────
 
@@ -1152,6 +1221,13 @@ function AssemblyBuilder({
                 </span>
               </label>
 
+              <MountsAtField
+                value={draft.mountHeightTypeKey}
+                onChange={key =>
+                  setDraft(d => ({ ...d, mountHeightTypeKey: key }))
+                }
+              />
+
               {draft.laborRateId === null && (
                 <p className="text-xs text-destructive">
                   No role picked — labor prices at $0 until you choose one.
@@ -1431,6 +1507,7 @@ export default function AssembliesLibraryPage() {
               })),
               modifierIds: draft.modifierIds,
               laborOnly: draft.laborOnly,
+              mountHeightTypeKey: draft.mountHeightTypeKey,
             },
             {
               onSuccess: () => {
@@ -1477,6 +1554,7 @@ export default function AssembliesLibraryPage() {
       })),
       modifierIds: detail.modifierIds,
       laborOnly: detail.laborOnly === true,
+      mountHeightTypeKey: detail.mountHeightTypeKey ?? null,
     };
     return (
       <AssemblyBuilder
@@ -1505,6 +1583,7 @@ export default function AssembliesLibraryPage() {
               })),
               modifierIds: draft.modifierIds,
               laborOnly: draft.laborOnly,
+              mountHeightTypeKey: draft.mountHeightTypeKey,
             },
             {
               // Editing a starter forks it, and the fork has a different id —

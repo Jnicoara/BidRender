@@ -25,6 +25,8 @@ import { assemblyHoursToWrite } from "../assemblyHoursWrite";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
+import { requireKnownKind } from "../knownHeightKind";
+import { heightList } from "../../shared/takeoffHeights";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -84,6 +86,12 @@ const createSchema = z.object({
   modifierIds: modifierIdsSchema.default([]),
   /** "Labor only" (0105). Absent = not said; never inferred from no parts. */
   laborOnly: z.boolean().optional(),
+  /**
+   * The height TYPE this device mounts at (0110, vertical-drops-plan § 7
+   * col 2): a key, never inches, so it follows the shop's height for that
+   * type. Absent or null = not said.
+   */
+  mountHeightTypeKey: z.string().trim().min(1).max(64).nullable().optional(),
 });
 
 const updateSchema = z.object({
@@ -103,6 +111,8 @@ const updateSchema = z.object({
   modifierIds: modifierIdsSchema.optional(),
   // Omitted leaves it; false unticks it ("not said" again).
   laborOnly: z.boolean().optional(),
+  // Omitted leaves it; null clears it back to "not said".
+  mountHeightTypeKey: z.string().trim().min(1).max(64).nullable().optional(),
 });
 
 const toDecimal = (value: number) => value.toFixed(4);
@@ -127,6 +137,22 @@ export const assembliesRouter = router({
       );
     }),
 
+  /**
+   * The height types an assembly can say it "Mounts at", with the shop's
+   * height for each — the same merged list Settings › Heights shows, read
+   * here so editing the library does not need the pricing permission.
+   */
+  mountTypes: procedure.query(async ({ ctx }) => {
+    const rows = await db.getMountingHeights(ctx.scope.dataUserId);
+    return heightList({ company: rows })
+      .filter(row => row.isActive)
+      .map(row => ({
+        typeKey: row.typeKey,
+        label: row.label,
+        heightInches: row.heightInches,
+      }));
+  }),
+
   /** One assembly with its full recipe. */
   get: procedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -141,6 +167,10 @@ export const assembliesRouter = router({
     }),
 
   create: procedure.input(createSchema).mutation(async ({ input, ctx }) => {
+    await requireKnownKind(
+      input.mountHeightTypeKey ?? null,
+      ctx.scope.dataUserId
+    );
     const existing = await db.getLibraryAssemblies(ctx.scope.dataUserId);
     const clash = existing.find(
       a => a.name.toLowerCase() === input.name.toLowerCase()
@@ -163,6 +193,7 @@ export const assembliesRouter = router({
       laborRateId: input.laborRateId,
       // Only a tick is stored as an answer; unticked stays NULL, "not said".
       laborOnly: input.laborOnly === true ? true : null,
+      mountHeightTypeKey: input.mountHeightTypeKey ?? null,
     });
 
     await db.setAssemblyMaterials(
@@ -193,6 +224,9 @@ export const assembliesRouter = router({
         message: "Assembly not found.",
       });
 
+    // Checked BEFORE the fork, so a refused key leaves no fork behind.
+    if (rest.mountHeightTypeKey != null)
+      await requireKnownKind(rest.mountHeightTypeKey, ctx.scope.dataUserId);
     // Resolved BEFORE the fork, so a refused "not set" leaves no fork behind.
     const hours =
       rest.baseLaborHours === undefined
@@ -211,6 +245,8 @@ export const assembliesRouter = router({
     if (rest.projectType !== undefined) patch.projectType = rest.projectType;
     if (rest.laborRateId !== undefined) patch.laborRateId = rest.laborRateId;
     if (rest.laborOnly !== undefined) patch.laborOnly = rest.laborOnly;
+    if (rest.mountHeightTypeKey !== undefined)
+      patch.mountHeightTypeKey = rest.mountHeightTypeKey;
     if (hours !== undefined) patch.baseLaborHours = hours;
     // Reaches the fork, never the starter — `editableId` above is already the
     // user's own copy when the target was a shipped row. Setting overhead

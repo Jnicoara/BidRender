@@ -132,6 +132,18 @@ a line saying so (both files, CLAUDE.md).
 switch…) comes from its count's `dropKind`. Nothing ties a device family,
 an assembly or a legend symbol to a height type today (§ 7 option B).
 
+> **Built 2026-10-07 (Track C, branch `c-homerun-footage`; owner: "a device
+> with no height uses its type's default, so every drop counts").** The type
+> is now `deviceKind(count's dropKind, its assembly's mountHeightTypeKey)`
+> (`shared/takeoffHeights.ts`), read for HOMERUNS and LINKED RUN ENDS, set as
+> "Mounts at" in the assembly editor. The count's answer still wins. This
+> **narrows** the § 7 "Track B after A" line: the key is read live (not
+> copied onto a new count), so setting it once re-prices every job — the
+> same inheritance as every other height. A count's OWN drops still need
+> its "Each drops to"; starting those answered from the key is still
+> Track B's, and still open (todo.md). A height from the type says "default
+> height" on screen. UNCC E111: 14 homeruns with no up-drop → 1.
+
 ### The run end — the gate
 
 Run height resolves run → job → company (`resolveDistributionHeight`) and

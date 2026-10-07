@@ -269,6 +269,23 @@ not applied anywhere) or follow it:
 - Bid numbers: `homerunExtraBends` moves none on its own (1 is already
   counted); `runsAt` moves none until somebody picks box to box.
 
+**Shop default heights and "No drop here" (owner, 2026-10-07) — NO new
+column.** Asked in the same breath as the two above; searched first, and
+every answer already has a home. Do NOT add any of these again:
+
+| What the owner asked                           | Where it already lives                                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Shop default height per device type            | `takeoff_mounting_heights` (Settings › Heights; shipped receptacle 18", switch 48")                                          |
+| Changed per device                             | `takeoff_stamps.mountHeightInches` + `mountHeightSource` (0098; the selection pill's height field)                           |
+| Which TYPE a device is, so its default applies | `assemblies.mountHeightTypeKey` (**0110**, vertical-drops-plan § 7 col 2) — live column, first READ by C's branch            |
+| "No drop here" saved on a run end              | `takeoff_runs.startKind` / `endKind` = `'distribution'` ("at run height" = level = no drop; the chip was labelled "Nothing") |
+
+- What C's branch adds is code only: `assemblies.mountHeightTypeKey` is
+  read for homeruns and linked run ends (`deviceKind`), set in the assembly
+  editor ("Mounts at"), and validated like a run end's kind.
+- The branch needs 0110 applied wherever it runs. It is on local-dev; check
+  staging with `scripts/schemaDrift.mts` before merging.
+
 **Numbering hazard, written down so it is not discovered:** the migrator
 skips a file numbered below one already applied (§ R.1). If ANY other
 migration is applied to staging or live before this branch merges, these

@@ -143,6 +143,7 @@ export const homerunsRouter = router({
             ceiling: r.ceiling,
             footage: r.footage,
             line: r.line,
+            deviceHeightSource: r.deviceHeightSource,
             overrideFt:
               c?.homerunOverrideFt == null ? null : Number(c.homerunOverrideFt),
             ceilingInches: c?.homerunCeilingInches ?? null,
