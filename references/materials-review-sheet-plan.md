@@ -229,12 +229,95 @@ run types, CLAUDE.md + ASSEMBLIES_PLAN.md step 6 + the pole test. Stop
 `pnpm dev` first (CLAUDE.md: a restart between two seed edits made nine
 duplicate rows once). The naming plan assigns the catalog edit to Track C.
 
+## What looks materials up by name — audit 2026-10-07 (read-only)
+
+Searched: every current name as a literal across tracked .ts/.tsx/.mts/.sql;
+`eq`/`inArray(materials.name`, `.name ===`, `byName`, name regexes, name
+templates, `*MaterialName`, `starterPartName`; the seed passes in
+`server/db.ts`, `importPrices`, the labor import, `pricing/*`, search
+ranking, bid-line and resend matching; Track C's `origin/c-homerun-footage`.
+Each hit read, not counted. Ran against HEAD and the working tree.
+
+**Would break — all fixed in the rename commit (step 7), not before:**
+
+1. **Case-only collision with a RETIRED name — the dangerous one.** The
+   proposal `4/0-4/0-4/0-2/0 SER AL` → `4/0-3 SER Aluminum` differs only by
+   case from the retired `4/0-3 SER aluminum` (`seed/materials/index.ts:80`),
+   which every database seeded before 2026-09-25 still holds — live
+   included. The columns are `utf8mb4_unicode_ci`, so SQL name matches
+   ignore case: the retire pass turns the renamed row off, reactivate (exact
+   JS match) turns it back on, and the next boot's dedupe (`GROUP BY name`)
+   DELETES one of them — `assembly_materials` cascades, so starter lines go
+   with it, and the row is re-inserted and deleted again every boot.
+   `materialsCatalog.test.ts` compares case-sensitively and misses it.
+   **Fix:** pick a name that is not a case variant of a retired name (or
+   rename the retired row out of the way first), and add a
+   case-INSENSITIVE test: no final name equals a retired name, a rename-map
+   key, or another baseline row. **This name is an owner question.**
+2. **`baselineRunTypes.ts` names materials exactly, with no rename map**
+   (`db.ts` `seedBaselineRunTypes`). `#12 THHN`, `#12 bare CU, solid`,
+   `12-2 MC cable`, `12-3 MC cable` would find nothing on a FRESH database
+   (test, new install) and leave conductor/ground links NULL, silently.
+   Existing databases hold ids and are unaffected. Update the material
+   names in the same commit; **do not touch the `label`s** — run types are
+   keyed `pathType:label`, a new label inserts a duplicate type. Add the
+   missing test.
+3. **`wireAndCable.ts` `cable()` reads its alias from the name with
+   `/^\d+-\d+/` and a `!`** — a slash name throws while the module loads and
+   takes the server boot down. Build the alias from the size argument.
+4. **Search loses the old spellings.** On the renamed catalog `12-2`,
+   `12-2 romex`, `8-8-8-8`, `6ft whip`, `3-4 mc` return nothing. Old
+   spellings go into `searchAliases` (check the restated-word rule allows
+   them); re-run `scripts/searchSpotCheck.mts`.
+5. **`STARTER_COMMONNESS` is keyed by exact name** — renamed rows lose
+   "common" and `20a breaker` leads with the 2-Pole. Rename the keys (a test
+   already fails on a stale key).
+6. **Rename chains of more than one hop.** `importPrices` and search's
+   `renamedTo` follow ONE hop (`starterPartName` follows five). 66 old keys
+   chain (`20A breaker` → `20A Single-Pole breaker` → `20A 1-Pole breaker`,
+   `5/6" wafer` → `5"/6"` → `6" canless`…): repoint every older key straight
+   to the final name.
+7. **`mcFittingNames`** — fixed already (step 4); at the old regex every MC
+   run, and C's cable homeruns, would have lost connectors and straps.
+8. **Size reading still to do:** `Ground rod, 5/8" x 8 ft` reads unsized
+   (sorts 10 ft before 8 ft); `materialDuplicates` reads `#3/4` as `#3` + a
+   word. The read-back's "size parser cannot read" check would refuse the
+   rods — teach `TRAILING` the `x N ft` form first.
+9. **Dev tooling names rows exactly:** `pricing/movedFromSheet.ts` (60
+   values; `pricingSheetMoves.test` goes red), `buildPricingSheet.mts`
+   SAME_AS, `buildLaborSheet.mts` (50 names), `materialsCompleteness.ts`.
+   Otherwise the regenerated pricing sheet shows renamed rows as NEW and
+   they get priced twice.
+10. **Smaller:** the labor import refuses a sheet printed after the rename
+    for a company FORK still under its old name (accept the reverse hop);
+    `materialsList` merges by lowercase name, so an old-name fork and the
+    renamed shipped row become two supplier-list lines; `runLineName` will
+    read `12-2 MC cable — 12/2 MC cable Copper` on new run lines (cosmetic).
+
+**Safe, checked:** starter recipes (part keys through `starterPartName`,
+5 hops; 44 parts hit renamed rows, all follow); conduit fittings, boxes,
+straps (none renamed); saved bid lines (name is a snapshot; run lines,
+swaps and assembly lines match by id); Track C's homerun branch (no new
+name lookups — raceway fittings by type id; cable homeruns ride
+`mcFittingNames`, already fixed).
+
+**Tests that assert current names and will go red:** `materialsCatalog`,
+the search tests (`materialSearchCommonness`, `-Rank`, `-Sizes`,
+`smartSearch`), `tradeSizeQuery`, `supplierPricing`, `priceListParse`,
+`bids`, `assemblies`, `materialsLibrary`, `runToBidWire`, `cableTeeBox`,
+`laborImportApply`, `materialsList`, `aliasSuggestions`,
+`pricingSheetMoves`, `materialNaming`. Update them to the new names, never
+weaken them.
+
 ## Order
 
 1. ~~Owner OKs this layout.~~ Done 2026-10-07.
 2. ~~A: the generator, sheet to owner.~~ Done.
 3. ~~Owner marks it.~~ Done, two rounds (2026-10-07).
 4. ~~Parser change.~~ Done 2026-10-07, on local-dev, ahead of any rename.
+   4b. **Before freezing:** owner picks a name for `4/0-4/0-4/0-2/0 SER AL`
+   that is not a case variant of the retired `4/0-3 SER aluminum` (item 1
+   above); teach the parser `Ground rod, 5/8" x 8 ft` (item 8).
 5. **Read-back and freeze** — `pricing/readMaterialsReview.mts` writes
    `pricing/frozen-names.json`; committing it freezes the names. Local
    only, touches no database. ← next, after the owner OKs this order.
