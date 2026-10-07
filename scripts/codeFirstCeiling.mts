@@ -1528,7 +1528,53 @@ async function circuits() {
   );
 }
 
+// ── Homerun footage worked example, UNCC E111 circuit 2B-1 ─────────────────
+/**
+ * The coordinates behind the E111 case in server/homerunFootage.test.ts:
+ * circuit 2B-1's devices (the owner's hand marks, grouped by their tags)
+ * and the panel spot, a tap on the "EXISTING ELECTRICAL ROOM" note —
+ * E111 draws no panel. Reads the marks with plain SQL so a local database
+ * a migration behind can still answer.
+ */
+async function homerunexample() {
+  const { groupByCircuit } = await import("../client/src/lib/circuitGroups");
+  const mysql = await import("mysql2/promise");
+  const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+  const [rows] = await conn.query(
+    "select s.id, s.x, s.y, g.label from takeoff_stamps s left join takeoff_groups g on g.id = s.groupId where s.sheetId = 234268 order by s.id"
+  );
+  await conn.end();
+  const marks = (
+    rows as { id: number; x: string; y: string; label: string | null }[]
+  ).map(m => ({
+    id: m.id,
+    x: Number(m.x),
+    y: Number(m.y),
+    name: m.label ?? "?",
+  }));
+  const e = await load("UNCC.pdf", 5);
+  const note = e.words.find(w => w.text === "ELECTRICAL" && w.cy < 300);
+  console.log(
+    `"ELECTRICAL" in the note at ${note?.cx.toFixed(2)}, ${note?.cy.toFixed(2)}; panel spot used: 443, 186`
+  );
+  const r = groupByCircuit({
+    words: e.words,
+    devices: marks,
+    panels: [],
+    placed: { "2B": { x: 443, y: 186 } },
+  });
+  const c = r.circuits.find(g => g.key === "2B-1");
+  for (const d of c?.devices ?? [])
+    console.log(
+      `  ${d.id} ${d.name} @ ${d.x}, ${d.y}: right angle ${(Math.abs(d.x - 443) + Math.abs(d.y - 186)).toFixed(4)} pt`
+    );
+  console.log(
+    `closest ${c?.closest?.device.id} at ${c?.closest?.distance.toFixed(4)} pt = ${((c?.closest?.distance ?? 0) / 18).toFixed(5)} ft at 1/4" = 1'-0"`
+  );
+}
+
 const sections: Record<string, () => Promise<void>> = {
+  homerunexample,
   circuits,
   homerunreader,
   schedreader,

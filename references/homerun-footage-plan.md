@@ -1,6 +1,8 @@
 # Homerun footage — plan (DESIGN ONLY)
 
-Track C, 2026-10-06. **Nothing here computes footage into a bid yet.** What
+Track C, 2026-10-06. **Nothing here computes footage into a bid yet** — the
+arithmetic exists as a standalone calculator (`shared/homerunFootage.ts`,
+§ 10 step 1), wired to nothing. What
 is built and read-only today is the input: circuits grouped from the
 devices' own tags, with the device closest to each panel
 (`@/lib/circuitGroups`, the "Circuits" panel on a sheet). This file says how
@@ -219,6 +221,17 @@ Height areas inside a sheet (before beta) are a new table,
 
 1. `shared/homerunFootage.ts`: pure — method resolution, L, V, the two
    footages, from plain inputs. The worked example as its first test.
+   **DONE 2026-10-06, standalone** (owner: "pure code plus tests, not wired
+   into bids or the database"). Also in it: the ceiling chain, the height
+   area pick (smaller outline wins; sharing a wall is not an overlap), the
+   totals with "+ N unconfirmed". `server/homerunFootage.test.ts`, 44
+   tests, each rule made to go red once by breaking it. A second known
+   answer, from a real sheet: UNCC E111 circuit 2B-1, re-measured by
+   `pnpm tsx scripts/codeFirstCeiling.mts homerunexample`. Not rounded
+   there except the verticals; rounding to the hundredth is step 4's.
+   Conduit, which § 5 did not spell out, is (L + V) × (1 + R + conduit
+   extra), no makeup — the traced-run rule (`vertical-drops-plan.md` § 3)
+   plus routing.
 2. Panel spots move from this browser to `bid_panels` (needs the column).
 3. Homerun rows on the Circuits panel: method, footage, confirm/override.
 4. Bid summary line and export; the bid line with its snapshot rules.
@@ -240,8 +253,9 @@ Height areas inside a sheet (before beta) are a new table,
    notes — confirmed by the owner; the edits to `vertical-drops-plan.md`
    and overhaul § 6 stand.
 
-**Still waiting:** the footage math is not built. It waits for Track A's
-columns (§ 9).
+**Still waiting:** the footage math is built as a standalone calculator
+(§ 10 step 1, 2026-10-06) and reaches no bid, screen or table. Steps 2–4
+wait for Track A's columns (§ 9).
 
 ## 12. Test plan
 

@@ -15,6 +15,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **Homerun footage, the arithmetic only — nothing on a bid yet.** A
+  calculator that turns a circuit's devices, the panel's spot, the sheet
+  scale and the ceiling height into wire, conduit and labor footage, showing
+  each piece: the run, the drop at each end, routing, waste and the 5 ft of
+  panel makeup. It follows the owner's rules — routing and waste add (15% +
+  10% = 25%), waste never touches labor, makeup only at the panel, and
+  unconfirmed homeruns still count. Checked by hand against circuit 2B-1 on
+  UNCC E111. It waits for Track A's columns before it reaches any screen.
+
 - **"Labor only" assemblies.** An assembly with no material on purpose —
   pulling wire, a trouble-shoot hour, demolition — can be ticked "Labor
   only" in the assembly editor. Its bid lines then price the labor and no

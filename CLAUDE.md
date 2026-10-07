@@ -949,6 +949,14 @@ example price, not yours" before the sheet lands, or the screen will quietly
 report a fully-priced catalog that no contractor has checked a line of. Written
 down here rather than discovered later — see `todo.md`.
 
+**How it shows, decided by the owner 2026-10-07: every shipped preset price
+carries a plain "Example price" tag — NO store, NO date — and the tag clears
+when a shop edits that price.** This overrides the earlier "BidRidge example,
+plus the date" (`migrations-0098-batch-plan.md` B3, which now says so), and it
+shrinks the signal to one column, `materials.isExamplePrice`, with the line's
+frozen `snapshotPriceWasExample` beside it. A supplier price a shop enters or
+imports is the shop's own and is never tagged (`multi-supplier-plan.md`).
+
 ## Brands — generic everywhere except panels and breakers
 
 **Decided 2026-09-17, in conversation, and it never reached the repo until

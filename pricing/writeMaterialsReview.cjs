@@ -100,13 +100,19 @@ const added = data.review.length - shipped;
     "     Cut = we stop shipping it.   Add = a new row goes into the catalog.   Your call = an open question decides it — pick one.",
   ],
   [
-    "2. Missing tab: things the catalog lacks. Mark Add or Skip. Add your own rows at the bottom.",
+    "2. Missing tab: things the catalog lacks. 'Typical job' rows are pre-filled Add (change to Skip if not wanted); size gaps and starter parts are blank — mark Add or Skip. Add your own rows at the bottom.",
   ],
   [
-    "3. Questions tab: five naming questions, each with our recommendation. Answer each one.",
+    "3. Possible duplicates tab: pairs that look like one part under two names. Pick Same - keep A, Same - keep B, or Not the same.",
   ],
   [
-    "4. Counts tab: totals as you mark, and two warnings that must be 0 before the names can freeze.",
+    "     'Same - keep A' cuts B; anything that used B (a starter assembly, a run type) is moved to A. Bids already priced keep what they have.",
+  ],
+  [
+    "4. Questions tab: five naming questions, each with our recommendation. Answer each one.",
+  ],
+  [
+    "5. Counts tab: totals as you mark, and the warnings that must be 0 before the names can freeze.",
   ],
   [""],
   [
@@ -199,10 +205,10 @@ review.addConditionalFormatting({
 // ── Tab 3: Missing ───────────────────────────────────────────────────────────
 const missing = wb.addWorksheet("Missing");
 header(missing, [
-  { header: "Source", key: "source", width: 12 },
-  { header: "Category", key: "category", width: 20 },
-  { header: "Item", key: "item", width: 40 },
-  { header: "Why it is listed", key: "detail", width: 60 },
+  { header: "Source", key: "source", width: 13 },
+  { header: "Category", key: "category", width: 24 },
+  { header: "Item", key: "item", width: 42 },
+  { header: "Why it is listed", key: "detail", width: 90 },
   { header: "Decision", key: "decision", width: 12 },
   { header: "Your name", key: "yourName", width: 30 },
   { header: "Note", key: "note", width: 30 },
@@ -217,9 +223,19 @@ const missingRows = [
   })),
 ];
 missingRows.forEach(r => {
-  const row = missing.addRow({ ...r, decision: "", yourName: "", note: "" });
+  const row = missing.addRow({
+    source: r.source,
+    category: r.category,
+    item: r.item,
+    detail: r.detail,
+    decision: r.prefill || "",
+    yourName: "",
+    note: "",
+  });
   for (const key of ["decision", "yourName", "note"])
     row.getCell(key).fill = YELLOW;
+  // Wrapped: the longest reason ran under Decision (seen 2026-10-07).
+  row.getCell("detail").alignment = { wrapText: true, vertical: "top" };
   if (r.source === "Your row") {
     row.getCell("category").fill = YELLOW;
     row.getCell("item").fill = YELLOW;
@@ -227,6 +243,34 @@ missingRows.forEach(r => {
   dropdown(row.getCell("decision"), MISSING_DECISIONS);
 });
 missing.autoFilter = { from: "A1", to: `G${missingRows.length + 1}` };
+
+// ── Tab: Possible duplicates ─────────────────────────────────────────────────
+const DUPLICATE_DECISIONS = ["Same - keep A", "Same - keep B", "Not the same"];
+const dups = wb.addWorksheet("Possible duplicates");
+header(dups, [
+  { header: "A", key: "a", width: 36 },
+  { header: "A is", key: "aStatus", width: 22 },
+  { header: "A used by", key: "aUses", width: 16 },
+  { header: "B", key: "b", width: 36 },
+  { header: "B is", key: "bStatus", width: 22 },
+  { header: "B used by", key: "bUses", width: 16 },
+  { header: "Why they look the same", key: "why", width: 60 },
+  { header: "Decision", key: "decision", width: 16 },
+  { header: "Note", key: "note", width: 30 },
+]);
+data.duplicates.forEach(d => {
+  const row = dups.addRow({ ...d, decision: "", note: "" });
+  row.getCell("decision").fill = YELLOW;
+  row.getCell("note").fill = YELLOW;
+  dropdown(row.getCell("decision"), DUPLICATE_DECISIONS);
+});
+dups.addRow({});
+const dupNote = dups.addRow({
+  a: `How these were found: ${data.duplicates.length} pair(s) from ${data.review.length} rows, matched on size, type, material and key words with spellings folded (1-pole = single pole = 1P; set screw = SS; CU = copper) and search words — and kept apart when a key word differs (set screw vs compression, 1-pole vs 2-pole, copper vs aluminum, EMT vs PVC, a different size or amperage).`,
+});
+dupNote.getCell("a").alignment = { wrapText: true, vertical: "top" };
+dups.mergeCells(`A${dupNote.number}:I${dupNote.number}`);
+dupNote.height = 45;
 
 // ── Tab 4: Questions ─────────────────────────────────────────────────────────
 const questions = wb.addWorksheet("Questions");
@@ -293,6 +337,13 @@ warn(
   `COUNTIF(Review!$M$2:$M$${last},"USED*")`
 );
 warn("Rows still 'Your call' (must be 0)", `COUNTIF(${D},"Your call")`);
+warn(
+  "Possible duplicates not decided (must be 0)",
+  // COUNTIF "?*", not COUNTA: an unmarked cell holds "" and COUNTA counts
+  // it as filled — the warning read 0 before anything was marked (seen in
+  // Excel, 2026-10-07).
+  `${data.duplicates.length}-COUNTIF('Possible duplicates'!$H$2:$H$${data.duplicates.length + 1},"?*")`
+);
 
 wb.xlsx.writeFile(OUT).then(() => {
   console.log(
