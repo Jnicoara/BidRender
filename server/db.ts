@@ -11511,13 +11511,13 @@ function costSums(productivityPct: number) {
       only" (0106): its $0 material is an answer. `<=> TRUE`, so NULL and
       false both stay "not said". The live-recipe branch below says the same.
     */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) ELSE 0 END), 0)`,
     /*
-      And a line whose HOURS are not set (NULL frozen from an assembly with
-      hours not set, D1) counts ONE more — `lineHoursNotSet` in
-      `linePartsNotPriced`. Counted whether or not the line froze its parts,
-      because the live-recipe path below counts parts only.
+      Lines whose HOURS were not set (D1) — `lineHoursMissing`: an assembly
+      line, not "Not priced" as a whole, with NULL frozen hours. Its OWN
+      count, never folded into parts (owner, 2026-10-07).
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) + (CASE WHEN ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
+    hoursMissing: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -11677,6 +11677,7 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     notPriced: {
       lines: Number(row.notPricedLines),
       parts: Number(row.frozenParts),
+      hours: Number(row.hoursMissing),
     },
   };
 }
@@ -12023,6 +12024,7 @@ export async function getDashboardBids(
     notPriced: {
       lines: Number(row.notPricedLines),
       parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
+      hours: Number(row.hoursMissing),
     },
     planLines: Number(row.planLines),
     plans: {

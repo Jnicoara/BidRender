@@ -493,16 +493,24 @@ export function ProposalSheet({
         return (
           <section key={id} style={{ marginBottom: 22 }}>
             {heading("Labor")}
-            <div style={{ fontSize: 12.5, color: INK }}>
-              Estimated at{" "}
-              <strong style={{ fontVariantNumeric: "tabular-nums" }}>
-                {doc.laborHours.toLocaleString("en-US")} labor hours
-              </strong>{" "}
-              of licensed work
-              {doc.mode === "scope-only"
-                ? "."
-                : ", included in the price below."}
-            </div>
+            {/* NULL = a line's hours are not set: held, like the price,
+                never a short number (owner, 2026-10-07). */}
+            {doc.laborHours === null ? (
+              <div style={{ fontSize: 12.5, color: INK }}>
+                Labor hours: <strong>Hours pending</strong>
+              </div>
+            ) : (
+              <div style={{ fontSize: 12.5, color: INK }}>
+                Estimated at{" "}
+                <strong style={{ fontVariantNumeric: "tabular-nums" }}>
+                  {doc.laborHours.toLocaleString("en-US")} labor hours
+                </strong>{" "}
+                of licensed work
+                {doc.mode === "scope-only"
+                  ? "."
+                  : ", included in the price below."}
+              </div>
+            )}
           </section>
         );
 

@@ -41,11 +41,11 @@ import {
   type CompanyPricingDefaults,
 } from "../shared/pricing";
 import { closeoutActualHours } from "../shared/closeout";
-import type { NotPricedTally } from "../shared/lineNotPriced";
+import { tallyLeavesOut, type NotPricedTally } from "../shared/lineNotPriced";
 
-/** The bid's figures count lines or parts nobody priced as $0. */
+/** The bid's figures leave out lines, parts or hours nobody priced. */
 function leavesUnpriced(notPriced: NotPricedTally): boolean {
-  return notPriced.lines > 0 || notPriced.parts > 0;
+  return tallyLeavesOut(notPriced);
 }
 import {
   DEFAULT_RANGE_MONTHS,

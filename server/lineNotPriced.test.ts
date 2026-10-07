@@ -154,6 +154,7 @@ describe("a line from an assembly", () => {
     expect(countNotPriced([{ line, directCost: 510 }])).toEqual({
       lines: 0,
       parts: 1,
+      hours: 0,
     });
   });
   it("counts the missing material ONCE, not on top of unpriced recipe parts", () => {
@@ -200,5 +201,5 @@ it("counts the lines a total leaves out", () => {
         directCost: 0,
       },
     ])
-  ).toEqual({ lines: 2, parts: 0 });
+  ).toEqual({ lines: 2, parts: 0, hours: 0 });
 });

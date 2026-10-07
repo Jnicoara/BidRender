@@ -196,64 +196,79 @@ beforeAll(async () => {
     cases[name] = { bidId, expected };
   };
 
-  await add("no lines", { lines: 0, parts: 0 }, async () => {});
+  await add("no lines", { lines: 0, parts: 0, hours: 0 }, async () => {});
 
-  await add("priced by hand", { lines: 1, parts: 0 }, async bidId => {
+  await add("priced by hand", { lines: 1, parts: 0, hours: 0 }, async bidId => {
     // Blank is not priced; a TYPED 0 is an answer.
     await line(bidId, { snapshotMaterialCost: null });
     await line(bidId, { snapshotMaterialCost: "0.0000" });
     await line(bidId);
   });
 
-  await add("from a run type", { lines: 2, parts: 0 }, async bidId => {
-    // Off a $0 catalog row — unpriced even with labor on it.
-    await line(bidId, {
-      takeoffRunTypeId: pipe,
-      runMaterialRole: "raceway",
-      snapshotMaterialCost: "0.0000",
-    });
-    await line(bidId, { takeoffRunTypeId: pipe, runMaterialRole: "conductor" });
-    // A field bend is decided by its HOURS: NULL is not priced, a set 0 is.
-    await line(bidId, {
-      takeoffRunTypeId: pipe,
-      runMaterialRole: "fieldBend",
-      snapshotMaterialCost: "0.0000",
-      snapshotLaborHours: null,
-    });
-    await line(bidId, {
-      takeoffRunTypeId: pipe2,
-      runMaterialRole: "fieldBend",
-      snapshotMaterialCost: "0.0000",
-      snapshotLaborHours: "0.0000",
-    });
-  });
+  await add(
+    "from a run type",
+    { lines: 2, parts: 0, hours: 0 },
+    async bidId => {
+      // Off a $0 catalog row — unpriced even with labor on it.
+      await line(bidId, {
+        takeoffRunTypeId: pipe,
+        runMaterialRole: "raceway",
+        snapshotMaterialCost: "0.0000",
+      });
+      await line(bidId, {
+        takeoffRunTypeId: pipe,
+        runMaterialRole: "conductor",
+      });
+      // A field bend is decided by its HOURS: NULL is not priced, a set 0 is.
+      await line(bidId, {
+        takeoffRunTypeId: pipe,
+        runMaterialRole: "fieldBend",
+        snapshotMaterialCost: "0.0000",
+        snapshotLaborHours: null,
+      });
+      await line(bidId, {
+        takeoffRunTypeId: pipe2,
+        runMaterialRole: "fieldBend",
+        snapshotMaterialCost: "0.0000",
+        snapshotLaborHours: "0.0000",
+      });
+    }
+  );
 
-  await add("from an assembly", { lines: 1, parts: 3 }, async bidId => {
-    // Whole cost $0 — one line, and its parts are in that already.
-    await line(bidId, {
-      assemblyId: recipe,
-      snapshotMaterialCost: "0.0000",
-      snapshotLaborHours: "0.0000",
-      snapshotUnpricedParts: 3,
-    });
-    // Labor, no material: its labor is in, its material is ONE thing not
-    // priced (owner, 2026-10-05). Until then this read "priced, nothing
-    // missing" — the trap a pole bid with no pole in it fell through.
-    await line(bidId, { assemblyId: recipe, snapshotMaterialCost: "0.0000" });
-    // Priced, with two frozen $0 parts: "+ 2 parts".
-    await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: 2 });
-  });
+  await add(
+    "from an assembly",
+    { lines: 1, parts: 3, hours: 0 },
+    async bidId => {
+      // Whole cost $0 — one line, and its parts are in that already.
+      await line(bidId, {
+        assemblyId: recipe,
+        snapshotMaterialCost: "0.0000",
+        snapshotLaborHours: "0.0000",
+        snapshotUnpricedParts: 3,
+      });
+      // Labor, no material: its labor is in, its material is ONE thing not
+      // priced (owner, 2026-10-05). Until then this read "priced, nothing
+      // missing" — the trap a pole bid with no pole in it fell through.
+      await line(bidId, { assemblyId: recipe, snapshotMaterialCost: "0.0000" });
+      // Priced, with two frozen $0 parts: "+ 2 parts".
+      await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: 2 });
+    }
+  );
 
-  await add("from before 0087", { lines: 0, parts: 2 }, async bidId => {
-    // NULL reads the recipe NOW: the lug is $0, the strap is not — one part
-    // per line, the same way the bid screen reads it.
-    await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
-    await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
-  });
+  await add(
+    "from before 0087",
+    { lines: 0, parts: 2, hours: 0 },
+    async bidId => {
+      // NULL reads the recipe NOW: the lug is $0, the strap is not — one part
+      // per line, the same way the bid screen reads it.
+      await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
+      await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
+    }
+  );
 
   await add(
     "labor only, from before 0087",
-    { lines: 0, parts: 1 },
+    { lines: 0, parts: 1, hours: 0 },
     async bidId => {
       // A recipe whose parts are all priced, so the live read says 0 — and the
       // line's own $0 material still counts one (the SQL's live branch).
@@ -271,7 +286,9 @@ beforeAll(async () => {
     not priced (`lineHoursNotSet`), on top of any parts — never 0 h of labor
     read as finished. With no material either, the whole line is not priced.
   */
-  await add("hours not set", { lines: 1, parts: 5 }, async bidId => {
+  // 1 whole line; 2 real parts (line C); 3 lines with HOURS missing (A, C,
+  // D) — counted apart since 2026-10-07, never as 5 "parts".
+  await add("hours not set", { lines: 1, parts: 2, hours: 3 }, async bidId => {
     // Material, no hours: priced for material, + 1 for the hours.
     await line(bidId, { assemblyId: pricedRecipe, snapshotLaborHours: null });
     // Neither: the whole line is not priced, and nothing on top.
@@ -304,7 +321,7 @@ beforeAll(async () => {
     false are "not said" and still count. Both branches of the SQL: the
     frozen-parts one and the live-recipe one (a line from before 0087).
   */
-  await add("labor only", { lines: 0, parts: 2 }, async bidId => {
+  await add("labor only", { lines: 0, parts: 2, hours: 0 }, async bidId => {
     // Ticked: nothing missing.
     await line(bidId, {
       assemblyId: pricedRecipe,
@@ -331,7 +348,7 @@ beforeAll(async () => {
     });
   });
 
-  await add("no quantity", { lines: 0, parts: 0 }, async bidId => {
+  await add("no quantity", { lines: 0, parts: 0, hours: 0 }, async bidId => {
     await line(bidId, { qty: "0", snapshotMaterialCost: null });
     await line(bidId, {
       qty: "0",
@@ -352,7 +369,7 @@ beforeAll(async () => {
     });
   });
 
-  await add("broken lines", { lines: 1, parts: 0 }, async bidId => {
+  await add("broken lines", { lines: 1, parts: 0, hours: 0 }, async bidId => {
     // The engine cannot price these at all. An assembly line it cannot price
     // is "can't price", not "not priced"; a blank hand price is still blank.
     await line(bidId, {
@@ -367,7 +384,7 @@ beforeAll(async () => {
     });
   });
 
-  await add("archived lines", { lines: 0, parts: 0 }, async bidId => {
+  await add("archived lines", { lines: 0, parts: 0, hours: 0 }, async bidId => {
     await line(bidId, { snapshotMaterialCost: null, archivedAt: new Date() });
     await line(bidId, {
       assemblyId: recipe,
@@ -376,21 +393,25 @@ beforeAll(async () => {
     });
   });
 
-  await add("everything at once", { lines: 3, parts: 3 }, async bidId => {
-    await line(bidId, { snapshotMaterialCost: null });
-    await line(bidId, {
-      takeoffRunTypeId: pipe,
-      runMaterialRole: "raceway",
-      snapshotMaterialCost: "0.0000",
-    });
-    await line(bidId, {
-      assemblyId: recipe,
-      snapshotMaterialCost: "0.0000",
-      snapshotLaborHours: "0.0000",
-    });
-    await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: 2 });
-    await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
-  });
+  await add(
+    "everything at once",
+    { lines: 3, parts: 3, hours: 0 },
+    async bidId => {
+      await line(bidId, { snapshotMaterialCost: null });
+      await line(bidId, {
+        takeoffRunTypeId: pipe,
+        runMaterialRole: "raceway",
+        snapshotMaterialCost: "0.0000",
+      });
+      await line(bidId, {
+        assemblyId: recipe,
+        snapshotMaterialCost: "0.0000",
+        snapshotLaborHours: "0.0000",
+      });
+      await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: 2 });
+      await line(bidId, { assemblyId: recipe, snapshotUnpricedParts: null });
+    }
+  );
 });
 
 afterAll(async () => {
@@ -428,8 +449,12 @@ withDb("the dashboard card's not-priced count", () => {
       .set({ costPerUnit: "12.5000" })
       .where(eq(materials.id, lugId));
     try {
-      expect(await screenTally(bidId)).toEqual({ lines: 0, parts: 0 });
-      expect(await cardTally(bidId)).toEqual({ lines: 0, parts: 0 });
+      expect(await screenTally(bidId)).toEqual({
+        lines: 0,
+        parts: 0,
+        hours: 0,
+      });
+      expect(await cardTally(bidId)).toEqual({ lines: 0, parts: 0, hours: 0 });
     } finally {
       await db!
         .update(materials)
@@ -452,7 +477,7 @@ withDb("the dashboard card's not-priced count", () => {
     await line(other, { snapshotMaterialCost: null });
     const theirs = await getDashboardBids(OTHER, 0);
     expect(theirs.map(b => b.id)).toEqual([other]);
-    expect(theirs[0].notPriced).toEqual({ lines: 1, parts: 0 });
+    expect(theirs[0].notPriced).toEqual({ lines: 1, parts: 0, hours: 0 });
     expect((await getDashboardBids(USER, 0)).some(b => b.id === other)).toBe(
       false
     );

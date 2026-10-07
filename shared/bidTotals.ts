@@ -61,6 +61,7 @@ export function sumBidTotals<T extends SummableBid>(
     notPriced = {
       lines: notPriced.lines + bid.notPriced.lines,
       parts: notPriced.parts + bid.notPriced.parts,
+      hours: notPriced.hours + bid.notPriced.hours,
     };
     incomplete = incomplete || bid.incomplete;
   }

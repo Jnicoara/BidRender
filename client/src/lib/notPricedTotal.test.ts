@@ -7,16 +7,16 @@ import { describe, it, expect } from "vitest";
 import {
   anyNotPriced,
   bidNotPricedCount,
-  hoursNotSetLines,
   materialMissingLines,
   notPricedHeadline,
   notPricedSuffix,
   partsNotPricedWords,
   totalWithNotPriced,
 } from "./notPricedTotal";
+import { notPricedLines } from "@shared/lineNotPriced";
 import { money, moneyWhole } from "./money";
 
-const lines = (n: number) => ({ lines: n, parts: 0 });
+const lines = (n: number) => ({ lines: n, parts: 0, hours: 0 });
 
 describe("a total with unpriced lines says so", () => {
   it("adds the count to the figure", () => {
@@ -49,17 +49,19 @@ describe("a total with unpriced lines says so", () => {
 
 describe("parts not priced inside priced lines (0087)", () => {
   it("names parts on their own", () => {
-    expect(notPricedSuffix({ lines: 0, parts: 1 })).toBe("+ 1 part not priced");
-    expect(notPricedSuffix({ lines: 0, parts: 3 })).toBe(
+    expect(notPricedSuffix({ lines: 0, parts: 1, hours: 0 })).toBe(
+      "+ 1 part not priced"
+    );
+    expect(notPricedSuffix({ lines: 0, parts: 3, hours: 0 })).toBe(
       "+ 3 parts not priced"
     );
   });
 
   it("names lines and parts apart, never as one sum", () => {
-    expect(totalWithNotPriced(money(378), { lines: 2, parts: 3 })).toBe(
-      "$378.00 + 2 lines, 3 parts not priced"
-    );
-    expect(anyNotPriced({ lines: 0, parts: 1 })).toBe(true);
+    expect(
+      totalWithNotPriced(money(378), { lines: 2, parts: 3, hours: 0 })
+    ).toBe("$378.00 + 2 lines, 3 parts not priced");
+    expect(anyNotPriced({ lines: 0, parts: 1, hours: 0 })).toBe(true);
   });
 
   it("gives the line cell its words", () => {
@@ -69,15 +71,15 @@ describe("parts not priced inside priced lines (0087)", () => {
   });
 
   it("makes a headline that agrees in number", () => {
-    expect(notPricedHeadline({ lines: 1, parts: 0 })).toEqual({
+    expect(notPricedHeadline({ lines: 1, parts: 0, hours: 0 })).toEqual({
       text: "1 line is not priced",
       one: true,
     });
-    expect(notPricedHeadline({ lines: 0, parts: 3 })).toEqual({
+    expect(notPricedHeadline({ lines: 0, parts: 3, hours: 0 })).toEqual({
       text: "3 parts are not priced",
       one: false,
     });
-    expect(notPricedHeadline({ lines: 2, parts: 1 }).text).toBe(
+    expect(notPricedHeadline({ lines: 2, parts: 1, hours: 0 }).text).toBe(
       "2 lines and 1 part are not priced"
     );
   });
@@ -107,7 +109,7 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
         line({ breakdown: { directCost: 12.5 } }),
         line({ qty: 0 }),
       ])
-    ).toEqual({ lines: 1, parts: 1 });
+    ).toEqual({ lines: 1, parts: 1, hours: 0 });
   });
 
   it("counts a run-type line off an unpriced catalog row", () => {
@@ -121,7 +123,7 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
           breakdown: { directCost: 4 },
         }),
       ])
-    ).toEqual({ lines: 1, parts: 0 });
+    ).toEqual({ lines: 1, parts: 0, hours: 0 });
   });
 
   it("counts the parts of a priced assembly line, and not of a $0 one", () => {
@@ -130,7 +132,7 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
         line({ unpricedParts: 2, breakdown: { directCost: 25 } }),
         line({ unpricedParts: 2 }),
       ])
-    ).toEqual({ lines: 1, parts: 2 });
+    ).toEqual({ lines: 1, parts: 2, hours: 0 });
   });
 });
 
@@ -156,7 +158,7 @@ describe("lines with labor and no material (owner, 2026-10-05)", () => {
     ];
     expect(materialMissingLines(lines)).toBe(1);
     // The tally holds both kinds: 1 (missing) + 2 (parts).
-    expect(bidNotPricedCount(lines)).toEqual({ lines: 0, parts: 3 });
+    expect(bidNotPricedCount(lines)).toEqual({ lines: 0, parts: 3, hours: 0 });
   });
 });
 
@@ -164,8 +166,9 @@ describe("lines whose assembly hours were not set (D1)", () => {
   /*
     Found on staging 2026-10-07: a bid with one such line (its parts all
     priced) said "1 part is not priced … price the part on the Materials
-    screen". The tally counts the hours as one thing not priced; the screen
-    must split it out so the advice says "set the hours".
+    screen". Since 2026-10-07 (owner) the tally keeps HOURS as their own
+    count, never inside parts, and every total says them apart:
+    "+ 1 part not priced, 1 line hours not set".
   */
   const line = (over: Record<string, unknown>) => ({
     qty: 1,
@@ -188,11 +191,38 @@ describe("lines whose assembly hours were not set (D1)", () => {
       line({ snapshotMaterialCost: "0", breakdown: { directCost: 0 } }),
     ];
     const tally = bidNotPricedCount(lines);
-    expect(tally).toEqual({ lines: 1, parts: 3 });
-    expect(hoursNotSetLines(lines)).toBe(2);
-    // What is left for the "price the part" advice: the one real part.
-    expect(
-      tally.parts - materialMissingLines(lines) - hoursNotSetLines(lines)
-    ).toBe(1);
+    // ONE real part, TWO lines with hours not set — never 3 "parts".
+    expect(tally).toEqual({ lines: 1, parts: 1, hours: 2 });
+    expect(tally.parts - materialMissingLines(lines)).toBe(1);
+  });
+
+  it("says hours apart from parts in every total, never lumped", () => {
+    expect(notPricedSuffix({ lines: 0, parts: 1, hours: 1 })).toBe(
+      "+ 1 part not priced, 1 line hours not set"
+    );
+    expect(notPricedSuffix({ lines: 2, parts: 0, hours: 3 })).toBe(
+      "+ 2 lines not priced, 3 lines hours not set"
+    );
+    expect(notPricedSuffix({ lines: 0, parts: 0, hours: 1 })).toBe(
+      "+ 1 line hours not set"
+    );
+    expect(notPricedHeadline({ lines: 0, parts: 1, hours: 1 })).toEqual({
+      text: "1 part is not priced and 1 line has hours not set",
+      one: false,
+    });
+    expect(notPricedHeadline({ lines: 0, parts: 0, hours: 1 })).toEqual({
+      text: "1 line has hours not set",
+      one: true,
+    });
+    expect(anyNotPriced({ lines: 0, parts: 0, hours: 1 })).toBe(true);
+  });
+
+  it("names a line whose only gap is its hours in the print's list", () => {
+    const named = notPricedLines([
+      { line: { ...line({}), name: "Duplex" }, directCost: 10 },
+    ]);
+    expect(named).toEqual([
+      { name: "Duplex", wholeLine: false, parts: 0, hoursNotSet: true },
+    ]);
   });
 });

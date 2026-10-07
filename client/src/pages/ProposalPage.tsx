@@ -663,7 +663,14 @@ export default function ProposalPage({
                   <span className="text-muted-foreground">
                     {item.wholeLine
                       ? " — not priced"
-                      : ` — ${item.parts} part${item.parts === 1 ? "" : "s"} not priced`}
+                      : ` — ${[
+                          item.parts > 0
+                            ? `${item.parts} part${item.parts === 1 ? "" : "s"} not priced`
+                            : "",
+                          item.hoursNotSet ? "hours not set" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}`}
                   </span>
                 </li>
               ))}

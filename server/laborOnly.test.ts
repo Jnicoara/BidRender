@@ -73,7 +73,7 @@ describe("the rule reads the line's frozen tick", () => {
     expect(lineMaterialNotPriced(laborLine(true), 160)).toBe(false);
     expect(
       countNotPriced([{ line: laborLine(true), directCost: 160 }])
-    ).toEqual({ lines: 0, parts: 0 });
+    ).toEqual({ lines: 0, parts: 0, hours: 0 });
   });
 
   it("still flags it when nothing was said — NULL or false", () => {
@@ -81,7 +81,7 @@ describe("the rule reads the line's frozen tick", () => {
       expect(lineMaterialNotPriced(laborLine(said), 160)).toBe(true);
       expect(
         countNotPriced([{ line: laborLine(said), directCost: 160 }])
-      ).toEqual({ lines: 0, parts: 1 });
+      ).toEqual({ lines: 0, parts: 1, hours: 0 });
     }
   });
 });
@@ -189,7 +189,7 @@ describe.skipIf(!hasDb)("ticking, freezing and the bid", () => {
 
     // The bid: only the not-said one counts its material as not priced.
     const before = await screenTally(bid.id);
-    expect(before).toEqual({ lines: 0, parts: 1 });
+    expect(before).toEqual({ lines: 0, parts: 1, hours: 0 });
     // The dashboard card says the same, through the SQL copy.
     const card = (await getDashboardBids(USER, 0)).find(b => b.id === bid.id)!;
     expect(card.notPriced).toEqual(before);
@@ -214,11 +214,12 @@ describe.skipIf(!hasDb)("ticking, freezing and the bid", () => {
     }))!;
     await caller().bids.addAssembly({ bidId: bid.id, assemblyId: ticked.id });
     const got = await screenTally(bid.id);
-    expect(got).toEqual({ lines: 0, parts: 0 });
+    expect(got).toEqual({ lines: 0, parts: 0, hours: 0 });
     const doc = await caller().proposals.document({ bidId: bid.id });
     expect("notPriced" in doc ? doc.notPriced : null).toEqual({
       lines: 0,
       parts: 0,
+      hours: 0,
     });
   });
 
