@@ -15,6 +15,12 @@ import { BASELINE_ASSEMBLIES } from "../server/seed/baselineAssemblies";
 import { BASELINE_RUN_TYPES } from "../server/seed/baselineRunTypes";
 import { starterPartName } from "../server/seed/starterParts";
 import { compareMaterials } from "../shared/materialOrder";
+import { proposeMaterialName } from "../shared/materialNaming";
+import { execSync } from "node:child_process";
+import { mkdirSync, readFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const PRICES_FILE = "starter-catalog-pricing.xlsx";
 export const LABOR_FILE = "labor-units-starter.xlsx";
@@ -23,10 +29,14 @@ export const LABOR_FILE = "labor-units-starter.xlsx";
 export const HEADER_ROW = 2;
 export const FIRST_DATA_ROW = 3;
 
+/** The filter column on all four sheets (owner, 2026-10-07). */
+export const KIND_COLUMN = "Residential / Commercial / Both";
+
 export const PRICE_SHEET = "Starter prices";
 export const PRICE_COLUMNS = [
   "#",
   "Used by",
+  KIND_COLUMN,
   "Category",
   "Name",
   "Unit of sale",
@@ -41,11 +51,43 @@ export const LABOR_SHEET = "Starter labor units";
 export const LABOR_COLUMNS = [
   "#",
   "Used by",
+  KIND_COLUMN,
   "Category",
   "Name",
   "Hours per",
   "MY HOURS",
   "Bend hours (raceway only)",
+  "Notes",
+] as const;
+
+export const BRANDS_FILE = "brand-variants-pricing.xlsx";
+export const BRAND_SHEET = "Brand variants";
+export const BRAND_COLUMNS = [
+  "#",
+  "Used by",
+  KIND_COLUMN,
+  "Category",
+  "Brand",
+  "Name",
+  "Parent (generic item)",
+  "Unit of sale",
+  "Pack size",
+  "Pack qty",
+  "Pack price",
+  "Price per unit",
+] as const;
+
+export const ASSEMBLY_HOURS_FILE = "assembly-hours-starter.xlsx";
+export const ASSEMBLY_SHEET = "Starter assembly hours";
+export const ASSEMBLY_COLUMNS = [
+  "#",
+  "Top-30 list",
+  KIND_COLUMN,
+  "Ref",
+  "Category",
+  "Assembly",
+  "Hours now",
+  "MY HOURS",
   "Notes",
 ] as const;
 
@@ -73,6 +115,44 @@ for (const t of BASELINE_RUN_TYPES) {
   }
 }
 
+/** Each shipped starter's Residential / Commercial / Both tag, by name. */
+const projectTypeByAssembly = new Map(
+  BASELINE_ASSEMBLIES.map(a => [a.name, a.projectType] as const)
+);
+
+export type JobKind =
+  | "Residential"
+  | "Commercial"
+  | "Both"
+  | "Not in an assembly";
+
+const KIND: Record<string, JobKind> = {
+  residential: "Residential",
+  commercial: "Commercial",
+  both: "Both",
+};
+
+/** An assembly's own tag, as the sheets show it. */
+export const assemblyKind = (projectType: string | null | undefined): JobKind =>
+  (projectType && KIND[projectType]) || "Both";
+
+/**
+ * A material's Residential / Commercial / Both — from the starter
+ * assemblies that USE it (owner, 2026-10-07): only residential ones ->
+ * Residential, only commercial ones -> Commercial, any "both" or a mix ->
+ * Both, none -> "Not in an assembly" (a run type alone does not count).
+ */
+export function materialKind(name: string): JobKind {
+  const users = starterUses.get(name);
+  if (!users || users.size === 0) return "Not in an assembly";
+  const tags = new Set([...users].map(a => projectTypeByAssembly.get(a)));
+  if (tags.has("both") || (tags.has("residential") && tags.has("commercial")))
+    return "Both";
+  if (tags.has("residential")) return "Residential";
+  if (tags.has("commercial")) return "Commercial";
+  return "Both";
+}
+
 export function usedBy(name: string): { text: string; count: number } {
   const starters = starterUses.get(name)?.size ?? 0;
   const runTypes = runTypeUses.get(name) ?? 0;
@@ -93,6 +173,162 @@ export function catalogInSheetOrder(): BaselineMaterial[] {
     const used = usedBy(b.name).count - usedBy(a.name).count;
     return used !== 0 ? used : compareMaterials(a, b);
   });
+}
+
+// ── Brand variants (panels and breakers only — CLAUDE.md § Brands) ─────────
+export type BrandVariant = {
+  brand: string;
+  name: string;
+  parent: BaselineMaterial;
+};
+
+let variantsCache: { kept: BrandVariant[]; dropped: string[] } | null = null;
+
+/**
+ * Every panel and breaker brand variant, one per row, under its generic
+ * PARENT. The curated list is the one pricing/buildPricingSheet.mts has
+ * generated since 2026-09-24 (its "branded" rows) — run here in a child
+ * process into a temp folder, so there is ONE list of brands and lines, not
+ * a second copy that drifts. On top of it, the naming rules frozen
+ * 2026-10-07 (`proposeMaterialName`: "Single-Pole" -> "1-Pole" on breakers).
+ *
+ * A variant whose parent the catalog does not ship is DROPPED and named in
+ * `dropped`: an assembly points at the parent, never a variant, so a variant
+ * with no parent can never be reached. On 2026-10-07 that was the 11 brand
+ * lines of the QO-only 60A single-pole the owner declined.
+ *
+ * There is no parent/variant model in the app yet (`materials.parentId`,
+ * ASSEMBLIES_PLAN.md); these prices load into their own generated file and
+ * stay inert until it exists (server/starterValues.test.ts).
+ */
+export function brandVariants(): { kept: BrandVariant[]; dropped: string[] } {
+  if (variantsCache) return variantsCache;
+  const out = path.join(os.tmpdir(), "bidridge-brand-variant-rows");
+  // The builder writes into PRICING_OUT_DIR but does not create it.
+  mkdirSync(out, { recursive: true });
+  execSync("npx tsx pricing/buildPricingSheet.mts", {
+    cwd: path.join(path.dirname(fileURLToPath(import.meta.url)), ".."),
+    env: { ...process.env, PRICING_OUT_DIR: out },
+    // Its output is noise here; its ERRORS must surface (they did not, the
+    // first time: a missing folder read as a bare "Command failed").
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+  const rows = JSON.parse(
+    readFileSync(path.join(out, "rows.json"), "utf8")
+  ) as {
+    branded: {
+      brand: string;
+      name: string;
+      parent: string;
+      category: string;
+    }[];
+  };
+  const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
+  const kept: BrandVariant[] = [];
+  const dropped: string[] = [];
+  const seen = new Set<string>();
+  for (const v of rows.branded) {
+    const parent = byName.get(v.parent);
+    if (!parent) {
+      dropped.push(`${v.name} (parent "${v.parent}" is not shipped)`);
+      continue;
+    }
+    const name = proposeMaterialName({
+      name: v.name,
+      category: v.category,
+    }).proposed;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    kept.push({ brand: v.brand, name, parent });
+  }
+  kept.sort(
+    (a, b) =>
+      usedBy(b.parent.name).count - usedBy(a.parent.name).count ||
+      compareMaterials(a.parent, b.parent) ||
+      a.brand.localeCompare(b.brand) ||
+      a.name.localeCompare(b.name)
+  );
+  variantsCache = { kept, dropped };
+  return variantsCache;
+}
+
+// ── Starter assemblies, the owner's top-30 lists first ─────────────────────
+export type AssemblyRow = {
+  ref: string;
+  name: string;
+  category: string;
+  projectType: string;
+  hoursNow: number | null;
+  top: string;
+};
+
+/** "| 3 | DR7 | Troffer LED retrofit kit |" rows of one section of the draft. */
+function topList(md: string, from: string, to: string): string[] {
+  const start = md.indexOf(from);
+  const end = md.indexOf(to, start + from.length);
+  if (start < 0 || end < 0)
+    throw new Error(`top-assemblies-draft.md: no "${from}"`);
+  return [
+    ...md.slice(start, end).matchAll(/^\|\s*(\d+)\s*\|\s*([A-Z]+\d+)\s*\|/gm),
+  ]
+    .sort((a, b) => Number(a[1]) - Number(b[1]))
+    .map(m => m[2]);
+}
+
+/**
+ * Every shipped starter: the commercial top 30, then the residential top 30
+ * (references/top-assemblies-draft.md § 1 and § 2 — a ref on both lists says
+ * so and appears once), then the rest by category and ref. A ref on a list
+ * that is not a shipped starter (a drafted recipe not yet in the seed) is
+ * named in `notShipped`.
+ */
+export function assembliesInSheetOrder(): {
+  rows: AssemblyRow[];
+  notShipped: string[];
+} {
+  const md = readFileSync(
+    path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "references",
+      "top-assemblies-draft.md"
+    ),
+    "utf8"
+  );
+  const commercial = topList(md, "## 1. Most used", "## 2. Most used");
+  const residential = topList(md, "## 2. Most used", "## 2b.");
+  const byRef = new Map(BASELINE_ASSEMBLIES.map(a => [a.ref, a]));
+  const label = (ref: string) => {
+    const c = commercial.indexOf(ref);
+    const r = residential.indexOf(ref);
+    return [
+      c >= 0 ? `Commercial #${c + 1}` : "",
+      r >= 0 ? `Residential #${r + 1}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+  };
+  const ordered: string[] = [];
+  for (const ref of [...commercial, ...residential])
+    if (!ordered.includes(ref)) ordered.push(ref);
+  const notShipped = ordered.filter(ref => !byRef.has(ref));
+  const rest = BASELINE_ASSEMBLIES.filter(a => !ordered.includes(a.ref)).sort(
+    (a, b) =>
+      a.category.localeCompare(b.category) ||
+      a.ref.localeCompare(b.ref, "en", { numeric: true })
+  );
+  const rows = [
+    ...ordered.filter(ref => byRef.has(ref)).map(ref => byRef.get(ref)!),
+    ...rest,
+  ].map(a => ({
+    ref: a.ref,
+    name: a.name,
+    category: a.category,
+    projectType: a.projectType,
+    hoursNow: a.baseLaborHours,
+    top: label(a.ref),
+  }));
+  return { rows, notShipped };
 }
 
 /**

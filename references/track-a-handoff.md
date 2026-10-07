@@ -4,7 +4,23 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 14) — read this first
+## UPDATE 2026-10-07 (session 15) — read this first
+
+- **"Example hours" decided** (owner): the price treatment, shipped with the
+  hours, never alone. Plan § "Shipped HOURS" + Batch 5 columns.
+- **Four starter sheets**, all built by `pricing/buildStarterSheets.mts`,
+  all loadable by `pricing/loadStarterSheets.mts` (`--prices`, `--labor`,
+  `--brands`, `--assembly-hours`; dry run unless `--write`), all with a
+  "Residential / Commercial / Both" column:
+  `pricing/starter-catalog-pricing.xlsx` (1,715),
+  `pricing/labor-units-starter.xlsx` (1,715),
+  `pricing/brand-variants-pricing.xlsx` (508; 11 left off, parent declined),
+  `pricing/assembly-hours-starter.xlsx` (168, top-30 lists first).
+- Everything loaded stays inert until its tag exists
+  (`server/starterValues.test.ts`); brand prices also wait on
+  `materials.parentId`.
+
+## UPDATE 2026-10-07 (session 14)
 
 - **Wafer variants renamed** `N" canless wafer LED downlight, <variant>` —
   the plain canless leads "N wafer" at every size (test pinned). **5"/6"

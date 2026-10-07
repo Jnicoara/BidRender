@@ -41,11 +41,17 @@ import { fileURLToPath } from "node:url";
 import { BASELINE_MATERIALS } from "../server/seed/materials";
 import { STARTER_PRICES } from "../server/seed/materials/starterPrices";
 import { STARTER_LABOR_UNITS } from "../server/seed/materials/starterLaborUnits";
+import { STARTER_BRAND_PRICES } from "../server/seed/materials/starterBrandPrices";
+import { STARTER_ASSEMBLY_HOURS } from "../server/seed/starterAssemblyHours";
+import { BASELINE_ASSEMBLIES } from "../server/seed/baselineAssemblies";
 import {
+  ASSEMBLY_SHEET,
+  BRAND_SHEET,
   FIRST_DATA_ROW,
   HEADER_ROW,
   LABOR_SHEET,
   PRICE_SHEET,
+  brandVariants,
   hoursPer,
 } from "./starterSheetLayout";
 
@@ -72,8 +78,12 @@ const arg = (flag: string) => {
 const WRITE = process.argv.includes("--write");
 const pricesPath = arg("--prices");
 const laborPath = arg("--labor");
-if (!pricesPath && !laborPath) {
-  console.error("Pass --prices <xlsx> and/or --labor <xlsx>. Nothing to do.");
+const brandsPath = arg("--brands");
+const assemblyHoursPath = arg("--assembly-hours");
+if (!pricesPath && !laborPath && !brandsPath && !assemblyHoursPath) {
+  console.error(
+    "Pass any of --prices, --labor, --brands, --assembly-hours <xlsx>. Nothing to do."
+  );
   process.exit(2);
 }
 
@@ -218,6 +228,93 @@ if (laborPath) {
   }
 }
 
+// ── Brand variants ──────────────────────────────────────────────────────────
+type BrandPrice = { parent: string; price: string };
+let nextBrands: Record<string, BrandPrice> | null = null;
+if (brandsPath) {
+  const { ws, col } = await open(brandsPath, BRAND_SHEET);
+  const [cName, cParent, cUnit, cQty, cPrice] = [
+    col("Name"),
+    col("Parent (generic item)"),
+    col("Unit of sale"),
+    col("Pack qty"),
+    col("Pack price"),
+  ];
+  // The SAME list the sheet was built from — a variant name not on it is
+  // refused, never guessed.
+  const variants = new Map(brandVariants().kept.map(v => [v.name, v]));
+  nextBrands = {};
+  const seen = new Set<string>();
+  for (let r = FIRST_DATA_ROW; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const name = text(row.getCell(cName).value);
+    if (!name) continue;
+    const at = `brands row ${r} (${name})`;
+    const v = variants.get(name);
+    if (!v) {
+      problems.push(`${at}: not a known brand variant`);
+      continue;
+    }
+    if (seen.has(name)) problems.push(`${at}: listed twice`);
+    seen.add(name);
+    const parent = text(row.getCell(cParent).value);
+    if (parent !== v.parent.name)
+      problems.push(
+        `${at}: parent "${parent}", the variant belongs to "${v.parent.name}"`
+      );
+    const unit = text(row.getCell(cUnit).value);
+    if (unit !== v.parent.unitOfSale)
+      problems.push(
+        `${at}: unit "${unit}", its parent sells by "${v.parent.unitOfSale}"`
+      );
+    const price = num(row.getCell(cPrice).value);
+    if (price === null) continue;
+    const qty = num(row.getCell(cQty).value);
+    if (Number.isNaN(price) || price <= 0) {
+      problems.push(`${at}: pack price is not a number above 0`);
+      continue;
+    }
+    if (qty === null || Number.isNaN(qty) || qty <= 0) {
+      problems.push(`${at}: pack qty is not a number above 0`);
+      continue;
+    }
+    nextBrands[name] = { parent: v.parent.name, price: dec(price / qty) };
+  }
+}
+
+// ── Starter assembly hours ──────────────────────────────────────────────────
+let nextAssemblyHours: Record<string, string> | null = null;
+if (assemblyHoursPath) {
+  const { ws, col } = await open(assemblyHoursPath, ASSEMBLY_SHEET);
+  const [cRef, cName, cHours] = [col("Ref"), col("Assembly"), col("MY HOURS")];
+  const byName = new Map(BASELINE_ASSEMBLIES.map(a => [a.name, a]));
+  nextAssemblyHours = {};
+  const seen = new Set<string>();
+  for (let r = FIRST_DATA_ROW; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const name = text(row.getCell(cName).value);
+    if (!name) continue;
+    const at = `assembly row ${r} (${name})`;
+    const a = byName.get(name);
+    if (!a) {
+      problems.push(`${at}: not a shipped starter assembly`);
+      continue;
+    }
+    if (seen.has(name)) problems.push(`${at}: listed twice`);
+    seen.add(name);
+    const ref = text(row.getCell(cRef).value);
+    if (ref !== a.ref)
+      problems.push(`${at}: ref "${ref}", the starter is ${a.ref}`);
+    const hours = num(row.getCell(cHours).value);
+    if (hours === null) continue; // blank: keeps what ships
+    if (Number.isNaN(hours) || hours <= 0) {
+      problems.push(`${at}: MY HOURS is not a number above 0 (blank = keep)`);
+      continue;
+    }
+    nextAssemblyHours[name] = dec(hours);
+  }
+}
+
 if (problems.length) {
   console.error(`REFUSED — ${problems.length} problem(s), nothing written:`);
   for (const p of problems) console.error(`  - ${p}`);
@@ -251,6 +348,14 @@ if (nextLabor)
       ? "not set"
       : `${v.laborHours ?? "—"} h, bend ${v.fieldBendLaborHours ?? "—"} h`
   );
+if (nextBrands)
+  diff("brand variants", STARTER_BRAND_PRICES, nextBrands, v =>
+    v === undefined ? "unpriced" : `$${v.price}`
+  );
+if (nextAssemblyHours)
+  diff("assembly hours", STARTER_ASSEMBLY_HOURS, nextAssemblyHours, v =>
+    v === undefined ? "as shipped" : `${v} h`
+  );
 
 if (!WRITE) {
   console.log(
@@ -261,7 +366,7 @@ if (!WRITE) {
 
 // Keeps the rule visible in the generated file, not only in git history.
 const header = (what: string, src: string) =>
-  `/**\n * ${what} — GENERATED by pricing/loadStarterSheets.mts from ${src} on ${new Date().toISOString().slice(0, 10)}.\n * Do not edit by hand: change the sheet and run the loader (Track A only).\n *\n * These are the SHARED STARTER's numbers: every shop gets them on the next\n * start, except on items the shop already changed (its own copy). A shipped\n * number must say it is an example — server/starterValues.test.ts refuses\n * any value here until the app can tag it (materials.isExamplePrice for a\n * price; a decided tag for hours). references/starter-vs-company-plan.md.\n */\n`;
+  `/**\n * ${what} — GENERATED by pricing/loadStarterSheets.mts from ${src} on ${new Date().toISOString().slice(0, 10)}.\n * Do not edit by hand: change the sheet and run the loader (Track A only).\n *\n * These are the SHARED STARTER's numbers: every shop gets them on the next\n * start, except on items the shop already changed (its own copy). A shipped\n * number must say it is an example — server/starterValues.test.ts refuses\n * any value here until the app can tag it ("Example price" / "Example hours",\n * owner 2026-10-07). references/starter-vs-company-plan.md.\n */\n`;
 const written: string[] = [];
 if (nextPrices) {
   const f = path.join(ROOT, "server/seed/materials/starterPrices.ts");
@@ -281,6 +386,30 @@ if (nextLabor) {
     f,
     header("Shipped starter LABOR UNITS", path.basename(laborPath!)) +
       `export const STARTER_LABOR_UNITS: Readonly<Record<string, { laborHours?: string; fieldBendLaborHours?: string }>> = ${JSON.stringify(nextLabor, null, 2)};\n`
+  );
+  written.push(f);
+}
+if (nextBrands) {
+  const f = path.join(ROOT, "server/seed/materials/starterBrandPrices.ts");
+  writeFileSync(
+    f,
+    header(
+      "Shipped BRAND VARIANT prices, per unit of sale",
+      path.basename(brandsPath!)
+    ) +
+      `export const STARTER_BRAND_PRICES: Readonly<Record<string, { parent: string; price: string }>> = ${JSON.stringify(nextBrands, null, 2)};\n`
+  );
+  written.push(f);
+}
+if (nextAssemblyHours) {
+  const f = path.join(ROOT, "server/seed/starterAssemblyHours.ts");
+  writeFileSync(
+    f,
+    header(
+      "Shipped starter ASSEMBLY HOURS",
+      path.basename(assemblyHoursPath!)
+    ) +
+      `export const STARTER_ASSEMBLY_HOURS: Readonly<Record<string, string>> = ${JSON.stringify(nextAssemblyHours, null, 2)};\n`
   );
   written.push(f);
 }

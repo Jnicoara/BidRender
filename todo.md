@@ -1091,12 +1091,14 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       variants renamed "N" canless wafer LED downlight, <variant>" (the plain
       one leads "N wafer"); the 5"/6" disc and retrofit trim split into 5"
       and 6" (the combined row became the 6", same id).
-- [ ] **Owner question: how does a SHIPPED labor unit say it is an
-      example?** The starter labor sheet loads into the seed
-      (`pricing/loadStarterSheets.mts`), but `server/starterValues.test.ts`
-      refuses any shipped hours until they can be tagged the way prices are
-      ("Example price"). Recommend the same shape: `materials.isExampleLaborHours`
-      (Batch 5), "Example hours" on the bid screen, a warning before printing.
+- [x] **How a SHIPPED hour says it is an example** — decided by the owner
+      2026-10-07: "Example hours", the price treatment (bid screen only,
+      clears on the shop's edit, warning before printing), shipped together
+      with the hours. Columns in Batch 5 (`migrations-next-batch.md`).
+- [ ] **Build the "Example price" / "Example hours" / "Example rate" tags**
+      (Batch 5 columns + the bid-screen tag + the print warning) — every
+      starter sheet's numbers wait on them (`server/starterValues.test.ts`),
+      and the brand-variant prices also wait on `materials.parentId`.
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while

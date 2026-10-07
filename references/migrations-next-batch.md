@@ -267,6 +267,15 @@ don't merge." Not written as a file yet; this is the plan.
 
 ## Batch 5 — before the priced sheet (numbered from 0132 when written — 0131 is Track C's, above)
 
+**Added 2026-10-07 — "Example hours" (owner decision):** shipped labor hours
+get the price treatment — tag on the bid screen only, never the customer
+quote; clears when the shop edits it; warning before printing. Columns:
+`materials.isExampleLaborHours`, `assemblies.isExampleHours`,
+`bid_line_items.snapshotHoursWereExample`. Additive, nullable, no DB
+default. **Ships TOGETHER with the hours, never hours alone** — the starter
+loader's hours stay refused by `server/starterValues.test.ts` until these
+exist (`references/starter-vs-company-plan.md` § "Shipped HOURS").
+
 **Added 2026-10-07 — example LOADED labor rates, APPROVED by the owner the
 same day** (Foreman ~$70.50, Journeyman $59.22, Apprentice $36.66, Helper
 $33.84, 41% burden as parts; NEVER the rates without the flag — one
