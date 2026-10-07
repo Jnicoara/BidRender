@@ -1,22 +1,22 @@
 # Next migrations — ONE list, every track's asks. 0105–0124 WRITTEN, 2026-10-06
 
-## Status: 0105–0124 written and rehearsed — on NO shared database
+## Status: 0105–0124 ON STAGING and on `local-dev` — NOT on live
 
-**Written 2026-10-06 (Track A), on branch `a-batch-0105` — NOT merged into
-`local-dev` (owner, 2026-10-06: keep it on the branch, because a drizzle/
-change on local-dev stops staging following it until staging is migrated;
-and B's labor-only code, which 0105/0106 must ship with, is not written
-yet). Applied ONLY to local
-databases** (a copy of `bidrender_local`, `bidrender_test_localdev`).
-**Not on staging, not on live** — the owner approves live. Batch 5 (0125+)
-is not written: its designs are not settled.
+**Written 2026-10-06 (Track A) on `a-batch-0105`; applied to STAGING
+2026-10-07 00:16 UTC** (owner: the pairing rules are for LIVE, not staging)
+and merged into `local-dev`. Staging: drift before = exactly this batch;
+backup restored locally with all 65 table counts equal; rehearsed on that
+copy (20 applied, rerun nothing, matches, 159/159 FKs, all 242 bid totals
+unchanged); then staging itself: 20 applied, 125, matches, 159/159, rerun
+nothing. Record: `deploying.md` § 11. **Live has 0000–0104.** Batch 5
+(0125+) is not written: its designs are not settled.
 
-**Release rules still in force for these files** (below, unchanged):
-0105–0106 ship only WITH Track B's labor-only code (not written yet) and B's
-labor rule; 0122/0123 ship only with B's H2 step-2 code (on local-dev,
-882ee8e); every file is step 1 (additive, before the push). So the next
-release that carries `local-dev` must apply ALL TWENTY first, and must not
-go out before B's labor-only code is in it.
+**Release rules for LIVE** — now in `live-release-plan.md` at the top, the
+release checklist: 0105–0106 only WITH B's labor rule + "Labor only" tick +
+reading code (tick and reading code not on any pushed branch, 2026-10-06);
+0122–0123 only with B's starter-seeding and "Hours not set" code (on
+local-dev); all twenty applied first (step 1); the LT1/LT2 repair does NOT
+run on live as written.
 
 **Rehearsal, on `bidrender_rehearsal_b2`, a copy of `bidrender_local` (105
 migrations, 4,386 bids, 9,686 lines):**
