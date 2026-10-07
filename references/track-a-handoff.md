@@ -4,7 +4,29 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 12) — read this first
+## UPDATE 2026-10-07 (session 13) — read this first
+
+- **Adds on staging (`f440576`), CI full suite + deploy + smoke green.**
+  Staging 1,554 → **1,713** (159 added, 0 deleted, 0 renamed), every
+  reference identical, the 227 earlier bid lines identical (full-row hash),
+  LT8 #871 / LT7 #872 on the 4" / 6" canless wafers. **VERDICT CLEAN.**
+  Second restart: measured on the docs push after it (see the plan file).
+- **Owner's answers applied:** 3-1/2" full family for EMT + PVC Sch 40;
+  150–200A two-pole + 100–200A main breakers; every wafer / canless size
+  2"–8" its own item (+ slim, gimbal, wet, CCT) and CCT discs 4"–7";
+  "Surface raceway (wire mold), low voltage"; "wire mold"/"wiremold" on every
+  surface raceway item. Declined: QO-only 60A/70A. 143 of 153 frozen adds
+  ship; 8 duplicates; `shared/frozenAddsHeld.ts` has every reason.
+- **Open owner questions** (todo.md): "6 wafer" lists the four variants before
+  the plain canless 6"; the plain 5"/6" disc and 5"/6" retrofit trim are
+  still one row for two sizes.
+- **Part 2 plan:** `references/starter-vs-company-plan.md` — what reaches
+  every account vs one company; file loader now, admin screen later;
+  example LOADED labor rates (columns in Batch 5, no migration).
+- CI caught two things the local subset could not: the British "colour" in
+  a search word, and a typo test that used 175A as "a size we do not ship".
+
+## UPDATE 2026-10-07 (session 12)
 
 - **The rename is on staging** (`47f0942`): backup first, then merged, Gate +
   deploy + smoke green, and staging checked directly — **VERDICT CLEAN**
