@@ -51,6 +51,14 @@ export type NotPricedLineLike = {
   runMaterialRole: string | null;
   snapshotMaterialCost: string | number | null;
   snapshotLaborHours: string | number | null;
+  /**
+   * The assembly was ticked "Labor only" when this line was added (0106,
+   * frozen). Only `true` means it: NULL (a line from before the column) and
+   * false are "not said". REQUIRED, so no total or screen can compile
+   * without deciding it — leaving it out would quietly flag every
+   * labor-only line "material not priced" again.
+   */
+  snapshotLaborOnly: boolean | null;
 };
 
 export function lineNotPriced(
@@ -168,6 +176,10 @@ export function lineMaterialNotPriced(
   // fault, already said. Counting it here too would say it twice.
   if (directCost === null) return false;
   if (lineNotPriced(line, directCost)) return false; // already all of it
+  // THE WAY OUT (owner, 2026-10-06; 0105–0106): an assembly ticked "Labor
+  // only" has no material ON PURPOSE, so its $0 material is an answer. Read
+  // from the LINE's frozen tick, never the assembly live.
+  if (line.snapshotLaborOnly === true) return false;
   return Number(line.snapshotMaterialCost ?? 0) === 0;
 }
 

@@ -1448,8 +1448,9 @@ export default function BidsPage({
                     — the total above has{" "}
                     {materialMissing === 1 ? "its" : "their"} labor and none of{" "}
                     {materialMissing === 1 ? "its" : "their"} material. Add the
-                    material to the assembly, then remove the line and add the
-                    assembly again.
+                    material to the assembly — or, if it has none on purpose,
+                    tick "Labor only" on the assembly — then remove the line and
+                    add the assembly again.
                   </p>
                 </div>
               )}

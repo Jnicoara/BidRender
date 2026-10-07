@@ -304,30 +304,43 @@ NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
       answer c: ONE company-wide number) — a nullable decimal beside the
       company markup default; A picks the table. NULL = no quoted-line rule.
 
-- [ ] **`assemblies.laborOnly BOOLEAN NULL`** — **owner: YES, 2026-10-06.**
-      This assembly has no material ON PURPOSE (demo, pull wire, a
-      trouble-shoot hour). ADDITIVE, nullable, **no DEFAULT**, no backfill.
-      NULL = not said. - **A ticked labor-only assembly never shows "not priced" and never
-      blocks the print.** `lineMaterialNotPriced` (shared/lineNotPriced.ts)
-      returns false for it, and its SQL copy in server/db.ts follows — both
-      sides of `dashboardNotPriced.test.ts` in one commit. - **Any other assembly with no parts stays "material not priced"**
-      until the user ticks **"Labor only"** in the assembly editor. Never
-      inferred from "has no parts" — that inference is the trap the
-      2026-10-05 rule closed. - **A bid LINE needs the answer too**, because a line keeps what was
-      frozen when it was added. Either freeze it onto the line
-      (`bid_line_items.snapshotLaborOnly BOOLEAN NULL`, with the other
-      snapshots) or read the assembly live; **freezing is recommended**, so
-      ticking the box later cannot quietly re-mark finished bids. **Track A
-      picked FREEZING, 2026-10-06: `snapshotLaborOnly` is migration 0106**
-      (`migrations-next-batch.md`); NULL on a line from before the column
-      reads as "not said", so no existing bid changes when it lands. - A shipped assembly forks on edit, as every shipped edit does. - **Starter assemblies to ship marked labor-only: NONE today.** Checked
-      2026-10-06: all 8 shipped starters carry 3–6 parts, and every planned
-      one in references/starter-assemblies-plan.md has parts too — even the
-      demo ones (DR1–DR4 carry blank covers, wire nuts, a filler plate), so
-      they price normally and need no flag. Nothing called "pull wire"
-      exists. Any purely-labor starter added later (pull wire in existing
-      conduit, trouble-shoot hour, core drill) ships with `laborOnly = true`
-      in its seed row.
+- [x] **LABOR ONLY — BUILT 2026-10-06 (Track B) on A's columns
+      `assemblies.laborOnly` (0105) and `bid_line_items.snapshotLaborOnly`
+      (0106), owner YES.** On `track-b`, merged there with `a-batch-0105`;
+      **NOT on local-dev until A's batch is** (see the pairing rule below).
+
+      - **The tick box**: "Labor only" in the assembly editor, under the
+        hours. Saved by `assemblies.create` / `update`; only a tick is an
+        answer (unticked stays NULL on create, false on an untick). Never
+        ticked for you, never inferred from "has no parts". The cost preview
+        says "none — labor only" instead of "not priced".
+      - **The rule**: `lineMaterialNotPriced` reads the LINE's frozen
+        `snapshotLaborOnly` (required on `NotPricedLineLike`, so no total
+        can compile without it) and its two SQL copies in `costSums` do the
+        same (`<=> TRUE`). A ticked line prices its labor and is never
+        "material not priced" — so it never holds up the priced print.
+      - **Frozen**: `snapshotForAssembly` freezes the tick; unticking the
+        assembly later leaves a sent bid exactly as it was.
+        `pricingSnapshotOf` (A's) carries it through every copy.
+      - **Starters**: `laborOnly: true` on a seed spec ships it ticked, and a
+        narrow pass ticks an existing shared row only where nothing was said
+        (`laborOnly IS NULL`) — a "no" is kept. **No starter qualifies
+        today** (all 168 carry parts, checked 2026-10-06); a purely-labor
+        starter added later (pull wire, trouble-shoot hour, core drill) sets it.
+      - The bid's amber strip and the quote panel now offer "or tick Labor
+        only" beside "add the material".
+      - Tests: `server/laborOnly.test.ts` and the "labor only" case of
+        `server/dashboardNotPriced.test.ts` — each part (rule, SQL, freeze,
+        save, starter seed, keep-a-no) checked red with it removed. On
+        screen at laptop and tablet (`scripts/laborOnlyScreenCheck.mts`):
+        tick box, preview, a ticked line at a clean $120.00 beside an
+        unticked one with "+ material not priced", and a bid of only the
+        ticked line printing "$120.00", not "Price pending".
+
+      > **PAIRING RULE — 0105 + 0106, B's labor-with-$0-material rule
+      > (`5c98bd1`) and THIS code ship together, NEVER APART** (owner,
+      > 2026-10-06). Written beside 0105–0106 in
+      > `references/migrations-next-batch.md` too.
 
 **Run bends** (Track B, 2026-10-06; references/run-bends-plan.md § 6). All
 ADDITIVE, nullable, **no DEFAULT**, no backfill. **Owner answered all three

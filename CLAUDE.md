@@ -1432,9 +1432,11 @@ conventions and both are load-bearing:**
   > no parts stays "material not priced" until somebody ticks it — never
   > inferred from "has no parts", which is the trap above. Starters that are
   > truly labor-only ship ticked (none today: every shipped and planned
-  > starter has parts). Needs the column — todo.md, "Track A next migration
-  > batch" — so until it lands, a labor-only assembly still reads "material
-  > not priced".
+  > starter has parts). **Built 2026-10-06** on 0105 (`assemblies.laborOnly`)
+  > and 0106 (`bid_line_items.snapshotLaborOnly`, the tick FROZEN onto the
+  > line): the rule reads the line's frozen tick, so unticking later never
+  > re-marks a sent bid. 0105–0106, the rule and that code ship together,
+  > never apart (`references/migrations-next-batch.md`).
 
 - **MEASUREMENT — unset must NEVER render as 0.** Zero is a legitimate answer —
   a floor box really is at 0'-0" — so a zero reads as a considered one. A

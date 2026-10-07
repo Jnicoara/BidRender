@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-06]
 
+- **"Labor only" assemblies.** An assembly with no material on purpose —
+  pulling wire, a trouble-shoot hour, demolition — can be ticked "Labor
+  only" in the assembly editor. Its bid lines then price the labor and no
+  longer say "material not priced", so they don't hold up the priced
+  proposal. The tick is frozen onto each bid line when it is added, so
+  changing the assembly later never changes a bid already made. Nothing is
+  ticked for you; every other assembly with no material still says so. Goes
+  live together with the database update that adds the tick.
+
 - **The server now notes any request that takes over 5 seconds** — which
   part of the app it was, how long it took, and whether the time went to the
   database, to waiting for a database connection, or somewhere else. Nothing

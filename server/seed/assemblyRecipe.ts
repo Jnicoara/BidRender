@@ -78,6 +78,15 @@ export type BaselineAssembly = {
   missingParts?: string[];
   /** Starter modifier names switched on by default. Matched by name. */
   modifiers?: string[];
+  /**
+   * Ships ticked "Labor only" (0105, owner 2026-10-06): no material ON
+   * PURPOSE, so its lines are never "material not priced". Only for a
+   * starter that is truly labor — never set because a recipe happens to have
+   * no parts. NONE of the 168 qualifies today (every one carries parts,
+   * checked 2026-10-06); a purely-labor starter added later (pull wire in
+   * existing conduit, a trouble-shoot hour, a core drill) sets this.
+   */
+  laborOnly?: true;
 };
 
 /** One recipe line. */

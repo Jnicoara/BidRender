@@ -6,6 +6,18 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-06 (late) — Labor only, on A's 0105–0106
+
+- **Built on `track-b`, which now CONTAINS `a-batch-0105` (0105–0124).**
+  So `track-b` must NOT merge into local-dev until A's batch is on
+  local-dev: merging it first would carry A's migrations in by the back
+  door. Once A lands the batch, pull local-dev and merge as usual.
+- Track B's own DBs (`bidrender_test_b`, `bidrender_local_b_new`) are
+  migrated to 0124. On that schema the starter holds lifted: only DV34 is
+  held, the other 167 seed with hours not set.
+- todo.md "LABOR ONLY — BUILT" has the parts, the tests and the screen
+  check; the pairing rule is there and in migrations-next-batch.md.
+
 ## Session 2026-10-06 (night) — new assemblies start "not set"; CSV Pin column
 
 - `304260a` on local-dev: green (tests, staging deploy, smoke).

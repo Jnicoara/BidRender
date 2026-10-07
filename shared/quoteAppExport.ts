@@ -191,7 +191,7 @@ export function quoteGaps(
         parts <= 0
           ? ""
           : noMaterial
-            ? "Add the material to the assembly"
+            ? 'Add the material to the assembly (or tick "Labor only" if it has none on purpose)'
             : "Price the parts on the Materials screen";
       const fix = partsFix
         ? hoursNotSet

@@ -298,6 +298,39 @@ beforeAll(async () => {
     await line(bidId, { snapshotLaborHours: null });
   });
 
+  /*
+    LABOR ONLY (0105–0106): a line frozen from an assembly ticked "Labor
+    only" has no material ON PURPOSE — never "material not priced". NULL and
+    false are "not said" and still count. Both branches of the SQL: the
+    frozen-parts one and the live-recipe one (a line from before 0087).
+  */
+  await add("labor only", { lines: 0, parts: 2 }, async bidId => {
+    // Ticked: nothing missing.
+    await line(bidId, {
+      assemblyId: pricedRecipe,
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborOnly: true,
+    });
+    // Not said (NULL, a line from before 0106) and unticked (false): 1 each.
+    await line(bidId, {
+      assemblyId: pricedRecipe,
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborOnly: null,
+    });
+    await line(bidId, {
+      assemblyId: pricedRecipe,
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborOnly: false,
+    });
+    // Ticked, from before 0087 — the live-recipe branch: still nothing.
+    await line(bidId, {
+      assemblyId: pricedRecipe,
+      snapshotMaterialCost: "0.0000",
+      snapshotUnpricedParts: null,
+      snapshotLaborOnly: true,
+    });
+  });
+
   await add("no quantity", { lines: 0, parts: 0 }, async bidId => {
     await line(bidId, { qty: "0", snapshotMaterialCost: null });
     await line(bidId, {
@@ -373,6 +406,7 @@ withDb("the dashboard card's not-priced count", () => {
     "from before 0087",
     "labor only, from before 0087",
     "hours not set",
+    "labor only",
     "no quantity",
     "broken lines",
     "archived lines",

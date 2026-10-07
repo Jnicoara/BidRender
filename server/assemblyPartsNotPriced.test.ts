@@ -50,6 +50,7 @@ describe("counting unpriced parts", () => {
     runMaterialRole: null,
     snapshotMaterialCost: "10",
     snapshotLaborHours: "0.5",
+    snapshotLaborOnly: null,
     unpricedParts: 0,
     ...over,
   });

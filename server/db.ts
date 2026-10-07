@@ -3591,7 +3591,10 @@ function starterHoursValue(
   return assemblyHoursColumnValue(spec.baseLaborHours, `"${spec.name}"`);
 }
 
-export async function seedBaselineAssemblies(): Promise<void> {
+export async function seedBaselineAssemblies(
+  /** The shipped starters; a test passes a probe list instead. */
+  specs: readonly BaselineAssembly[] = BASELINE_ASSEMBLIES
+): Promise<void> {
   await withSeedLock("helixbid:seed:assemblies", async () => {
     const db = await getDb();
     if (!db) return;
@@ -3656,7 +3659,7 @@ export async function seedBaselineAssemblies(): Promise<void> {
      *
      * Idempotent: running it twice marks the same rows.
      */
-    const whipPairs = BASELINE_ASSEMBLIES.flatMap(spec =>
+    const whipPairs = specs.flatMap(spec =>
       spec.materials
         .filter(line => line.branchWhip)
         .map(line => ({
@@ -3706,6 +3709,29 @@ export async function seedBaselineAssemblies(): Promise<void> {
     const alreadySeeded = new Set(existingRows.map(row => row.name));
 
     /**
+     * Tick "Labor only" on a shipped starter that ships ticked but was seeded
+     * before it did (0105). Same narrow shape as the role and whip passes:
+     * shared rows only, named in the seed, and only where NOTHING was said
+     * (`laborOnly IS NULL`) — a starter somebody unticked keeps their
+     * answer, and a company's fork is never touched.
+     */
+    const laborOnlyNames = specs
+      .filter(spec => spec.laborOnly === true)
+      .map(spec => spec.name);
+    if (laborOnlyNames.length > 0) {
+      await db
+        .update(assemblies)
+        .set({ laborOnly: true })
+        .where(
+          and(
+            isNull(assemblies.userId),
+            isNull(assemblies.laborOnly),
+            inArray(assemblies.name, laborOnlyNames)
+          )
+        );
+    }
+
+    /**
      * Starters the schema cannot hold yet wait, named, rather than seeding
      * half-built or at a made-up 0 hours. One log line per reason, not one per
      * starter: 160 near-identical warnings on every boot hide the one that
@@ -3713,7 +3739,7 @@ export async function seedBaselineAssemblies(): Promise<void> {
      */
     const schema = liveStarterSchema();
     const held = new Map<StarterHold, BaselineAssembly[]>();
-    const pending = BASELINE_ASSEMBLIES.filter(spec => {
+    const pending = specs.filter(spec => {
       if (alreadySeeded.has(spec.name)) return false;
       const holds = starterHolds(spec, schema);
       for (const hold of holds)
@@ -3772,6 +3798,8 @@ export async function seedBaselineAssemblies(): Promise<void> {
         baseLaborHours: starterHoursValue(spec),
         // Without this the hours above cost nothing — see DEFAULT_ASSEMBLY_ROLE.
         laborRateId: defaultRole?.id ?? null,
+        // Ships ticked only when the seed says so; otherwise "not said".
+        laborOnly: spec.laborOnly === true ? true : null,
       });
       const assemblyId = result.insertId;
 
@@ -6060,6 +6088,7 @@ async function snapshotForAssembly(
   snapshotMarkupPct: string;
   snapshotMarkupSource: LineMarkupSource;
   snapshotUnpricedParts: number;
+  snapshotLaborOnly: boolean;
 }> {
   const [activeModifiers, rates, markupRuleSet] = await Promise.all([
     getLibraryModifiers(userId, "active"),
@@ -6127,6 +6156,13 @@ async function snapshotForAssembly(
     // Over the SAME recipe rows the material cost above was summed from, so
     // the count names exactly the parts missing from that frozen figure.
     snapshotUnpricedParts: unpricedPartsIn(detail.materials),
+    /*
+      "Labor only" (0105), FROZEN (0106): ticking or unticking the assembly
+      later never re-marks a line already on a bid. Only a TICK is true;
+      NULL and false on the assembly both freeze false — "not said", never
+      inferred from having no parts (lineMaterialNotPriced).
+    */
+    snapshotLaborOnly: detail.laborOnly === true,
   };
 }
 
@@ -11471,7 +11507,9 @@ function costSums(productivityPct: number) {
     /*
       A line with $0 or unset material counts at least ONE (its material is
       missing — `lineMaterialNotPriced`, owner 2026-10-05), never on top of
-      the recipe parts that already say so.
+      the recipe parts that already say so — UNLESS the line froze "Labor
+      only" (0106): its $0 material is an answer. `<=> TRUE`, so NULL and
+      false both stay "not said". The live-recipe branch below says the same.
     */
     /*
       And a line whose HOURS are not set (NULL frozen from an assembly with
@@ -11479,7 +11517,7 @@ function costSums(productivityPct: number) {
       `linePartsNotPriced`. Counted whether or not the line froze its parts,
       because the live-recipe path below counts parts only.
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END) ELSE 0 END) + (CASE WHEN ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) + (CASE WHEN ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -11943,7 +11981,7 @@ export async function getDashboardBids(
         lines: sql<string>`COUNT(*)`,
         // Of those, the ones with no material at all — each counts at least
         // one part not priced (`lineMaterialNotPriced`).
-        noMaterial: sql<string>`SUM(CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 THEN 1 ELSE 0 END)`,
+        noMaterial: sql<string>`SUM(CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END)`,
       })
       .from(bids)
       .innerJoin(bidLineItems, liveLines)

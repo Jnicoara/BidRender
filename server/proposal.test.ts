@@ -417,6 +417,7 @@ describe("what leaves the building", () => {
       runMaterialRole: null,
       snapshotMaterialCost: cost,
       snapshotLaborHours: 0,
+      snapshotLaborOnly: null,
       unpricedParts,
     });
     expect(

@@ -82,6 +82,8 @@ const createSchema = z.object({
   laborRateId: z.number().int().positive().nullable().default(null),
   materials: materialsSchema.default([]),
   modifierIds: modifierIdsSchema.default([]),
+  /** "Labor only" (0105). Absent = not said; never inferred from no parts. */
+  laborOnly: z.boolean().optional(),
 });
 
 const updateSchema = z.object({
@@ -99,6 +101,8 @@ const updateSchema = z.object({
   laborRateId: z.number().int().positive().nullable().optional(),
   materials: materialsSchema.optional(),
   modifierIds: modifierIdsSchema.optional(),
+  // Omitted leaves it; false unticks it ("not said" again).
+  laborOnly: z.boolean().optional(),
 });
 
 const toDecimal = (value: number) => value.toFixed(4);
@@ -157,6 +161,8 @@ export const assembliesRouter = router({
       baseLaborHours: assemblyHoursToWrite(input.baseLaborHours, input.name),
       overheadLaborHours: toDecimal(input.overheadLaborHours),
       laborRateId: input.laborRateId,
+      // Only a tick is stored as an answer; unticked stays NULL, "not said".
+      laborOnly: input.laborOnly === true ? true : null,
     });
 
     await db.setAssemblyMaterials(
@@ -204,6 +210,7 @@ export const assembliesRouter = router({
     if (rest.trade !== undefined) patch.trade = rest.trade;
     if (rest.projectType !== undefined) patch.projectType = rest.projectType;
     if (rest.laborRateId !== undefined) patch.laborRateId = rest.laborRateId;
+    if (rest.laborOnly !== undefined) patch.laborOnly = rest.laborOnly;
     if (hours !== undefined) patch.baseLaborHours = hours;
     // Reaches the fork, never the starter — `editableId` above is already the
     // user's own copy when the target was a shipped row. Setting overhead

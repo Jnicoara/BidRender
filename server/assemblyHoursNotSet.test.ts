@@ -50,6 +50,7 @@ function aLine(fields: Partial<PartsLineLike> = {}): PartsLineLike {
     runMaterialRole: null,
     snapshotMaterialCost: "10.0000",
     snapshotLaborHours: "0.5000",
+    snapshotLaborOnly: null,
     unpricedParts: 0,
     ...fields,
   };
@@ -122,6 +123,7 @@ describe("a bid line whose assembly hours were not set", () => {
   it("is a whole line not priced when it has no material either", () => {
     const nothing = aLine({
       snapshotLaborHours: null,
+      snapshotLaborOnly: null,
       snapshotMaterialCost: "0.0000",
     });
     expect(lineNotPriced(nothing, 0)).toBe(true);
@@ -139,6 +141,7 @@ describe("a bid line whose assembly hours were not set", () => {
           assemblyId: null,
           takeoffRunTypeId: 3,
           snapshotLaborHours: null,
+          snapshotLaborOnly: null,
         })
       )
     ).toBe(false);

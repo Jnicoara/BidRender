@@ -77,6 +77,7 @@ import {
   type LibraryScope,
 } from "@/lib/libraryScope";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -174,6 +175,12 @@ type Draft = {
   laborRateId: number | null;
   materials: MaterialLine[];
   modifierIds: number[];
+  /**
+   * Ticked "Labor only" (0105, owner 2026-10-06): no material ON PURPOSE,
+   * so its lines are never flagged "material not priced". Round-trips like
+   * every field the form can edit (rule 7).
+   */
+  laborOnly: boolean;
 };
 
 const round = (value: number, places = 2) => {
@@ -196,6 +203,8 @@ const emptyDraft = (): Draft => ({
   laborRateId: null,
   materials: [],
   modifierIds: [],
+  // Never ticked for you: "not said" until the contractor ticks it.
+  laborOnly: false,
 });
 
 // ─── Origin badge ─────────────────────────────────────────────────────────────
@@ -312,7 +321,10 @@ function CostPreview({
 
   /* Labor with no material, or $0 parts: never a clean cost (2026-10-05). */
   const unpricedParts = unpricedPartsIn(draft.materials);
-  const materialMissing = line.materialCost === 0 && line.laborCost > 0;
+  // …unless ticked "Labor only" (0105): then no material is the answer, the
+  // same rule a bid line follows (`lineMaterialNotPriced`).
+  const materialMissing =
+    !draft.laborOnly && line.materialCost === 0 && line.laborCost > 0;
 
   const Row = ({
     label,
@@ -358,7 +370,13 @@ function CostPreview({
 
       <Row
         label={`Materials (${draft.materials.length} lines)`}
-        value={materialMissing ? "not priced" : money(line.materialCost)}
+        value={
+          materialMissing
+            ? "not priced"
+            : draft.laborOnly && line.materialCost === 0
+              ? "none — labor only"
+              : money(line.materialCost)
+        }
         warn={materialMissing}
       />
       {/*
@@ -1104,6 +1122,35 @@ function AssemblyBuilder({
                 </p>
               )}
 
+              {/*
+                "Labor only" (0105, owner 2026-10-06): this assembly has no
+                material ON PURPOSE — demo, pulling wire, a trouble-shoot
+                hour. Ticked, its bid lines are never "material not priced"
+                and never hold up the priced print. Never ticked for you:
+                "has no parts" is not the same as "needs no parts".
+              */}
+              <label className="flex items-start gap-2.5 text-sm cursor-pointer py-1">
+                <Checkbox
+                  checked={draft.laborOnly}
+                  onCheckedChange={v =>
+                    setDraft(d => ({ ...d, laborOnly: v === true }))
+                  }
+                  className="mt-0.5"
+                  aria-describedby="labor-only-note"
+                />
+                <span>
+                  <span className="font-medium">Labor only</span>
+                  <span
+                    id="labor-only-note"
+                    className="block text-xs text-muted-foreground"
+                  >
+                    No material on purpose. Bid lines from it won't say
+                    "material not priced". Lines already on a bid keep what they
+                    had when they were added.
+                  </span>
+                </span>
+              </label>
+
               {draft.laborRateId === null && (
                 <p className="text-xs text-destructive">
                   No role picked — labor prices at $0 until you choose one.
@@ -1392,6 +1439,7 @@ export default function AssembliesLibraryPage() {
                 isBranchWhip: m.isBranchWhip,
               })),
               modifierIds: draft.modifierIds,
+              laborOnly: draft.laborOnly,
             },
             {
               onSuccess: () => {
@@ -1437,6 +1485,7 @@ export default function AssembliesLibraryPage() {
         isBranchWhip: m.isBranchWhip,
       })),
       modifierIds: detail.modifierIds,
+      laborOnly: detail.laborOnly === true,
     };
     return (
       <AssemblyBuilder
@@ -1464,6 +1513,7 @@ export default function AssembliesLibraryPage() {
                 isBranchWhip: m.isBranchWhip,
               })),
               modifierIds: draft.modifierIds,
+              laborOnly: draft.laborOnly,
             },
             {
               // Editing a starter forks it, and the fork has a different id —

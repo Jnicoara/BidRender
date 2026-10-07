@@ -95,6 +95,25 @@ and `ai-correction-log-plan.md` § 4 (on `a-plans`);
 
 ## 0105–0106 — labor only: FIRST, because it ships with B's rule
 
+> **PAIRING RULE — THREE PIECES SHIP TOGETHER, NEVER APART** (owner,
+> 2026-10-06): **0105 + 0106**, **B's labor-with-$0-material rule
+> (`5c98bd1`, already on local-dev)**, and **B's labor-only code** — the
+> "Labor only" tick box, the rule reading the line's frozen tick, freezing
+> it onto the line, starters shipping ticked. That code is BUILT on
+> `track-b` (2026-10-06, commit "Labor only"), merged there with
+> `a-batch-0105`; it goes to local-dev only once this batch is on
+> local-dev. Why each direction is unsafe:
+>
+> - **The rule without the code**: every labor-only assembly a contractor
+>   builds reads "material not priced" and holds up its bid's priced print,
+>   with nothing to tick that clears it.
+> - **The code without 0105–0106**: every read of a bid line or assembly
+>   names a column the database does not have — `Unknown column`, screens
+>   down. Apply both files BEFORE the push (step 1), as the table says.
+>
+> No existing number moves when they land: NULL on a line or assembly is
+> "not said", which is exactly today's behaviour.
+
 **Owner, 2026-10-06: YES.** Shipped labor-only starter assemblies are marked
 labor-only; every other assembly stays "material not priced" until somebody
 ticks it. Numbered first — added 2026-10-06, shifting everything below up
