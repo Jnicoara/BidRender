@@ -6,28 +6,30 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
-## WHERE B STANDS — 2026-10-07 (read this first)
+## WHERE B STANDS — 2026-10-07, after the merge (read this first)
 
-- **`track-b` holds everything B has built and is WAITING on Track A.** It
-  carries `a-batch-0105` (A's migrations 0105–0124) because Labor only was
-  built on those columns. **0105–0124 are NOT on `origin/local-dev`**
-  (checked 2026-10-07 after a fresh fetch: local-dev's newest migration is
-  0104, head `3a173a0`; `caf6c60` is not in it). So:
-  - **Do not push `track-b` into `local-dev`** until A's batch is there —
-    it would bring A's migrations in through B.
-  - `drizzle-guard` fails on `track-b` for the same reason, and only that
-    reason (it lists A's `caf6c60`); it clears once A's batch is on
-    local-dev. The `test` job passes.
-  - When A lands it: pull local-dev into track-b, push, confirm Gate
-    (drizzle-guard included), then merge into local-dev and confirm the
-    staging deploy and smoke.
-- **Then, on staging, the on-screen check still owed** (todo.md "ON-SCREEN
-  CHECK of every hours not set screen"): bid line, totals, dashboard, quote
-  panel, editor (empty box, "Use suggested"), Quick bid, kits, import — and
-  the Labor-only tick — at laptop and tablet, on a throwaway bid deleted
-  after. Labor only was checked LOCALLY on 0124 already (todo.md).
-- **Ships together, never apart**: H2 step 2 with 0122/0123; Labor only
-  with 0105–0106 and `5c98bd1` (migrations-next-batch.md says both).
+- **Everything B has built is on `local-dev` and on staging.** A landed
+  0105–0124 on local-dev (`7f5832f`); B merged it into `track-b` (Gate green,
+  drizzle-guard included, `3487c93`), then into local-dev as **`2f469e5`**:
+  tests, staging deploy and smoke all green; staging serves `2f469e5`.
+  That carries H2 step 2 ("hours not set"), "Use suggested", the CSV Pin
+  column and Labor only, all on the schema they pair with.
+- **The STAGING on-screen check is still owed — blocked on the staging
+  password.** `scripts/stagingHoursCheck.mts` is written and does the whole
+  check: passes the gate, signs up a throwaway `example.com` account, builds
+  a test material, role, three assemblies (hours not set / labor only / not
+  said) and a throwaway bid, screenshots bid lines and totals, dashboard,
+  quote-app panel, proposal, editor (not-set, labor-only, new), library and
+  the labor-sheet import preview at laptop and tablet, then archives the bid
+  (the app's delete; purged after 30 days) and deletes the rest. **It stopped
+  at step one: the gate answered 401** to the `STAGING_PASSWORD` in
+  `C:\dev\BidPhase\.env.staging.local` — that value is stale (smoke still
+  gets in with GitHub's current secret). Nothing was created on staging.
+  **To finish:** put the current staging password in that file, then
+  `OUT_DIR=<dir> npx tsx scripts/stagingHoursCheck.mts` and look at every
+  shot. Labor only was already checked LOCALLY on 0124 (todo.md).
+- **Ships together, never apart** — now on local-dev together, as required:
+  H2 step 2 with 0122/0123; Labor only with 0105–0106 and `5c98bd1`.
 - **Not run anywhere, on purpose**: the LT1/LT2 fixture repair script. It
   rides the next release (migrations-next-batch.md § "Data repairs").
 - **Next B jobs with no A column and no bid number** (all on-screen): the
