@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-10-07T04:34:46.394Z",
+ "generatedAt": "2026-10-07T17:45:23.550Z",
  "review": [
   {
    "category": "Wire & Cable",
@@ -14597,24 +14597,24 @@
    "category": "Lighting Hardware",
    "type": "wafer LED downlight",
    "current": "4\" wafer LED downlight",
-   "proposed": "(unchanged)",
-   "why": "",
+   "proposed": "4\" canless wafer LED downlight",
+   "why": "owner's decision on the review sheet",
    "usedBy": "1 starter",
    "usedByCount": 1,
    "status": "Shipped",
-   "decision": "Keep",
+   "decision": "Keep proposed",
    "question": ""
   },
   {
    "category": "Lighting Hardware",
    "type": "wafer LED downlight",
    "current": "5\"/6\" wafer LED downlight",
-   "proposed": "(unchanged)",
-   "why": "",
+   "proposed": "6\" canless wafer LED downlight",
+   "why": "owner's decision on the review sheet",
    "usedBy": "1 starter",
    "usedByCount": 1,
    "status": "Shipped",
-   "decision": "Keep",
+   "decision": "Keep proposed",
    "question": ""
   },
   {
@@ -14753,24 +14753,24 @@
    "category": "Grounding & Bonding",
    "type": "Ground rod",
    "current": "Ground rod, 8 ft",
-   "proposed": "(unchanged)",
-   "why": "",
+   "proposed": "Ground rod, 5/8\" x 8 ft",
+   "why": "owner's decision on the review sheet",
    "usedBy": "5 starters",
    "usedByCount": 5,
    "status": "Shipped",
-   "decision": "Keep",
+   "decision": "Keep proposed",
    "question": ""
   },
   {
    "category": "Grounding & Bonding",
    "type": "Ground rod",
    "current": "Ground rod, 10 ft",
-   "proposed": "(unchanged)",
-   "why": "",
+   "proposed": "Ground rod, 5/8\" x 10 ft",
+   "why": "owner's decision on the review sheet",
    "usedBy": "—",
    "usedByCount": 0,
    "status": "Shipped",
-   "decision": "Keep",
+   "decision": "Keep proposed",
    "question": ""
   },
   {

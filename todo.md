@@ -981,6 +981,25 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       symbol learning later. Nothing may export, pool or share it — even the
       anonymised half — until users have agreed to terms that say so. Not
       blocking the log itself; blocking the first read of it.
+- [ ] **Point DV34's recipe at the new surface-raceway names when they are
+      added** (owner, 2026-10-07, review sheet). DV34 is held for four
+      `missingParts` ("Surface raceway, 10 ft", "… device box", "… cover
+      plate", "… entrance fitting"), which the sheet marks SKIP because the
+      waiting Surface Raceway rows cover them under other names ("Surface
+      raceway base/cover, 500/700 series", "Raceway device box, 1-gang",
+      "Raceway entrance end fitting"; a standard wall plate for the cover).
+      When those rows are seeded: replace `missingParts` with `p(...)` lines
+      naming them (server/seed/starterAssemblies.ts, DV34), so DV34 seeds.
+- [ ] **Track B: drafted recipes name parts by names the rename will change**
+      (references/top-assemblies-draft.md, checked 2026-10-07): e.g.
+      `Ground rod, 8 ft` → `Ground rod, 5/8" x 8 ft`, `#4 bare CU, stranded`
+      → `#4 bare stranded Copper`, `4/0-4/0-4/0-2/0 SER AL` → `4/0-3 SER
+    Aluminum`, `4" wafer LED downlight` → `4" canless wafer LED downlight`.
+      Write recipes through `STARTER_PARTS` keys (they follow
+      RENAMED_BASELINE_MATERIALS), never by display name. The new 4" wafer
+      assembly B is adding uses the SAME row as LT8 (renamed in place).
+      `Underground warning tape` is already a waiting row (Add); the concrete
+      pole base and 320A meter base are owner adds on the review sheet.
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while

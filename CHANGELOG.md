@@ -14,6 +14,15 @@ This is the human-readable companion to the git history — read this to see wha
   appears once the company has three bids — before that nothing extra
   shows. It hides as soon as you start typing.
 
+- **The app now reads sizes in the catalog's new wire names** — "12/2",
+  "#3/4" (a #3 four-wire, not 3/4 inch) and "1/0" without the "#" — so they
+  sort and group correctly. The current names still read exactly as before.
+  This comes before any rename. No material has been renamed yet.
+- **Materials review sheet: owner's second answers applied** (nothing renamed
+  yet). Three ground rods stay separate. 4" and 6" canless wafers are separate
+  items, and the old combined 5"/6" becomes the 6". #3 aluminum is added back.
+  The concrete pole base and the 320A meter base are added. The result is 151
+  renames, 153 adds and no shipped item cut.
 - **"Hours not set" now appears on the Labor line of a bid's totals, not on
   Materials**, on the bid screen and in the proposal's own figures. And
   "Direct cost", "Bid price" and "Total due" no longer break onto two lines

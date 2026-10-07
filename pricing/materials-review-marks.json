@@ -8,21 +8,41 @@
     ],
     "4\" wafer LED downlight|4\" canless LED downlight": [
       "Same - keep A",
-      "Canless and wafer are two names for one fixture; the shipped row is used by a starter."
+      "Owner 2026-10-07: 4\" and 6\" as separate canless wafers. The shipped 4\" is renamed \"4\" canless wafer LED downlight\" (same row, starter LT8 follows) and is this part."
     ],
     "5\"/6\" wafer LED downlight|5\" canless LED downlight": [
-      "Same - keep A",
-      "The shipped 5\"/6\" wafer fits both cutouts; the new 5\" row would split it. UNSURE — see summary."
+      "Not the same",
+      "Owner 2026-10-07: do not fold. The shipped 5\"/6\" becomes the 6\" item; a 5\" is not used (this new row is not added — Review: Cut)."
     ],
     "5\"/6\" wafer LED downlight|6\" canless LED downlight": [
       "Same - keep A",
-      "As the 5\" row. UNSURE — see summary."
+      "The shipped 5\"/6\" is RENAMED into \"6\" canless wafer LED downlight\" (same row, so starter LT7 keeps pricing from it) — this new row would be a second 6\"."
     ],
     "Ground rod, 10 ft|Ground rod, 3/4\" x 10 ft": [
-      "Same - keep B",
-      "Keep the name that states the diameter; neither is used by a starter. UNSURE — see summary."
+      "Not the same",
+      "Owner 2026-10-07: three rods. 5/8\" x 8 ft is the usual one; the plain 10 ft is renamed \"Ground rod, 5/8\" x 10 ft\"; 3/4\" x 10 ft stays."
     ]
   },
+  "review": {
+    "5\" canless LED downlight": [
+      "Cut",
+      "Owner 2026-10-07: 4\" and 6\" only — this new row is not added."
+    ]
+  },
+  "extraMissing": [
+    {
+      "category": "Lighting Hardware",
+      "item": "Concrete pole base",
+      "detail": "Owner 2026-10-07: Track B's drafted recipe GC3 (light pole) uses it (references/top-assemblies-draft.md).",
+      "decision": "Add"
+    },
+    {
+      "category": "Panels",
+      "item": "320A meter base",
+      "detail": "Owner 2026-10-07: Track B's drafted recipe GR3 (320A/400A residential service) — the class-320 meter base with two 200A main breakers; 400A meter base stands in until it exists.",
+      "decision": "Add"
+    }
+  ],
   "questions": {
     "Q2": "Yes",
     "Q2d": "Yes",
@@ -52,8 +72,8 @@
       "Covered by the waiting \"Raceway entrance end fitting\"."
     ],
     "#3 XHHW Aluminum": [
-      "Skip",
-      "Not a size small commercial feeders use; #2 and #1 AL are listed."
+      "Add",
+      "Owner 2026-10-07: add it back — same style as the other aluminum sizes."
     ],
     "#3 bare stranded Copper": [
       "Skip",

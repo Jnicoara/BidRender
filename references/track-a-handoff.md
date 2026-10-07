@@ -4,7 +4,22 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 9) — read this first
+## UPDATE 2026-10-07 (session 10) — read this first
+
+- **Size reader landed** (`d86043b`, local-dev): 12/2, #3/4, bare 1/0 and
+  22 AWG read; the current names are unchanged. **Nothing is renamed or
+  frozen.**
+- **Sheet:** the owner's second answers are marked. Measured: 151 renames,
+  153 adds, 0 shipped rows cut, all Excel warnings 0.
+- **Name-lookup audit and the freeze/rename ORDER** are in
+  `materials-review-sheet-plan.md`. **Waiting for the owner's OK on the
+  order.** One owner question blocks the freeze: `4/0-3 SER Aluminum`
+  collides with a retired row by letter case only.
+- **Wafers:** 4" → `4" canless wafer LED downlight` and 5"/6" → `6" canless
+wafer LED downlight`, both renamed in place. LT8 and LT7 follow through
+  their ids; LT7 is the only user of the 5"/6" row.
+
+## UPDATE 2026-10-07 (session 9)
 
 | What              | State                                                                                                                                                                                                                                                                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

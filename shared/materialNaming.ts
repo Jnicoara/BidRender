@@ -12,7 +12,10 @@
  * It proposes; it renames nothing. The catalog changes only through
  * RENAMED_BASELINE_MATERIALS, after the sheet comes back.
  */
-import { WIRE_AND_CABLE_PROPOSALS } from "./materialRenameProposals";
+import {
+  OWNER_RENAMES,
+  WIRE_AND_CABLE_PROPOSALS,
+} from "./materialRenameProposals";
 
 export type NameProposal = {
   /** The proposed name — equal to the current one when no rule applies. */
@@ -24,6 +27,7 @@ export type NameProposal = {
 };
 
 const WIRE = new Map(WIRE_AND_CABLE_PROPOSALS.map(row => [row.current, row]));
+const OWNER = new Map(OWNER_RENAMES.map(row => [row.current, row.proposed]));
 
 /** Data cable that is not copper-bearing: fibre carries no metal (Q4). */
 const NOT_COPPER = /\bfiber\b|\bfibre\b/i;
@@ -58,6 +62,16 @@ function baseProposal(material: {
   unitOfSale?: string | null;
 }): NameProposal {
   const { name, category } = material;
+
+  // The owner's row-by-row answers on the review sheet (2026-10-07).
+  const owner = OWNER.get(name);
+  if (owner) {
+    return {
+      proposed: owner,
+      why: "owner's decision on the review sheet",
+      openQuestion: null,
+    };
+  }
 
   // Wire and cable: the decided table, row by row (owner, 2026-10-01).
   const wire = WIRE.get(name);
