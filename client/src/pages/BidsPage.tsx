@@ -94,6 +94,7 @@ import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { MostUsedRow } from "@/components/MostUsedRow";
 import { TapExplain } from "@/components/TapExplain";
 import {
   lineHoursNotSet,
@@ -281,6 +282,10 @@ export default function BidsPage({
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
+    // "Most used" counts bids per assembly, so adding or removing a line can
+    // move it — refreshed here, through the one helper every line mutation
+    // already uses (CLAUDE.md § "yesterday's answer").
+    void utils.assemblies.mostUsed.invalidate();
     void utils.bids.units.invalidate({ bidId });
     // Pushing, forking and archiving all change roles rather than lines, so a
     // refresh that skipped this would leave stale badges beside fresh totals.
@@ -369,6 +374,9 @@ export default function BidsPage({
     onError: error => toast.error(error.message),
     onSettled: refresh,
   });
+
+  /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
+  const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
 
   const assemblyResults = useMemo(() => {
     const q = assemblyQuery.trim().toLowerCase();
@@ -861,6 +869,20 @@ export default function BidsPage({
                   aria-label="Unit label"
                 />
               </div>
+
+              {/*
+                "MOST USED" (top-assemblies-draft.md § 4): this company's top
+                assemblies by number of bids, one click to add with the qty
+                and unit above. Only while the search box is empty — typing
+                means the person knows what they want. Nothing at all until
+                the company has 3 bids (the server returns []), so a new
+                account sees no empty row.
+              */}
+              <MostUsedRow
+                items={mostUsed}
+                query={assemblyQuery}
+                onAdd={addHighlighted}
+              />
 
               {assemblyResults.length > 0 && (
                 <div className="rounded-lg border border-border overflow-hidden">

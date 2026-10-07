@@ -38,6 +38,7 @@ import { snapshotHoursFor } from "@shared/assemblyHours";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { MostUsedRow } from "@/components/MostUsedRow";
 import { bidNotPricedCount } from "@/lib/notPricedTotal";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
@@ -86,11 +87,15 @@ export default function QuickBidPage({
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
+  /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
+  const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
   const { data: kits = [] } = trpc.kits.list.useQuery();
   const { data: units = [] } = trpc.bids.units.useQuery({ bidId });
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
+    // Adding here moves the bid screen's "Most used" row too.
+    void utils.assemblies.mostUsed.invalidate();
     void utils.bids.units.invalidate({ bidId });
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
@@ -325,6 +330,11 @@ export default function QuickBidPage({
                 aria-label="Unit label"
               />
             </div>
+
+            {/* The same "Most used" row as the bid screen — one component,
+                same rules: hidden while typing, nothing before 3 bids. A
+                click counts it onto the bid like Enter does (merge). */}
+            <MostUsedRow items={mostUsed} query={query} onAdd={add} />
 
             {results.length > 0 ? (
               <div className="rounded-lg border border-border overflow-hidden">

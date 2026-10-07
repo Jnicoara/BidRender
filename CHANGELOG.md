@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Quick bid has the "Most used" row too** — the same one as the bid
+  screen: your company's most-used assemblies, one tap to count onto the
+  bid, hidden while you type, and nothing extra until the company has three
+  bids.
+
+- **"Most used" assemblies, one click to add.** Under the bid's "Add an
+  assembly" box, a row shows the eight assemblies your company has put on
+  the most bids in the last year; click one to add it with the quantity and
+  unit already typed. It counts bids, not lines, counts your edited copy of
+  a starter together with the starter, leaves out the sample bid, and only
+  appears once the company has three bids — before that nothing extra
+  shows. It hides as soon as you start typing.
+
 - **The app now reads sizes in the catalog's new wire names** — "12/2",
   "#3/4" (a #3 four-wire, not 3/4 inch) and "1/0" without the "#" — so they
   sort and group correctly. The current names still read exactly as before.
