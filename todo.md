@@ -3030,6 +3030,18 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       the pack a part is sold in (a box of 100 wire nuts), because the catalog
       has no pack size yet — `references/material-markup.md` D3. When pack
       sizes land, round there too, in the same function.
+- [ ] **Load drafted starters after names freeze, using final names.**
+      (Owner, 2026-10-07.) Twelve recipes are drafted, not seeded, in
+      `references/top-assemblies-draft.md` § 2b: GC1–GC5 commercial (emergency
+      pack in a troffer, 3-phase panelboard replacement, site pole light,
+      emergency remote head, door-hardware 120V feed) and GR1–GR7
+      residential (old-work switch, 200A underground service, 320/400A
+      service, 50A generator inlet, detached-garage feeder, kitchen and bath
+      20A circuits). Their part names are TODAY's; re-check each against the
+      frozen catalog before seeding (the doc's check script pattern), and add
+      the four ‡ parts (concrete pole base, underground warning tape ×2 uses,
+      320A class meter base) to the catalog first or leave those starters
+      held. Hours stay not set.
 - [ ] **Starter assemblies: the 168 are IN THE SEED (Track B, 2026-10-06);
       160 are held until Track A's 0122 and 0123.**
       (`references/starter-assemblies-plan.md`,

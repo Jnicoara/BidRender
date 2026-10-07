@@ -59,8 +59,10 @@ raceway is in the catalog, so it is listed but not in either top list.
 - **Site / parking lot pole light** — `20 ft light pole` and `LED area light`
   are in the catalog; no assembly puts them together (base, pole, head, hand
   hole, ground).
-- **Emergency light, remote head** and **exit sign with battery, ceiling
-  mount in hard lid** — variants people price often.
+- **Emergency light, remote head** — priced often on retail; no starter.
+- ~~Exit sign with battery, hard-lid ceiling~~ — **not a gap after all**
+  (checked 2026-10-07): LT27 is already an exit sign on a 4" box with a
+  fixture mud ring, which is the hard-lid mount.
 - **Door hardware power (card reader / maglock 120V feed)** — common in office
   TI; low-voltage side is by others, but the 120V circuit and J-box are ours.
 
@@ -71,33 +73,38 @@ raceway is in the catalog, so it is listed but not in either top list.
 | 1   | DV1  | Duplex receptacle standard               |
 | 2   | DV4  | Single-pole switch                       |
 | 3   | LT7  | Wafer LED downlight, 6" (canless)        |
-| 4   | DV2  | GFCI receptacle                          |
-| 5   | DV13 | 3-way switch                             |
-| 6   | DV9  | AFCI receptacle                          |
-| 7   | LT1  | Surface-mount ceiling fixture            |
-| 8   | DV5  | Dimmer switch                            |
-| 9   | RS9  | Combination smoke/CO detector            |
-| 10  | LT2  | Ceiling fan standard                     |
-| 11  | DV3  | Dedicated 20A receptacle                 |
-| 12  | RS7  | Bath exhaust fan wiring                  |
-| 13  | DV8  | Outdoor GFCI receptacle, in-use cover    |
-| 14  | LT12 | Vanity light                             |
-| 15  | LT14 | Under-cabinet light                      |
-| 16  | RS4  | Dishwasher connection                    |
-| 17  | RS5  | Garbage disposal, switched               |
-| 18  | RS6  | Range hood / microwave circuit           |
-| 19  | RS1  | Range receptacle, 50A                    |
-| 20  | RS2  | Dryer receptacle, 30A                    |
-| 21  | LT10 | Pendant light                            |
-| 22  | MH1  | HVAC condenser disconnect + whip         |
-| 23  | RS12 | EV charger circuit, 48A hardwired        |
-| 24  | RS13 | EV / RV receptacle, 50A (NEMA 14-50)     |
-| 25  | PG3  | Service upgrade 200A, meter-main outdoor |
-| 26  | PG2  | Service upgrade 200A, overhead           |
-| 27  | RS18 | Generator inlet and interlock            |
-| 28  | PG9  | Breaker swap to AFCI/GFCI                |
-| 29  | PG5  | Subpanel, 100A (resi, 60A feed)          |
-| 30  | PG19 | Standby generator hookup                 |
+| 4   | LT8  | Wafer LED downlight, 4" (canless)        |
+| 5   | DV2  | GFCI receptacle                          |
+| 6   | DV13 | 3-way switch                             |
+| 7   | DV9  | AFCI receptacle                          |
+| 8   | LT1  | Surface-mount ceiling fixture            |
+| 9   | DV5  | Dimmer switch                            |
+| 10  | RS9  | Combination smoke/CO detector            |
+| 11  | LT2  | Ceiling fan standard                     |
+| 12  | DV3  | Dedicated 20A receptacle                 |
+| 13  | RS7  | Bath exhaust fan wiring                  |
+| 14  | DV8  | Outdoor GFCI receptacle, in-use cover    |
+| 15  | LT12 | Vanity light                             |
+| 16  | LT14 | Under-cabinet light                      |
+| 17  | RS4  | Dishwasher connection                    |
+| 18  | RS5  | Garbage disposal, switched               |
+| 19  | RS6  | Range hood / microwave circuit           |
+| 20  | RS1  | Range receptacle, 50A                    |
+| 21  | RS2  | Dryer receptacle, 30A                    |
+| 22  | LT10 | Pendant light                            |
+| 23  | MH1  | HVAC condenser disconnect + whip         |
+| 24  | RS12 | EV charger circuit, 48A hardwired        |
+| 25  | RS13 | EV / RV receptacle, 50A (NEMA 14-50)     |
+| 26  | PG3  | Service upgrade 200A, meter-main outdoor |
+| 27  | PG2  | Service upgrade 200A, overhead           |
+| 28  | RS18 | Generator inlet and interlock            |
+| 29  | PG19 | Standby generator hookup                 |
+| 30  | PG9  | Breaker swap to AFCI/GFCI                |
+
+**4" wafer (owner, 2026-10-07: "we use a lot of them"):** already a starter —
+**LT8**, `4" wafer LED downlight` + `14-2 NM-B` 20 ft whip + 2 wire nuts,
+tagged Both — so it is at #4, not on the missing list. PG5 (100A subpanel)
+moved off the top 30 to make room.
 
 **Common on these jobs but NOT a starter (gaps):**
 
@@ -114,6 +121,95 @@ raceway is in the catalog, so it is listed but not in either top list.
   priceable today as DV3 + DV2, but estimators look for them by those names.
 
 ---
+
+## 2b. Drafted recipes for the gaps — NOT in the seed yet
+
+**Owner, 2026-10-07: draft only, load after material names freeze, using
+the final names** (todo.md). Every part below is an exact shipped catalog
+name **today** (checked by script against `BASELINE_MATERIALS`, 2026-10-07);
+**‡ marks a part the catalog does not have**. Hours are **not set** on all
+of them (D1). Conduit and wire that a traced run owns are left out, as in
+every starter (STARTER_LIBRARY.md). F = the fixture or equipment line (D2).
+Surface raceway (DV34) stays held and is not repeated here.
+
+### Commercial
+
+**GC1 — Emergency battery pack added to a troffer** · Commercial · Lighting
+`Emergency battery backup pack` 1 · `Wire nuts` 4 — the unswitched hot
+comes from the fixture's own whip; add `6ft MC whip` 1 if it needs a new one.
+
+**GC2 — Panelboard replacement, 3-phase, existing feeders** · Commercial ·
+Panels
+`225A panelboard, 3-phase main, 42-space` 1 · `#12 THHN` 40 · `Wire nuts` 20
+· `Panel knockout seal` 4 · `Panel directory label` 1 · `Arc flash label` 1 —
+breakers counted with PG7/PG8/PG15, as PG4 does; swap to `Panelboard interior
+only` 1 when only the guts are changed.
+
+**GC3 — Site / parking lot pole light** · Commercial · Lighting
+`20 ft light pole` 1 · F `LED area light` 1 · `Pole anchor bolt kit` 1 ·
+`Pole base cover` 1 · `Pole base grout` 1 · `Pole handhole cover` 1 ·
+`Ground rod, 8 ft` 1 · `Ground rod clamp` 1 · `Wire nuts` 3 ·
+‡ _Concrete pole base (pier)_ 1 — conduit and wire traced.
+
+**GC4 — Emergency light, remote head** · Commercial · Lighting
+`4" square box` 1 · `4" square mud ring, fixture` 1 · F `Emergency light
+remote head` 1 · `18/2 control wire` 25 · `Wire nuts` 2 — fed from an
+`Emergency light` or `Emergency exit light combo` that has remote capacity.
+
+**GC5 — 120V feed for door hardware / access control** · Commercial ·
+Devices
+`4" square box` 1 · `4" square blank cover` 1 · `12-2 MC cable` 40 ·
+`3/8" MC connector` 2 · `MC anti-short bushing` 2 · `20A Single-Pole
+breaker` 1 · `Wire nuts` 3 — the power supply and low-voltage side are by
+others.
+
+### Residential
+
+**GR1 — Single-pole switch, old work** · Residential · Devices
+`Single-gang old-work box` 1 · `Single-pole switch` 1 · `Wall plate` 1 ·
+`14-2 NM-B` 20 whip · `Wire nuts` 3
+
+**GR2 — Service upgrade 200A, underground** · Residential · Panels
+`200A meter base` 1 · `200A main panel, 40-space` 1 · `2" PVC Sch 40` 10 ·
+`2" PVC Sch 40 90-degree elbow` 1 · `2" PVC Sch 40 connector` 2 ·
+`4/0-4/0-4/0-2/0 SER AL` 10 · `Ground rod, 8 ft` 2 · `Ground rod clamp` 2 ·
+`#4 bare CU, stranded` 30 · `Water pipe bonding clamp` 1 · `Intersystem
+bonding bridge` 1 · `Panel directory label` 1 · ‡ _Underground warning
+tape_ 1 — the lateral to the transformer is usually the utility's.
+
+**GR3 — Service 320A / 400A residential (two 200A panels)** · Residential ·
+Panels
+`400A meter base` 1 · `200A main panel, 40-space` 2 ·
+`4/0-4/0-4/0-2/0 SER AL` 20 · `Ground rod, 8 ft` 2 · `Ground rod clamp` 2 ·
+`#4 bare CU, stranded` 30 · `Water pipe bonding clamp` 1 · `Intersystem
+bonding bridge` 1 · `Panel directory label` 2 · ‡ _320A class meter base
+with two 200A breakers_ — the common residential part; `400A meter base`
+stands in until it is in the catalog.
+
+**GR4 — Generator inlet and interlock, 50A** · Residential · Panels
+`Generator interlock kit` 1 · `50A power inlet box` 1 · `50A 2-Pole
+breaker` 1 · `6-3 NM-B` 25 · `1" cable connector` 1 · F `50A generator
+cord` 1
+
+**GR5 — Detached garage / shop feeder and panel** · Residential · Panels
+`100A main panel, 24-space` 1 · `60A 2-Pole breaker` 1 · `Ground rod, 8 ft`
+2 · `Ground rod clamp` 2 · `#6 bare CU, stranded` 20 · `1" PVC Sch 40
+connector` 2 · `Panel directory label` 1 · ‡ _Underground warning tape_ 1 —
+a main-breaker panel so the building has its disconnect; feeder conduit and
+wire traced.
+
+**GR6 — Kitchen countertop 20A circuit** · Residential · Devices
+`Single-gang box` 1 · `20A GFCI receptacle` 1 · `Wall plate` 1 · `12-2
+NM-B` 35 · `20A Single-Pole AFCI breaker` 1 · `Wire nuts` 3 — includes its
+home run (not a whip), like DV3.
+
+**GR7 — Bathroom 20A circuit** · Residential · Devices
+`Single-gang box` 1 · `20A GFCI receptacle` 1 · `Wall plate` 1 · `12-2
+NM-B` 35 · `20A Single-Pole breaker` 1 · `Wire nuts` 3 — includes its home
+run (not a whip), like DV3.
+
+**Missing from the catalog, all recipes:** ‡ concrete pole base (GC3),
+‡ underground warning tape (GR2, GR5), ‡ 320A class meter base (GR3).
 
 ## 3. Residential / Commercial / Both — every starter
 
