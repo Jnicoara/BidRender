@@ -20,7 +20,7 @@
  *   deletes the assemblies, material and role for good.
  * Never touches another account, never writes to the database directly.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import type { Browser, BrowserContext, Page } from "playwright-core";
 import { SIZES, launchChrome } from "./deviceAudit.mts";
 
@@ -100,6 +100,10 @@ const gate = await setup.request.post(`${BASE}/staging-gate`, {
 });
 if (gate.status() >= 400)
   throw new Error(`staging gate refused (${gate.status()})`);
+// The throwaway login, kept OUTSIDE the repo so a run that fails half-way
+// can still be signed back into and cleaned up. Never printed.
+if (process.env.CREDS_FILE)
+  writeFileSync(process.env.CREDS_FILE, JSON.stringify({ email, password }));
 await trpc(setup, "auth.signup", {
   email,
   password,
@@ -164,7 +168,8 @@ try {
 
     await go(page, `/bids/${bid.id}`);
     await shot("bid");
-    await page.getByText("Total due").first().scrollIntoViewIfNeeded();
+    // "Bid price" is always there; "Total due" only once sales tax is set up.
+    await page.getByText("Bid price").first().scrollIntoViewIfNeeded();
     await shot("bid-totals");
 
     await page.getByRole("button", { name: /^Send/ }).click();
