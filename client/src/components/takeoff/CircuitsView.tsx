@@ -356,8 +356,9 @@ export function CircuitsPanel({
 }
 
 /**
- * The sheet layer: the picked circuit's devices ringed, its closest device
- * joined to the panel by the right-angle path, the panel's spot, and — while
+ * The sheet layer: the picked circuit's devices ringed (the one its homerun
+ * leaves from larger), the panel's spot — and NO path between them (patent
+ * option A, 2026-10-07) — and, while
  * placing — the one tap that sets it. That tap stops here, so an armed tool
  * underneath never also takes it (CLAUDE.md, "a guard, not a comment").
  */
@@ -385,9 +386,6 @@ export function CircuitLayer({
       : null;
   const devices =
     pick?.kind === "untagged" ? report.untagged : (circuit?.devices ?? []);
-  const panelSpot = circuit
-    ? (report.panels.find(p => p.name === circuit.panel)?.spot ?? null)
-    : null;
   const tone = pick?.kind === "untagged" ? "#F59E0B" : "#0D9488";
   // Where the tap began; a ref, so a re-render mid-tap cannot reset it.
   const downRef = useRef({ x: 0, y: 0 });
@@ -450,21 +448,16 @@ export function CircuitLayer({
           </g>
         ) : null
       )}
-      {circuit?.closest && panelSpot && (
-        <polyline
-          points={[
-            [circuit.closest.device.x, circuit.closest.device.y],
-            [panelSpot.x, circuit.closest.device.y],
-            [panelSpot.x, panelSpot.y],
-          ]
-            .map(([x, y]) => `${x * k},${y * k}`)
-            .join(" ")}
-          fill="none"
-          stroke="#7C3AED"
-          strokeWidth={4 * k}
-          strokeDasharray={`${12 * k} ${7 * k}`}
-        />
-      )}
+      {/*
+        NO PATH between the device and the panel (owner, 2026-10-07: patent
+        option A, references/homerun-patent-notes.md). A dashed one-corner
+        right-angle line was drawn here, for display only; it is gone, and
+        nothing on this layer may join a device to a panel. The device is
+        still ringed (the leaving one larger) and the panel still marked.
+        The homerun's LENGTH never came from the line and has not changed.
+        server/noHomerunPath.test.ts fails if a line, polyline or path
+        element comes back into this layer.
+      */}
       {devices.map(d => {
         const closest = circuit?.closest?.device.id === d.id;
         return (

@@ -293,9 +293,18 @@ Search those before asking for a height column.
 - [ ] **Drops not priced are NOT in analytics or the dashboard cards** — those
       list many bids and do not load each one's takeoff. A bid card can still
       read complete while its bid page says drops are not priced. Owner's call.
-- [ ] **Patent review (US 11,120,171):** `references/homerun-patent-notes.md`
-      for the attorney — plan only. Waiting on the owner/attorney before
-      changing anything (options A–C there).
+- [x] **Patent review (US 11,120,171) — Option A chosen and built 2026-10-07:**
+      the dashed device-to-panel line is gone from the Circuits layer (rings
+      and the panel mark stay; length math unchanged), guarded by
+      `server/noHomerunPath.test.ts`. `references/homerun-patent-notes.md` § 4
+      sets claims 1, 13 and dependents 4–9 beside what the app does.
+- [ ] **Patent — for the attorney:** the Measured number |Δx| + |Δy| equals the
+      length of a one-corner right-angle path although none is generated or
+      drawn (notes § 4, claim 13 flag). If that matters, Option B (user traces
+      each homerun) or C (typed lengths) removes it. Also: never add a
+      "direct"/straight-line choice — claim 1 names exactly that.
+- [ ] Claim text in the notes was read through a summarising fetch tool —
+      the attorney should check it against the official text.
 
 **Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
 `references/homerun-footage-plan.md`; nothing computes footage yet). Owner:

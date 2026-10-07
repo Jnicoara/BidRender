@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **The Circuits view no longer draws a line from a device to its panel
+  (branch `c-homerun-footage`).** Picking a circuit still rings its devices
+  and marks the panel, but nothing is drawn between them — the owner's
+  choice after the patent review. Homerun lengths are worked out exactly as
+  before. The attorney's notes now compare each claim of the patent with
+  what the app does.
+
 - **A bid cannot print a price while drops are unpriced (branch
   `c-homerun-footage`).** Drops whose material was never picked now count as
   "not priced" on the bid itself: the totals read "+ 205 drops not priced",

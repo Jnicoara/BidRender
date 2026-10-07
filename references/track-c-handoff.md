@@ -295,6 +295,19 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+**Patent Option A — DONE on `c-homerun-footage` (2026-10-07).** The dashed
+one-corner device-to-panel line is removed from `CircuitLayer`; a picked
+circuit's devices are ringed (leaving device larger) and the panel stays
+marked, with NO path between them. Length math untouched (homerun suites
+pass unchanged). Guard: `server/noHomerunPath.test.ts` (reads the layer's
+source, comments stripped; red on the old file). Seen at 1180x820 touch on
+E111, circuit 2B-1: 7 rings, 1 panel mark, 0 line elements, 42.8 ft.
+`references/homerun-patent-notes.md` § 4 now quotes claims 1, 13 and 4–9
+(fetched from Google Patents; attorney to verify the wording) and says per
+element what the app does. Honest flag in it: |Δx| + |Δy| equals the length
+of the one-corner orthogonal path even with nothing drawn. Do NOT add a
+straight-line / "direct" option (claim 1).
+
 **Drops not priced are in the bid's not-priced check — DONE on
 `c-homerun-footage` (2026-10-07, owner YES).** `NotPricedTally.drops`
 (optional, so B's lines-only tallies need no edit), `withDropsNotPriced`
