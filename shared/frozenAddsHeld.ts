@@ -34,6 +34,16 @@ export const FROZEN_ADDS_SHIPPED_AS: Readonly<Record<string, string>> = {
   '8" canless LED downlight': '8" canless wafer LED downlight',
   // Owner, 2026-10-07: generic name first, the trade word beside it.
   "Wire mold for low voltage": "Surface raceway (wire mold), low voltage",
+  // Owner's third answers, 2026-10-07: the variants carry "canless" so the
+  // plain canless wafer leads a typed "6 wafer" (lighting.ts).
+  ...Object.fromEntries(
+    ['2"', '3"', '4"', '5"', '6"', '8"'].flatMap(size =>
+      ["CCT selectable", "gimbal", "slim", "wet rated"].map(variant => [
+        `${size} wafer LED downlight, ${variant}`,
+        `${size} canless wafer LED downlight, ${variant}`,
+      ])
+    )
+  ),
 };
 
 export type HeldAdd = {

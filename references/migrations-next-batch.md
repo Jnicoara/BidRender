@@ -267,7 +267,10 @@ don't merge." Not written as a file yet; this is the plan.
 
 ## Batch 5 — before the priced sheet (numbered from 0132 when written — 0131 is Track C's, above)
 
-**Added 2026-10-07 — example LOADED labor rates** (owner;
+**Added 2026-10-07 — example LOADED labor rates, APPROVED by the owner the
+same day** (Foreman ~$70.50, Journeyman $59.22, Apprentice $36.66, Helper
+$33.84, 41% burden as parts; NEVER the rates without the flag — one
+release;
 `references/starter-vs-company-plan.md` § 3b): `labor_rates.isExampleRate`,
 `labor_rates.baseWage`, `payrollTaxPct`, `workersCompPct`, `insurancePct`,
 `benefitsPct`, and `bid_line_items.snapshotLaborRateWasExample`. All additive,

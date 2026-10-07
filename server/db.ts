@@ -2158,6 +2158,9 @@ export async function seedBaselineMaterialsFrom(
       trade: m.trade ?? "electrical",
       defaultQty: m.defaultQty != null ? m.defaultQty.toFixed(4) : null,
       ...racewayColumns(m),
+      // From the starter labor sheet (starterLaborUnits.ts); NULL = not set.
+      laborHours: m.laborHours ?? null,
+      fieldBendLaborHours: m.fieldBendLaborHours ?? null,
       userId: null,
     }));
 
@@ -2261,6 +2264,8 @@ async function backfillMaterialMetadata(
       stickJoint: materials.stickJoint,
       strapSpacingFeet: materials.strapSpacingFeet,
       strapFromBoxFeet: materials.strapFromBoxFeet,
+      laborHours: materials.laborHours,
+      fieldBendLaborHours: materials.fieldBendLaborHours,
     })
     .from(materials)
     .where(isNull(materials.userId));
@@ -2305,6 +2310,19 @@ async function backfillMaterialMetadata(
     }
     if (row.stickJoint !== wantRaceway.stickJoint) {
       patch.stickJoint = wantRaceway.stickJoint;
+    }
+
+    // Labor units, from the starter labor sheet (pricing/loadStarterSheets
+    // .mts) — re-stamped like the price, so a value loaded into the seed
+    // reaches every existing database on its next start. SHIPPED rows only,
+    // as everything in this pass: a company's own hours live on its fork and
+    // are never in this loop. Added 2026-10-07; measured that day, staging's
+    // 1,713 shipped rows held no hours at all, so the first run changes
+    // nothing. NULL compared as NULL, numbers numerically.
+    for (const key of ["laborHours", "fieldBendLaborHours"] as const) {
+      const want = intended[key] ?? null;
+      const have = row[key] === null ? null : Number(row[key]);
+      if (have !== (want === null ? null : Number(want))) patch[key] = want;
     }
 
     if (Object.keys(patch).length > 0) {

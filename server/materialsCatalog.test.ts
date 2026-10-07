@@ -401,21 +401,31 @@ describe("alias hygiene across the whole catalog", () => {
     // Owner, 2026-10-07, twice: first "4" and 6" separately" (the 5"/6" row
     // became the 6"), then "ship ALL wafer/canless/CCT-disc sizes (2", 3",
     // 4", 5", 6", 8"), each size its own separate item, never folded
-    // together". So: one canless wafer per size, four variants per size, and
-    // no wafer name carrying two sizes.
+    // together". So: one canless wafer per size, four variants per size
+    // (named after the plain row, third answers: "6" canless wafer LED
+    // downlight, slim"), and no wafer, disc or retrofit-trim name carrying
+    // two sizes — the plain 5"/6" disc and trim were split the same day.
     const names = new Set(BASELINE_MATERIALS.map(m => m.name));
     for (const s of ['2"', '3"', '4"', '5"', '6"', '8"']) {
       expect(names.has(`${s} canless wafer LED downlight`), s).toBe(true);
       for (const v of ["CCT selectable", "gimbal", "slim", "wet rated"])
-        expect(names.has(`${s} wafer LED downlight, ${v}`), `${s} ${v}`).toBe(
-          true
-        );
+        expect(
+          names.has(`${s} canless wafer LED downlight, ${v}`),
+          `${s} ${v}`
+        ).toBe(true);
     }
     const wafers = BASELINE_MATERIALS.filter(m => /wafer/.test(m.name)).map(
       m => m.name
     );
     expect(wafers).toHaveLength(30);
-    expect(wafers.filter(n => /"\/\d/.test(n))).toEqual([]);
+    const folded = BASELINE_MATERIALS.filter(m =>
+      /wafer|disc light|retrofit trim/.test(m.name)
+    ).filter(m => /"\/\d/.test(m.name));
+    expect(folded.map(m => m.name)).toEqual([]);
+    for (const s of ['4"', '5"', '6"']) {
+      expect(names.has(`${s} LED disc light`), s).toBe(true);
+      expect(names.has(`${s} LED retrofit trim`), s).toBe(true);
+    }
     for (const s of ['4"', '5"', '6"', '7"'])
       expect(names.has(`${s} LED disc light, CCT selectable`), s).toBe(true);
   });

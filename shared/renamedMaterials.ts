@@ -195,14 +195,42 @@ const FROZEN_FINAL: Record<string, string> = Object.fromEntries(
  * plan.md item 6). renamedMaterials.test.ts fails on any value that is
  * itself a key.
  */
+/**
+ * Renames decided AFTER the freeze — the owner's third answers, 2026-10-07.
+ * Rows that reached staging under the first name are renamed in place.
+ *   - The wafer variants put "canless" in the name, so a typed "6 wafer"
+ *     leads with the plain 6" canless wafer rather than its variants.
+ *   - The plain 5"/6" disc and 5"/6" LED retrofit trim are split: the
+ *     combined row BECOMES the 6" (same id, so the three 6" starters that
+ *     use the trim keep pricing from it), and a 5" is a new row.
+ */
+const AFTER_FREEZE: Record<string, string> = {
+  ...Object.fromEntries(
+    ['2"', '3"', '4"', '5"', '6"', '8"'].flatMap(size =>
+      ["CCT selectable", "gimbal", "slim", "wet rated"].map(variant => [
+        `${size} wafer LED downlight, ${variant}`,
+        `${size} canless wafer LED downlight, ${variant}`,
+      ])
+    )
+  ),
+  '5"/6" LED disc light': '6" LED disc light',
+  '5"/6" LED retrofit trim': '6" LED retrofit trim',
+};
+
+/** Today's name for a name some rename above produced. */
+const latest = (name: string): string => AFTER_FREEZE[name] ?? name;
+
 export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   ...Object.fromEntries(
     Object.entries(RENAMED_BEFORE_2026_10_07).map(([from, to]) => [
       from,
-      FROZEN_FINAL[to] ?? to,
+      latest(FROZEN_FINAL[to] ?? to),
     ])
   ),
-  ...FROZEN_FINAL,
+  ...Object.fromEntries(
+    Object.entries(FROZEN_FINAL).map(([from, to]) => [from, latest(to)])
+  ),
+  ...AFTER_FREEZE,
 };
 
 /** An old spelling, normalised the way search ranking compares names. */

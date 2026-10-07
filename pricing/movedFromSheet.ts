@@ -192,9 +192,10 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Spa manual disconnect": "50A GFCI spa disconnect",
   "Hot tub GFCI panel": "50A GFCI spa disconnect",
   "20A twist-lock receptacle": "L5-20 receptacle",
-  // The wafer's two-size rule: 5", 6" and 7" discs are one 5"/6" row.
-  '6" LED disc light': '5"/6" LED disc light',
-  '7" LED disc light': '5"/6" LED disc light',
+  // (5", 6" and 7" discs were folded into one 5"/6" row here until
+  // 2026-10-07, when the owner split it — "never folded together". The 5"
+  // and 6" now ship as themselves; a plain 7" is not shipped, and is no
+  // longer folded into another size.)
   "Wall plate extender": "Single-gang box extender",
 };
 
@@ -335,7 +336,6 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   "SEU cable, 4-4-6": "4-4-6 SEU Aluminum",
   "USE-2, 4/0": "4/0 USE-2 Aluminum",
   "Aluminum URD, 1/0": "1/0 URD triplex Aluminum",
-  '5" LED disc light': '5"/6" LED disc light',
   ...Object.fromEntries(
     ["15", "30", "45", "75"].map(kva => [
       `Step-down transformer, ${kva} kVA`,

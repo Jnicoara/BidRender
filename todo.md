@@ -1076,7 +1076,7 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       `Ground rod, 5/8" x 8 ft`, `#4 bare stranded Copper`,
       `4/0-4/0-4/0-2/0 SER Aluminum`, `4" canless wafer LED downlight` (the
       SAME row as LT8 — the new 4" wafer assembly uses it), `2/0 XHHW
-  Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
+Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       drafts marked missing now ship: `Underground warning tape`,
       `Concrete pole base`, `320A meter base`. Full list:
       `pricing/frozen-names.json`; what is NOT shipped and why:
@@ -1087,12 +1087,16 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       duplicates; 2 declined (QO-only 60A/70A). Reasons in
       `shared/frozenAddsHeld.ts`. Point DV34 at the surface raceway rows
       (line above).
-- [ ] **Owner questions from the adds (2026-10-07):** (1) "6 wafer" lists
-      the four 6" variants before the plain 6" canless wafer, because their
-      names start "6" wafer" — rename the variants to "6" canless wafer LED
-      downlight, slim" etc. if the plain one should lead? (2) The plain
-      `5"/6" LED disc light` and `5"/6" LED retrofit trim` are still one row
-      for two sizes — split them too ("never folded together")?
+- [x] **Owner questions from the adds** — answered 2026-10-07: wafer
+      variants renamed "N" canless wafer LED downlight, <variant>" (the plain
+      one leads "N wafer"); the 5"/6" disc and retrofit trim split into 5"
+      and 6" (the combined row became the 6", same id).
+- [ ] **Owner question: how does a SHIPPED labor unit say it is an
+      example?** The starter labor sheet loads into the seed
+      (`pricing/loadStarterSheets.mts`), but `server/starterValues.test.ts`
+      refuses any shipped hours until they can be tagged the way prices are
+      ("Example price"). Recommend the same shape: `materials.isExampleLaborHours`
+      (Batch 5), "Example hours" on the bid screen, a warning before printing.
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while

@@ -197,17 +197,18 @@ describe("counts and cable specs keep working", () => {
     expect(search("#12").some(n => /under-cabinet/.test(n))).toBe(false);
   });
 
-  it('"6 wafer" finds 6" wafers only, the canless one among them — every size its own item', () => {
+  it('"6 wafer" leads with the plain 6" canless wafer, at every size, and never leaks a size', () => {
     // Was 'a dual size is both: "6 wafer" finds the 5"/6" wafer' while one
     // row covered both openings. The owner split them (4" and 6"), then
-    // shipped every size 2"–8" with four variants each (2026-10-07). The
-    // variants' names START "6" wafer", so they lead the canless one on the
-    // typed phrase — an owner question (handoff), pinned here as it is: the
-    // size never leaks, and the canless row is in the first five.
-    for (const s of ["2", "4", "5", "6", "8"]) {
+    // shipped every size 2"–8" with four variants each (2026-10-07). Named
+    // "6" wafer LED downlight, slim" the variants matched the typed phrase
+    // and led the plain row; the owner had them renamed "6" canless wafer LED
+    // downlight, slim" (third answers) so the plain one leads. This goes red
+    // if it stops.
+    for (const s of ["2", "3", "4", "5", "6", "8"]) {
       const hits = search(`${s} wafer`).slice(0, 5);
       onlySize(hits, s);
-      expect(hits).toContain(`${s}" canless wafer LED downlight`);
+      expect(hits[0], `${s} wafer`).toBe(`${s}" canless wafer LED downlight`);
     }
   });
 });

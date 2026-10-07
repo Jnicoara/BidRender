@@ -112,6 +112,24 @@ screen must NOT exist before he fills the sheets.** Reasons:
    exist.
 3. Filling the sheets does not depend on it — he fills spreadsheets either way.
 
+> **BUILT 2026-10-07 (owner: "build the file loader").**
+> `pricing/loadStarterSheets.mts` reads the filled sheets and writes
+> `server/seed/materials/starterPrices.ts` and `starterLaborUnits.ts` (dry
+> run unless `--write`; refuses an unknown name, a unit mismatch, a bad
+> number, bend hours off a raceway, a duplicate — each with its sheet row;
+> prints every before -> after). The seed applies both by name and
+> re-stamps shipped rows' price and labor hours on every start (labor hours
+> joined the re-stamp that day; staging's 1,713 shipped rows held none).
+> Exercised end to end on scratch sheets: $138 / 250 ft roll -> $0.5520/ft,
+> 1.2 h per 100 ft -> 0.0120 h/ft, three bad rows refused.
+> **Inert until tagged:** `server/starterValues.test.ts` fails while either
+> generated file holds a value and its example tag does not exist
+> (`materials.isExamplePrice`; for hours, a tag still to be decided — owner
+> question). The sheets, rebuilt from the frozen catalog that day:
+> `pricing/starter-catalog-pricing.xlsx` and `pricing/labor-units-starter.xlsx`
+> (`pricing/buildStarterSheets.mts`, 1,715 rows each — the 1,713 plus the
+> 5" disc and 5" retrofit trim split out the same day).
+
 **What the loader needs before the first real prices load** (in order):
 
 1. `materials.isExamplePrice` + `bid_line_items.snapshotPriceWasExample`
@@ -162,6 +180,12 @@ retired to first-boot. Its own plan when the time comes.
   `onboarding.setStarterRate`, his company only).
 
 ### The plan: shipped EXAMPLE LOADED rates, deliberately high
+
+> **APPROVED by the owner, 2026-10-07:** Foreman ~$70.50, Journeyman
+> $59.22, Apprentice $36.66, Helper $33.84, 41% burden shown as its parts —
+> "kept in the migration batch with the 'Example rate' flag, shipped
+> together (never rates without the flag)". Not built: they wait for the
+> Batch 5 columns, and land in the same release as `isExampleRate`.
 
 **The owner's rule: if the example is wrong, better high than low.** A high
 example loses a job; a low one wins a job at a loss. Anchor (BLS OEWS, May

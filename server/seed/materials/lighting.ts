@@ -66,13 +66,19 @@ const recessed: BaselineMaterial[] = [
  *
  * Since 2026-10-07 the CCT-selectable discs ship at 4", 5", 6" and 7", each
  * its own item (owner: "never folded together"), so the plain 5"/6" row no
- * longer answers to "7": that is a real row now. The plain 5"/6" row itself
- * is unchanged — whether it splits too is an open owner question
- * (references/track-a-handoff.md).
+ * longer answers to "7": that is a real row now.
+ *
+ * ── SPLIT, owner 2026-10-07 (third answers) ──────────────────────────────
+ * The plain 5"/6" disc is now separate 5" and 6" items. The 5"/6" row is
+ * RENAMED IN PLACE to the 6" (same id — RENAMED_BASELINE_MATERIALS, post-
+ * freeze block) and the 5" is new. No starter used it (checked 2026-10-07);
+ * a saved bid line keeps the name it was added under.
  */
 const discs: BaselineMaterial[] = [
   { size: '4"', slang: "4 four" },
-  { size: '5"/6"', slang: "5 6 five six 5/6" },
+  { size: '5"', slang: "5 five" },
+  // The old combined row's spelling, so typing its name still finds it.
+  { size: '6"', slang: '6 six 5"/6" 5/6' },
 ].map(({ size, slang }) => ({
   ...fixture,
   name: `${size} LED disc light`,
@@ -101,7 +107,13 @@ const cctDiscs: BaselineMaterial[] = [
 
 /*
   Wafer variants, every size its own item (owner, 2026-10-07). NOT the same
-  part as the canless wafer above: each says what makes it different.
+  part as the canless wafer above: each says what makes it different, AFTER
+  the comma. Named "6" canless wafer LED downlight, slim" — the plain row's
+  name plus the variant — since the owner's third answers (same day): as
+  "6" wafer LED downlight, slim" they matched a typed "6 wafer" as a phrase
+  and led the plain 6" canless wafer, which is the one an estimator means.
+  Renamed in place on databases that already had them (post-freeze block in
+  shared/renamedMaterials.ts).
 */
 const WAFER_SIZES: { size: string; slang: string }[] = [
   { size: '2"', slang: "2 two mini" },
@@ -127,11 +139,11 @@ const waferVariants: BaselineMaterial[] = WAFER_VARIANTS.flatMap(
   ({ variant, slang: variantSlang }) =>
     WAFER_SIZES.map(({ size, slang }) => ({
       ...fixture,
-      name: `${size} wafer LED downlight, ${variant}`,
+      name: `${size} canless wafer LED downlight, ${variant}`,
       searchAliases: aliases(
         slang,
         variantSlang,
-        "canless recessed pot light retrofit trim"
+        "recessed pot light retrofit trim"
       ),
     }))
 );
@@ -387,12 +399,20 @@ const cans: BaselineMaterial[] = CAN_SIZES.flatMap(
 
 /**
  * The LED module that goes INTO an existing can — the most common downlight
- * job on a remodel, and missing until now. 5"/6" as one row, for the reason
- * `recessed` gives above.
+ * job on a remodel, and missing until now. It was 5"/6" as one row; SPLIT
+ * into 5" and 6" by the owner, 2026-10-07 ("never folded together"). The
+ * 5"/6" row was RENAMED IN PLACE to the 6" (same id), so the three starters
+ * that use it — "Recessed can new construction, 6"", LT6 "Recessed can
+ * retrofit, 6"" and DR20 "Recessed can LED retrofit (resi)", all 6" jobs —
+ * keep pricing from the same row, now named 6" (measured on staging
+ * 2026-10-07: those 3 recipe lines, 0 company copies, 0 bid lines). The 5"
+ * is new.
  */
 const retrofitTrims: BaselineMaterial[] = [
   { size: '4"', slang: "4 four rl4" },
-  { size: '5"/6"', slang: "5 6 five six 5/6 rl56" },
+  { size: '5"', slang: "5 five rl5" },
+  // The old combined row's spelling, so typing its name still finds it.
+  { size: '6"', slang: '6 six 5"/6" 5/6 rl56 rl6' },
 ].map(({ size, slang }) => ({
   ...fixture,
   name: `${size} LED retrofit trim`,

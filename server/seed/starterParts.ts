@@ -165,7 +165,9 @@ export const STARTER_PARTS = {
   "50a-2-pole-gfci-breaker": "50A 2-Pole GFCI breaker",
   "50a-range-receptacle": "50A range receptacle",
   "50a-rv-receptacle": "50A RV receptacle",
-  "5in-6in-led-retrofit-trim": '5"/6" LED retrofit trim',
+  // The 5"/6" trim, renamed in place to the 6" (owner, 2026-10-07: split
+  // into 5" and 6"). Its three starters are all 6" jobs and keep the row.
+  "5in-6in-led-retrofit-trim": '6" LED retrofit trim',
   // The 5"/6" row, renamed in place to the 6" canless wafer (owner,
   // 2026-10-07). The key stays, so LT7's recipe is untouched.
   "5in-6in-wafer-led-downlight": '6" canless wafer LED downlight',

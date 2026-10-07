@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Searching "6 wafer" (any size) now leads with the plain canless wafer.**
+  The slim, gimbal, wet-rated and color-selectable versions are named after
+  it ("6" canless wafer LED downlight, slim") and follow it.
+- **The 5"/6" disc light and 5"/6" LED retrofit trim are now separate 5" and
+  6" items.** The combined item became the 6" one. The three 6" starter
+  recipes that used the trim are unchanged, and no saved bid moves.
+- **New starter pricing and labor sheets for the owner to fill in**, one row
+  per catalog item (1,715), most-used first, with a pack-price column. Filled
+  sheets are loaded by Track A into the shared starter that every shop gets.
+  Nothing loaded can ship until the app can tag a shipped number as an
+  example.
+
 - **Large plan sets no longer download whole in the background.** Opening a
   plan set over 50 MB was meant to fetch only the pages you look at, but the
   viewer was quietly pulling down the entire file as well. On a 52.6 MB set

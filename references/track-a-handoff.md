@@ -4,7 +4,25 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 13) — read this first
+## UPDATE 2026-10-07 (session 14) — read this first
+
+- **Wafer variants renamed** `N" canless wafer LED downlight, <variant>` —
+  the plain canless leads "N wafer" at every size (test pinned). **5"/6"
+  disc and retrofit trim split** into 5" and 6": the combined rows became
+  the 6" (same ids). On staging only the trim was used — 3 starter recipe
+  lines, all 6" jobs; 0 company copies, 0 bid lines.
+- **Example loaded rates APPROVED** (plan § 3b): still in Batch 5, shipped
+  only together with `isExampleRate`.
+- **File loader BUILT**: `pricing/loadStarterSheets.mts` → the seed
+  (`server/seed/materials/starterPrices.ts`, `starterLaborUnits.ts`, empty).
+  Labor hours now re-stamp on shipped rows like price. Inert until tagged —
+  `server/starterValues.test.ts`.
+- **Sheets for the owner**: `pricing/starter-catalog-pricing.xlsx`,
+  `pricing/labor-units-starter.xlsx` (`pricing/buildStarterSheets.mts`,
+  1,715 rows, most-used first, pack price, no store/date).
+- Open: how shipped labor HOURS say "example" (todo.md).
+
+## UPDATE 2026-10-07 (session 13)
 
 - **Adds on staging (`f440576`), CI full suite + deploy + smoke green.**
   Staging 1,554 → **1,713** (159 added, 0 deleted, 0 renamed), every
