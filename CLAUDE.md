@@ -1776,6 +1776,16 @@ background** (`shared/pdfRangeLoading.ts`). Below it, prefetching is free and
 makes later pages instant; above it, it is a gigabyte competing with the page
 being drawn.
 
+> **This was not true until 2026-10-07.** Only `disableAutoFetch` was set,
+> and pdf.js's STREAM (its first request, which has no Range header) kept
+> reading the whole file, so every set came down whole in the background.
+> Measured on staging: 52.55 MB extra on a 52.6 MB set, once arriving BEFORE
+> sheet 1. Both switches are now set together, and
+> `client/src/lib/pdfRangeLoading.test.ts` pins them along with the pdf.js
+> line that makes the stream matter. To measure a real upload and the bytes
+> that come back down, use `scripts/stagingUploadTiming.mts` (staging has its
+> own bucket).
+
 **A size column has to be BIGINT.** `bid_pdfs.byteSize` was `int`, which tops
 out one byte under 2GB — so a 2GB set uploaded perfectly and then failed to
 attach, after the transfer rather than before it. Anything new that records a

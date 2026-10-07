@@ -7,6 +7,8 @@
  * a supply house, against a deadline.
  */
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import {
   PDF_AUTOFETCH_LIMIT_BYTES,
   PDF_RANGE_CHUNK_BYTES,
@@ -23,16 +25,55 @@ const MB = 1024 * 1024;
 const BASE = "http://localhost:3000/src/workers/pdfRenderer.worker.ts";
 
 describe("fetching by byte range", () => {
-  it("always leaves ranges and streaming on", () => {
-    // Without these pdf.js downloads the document before drawing anything,
+  it("always leaves ranges on", () => {
+    // Without ranges pdf.js downloads the document before drawing anything,
     // which is what made a large set unusable in the first place.
-    const options = pdfRangeLoadOptions(
-      "https://bucket.example/plan.pdf",
-      MB,
-      BASE
+    for (const size of [MB, 800 * MB, null])
+      expect(
+        pdfRangeLoadOptions("https://bucket.example/plan.pdf", size, BASE)
+          .disableRange
+      ).toBe(false);
+  });
+
+  /**
+   * Until 2026-10-07 this test asserted streaming was ALWAYS on, which pinned
+   * the fault: the stream is pdf.js's first, Range-less request read to the
+   * end, so a set of any size came down whole behind the viewer (52.55 MB
+   * measured on staging for a 52.6 MB set). shared/pdfRangeLoading.ts.
+   */
+  it("turns the stream off wherever the background download is off", () => {
+    for (const size of [10 * MB, 60 * MB, 800 * MB, null]) {
+      const o = pdfRangeLoadOptions(
+        "https://bucket.example/plan.pdf",
+        size,
+        BASE
+      );
+      expect(o.disableStream).toBe(o.disableAutoFetch);
+    }
+    expect(
+      pdfRangeLoadOptions("https://bucket.example/plan.pdf", 800 * MB, BASE)
+        .disableStream
+    ).toBe(true);
+    expect(
+      pdfRangeLoadOptions("https://bucket.example/plan.pdf", 10 * MB, BASE)
+        .disableStream
+    ).toBe(false);
+  });
+
+  /**
+   * WHY the stream matters, pinned against the pdf.js actually installed: it
+   * cancels its whole-file response only when streaming is disabled and
+   * ranges work. If an upgrade changes that, this goes red and the reasoning
+   * above needs re-checking — not silently trusting it.
+   */
+  it("matches what the installed pdf.js does with the stream", () => {
+    const pdfjs = readFileSync(
+      createRequire(import.meta.url).resolve("pdfjs-dist/build/pdf.mjs"),
+      "utf8"
     );
-    expect(options.disableRange).toBe(false);
-    expect(options.disableStream).toBe(false);
+    expect(pdfjs).toMatch(
+      /if \(!this\._isStreamingSupported && this\._isRangeSupported\) \{\s*this\.cancel\(new AbortException\("Streaming is disabled\."\)\);/
+    );
   });
 
   it("uses a one-megabyte request chunk", () => {

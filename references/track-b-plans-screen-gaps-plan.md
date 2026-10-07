@@ -1,6 +1,22 @@
 # Track B: Plans screen edits — what is left (2026-10-07)
 
-**Plan only. Nothing here is built.** This was asked again on 2026-10-07 using
+> **STATUS, 2026-10-07 (later) — owner: build only in files Track C does not
+> touch.**
+>
+> - **Gap 1 is Track C's.**
+> - **Gap 5 is BUILT:** `server/previewNeverSaved.test.ts` and
+>   `client/src/lib/traceSavePath.test.ts`. Each was shown red against a
+>   mutation.
+> - **Gap 6 is MEASURED on staging (R2):** `scripts/stagingUploadTiming.mts`.
+>   - The PUT is most of the wait.
+>   - The measurement found a fault this plan had not: every plan set
+>     downloaded WHOLE in the background (pdf.js's stream). **Fixed** in
+>     `shared/pdfRangeLoading.ts`.
+>   - 6.2 ("Preparing sheets") is dropped: there is no silent stretch.
+> - **Gaps 2, 3, 4 and 6.1** need a file C changes, so they are in todo.md,
+>   "Plans screen gaps — AFTER TRACK C MERGES".
+
+**Plan only when written.** This was asked again on 2026-10-07 using
 the 2026-09-29 brief (drag points, live distance, undo/clear, PDF loading).
 That brief already has a plan, `references/track-b-plans-screen-edits-plan.md`,
 and **almost all of it is built and live on local-dev.** This file does not
