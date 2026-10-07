@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Large plan sets no longer download whole in the background.** Opening a
+  plan set over 50 MB was meant to fetch only the pages you look at, but the
+  viewer was quietly pulling down the entire file as well. On a 52.6 MB set
+  that was 52.55 MB extra, sometimes before the first sheet appeared. Now it
+  fetches only what is on screen. Smaller sets still preload, so page-flipping
+  stays instant.
+- **Two new checks that a traced run never includes the line to your mouse.**
+  The saved length, the bid quantity and the totals always come from the
+  points you clicked, and the tests now fail if that ever changes.
+
 - **Quick bid has the "Most used" row too** — the same one as the bid
   screen: your company's most-used assemblies, one tap to count onto the
   bid, hidden while you type, and nothing extra until the company has three

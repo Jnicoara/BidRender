@@ -3,6 +3,42 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
+
+From `references/track-b-plans-screen-gaps-plan.md`. Each item needs a file
+that Track C's `c-homerun-footage` also changes, so it waits for C to land
+(owner, 2026-10-07: build only in files C does not touch). Gap 1, a run end
+dragged off its mark keeping the old claim, is **Track C's**, not B's.
+
+- [ ] **Gap 2: `takeoffRuns.setLocation` has no lock check** — the one run
+      mutation without `refuseIfLocked` (`server/routers/takeoffRunsRouter.ts`).
+      One line. Test: refused on a locked bid. A label, not a number.
+- [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
+      screen (`TakeoffPage.tsx`). No status gate. Owner's call first (plan Q2).
+- [ ] **Gap 4a: "can't be undone" on the undo arrow** when the last change was
+      one undo does not cover (mark status/height/location, legs and tees,
+      circuits, run type, typed length, extras, trace mode, branch wiring,
+      symbol capture, scale, sheet name/number, plan set removal). The
+      wording can live in `client/src/lib/undoStack.ts`, but recording WHICH
+      change happened is in TakeoffPage's mutations — so it is built as one
+      piece, not as a helper nothing calls.
+- [ ] **Gap 4b: undoing a count deleted from several sheets refreshes every
+      sheet** (`client/src/lib/takeoffRefresh.ts` + its test). Today other
+      sheets flash their old marks until refetch (staleTime 0) — a flash, not
+      a lasting wrong number.
+- [ ] **Gap 4c: undo for run type, typed length, circuits, legs**, in that
+      order (TakeoffPage + router).
+- [ ] **Gap 6.1: open the viewer from the file on this machine while it
+      uploads** (`TakeoffPage.tsx`, `planUpload.ts`). Measured on staging
+      2026-10-07 (52.6 MB, 15 pages): the PUT is 11.5–16.4 s of a 16–22 s
+      wait to sheet 1, and the viewer re-reads the file from R2 afterwards.
+      Opening from disk would show sheet 1 in about 2 s.
+
+**Dropped, with the measurement:** Gap 6.2, a "Preparing sheets" line after
+attach. Staging shows no silent stretch: "Finishing…" (0.2 s) → "Opening plan
+set…" (2.9–4.0 s) → "Drawing sheet 1…" (1.4 s), with "Reading sheet numbers
+N of M" beside it.
+
 ## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30
 
 > **BUILT 2026-09-30 on `a-version-bar`: steps 1–4 below.** Bar:

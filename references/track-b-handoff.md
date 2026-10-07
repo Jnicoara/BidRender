@@ -6,6 +6,28 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-07 (late) — Plans screen gaps, staging upload timing
+
+- **On local-dev as `1fcb2e7`**, and green: tests, staging deploy, smoke.
+- **Fixed: large plan sets downloaded WHOLE in the background**
+  (`shared/pdfRangeLoading.ts`, `disableStream`).
+  - Measured on staging R2 with the 52.6 MB / 15-page Decant set.
+  - Before: 52.55 MB extra.
+  - After, at laptop and tablet sizes: 6.4 MB of ranges to sheet 1, and
+    0 MB more in the 10 s after it.
+- **Where the time goes** (staging, 4 runs):
+  - PUT: 11.5–17.1 s.
+  - Ticket and attach: about 0.2 s each.
+  - Viewer opens the file: 2.7–4.0 s.
+  - Sheet 1 drawn: 1.4–2.0 s.
+  - `scripts/stagingUploadTiming.mts` (`SIZE=tablet-portrait` for tablet).
+- **Gap 5 built** (preview never saved): two guard tests, each shown red.
+- **Gaps 2, 3, 4 and 6.1** are in todo.md "after Track C merges". Gap 1 is
+  Track C's.
+- **Left on staging:** six throwaway `example.com` accounts from the upload
+  probe. Their plan sets were removed from the bucket and their bids
+  archived.
+
 ## WHERE B STANDS — 2026-10-07, after the merge (read this first)
 
 - **Everything B has built is on `local-dev` and on staging.** A landed
