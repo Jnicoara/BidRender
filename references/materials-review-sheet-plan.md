@@ -13,6 +13,33 @@ Q2/Q2d, 17 on Q4); 313 rows used by a starter or run type; Missing 85
 and recalculated: totals add up, and each warning fires on a test mark
 (cut of a used row, rename with no name, duplicate final name) and clears.
 
+**Two checks added 2026-10-07 (owner), still review-only — no name or row
+changed:**
+
+- **Possible duplicates tab.** `findPossibleDuplicates`
+  (`shared/materialDuplicates.ts`, `server/materialDuplicates.test.ts`)
+  over all 1,679 rows: size and words with spellings folded (1-pole = single
+  pole = 1P, set screw = SS, CU = copper…) and search words; kept apart on any
+  differing key word (set screw/compression, 1/2/3-pole, Cu/Al, EMT/PVC/rigid,
+  sizes, amps). **Found: 1 pair** — the waiting `Riser strap, 2"` is the
+  shipped `2" riser strap`. Measured, not assumed: a looser rule ("one extra
+  word") paired 190 rows that are different parts (a conduit and its
+  connector, a box and a deep box), so extra words must be qualifiers only.
+  The shipped catalog is already guarded against duplicate names and
+  cross-aliasing by `materialsCatalog.test.ts`, which is why the count is low.
+  Dropdown: Same - keep A / Same - keep B / Not the same; "keep A" cuts B and
+  moves anything that used B (starters, run types) to A — the read-back does
+  that, bids keep what they priced.
+- **Typical-job completeness pass** on the Missing tab
+  (`pricing/materialsCompleteness.ts`): 65 items a Dollar Tree retrofit,
+  office TI, lighting retrofit, panel change or service upgrade uses, each
+  matched by its essential words against names (and search words, except
+  where slang names a different part). **13 likely missing**, pre-filled
+  Add, each with its reason. Every "missing" verdict was checked by hand
+  against the catalog; 9 first-pass verdicts were wrong (the part exists
+  under another name — split-bolt, breaker lock-off, motor-rated toggle,
+  pull rope…) and were corrected, not hidden.
+
 **One change from the plan below:** the 125 new rows are on the REVIEW tab
 (status "New — not in catalog yet", Decision "Add"), not repeated on
 Missing, so nothing is listed twice. Missing holds starter parts, size

@@ -991,6 +991,12 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       failure the $0 rule was written to prevent, arriving from the other side.
       Needs a way to say "this is our example price, not yours": a column, or
       comparing against the seed value. **Blocks the upload, not the sheet.**
+      **Shape decided 2026-10-07 (owner):** every shipped preset price shows a
+      plain **"Example price"** tag — NO store, NO date — cleared when a shop
+      edits that price. One column, `materials.isExamplePrice`, plus the
+      line's frozen `snapshotPriceWasExample` (Batch 5;
+      `migrations-0098-batch-plan.md` B3, overridden there; CLAUDE.md
+      § "Where a priced catalog lands").
 
 - [x] **400 kcmil lug ADDED 2026-09-26 (Track B)** — a single size, because
       above 350 kcmil a compression lug is sold per conductor size (Crescent

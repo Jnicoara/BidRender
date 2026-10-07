@@ -25,6 +25,11 @@ import {
 } from "../shared/materialNaming";
 import { compareMaterials } from "../shared/materialOrder";
 import {
+  findPossibleDuplicates,
+  signature,
+} from "../shared/materialDuplicates";
+import { TYPICAL_ITEMS } from "./materialsCompleteness";
+import {
   CONDUCTOR_SIZES,
   TRADE_SIZE_ORDER,
   materialTypeName,
@@ -128,6 +133,8 @@ type MissingRow = {
   category: string;
   item: string;
   detail: string;
+  /** Pre-filled decision; blank = the owner decides from nothing. */
+  prefill?: string;
 };
 
 const missing: MissingRow[] = [];
@@ -204,6 +211,51 @@ families.forEach(({ category, names }, key) => {
   }
 });
 
+// ── Completeness pass (owner, 2026-10-07): typical small-commercial items ────
+// Missing only when no row's NAME (or, unless `nameOnly`, its search words)
+// carries every needed word and size — pricing/materialsCompleteness.ts.
+const allRows = [
+  ...BASELINE_MATERIALS.map(m => ({ name: m.name, aliases: m.searchAliases })),
+  ...waiting.map(w => ({ name: w.proposed, aliases: "" })),
+];
+const wordsOf = (text: string) => {
+  const s = signature(text);
+  return new Set([...s.words, ...s.sizes]);
+};
+const nameWords = allRows.map(r => wordsOf(r.name));
+const allWords = allRows.map(r => wordsOf(`${r.name} ${r.aliases}`));
+let completenessAdds = 0;
+for (const it of TYPICAL_ITEMS) {
+  const need = it.need.flatMap(n => {
+    const s = signature(n);
+    return [...s.words, ...s.sizes];
+  });
+  const sets = it.nameOnly ? nameWords : allWords;
+  if (sets.some(set => need.every(w => set.has(w)))) continue;
+  completenessAdds += 1;
+  missing.push({
+    source: "Typical job",
+    category: it.category,
+    item: it.name,
+    detail: it.reason,
+    prefill: "Add",
+  });
+}
+
+// ── Possible duplicates (owner, 2026-10-07) ──────────────────────────────────
+const statusOf = new Map(
+  [...shipped, ...waiting].map(r => [r.current || r.proposed, r])
+);
+const duplicates = findPossibleDuplicates(allRows).map(p => ({
+  a: p.a,
+  aStatus: statusOf.get(p.a)?.status ?? "",
+  aUses: usedBy(p.a).text,
+  b: p.b,
+  bStatus: statusOf.get(p.b)?.status ?? "",
+  bUses: usedBy(p.b).text,
+  why: p.why,
+}));
+
 // ── Tab 4: Questions — the open naming questions, asked once ─────────────────
 const questions = [
   {
@@ -242,6 +294,7 @@ const out = {
   generatedAt: new Date().toISOString(),
   review: [...shipped, ...waiting],
   missing,
+  duplicates,
   questions,
 };
 fs.writeFileSync(
@@ -250,5 +303,5 @@ fs.writeFileSync(
 );
 const changed = shipped.filter(r => r.proposed !== "(unchanged)").length;
 console.log(
-  `review: ${shipped.length} shipped (${changed} with a proposed name, ${shipped.filter(r => r.decision === "Your call").length} your call), ${waiting.length} new; missing: ${missing.length}; questions: ${questions.length}`
+  `review: ${shipped.length} shipped (${changed} with a proposed name, ${shipped.filter(r => r.decision === "Your call").length} your call), ${waiting.length} new; missing: ${missing.length} (${completenessAdds} from the typical-job pass, of ${TYPICAL_ITEMS.length} checked); possible duplicates: ${duplicates.length}; questions: ${questions.length}`
 );

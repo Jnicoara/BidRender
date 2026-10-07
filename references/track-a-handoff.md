@@ -4,7 +4,16 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 ~02:30 UTC (session 8) — read this first
+## UPDATE 2026-10-07 (session 9) — read this first
+
+| What              | State                                                                                                                                                                                                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Review sheet      | `pricing/materials-review.xlsx` now has a **Possible duplicates** tab (1 pair: `2" riser strap` / waiting `Riser strap, 2"`) and a **typical-job completeness pass** on Missing (13 likely-missing items, pre-filled Add, each hand-checked; 9 first-pass false "missing" corrected). Still waiting for the owner to mark it.                     |
+| Example price     | Owner rule recorded: plain "Example price" tag, no store, no date, cleared on a shop edit — CLAUDE.md, `migrations-0098-batch-plan.md` B3 (overridden), Batch 5 now `isExamplePrice` + `snapshotPriceWasExample`.                                                                                                                                 |
+| Track C's columns | **0125–0130 on branch `a-batch-c-0125` only** (not local-dev, not staging): `bid_panels`, `bid_panel_circuits` (incl. `homerunCeilingInches`), bid + sheet homerun settings, `takeoff_run_circuits.panelCircuitId` / `conductorSource`, `bid_height_areas`. Pairing rule 3 in `live-release-plan.md`. Renumber if anything else is applied first. |
+| Multi-supplier    | Plan only: `references/multi-supplier-plan.md` (suppliers, supplier_prices, imports; default supplier on pricing_defaults, per-bid on bids; frozen snapshotSupplierId + snapshotPriceParts; no auto-pick; 4 owner questions).                                                                                                                     |
+
+## UPDATE 2026-10-07 ~02:30 UTC (session 8)
 
 | What              | State                                                                                                                                                                                                                                                                                   |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

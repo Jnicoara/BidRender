@@ -1015,6 +1015,14 @@ three-step deploy. Numbers are given at write time, after 0105.
 3. **B3: the source reads "BidRidge example", plus the date.** Not a supplier
    name.
 
+   > **OVERRIDDEN 2026-10-07 by the owner: the tag is a plain "Example
+   > price" — NO store, NO date.** Every shipped preset price shows it; it
+   > clears when a shop edits that price (the price is then theirs). So
+   > `examplePriceSource` and `examplePriceAsOf` below are NOT needed: the
+   > one fact is "is this still our example price", a single column. See the
+   > note under § 10b Option A, and CLAUDE.md § "Where a priced catalog
+   > lands".
+
 **Read first:** CLAUDE.md § Brands (brand exists on PANELS and BREAKERS only;
 an assembly points at the parent), `ASSEMBLIES_PLAN.md` § "Parent items and
 brand variants" step 5 (parent → preferred variant → fork of that variant;
@@ -1072,6 +1080,15 @@ one line on a job; otherwise A.** B only if brand is ever widened beyond those
 two shelves.
 
 ### 10b. The example-price flag (H2)
+
+> **Narrowed 2026-10-07 (owner; B3 above): the label is a plain "Example
+> price" with no store and no date.** The two material columns below become
+> ONE: `materials.isExamplePrice boolean` — NULL/false = the shop's own price
+> (or none), true = our shipped example. Set by the seeder on baseline rows
+> that carry a price; cleared in the same update as any edit of the price
+> (which forks the row, so the fork is simply never flagged). The line flag
+> `snapshotPriceWasExample` stays exactly as written. Still unnumbered — it
+> is Batch 5, and must land before any shipped price is non-zero.
 
 **Option A (recommended): source and date on the material, one frozen flag on
 the line.**
