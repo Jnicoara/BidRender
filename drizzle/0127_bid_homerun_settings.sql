@@ -1,0 +1,16 @@
+-- How a bid prices its homeruns (Track C, homerun-footage-plan.md, owner
+-- answers 2026-10-06; todo.md "Homerun footage" → "On bids"). One ALTER.
+--
+--   homerunMethod      'measured' | 'average' | 'measuredMin'. NULL =
+--                      Measured, the default. varchar, as todo.md asks, so a
+--                      new method is code rather than a migration.
+--   homerunAverageFt, homerunMinimumFt   NULL = not set.
+--   homerunRoutingPct  0.1500 = +15%. NULL = none applied (a starter is
+--                      shown, inert until accepted — CLAUDE.md § Starter).
+--   homerunRunTypeId   the run type a computed homerun is made of (plan § 8:
+--                      conductors from the type, never inferred). SET NULL.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- No DEFAULT, no backfill: nothing computes footage until C's code ships.
+-- Pairing rule: as 0125. Hand-written, not generated.
+ALTER TABLE `bids` ADD `homerunMethod` varchar(16), ADD `homerunAverageFt` decimal(8,2), ADD `homerunMinimumFt` decimal(8,2), ADD `homerunRoutingPct` decimal(6,4), ADD `homerunRunTypeId` int, ADD CONSTRAINT `bids_homerunRunTypeId_takeoff_run_types_id_fk` FOREIGN KEY (`homerunRunTypeId`) REFERENCES `takeoff_run_types`(`id`) ON DELETE set null ON UPDATE no action;

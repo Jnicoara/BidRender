@@ -203,6 +203,11 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-09-21",
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
+  "bids.homerunRunTypeId": {
+    kind: "unreviewed",
+    since: "2026-10-07",
+    why: "Migration 0127 (Track C's homerun footage): the run type a computed homerun is made of. NOTHING reads or writes it yet. Run types fork — the 2026-09-20 instance of this bug was run types — so C's footage code must read it through the run-type resolver before it prices a single homerun.",
+  },
   "materials.parentId": {
     kind: "unreviewed",
     since: "2026-10-06",
@@ -390,7 +395,9 @@ describe("every stored id into a forkable row is accounted for", () => {
     );
     // 9 → 6 on 2026-09-27: bid_line_items.assemblyId resolved,
     // takeoff_groups.materialId and .laborRateId reviewed and exempt.
-    expect(unreviewed.length).toBeLessThanOrEqual(6);
+    // 6 → 7 on 2026-10-07 (Track A): bids.homerunRunTypeId (0127), added
+    // before its code exists; its entry says what C's footage code owes.
+    expect(unreviewed.length).toBeLessThanOrEqual(7);
   });
 
   it("unused group labor rate: nothing on the server reads takeoff_groups.laborRateId", () => {
