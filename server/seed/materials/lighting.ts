@@ -30,12 +30,24 @@ const fixture = {
  * into the 6" one (same id, so starter LT7 — "Wafer LED downlight, 6"
  * (canless)" — keeps pricing from it), not cut; the 4" row likewise, so LT8
  * and Track B's 4" wafer assembly price from it. The two-size reasoning
- * above is history: a 5" opening is no longer offered.
+ * above is history.
+ *
+ * ── EVERY SIZE ITS OWN ITEM — owner, 2026-10-07, second answer ───────────
+ * "Ship ALL wafer/canless/CCT-disc sizes (2", 3", 4", 5", 6", 8"), each size
+ * its own separate item, never folded together." So the canless wafer runs
+ * 2"–8" here, and no row answers to another size's number: the 6" row lost
+ * its "5" search word the day a real 5" row arrived. The four wafer variants
+ * (slim, gimbal, wet rated, CCT selectable) are separate items below, never
+ * folded into these.
  */
 const recessed: BaselineMaterial[] = [
+  { size: '2"', slang: "2 two mini" },
+  { size: '3"', slang: "3 three" },
   { size: '4"', slang: "4 four" },
+  { size: '5"', slang: "5 five" },
   // The old combined row's spelling, so typing its name still finds it.
-  { size: '6"', slang: '6 six 5"/6" 5/6 5 6' },
+  { size: '6"', slang: '6 six 5"/6" 5/6' },
+  { size: '8"', slang: "8 eight" },
 ].map(({ size, slang }) => ({
   ...fixture,
   name: `${size} canless wafer LED downlight`,
@@ -51,10 +63,16 @@ const recessed: BaselineMaterial[] = [
  * reason (2026-09-25): the sheet's 5", 6" and 7" discs cover the same range
  * of openings and boxes, so they are one 5"/6" row that answers to all three
  * sizes rather than three rows an estimator has to choose between.
+ *
+ * Since 2026-10-07 the CCT-selectable discs ship at 4", 5", 6" and 7", each
+ * its own item (owner: "never folded together"), so the plain 5"/6" row no
+ * longer answers to "7": that is a real row now. The plain 5"/6" row itself
+ * is unchanged — whether it splits too is an open owner question
+ * (references/track-a-handoff.md).
  */
 const discs: BaselineMaterial[] = [
   { size: '4"', slang: "4 four" },
-  { size: '5"/6"', slang: "5 6 7 five six seven 5/6 7in" },
+  { size: '5"/6"', slang: "5 6 five six 5/6" },
 ].map(({ size, slang }) => ({
   ...fixture,
   name: `${size} LED disc light`,
@@ -63,6 +81,61 @@ const discs: BaselineMaterial[] = [
     "surface mount junction box j box flush low profile round ceiling"
   ),
 }));
+
+const DISC_SLANG =
+  "surface mount junction box j box flush low profile round ceiling";
+const cctDiscs: BaselineMaterial[] = [
+  { size: '4"', slang: "4 four" },
+  { size: '5"', slang: "5 five" },
+  { size: '6"', slang: "6 six" },
+  { size: '7"', slang: "7 seven" },
+].map(({ size, slang }) => ({
+  ...fixture,
+  name: `${size} LED disc light, CCT selectable`,
+  searchAliases: aliases(
+    slang,
+    "color temperature colour switchable 3cct 5cct 2700k 3000k 4000k 5000k",
+    DISC_SLANG
+  ),
+}));
+
+/*
+  Wafer variants, every size its own item (owner, 2026-10-07). NOT the same
+  part as the canless wafer above: each says what makes it different.
+*/
+const WAFER_SIZES: { size: string; slang: string }[] = [
+  { size: '2"', slang: "2 two mini" },
+  { size: '3"', slang: "3 three" },
+  { size: '4"', slang: "4 four" },
+  { size: '5"', slang: "5 five" },
+  { size: '6"', slang: "6 six" },
+  { size: '8"', slang: "8 eight" },
+];
+const WAFER_VARIANTS: { variant: string; slang: string }[] = [
+  {
+    variant: "CCT selectable",
+    slang:
+      "color temperature colour switchable 3cct 5cct 2700k 3000k 4000k 5000k",
+  },
+  { variant: "gimbal", slang: "adjustable aim tilt directional accent" },
+  { variant: "slim", slang: "thin ultra thin low profile shallow joist" },
+  {
+    variant: "wet rated",
+    slang: "wet location shower bathroom exterior soffit",
+  },
+];
+const waferVariants: BaselineMaterial[] = WAFER_VARIANTS.flatMap(
+  ({ variant, slang: variantSlang }) =>
+    WAFER_SIZES.map(({ size, slang }) => ({
+      ...fixture,
+      name: `${size} wafer LED downlight, ${variant}`,
+      searchAliases: aliases(
+        slang,
+        variantSlang,
+        "canless recessed pot light retrofit trim"
+      ),
+    }))
+);
 
 /** 2 ft moved from the pricing sheet, 2026-09-25. */
 const LINEAR_LENGTH_SLANG: Record<string, string> = {
@@ -276,9 +349,18 @@ const vaporTight: BaselineMaterial[] = [
 }));
 
 /**
- * Six can types at 4" and 6" — the curated sizes. The sheet also lists 3" and
- * 5"; those stay there until a job asks.
+ * Six can types at 3", 4", 5" and 6". It was 4" and 6" only — "the curated
+ * sizes; the sheet also lists 3" and 5", those stay there until a job asks" —
+ * until the owner approved the 3" and 5" rows on the materials review sheet
+ * (frozen 2026-10-07, pricing/frozen-names.json). That approval overrides the
+ * curation here; the trims below follow the cans.
  */
+const CAN_SIZES: { size: string; slang: string }[] = [
+  { size: '3"', slang: "3 three" },
+  { size: '4"', slang: "4 four" },
+  { size: '5"', slang: "5 five" },
+  { size: '6"', slang: "6 six" },
+];
 const CAN_TYPES: { type: string; slang: string }[] = [
   { type: "new construction IC", slang: "new work insulation contact rated" },
   { type: "new construction non-IC", slang: "new work non ic" },
@@ -290,17 +372,18 @@ const CAN_TYPES: { type: string; slang: string }[] = [
   },
   { type: "sloped ceiling", slang: "vaulted pitched angled slope" },
 ];
-const cans: BaselineMaterial[] = ['4"', '6"'].flatMap(size =>
-  CAN_TYPES.map(({ type, slang }) => ({
-    ...fixture,
-    name: `${size} recessed can, ${type}`,
-    searchAliases: aliases(
-      size === '4"' ? "4 four" : "6 six",
-      "pot light housing downlight",
-      slang,
-      "halo juno"
-    ),
-  }))
+const cans: BaselineMaterial[] = CAN_SIZES.flatMap(
+  ({ size, slang: sizeSlang }) =>
+    CAN_TYPES.map(({ type, slang }) => ({
+      ...fixture,
+      name: `${size} recessed can, ${type}`,
+      searchAliases: aliases(
+        sizeSlang,
+        "pot light housing downlight",
+        slang,
+        "halo juno"
+      ),
+    }))
 );
 
 /**
@@ -321,9 +404,9 @@ const retrofitTrims: BaselineMaterial[] = [
 }));
 
 /**
- * Trims for the shipped can sizes, 4" and 6". Moved from the pricing sheet,
- * 2026-09-25. The sheet also lists 3" and 5" trims; they stay there with the
- * 3" and 5" cans they fit (see CAN_TYPES).
+ * Trims for the shipped can sizes — 3", 4", 5" and 6" since 2026-10-07 (see
+ * CAN_SIZES: the 3" and 5" trims came with the 3" and 5" cans they fit).
+ * Moved from the pricing sheet, 2026-09-25.
  */
 const TRIM_TYPES: { type: string; slang: string }[] = [
   { type: "baffle trim", slang: "ribbed black white glare" },
@@ -334,16 +417,17 @@ const TRIM_TYPES: { type: string; slang: string }[] = [
   { type: "adjustable trim", slang: "aim tilt directional accent" },
   { type: "shower wet-rated trim", slang: "lensed wet location bathroom tub" },
 ];
-const cannedTrims: BaselineMaterial[] = ['4"', '6"'].flatMap(size =>
-  TRIM_TYPES.map(({ type, slang }) => ({
-    ...fixture,
-    name: `${size} ${type}`,
-    searchAliases: aliases(
-      size === '4"' ? "4 four" : "6 six",
-      slang,
-      "recessed can pot light housing"
-    ),
-  }))
+const cannedTrims: BaselineMaterial[] = CAN_SIZES.flatMap(
+  ({ size, slang: sizeSlang }) =>
+    TRIM_TYPES.map(({ type, slang }) => ({
+      ...fixture,
+      name: `${size} ${type}`,
+      searchAliases: aliases(
+        sizeSlang,
+        slang,
+        "recessed can pot light housing"
+      ),
+    }))
 );
 
 /*
@@ -529,6 +613,17 @@ const moreFixtures: BaselineMaterial[] = [
   { name: "Track light connector", slang: "rail joiner coupler l t" },
   { name: "Track light end feed", slang: "rail power feed live end" },
   { name: "Pole anchor bolt kit", slang: "light pole base template" },
+  // Owner adds, review sheet 2026-10-07: what a light-pole job pours and
+  // what a retail retrofit hangs strips from (GC3 in top-assemblies-draft).
+  {
+    name: "Concrete pole base",
+    slang: "light pole pier footing precast foundation sonotube parking lot",
+  },
+  {
+    name: "Fixture hanging kit, aircraft cable",
+    slang:
+      "pendant suspension wire rope cable hanger gripper strip open structure",
+  },
   { name: "Pole base cover", slang: "light pole shroud skirt" },
   { name: "Pole base grout", slang: "light pole non shrink" },
   { name: "Pole handhole cover", slang: "light pole access plate" },
@@ -552,7 +647,9 @@ const moreFixtures: BaselineMaterial[] = [
 
 export const LIGHTING: BaselineMaterial[] = [
   ...recessed,
+  ...waferVariants,
   ...discs,
+  ...cctDiscs,
   ...linear,
   ...track,
   ...underCabinet,

@@ -273,7 +273,9 @@ missingRows.forEach(r => {
   const mark = r.source === "Your row" ? undefined : markFor("missing", r.item);
   const fallback =
     r.source !== "Your row" && !r.prefill ? marks.missingDefault : undefined;
-  const [decision, note] = mark ||
+  // An optional third element is the name to add it under ("Your name"),
+  // when the owner renamed a found item (2026-10-07: "… Copper").
+  const [decision, note, yourName = ""] = mark ||
     (r.prefill ? [r.prefill, ""] : fallback) || ["", ""];
   const row = missing.addRow({
     source: r.source,
@@ -281,7 +283,7 @@ missingRows.forEach(r => {
     item: r.item,
     detail: r.detail,
     decision,
-    yourName: "",
+    yourName,
     note,
   });
   for (const key of ["decision", "yourName", "note"])

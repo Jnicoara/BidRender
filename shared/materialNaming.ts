@@ -29,8 +29,12 @@ export type NameProposal = {
 const WIRE = new Map(WIRE_AND_CABLE_PROPOSALS.map(row => [row.current, row]));
 const OWNER = new Map(OWNER_RENAMES.map(row => [row.current, row.proposed]));
 
-/** Data cable that is not copper-bearing: fibre carries no metal (Q4). */
-const NOT_COPPER = /\bfiber\b|\bfibre\b/i;
+/**
+ * Sold by the foot on Low Voltage but carrying no copper conductor: fibre
+ * (Q4), and the surface raceway the cable runs IN (2026-10-07 — "Surface
+ * raceway (wire mold), low voltage" is a channel, not a cable).
+ */
+const NOT_COPPER = /\bfiber\b|\bfibre\b|\braceway\b/i;
 
 /** "#1/0" → "1/0": aughts are written without "#" (owner, 2026-10-07). */
 const AUGHT_WITH_HASH = /#(\d\/0)(?![\d/])/g;

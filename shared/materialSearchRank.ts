@@ -338,7 +338,25 @@ export function queryTier(row: RankableRow, word: string): MatchTier {
     with the sort (materialSizeOrder) on purpose — a row cannot be one type when
     it is listed and another when it is searched.
   */
-  const type = norm(materialTypeName(head(row.name)) ?? head(row.name));
+  /*
+    …minus a trailing METAL word, for the head-noun test only. Every wire has
+    said its metal at the END since 2026-10-07 ("#12 THHN Copper", "4-4-4-6
+    SER Aluminum"), which made "copper" the head noun of every wire: "thhn"
+    and "ser" stopped being EXACT for the rows they name, and "ser" put
+    "Service mast" (a prefix tie) above every SER cable (found by the
+    search spot-check the day the adds landed). The metal describes the part;
+    the noun before it is what it IS. The sort keeps the full type.
+
+    A qualifier that used to sit after a comma goes with it, because the
+    rename took the comma away: "12/2 MC cable isolated ground Copper" was
+    "12-2 MC cable, isolated ground", and setting only the metal aside made
+    "ground" its head noun — it then led "ground" over every ground rod. The
+    same for "… with 16/2 dimming Copper" and "dim". Both are cables first.
+  */
+  const type = norm(materialTypeName(head(row.name)) ?? head(row.name)).replace(
+    /^(.+?)(?: isolated ground| with .+)? (copper|aluminum)$/,
+    "$1"
+  );
 
   /*
     The head noun is matched by PREFIX, not only whole.

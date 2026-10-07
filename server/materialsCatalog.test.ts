@@ -131,16 +131,13 @@ describe("shipped catalog shape", () => {
   });
 
   /**
-   * Shelves migration 0117 made BEFORE Track C's rows for them ship (step 1:
-   * the column first). Their 50 rows wait in pricing/rows.json. A TRIPWIRE,
-   * not an exemption: the case below goes red as soon as C seeds a row onto
-   * one, and the name then comes off this list.
+   * Shelves a migration made BEFORE their rows ship (step 1: the column
+   * first). A TRIPWIRE, not an exemption: the case below goes red as soon as
+   * a row lands on one, and the name then comes off this list. Empty since
+   * 2026-10-07, when 0117's three shelves (Surface Raceway, Underground,
+   * Service Entrance) got their rows (seed/materials/raceUndergroundService.ts).
    */
-  const AWAITING_ROWS: readonly (typeof MATERIAL_CATEGORIES)[number][] = [
-    "Surface Raceway",
-    "Underground",
-    "Service Entrance",
-  ];
+  const AWAITING_ROWS: readonly (typeof MATERIAL_CATEGORIES)[number][] = [];
 
   it("fills every shelf it declares", () => {
     // An empty category renders as nothing and is dead weight in the picker.
@@ -191,8 +188,15 @@ describe("every part the bend count can ask for is shipped", () => {
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   it("reads a size and family off every rigid raceway row", () => {
-    // 5 rigid families x 9 trade sizes, + 2 flex families x 4 sizes.
-    expect(raceways).toHaveLength(53);
+    // 5 rigid families x 9 trade sizes, + 3-1/2" for EMT and PVC Sch 40
+    // (2026-10-07), + 2 flex families x 4 sizes.
+    expect(raceways).toHaveLength(55);
+    expect(
+      raceways
+        .filter(r => r.size === '3-1/2"')
+        .map(r => r.family)
+        .sort()
+    ).toEqual(["EMT", "PVC Sch 40"]);
   });
 
   it("ships a 90, a 45 and every body shape for every rigid raceway", () => {
@@ -217,10 +221,21 @@ describe("every part the bend count can ask for is shipped", () => {
   it("ships the PVC sweep matrix, and nothing outside it", () => {
     // Plan § 8 (owner, 2026-09-29): 1"–4", 90 and 45, 24" and 36" radius,
     // Schedule 40 and 80 = 56. Built through `sweepName`, so a run type's
-    // override and any later lookup find the same spelling.
+    // override and any later lookup find the same spelling. Plus 3-1/2" on
+    // Schedule 40 only (owner, 2026-10-07: 3-1/2" a full size for EMT and
+    // PVC Sch 40) = 60.
     const want: string[] = [];
     for (const family of ["PVC Sch 40", "PVC Sch 80"])
-      for (const size of ['1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'])
+      for (const size of [
+        '1"',
+        '1-1/4"',
+        '1-1/2"',
+        '2"',
+        '2-1/2"',
+        '3"',
+        ...(family === "PVC Sch 40" ? ['3-1/2"'] : []),
+        '4"',
+      ])
         for (const angle of [90, 45] as const)
           for (const radius of [24, 36])
             want.push(sweepName(size, family, angle, radius));
@@ -382,15 +397,27 @@ describe("alias hygiene across the whole catalog", () => {
     expect(names.filter(n => /^4\/0-3 SER/i.test(n))).toEqual([]);
   });
 
-  it('ships exactly two wafer sizes, 4" and 6", with no 5" row', () => {
-    // Owner, 2026-10-07: "4" and 6" separately". The 5"/6" row became the 6".
-    const wafers = BASELINE_MATERIALS.filter(m => m.name.includes("wafer")).map(
+  it("ships every wafer size as its own item, never folded together", () => {
+    // Owner, 2026-10-07, twice: first "4" and 6" separately" (the 5"/6" row
+    // became the 6"), then "ship ALL wafer/canless/CCT-disc sizes (2", 3",
+    // 4", 5", 6", 8"), each size its own separate item, never folded
+    // together". So: one canless wafer per size, four variants per size, and
+    // no wafer name carrying two sizes.
+    const names = new Set(BASELINE_MATERIALS.map(m => m.name));
+    for (const s of ['2"', '3"', '4"', '5"', '6"', '8"']) {
+      expect(names.has(`${s} canless wafer LED downlight`), s).toBe(true);
+      for (const v of ["CCT selectable", "gimbal", "slim", "wet rated"])
+        expect(names.has(`${s} wafer LED downlight, ${v}`), `${s} ${v}`).toBe(
+          true
+        );
+    }
+    const wafers = BASELINE_MATERIALS.filter(m => /wafer/.test(m.name)).map(
       m => m.name
     );
-    expect(wafers).toEqual([
-      '4" canless wafer LED downlight',
-      '6" canless wafer LED downlight',
-    ]);
+    expect(wafers).toHaveLength(30);
+    expect(wafers.filter(n => /"\/\d/.test(n))).toEqual([]);
+    for (const s of ['4"', '5"', '6"', '7"'])
+      expect(names.has(`${s} LED disc light, CCT selectable`), s).toBe(true);
   });
 
   it("stocks a fuse for every fused disconnect amperage", () => {

@@ -340,18 +340,41 @@ Aluminum` (and every SER row likewise, "8-8-8-8 SER Copper"). The root
    (839 starter recipe lines, run-type wire). LT8 -> #871 `4" canless
 wafer LED downlight`, LT7 -> #872 `6" canless wafer LED downlight`, same
    ids. The four shipped run types resolve to the renamed wire, same ids.
-   209 saved bid lines byte-identical (digest of id, name and frozen cost).
+   209 saved bid lines "byte-identical" — **CORRECTED the same day: that
+   digest was MySQL `GROUP_CONCAT`, which stops at 1,024 bytes, so it only
+   ever covered the first few lines** (found when staging's 217 lines gave
+   the rehearsal's digest). The staging check below hashes every row and
+   column in code instead; the claim stands there, measured properly.
    Second boot: nothing changed. Search: 258 old spellings, the renamed row
    first for every one but `5/6" wafer LED downlight` — the pre-2026-09-25
    spelling, already a known fraction-reading miss. 167 starters, DV34 held
    as before (its raceway parts are adds).
-8. **Staging — only with the owner's OK.** ← HERE. Back up staging, merge
-   `a-rename` into local-dev and push (that deploys staging; the rename runs
-   on its server start — there is no migration). Then repeat step 8's
-   compare and probe against staging.
+8. ~~Staging~~ **DONE 2026-10-07, owner's OK.** Backup
+   `staging-2026-10-07T20-16-01Z-before-rename.sql` (69 tables), restored
+   locally and counted (1,554 materials, 217 bid lines, 839 recipe lines —
+   equal to staging). `a-rename` merged into local-dev (`47f0942`), suite
+   5,531 passed, Gate + deploy + smoke green, staging `/api/version` =
+   `47f0942`. Against staging itself: **VERDICT CLEAN** — 151 renamed by id,
+   0 added / retired / deleted, every reference identical (839 recipe lines,
+   run-type wire #2 / #75 / #45 / #46), LT8 #871 / LT7 #872. The 217 bid
+   lines that existed before (ids ≤ 220) hash identical over every column;
+   the smoke job added ids 221–224 of its own. Second restart: measured on
+   the NEXT deploy (the adds, below).
+   **Then the adds:** first pass 86 of the 153, 8 duplicates, 59 held; the
+   owner answered the 59 the same day. **Final: 143 of the 153 ship** (10
+   under a corrected name — `FROZEN_ADDS_SHIPPED_AS`), 8 were duplicates of
+   shipped rows, 2 declined (QO-only 60A/70A single-pole). The catalog grows
+   1,554 -> **1,713 (159 rows)**: the 143, plus 15 rows that complete the
+   3-1/2" EMT and PVC Sch 40 family the tests require (T/LL/LR/C bodies,
+   EMT compression and raintight, the Sch 40 LB, the 45° sweeps), plus the
+   5" canless wafer ("every size its own item"). Enforced by
+   `server/frozenMaterialNames.test.ts`. Second restart after the rename,
+   on staging (`47f0942` -> `7168435`): 0 renamed, 0 deleted, references
+   identical — CLEAN.
 9. **Live** rides a normal release, later, with the owner's yes. Live has
    neither wafer starter today (0122/0123 not applied), so its order there
    is the release plan's, not this file's.
 10. Regenerate the pricing sheet with the final names, carrying typed
     prices over (naming plan § 5.1), and pricing can start. Track B's
-    drafted recipes switch to `STARTER_PARTS` keys before they load.
+    drafted recipes switch to `STARTER_PARTS` keys before they load — told
+    2026-10-07 (todo.md): names are frozen, B can load them now.

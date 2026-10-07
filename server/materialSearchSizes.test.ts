@@ -197,11 +197,18 @@ describe("counts and cable specs keep working", () => {
     expect(search("#12").some(n => /under-cabinet/.test(n))).toBe(false);
   });
 
-  it('"6 wafer" finds the 6" wafer, and "4 wafer" the 4" — two rows since 2026-10-07', () => {
+  it('"6 wafer" finds 6" wafers only, the canless one among them — every size its own item', () => {
     // Was 'a dual size is both: "6 wafer" finds the 5"/6" wafer' while one
-    // row covered both openings. The owner split them (4" and 6").
-    expect(search("6 wafer")[0]).toBe('6" canless wafer LED downlight');
-    expect(search("4 wafer")[0]).toBe('4" canless wafer LED downlight');
+    // row covered both openings. The owner split them (4" and 6"), then
+    // shipped every size 2"–8" with four variants each (2026-10-07). The
+    // variants' names START "6" wafer", so they lead the canless one on the
+    // typed phrase — an owner question (handoff), pinned here as it is: the
+    // size never leaks, and the canless row is in the first five.
+    for (const s of ["2", "4", "5", "6", "8"]) {
+      const hits = search(`${s} wafer`).slice(0, 5);
+      onlySize(hits, s);
+      expect(hits).toContain(`${s}" canless wafer LED downlight`);
+    }
   });
 });
 

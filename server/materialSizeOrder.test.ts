@@ -506,6 +506,8 @@ describe("the real catalog", () => {
       '2" EMT',
       '2-1/2" EMT',
       '3" EMT',
+      // A full size for EMT since 2026-10-07 (owner) — between 3" and 4".
+      '3-1/2" EMT',
       '4" EMT',
     ]);
   });

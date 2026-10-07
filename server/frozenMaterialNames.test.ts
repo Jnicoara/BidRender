@@ -23,6 +23,10 @@ import {
 } from "./seed/materials";
 import { FROZEN_RENAMES_2026_10_07 } from "../shared/frozenMaterialNames";
 import { BASELINE_RUN_TYPES } from "./seed/baselineRunTypes";
+import {
+  FROZEN_ADDS_NOT_SEEDED,
+  FROZEN_ADDS_SHIPPED_AS,
+} from "../shared/frozenAddsHeld";
 import frozenJson from "../pricing/frozen-names.json";
 
 const shippedNames = BASELINE_MATERIALS.map(m => m.name);
@@ -54,6 +58,47 @@ describe("the frozen names (2026-10-07)", () => {
     for (const { current, final } of FROZEN_RENAMES_2026_10_07) {
       expect(RENAMED_BASELINE_MATERIALS[current], current).toBe(final);
     }
+  });
+});
+
+describe("the frozen ADDS (2026-10-07)", () => {
+  const adds: { name: string }[] = frozenJson.adds;
+
+  it("are each shipped, or listed as held with a reason — never silently dropped", () => {
+    const unaccounted = adds
+      .map(a => a.name)
+      .filter(
+        name =>
+          !shipped.has(FROZEN_ADDS_SHIPPED_AS[name] ?? name) &&
+          !(name in FROZEN_ADDS_NOT_SEEDED)
+      );
+    expect(unaccounted).toEqual([]);
+  });
+
+  it("list nothing as held that is also shipped, nor anything that is not a frozen add", () => {
+    const frozen = new Set(adds.map(a => a.name));
+    for (const name of Object.keys(FROZEN_ADDS_NOT_SEEDED)) {
+      expect(frozen.has(name), `${name} is not a frozen add`).toBe(true);
+      expect(shipped.has(name), `${name} is held AND shipped`).toBe(false);
+    }
+    for (const [from, to] of Object.entries(FROZEN_ADDS_SHIPPED_AS)) {
+      expect(frozen.has(from), from).toBe(true);
+      expect(shipped.has(to), to).toBe(true);
+    }
+  });
+
+  it("measured 2026-10-07: 153 adds = 143 shipped + 8 duplicates + 2 declined", () => {
+    // 86 shipped on the first pass and 59 were held; the owner's second
+    // answers shipped 57 of them and declined 2. If this count moves, a row
+    // was seeded, held or dropped since — find out which before trusting the
+    // summary in materials-review-sheet-plan.md.
+    const held = Object.values(FROZEN_ADDS_NOT_SEEDED);
+    expect(adds).toHaveLength(153);
+    expect(held.filter(h => h.kind === "duplicate")).toHaveLength(8);
+    expect(held.filter(h => h.kind === "declined")).toHaveLength(2);
+    expect(
+      adds.filter(a => shipped.has(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name))
+    ).toHaveLength(143);
   });
 });
 

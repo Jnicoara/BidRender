@@ -47,7 +47,10 @@ const channel: BaselineMaterial[] = [
  * Straps that clamp a raceway to channel, sized by the trade size of the pipe
  * they hold — never by the channel, which is why one set covers all profiles.
  */
-const strutStraps: BaselineMaterial[] = TRADE_SIZES.map(size => ({
+// 3-1/2" too since 2026-10-07: EMT and PVC Sch 40 ship it (conduit.ts).
+const STRAP_SIZES: string[] = [...TRADE_SIZES];
+STRAP_SIZES.splice(STRAP_SIZES.indexOf('4"'), 0, '3-1/2"');
+const strutStraps: BaselineMaterial[] = STRAP_SIZES.map(size => ({
   name: `${size} strut conduit strap`,
   unitOfSale: "each",
   costPerUnit: UNPRICED,

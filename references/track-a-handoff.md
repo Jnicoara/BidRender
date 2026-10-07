@@ -4,7 +4,29 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 11) — read this first
+## UPDATE 2026-10-07 (session 12) — read this first
+
+- **The rename is on staging** (`47f0942`): backup first, then merged, Gate +
+  deploy + smoke green, and staging checked directly — **VERDICT CLEAN**
+  (`materials-review-sheet-plan.md` § Order, step 8).
+- **The adds:** 86 of 153 seeded; 8 duplicates of shipped rows; **59 held
+  for the owner** with reasons in `shared/frozenAddsHeld.ts`. The three new
+  wire items ship with "Copper" (owner). The new shelves need **0117** — on
+  staging, NOT live: pairing rule 4 in `live-release-plan.md`.
+- **Search fix that came with them:** the head noun of a wire is the word
+  before its metal (`queryTier`) — "ser" had led with Service mast.
+- **Correction:** the session-11 rehearsal's "209 bid lines byte-identical"
+  used a `GROUP_CONCAT` digest truncated at 1,024 bytes. Staging was
+  checked with a full-row hash instead.
+- **Track C 0131** planned (not written, not merged): `bids.homerunExtraBends`
+  - `takeoff_runs.runsAt`, nullable, no DB default — "default 1,
+    unconfirmed" is NULL read by C's code. Batch 5 moves to 0132.
+- **Track B told** (todo.md): names frozen, load the drafted starters by
+  part key with final names.
+- **Open for the owner:** the 59 held adds (four questions, in
+  `frozenAddsHeld.ts`).
+
+## UPDATE 2026-10-07 (session 11)
 
 - **STOPPED BEFORE STAGING, as asked. The rename is on branch `a-rename`
   (`3a6423e`), NOT on local-dev** — pushing local-dev deploys staging, and

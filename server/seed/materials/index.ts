@@ -29,6 +29,11 @@ import {
   LIFE_SAFETY,
 } from "./safetyAndSupport";
 import { STRUT } from "./strut";
+import {
+  SERVICE_ENTRANCE,
+  SURFACE_RACEWAY,
+  UNDERGROUND,
+} from "./raceUndergroundService";
 import { WIRE_AND_CABLE } from "./wireAndCable";
 import { dropRestatedWords, type BaselineMaterial } from "./types";
 
@@ -104,5 +109,9 @@ export const BASELINE_MATERIALS: BaselineMaterial[] = (
     ...EQUIPMENT,
     ...DISTRIBUTION,
     ...CONSUMABLES,
+    // Since 2026-10-07; their categories need migration 0117 (see module).
+    ...SURFACE_RACEWAY,
+    ...UNDERGROUND,
+    ...SERVICE_ENTRANCE,
   ] as BaselineMaterial[]
 ).map(dropRestatedWords);

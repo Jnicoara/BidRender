@@ -171,5 +171,17 @@ describe("MC connector and strap from the cable name", () => {
 
   it("is still null for a cable that is not MC", () => {
     expect(mcFittingNames("12/2 NM-B Copper")).toBeNull();
+    expect(
+      mcFittingNames("18/2 shielded fire alarm cable, FPLP Copper")
+    ).toBeNull();
+  });
+
+  it("reads the MC adds of 2026-10-07 — MC-AP and the dimming MC — as MC", () => {
+    expect(mcFittingNames("12/2 MC-AP cable Copper")?.connector).toBe(
+      '3/8" MC connector'
+    );
+    expect(
+      mcFittingNames("12/2 MC cable with 16/2 dimming Copper")?.connector
+    ).toBe('3/8" MC connector');
   });
 });

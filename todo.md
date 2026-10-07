@@ -990,28 +990,32 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       "Raceway entrance end fitting"; a standard wall plate for the cover).
       When those rows are seeded: replace `missingParts` with `p(...)` lines
       naming them (server/seed/starterAssemblies.ts, DV34), so DV34 seeds.
-- [ ] **Track B: drafted recipes name parts by names the rename will change**
-      (references/top-assemblies-draft.md, checked 2026-10-07): e.g.
-      `Ground rod, 8 ft` → `Ground rod, 5/8" x 8 ft`, `#4 bare CU, stranded`
-      → `#4 bare stranded Copper`, `4/0-4/0-4/0-2/0 SER AL` →
-      `4/0-4/0-4/0-2/0 SER Aluminum` (full set — owner, 2026-10-07),
-      `4" wafer LED downlight` → `4" canless wafer LED downlight`. The full
-      list is `pricing/frozen-names.json` (renames on branch `a-rename`).
-      Write recipes through `STARTER_PARTS` keys (they follow
-      RENAMED_BASELINE_MATERIALS), never by display name. The new 4" wafer
-      assembly B is adding uses the SAME row as LT8 (renamed in place).
-      `Underground warning tape` is already a waiting row (Add); the concrete
-      pole base and 320A meter base are owner adds on the review sheet.
-- [ ] **Seed the 153 frozen ADDS** (`pricing/frozen-names.json` → `adds`:
-      120 waiting rows + 33 from Missing, incl. `#3 XHHW Aluminum`, the
-      3-1/2" EMT/PVC fittings, concrete pole base, 320A meter base). Not in
-      the rename commit (`a-rename`) because each needs a unit, trade slang
-      (CLAUDE.md § Materials) and, for 3-1/2" raceway, stick/strap facts.
-      Three wire adds do not end with their metal — `12/2 MC cable with
-    16/2 dimming`, `12/2 MC-AP cable`, `18/2 shielded fire alarm cable,
-    FPLP` — and would fail the "metal at the end" catalog test as named:
-      ask the owner before seeding (e.g. "… Copper"). After the adds: point
-      DV34 at the surface raceway rows (line above).
+- [ ] **TRACK B: NAMES ARE FROZEN — load the drafted starters now** (owner,
+      2026-10-07). The rename is on local-dev and staging (151 names, in
+      place); the adds follow. Load `references/top-assemblies-draft.md`'s
+      recipes (GC1–GC5, GR1–GR7) through `STARTER_PARTS` keys
+      (`server/seed/starterParts.ts`), never by display name — add a key per
+      new part, valued with the FINAL name. Final names to use, e.g.:
+      `Ground rod, 5/8" x 8 ft`, `#4 bare stranded Copper`,
+      `4/0-4/0-4/0-2/0 SER Aluminum`, `4" canless wafer LED downlight` (the
+      SAME row as LT8 — the new 4" wafer assembly uses it), `2/0 XHHW
+    Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
+      drafts marked missing now ship: `Underground warning tape`,
+      `Concrete pole base`, `320A meter base`. Full list:
+      `pricing/frozen-names.json`; what is NOT shipped and why:
+      `shared/frozenAddsHeld.ts`. `server/frozenMaterialNames.test.ts` and
+      `server/starterAssembliesSeed.test.ts` go red on a stale name.
+- [x] **Seed the frozen ADDS** — 2026-10-07: **143 of 153 ship** (+15 rows
+      completing the 3-1/2" family, +5" canless = 159 new rows); 8 were
+      duplicates; 2 declined (QO-only 60A/70A). Reasons in
+      `shared/frozenAddsHeld.ts`. Point DV34 at the surface raceway rows
+      (line above).
+- [ ] **Owner questions from the adds (2026-10-07):** (1) "6 wafer" lists
+      the four 6" variants before the plain 6" canless wafer, because their
+      names start "6" wafer" — rename the variants to "6" canless wafer LED
+      downlight, slim" etc. if the plain one should lead? (2) The plain
+      `5"/6" LED disc light` and `5"/6" LED retrofit trim` are still one row
+      for two sizes — split them too ("never folded together")?
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while

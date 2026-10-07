@@ -155,6 +155,8 @@ const SIZE_ALIASES: Record<string, string> = {
   '2"': "two inch",
   '2-1/2"': "2 1/2 2.5 two and a half",
   '3"': "three inch",
+  // EMT and PVC Sch 40 only (owner, 2026-10-07) — see conduit.ts.
+  '3-1/2"': "3 1/2 3.5 three and a half",
   '4"': "four inch",
 };
 

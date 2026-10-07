@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BASELINE_MATERIALS } from "./seed/materials/index";
 import { WIRE_AND_CABLE_PROPOSALS } from "../shared/materialRenameProposals";
+import frozenJson from "../pricing/frozen-names.json";
 import {
   normaliseNewName,
   proposeMaterialName,
@@ -12,7 +13,7 @@ const proposed = BASELINE_MATERIALS.map(m => ({
 }));
 
 describe("the decided wire and cable names", () => {
-  it("are APPLIED: every Wire & Cable row is exactly one decided name", () => {
+  it("are APPLIED: every Wire & Cable row is exactly one decided name, or a frozen add", () => {
     // Before the 2026-10-07 rename this asserted the proposals covered the
     // catalog's CURRENT names. They have been applied since, so the same
     // coverage is asserted the other way round: every shipped Wire & Cable
@@ -26,9 +27,20 @@ describe("the decided wire and cable names", () => {
         proposeMaterialName({ name: r.current, category: "Wire & Cable" })
           .proposed
     );
-    expect(wire.filter(m => !finals.includes(m.name)).map(m => m.name)).toEqual(
-      []
-    );
+    // The new rows frozen with them (#3 XHHW Aluminum and three cables) are
+    // decided names too, by the same sheet — just not renames.
+    const frozenWireAdds = (
+      frozenJson.adds as { name: string; category: string }[]
+    )
+      .filter(a => a.category === "Wire & Cable")
+      .map(a => a.name);
+    expect(
+      wire
+        .filter(
+          m => !finals.includes(m.name) && !frozenWireAdds.includes(m.name)
+        )
+        .map(m => m.name)
+    ).toEqual([]);
     const names = new Set(wire.map(m => m.name));
     expect(finals.filter(f => !names.has(f))).toEqual([]);
     const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));

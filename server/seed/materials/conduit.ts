@@ -253,6 +253,24 @@ function fittingSlang(
 
 const PVC_LABELS = new Set(["PVC Sch 40", "PVC Sch 80"]);
 
+/*
+  3-1/2" is a full trade size for EMT and PVC Sch 40 since 2026-10-07 (owner:
+  "ship 3-1/2" as a full conduit size for EMT and PVC — elbows, bodies,
+  everything the tests require"). Not in TRADE_SIZES, because that list is
+  every family's, and rigid, IMC and Sch 80 do not ship it. Everything that
+  follows a raceway — its fittings, every body shape, straps, bushings,
+  locknuts, strut straps, Sch 40 sweeps — takes it from here.
+*/
+const THREE_AND_A_HALF = '3-1/2"';
+const WITH_3_5 = new Set(["EMT", "PVC Sch 40", "PVC"]);
+/** The sizes one family (or strap family) ships, in trade-size order. */
+function sizesFor(label: string): string[] {
+  const sizes: string[] = [...TRADE_SIZES];
+  if (WITH_3_5.has(label))
+    sizes.splice(sizes.indexOf('4"'), 0, THREE_AND_A_HALF);
+  return sizes;
+}
+
 /**
  * Large-radius PVC sweeps, 56 rows (owner, 2026-09-29, plan § 8, S1–S5):
  * 1" to 4", 90 and 45, 24" and 36" radius, Schedule 40 and 80.
@@ -277,7 +295,10 @@ const SWEEP_RADII = [24, 36] as const;
 const pvcSweeps: BaselineMaterial[] = FAMILIES.filter(f =>
   PVC_LABELS.has(f.label)
 ).flatMap(family =>
-  SWEEP_SIZES.flatMap(size =>
+  (family.label === "PVC Sch 40"
+    ? [...SWEEP_SIZES.slice(0, -1), THREE_AND_A_HALF, '4"']
+    : SWEEP_SIZES
+  ).flatMap(size =>
     SWEEP_ANGLES.flatMap(angle =>
       SWEEP_RADII.map(radius => ({
         name: sweepName(size, family.label, angle, radius),
@@ -299,7 +320,7 @@ const pvcSweeps: BaselineMaterial[] = FAMILIES.filter(f =>
 const rigidFamilies: BaselineMaterial[] = FAMILIES.flatMap(family => [
   // The raceway itself, priced by the foot the way it is estimated even though
   // it is bought in 10 ft sticks — which `raceway` records for the count.
-  ...TRADE_SIZES.map(size => ({
+  ...sizesFor(family.label).map(size => ({
     name: `${size} ${family.label}`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
@@ -307,7 +328,7 @@ const rigidFamilies: BaselineMaterial[] = FAMILIES.flatMap(family => [
     searchAliases: aliases(sizeAliases(size), family.slang, "conduit raceway"),
     raceway: family.raceway(size),
   })),
-  ...TRADE_SIZES.flatMap(size => [
+  ...sizesFor(family.label).flatMap(size => [
     ...FITTINGS.filter(
       fitting =>
         family.label !== "EMT" ||
@@ -344,7 +365,7 @@ const STRAP_FAMILIES = [
 
 const straps: BaselineMaterial[] = [
   ...STRAP_FAMILIES.flatMap(family =>
-    TRADE_SIZES.map(size => ({
+    sizesFor(family.label).map(size => ({
       name: oneHoleStrapName(size, family.label),
       unitOfSale: "each" as const,
       costPerUnit: UNPRICED,
@@ -430,8 +451,9 @@ const flex: BaselineMaterial[] = FLEX_FAMILIES.flatMap(family => [
  * raceway on the other side of them is, and shipping five identical locknuts
  * under five family names would be five rows for one part.
  */
+// Every size any raceway ships at — 3-1/2" included, for EMT and Sch 40.
 const terminations: BaselineMaterial[] = [
-  ...TRADE_SIZES.map(size => ({
+  ...sizesFor("EMT").map(size => ({
     name: `${size} conduit bushing`,
     unitOfSale: "each" as const,
     costPerUnit: UNPRICED,
@@ -441,7 +463,7 @@ const terminations: BaselineMaterial[] = [
       "plastic insulating insulated throat bushing"
     ),
   })),
-  ...TRADE_SIZES.map(size => ({
+  ...sizesFor("EMT").map(size => ({
     name: `${size} conduit locknut`,
     unitOfSale: "each" as const,
     costPerUnit: UNPRICED,
@@ -489,6 +511,57 @@ const weatherheads: BaselineMaterial[] = [
   }))
 );
 
+/*
+  The review sheet's typical-job pass (owner-approved, frozen 2026-10-07):
+  the 1/2" fittings a tenant improvement, a retrofit or a service upgrade
+  reaches for, and the reduced-wall flex a fixture whip is pulled in. Single
+  rows, not families — each is the size that job uses. The reduced-wall
+  flex is NOT named as a flexible-metal-conduit family size, so the run
+  lookup does not treat it as one (it has no fittings or straps of its own).
+*/
+const fit = (name: string, slang: string): BaselineMaterial => ({
+  name,
+  unitOfSale: "each",
+  costPerUnit: UNPRICED,
+  category: "Conduit Fittings",
+  searchAliases: aliases("1/2 half inch", slang),
+});
+const typicalJobFittings: BaselineMaterial[] = [
+  fit(
+    '1/2" EMT insulated set-screw connector',
+    "insulated throat nylon setscrew set screw ss box connector thinwall"
+  ),
+  fit(
+    '1/2" EMT to FMC transition coupling',
+    "combination coupling emt flex greenfield adapter thinwall"
+  ),
+  fit(
+    '1/2" liquidtight 90-degree connector',
+    "lfmc sealtite seal tite 90 ell elbow angle rooftop unit condenser"
+  ),
+  fit(
+    '1/2" PVC female adapter',
+    "fa threaded schedule sch40 plastic transition"
+  ),
+  fit(
+    '1/2" PVC expansion fitting',
+    "expansion joint thermal outdoor exposed schedule sch40 plastic"
+  ),
+  fit(
+    '1/2" EMT offset connector',
+    "offset box connector surface mount thinwall"
+  ),
+  {
+    name: '3/8" FMC (reduced wall)',
+    unitOfSale: "foot",
+    costPerUnit: UNPRICED,
+    category: "Conduit",
+    searchAliases: aliases(
+      "3/8 flex greenfield flexible metal conduit rwa fixture whip"
+    ),
+  },
+];
+
 export const CONDUIT: BaselineMaterial[] = [
   ...rigidFamilies,
   ...pvcSweeps,
@@ -496,6 +569,7 @@ export const CONDUIT: BaselineMaterial[] = [
   ...flex,
   ...terminations,
   ...weatherheads,
+  ...typicalJobFittings,
   {
     // The plain wall strap, as distinct from the strut-mounted straps in
     // strut.ts: this one screws to a surface, that one bolts to channel.

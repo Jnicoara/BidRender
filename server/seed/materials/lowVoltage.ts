@@ -56,6 +56,21 @@ const lvFromSheet: BaselineMaterial[] = [
   cable("Cat6 shielded cable Copper", "cat 6 stp ftp ethernet data network"),
   // "Cat6A" is its own row now; the Cat6 cable no longer answers to it.
   cable("Cat6A cable Copper", "cat 6a 10g ethernet data network augmented"),
+  // The sheet's "Wire mold for low voltage", named by the owner (2026-10-07)
+  // so the brand reads as the trade word it is, beside a generic name.
+  {
+    ...lv("foot"),
+    name: "Surface raceway (wire mold), low voltage",
+    searchAliases: aliases(
+      "wiremold surface metal plastic channel data cable cover cord concealer"
+    ),
+  },
+  // Owner-approved add, 2026-10-07 (review sheet, typical-job pass): drops
+  // above a return-air ceiling must be plenum-rated.
+  cable(
+    "Cat6 plenum cable Copper",
+    "cat 6 cmp ethernet data network utp return air ceiling drop office"
+  ),
   cable("Fiber optic cable", "fibre single mode multimode om3 om4 os2"),
   cable("RG11 coax cable Copper", "rg-11 coaxial tv satellite long run trunk"),
   cable("Security camera cable Copper", "siamese rg59 power video cctv"),
@@ -105,8 +120,10 @@ export const LOW_VOLTAGE: BaselineMaterial[] = [
     ...lv("foot"),
     name: "Cat6 cable Copper",
     searchAliases: aliases(
-      // No "cat6a" since 2026-09-25: Cat6A cable is its own row.
-      "cat 6 ethernet data network utp riser plenum blue lan"
+      // No "cat6a" since 2026-09-25: Cat6A cable is its own row. No
+      // "plenum" since 2026-10-07: Cat6 plenum cable is its own row too,
+      // and this one is riser (CMR).
+      "cat 6 ethernet data network utp riser cmr blue lan"
     ),
   },
   {

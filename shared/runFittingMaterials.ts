@@ -756,8 +756,9 @@ export function mcFittingNames(
   // "12/2 MC cable Copper" and "#3/4 MC cable Copper" after the rename.
   // Until 2026-10-07 only the dash form matched, and every MC run renamed to
   // the slash form would have lost its connectors and straps without a word
-  // (naming plan § 1.3).
-  const match = /^#?(\d+)[-/](\d) MC cable\b/.exec(cableName);
+  // (naming plan § 1.3). MC-AP (aluminum armor, 2026-10-07) is MC too and
+  // takes the same connector and strap.
+  const match = /^#?(\d+)[-/](\d) MC(?:-AP)? cable\b/.exec(cableName);
   if (!match) return null;
   const gauge = Number(match[1]);
   const conductors = Number(match[2]);

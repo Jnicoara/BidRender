@@ -19,6 +19,31 @@ This is the human-readable companion to the git history — read this to see wha
   appears once the company has three bids — before that nothing extra
   shows. It hides as soon as you start typing.
 
+- **159 new catalog items**, from the approved review sheet and the owner's
+  answers:
+  - Three new shelves: Surface Raceway, Underground and Service Entrance,
+    including warning tape, tracer wire, mule tape, service masts, SE caps
+    and a main bonding jumper kit. Every surface raceway item answers to
+    "wire mold" and "wiremold".
+  - 3-1/2" conduit as a full size for EMT and PVC Schedule 40: pipe,
+    elbows, every conduit body, fittings, straps and sweeps.
+  - 150A to 200A two-pole breakers, and 100A to 200A main breakers.
+  - Every wafer and canless downlight size from 2" to 8", each its own
+    item, with slim, gimbal, wet-rated and color-selectable versions, plus
+    color-selectable discs.
+  - 3" and 5" recessed cans and trims, a concrete pole base, a fixture
+    hanging kit and a 320A meter base.
+  - #3 aluminum wire, MC-AP and dimming MC cable, plenum Cat6, crimp sleeves
+    from #1 to 3/0, and the everyday 1/2" fittings a tenant improvement
+    uses.
+
+  Eight requested items were already in the catalog under another name and
+  weren't added twice. The QO-only 60A and 70A single-pole breakers stay off,
+  as the owner decided.
+
+- **Searching "ser" finds SER cable again.** It briefly found service masts
+  first, because the rename put "Copper" or "Aluminum" at the end of every
+  wire name.
 - **151 catalog items have their final names** (frozen from the owner's
   review sheet). Every wire states its metal at the end ("#12 THHN Copper",
   "12/2 NM-B Copper", "4/0 XHHW Aluminum"). Breakers say "1-Pole". SER cable

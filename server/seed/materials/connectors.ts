@@ -247,9 +247,10 @@ const terminations: BaselineMaterial[] = [
   },
   /*
     Compression splice sleeves, by the conductor they join. Moved from the
-    pricing sheet, 2026-09-25; the two sizes a service job uses.
+    pricing sheet, 2026-09-25, with #2 and 4/0; #1 to 3/0 added 2026-10-07
+    (owner-approved review sheet: service and feeder splices).
   */
-  ...["#2", "#4/0"].map(gauge => ({
+  ...["#2", "#1", "#1/0", "#2/0", "#3/0", "#4/0"].map(gauge => ({
     ...CONN,
     // Aughts without the "#" (owner, 2026-10-07): "4/0 crimp sleeve".
     name: `${gauge.replace(/^#(\d\/0)$/, "$1")} crimp sleeve`,

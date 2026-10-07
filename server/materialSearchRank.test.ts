@@ -370,6 +370,22 @@ describe("the searches that must not regress, against the shipped catalog", () =
     expect(aluminum[0]).toMatch(/ Aluminum$/);
   });
 
+  it("answers a wire's TYPE with that wire, though its name now ends in the metal", () => {
+    // Since 2026-10-07 every wire ends "… Copper" / "… Aluminum", which made
+    // the metal the head noun: "ser" led with "Service mast" (a prefix of
+    // "service") over every SER cable. The head-noun test sets a trailing
+    // metal aside (queryTier); this goes red if it stops.
+    expect(top("ser")[0]).toMatch(/ SER (Copper|Aluminum)$/);
+    expect(top("thhn")[0]).toMatch(/ THHN Copper$/);
+    expect(top("xhhw")[0]).toMatch(/ XHHW Aluminum$/);
+    expect(top("mast")[0]).toMatch(/^Service mast/);
+    // …and a qualifier the rename un-commaed stays a qualifier: the IG MC
+    // cable must not lead "ground", nor the dimming MC lead "dim".
+    expect(top("ground")[0]).toContain("Ground rod");
+    expect(top("dimmer")[0]).toBe("Dimmer");
+    expect(top("dim")[0]).not.toMatch(/MC cable/);
+  });
+
   it("answers the SER shorthand 4/0-3 with the four-wire cable", () => {
     // "-3" is three insulated conductors plus a ground; the three-wire
     // 4/0-4/0-2/0 is a different cable and must not lead.

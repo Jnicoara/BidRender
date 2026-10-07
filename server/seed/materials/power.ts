@@ -77,8 +77,12 @@ const singlePole: BaselineMaterial[] = [
   which is the only place search reads.
 
   Above 125A a two-pole is a main breaker (a different frame, and usually part
-  of the panel), so 150A and up are deliberately NOT shipped as branch
-  breakers. The pricing sheet lists them; see the audit in CHANGELOG.md.
+  of the panel), so 150A and up were deliberately NOT shipped as branch
+  breakers. **Overridden by the owner, 2026-10-07** ("YES: 150A+ two-pole and
+  main breakers"): 150, 175 and 200A ship below, and the 2-Pole MAIN breakers
+  (100–200A) ship as their own rows (`mainBreakers`), because a main is a
+  different part from a branch breaker of the same amps — a service upgrade
+  or a panel swap buys one on its own.
 */
 const doublePole: BaselineMaterial[] = [
   "15",
@@ -96,6 +100,9 @@ const doublePole: BaselineMaterial[] = [
   "100",
   "110",
   "125",
+  "150",
+  "175",
+  "200",
 ].map(amps => ({
   ...gear("Breakers"),
   name: `${amps}A 2-Pole breaker`,
@@ -105,6 +112,20 @@ const doublePole: BaselineMaterial[] = [
     BREAKER_SLANG
   ),
 }));
+
+/** Main breakers — see the note above `doublePole`. */
+const mainBreakers: BaselineMaterial[] = ["100", "125", "150", "200"].map(
+  amps => ({
+    ...gear("Breakers"),
+    name: `${amps}A 2-Pole main breaker`,
+    searchAliases: aliases(
+      `${amps} amp ${amps}a ${amps}/2`,
+      "service disconnect main kit back fed backfed panel conversion",
+      TWO_POLE_SLANG,
+      BREAKER_SLANG
+    ),
+  })
+);
 
 /**
  * Three-pole breakers — rooftop units, 3-phase motors, panel feeders on a
@@ -485,14 +506,19 @@ const panelParts: BaselineMaterial[] = [
   searchAliases: aliases(slang),
 }));
 
-const meterBases: BaselineMaterial[] = ["100", "200", "400"].map(amps => ({
-  ...gear("Panels"),
-  name: `${amps}A meter base`,
-  searchAliases: aliases(
-    `${amps} amp`,
-    "socket can meter main utility service ringless"
-  ),
-}));
+// 320A (owner add, 2026-10-07): the class-320 base a 400A residential
+// service lands on, with two 200A mains (GR3 in top-assemblies-draft.md).
+const meterBases: BaselineMaterial[] = ["100", "200", "320", "400"].map(
+  amps => ({
+    ...gear("Panels"),
+    name: `${amps}A meter base`,
+    searchAliases: aliases(
+      `${amps} amp`,
+      "socket can meter main utility service ringless",
+      amps === "320" ? "class 320 cl320 400a residential dual lug" : ""
+    ),
+  })
+);
 
 /*
   The hub an overhead mast threads into on top of a meter base (starter
@@ -807,6 +833,7 @@ export const DISTRIBUTION: BaselineMaterial[] = [
 export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...singlePole,
   ...doublePole,
+  ...mainBreakers,
   ...triplePole,
   ...protectedSingle,
   ...protectedSingleLarge,

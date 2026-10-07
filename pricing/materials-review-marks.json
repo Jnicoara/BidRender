@@ -55,6 +55,21 @@
     "Q3": "Recorded: the tag shows on the bid screen only; the customer quote never shows it; printing warns first."
   },
   "missing": {
+    "12/2 MC cable with 16/2 dimming": [
+      "Add",
+      "Owner 2026-10-07: metal at the end, like every wire.",
+      "12/2 MC cable with 16/2 dimming Copper"
+    ],
+    "12/2 MC-AP cable": [
+      "Add",
+      "Owner 2026-10-07: metal at the end, like every wire.",
+      "12/2 MC-AP cable Copper"
+    ],
+    "18/2 shielded fire alarm cable, FPLP": [
+      "Add",
+      "Owner 2026-10-07: metal at the end, like every wire.",
+      "18/2 shielded fire alarm cable, FPLP Copper"
+    ],
     "Surface raceway, 10 ft": [
       "Skip",
       "Covered by the waiting Surface Raceway rows (base/cover 500 and 700 series, 1500 series). DV34's recipe must be pointed at those names when they are added."

@@ -150,6 +150,8 @@ const ALUMINUM_SIZES = [
   "#8",
   "#6",
   "#4",
+  // #3 added back by the owner, 2026-10-07 (review sheet).
+  "#3",
   "#2",
   "#1",
   "#1/0",
@@ -391,6 +393,40 @@ const trayCable: BaselineMaterial[] = [
   either one as MC and buy MC connectors for it; its pattern needs
   "MC cable" in the name, which these do not have.
 */
+/*
+  Three cables from the review sheet's typical-job pass (owner-approved,
+  2026-10-07, "… Copper" at the owner's word). The two MC ones take MC
+  connectors and straps (`mcFittingNames` reads "MC cable" and "MC-AP
+  cable"); the fire-alarm one is not MC.
+*/
+const typicalJobCable: BaselineMaterial[] = [
+  {
+    ...cable(
+      "12-2",
+      "MC cable with 16/2 dimming",
+      "0-10v 0-10 dimming pair lighting retrofit mc lumi metal clad armored bx"
+    ),
+    description:
+      "Two conductors and a ground, plus a 16/2 pair for 0-10V dimming.",
+  },
+  {
+    ...cable(
+      "12-2",
+      "MC-AP cable",
+      "mcap aluminum armor bonding wire metal clad armored bx tenant improvement"
+    ),
+    description:
+      "Aluminum armor with a bonding wire in place of a green ground.",
+  },
+  {
+    ...cable(
+      "18-2",
+      "shielded fire alarm cable, FPLP",
+      "fplp plenum shielded fa power limited red 18/2"
+    ),
+  },
+];
+
 const equipmentCable: BaselineMaterial[] = [
   {
     ...cable(
@@ -617,6 +653,7 @@ export const WIRE_AND_CABLE: BaselineMaterial[] = [
   ...portableCord,
   ...trayCable,
   ...equipmentCable,
+  ...typicalJobCable,
   ...bareCopper,
   ...serCopper,
   ...serAluminum,

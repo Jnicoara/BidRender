@@ -178,7 +178,14 @@ questions.eachRow((row, n) => {
 // the database does (utf8mb4_unicode_ci), so two names that differ only by a
 // capital are one name to it. server/seedNameCase.test.ts has why that
 // matters; this stops it reaching the seed at all.
-const renamedAway = new Set(renames.map(r => r.current));
+// Both the old and the final name stand for the renamed row: before the
+// rename commit the seed ships the old one, after it the final one, and the
+// row must be counted once either way (found re-running this after the
+// rename, 2026-10-07, when every renamed row read as a duplicate).
+const renamedAway = new Set([
+  ...renames.map(r => r.current),
+  ...renames.map(r => r.final),
+]);
 const cutAway = new Set(cuts.filter(c => c.shipped).map(c => c.name));
 const finalNames = [
   ...BASELINE_MATERIALS.map(m => m.name).filter(
