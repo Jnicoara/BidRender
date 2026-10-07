@@ -25,7 +25,7 @@
  */
 import { readFileSync, writeFileSync, statSync } from "node:fs";
 import type { Page } from "playwright-core";
-import { launchChrome } from "./deviceAudit.mts";
+import { SIZES, launchChrome } from "./deviceAudit.mts";
 
 const BASE = "https://staging.bidridge.com";
 const OUT = process.env.OUT_DIR ?? ".";
@@ -65,9 +65,17 @@ async function trpc(page: Page, proc: string, input?: unknown, mutate = true) {
   return body[0].result.data.json;
 }
 
+// SIZE=tablet-portrait (any name in deviceAudit's SIZES) for a touch tablet;
+// laptop 1366x768 otherwise.
+const size = SIZES.find(s => s.name === process.env.SIZE);
 const browser = await launchChrome();
 const ctx = await browser.newContext({
-  viewport: { width: 1366, height: 768 },
+  viewport: size
+    ? { width: size.width, height: size.height }
+    : { width: 1366, height: 768 },
+  deviceScaleFactor: size?.dpr ?? 1,
+  hasTouch: size?.touch ?? false,
+  isMobile: size?.mobile ?? false,
   serviceWorkers: "block",
 });
 const page = await ctx.newPage();
@@ -221,8 +229,13 @@ while (Date.now() < deadline) {
       !Array.from(seen).some(s => /Reading sheet numbers/.test(s)) ||
       (await sayings()).every(s => !/Reading sheet numbers/.test(s))
     ) {
-      await page.waitForTimeout(1500);
-      note("sheet list idle");
+      // Ten seconds more, still counting: the whole-file stream this measured
+      // on 2026-10-07 arrived up to a second AFTER sheet 1 on one run.
+      const before = { bytes: downBytes, whole: wholeFetches };
+      await page.waitForTimeout(10000);
+      note(
+        `in the 10 s after sheet 1: ${((downBytes - before.bytes) / 1e6).toFixed(1)} MB more, ${wholeFetches - before.whole} without a Range header`
+      );
       break;
     }
   }
