@@ -4,7 +4,26 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 16) — read this first
+## UPDATE 2026-10-08 (session 17) — read this first
+
+- **local-dev = staging = `bea4d8f`**, which merges `c-homerun-footage` and
+  `a-example-tags` and adds **0131** (`bids.homerunExtraBends`,
+  `takeoff_runs.runsAt`). **Staging has 0000–0134 (135)**, applied before
+  the code. **Live is unchanged: `24105ad`, 0000–0104.**
+- Every staging bid total was unchanged across the migration and the new
+  code's first boot. Gate run 37715026901 green (test, deploy-staging,
+  smoke). Record: `deploying.md` § 11 "0125–0134".
+- **On-screen was done LOCALLY, not on staging.** Staging's gate password and
+  sign-up are not something this agent may enter. If the owner wants it seen
+  on staging itself, they sign in (or run a check script themselves).
+- Cleaned up: mirror branch `a-ci-c-homerun-footage` deleted; scratch DBs
+  `bidrender_test_exampletags` and the two rehearsal copies dropped. B told
+  its after-C fixes are unblocked; C told the two columns are live (nothing
+  reads them yet, and C wires them).
+- Live release: all of 0105–0134 together with their code, under the
+  pairing rules in `live-release-plan.md`. Not scheduled.
+
+## UPDATE 2026-10-07 (session 16)
 
 - **Example tags BUILT on branch `a-example-tags`** (from local-dev
   `615f122`; NOT merged, NOT on staging). Migrations **0132–0134**

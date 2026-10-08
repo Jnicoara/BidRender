@@ -20,7 +20,12 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       `track-b-flash-*`, `track-b-starters-*`); their bids are archived and
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
-- [ ] **Track A: rebuild `pricing/assembly-hours-starter.xlsx`** with
+- [x] **DONE 2026-10-08:** rebuilt with `--only assembly-hours --new-since
+    <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
+      NEW, DV34 grey with "HELD - no 700 plate yet". The old copy had 0 typed
+      hours, so nothing needed carrying across. The other three sheets were
+      not rebuilt (byte-identical before and after). Original item:
+- [x] **Track A: rebuild `pricing/assembly-hours-starter.xlsx`** with
       `pricing/buildStarterSheets.mts`. It was built from the 168 starters;
       Track B added 15 on 2026-10-07 (GC1–GC5, GR1–GR7, LT31–LT33), so they
       are not on the sheet the owner is filling in. The hours map is keyed by

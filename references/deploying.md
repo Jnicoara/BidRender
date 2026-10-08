@@ -1587,6 +1587,40 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0125–0134 (done 2026-10-08, ~01:50 UTC) — NOT on live
+
+Track C's homerun footage (0125–0130), the 0131 C asked for
+(`bids.homerunExtraBends`, `takeoff_runs.runsAt`) and the example tags
+(0132–0134), applied TOGETHER and in order: the migrator skips a file whose
+`when` is older than the newest applied, so 0132–0134 must never land first.
+All ten are additive (no `UPDATE`); nothing in step 3.
+
+1. **Backup**: `staging-2026-10-08T01-46-38Z-before-0125-0134.sql` (69
+   tables) in `C:\dev\bidrender-backups\`; restored locally. 64 table counts
+   equal staging's. The other 5 (bids, bid_pdfs, three sheet tables) were
+   higher on staging only by CI smoke rows written after the dump (bids
+   507–510, "CI smoke …"), not a restore fault.
+2. **Rehearsal on that copy**: drift before listed exactly this batch;
+   `bidTotals` before (staging's code `6d860d0`); **10 applied**, 135; second
+   run nothing; "matches", 173/173 foreign keys; the shipped-library seed run
+   as a boot would (example rates landed: 70.50 / 59.22 / 36.66 / 33.84);
+   `bidTotals` after (merge code): **all 505 bids unchanged**.
+3. **Staging**: drift before the same; `bidTotals` before (511 bids);
+   **10 applied** (0125 → 0134), 135; second run nothing; "matches",
+   173/173. Old code still served and priced all 511, unchanged.
+4. **Code**: `bea4d8f` pushed to `staging` by hand, then `local-dev`. Gate
+   run 37715026901: test, deploy-staging, smoke all green. `bidTotals` after
+   the new code booted (example rates seeded): **all 511 earlier bids
+   unchanged**; the only differences were bids 513–514, new smoke bids.
+5. **On screen**: done at 1180x820 touch on LOCAL copies, not on staging.
+   Staging's gate password and sign-up are not something Track A's agent may
+   enter. A copy of C's database with the merged code showed E111: 38
+   homeruns, 11,988.1 ft of wire, 2B-1 at 42.8 ft. Ceilings opened, and bid
+   totals read "Materials $0.00 + 205 drops not priced". A fresh first-run
+   shop showed setup with each example rate, the banner, Most used, all three
+   tags, and the print warning with "Print anyway". The proposal showed no
+   tag.
+
 ### Staging: migrations 0105–0124 (done 2026-10-07) — NOT on live
 
 All twenty step-1 files (`migrations-next-batch.md`). Owner, 2026-10-06:

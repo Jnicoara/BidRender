@@ -81,6 +81,7 @@ export const ASSEMBLY_HOURS_FILE = "assembly-hours-starter.xlsx";
 export const ASSEMBLY_SHEET = "Starter assembly hours";
 export const ASSEMBLY_COLUMNS = [
   "#",
+  "New",
   "Top-30 list",
   KIND_COLUMN,
   "Ref",
@@ -145,7 +146,11 @@ export const assemblyKind = (projectType: string | null | undefined): JobKind =>
 export function materialKind(name: string): JobKind {
   const users = starterUses.get(name);
   if (!users || users.size === 0) return "Not in an assembly";
-  const tags = new Set([...users].map(a => projectTypeByAssembly.get(a)));
+  // Array.from, not a spread: this file is typechecked through
+  // server/starterSheetLayout.test.ts, and tsconfig has no `target` yet.
+  const tags = new Set(
+    Array.from(users).map(a => projectTypeByAssembly.get(a))
+  );
   if (tags.has("both") || (tags.has("residential") && tags.has("commercial")))
     return "Both";
   if (tags.has("residential")) return "Residential";
@@ -260,6 +265,30 @@ export type AssemblyRow = {
   projectType: string;
   hoursNow: number | null;
   top: string;
+  /**
+   * Why this starter does not seed yet, or null. A held starter is ON the
+   * sheet (so the list is complete) but its MY HOURS cell refuses input, and
+   * the loader refuses a value typed there anyway (owner, 2026-10-08).
+   */
+  held: string | null;
+};
+
+/**
+ * The note a held starter carries on the sheet. Today only missing parts
+ * hold one (DV34, no 700-series device plate in the catalog).
+ */
+export function heldNote(a: {
+  missingParts?: readonly string[];
+}): string | null {
+  const missing = a.missingParts ?? [];
+  if (missing.length === 0) return null;
+  // The owner's words for the part, where he has given them (2026-10-08).
+  const short = missing.map(m => SHORT_PART_NAME[m] ?? m).join("; ");
+  return `HELD - no ${short} yet. Not seeded until the catalog has: ${missing.join("; ")}. Leave MY HOURS blank.`;
+}
+
+const SHORT_PART_NAME: Readonly<Record<string, string>> = {
+  "Surface raceway device plate, 700 series": "700 plate",
 };
 
 /** "| 3 | DR7 | Troffer LED retrofit kit |" rows of one section of the draft. */
@@ -268,9 +297,9 @@ function topList(md: string, from: string, to: string): string[] {
   const end = md.indexOf(to, start + from.length);
   if (start < 0 || end < 0)
     throw new Error(`top-assemblies-draft.md: no "${from}"`);
-  return [
-    ...md.slice(start, end).matchAll(/^\|\s*(\d+)\s*\|\s*([A-Z]+\d+)\s*\|/gm),
-  ]
+  return Array.from(
+    md.slice(start, end).matchAll(/^\|\s*(\d+)\s*\|\s*([A-Z]+\d+)\s*\|/gm)
+  )
     .sort((a, b) => Number(a[1]) - Number(b[1]))
     .map(m => m[2]);
 }
@@ -327,6 +356,7 @@ export function assembliesInSheetOrder(): {
     projectType: a.projectType,
     hoursNow: a.baseLaborHours,
     top: label(a.ref),
+    held: heldNote(a),
   }));
   return { rows, notShipped };
 }

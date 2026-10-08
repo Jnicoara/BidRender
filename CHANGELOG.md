@@ -4,6 +4,15 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-08]
+
+- **The starter assembly-hours sheet now lists all 183 starters.** It has
+  the 15 Track B added, marked NEW so they are easy to find. DV34 (surface
+  raceway receptacle) is listed but greyed out as HELD, because its 700-series
+  plate is not in the catalog yet. Hours typed there are refused, so it cannot
+  be filled in by mistake. The pricing and labor-units sheets were left
+  untouched.
+
 ## [2026-10-07]
 
 - **Warnings are now the way to fix what they name.**
