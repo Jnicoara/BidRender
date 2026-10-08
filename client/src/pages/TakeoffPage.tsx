@@ -333,6 +333,7 @@ import {
   redoTitle,
   settleRedo,
   settleUndo,
+  stillSavingMessage,
   undoForSubject,
   undoTitle,
   type EndsPatch,
@@ -3360,6 +3361,8 @@ export default function TakeoffPage({
    */
   const [pendingMarks, setPendingMarks] = useState<PendingMark[]>([]);
   const pendingStamps = useRef<PendingMark[]>([]);
+  // `flushStamps` for code above its definition (undo); set where it is made.
+  const flushStampsRef = useRef<() => void>(() => {});
   const setPending = useCallback((next: PendingMark[]) => {
     pendingStamps.current = next;
     setPendingMarks(next);
@@ -3969,6 +3972,20 @@ export default function TakeoffPage({
         it. The press clears the note, so pressing again reaches that older
         step knowingly — the message names it.
       */
+      /*
+        Marks still being saved have no undo step yet — it is pushed when the
+        server confirms their ids — so undo now would do nothing, or take back
+        something older. Say so, take nothing, and send the queue now rather
+        than at its timer, so "a second" is true (a batch that failed waits
+        for the next flush, and this is one).
+      */
+      const saving =
+        direction === "undo" ? stillSavingMessage(pendingStamps.current) : null;
+      if (saving !== null) {
+        flushStampsRef.current();
+        toast.message(saving);
+        return;
+      }
       const notCovered =
         direction === "undo" ? notUndoableMessage(state) : null;
       if (notCovered !== null) {
@@ -6017,6 +6034,7 @@ export default function TakeoffPage({
         });
     }
   }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
+  flushStampsRef.current = flushStamps;
   /**
    * Take a click: draw it now, send it shortly after.
    *

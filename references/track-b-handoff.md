@@ -1,6 +1,35 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, after batch 2 (READ FIRST)
+## WHERE B STANDS — 2026-10-08, cover swaps + "still saving" (READ FIRST)
+
+- **Cover swaps DONE (release blocker).** 48 starters, old → new cover
+  lines in `server/seed/starterCoverSwaps.ts`, recipes changed to match.
+  Nylon throughout. Nothing missing from the catalog, so nothing for A to
+  add. **Track A: run `scripts/repairStarterCovers.mts` (report, then
+  `--apply`) on staging and live at the next release** — the seeder never
+  rewrites an existing starter. It swaps a FORKED shared starter too (the
+  fork is never touched), unlike the LT1/LT2 repair; reason in
+  `server/starterCoverRepair.ts`. Rehearsed on a local copy of staging
+  (`before-0139`): 48 swapped, rerun 48 "already has it", 732 bid totals
+  unchanged ($20,333.43 both sides, `bidTotals --compare`). Scratch DB
+  dropped. Owner notes are in todo.md (RS1/RS2 box size, RS13 in-use,
+  stainless).
+- **"Still saving" DONE:** Ctrl+Z (and every undo control) while a mark is
+  in the queue says "Still saving — try again in a second.", takes nothing,
+  and flushes the queue. `client/src/lib/undoWhileSaving.test.ts`.
+- **On screen, laptop 1536x864 and tablet 1180x820, both pass:** DV1 in
+  the assembly editor lists "1-gang wall plate, duplex, nylon"; with the
+  drop held 5 s the message showed, then undo after the save took the
+  mark back (6 → 7 → 6). Throwaway probe deleted. It left an empty "20A
+  duplex receptacle" count on bid 1728350 (local `bidrender_local_b_new`
+  only), and that DB has the cover repair applied.
+- **Gap 3 DECIDED by the owner (batch 3, not built):** when a bid is
+  marked Won, OFFER "Lock this bid?" — never auto-lock, "Not now" just as
+  easy.
+- **Left for batch 3:** Gap 6.1 and Gap 3. Then (c) the "fix this line"
+  panel.
+
+## WHERE B STOOD — 2026-10-08, after batch 2
 
 **Batch 2 of 3 is built** (undo), details ticked in todo.md:
 

@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Starter assemblies now carry the right cover plate.** Receptacles get a
+  duplex plate, switches a toggle plate, and GFCI, AFCI, USB, dimmer,
+  sensor, timer and fan-control devices a decorator plate, in place of the
+  one generic "Wall plate". Twist-locks get a single-receptacle raised cover
+  instead of a duplex one; the sump and cooler receptacles get a
+  single-receptacle plate; the range, dryer, 14-50 and structured-media
+  starters, which had no cover at all, now have one. 48 starters in all,
+  nylon plates throughout. New databases get them on their own; existing
+  ones get them from a repair script run at the next release. Bid totals
+  do not move (checked on a copy of staging: all 732 bids unchanged).
+- **Ctrl+Z on a mark that is still saving now says "Still saving — try
+  again in a second."** Before, undo pressed in the moment between placing
+  a mark and the server confirming it did nothing, or took back something
+  older, without a word. It now takes nothing back, says so, and sends the
+  mark straight away so the next press works.
 - **Undo on the Plans screen now covers a run's type, typed length,
   circuits and added legs, and says plainly when something can't be
   undone.** Before, pressing undo after one of those quietly took back the

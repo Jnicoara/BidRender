@@ -389,6 +389,26 @@ export const STARTER_PARTS = {
   "surface-raceway-device-plate-700":
     "Surface raceway device plate, 700 series",
   "raceway-entrance-end-fitting": "Raceway entrance end fitting",
+  // The cover swaps (cover-plates-audit.md § 3, 2026-10-08): typed plates in
+  // place of the generic "Wall plate". Nylon, the everyday plate; stainless
+  // per recipe is the owner's call (todo.md). Old lines: starterCoverSwaps.ts.
+  "1-gang-wall-plate-duplex-nylon": "1-gang wall plate, duplex, nylon",
+  "1-gang-wall-plate-toggle-nylon": "1-gang wall plate, toggle, nylon",
+  "1-gang-wall-plate-decorator-nylon": "1-gang wall plate, decorator, nylon",
+  "1-gang-wall-plate-single-receptacle-nylon":
+    "1-gang wall plate, single receptacle, nylon",
+  "1-gang-wall-plate-30a-50a-power-receptacle-nylon":
+    "1-gang wall plate, 30A/50A power receptacle, nylon",
+  "2-gang-wall-plate-duplex-duplex-nylon":
+    "2-gang wall plate, duplex/duplex, nylon",
+  "2-gang-wall-plate-toggle-toggle-nylon":
+    "2-gang wall plate, toggle/toggle, nylon",
+  "3-gang-wall-plate-toggle-toggle-toggle-nylon":
+    "3-gang wall plate, toggle/toggle/toggle, nylon",
+  "4in-square-raised-cover-single-receptacle":
+    '4" square raised cover, single receptacle',
+  "4-11-16in-square-raised-cover-30a-50a-power-receptacle":
+    '4-11/16" square raised cover, 30A/50A power receptacle',
 } as const satisfies Record<string, string>;
 
 export type StarterPart = keyof typeof STARTER_PARTS;

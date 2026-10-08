@@ -35,11 +35,15 @@ left as written rather than rewritten to match the rename.
 >       so it states a zero it does not know (CLAUDE.md: a number that is
 >       quietly wrong). Usually a fraction of a second; on a slow staging,
 >       long enough for a test — or a person — to read it.
-> - [ ] **Ctrl+Z on a mark still being saved does nothing, silently.** The
->       undo step is pushed when the server confirms the write
->       (`TakeoffPage` flush, `pushUndo` in `.then`). Press Ctrl+Z inside
->       that window and the mark stays, with no message. By design (an undo
->       guessing ids would be worse), but it could say "still saving".
+> - [x] **Ctrl+Z on a mark still being saved does nothing, silently.**
+>       **DONE 2026-10-08 (B):** every undo press goes through `stepBack`,
+>       which now asks `stillSavingMessage` (`@/lib/undoStack`) first: while
+>       any mark is in the queue it says "Still saving — try again in a
+>       second.", takes nothing back, and flushes the queue (so a batch that
+>       failed is resent too). `client/src/lib/undoWhileSaving.test.ts`, red
+>       without the page change. Seen on screen at laptop and tablet with the
+>       drop held 5 s: message shown, mark kept, then Ctrl+Z after the save
+>       took it back (6 → 7 → 6).
 
 - [x] **"10. undo and redo a mark; delete one and Undo brings it back"**
       (`e2e/smoke/flow.spec.ts:410`) failed on local-dev run 37724027830
@@ -121,8 +125,29 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
 box, 700 series`. **Correction:** this line said DV34 then "seeds by
       itself on the next start". It does not — `assemblyRecipe.ts` holds a
       starter while `missingParts` is non-empty, whatever the catalog has.
-- [ ] **Track B: the cover swaps** (owner, 2026-10-08 — Track A shipped
-      the parts and changed no recipe). **DV34 DONE 2026-10-08 by B:** the
+- [x] **Track B: the cover swaps — DONE 2026-10-08 (B), seed AND repair.**
+      48 starters, listed with their old and new cover lines in
+      `server/seed/starterCoverSwaps.ts`; recipes changed to match. Nylon
+      throughout (stainless is still the owner's call). Nothing was missing
+      from the catalog. `server/starterCoverSwaps.test.ts` (5, all red
+      before). **Existing databases need `scripts/repairStarterCovers.mts
+    --apply` at the next release — TRACK A runs it** (staging, then live;
+      the seeder never rewrites an existing starter): swaps a shared starter
+      only if its lines are EXACTLY the old recipe, and unlike the LT1/LT2
+      repair it DOES swap a forked one (the fork keeps its own lines; the
+      shared row is what every other company sees). Rehearsed on a local
+      copy of staging (backup `before-0139`): 48 would swap → 48 swapped →
+      second run 48 "already has it"; `bidTotals` 732 bids, $20,333.43
+      before and after, all unchanged. Note: an open bid's supplier
+      materials list reads the recipe live, so it names the typed plate
+      after the repair (its prices are snapshots and do not move).
+      `server/starterCoverRepair.test.ts`, red with the write disabled.
+      **For the owner:** RS1/RS2 put a 1-gang 30A/50A plate on a
+      double-gang box (as the audit said); RS13 got no in-use cover (the
+      starter does not say outdoor); DV33's generic floor box cover was not
+      in scope.
+- [x] **The original entry, superseded by the one above** (owner,
+      2026-10-08 — Track A shipped the parts and changed no recipe). **DV34 DONE 2026-10-08 by B:** the
       700-series plate AND 700-series box lines, `missingParts` emptied, so
       it loads. Its tests are rewritten, and the seed and plan tests now say
       nothing is held. Still to do, the rest per `references/cover-plates-audit.md` § 3: CS6/7/8 → `4"
@@ -220,7 +245,9 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       ANY run mutation without `refuseIfLocked`/`refuseIfRunLocked` (it was
       the only one). Both red without the check.
 - [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
-      screen (`TakeoffPage.tsx`). No status gate. Owner's call first (plan Q2).
+      screen (`TakeoffPage.tsx`). No status gate. **Owner DECIDED
+      2026-10-08:** when a bid is marked Won, OFFER "Lock this bid?" —
+      never auto-lock, and "Not now" exactly as easy as "Lock". Batch 3.
 - [x] **DONE 2026-10-08 (batch 2): Gap 4a, "can't be undone" on the undo
       arrow.** `NOT_UNDOABLE` in `client/src/lib/undoStack.ts` names 19
       changes undo does not cover; the screen notes each on success

@@ -262,6 +262,22 @@ export function notUndoableMessage(state: UndoState): string | null {
     : said;
 }
 
+/**
+ * What a press of undo says while placed marks are still on their way to the
+ * server, or null when none are.
+ *
+ * A mark's undo step is pushed only once the server confirms which ids it
+ * wrote (`TakeoffPage`'s flush) — an undo guessing ids would be worse. So in
+ * that window the newest step is something OLDER, and before this a press
+ * either did nothing at all or took back that older step, with no word
+ * either way (todo.md, smoke step 10). Now it says so and takes nothing.
+ * Every mark still drawn from the queue counts — queued, in flight, or
+ * waiting on a count or sheet the server has not made yet.
+ */
+export function stillSavingMessage(queue: readonly unknown[]): string | null {
+  return queue.length > 0 ? "Still saving — try again in a second." : null;
+}
+
 export function nextUndo(state: UndoState): UndoEntry | null {
   return state.past[state.past.length - 1] ?? null;
 }
