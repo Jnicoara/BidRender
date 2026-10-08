@@ -90,7 +90,7 @@ by local user 22173517 — run it as that user.
 empty pipe keeps tape and reuses its type, picked wire priced with tape,
 ground named and sendable, refusal), `runRespecify.test.ts` (+8),
 `takeoffSummary.test.ts` (+2), `runExtrasPerFoot.test.ts` (`how`).
-**Mutation-checked, 13 of 13 red.**
+**Mutation-checked, 13 of 13 red.** CI: Gate 37857115190 (`8277522`, pushed to `track-c`) — `test` GREEN, `drizzle-guard` red by rule until A's 0139. The local full-suite rerun was stopped for low memory; the earlier full run was 5978 passed with one failure, in a test edited while it ran, which passes now.
 
 ## WHERE THINGS STAND (2026-10-08, before the section above — still true)
 
