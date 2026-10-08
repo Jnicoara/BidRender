@@ -4,7 +4,35 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-08 (session 22) — START HERE
+## UPDATE 2026-10-08 (session 23) — START HERE
+
+**Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
+`local-dev`, **migrations 0000–0139 (140)**.
+
+- **0139 BUILT and on staging**: `0139_elbow_flat_role` appends
+  `elbowFlat` to `bid_line_items.runMaterialRole` (after `extra`). Why: a
+  700 run needs an inside elbow (`elbow90`) AND a flat elbow, and the bid
+  allows one line per run type + role. **Matches C's stand-in exactly** —
+  name, journal entry (`when` 1789962900000) and statement; only the header
+  comment differs. C takes A's file at merge; a DB that ran the stand-in
+  needs nothing (the migrator goes by `when`).
+- Safety steps as for 0135–0138: backup
+  `staging-2026-10-08T22-38-43Z-before-0139.sql`, restored, 73/73 counts
+  equal; rehearsed (1 applied, re-run nothing, matches 176/176, **732/732
+  totals unchanged**); staging 22:44 UTC the same, **732/732 unchanged**,
+  old code still serving. Record: `deploying.md` § 11 "0139".
+- Code: `RUN_MATERIAL_ROLES` + `elbowFlat`; a **tripwire** `elbowFlat` case
+  in `feetForRole` (`server/db.ts`) answering 0 — C's code puts the role in
+  `FITTING_KINDS`, the label stops compiling, delete it then.
+  `server/teeBodyRole.test.ts` now takes its list from 0139 (C's same edit).
+- Test: `server/migration0139.test.ts` — red on a DB at 0138 ("Data
+  truncated for column 'runMaterialRole'", and the enum check), green after.
+- **Next live release**: batch is now **0105–0139 (35)**, expect 140 and
+  176/176; re-rehearse first (`next-live-release-plan.md` § 3).
+- Local DBs at 140: `bidrender_local`, `bidrender_test_localdev`. Scratch
+  `bidrender_staging_restore_0139` dropped.
+
+## UPDATE 2026-10-08 (session 22)
 
 **Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
 `local-dev` = `27d5ca0` (+ this docs commit), migrations 0000–0138, no

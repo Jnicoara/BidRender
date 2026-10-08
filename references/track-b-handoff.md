@@ -28,6 +28,9 @@
   easy.
 - **Left for batch 3:** Gap 6.1 and Gap 3. Then (c) the "fix this line"
   panel.
+- **State:** merged A's 0139 (`elbowFlat`) from local-dev; B's databases
+  migrated to 140 and `schemaDrift` matches (176/176 FKs). No dev server
+  running.
 
 ## WHERE B STOOD — 2026-10-08, after batch 2
 

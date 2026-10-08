@@ -1,0 +1,27 @@
+-- 0139 — the 700 surface raceway FLAT elbow gets a bid-line role of its own
+-- (references/per-foot-items-plan.md § 3c and § 4 M2, "OPEN … the flat elbow
+-- has no role").
+--
+--   runMaterialRole   'elbowFlat' APPENDED after 'extra', like 0084/0085/
+--                     0096/0118/0136 — every stored value keeps its index.
+--
+-- Why a role and not `elbow45`: the 700 type buys an inside elbow (`elbow90`)
+-- at a plan corner AND a flat elbow at an end drop — two parts on ONE run
+-- type — and `bid_line_items_bid_runtype_role_extra_uq` allows one line per
+-- (bid, type, role, extra key). Reusing `elbow45` would fit the database and
+-- lie on every screen that labels the role.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- No UPDATE. Old code never writes 'elbowFlat'; the MODIFY only widens the
+-- list. Re-running it is harmless (the same list again).
+--
+-- ── TRACK A'S FILE, REPLACING TRACK C'S STAND-IN (2026-10-08) ───────────────
+-- Track C wrote a stand-in 0139 on `c-per-foot-logic` so its CI could apply
+-- the role its code writes. This is the real one: the same file name, the
+-- same journal entry (idx 139, when 1789962900000) and the SAME statement.
+-- The migrator decides "applied" by `when` (scripts/migrate.mts reads
+-- MAX(created_at)), so a database that ran C's stand-in counts this one as
+-- applied and needs nothing more. In C's merge, take this file.
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_line_items` MODIFY COLUMN `runMaterialRole` enum('raceway','conductor','ground','coupling','connector','strap','elbow90','elbow45','fieldBend','lb','pullBox','teeBox','teeCover','teeBody','locknut','bushing','extra','elbowFlat');

@@ -21,6 +21,12 @@ This is the human-readable companion to the git history — read this to see wha
   a mark and the server confirming it did nothing, or took back something
   older, without a word. It now takes nothing back, says so, and sends the
   mark straight away so the next press works.
+- **The database can now hold a "flat elbow" line for 700 surface raceway,
+  separate from the inside elbow.** A 700 run needs both kinds, and a bid
+  allows one line per run type and part kind, so the flat elbow needed a
+  kind of its own. Nothing on screen changes yet — the code that counts
+  flat elbows comes next. On staging only; every staging bid total was
+  checked unchanged before and after.
 - **Undo on the Plans screen now covers a run's type, typed length,
   circuits and added legs, and says plainly when something can't be
   undone.** Before, pressing undo after one of those quietly took back the

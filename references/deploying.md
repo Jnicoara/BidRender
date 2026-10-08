@@ -1587,6 +1587,37 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0139 (done 2026-10-08, 22:44 UTC) — NOT on live
+
+`0139_elbow_flat_role`: `elbowFlat` appended to
+`bid_line_items.runMaterialRole`, after `extra` (`per-foot-items-plan.md`
+§ 4 M2 — a 700 type needs an inside elbow AND a flat elbow, and the bid
+allows one line per type + role). Additive, no `UPDATE`; step 3 empty. Same
+name, journal entry and statement as Track C's stand-in on
+`c-per-foot-logic`, which takes this file at merge.
+
+1. **Backup**: `staging-2026-10-08T22-38-43Z-before-0139.sql` (73 tables,
+   `--single-transaction`, `VERIFY_IDENTITY` TLS) in
+   `C:\dev\bidrender-backups\`; restored locally into a scratch database;
+   **73/73 table counts equal staging's**.
+2. **Rehearsal on that copy**: drift before = exactly the one enum, 176/176;
+   `bidTotals` before; **1 applied**, 140; re-run nothing; "matches",
+   176/176; `bidTotals` after: **all 732 unchanged**; counts after = before
+   except `__drizzle_migrations` (+1).
+3. **Staging**: serving `1e7f544` (built 22:27) — the same commit this
+   checkout's code was based on, plus only the enum and tests. Drift before
+   the same; `bidTotals` before (732 bids); **1 applied**, 140; re-run
+   nothing; "matches", 176/176; `bidTotals` after: **all 732 unchanged**;
+   site still HTTP 200 on the old code.
+4. **Code**: the commit after this record — `RUN_MATERIAL_ROLES` gains
+   `elbowFlat`, a tripwire case in `feetForRole` (nothing writes the role
+   until C's 700 code), `server/migration0139.test.ts`. Pushed to `staging`
+   by hand (the auto-deploy refuses a `drizzle/` change), then `local-dev`.
+
+**Live**: 0139 joins the batch (0105–0139, 35 files, expect 140 and 176/176
+FKs — `next-live-release-plan.md` § 3). Additive, so it is safe ahead of C's
+code; it reaches live with whichever release carries that code or earlier.
+
 ### Staging: migrations 0135–0138 (done 2026-10-08, ~19:35 UTC) — NOT on live
 
 The per-foot items plan's M1–M4 (`per-foot-items-plan.md` § 4), all four
