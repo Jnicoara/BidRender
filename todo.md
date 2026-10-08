@@ -134,7 +134,8 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       `RENEW_HOLD_MS`: locally at the default 5 s the renewal landed BEFORE
       sheet 1 was drawn, so it printed "No flash" with the fix taken out; at
       14 s it printed FLASH (58x29 [300x150]) without the fix and "No flash"
-      with it, at laptop and tablet. Staging result: see the handoff.
+      with it, at laptop and tablet. Staging (`06791ea`): "No flash" at
+      both sizes, the renewal landing after sheet 1 was drawn.
       Original item:
 - [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet
