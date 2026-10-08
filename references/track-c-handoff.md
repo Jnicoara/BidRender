@@ -83,9 +83,24 @@ skipping extras; flat elbow mapped to `elbow45`; drops counted as flat.
 still unread — `shared/tracedParts.ts` belongs with the bid half and the
 GR2/GR5/DV34 recipe changes (plan § 9 step 3, after B's gap 11). The
 "Shared trench?" button on the bid line and the run-type editor's Extras
-block are screens nobody has built. **Not looked at on screen:** the
-RunsPanel send preview's extra sentence (the only UI change) — look at it at
-laptop and 1180x820 before calling the screen side done.
+block are screens nobody has built.
+
+**CI (Gate 37847472206, pushed to `track-c`):** `test` GREEN — the full
+suite. `drizzle-guard` RED, and that is the rule working: a track branch
+may not touch `drizzle/`, and this one carries the stand-in 0139 and the
+`schema.ts` enum line. It clears when A's 0139 is on local-dev and the merge
+takes A's files (the branch's own `drizzle/` diff is then empty). Do not
+"fix" it any other way.
+
+**On screen (local, 2026-10-08):** a throwaway bid with a 52 ft 1"
+underground run (deleted after). The Runs panel reads "Underground warning
+tape 52 ft" with "52 ft of Underground warning tape: 52 ft over 1 run, the
+flat length only, not the risers" under it; the Send dialog lists the tape
+as its own 52 ft new line. Read from the DOM — **the driven tab was hidden,
+so no screenshot: the LAYOUT is still unlooked-at**, at laptop or 1180x820.
+Seen in passing, not changed: an underground type's send says "Cannot go on
+the bid: Wire for 1 conduit run — conduit with nothing pulled through it",
+which is true (no wire, by design § 3b) but reads as a fault on a trench.
 
 ## Earlier (2026-10-08, later)
 
