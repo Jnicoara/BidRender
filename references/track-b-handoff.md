@@ -6,6 +6,20 @@ databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105
 and `scripts/schemaDrift.mts` says both match. Last gate: `pnpm check` clean,
 292 test files / 4,976 passing / 5 skipped.
 
+## Session 2026-10-08 (early) — never stuck, gaps 1–7 built
+
+- `references/never-stuck-plan.md` § 3 lists what each gap does. Tests:
+  `client/src/lib/neverStuck.test.ts` and
+  `server/analyticsNotPricedNamed.test.ts`, 16 red on the old code.
+- **Gap 11** (fix a bid line in place) is re-planned with the owner's
+  "Also save to my library" tick box, ON by default. Sent and locked bids
+  never change.
+- **Track A, in todo.md:** ONE feature, "extra per-foot items on a traced
+  run" (warning tape and the 700-series cover), plus the 700-series device
+  plate.
+- **Track C merged** (`bea4d8f`): the "after Track C merges" items are
+  unblocked.
+
 ## Session 2026-10-07 (late night) — 15 more starters, by key, hours not set
 
 - **Loaded:** GC1–GC5 and GR1–GR7 (top-assemblies-draft.md § 2b), LT31 (2")

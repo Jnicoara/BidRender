@@ -68,6 +68,8 @@ type Report = {
     incompleteBids: number;
     /** Bids whose figures count lines or parts nobody priced as $0. */
     notPricedBids: number;
+    /** The first of those by name, to open from the note. */
+    notPricedBidList: { bidId: number; name: string }[];
   };
   timeline: Period[];
 };
@@ -151,7 +153,14 @@ function TooltipCard({
   );
 }
 
-export function OutcomesPanel({ report }: { report: Report }) {
+export function OutcomesPanel({
+  report,
+  onOpenBid,
+}: {
+  report: Report;
+  /** Opens a bid named in the "not priced" note (never-stuck gap 7). */
+  onOpenBid?: (bidId: number) => void;
+}) {
   const [rateTable, setRateTable] = useState(false);
   const [volumeTable, setVolumeTable] = useState(false);
   const { totals, timeline } = report;
@@ -200,6 +209,8 @@ export function OutcomesPanel({ report }: { report: Report }) {
       <IncompleteFiguresNote
         count={totals.incompleteBids}
         notPricedCount={totals.notPricedBids}
+        notPricedBids={totals.notPricedBidList}
+        onOpenBid={onOpenBid}
         noun={["bid", "bids"]}
       />
 

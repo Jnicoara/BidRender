@@ -59,24 +59,77 @@ function sourceLabel(row: HeightRow): string {
   return "";
 }
 
+/**
+ * A company's OWN height type can be renamed: tap the name, type, Enter (or
+ * click away) saves, Escape puts it back. The server has allowed this since
+ * the types were built (`takeoffHeights.renameType`); nothing on screen
+ * called it, so a typo in a type somebody added was permanent
+ * (references/never-stuck-plan.md, gap 4). A SHIPPED type's name stays ours —
+ * the server refuses it — so it is plain text.
+ */
+function TypeName({
+  row,
+  onRename,
+}: {
+  row: HeightRow;
+  onRename?: (label: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const tone = row.isActive ? "" : "text-muted-foreground";
+  if (!onRename) return <span className={tone}>{row.label}</span>;
+  if (draft === null)
+    return (
+      <button
+        type="button"
+        onClick={() => setDraft(row.label)}
+        className={`${tone} text-left underline decoration-dotted underline-offset-2 hover:decoration-solid`}
+        aria-label={`Rename ${row.label}`}
+        title="Rename this type"
+      >
+        {row.label}
+      </button>
+    );
+  const commit = () => {
+    const next = draft.trim();
+    setDraft(null);
+    if (next && next !== row.label) onRename(next);
+  };
+  return (
+    <Input
+      value={draft}
+      autoFocus
+      onFocus={selectOnFocus}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") setDraft(null);
+      }}
+      className="h-7 text-sm w-48"
+      aria-label={`New name for ${row.label}`}
+    />
+  );
+}
+
 function HeightRowView({
   row,
   onSave,
   onReset,
   onRetire,
+  onRename,
 }: {
   row: HeightRow;
   onSave: (inches: number) => void;
   onReset: () => void;
   onRetire: (retired: boolean) => void;
+  /** Only for a company's own type; a shipped name is not theirs to change. */
+  onRename?: (label: string) => void;
 }) {
   return (
     <div className="flex items-center gap-3 py-1.5 border-b border-border/40 last:border-0">
       <div className="min-w-0 flex-1">
         <div className="text-sm flex items-center gap-2">
-          <span className={row.isActive ? "" : "text-muted-foreground"}>
-            {row.label}
-          </span>
+          <TypeName row={row} onRename={onRename} />
           {!row.isActive && (
             <span className="text-[0.7rem] text-muted-foreground border border-border rounded px-1">
               retired
@@ -145,6 +198,15 @@ export function HeightsSection() {
     onSuccess: refresh,
     onError,
   });
+  const renameType = trpc.takeoffHeights.renameType.useMutation({
+    onSuccess: refresh,
+    onError,
+  });
+  /** A rename handler for the company's own types only — see TypeName. */
+  const renameFor = (row: HeightRow) =>
+    row.isShipped
+      ? undefined
+      : (label: string) => renameType.mutate({ typeKey: row.typeKey, label });
   const addType = trpc.takeoffHeights.addType.useMutation({
     onSuccess: () => {
       setNewLabel("");
@@ -227,6 +289,7 @@ export function HeightsSection() {
             onRetire={retired =>
               setRetired.mutate({ typeKey: row.typeKey, retired })
             }
+            onRename={renameFor(row)}
           />
         ))}
 
@@ -260,6 +323,7 @@ export function HeightsSection() {
               onRetire={retired =>
                 setRetired.mutate({ typeKey: row.typeKey, retired })
               }
+              onRename={renameFor(row)}
             />
           ))}
       </div>

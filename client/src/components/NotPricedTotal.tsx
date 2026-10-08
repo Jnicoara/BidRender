@@ -15,6 +15,10 @@
 import { cn } from "@/lib/utils";
 import { notPricedSuffix } from "@/lib/notPricedTotal";
 import type { NotPricedTally } from "@shared/lineNotPriced";
+import { TapExplain } from "./TapExplain";
+
+export const NOT_PRICED_TOTAL_WHY =
+  "Lines and parts nobody has priced add nothing to this total. Each says “not priced” on the bid.";
 
 export function NotPricedTotal({
   amount,
@@ -36,12 +40,13 @@ export function NotPricedTotal({
     <span className="inline-flex flex-wrap items-baseline justify-end gap-x-1.5 text-right">
       <span className={className}>{amount}</span>
       {suffix && (
-        <span
+        // Tap or hover: the reason must reach a finger too (never-stuck plan).
+        <TapExplain
+          explanation={NOT_PRICED_TOTAL_WHY}
           className="text-[11px] font-sans text-[#F5C518] whitespace-nowrap"
-          title="Lines and parts nobody has priced add nothing to this total. Each says “not priced” on the bid."
         >
           {suffix}
-        </span>
+        </TapExplain>
       )}
     </span>
   );

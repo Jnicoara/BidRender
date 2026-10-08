@@ -9,6 +9,7 @@
  * price, just not the shop's own. Sky, small, with the reason on hover.
  */
 import { cn } from "@/lib/utils";
+import { TapExplain } from "./TapExplain";
 import {
   EXAMPLE_LABEL,
   lineExampleKinds,
@@ -39,13 +40,14 @@ export function ExampleTags({
   return (
     <span className={cn("inline-flex flex-wrap gap-1", className)}>
       {kinds.map(kind => (
-        <span
+        // Tap or hover — a `title` alone never reaches a tablet.
+        <TapExplain
           key={kind}
-          title={WHY[kind]}
-          className="rounded border border-sky-500/40 px-1 text-[10px] leading-4 text-sky-400 whitespace-nowrap"
+          explanation={WHY[kind]}
+          className="rounded border border-sky-500/40 px-1 text-[10px] leading-4 text-sky-400 whitespace-nowrap no-underline"
         >
           {EXAMPLE_LABEL[kind]}
-        </span>
+        </TapExplain>
       ))}
     </span>
   );

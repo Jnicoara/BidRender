@@ -47,6 +47,28 @@ import { tallyLeavesOut, type NotPricedTally } from "../shared/lineNotPriced";
 function leavesUnpriced(notPriced: NotPricedTally): boolean {
   return tallyLeavesOut(notPriced);
 }
+
+/** How many of the not-priced bids the note names, so it stays a note. */
+export const NOT_PRICED_NAMED = 10;
+
+/** A bid the analytics note can open by name. */
+export type NamedBid = { bidId: number; name: string };
+
+/**
+ * WHICH bids the "not priced — N bids" note is about, so each can be opened
+ * from the note itself (references/never-stuck-plan.md, gap 7) — a count
+ * with no way to reach the bids behind it is the dead end the owner's rule
+ * forbids. The same filter as the count, so the two can never disagree;
+ * capped, because the note is not a list screen.
+ */
+export function notPricedNamed<
+  T extends { id: number; name: string; notPriced: NotPricedTally },
+>(rows: readonly T[]): NamedBid[] {
+  return rows
+    .filter(row => leavesUnpriced(row.notPriced))
+    .slice(0, NOT_PRICED_NAMED)
+    .map(row => ({ bidId: row.id, name: row.name }));
+}
 import {
   DEFAULT_RANGE_MONTHS,
   EMPTY_OUTCOMES,
@@ -227,6 +249,8 @@ export type OutcomesReport = {
      * the screen said nothing.
      */
     notPricedBids: number;
+    /** The first of those, by name, to open from the note (`notPricedNamed`). */
+    notPricedBidList: NamedBid[];
   };
   timeline: OutcomePeriod[];
   /**
@@ -351,6 +375,7 @@ export async function outcomesReport(
       totalValue: roundMoney(timeline.reduce((s, p) => s + p.totalValue, 0)),
       incompleteBids: costs.filter(row => row.brokenLines > 0).length,
       notPricedBids: costs.filter(row => leavesUnpriced(row.notPriced)).length,
+      notPricedBidList: notPricedNamed(costs),
     },
     timeline,
     earliestBid: earliest ? asDateString(earliest) : null,
@@ -393,6 +418,8 @@ export type ProfitabilityReport = {
    * those at $0. See OutcomesReport's `notPricedBids`.
    */
   notPricedJobs: number;
+  /** The first of those, by name, to open from the note (`notPricedNamed`). */
+  notPricedJobList: NamedBid[];
   /** True when more jobs closed in the range than one call will value. */
   truncated: boolean;
   /** How many jobs there really are, when truncated. */
@@ -548,6 +575,9 @@ export async function profitabilityReport(
     worstJobs,
     incompleteJobs: jobs.filter(job => job.incomplete).length,
     notPricedJobs: jobs.filter(job => leavesUnpriced(job.notPriced)).length,
+    notPricedJobList: notPricedNamed(
+      jobs.map(job => ({ ...job, id: job.bidId }))
+    ),
     truncated: jobsInRange > rows.length,
     jobsInRange,
   };

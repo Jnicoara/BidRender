@@ -85,6 +85,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { unitCost } from "@/lib/money";
 import { materialItemKey } from "@shared/materialMarkup";
 import { PercentKindInput } from "@/components/PercentKindInput";
+import { focusOnOpen, NEEDS_WHY, type NeedsField } from "@/lib/needsFix";
 import {
   isStickJoint,
   STICK_JOINTS,
@@ -386,6 +387,12 @@ function MaterialRow({
   */
   const [markupDraft, setMarkupDraft] = useState("");
   const [openedWith, setOpenedWith] = useState<Draft | null>(null);
+  /**
+   * Which warning opened the editor, if one did — "Needs price" lands the
+   * cursor in the price box and says why, instead of the person having to
+   * find the pencil and then the field (@/lib/needsFix).
+   */
+  const [openedFor, setOpenedFor] = useState<NeedsField | null>(null);
 
   const utils = trpc.useUtils();
   const setOverride = trpc.bids.setItemMarkupOverride.useMutation({
@@ -397,7 +404,8 @@ function MaterialRow({
     onError: e => toast.error(e.message),
   });
 
-  const startEditing = () => {
+  const startEditing = (focus: NeedsField | null = null) => {
+    setOpenedFor(focus);
     setMarkupDraft(
       markupOverride === undefined
         ? ""
@@ -476,7 +484,7 @@ function MaterialRow({
             onChange={e => setDraft({ ...draft, name: e.target.value })}
             className="h-8 flex-1 min-w-[12rem] text-sm"
             placeholder="Material name"
-            autoFocus
+            autoFocus={focusOnOpen(openedFor, "name")}
           />
           <CategorySelect
             value={draft.category}
@@ -509,6 +517,8 @@ function MaterialRow({
             inputMode="decimal"
             onFocus={selectOnFocus}
             placeholder="0.00"
+            aria-label="Price per unit"
+            autoFocus={focusOnOpen(openedFor, "price")}
           />
           {/*
             Hours per unit of sale, and the PLACEHOLDER is doing real work:
@@ -529,6 +539,7 @@ function MaterialRow({
             placeholder="hours"
             aria-label="Labor hours per unit"
             title="Hours to install one of these. Leave blank if you have not decided; 0 means it adds no time of its own."
+            autoFocus={focusOnOpen(openedFor, "hours")}
           />
           {/*
             This material's OWN markup — the first markup rule, over its
@@ -569,6 +580,14 @@ function MaterialRow({
             </Button>
           </div>
         </div>
+
+        {/* Why the field the cursor is in matters — the explanation that was
+            a hover-only tooltip, now visible on any device (@/lib/needsFix). */}
+        {openedFor && openedFor !== "rate" && (
+          <p className="mt-1.5 text-xs text-[#F5C518]" role="note">
+            {NEEDS_WHY[openedFor]}
+          </p>
+        )}
 
         <div className="mt-2">
           <Input
@@ -816,12 +835,17 @@ function MaterialRow({
           price of nothing — which is exactly the number that loses a job
           quietly. So an unpriced row says so instead of showing the zero. */}
       {unpriced ? (
-        <span
-          className="text-xs md:w-24 text-right shrink-0 font-medium text-[#F5C518]"
-          title="No price yet — this material prices the job at nothing until you set one."
+        // A button, not a label: clicking it opens this row with the cursor
+        // in the price box and the reason shown beside it (@/lib/needsFix).
+        <button
+          type="button"
+          onClick={() => startEditing("price")}
+          disabled={isBusy}
+          className="text-xs md:w-24 text-right shrink-0 font-medium text-[#F5C518] underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          aria-label={`Set a price for ${material.name}`}
         >
           Needs price
-        </span>
+        </button>
       ) : (
         <span className="text-sm font-mono md:w-24 text-right shrink-0">
           {unitCost(material.costPerUnit)}
@@ -845,12 +869,15 @@ function MaterialRow({
         being asked for it.
       */}
       {unhoured ? (
-        <span
-          className="text-xs md:w-24 text-right shrink-0 font-medium text-[#F5C518]"
-          title="No labor unit yet — work using this material carries no hours until you set one. On a traced run, couplings, connectors and straps need none: the pipe's hours per foot pay for them."
+        <button
+          type="button"
+          onClick={() => startEditing("hours")}
+          disabled={isBusy}
+          className="text-xs md:w-24 text-right shrink-0 font-medium text-[#F5C518] underline decoration-dotted underline-offset-2 hover:decoration-solid"
+          aria-label={`Set labor hours for ${material.name}`}
         >
           Needs hours
-        </span>
+        </button>
       ) : (
         <span
           className="text-sm font-mono md:w-24 text-right shrink-0"
@@ -872,7 +899,7 @@ function MaterialRow({
           size="sm"
           variant="ghost"
           className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-          onClick={startEditing}
+          onClick={() => startEditing()}
           disabled={isBusy}
           title={
             material.userId === null ? "Edit — creates your own copy" : "Edit"

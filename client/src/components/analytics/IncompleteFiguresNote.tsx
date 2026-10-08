@@ -18,12 +18,20 @@
 export function IncompleteFiguresNote({
   count,
   notPricedCount = 0,
+  notPricedBids = [],
+  onOpenBid,
   noun,
 }: {
   /** Bids or jobs carrying a line that can't be priced. */
   count: number;
   /** Bids or jobs carrying lines or parts nobody has priced. */
   notPricedCount?: number;
+  /**
+   * The first of those by name (server `notPricedNamed`), each a button that
+   * opens the bid — the count alone was a dead end (never-stuck plan, gap 7).
+   */
+  notPricedBids?: readonly { bidId: number; name: string }[];
+  onOpenBid?: (bidId: number) => void;
   noun: [one: string, many: string];
 }) {
   if (count <= 0 && notPricedCount <= 0) return null;
@@ -45,6 +53,24 @@ export function IncompleteFiguresNote({
           {notPricedCount === 1 ? noun[0] : noun[1]} in this range{" "}
           {notPricedCount === 1 ? "has" : "have"} lines or parts nobody has
           priced. The dollar figures here count them as $0.
+        </p>
+      )}
+      {notPricedCount > 0 && onOpenBid && notPricedBids.length > 0 && (
+        <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span>Open to price:</span>
+          {notPricedBids.map(b => (
+            <button
+              key={b.bidId}
+              type="button"
+              onClick={() => onOpenBid(b.bidId)}
+              className="text-[#F5C518] underline underline-offset-2 hover:decoration-solid [@media(pointer:coarse)]:min-h-11"
+            >
+              {b.name}
+            </button>
+          ))}
+          {notPricedCount > notPricedBids.length && (
+            <span>and {notPricedCount - notPricedBids.length} more</span>
+          )}
         </p>
       )}
     </div>

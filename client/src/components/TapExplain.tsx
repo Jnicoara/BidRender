@@ -32,6 +32,13 @@ export function TapExplain({
         <button
           type="button"
           title={explanation}
+          /*
+            Explaining is all a tap here does. Several of these sit inside a
+            row that opens a bid on click (the Dashboard's bid cards, the
+            profitability table), and without this the same tap would both
+            open the explanation and navigate away from it.
+          */
+          onClick={e => e.stopPropagation()}
           className={cn(
             "underline decoration-dotted underline-offset-2 cursor-help",
             className

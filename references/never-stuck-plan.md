@@ -1,6 +1,18 @@
 # Never stuck — every number and name easy to edit (PLAN, 2026-10-07)
 
-**Plan only. Nothing here is built.** Track B, on `track-b`.
+> **STATUS, 2026-10-07 (later).**
+>
+> - **Gaps 1–7 are BUILT** (§ 3). Tests: `client/src/lib/neverStuck.test.ts`
+>   and `server/analyticsNotPricedNamed.test.ts`, red on the old code.
+> - **Track C has merged into local-dev** (`bea4d8f`), so the ★ items below
+>   no longer wait on C.
+> - **Gap 11 is amended by the owner:** an "Also save to my library" tick box,
+>   ON by default. See gap 11.
+> - **The Example price, hours and rate tags now exist** (Track A's
+>   0132–0134). They open on a tap. On a labor rate, the tag also opens the
+>   rate (gap 2).
+
+**Written as a plan; § 3 says what is built.** Track B, on `track-b`.
 
 **The owner's rule:** a user must never feel stuck. Every number and every
 name must be easy to edit.
@@ -215,35 +227,44 @@ gets a test that fails without the change. Pure decisions go in
 `client/src/lib` or `shared/`, where vitest can reach them; the screen
 itself is checked on staging at laptop and tablet sizes.
 
-### Can be built now (no ★ file)
+### BUILT 2026-10-07 — gaps 1–7
 
-1. **"Needs price" / "Needs hours" become buttons** that open the material's
-   editor focused on that field. Files: `MaterialsLibraryPage.tsx`.
-   - Test: a source guard that the label is a `<button>` wired to
-     `startEdit`. Then the screen check, including that the field is
-     focused.
-2. **"Needs rate" / "Set hours" the same**, on labor rates. Files:
-   `LaborRatesPage.tsx`.
-3. **Explanations a finger can open.** Replace the hover `title` on these
-   with `TapExplain`, which already exists:
-   - "Not priced" and "+ … not priced" in `LineCost.tsx`;
-   - the total's "+ N not priced" in `NotPricedTotal.tsx`.
+1. **Materials: "Needs price" / "Needs hours" are buttons.** Each opens that
+   row's editor with the cursor in the price or hours box, and the reason
+   shows as a visible line under it. It used to be a hover-only tooltip.
+   `MaterialsLibraryPage.tsx`; the words and the focus rule are in
+   `client/src/lib/needsFix.ts`.
+2. **Labor rates: "Needs rate", "Set hours" and the "Example rate" tag are
+   buttons**, each opening the rate or yearly-hours box with the reason
+   shown. The Example tag is included because it is a number someone should
+   be able to replace in one tap. `LaborRatesPage.tsx`.
+3. **Explanations a finger can open**, via `TapExplain`:
+   - "Can't price", "Not priced" and "+ … not priced" (`LineCost.tsx`);
+   - the totals' "+ N not priced" (`NotPricedTotal.tsx`);
+   - the Example price/hours/rate tags on bid lines (`ExampleTags.tsx`).
 
-   Both files are clear of C. Test: the explanation text is reachable without
-   hover (source guard), then a tablet screen check.
+   `TapExplain` now stops the tap from bubbling. Several totals sit inside a
+   row that opens a bid (the Dashboard's cards, the profitability table),
+   and a tap must not both explain and navigate.
 
-4. **Rename a shop's own height type.** The server half exists
-   (`renameType`). Add the field in `HeightsSection.tsx` (clear of C).
-   - Test: the server test for `renameType` already exists; add a client
-     source guard that it is called.
-5. **"Customer: not set" opens the client picker** in
-   `AccountingExportDialog.tsx` (clear of C).
-6. **"+ N with hours not set" on a kit** lists its assemblies, each opening
-   the assembly editor. `KitsPage.tsx` (clear of C).
-7. **Analytics "not priced — N bids"** links to those bids.
-   `IncompleteFiguresNote.tsx` (clear of C).
+4. **A shop renames its own height type**: tap the name, type, then Enter or
+   click away; Escape cancels. Shipped names stay fixed, which the server
+   enforces. `HeightsSection.tsx`.
+5. **"Customer: not set" in the accounting export** is the bid's client
+   picker, in the dialog (`ClientLinkField`, the same one the bid screen
+   uses). Attaching a client re-reads the export.
+   `AccountingExportDialog.tsx`.
+6. **A kit's "+ N with hours not set"** now names those assemblies, each
+   with an hours box in the panel. Saving writes the assembly (a starter
+   forks), and the kit's figures move, because kit pricing resolves forks.
+   **This went further than the plan**, which only said "open the editor".
+   `KitsPage.tsx`.
+7. **Analytics "not priced — N bids"** names up to 10 of those bids, each
+   opening the bid. The names come from the same rule as the count
+   (`notPricedNamed` in `server/analytics.ts`), drops included.
+   `IncompleteFiguresNote.tsx`, both panels, `AnalyticsPage.tsx`.
 
-### Wait for Track C to merge
+### Next — Track C has merged, so these no longer wait (★ kept as history)
 
 8. **"hours not set" on the assembly list opens the editor ON the hours
    field.** `AssembliesLibraryPage.tsx` ★.
@@ -259,27 +280,61 @@ itself is checked on staging at laptop and tablet sizes.
     - the assembly's hours, for hours not set;
     - the role's rate, for no labor rate.
 
-    **Save** writes the library row (forking a starter, as today) **and
-    re-snapshots THAT line.**
-    - **The snapshot freeze is the reason this is not automatic** (CLAUDE.md
-      § Architecture: "never mutate a snapshot field"). So the re-snapshot
-      is an explicit action on one line, named on the button: "Save and
-      update this line". Other lines on this bid, and other bids, keep their
-      frozen numbers.
-    - A second button, "Update all N lines using it on this bid", is the
-      deliberate bulk version.
-    - **Needs a new server procedure**, `bids.refreshLineFromLibrary`,
-      modelled on `db.priceLineFromAssembly`. Files: `bidsRouter.ts` ★,
-      `server/db.ts` ★, `BidsPage.tsx` ★, `LineCost.tsx`,
-      `shared/lineNotPriced.ts` ★, `client/src/lib/notPricedTotal.ts` ★.
-      **No migration.**
-    - **Tests that must fail without it:**
-      - the line's numbers move and the "not priced" count drops;
-      - another bid using the same assembly does NOT move;
-      - a line on this bid not chosen does NOT move;
-      - a starter edit forks it and leaves the shipped row alone.
-    - The totals strips then get "Fix these" buttons that walk the same
-      panels line by line.
+    > **Amended by the owner, 2026-10-07:** the panel saves the number onto
+    > THIS line, and offers a tick box **"Also save to my library", ON by
+    > default**, so the next bid is not stuck on the same missing number.
+    > **Sent and frozen bids never change.** This replaces the two-button
+    > design that stood here ("Save and update this line" / "Update all N
+    > lines").
+
+    **How it works:**
+    1. **Save always writes THIS line.** The typed price, hours or rate goes
+       into this line's own snapshot fields, as a hand edit, and the line
+       re-prices. That is the person deliberately changing their own line,
+       which the snapshot rule allows. What it forbids is a line moving
+       because something ELSE changed.
+    2. **"Also save to my library" (ticked by default)** also writes the
+       source: the material's price, the assembly's hours, or the role's
+       rate. A starter forks, as every library edit does. That is the
+       default because the owner's aim is that the next bid is not stuck
+       too.
+    3. **Nothing else moves.** Other lines on this bid using the same
+       assembly, and every other bid, keep their frozen numbers. That is the
+       snapshot freeze (CLAUDE.md § Architecture). A small note under the
+       tick box says so: "Other bids keep their prices. New lines use this."
+       Bringing other lines on THIS bid up to date stays its own deliberate
+       action, offered afterwards only if there are some: "Update N other
+       lines on this bid to the new figure?"
+    4. **Sent and frozen bids never change.** The panel does not open on a
+       bid whose quantities are locked, or that has gone to the customer
+       (Sent, Won, Lost). It still EXPLAINS, so the person is not stuck
+       wondering: "This bid was sent, so its prices are fixed. Fix it in
+       your library for next time." The library half is still offered.
+       That needs the same rule the bid screen already applies to editing a
+       line; reuse it rather than writing a second one.
+
+    **Needs:**
+    - **One server procedure**, `bids.fixLine({ lineId, price?, hours?,
+laborRateId?, saveToLibrary })`, that writes the line and, if asked,
+      the library row, in one transaction. It refuses on a locked or sent
+      bid, and that refusal is tested.
+    - **Files:** `bidsRouter.ts`, `server/db.ts`, `BidsPage.tsx`,
+      `LineCost.tsx`, `shared/lineNotPriced.ts`,
+      `client/src/lib/notPricedTotal.ts`.
+    - **No migration.**
+
+    **Tests that must fail without it:**
+    - the line's numbers move and the "not priced" count drops;
+    - with the box ticked, the library row changes (a starter forks, the
+      shipped row untouched);
+    - with it unticked, the library does NOT change;
+    - another bid using the same assembly does NOT move, ticked or not;
+    - another line on this bid does NOT move until the person says so;
+    - a sent bid and a locked bid refuse the line change, and allow the
+      library change.
+
+    The totals strips then get "Fix these" buttons that walk the same panel
+    line by line.
 
 12. **The run-end text warnings** ("no run height set for this job") open the
     heights popover. `runEnds.tsx` ★.

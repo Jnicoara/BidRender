@@ -21,6 +21,7 @@ import {
 import { lineShortfallWords } from "@/lib/notPricedTotal";
 import type { LineExampleFlags } from "@shared/exampleTags";
 import { ExampleTags } from "./ExampleTags";
+import { TapExplain } from "./TapExplain";
 
 export function LineCost({
   line,
@@ -34,32 +35,40 @@ export function LineCost({
   /** Width and alignment, which differ between the two screens. */
   className?: string;
 }) {
+  /*
+    Every explanation in this cell opens on a TAP as well as a hover
+    (TapExplain). They were `title` attributes, which a finger cannot reach,
+    so on a tablet "Not priced" said what was wrong and never why
+    (references/never-stuck-plan.md, gap 3).
+  */
   if (line.breakdown === null) {
+    const why =
+      line.problem?.message ?? "The pricing engine refused this line.";
     return (
-      <span
+      <TapExplain
+        explanation={why}
         className={cn("text-xs text-red-500", className)}
-        title={line.problem?.message ?? undefined}
       >
         Can't price
         {line.problem?.ref ? (
           <span className="font-mono"> · {line.problem.ref}</span>
         ) : null}
-      </span>
+      </TapExplain>
     );
   }
   const cost = line.breakdown.directCost;
   if (lineNotPriced(line, cost)) {
     return (
-      <span
-        className={cn("text-xs text-[#F5C518]", className)}
-        title={
+      <TapExplain
+        explanation={
           cost > 0
             ? `The material has no price. ${money(cost)} of labor is in the total; the material is not.`
             : "Nothing on this line has a price yet, so it adds nothing to the total."
         }
+        className={cn("text-xs text-[#F5C518]", className)}
       >
         Not priced
-      </span>
+      </TapExplain>
     );
   }
   /*
@@ -93,9 +102,9 @@ export function LineCost({
         )}
       >
         <span className="font-mono text-sm">{money(cost)}</span>
-        <span
+        <TapExplain
           className="text-[11px] text-[#F5C518] whitespace-nowrap"
-          title={
+          explanation={
             hoursMissing && parts === "hours not set"
               ? `${money(cost)} of material is in the total. The assembly's hours were not set when this line was added, so its labor is not.`
               : materialMissing
@@ -104,7 +113,7 @@ export function LineCost({
           }
         >
           + {parts}
-        </span>
+        </TapExplain>
         <ExampleTags line={line} only={["price"]} />
       </span>
     );

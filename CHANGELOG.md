@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **Warnings are now the way to fix what they name.**
+  - On the Materials screen, "Needs price" and "Needs hours" open that item
+    with the cursor in the right box. On Labor rates, "Needs rate", "Set
+    hours" and "Example rate" do the same, and each says why in plain words
+    you can read on a tablet.
+  - On a bid, "Not priced", "Can't price", "+ … not priced" and the
+    "Example" tags explain themselves on a tap, not just a mouse hover.
+  - Elsewhere:
+    - a kit now lists the assemblies whose hours aren't set, each with an
+      hours box right there;
+    - the accounting export lets you pick the customer when it says "not
+      set";
+    - Analytics names the unpriced bids so you can open them;
+    - you can rename your own job height types.
+
 - **The Circuits view no longer draws a line from a device to its panel
   (branch `c-homerun-footage`).** Picking a circuit still rings its devices
   and marks the panel, but nothing is drawn between them — the owner's
