@@ -384,7 +384,7 @@ Search those before asking for a height column.
       bid page says "N drops not priced — drop material not set", the
       proposal says "Price pending" and Print is blocked (its dialog points
       at the Plans screen when drops are the gap).
-- [ ] **FOR TRACK B — merge note for the not-priced check (small, on purpose).**
+- [x] **DONE 2026-10-08 (merged local-dev into c-homerun-footage: one tallyLeavesOut with hours AND drops; materialsShare carries drops — track-c-handoff.md merge note). Was: FOR TRACK B — merge note for the not-priced check (small, on purpose).**
       C's branch touched B-owned files: `shared/lineNotPriced.ts` (optional
       `drops` on the tally, `tallyLeavesOut`, `withDropsNotPriced`),
       `client/src/lib/notPricedTotal.ts` (suffix/headline say drops;

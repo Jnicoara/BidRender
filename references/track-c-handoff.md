@@ -295,6 +295,48 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
+### MERGE NOTE FOR TRACK A (2026-10-08) — `c-homerun-footage` is ready; A merges it
+
+**local-dev (`615f122`) is merged INTO the branch** (merge `96635c1`). A
+merges the branch into local-dev WITH migrations 0125–0130 (pairing rule).
+**local-dev still ends at 0124 — no renumbering needed;** if anything lands
+above 0124 first, renumber 0125–0130 above it before merging.
+
+**What clashed, and how it was fixed:**
+
+| File                                                        | Clash                                                                                                                                              | Fix                                                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `shared/lineNotPriced.ts`                                   | B's `hours` and C's `drops` on `NotPricedTally`; **git kept TWO `tallyLeavesOut` functions** (B's read hours, C's read drops)                      | One type with both; ONE `tallyLeavesOut` reading lines, parts, hours AND drops |
+| `shared/proposal.ts`                                        | same `pricePending` line                                                                                                                           | kept B's `hoursPending`                                                        |
+| `client/src/lib/notPricedTotal.ts`                          | B restructured suffix/headline (priced items, then hours)                                                                                          | B's shape, drops in the priced group                                           |
+| `client/src/lib/notPricedTotal.ts` — **NO conflict marker** | B's new `materialsShare` (totals split) built the tally field by field and **silently dropped `drops`**: Materials row lost "+ N drops not priced" | carries drops (missing drop MATERIAL); `laborShare` unchanged                  |
+| `notPricedTotal.test.ts`, `dashboardFollowsDrawing.test.ts` | C's one-token `, 0` edits vs B's edits                                                                                                             | took B's files whole, re-added the required `dropsNotPriced` argument          |
+| `server/routers/assembliesRouter.ts`                        | imports                                                                                                                                            | both kept                                                                      |
+| `CHANGELOG.md`                                              | both sides' 2026-10-07 entries                                                                                                                     | both kept                                                                      |
+
+**Kept from local-dev, checked present:** Most used row (`MostUsedRow`,
+both pickers), totals split (`materialsShare`/`laborShare`), upload stream
+fix (`disableStream` in `shared/pdfRangeLoading.ts`), Labor-only tick box
+(beside C's "Mounts at" in the assembly editor).
+
+**Checked:** `pnpm check` clean; touched tests 152/152 locally
+(dropsNotPriced, notPricedTotal, dashboardFollowsDrawing, proposal,
+deviceMountKind, groupDrops, assemblies). Full suite: GitHub Actions run
+37709024423 on the mirror branch `a-ci-c-homerun-footage` (the Gate does
+not run on `c-*`; a `track-*` name would trip drizzle-guard on A's 0125–0130
+commits). **Delete `a-ci-c-homerun-footage` after merging.** On screen at
+1180x820 touch: E111 38 homeruns / 11,988.1 ft wire / 2B-1 42.8 ft
+(unchanged by the merge); Ceilings panel opens; Most used row shows (3
+throwaway bids made for it, deleted); bid totals "Materials $0.00 + 205
+drops not priced", Labor without it; no page errors.
+
+**A must check after merging:** (1) CI green on local-dev; (2) apply
+0125–0130 to staging BEFORE the code reaches it (step 1, additive — the
+Gate's deploy refuses a drizzle/ change anyway). The catalog rename was
+checked: no test this branch adds or changes looks a material up by a
+renamed name (`'1/2" EMT'` is not renamed; `"#12 THHN"` is used only in
+local-dev's own tests).
+
 **Patent Option A — DONE on `c-homerun-footage` (2026-10-07).** The dashed
 one-corner device-to-panel line is removed from `CircuitLayer`; a picked
 circuit's devices are ringed (leaving device larger) and the panel stays
