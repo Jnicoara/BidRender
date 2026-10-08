@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **A full set of cover plates is now in the starter catalog — 103 new
+  items, 1,818 in all.** Every standard flush plate from 1 to 3 gangs
+  (toggle, duplex, decora, blank and every mix of them) plus the common
+  4-gang ones, in both nylon and stainless, with midway and oversized sizes.
+  Also the single-receptacle plate, 30A/50A range, dryer and RV plates and
+  covers, more raised covers for 4" and 4-11/16" boxes, a heavy-duty metal
+  in-use cover, floor box covers by type with a carpet flange, and the
+  Wiremold 700 device plate and box. Colors are search words, not separate
+  items. Nothing was renamed or removed, and no starter assembly changed.
+  The pricing and labor-units sheets were rebuilt with the new rows.
+
 - **The starter assembly-hours sheet now lists all 183 starters.** It has
   the 15 Track B added, marked NEW so they are easy to find. DV34 (surface
   raceway receptacle) is listed but greyed out as HELD, because its 700-series

@@ -300,6 +300,108 @@ const squareBoxes: BaselineMaterial[] = [
   })),
 ];
 
+/*
+  ── The cover family's box covers (owner, 2026-10-08) ───────────────────────
+  The rest of the standard raised-cover openings, and floor box covers by
+  type. The blank raised cover is the flat `… square blank cover` above, not
+  a raised one; "and" joins two devices, as "two toggle" already reads.
+
+  Exported on their own and listed AFTER the receptacles in index.ts, on
+  purpose: raw search scores "recep" the same for every name holding
+  "receptacle", and an equal score keeps catalog order — so listed with the
+  other boxes, "4\" square raised cover, single receptacle" led a search for
+  "recep" (materialsCatalog.test.ts). The shelf is still Boxes.
+*/
+export const BOX_COVER_FAMILY: BaselineMaterial[] = [
+  ...[
+    { kind: "single receptacle", slang: "round hole 1.406 1.59 outlet" },
+    { kind: "duplex and toggle", slang: "receptacle outlet switch combo" },
+    {
+      kind: "decorator and toggle",
+      slang: "decora gfci gfi rocker paddle switch combo",
+    },
+    {
+      kind: "decorator and duplex",
+      slang: "decora gfci gfi rocker paddle receptacle outlet combo",
+    },
+  ].map(({ kind, slang }) => ({
+    ...each,
+    name: `4" square raised cover, ${kind}`,
+    searchAliases: aliases("1900 4in", slang, RAISED_COVER, STEEL_BRANDS),
+    jobKind: "commercial" as const,
+  })),
+  ...[
+    { kind: "duplex", slang: "receptacle outlet 1g single" },
+    { kind: "single toggle", slang: "switch 1 one 1g" },
+    { kind: "decorator", slang: "decora gfci gfi rocker paddle 1g single" },
+    { kind: "single receptacle", slang: "round hole 1.406 1.59 outlet 1g" },
+    { kind: "two toggle", slang: "switch 2 double 2g" },
+    {
+      kind: "duplex and toggle",
+      slang: "receptacle outlet switch combo 2g",
+    },
+    {
+      kind: "decorator and toggle",
+      slang: "decora gfci gfi rocker paddle switch combo 2g",
+    },
+    {
+      kind: "decorator and duplex",
+      slang: "decora gfci gfi rocker paddle receptacle outlet combo 2g",
+    },
+    {
+      kind: "30A/50A power receptacle",
+      slang:
+        "240 240v 250v 30a 50a 30 50 amp range dryer rv welder 14-30 14-50 10-30 10-50 2.15 round hole outlet",
+    },
+  ].map(({ kind, slang }) => ({
+    ...each,
+    name: `4-11/16" square raised cover, ${kind}`,
+    searchAliases: aliases(
+      "4 11/16 five square",
+      slang,
+      RAISED_COVER,
+      STEEL_BRANDS
+    ),
+    jobKind: "commercial" as const,
+  })),
+  // Floor box covers by type. The generic "Floor box cover" stays as it is.
+  // Finish (brass, nickel, aluminum) is a search word, not a row, the same
+  // as a plate's color.
+  ...[
+    { kind: "duplex", slang: "flip lid receptacle outlet" },
+    { kind: "decorator", slang: "decora gfci gfi flip lid" },
+    {
+      kind: "single receptacle",
+      slang: "screw plug round hole 1.406 1.59 outlet",
+    },
+    { kind: "blank", slang: "solid flat no hole abandoned" },
+    {
+      kind: "data",
+      slang: "communication comm low voltage voice cat6 cat5e keystone jack",
+    },
+    {
+      kind: "duplex and data",
+      slang: "combination combo power communication comm receptacle outlet",
+    },
+  ].map(({ kind, slang }) => ({
+    ...each,
+    name: `Floor box cover, ${kind}`,
+    searchAliases: aliases(
+      slang,
+      "brass nickel aluminum plate flush slab concrete"
+    ),
+    jobKind: "commercial" as const,
+  })),
+  {
+    ...each,
+    name: "Floor box carpet flange",
+    searchAliases: aliases(
+      "carpet plate ring trim cover floor box tile brass nickel"
+    ),
+    jobKind: "commercial",
+  },
+];
+
 const ceilingBoxes: BaselineMaterial[] = [
   {
     ...each,

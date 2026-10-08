@@ -101,6 +101,25 @@ export const SURFACE_RACEWAY: BaselineMaterial[] = [
   sr("each", "Raceway mounting strap", "clip clamp support"),
   sr("each", "Raceway outside elbow", "90 ell external corner"),
   sr("each", "Raceway tee fitting", "t branch split"),
+  // The 700-series device box and plate, cover family 2026-10-08 (owner).
+  // The plate is the part DV34 lists as missing (starterAssemblies.ts); the
+  // recipe change that un-holds DV34 is Track B's, not this file's.
+  {
+    ...sr(
+      "each",
+      "Surface raceway device box, 700 series",
+      "700 v700 shallow switch receptacle single gang one gang 1g"
+    ),
+    jobKind: "commercial",
+  },
+  {
+    ...sr(
+      "each",
+      "Surface raceway device plate, 700 series",
+      "700 v700 faceplate cover outlet duplex single gang one gang 1g"
+    ),
+    jobKind: "commercial",
+  },
 ];
 
 // ─── Underground ──────────────────────────────────────────────────────────────

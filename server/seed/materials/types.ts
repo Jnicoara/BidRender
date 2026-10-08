@@ -54,6 +54,14 @@ export type BaselineMaterial = {
    */
   description?: string;
   /**
+   * Residential / Commercial / Both, for a row no starter assembly uses yet.
+   * Read ONLY by the starter sheets (pricing/starterSheetLayout.ts
+   * `materialKind`); never written to the database. A row a starter DOES use
+   * takes its tag from those starters instead, so the two cannot disagree.
+   * Set on the cover-plate family added 2026-10-08 (owner).
+   */
+  jobKind?: "residential" | "commercial" | "both";
+  /**
    * Suggested quantity when this material is added to an assembly. Omitted = 1.
    *
    * Only for consumables nobody fits one of — you do not put a single wire nut

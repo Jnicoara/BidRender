@@ -309,10 +309,12 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     raceway line here; a matching 700-series device plate; wire stays with
     the traced run. Hours not set, Commercial.
 
-    STILL HELD — never seeded half-built. The catalog has no 700-series
-    device plate (it has the raceway, boxes and fittings since Track A's
-    adds). The moment a row of that name ships and this list is emptied, it
-    seeds by itself. todo.md has the part for Track A.
+    STILL HELD — never seeded half-built. Until 2026-10-08 this said the
+    catalog had no 700-series device plate; Track A shipped it that day
+    under exactly the name listed below, without touching this recipe. It
+    stays held because the list below is non-empty — the catalog having the
+    part is not enough. Track B adds the plate line and empties the list
+    (todo.md).
   */
   starter(
     "DV34",

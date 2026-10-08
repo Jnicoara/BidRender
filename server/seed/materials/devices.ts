@@ -636,3 +636,211 @@ export const COVER_PLATES: BaselineMaterial[] = [
     defaultQty: 4,
   },
 ];
+
+// ─── The full cover family (owner, 2026-10-08) ───────────────────────────────
+/*
+  Every standard flush plate in NYLON and in STAINLESS, 1- to 4-gang, plus
+  the midway (nylon) and oversized (stainless) sizes, and the 30A/50A power
+  receptacle plate. Added beside the generic rows above, which stay exactly
+  as they are ("Wall plate", "2-gang wall plate", "1-gang blank plate" …):
+  names are frozen, so this is adds only.
+
+  ONE row per plate, in white. The colors are search words, not rows — a
+  color changes nothing about what is bought or how long it takes to fit.
+  Stainless has no color, so it carries none.
+
+  The openings are listed in the name, left to right in a fixed order
+  (toggle, duplex, decorator, single receptacle), every one spelled out:
+  "toggle/toggle" rather than "2 toggle", so a mix and an all-one-kind plate
+  read the same way and a search for any opening finds every plate with it.
+
+  Blank-plus-device mixes are left out on purpose: they are a special order,
+  not a stocked plate. The 4-gang set is the common four (all toggle, all
+  duplex, all decorator, blank), not every mix.
+
+  What a plate IS stays the rule (file header): the opening words describe
+  the hole, and a search that names a device still finds the device first —
+  server/coverPlateFamily.test.ts pins that for "switch", "gfci", "outlet",
+  "dryer", "range" and "recep".
+*/
+type Opening = "toggle" | "duplex" | "decorator" | "single receptacle";
+const OPENING_ORDER: Opening[] = [
+  "toggle",
+  "duplex",
+  "decorator",
+  "single receptacle",
+];
+const OPENING_SLANG: Record<Opening, string> = {
+  toggle: "switch",
+  duplex: "outlet",
+  decorator: "decora gfci gfi rocker paddle",
+  "single receptacle": "round hole 1.406 1.59 single outlet",
+};
+const GANG_SLANG: Record<number, string> = {
+  1: "1g one gang single",
+  2: "2g two gang double",
+  3: "3g three gang triple",
+  4: "4g four gang",
+};
+const PLATE_MATERIAL = {
+  nylon: {
+    slang:
+      "nylon plastic thermoplastic polycarbonate unbreakable white ivory light almond black",
+    jobKind: "both" as const,
+  },
+  stainless: {
+    slang: "stainless ss metal steel 302 304 brushed commercial",
+    jobKind: "both" as const,
+  },
+};
+type PlateMaterial = keyof typeof PLATE_MATERIAL;
+/** Midway in nylon, oversized in stainless: what each is stocked as. */
+const BIG_SIZE: Record<PlateMaterial, { word: string; slang: string }> = {
+  nylon: { word: "midway", slang: "mid-way mid size oversize bad cut" },
+  stainless: { word: "oversized", slang: "jumbo oversize large bad cut" },
+};
+
+/** Every multiset of `n` openings, in OPENING_ORDER. */
+function openingMixes(kinds: Opening[], n: number): Opening[][] {
+  if (n === 0) return [[]];
+  const out: Opening[][] = [];
+  kinds.forEach((k, i) => {
+    for (const rest of openingMixes(kinds.slice(i), n - 1))
+      out.push([k, ...rest]);
+  });
+  return out;
+}
+
+const THREE_KINDS: Opening[] = ["toggle", "duplex", "decorator"];
+/** The openings each gang count ships, before material and size. */
+const PLATE_OPENINGS: { gangs: number; openings: (Opening[] | "blank")[] }[] = [
+  {
+    gangs: 1,
+    openings: [
+      ["toggle"],
+      ["duplex"],
+      ["decorator"],
+      ["single receptacle"],
+      "blank",
+    ],
+  },
+  { gangs: 2, openings: [...openingMixes(THREE_KINDS, 2), "blank"] },
+  { gangs: 3, openings: [...openingMixes(THREE_KINDS, 3), "blank"] },
+  {
+    gangs: 4,
+    openings: [
+      ["toggle", "toggle", "toggle", "toggle"],
+      ["duplex", "duplex", "duplex", "duplex"],
+      ["decorator", "decorator", "decorator", "decorator"],
+      "blank",
+    ],
+  },
+];
+
+function familyPlate(
+  gangs: number,
+  openings: Opening[] | "blank",
+  material: PlateMaterial,
+  big: boolean
+): BaselineMaterial {
+  const sorted =
+    openings === "blank"
+      ? "blank"
+      : [...openings]
+          .sort((a, b) => OPENING_ORDER.indexOf(a) - OPENING_ORDER.indexOf(b))
+          .join("/");
+  const size = big ? `, ${BIG_SIZE[material].word}` : "";
+  const kinds = openings === "blank" ? [] : Array.from(new Set(openings));
+  return {
+    ...device("Wall Plates & Misc"),
+    name: `${gangs}-gang wall plate, ${sorted}, ${material}${size}`,
+    // Gang words FIRST: after them, "double" sat beside "switch" and the
+    // aliases spelled another item's whole name, "Double switch"
+    // (materialsCatalog.test.ts, alias hygiene).
+    searchAliases: aliases(
+      GANG_SLANG[gangs],
+      "cover faceplate face trim flush",
+      openings === "blank" ? "solid no hole abandoned" : undefined,
+      ...kinds.map(k => OPENING_SLANG[k]),
+      kinds.length > 1 ? "combination combo mixed" : undefined,
+      PLATE_MATERIAL[material].slang,
+      big ? BIG_SIZE[material].slang : undefined
+    ),
+    jobKind: PLATE_MATERIAL[material].jobKind,
+  };
+}
+
+/** Standard size: every opening set above, in both materials. */
+const STANDARD_PLATES = (["nylon", "stainless"] as const).flatMap(material =>
+  PLATE_OPENINGS.flatMap(({ gangs, openings }) =>
+    openings.map(o => familyPlate(gangs, o, material, false))
+  )
+);
+
+/** Midway / oversized: the 1- and 2-gang sets, where they are stocked. */
+const BIG_PLATES = (["nylon", "stainless"] as const).flatMap(material =>
+  PLATE_OPENINGS.filter(p => p.gangs <= 2).flatMap(({ gangs, openings }) =>
+    openings
+      // No single-receptacle plate in the big sizes: not a stocked item.
+      .filter(o => o === "blank" || !o.includes("single receptacle"))
+      .map(o => familyPlate(gangs, o, material, true))
+  )
+);
+
+/*
+  The 30A/50A power receptacle plate: the 2.15" round hole a 14-30, 10-30,
+  14-50 or 10-50 receptacle sits in — dryer, range, and a 50A RV outlet. ONE
+  plate per material, because one plate fits both amperages; a 30A row and a
+  50A row would be the same part twice.
+*/
+const POWER_PLATE_SLANG =
+  "240 240v 250v 30a 50a 30 50 amp range dryer rv camper 14-30 14-50 10-30 10-50 2.15 round hole power outlet";
+const POWER_PLATES: BaselineMaterial[] = (["nylon", "stainless"] as const).map(
+  material => ({
+    ...device("Wall Plates & Misc"),
+    name: `1-gang wall plate, 30A/50A power receptacle, ${material}`,
+    searchAliases: aliases(
+      "cover faceplate face trim flush",
+      GANG_SLANG[1],
+      POWER_PLATE_SLANG,
+      PLATE_MATERIAL[material].slang
+    ),
+    jobKind: "residential" as const,
+  })
+);
+
+/** The weatherproof covers this family adds (the plain in-use pair is above). */
+const FAMILY_WEATHERPROOF: BaselineMaterial[] = [
+  {
+    ...device("Wall Plates & Misc"),
+    name: "Weatherproof in-use cover, 30A/50A power receptacle",
+    searchAliases: aliases(
+      "wp bubble while while-in-use outdoor exterior lid rain tight",
+      POWER_PLATE_SLANG
+    ),
+    jobKind: "residential",
+  },
+  {
+    ...device("Wall Plates & Misc"),
+    name: "Weatherproof in-use cover, metal, heavy-duty",
+    searchAliases: aliases(
+      "wp bubble while while-in-use outdoor exterior lid rain tight die-cast diecast aluminum extra duty 1g one gang single lockable"
+    ),
+    jobKind: "commercial",
+  },
+  {
+    ...device("Wall Plates & Misc"),
+    name: "Weatherproof in-use cover, metal, heavy-duty, 2-gang",
+    searchAliases: aliases(
+      "wp bubble while while-in-use outdoor exterior lid rain tight die-cast diecast aluminum extra duty 2g two gang double lockable"
+    ),
+    jobKind: "commercial",
+  },
+];
+
+export const COVER_PLATE_FAMILY: BaselineMaterial[] = [
+  ...STANDARD_PLATES,
+  ...BIG_PLATES,
+  ...POWER_PLATES,
+  ...FAMILY_WEATHERPROOF,
+];
