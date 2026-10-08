@@ -263,8 +263,12 @@ const PVC_LABELS = new Set(["PVC Sch 40", "PVC Sch 80"]);
 */
 const THREE_AND_A_HALF = '3-1/2"';
 const WITH_3_5 = new Set(["EMT", "PVC Sch 40", "PVC"]);
-/** The sizes one family (or strap family) ships, in trade-size order. */
-function sizesFor(label: string): string[] {
+/**
+ * The sizes one family (or strap family) ships, in trade-size order.
+ * Exported for the shipped underground run types (baselineRunTypes.ts): one
+ * per PVC Sch 40 size, so a size added here ships its type too.
+ */
+export function sizesFor(label: string): string[] {
   const sizes: string[] = [...TRADE_SIZES];
   if (WITH_3_5.has(label))
     sizes.splice(sizes.indexOf('4"'), 0, THREE_AND_A_HALF);

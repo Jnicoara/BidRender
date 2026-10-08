@@ -33,6 +33,7 @@ import type { TrpcContext } from "./_core/context";
 import { laborPerFootForRunType } from "../shared/runTypeLabor";
 import { laborUnitHours } from "../shared/materialLabor";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import { isShippedUndergroundType } from "../shared/undergroundRunTypes";
 
 const USER = 9701;
 const OTHER_USER = 9702;
@@ -122,8 +123,19 @@ describeDb("the palette", () => {
     );
     for (const type of shipped) {
       expect(type.label.length).toBeGreaterThan(0);
-      expect(type.conductorMaterialId).not.toBeNull();
       expect(type.needsSpecification).toBe(false);
+      /*
+        The underground types (2026-10-08, owner; per-foot-items-plan.md § 3b)
+        name their PIPE and no wire, on purpose: a trench holds whatever the
+        job needs, and GR2/GR5 carry their own feeder. Every other shipped type
+        names its conductor.
+      */
+      if (isShippedUndergroundType(type)) {
+        expect(type.racewayMaterialId, type.label).not.toBeNull();
+        expect(type.conductorMaterialId, type.label).toBeNull();
+      } else {
+        expect(type.conductorMaterialId, type.label).not.toBeNull();
+      }
     }
   });
 
@@ -601,7 +613,18 @@ describeDb("the ground travels with the type", () => {
       .where(isNull(takeoffRunTypes.userId));
     const conduit = shipped.filter(t => t.pathType === "conduit");
     expect(conduit.length).toBeGreaterThan(0);
-    for (const type of conduit) {
+    // The underground types carry no wire and say so — NULL, never 0 or a
+    // guessed 1 (per-foot-items-plan.md § 3b). The rest are "+ ground" types.
+    const trench = conduit.filter(t =>
+      isShippedUndergroundType({ isShipped: true, label: t.label })
+    );
+    for (const type of trench) {
+      expect([type.conductorCount, type.groundCount], type.label).toEqual([
+        null,
+        null,
+      ]);
+    }
+    for (const type of conduit.filter(t => !trench.includes(t))) {
       expect(type.groundCount).toBe(1);
       expect(type.conductorCount).toBeGreaterThanOrEqual(1);
       // The label says "+ ground" and the columns now agree with it.

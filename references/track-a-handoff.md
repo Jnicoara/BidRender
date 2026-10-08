@@ -4,7 +4,56 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-08 (session 20) — START HERE
+## UPDATE 2026-10-08 (session 21) — START HERE
+
+**Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
+`local-dev` = `06791ea` (+ this docs commit), **migrations 0000–0138**.
+
+- **Per-foot items M1–M4 BUILT and on staging** as **0135–0138**
+  (`0135_run_type_extras`, `0136_bid_line_extras`,
+  `0137_assembly_material_qty_source`, `0138_traced_parts`), all additive.
+  Backup `staging-2026-10-08T19-09-32Z-before-0135-0138.sql` restored and
+  counted; rehearsed on that copy; staging 4 applied, 176/176 FKs; **all
+  651 staging bid totals unchanged** after the migration AND after the new
+  code booted (`deploying.md` § 11 "0135–0138").
+- **Seed content shipped with it:** ten `N" PVC Sch 40, underground` types
+  (no wire, NULL counts) each with `Underground warning tape` (flat, 1.0) as
+  an extra row; `700 series surface raceway, 2 #12 + ground`; seven 700
+  fittings; `Surface raceway base, 700 series` → `Surface raceway, 700
+series` (same id #1685 on staging) and the 700 cover retired (#1686).
+  Clip spacing NULL; no Sch 80; 500 series untouched (owner Qs 1–3 open).
+  The frozen-adds record moved through `shared/frozenAddsHeld.ts`
+  (`SHIPPED_AS` + a new `retired` kind), NOT by editing
+  `pricing/frozen-names.json`, which stays the owner's frozen sheet.
+- **Picker fold built** (CLAUDE.md rule 3: ships with the types):
+  `client/src/lib/runTypeFold.ts`, sorted by SIZE. Looked at locally.
+  The homerun-type and drop-type SELECTS still list all 15 — not folded.
+- **What is NOT built (C's server half, plan § 9 step 2):** the extras'
+  footage — `feetForRole` in `server/db.ts` has an `extra` tripwire case
+  answering 0 that C must REPLACE; the 700 fitting family (until then a 700
+  run's fittings say "no catalog match"); `setExtraShared`; extras CRUD; a
+  resolver for `takeoff_run_type_extras.materialId` (registered
+  `unreviewed`, count 6 → 7 in `forkableReferences.test.ts`).
+  `forkRunType` already copies extras (tested). **B's step 3** (DV34 drops
+  the entrance end, GR2/GR5 `qtySource`) is NOT done — every part's
+  `qtySource` is NULL; the 0136/0138 columns are written by nobody.
+- **Pricing sheets**: still list the old 700 base/cover names; the loader
+  folds old names through the rename map. Not rebuilt (owner typing).
+- **Before the next live release**: 0135–0138 join the batch (now
+  0105–0138); the 11 types and the rename ride with `06791ea`'s seed.
+  Re-rehearse (`next-live-release-plan.md` § 5) — expect 34 applied, 139.
+  If that differs, stop and find out why.
+- **Gate on `06791ea` GREEN**: run 37833034148 — test, deploy-staging,
+  smoke all success.
+- Cleaned up: worktree `../bidrender-before-0135` removed, local DB
+  `bidrender_staging_restore_0135` dropped. Local `bidrender_local` is now
+  at 139 (was 105); `bidrender_test_localdev` at 139, seeded.
+- **Local sign-in gotcha met this session:** a stale httpOnly
+  `app_session_id` cookie on 127.0.0.1 outranks the Bearer header, so a
+  freshly minted token still shows the landing page. Calling `auth.logout`
+  from the page clears it.
+
+## UPDATE 2026-10-08 (session 20)
 
 **Where things stand.** Live = `24105ad`, migrations 0000–0104, untouched.
 Staging = `local-dev` (`9d2d854` + later docs), migrations 0000–0134, Gate

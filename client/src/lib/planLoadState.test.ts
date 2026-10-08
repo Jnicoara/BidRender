@@ -1,24 +1,86 @@
 import { describe, expect, it } from "vitest";
-import { drawingNextSheet, marksMayShow, planLoadState } from "./planLoadState";
+import {
+  EMPTY_PLAN_CANVAS,
+  drawingNextSheet,
+  marksMayShow,
+  planCanvasStep,
+  planLoadState,
+} from "./planLoadState";
 
 describe("what the viewer shows while a plan opens", () => {
   it("says it is opening while the file loads", () => {
     expect(
-      planLoadState({ documentLoading: true, drawn: false, page: 1 }).show
+      planLoadState({ documentLoading: true, drawnPage: null, page: 1 }).show
     ).toBe("opening");
   });
 
   it("does NOT show the sheet when the file has loaded but nothing is drawn", () => {
     // The white square: the old viewer showed the empty canvas here.
     expect(
-      planLoadState({ documentLoading: false, drawn: false, page: 1 })
+      planLoadState({ documentLoading: false, drawnPage: null, page: 1 })
     ).toEqual({ show: "drawing", message: "Drawing sheet 1…" });
   });
 
   it("shows the sheet once it is drawn", () => {
     expect(
-      planLoadState({ documentLoading: false, drawn: true, page: 3 }).show
+      planLoadState({ documentLoading: false, drawnPage: 3, page: 3 }).show
     ).toBe("sheet");
+  });
+});
+
+describe("a plan that loads AGAIN (link renewed) does not show a blank canvas", () => {
+  const drawn = planCanvasStep(EMPTY_PLAN_CANVAS, {
+    type: "drawn",
+    page: 1,
+    width: 4000,
+    height: 2600,
+  });
+  const reloading = planCanvasStep(drawn, { type: "loadStarted" });
+
+  it("forgets the old raster the moment a load starts", () => {
+    expect(reloading).toEqual(EMPTY_PLAN_CANVAS);
+  });
+
+  it("says opening, then drawing — never 'sheet' — although sheet 1 was drawn before", () => {
+    // The white box: the stale size said "sheet" over a new, blank canvas.
+    expect(
+      planLoadState({
+        documentLoading: true,
+        drawnPage: reloading.drawnPage,
+        page: 1,
+      }).show
+    ).toBe("opening");
+    expect(
+      planLoadState({
+        documentLoading: false,
+        drawnPage: reloading.drawnPage,
+        page: 1,
+      }).show
+    ).toBe("drawing");
+  });
+
+  it("keeps the pins off the blank canvas until the sheet is drawn again", () => {
+    expect(marksMayShow({ drawnPage: reloading.drawnPage, page: 1 })).toBe(
+      false
+    );
+    const redrawn = planCanvasStep(reloading, {
+      type: "drawn",
+      page: 1,
+      width: 4000,
+      height: 2600,
+    });
+    expect(marksMayShow({ drawnPage: redrawn.drawnPage, page: 1 })).toBe(true);
+  });
+
+  it("does not re-render for a raster identical to the one it holds", () => {
+    expect(
+      planCanvasStep(drawn, {
+        type: "drawn",
+        page: 1,
+        width: 4000,
+        height: 2600,
+      })
+    ).toBe(drawn);
   });
 });
 

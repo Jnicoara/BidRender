@@ -110,6 +110,8 @@ import {
   takeoffGroups,
   takeoffRunTypes,
   InsertTakeoffRunType,
+  takeoffRunTypeExtras,
+  InsertTakeoffRunTypeExtra,
   TakeoffRunType,
   TakeoffLocation,
   InsertSymbolLink,
@@ -2670,6 +2672,7 @@ export async function seedBaselineRunTypes(): Promise<void> {
         t.racewayMaterialName,
         t.conductorMaterialName,
         t.groundMaterialName,
+        ...(t.extras ?? []).map(e => e.materialName),
       ]).filter((n): n is string => Boolean(n))
     );
     const catalog =
@@ -2757,7 +2760,75 @@ export async function seedBaselineRunTypes(): Promise<void> {
         .set(patch)
         .where(eq(takeoffRunTypes.id, row.id));
     }
+
+    await seedBaselineRunTypeExtras(db, materialId);
   });
+}
+
+/**
+ * The shipped EXTRAS (0135) — underground warning tape on each underground
+ * type (references/per-foot-items-plan.md § 3a–3b).
+ *
+ * Runs inside the run-type seed lock, after the types exist, so every
+ * shipped type has an id. Adds a missing shipped extra and nothing else:
+ *
+ * - keyed by (type, material), so a restart inserts nothing twice;
+ * - only SHIPPED rows (`userId` NULL), on SHIPPED types — a company's fork
+ *   carries its own copy (`forkRunType`) and this never sees it;
+ * - a material that does not resolve is skipped, not inserted as NULL: a
+ *   NULL `materialId` means "its material was deleted" (0135), and the next
+ *   start adds it once the catalog has the row.
+ *
+ * It never edits or deletes an existing shipped extra. Changing a shipped
+ * extra's rate later is a deliberate seed change that needs its own pass.
+ */
+async function seedBaselineRunTypeExtras(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  materialId: (name: string | null) => number | null
+): Promise<void> {
+  const shippedWithExtras = BASELINE_RUN_TYPES.filter(
+    t => (t.extras ?? []).length > 0
+  );
+  if (shippedWithExtras.length === 0) return;
+
+  const types = await db
+    .select({
+      id: takeoffRunTypes.id,
+      label: takeoffRunTypes.label,
+      pathType: takeoffRunTypes.pathType,
+    })
+    .from(takeoffRunTypes)
+    .where(isNull(takeoffRunTypes.userId));
+  const typeId = new Map(types.map(t => [`${t.pathType}:${t.label}`, t.id]));
+
+  const existing = await db
+    .select({
+      runTypeId: takeoffRunTypeExtras.runTypeId,
+      materialId: takeoffRunTypeExtras.materialId,
+    })
+    .from(takeoffRunTypeExtras)
+    .where(isNull(takeoffRunTypeExtras.userId));
+  const have = new Set(existing.map(e => `${e.runTypeId}:${e.materialId}`));
+
+  const missing: InsertTakeoffRunTypeExtra[] = [];
+  for (const t of shippedWithExtras) {
+    const runTypeId = typeId.get(`${t.pathType}:${t.label}`);
+    if (runTypeId === undefined) continue;
+    (t.extras ?? []).forEach((extra, sortOrder) => {
+      const material = materialId(extra.materialName);
+      if (material === null) return;
+      if (have.has(`${runTypeId}:${material}`)) return;
+      missing.push({
+        userId: null,
+        runTypeId,
+        materialId: material,
+        feetPerFoot: extra.feetPerFoot.toFixed(4),
+        appliesTo: extra.appliesTo,
+        sortOrder,
+      });
+    });
+  }
+  if (missing.length > 0) await db.insert(takeoffRunTypeExtras).values(missing);
 }
 
 /**
@@ -5970,6 +6041,16 @@ function feetForRole(
     case "locknut":
     case "bushing":
       return { bought: 0, installed: 0 };
+    /*
+      0136's `extra` role, the same tripwire for the same reason: the column
+      arrives before the code (references/per-foot-items-plan.md § 9). Nothing
+      writes an `extra` line until the plan's server half ships — `sendToBid`
+      builds no candidate with the role. That half REPLACES this case with the
+      extra's own feet (flat or all, × feetPerFoot, read through
+      `extraFeetPerFoot`); it must not leave it answering 0.
+    */
+    case "extra":
+      return { bought: 0, installed: 0 };
   }
 }
 
@@ -6676,6 +6757,11 @@ export function pricingSnapshotOf(
     snapshotPriceWasExample: line.snapshotPriceWasExample,
     snapshotHoursWereExample: line.snapshotHoursWereExample,
     snapshotLaborRateWasExample: line.snapshotLaborRateWasExample,
+    // And its frozen traced parts (0138): a copy prices its tape and its
+    // default length from the same frozen costs. The ANSWERS
+    // (`tracedPartAnswers`) are not a snapshot and are not copied — a length
+    // typed on one room is not a fact about the next.
+    snapshotTracedParts: line.snapshotTracedParts,
     snapshotAt: line.snapshotAt,
   };
 }
@@ -9243,12 +9329,46 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
     ...specification
   } = source;
 
-  return createRunType({
+  const forkId = await createRunType({
     ...specification,
     userId,
     baselineId: source.id,
     baselineVersion: source.version,
   });
+
+  /*
+    The type's EXTRAS go with it (0135, per-foot-items-plan.md § 3a): a fork
+    of an underground type that lost its tape would quietly stop buying it.
+    Copied by the same exclusion as the type above, so a column added to the
+    extras later is copied by default. `baselineExtraId` points back, so the
+    fork's bid line keeps its `runExtraKey`.
+  */
+  const extras = await db
+    .select()
+    .from(takeoffRunTypeExtras)
+    .where(eq(takeoffRunTypeExtras.runTypeId, source.id));
+  if (extras.length > 0) {
+    await db.insert(takeoffRunTypeExtras).values(
+      extras.map(extra => {
+        const {
+          id: _id,
+          userId: _extraUserId,
+          runTypeId: _runTypeId,
+          baselineExtraId: _baselineExtraId,
+          createdAt: _created,
+          updatedAt: _updated,
+          ...copied
+        } = extra;
+        return {
+          ...copied,
+          userId,
+          runTypeId: forkId,
+          baselineExtraId: extra.baselineExtraId ?? extra.id,
+        };
+      })
+    );
+  }
+  return forkId;
 }
 
 export async function updateRunType(

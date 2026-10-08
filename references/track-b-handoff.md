@@ -1,6 +1,57 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, closing for a Claude Code update (READ FIRST)
+## WHERE B STANDS — 2026-10-08, after batch 1 (READ FIRST)
+
+**Batch 1 of 3 is built**, details in todo.md (each item ticked there):
+
+- **The white box on plan open is fixed.** `planCanvasStep` in
+  `client/src/lib/planLoadState.ts` clears the drawn page and size when a
+  load starts.
+  - Locally at laptop and tablet: FLASH without the fix, "No flash" with
+    it.
+  - The local run needs `RENEW_HOLD_MS=14000 BASE=http://127.0.0.1:3002`.
+    At 5 s the renewal lands before sheet 1 is drawn, so it cannot fail.
+  - **Staging (serving `06791ea`, which contains it): "No flash" at
+    laptop and tablet.** Sheet 1 was drawn at ~9 s and the renewal landed
+    at ~10.5 s, so the walk was able to fail. On 2026-10-07 it printed
+    FLASH.
+- **Gap 2:** `setLocation` now checks the lock.
+  `server/runMutationsCheckLock.test.ts` fails on any run mutation that does
+  not check it.
+- **Gap 4b:** undoing a count delete refreshes every sheet. It is NOT seen
+  on screen yet; look at it in batch 2.
+
+**Left for batch 2 (undo):**
+
+- Gap 4a: "can't be undone" on the undo arrow.
+- Gap 4c: undo for run type, typed length, circuits and legs.
+- The on-screen look at 4b.
+
+**Left for batch 3:**
+
+- Gap 6.1: open the viewer from the local file while it uploads.
+- Gap 3: a won bid offers "lock it?" once. Owner's call first (plan Q2).
+
+**Then (b) the cover swaps and (c) the "fix this line" panel**, as below.
+
+**State:**
+
+- `track-b` = `origin/local-dev` at `06791ea` plus this handoff commit.
+- B's databases are at 139 (0135–0138 from A), and `schemaDrift` says
+  both match.
+- **The local-dev run for `14fead9` went red at deploy-staging only.** Its
+  tests passed. The deploy was refused because Track A had pushed staging
+  by hand (0135–0138). That staging push (`06791ea`) contains B's commit,
+  so staging runs it anyway. The `06791ea` local-dev run was still queued
+  at handoff.
+- No dev server is running.
+
+**Watch out:** stopping dev servers by matching `pnpm` in the command line
+also kills a `pnpm test` running in the same worktree. Its vitest then
+lives on, orphaned, and holds the test-DB lock. Stop the server set by its
+port's tree, and check for a stray `vitest` before re-running.
+
+## WHERE B STOOD — 2026-10-08, closing for a Claude Code update
 
 **State:**
 

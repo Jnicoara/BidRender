@@ -1587,6 +1587,42 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0135–0138 (done 2026-10-08, ~19:35 UTC) — NOT on live
+
+The per-foot items plan's M1–M4 (`per-foot-items-plan.md` § 4), all four
+additive (no `UPDATE`); step 3 empty. With them, seed content: ten
+underground PVC types with tape extras, the 700 type, seven 700 fittings,
+the 700 base renamed in place and the cover retired.
+
+1. **Backup**: `staging-2026-10-08T19-09-32Z-before-0135-0138.sql` (72
+   tables, `--single-transaction`, `VERIFY_IDENTITY` TLS) in
+   `C:\dev\bidrender-backups\`; restored locally; 67 table counts equal
+   staging's, the other 5 higher on staging only by bids 648–649, "CI
+   smoke …", written after the dump.
+2. **Rehearsal on that copy**: drift before = exactly this batch;
+   `bidTotals` before (staging's code `df25451`); **4 applied**, 139;
+   re-run nothing; "matches", 176/176; old code's totals: **all 646
+   unchanged**; the new seed booted twice (15 types both times); new
+   code's totals: **all 646 unchanged**. The 700 base kept its id (#1685),
+   the cover #1686 retired, 10 tape extras.
+3. **Staging**: drift before the same; `bidTotals` before (651 bids, old
+   code); **4 applied** (0135 → 0138), 139; re-run nothing; "matches",
+   176/176; old code still serving — **all 651 unchanged**.
+4. **Code**: `06791ea` pushed to `staging` by hand, then `local-dev`;
+   served 19:37 UTC. First boot (read only): 15 shipped types, 10 tape
+   extras (flat, 1.0), #1685 = "Surface raceway, 700 series" (10 ft
+   sticks, clip spacing NULL), #1686 retired, seven fittings #1829–1835.
+   `bidTotals` with the new code: **all 651 unchanged**.
+5. **On screen**: LOCAL, laptop size — the conduit picker opens on the
+   common types with "› Underground (10)" closed; opened, the ten list by
+   size. (Found and fixed on that look: they first came out alphabetical,
+   1-1/2" before 1-1/4".)
+
+**Live**: 0135–0138 go only with the code that reads them (plan § 4,
+pairing). They are additive, so applying them before that code is safe,
+but the seed content (11 types, the 700 rename) ships with whichever
+release carries `06791ea`, and needs 0117 and 0135 on live first.
+
 ### Staging: migrations 0125–0134 (done 2026-10-08, ~01:50 UTC) — NOT on live
 
 Track C's homerun footage (0125–0130), the 0131 C asked for

@@ -126,6 +126,17 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
 
 ## White box on plan open — Track B, NEXT (unblocked: Track C has merged)
 
+- [x] **DONE 2026-10-08 (batch 1)** — `planCanvasStep` in
+      `client/src/lib/planLoadState.ts` forgets the drawn page AND size when
+      a load starts, and `planLoadState` reads the drawn page (one fact for
+      the panel and the pins). 3 tests red without the reset.
+      `scripts/stagingOpenFlash.mts` now takes `BASE` (a local server) and
+      `RENEW_HOLD_MS`: locally at the default 5 s the renewal landed BEFORE
+      sheet 1 was drawn, so it printed "No flash" with the fix taken out; at
+      14 s it printed FLASH (58x29 [300x150]) without the fix and "No flash"
+      with it, at laptop and tablet. Staging (`06791ea`): "No flash" at
+      both sizes, the renewal landing after sheet 1 was drawn.
+      Original item:
 - [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet
       (1180x820, touch) with `scripts/stagingOpenFlash.mts`, which prints
@@ -167,9 +178,11 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
     workaround (hide a canvas with no `width`) would hide the box and leave
     the pins floating, so it was not done.
 
-- [ ] **Gap 2: `takeoffRuns.setLocation` has no lock check** — the one run
-      mutation without `refuseIfLocked` (`server/routers/takeoffRunsRouter.ts`).
-      One line. Test: refused on a locked bid. A label, not a number.
+- [x] **DONE 2026-10-08 (batch 1): Gap 2, `takeoffRuns.setLocation` lock
+      check.** Refusal + unlocked twin in `server/lockedEdits.test.ts`, and
+      `server/runMutationsCheckLock.test.ts` reads the router and fails on
+      ANY run mutation without `refuseIfLocked`/`refuseIfRunLocked` (it was
+      the only one). Both red without the check.
 - [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
       screen (`TakeoffPage.tsx`). No status gate. Owner's call first (plan Q2).
 - [ ] **Gap 4a: "can't be undone" on the undo arrow** when the last change was
@@ -179,10 +192,13 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       wording can live in `client/src/lib/undoStack.ts`, but recording WHICH
       change happened is in TakeoffPage's mutations — so it is built as one
       piece, not as a helper nothing calls.
-- [ ] **Gap 4b: undoing a count deleted from several sheets refreshes every
-      sheet** (`client/src/lib/takeoffRefresh.ts` + its test). Today other
-      sheets flash their old marks until refetch (staleTime 0) — a flash, not
-      a lasting wrong number.
+- [x] **DONE 2026-10-08 (batch 1): Gap 4b.** `sheetsAnUndoMoves` in
+      `client/src/lib/takeoffRefresh.ts` says "every" for a count restored or
+      deleted again, a switch over every undo kind (a new kind must decide),
+      and the screen invalidates every sheet's marks and runs for it. Red
+      without the rule. **Not seen on screen** — it is a refetch timing, and
+      the batch's on-screen check was the white box; look at it with the
+      next undo work (batch 2).
 - [ ] **Gap 4c: undo for run type, typed length, circuits, legs**, in that
       order (TakeoffPage + router).
 - [ ] **Gap 6.1: open the viewer from the file on this machine while it

@@ -31,6 +31,14 @@
  * combinations a commercial estimator reaches for most; everything else is one
  * "new type" away and belongs to the person who needs it.
  *
+ * **Fifteen since 2026-10-08, and the palette still OPENS on five** (owner;
+ * references/per-foot-items-plan.md § 3b–3c). The 700 surface raceway type
+ * joins the four, and ten underground PVC types — one per Sch 40 size — sit
+ * behind ONE "Underground (10)" fold in RunTypePicker, closed by default
+ * (CLAUDE.md § Customization, rules 1 and 3). They ship because underground
+ * warning tape has to follow the TRENCH, and a type is how a run says what it
+ * is (takeoff-spec D3); a PVC type used above and below grade could not say.
+ *
  * ── Materials are named, not numbered ────────────────────────────────────────
  * Each row names the catalog material it is made of, resolved to an id at seed
  * time by the same by-name lookup `seedBaselineAssemblies` uses — which is why
@@ -38,7 +46,20 @@
  * the link NULL and the type still works; it simply has nothing to price
  * against yet, which is the honest state for a type whose material is missing.
  */
-import type { RunPathType } from "../../drizzle/schema";
+import type { RunExtraAppliesTo, RunPathType } from "../../drizzle/schema";
+import { undergroundRunTypeLabel } from "../../shared/undergroundRunTypes";
+import { sizesFor } from "./materials/conduit";
+
+/**
+ * A per-foot item that rides on a shipped type (0135,
+ * `takeoff_run_type_extras`). Matched by EXACT name, like the type's own
+ * materials.
+ */
+export type BaselineRunTypeExtra = {
+  materialName: string;
+  feetPerFoot: number;
+  appliesTo: RunExtraAppliesTo;
+};
 
 export type BaselineRunType = {
   label: string;
@@ -59,8 +80,11 @@ export type BaselineRunType = {
    * 0061-0064 gave the ground its own column and its own count, so a row
    * labelled "2 #12 + ground" now ships as a 2 and a 1 rather than as a 3 that
    * has to be explained.
+   *
+   * NULL = not said, with no conductor named either: the underground types
+   * carry no wire, because what goes in a trench varies by job (plan § 3b).
    */
-  conductorCount: number;
+  conductorCount: number | null;
   /** Grounds in one circuit. Null on a cable — see `groundMaterialName`. */
   groundCount: number | null;
   /**
@@ -72,6 +96,21 @@ export type BaselineRunType = {
    * arrives on the same reel.
    */
   groundMaterialName: string | null;
+  /**
+   * Per-foot extras (0135). Omitted = none. Underground warning tape on the
+   * underground types is the only shipped extra (owner decision 2).
+   */
+  extras?: BaselineRunTypeExtra[];
+};
+
+/**
+ * Underground warning tape lies in the trench: it follows the FLAT traced
+ * length, never the risers (plan § 3a), one foot of tape per foot of trench.
+ */
+const WARNING_TAPE: BaselineRunTypeExtra = {
+  materialName: "Underground warning tape",
+  feetPerFoot: 1,
+  appliesTo: "flat",
 };
 
 /*
@@ -125,4 +164,40 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     groundCount: 1,
     groundMaterialName: null,
   },
+  /*
+    Wiremold 700 is a run type of its own (owner decision 1, plan § 3c):
+    picked and traced like EMT, priced by the foot from ONE raceway row, with
+    the same wire as the 1/2" EMT type. Its fittings are found from the
+    raceway's shipped name by the fitting family — until that family ships
+    (plan § 9, step 2) the count says it cannot match them, rather than
+    buying EMT parts.
+  */
+  {
+    label: "700 series surface raceway, 2 #12 + ground",
+    pathType: "conduit",
+    racewayMaterialName: "Surface raceway, 700 series",
+    conductorMaterialName: "#12 THHN Copper",
+    conductorCount: 2,
+    groundCount: 1,
+    groundMaterialName: "#12 bare solid Copper",
+  },
+  /*
+    Underground PVC, one per Sch 40 size the catalog ships (owner decision 3,
+    plan § 3b), each carrying warning tape. NO WIRE: a trench may hold SER, a
+    feeder or a set of THHN, and GR2/GR5 carry their own feeder — a type that
+    shipped wire would count it twice. NULL is "not said". Sch 80 is not
+    shipped (plan § 7, Q2, open).
+  */
+  ...sizesFor("PVC Sch 40").map(
+    (size): BaselineRunType => ({
+      label: undergroundRunTypeLabel(size),
+      pathType: "conduit",
+      racewayMaterialName: `${size} PVC Sch 40`,
+      conductorMaterialName: null,
+      conductorCount: null,
+      groundCount: null,
+      groundMaterialName: null,
+      extras: [WARNING_TAPE],
+    })
+  ),
 ];

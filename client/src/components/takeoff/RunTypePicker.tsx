@@ -44,6 +44,7 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  ChevronRight,
   Pencil,
   Plus,
   Search,
@@ -98,6 +99,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { runTypeEnterAction } from "@/lib/runTypeEnter";
+import { foldRunTypes } from "@/lib/runTypeFold";
 
 export type PickableRunType = {
   id: number;
@@ -590,14 +592,26 @@ export function RunTypePicker({
     [mine]
   );
 
+  /*
+    The ten shipped underground types sit behind ONE fold, closed unless the
+    armed type is one of them (per-foot-items-plan.md § 3b; the rule is
+    `foldRunTypes`). A search shows every match — a hit is never folded.
+  */
+  const fold = useMemo(
+    () => foldRunTypes(mine, query, MAX_RESULTS, armedId),
+    [mine, query, armedId]
+  );
+  const [foldOpen, setFoldOpen] = useState(false);
+
   const results = useMemo(() => {
-    if (!query.trim()) return mine.slice(0, MAX_RESULTS);
+    if (!query.trim())
+      return foldOpen ? [...fold.shown, ...fold.folded] : fold.shown;
     const hits = smartSearch(searchable, query, MAX_RESULTS);
     const byId = new Map(mine.map(t => [t.id, t]));
     return hits
       .map(hit => byId.get(Number(hit.id)))
       .filter((t): t is PickableRunType => Boolean(t));
-  }, [query, searchable, mine]);
+  }, [query, searchable, mine, fold, foldOpen]);
 
   /**
    * The catalog, for a run whose type nobody has defined yet.
@@ -634,6 +648,9 @@ export function RunTypePicker({
       open={open}
       onOpenChange={next => {
         setOpen(next);
+        // The fold starts closed on every open — unless the armed type is in
+        // it, where a closed fold would show no tick anywhere.
+        if (next) setFoldOpen(fold.openAtStart);
         // Cleared on close so reopening does not present a stale query as the
         // current filter — same as the mark picker. The editor goes with it:
         // a half-typed specification is abandoned rather than kept warm, for
@@ -1437,11 +1454,37 @@ export function RunTypePicker({
                 </div>
               ))}
 
-              {results.length === 0 && !query.trim() && (
-                <p className="text-xs text-muted-foreground px-2 py-2">
-                  No {pathType} types yet — type a name to make one.
-                </p>
+              {/*
+                ONE fold for the ten shipped underground types (plan § 3b;
+                CLAUDE.md § Customization, rules 1–3). Below the rows it
+                hides, so opening it puts them where the eye already is. A
+                shop's fork of one is its own and never sits behind this.
+              */}
+              {!query.trim() && fold.folded.length > 0 && (
+                <button
+                  type="button"
+                  className="w-full text-left px-2 py-1.5 rounded text-xs text-muted-foreground hover:bg-muted flex items-center gap-2"
+                  onClick={() => setFoldOpen(!foldOpen)}
+                  aria-expanded={foldOpen}
+                >
+                  {foldOpen ? (
+                    <ChevronDown className="w-3 h-3 shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3 shrink-0" />
+                  )}
+                  {foldOpen
+                    ? "Hide underground"
+                    : `Underground (${fold.folded.length})`}
+                </button>
               )}
+
+              {results.length === 0 &&
+                fold.folded.length === 0 &&
+                !query.trim() && (
+                  <p className="text-xs text-muted-foreground px-2 py-2">
+                    No {pathType} types yet — type a name to make one.
+                  </p>
+                )}
 
               {/*
                 ── The catalog, underneath the saved types ───────────────────

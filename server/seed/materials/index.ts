@@ -90,6 +90,11 @@ export const RETIRED_BASELINE_MATERIALS: string[] = [
   // was 4/0-4/0-4/0-2/0. Retired rather than renamed because that row
   // already exists; "4/0-3" is an alias on it (2026-09-25, wireAndCable.ts).
   "4/0-3 SER aluminum",
+  // 700 is one-piece raceway (owner, 2026-10-08; per-foot-items-plan.md
+  // § 3c): its base row became "Surface raceway, 700 series" and the cover
+  // describes a part nobody buys on its own. Retired, not deleted, so
+  // anything already pointing at it still resolves. Staging-only row.
+  "Surface raceway cover, 700 series",
 ];
 
 /**

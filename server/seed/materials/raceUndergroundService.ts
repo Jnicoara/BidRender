@@ -57,18 +57,34 @@ export const SURFACE_RACEWAY: BaselineMaterial[] = [
     "500 v500 small snap on cover",
     "The cover half of two-piece raceway; the base is its own row."
   ),
-  sr(
-    "foot",
-    "Surface raceway base, 700 series",
-    "700 v700 single channel base",
-    "The base half of two-piece raceway; the cover is its own row."
-  ),
-  sr(
-    "foot",
-    "Surface raceway cover, 700 series",
-    "700 v700 snap on cover",
-    "The cover half of two-piece raceway; the base is its own row."
-  ),
+  /*
+    ONE per-foot row for 700, not base + cover (owner, 2026-10-08;
+    references/per-foot-items-plan.md § 3c). 700 is one-piece raceway in the
+    field, and it is a RUN TYPE of its own, traced like EMT — so the row is
+    the raceway that type prices. It was "Surface raceway base, 700 series"
+    (renamed in place, shared/renamedMaterials.ts AFTER_FREEZE) and the cover
+    row is retired (index.ts). Allowed because neither row had reached live.
+
+    Its raceway facts feed the fitting count: 10 ft sticks joined by a
+    coupling. The support-clip spacing and distance from a box ship NOT SET —
+    the owner has not given a figure (plan § 7, Q1), and the count says
+    "straps not counted" rather than inventing one.
+  */
+  {
+    // "base" kept as a search word: the row's old name, and what the counter
+    // still calls the channel, so a typed "700 base" lands here first.
+    ...sr(
+      "foot",
+      "Surface raceway, 700 series",
+      "700 v700 single channel base"
+    ),
+    raceway: {
+      stickLengthFeet: 10,
+      stickJoint: "coupling",
+      strapSpacingFeet: null,
+      strapFromBoxFeet: null,
+    },
+  },
   sr("foot", "Surface raceway, 1500 series", "1500 ds pancake low profile"),
   sr(
     "foot",
@@ -120,6 +136,29 @@ export const SURFACE_RACEWAY: BaselineMaterial[] = [
     ),
     jobKind: "commercial",
   },
+  /*
+    The 700 run type's own fittings (per-foot items plan § 3e, owner
+    2026-10-08), so a traced 700 run can buy 700 parts rather than the
+    generic `Raceway …` rows, which stay for the other series. No 700 end cap:
+    a 700 run ends in a device box or an entrance end. Which trace event buys
+    which part (a plan corner an inside elbow, an end drop a flat elbow, the
+    entrance end at the START only, a tee as a fitting) is the fitting
+    family's code — plan § 3c — not this file.
+  */
+  ...(
+    [
+      ["coupling", "joiner splice connection"],
+      ["flat elbow", "90 ell flat turn"],
+      ["inside elbow", "90 ell internal corner"],
+      ["outside elbow", "90 ell external corner"],
+      ["tee", "t branch split"],
+      ["entrance end fitting", "entry feed start from wall box"],
+      ["support clip", "strap clamp mounting"],
+    ] as const
+  ).map(([part, slang]) => ({
+    ...sr("each", `Surface raceway ${part}, 700 series`, `700 v700 ${slang}`),
+    jobKind: "commercial" as const,
+  })),
 ];
 
 // ─── Underground ──────────────────────────────────────────────────────────────

@@ -946,6 +946,34 @@
       "when": 1789962400000,
       "tag": "0134_example_labor_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "5",
+      "when": 1789962500000,
+      "tag": "0135_run_type_extras",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "5",
+      "when": 1789962600000,
+      "tag": "0136_bid_line_extras",
+      "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "5",
+      "when": 1789962700000,
+      "tag": "0137_assembly_material_qty_source",
+      "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "5",
+      "when": 1789962800000,
+      "tag": "0138_traced_parts",
+      "breakpoints": true
     }
   ]
 }
