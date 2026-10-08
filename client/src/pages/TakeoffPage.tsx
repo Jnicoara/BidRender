@@ -45,6 +45,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -146,8 +147,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
 import {
+  EMPTY_PLAN_CANVAS,
   drawingNextSheet,
   marksMayShow,
+  planCanvasStep,
   planLoadState,
 } from "@/lib/planLoadState";
 import {
@@ -311,6 +314,7 @@ import {
 import { uploadInParts } from "@/lib/multipartUpload";
 import {
   QUERIES_MOVED_BY,
+  sheetsAnUndoMoves,
   sheetsToRefresh,
   type TakeoffChange,
   type TakeoffQuery,
@@ -1118,7 +1122,20 @@ function PlanPane({
    */
   onUrlExpired?: () => Promise<string | null>;
 }) {
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  /**
+   * Which page the canvas holds and its pixel size, as ONE state, so a load
+   * starting forgets both at once (@/lib/planLoadState, `planCanvasStep`).
+   */
+  const [planCanvas, stepCanvas] = useReducer(
+    planCanvasStep,
+    EMPTY_PLAN_CANVAS
+  );
+  const canvasSize = useMemo(
+    () => ({ width: planCanvas.width, height: planCanvas.height }),
+    [planCanvas.width, planCanvas.height]
+  );
+  /** The page whose raster is on the canvas, or null before the first. */
+  const drawnPage = planCanvas.drawnPage;
   /**
    * The scale the canvas on screen was actually drawn at.
    *
@@ -1860,13 +1877,11 @@ function PlanPane({
   const [pageCount, setPageCount] = useState(doc.pageCount ?? 0);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
-  /** The page whose raster is on the canvas, or null before the first. */
-  const [drawnPage, setDrawnPage] = useState<number | null>(null);
   const marksShow = marksMayShow({ drawnPage, page });
   /** Opening → drawing sheet N → the sheet. @/lib/planLoadState. */
   const loadState = planLoadState({
     documentLoading: loading,
-    drawn: canvasSize.width > 0,
+    drawnPage,
     page,
   });
   const [error, setError] = useState<string | null>(null);
@@ -1902,6 +1917,9 @@ function PlanPane({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    // The canvas is about to be replaced by a blank one; forget what the old
+    // one held, or a reload shows that blank as the sheet (the white box).
+    stepCanvas({ type: "loadStarted" });
     setError(null);
     detected.current.delivered.clear();
 
@@ -2020,10 +2038,14 @@ function PlanPane({
         canvas.height = bitmap.height;
         canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
         endUploadTiming(`sheet ${page} drawn`);
-        setCanvasSize({ width: bitmap.width, height: bitmap.height });
-        // Which sheet the canvas now holds — the marks wait for this
+        // Its size, and which sheet it now holds — the marks wait for this
         // (@/lib/planLoadState, `marksMayShow`).
-        setDrawnPage(page);
+        stepCanvas({
+          type: "drawn",
+          page,
+          width: bitmap.width,
+          height: bitmap.height,
+        });
         // The scale this canvas was ACTUALLY drawn at, kept beside the canvas
         // it describes. Anything that converts between canvas pixels and page
         // points reads this, never RENDER_SCALE.
@@ -3634,19 +3656,26 @@ export default function TakeoffPage({
    * a test can go red. This only carries it out.
    */
   const invalidateQuery = useCallback(
-    (query: TakeoffQuery, stepSheetId?: number) => {
+    (query: TakeoffQuery, stepSheetId?: number | "every") => {
       // The open sheet, and the sheet the change was made on when that is a
-      // different one (an undo pressed after switching). @/lib/takeoffRefresh.
+      // different one (an undo pressed after switching) — or every sheet, for
+      // a step that reaches them all. @/lib/takeoffRefresh.
       const sheetIds = sheetsToRefresh(activeSheet?.id, stepSheetId);
       const bidPdfId = doc?.id;
       switch (query) {
         case "takeoffRuns.listForSheet":
-          for (const sheetId of sheetIds)
-            void utils.takeoffRuns.listForSheet.invalidate({ sheetId });
+          if (sheetIds === "every")
+            void utils.takeoffRuns.listForSheet.invalidate();
+          else
+            for (const sheetId of sheetIds)
+              void utils.takeoffRuns.listForSheet.invalidate({ sheetId });
           return;
         case "takeoffStamps.listForSheet":
-          for (const sheetId of sheetIds)
-            void utils.takeoffStamps.listForSheet.invalidate({ sheetId });
+          if (sheetIds === "every")
+            void utils.takeoffStamps.listForSheet.invalidate();
+          else
+            for (const sheetId of sheetIds)
+              void utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           return;
         case "bidPdfs.sheets":
           if (bidPdfId) void utils.bidPdfs.sheets.invalidate({ bidPdfId });
@@ -3707,7 +3736,7 @@ export default function TakeoffPage({
     [utils, activeSheet?.id, doc?.id, bidId]
   );
   const refreshFor = useCallback(
-    (change: TakeoffChange, stepSheetId?: number) => {
+    (change: TakeoffChange, stepSheetId?: number | "every") => {
       for (const query of QUERIES_MOVED_BY[change])
         invalidateQuery(query, stepSheetId);
     },
@@ -3889,7 +3918,8 @@ export default function TakeoffPage({
         );
       } finally {
         setUndoBusy(false);
-        refreshFor("undo", entry.sheetId);
+        // A count's marks are on every sheet (@/lib/takeoffRefresh).
+        refreshFor("undo", sheetsAnUndoMoves(op, entry.sheetId));
       }
     },
     [undoBusy, runUndoOp, refreshFor]

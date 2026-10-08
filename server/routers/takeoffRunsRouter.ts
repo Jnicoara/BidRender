@@ -937,7 +937,11 @@ export const takeoffRunsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireRun(input.id, ctx.scope.dataUserId);
+      const run = await requireRun(input.id, ctx.scope.dataUserId);
+      // A label, not a number — but a locked bid does not change at all, and
+      // this was the one run edit without the check until 2026-10-08
+      // (`server/runMutationsCheckLock.test.ts` now lists every one).
+      await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
       await db.updateRun(input.id, ctx.scope.dataUserId, {
         location: input.location,
       });

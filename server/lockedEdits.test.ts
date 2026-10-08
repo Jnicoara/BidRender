@@ -246,6 +246,24 @@ withDb("adding to a locked bid", () => {
     expect(Number(run.typedLengthInches)).toBe(600);
   });
 
+  it("refuses a run's location, set or cleared, and leaves it", async () => {
+    // Gap 2 (2026-10-08): the one run edit that went through a lock.
+    const f = await aBid();
+    await caller().takeoffRuns.setLocation({ id: f.runId, location: "Wall" });
+    await f.lock();
+    await expect(
+      caller().takeoffRuns.setLocation({
+        id: f.runId,
+        location: "Ceiling/Overhead",
+      })
+    ).rejects.toThrow(/locked/);
+    await expect(
+      caller().takeoffRuns.setLocation({ id: f.runId, location: null })
+    ).rejects.toThrow(/locked/);
+    const [run] = await runsOn(f.bidId);
+    expect(run.location).toBe("Wall");
+  });
+
   it("refuses a new leg, and adds no row", async () => {
     const f = await aBid();
     await f.lock();
@@ -340,6 +358,7 @@ withDb("the same edits on an unlocked bid", () => {
       id: f.runId,
       typedLengthInches: 1200,
     });
+    await caller().takeoffRuns.setLocation({ id: f.runId, location: "Roof" });
     await caller().takeoffRuns.answerPullPoint(cornerAnswer(f.runId));
     const [answer] = await pullPointsOf(f.runId);
     await caller().takeoffRuns.clearPullPointAnswer({ id: answer.id });
@@ -380,5 +399,6 @@ withDb("the same edits on an unlocked bid", () => {
     await caller().takeoffRuns.commit({ id: created.id });
     expect(await runsOn(f.bidId)).toHaveLength(3);
     expect(Number((await runsOn(f.bidId))[0].typedLengthInches)).toBe(1200);
+    expect((await runsOn(f.bidId))[0].location).toBe("Roof");
   });
 });

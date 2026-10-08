@@ -22,6 +22,8 @@
  * that is a look at the running app.
  */
 
+import type { UndoOp } from "./undoStack";
+
 /** A cached query the Plans screen shows a quantity, a sheet or a mark from. */
 export type TakeoffQuery =
   // Per sheet.
@@ -223,12 +225,50 @@ export type TakeoffChange =
  */
 export function sheetsToRefresh(
   openSheetId: number | null | undefined,
-  stepSheetId: number | null | undefined
-): number[] {
+  stepSheetId: number | "every" | null | undefined
+): number[] | "every" {
+  if (stepSheetId === "every") return "every";
   const ids = [openSheetId, stepSheetId].filter(
     (id): id is number => typeof id === "number"
   );
   return Array.from(new Set(ids));
+}
+
+/**
+ * Which sheets an undo or redo step changes: the sheet it was taken on, or
+ * EVERY sheet (never-stuck gap 4b, 2026-10-08).
+ *
+ * A count deleted takes its marks off every sheet, and the delete itself
+ * refreshes them all. Its undo refreshed only the open sheet and the step's,
+ * so another sheet showed the count's marks still gone until its own
+ * refetch landed. A switch over every kind, so a new step has to say.
+ */
+export function sheetsAnUndoMoves(
+  op: UndoOp,
+  stepSheetId: number
+): number | "every" {
+  switch (op.kind) {
+    case "restoreGroup":
+    case "removeGroup":
+      return "every";
+    case "removeMarks":
+    case "restoreMarks":
+    case "removeRun":
+    case "restoreRun":
+    case "setPoints":
+    case "restorePoints":
+    case "setEnds":
+    case "restoreEnds":
+    case "restoreSheet":
+    case "clearSheet":
+    // Marks moved between counts are a selection on the step's sheet.
+    case "moveMarks":
+      return stepSheetId;
+    default: {
+      const unhandled: never = op;
+      return unhandled;
+    }
+  }
 }
 
 function unique(list: readonly TakeoffQuery[]): readonly TakeoffQuery[] {

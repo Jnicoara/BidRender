@@ -26,20 +26,36 @@ import { readFileSync, writeFileSync } from "node:fs";
 import type { Browser, Page } from "playwright-core";
 import { SIZES, launchChrome } from "./deviceAudit.mts";
 
-const BASE = "https://staging.bidridge.com";
+/*
+  Staging unless BASE says otherwise — `BASE=http://127.0.0.1:<port>` runs
+  the same walk against a local dev server, which has no gate (2026-10-08).
+*/
+const STAGING = "https://staging.bidridge.com";
+const BASE = process.env.BASE ?? STAGING;
+const behindGate = BASE === STAGING;
 const OUT = process.env.OUT_DIR ?? ".";
+/*
+  How long the renewed plan list is held back. The renewal has to land AFTER
+  sheet 1 is drawn or there is nothing stale to show: 5 s on staging; a local
+  dev server draws slower, so a local run wants about 12 s (2026-10-08 — at 5 s
+  locally the walk printed "No flash" with the fix taken OUT).
+*/
+const RENEW_HOLD_MS = Number(process.env.RENEW_HOLD_MS ?? 5000);
 const PDF = process.env.PDF;
 if (!PDF) throw new Error("Set PDF=<path to a plan set>");
 
-const gatePassword = (
-  readFileSync("C:/dev/BidPhase/.env.staging.local", "utf8")
-    .split(/\r?\n/)
-    .find(l => l.startsWith("STAGING_PASSWORD="))
-    ?.slice("STAGING_PASSWORD=".length) ?? ""
-)
-  .replace(/^["']|["']$/g, "")
-  .trim();
-if (!gatePassword) throw new Error("No STAGING_PASSWORD in .env.staging.local");
+const gatePassword = behindGate
+  ? (
+      readFileSync("C:/dev/BidPhase/.env.staging.local", "utf8")
+        .split(/\r?\n/)
+        .find(l => l.startsWith("STAGING_PASSWORD="))
+        ?.slice("STAGING_PASSWORD=".length) ?? ""
+    )
+      .replace(/^["']|["']$/g, "")
+      .trim()
+  : "";
+if (behindGate && !gatePassword)
+  throw new Error("No STAGING_PASSWORD in .env.staging.local");
 
 const stamp = Date.now();
 const email = `track-b-flash-${stamp}@example.com`;
@@ -130,12 +146,14 @@ const setupCtx = await browser.newContext({
   serviceWorkers: "block",
 });
 const setup = await setupCtx.newPage();
-const gate = await setup.request.post(`${BASE}/staging-gate`, {
-  form: { password: gatePassword },
-  maxRedirects: 0,
-});
-if (gate.status() >= 400)
-  throw new Error(`staging gate refused (${gate.status()})`);
+if (behindGate) {
+  const gate = await setup.request.post(`${BASE}/staging-gate`, {
+    form: { password: gatePassword },
+    maxRedirects: 0,
+  });
+  if (gate.status() >= 400)
+    throw new Error(`staging gate refused (${gate.status()})`);
+}
 if (process.env.CREDS_FILE)
   writeFileSync(process.env.CREDS_FILE, JSON.stringify({ email, password }));
 await trpc(setup, "auth.signup", {
@@ -323,7 +341,7 @@ for (const size of sizes) {
       /("url":"[^"#]+)"/g,
       `$1#renewed-${renewal}"`
     );
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, RENEW_HOLD_MS));
     await route.fulfill({ response: res, body });
   });
   await page.evaluate(id => (location.hash = `#/bids/${id}`), bid.id);
@@ -334,7 +352,7 @@ for (const size of sizes) {
   await mark("link renewed");
   await cast("renewed");
   await page.evaluate(id => (location.hash = `#/bids/${id}/plans`), bid.id);
-  await page.waitForTimeout(12000);
+  await page.waitForTimeout(RENEW_HOLD_MS + 7000);
   await uncast();
   await page.screenshot({ path: `${OUT}/${size.name}-renewed.png` });
   await read(`link renewed (${renewal} list answer(s) changed)`);
