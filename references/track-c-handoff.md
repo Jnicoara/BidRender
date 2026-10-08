@@ -10,14 +10,44 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## Latest (2026-10-08) — 0131's two columns WIRED, branch `c-homerun-wiring`
+## WHERE THINGS STAND (2026-10-08, end of session — read this first)
 
-- **Per-foot extras plan REVISED with the owner's answers**
-  (`references/per-foot-items-plan.md` § 0, docs only): 700 is its own run
-  type with 700 fittings; tape is the only shipped extra, on ten new
-  underground PVC Sch 40 types; M1–M4 for Track A (M1 lost `onlyLocation`,
-  M2 gained `extraFeetPerFoot`, M3 gained `traced_or_default`). Five small
-  owner questions left in § 7; none blocks the migrations.
+**No job is in progress.** Working tree clean; `c-homerun-wiring` and
+`local-dev` both at `11dbd02` (or later, if this commit). No WIP anywhere.
+No dev server or background check left running.
+
+**Per-foot extras plan — APPROVED by the owner** (`11dbd02`,
+`references/per-foot-items-plan.md`). 700 is its own run type with 700
+fittings; tape is the only shipped extra, on ten new underground PVC Sch 40
+types; "shared trench" = 0 per bid line; GR2's pipe uses the traced run,
+else 10 ft "default length".
+
+**Order — do not start C's part early:**
+
+1. **Track A first:** migrations M1–M4 (plan § 4) AND the seed content
+   (eleven run types, tape extras, seven 700 fittings, 700 rename/retire,
+   starter recipe changes). Not C's.
+2. **Then C: the server / run-type half** (plan § 5 first list, § 9 step 2)
+   — only once A's M1–M4 are on local-dev and on C's databases
+   (`scripts/schemaDrift.mts`). Extras' feet, the bridge, extras CRUD and
+   fork, `setExtraShared`, the 700 family's fitting rules.
+3. **The bid-screen half waits for Track B's gap 11** ("fix this line"
+   panel, `never-stuck-plan.md` § 3) and is built on top of it.
+
+**Five owner questions (plan § 7) — still WAITING on the owner.** Suggested
+answers, **NOT YET CONFIRMED** — do not build on them as decided:
+
+1. 700 clip spacing: ships "not set" unless the owner gives a figure.
+2. Add Sch 80 underground types (as well as Sch 40).
+3. Merge the 500-series base/cover into one row, the same way as 700.
+4. DV34 keeps its wire nuts.
+5. GR2's elbow/connectors and GR5's connectors follow the traced pipe.
+
+Note: Q2 and Q3 suggestions differ from the plan text, which ships Sch 40
+only and leaves 500 alone. If the owner confirms them, update plan § 3b /
+§ 3c and § 0 in the same edit.
+
+## Earlier (2026-10-08) — 0131's two columns WIRED, branch `c-homerun-wiring`
 
 - **Extra bends per homerun** (`bids.homerunExtraBends`): read by
   `loadBidHomeruns` and `forBid`, written by `setBidSettings`
