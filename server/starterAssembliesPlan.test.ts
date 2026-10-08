@@ -50,10 +50,11 @@ describe("the starter assemblies plan", () => {
     ).toEqual([]);
   });
 
-  it("leaves only surface raceway waiting on a missing part", () => {
+  // Surface raceway was the last ‡ part; DV34 loaded on 2026-10-08 once its
+  // 700-series plate shipped. Nothing in the tables waits on a missing part.
+  it("leaves no part waiting — every recipe names shipped rows", () => {
     const waiting = Array.from(tables.matchAll(/‡_([^_]+)_/g), m => m[1]);
-    expect(waiting.length).toBeGreaterThan(0);
-    expect(waiting.filter(name => !/^Surface raceway/.test(name))).toEqual([]);
+    expect(waiting).toEqual([]);
   });
 });
 

@@ -309,12 +309,10 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     raceway line here; a matching 700-series device plate; wire stays with
     the traced run. Hours not set, Commercial.
 
-    STILL HELD — never seeded half-built. Until 2026-10-08 this said the
-    catalog had no 700-series device plate; Track A shipped it that day
-    under exactly the name listed below, without touching this recipe. It
-    stays held because the list below is non-empty — the catalog having the
-    part is not enough. Track B adds the plate line and empties the list
-    (todo.md).
+    LOADED 2026-10-08. It was held until Track A shipped the 700-series
+    device plate (and a 700-series device box) with the cover family; the
+    box is now the 700-series one, so every part is the series the owner
+    named, and nothing is missing.
   */
   starter(
     "DV34",
@@ -322,12 +320,12 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "Devices",
     "commercial",
     [
-      p("raceway-device-box-1-gang", 1),
+      p("surface-raceway-device-box-700", 1),
       p("20a-duplex-receptacle", 1),
+      p("surface-raceway-device-plate-700", 1),
       p("raceway-entrance-end-fitting", 1),
       p("wire-nuts", 3),
-    ],
-    { missingParts: ["Surface raceway device plate, 700 series"] }
+    ]
   ),
 
   // ── LT — Lighting ──

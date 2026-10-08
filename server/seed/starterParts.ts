@@ -385,7 +385,9 @@ export const STARTER_PARTS = {
   "pole-base-grout": "Pole base grout",
   "pole-handhole-cover": "Pole handhole cover",
   // DV34 (surface raceway receptacle), owner's answers 2026-10-07.
-  "raceway-device-box-1-gang": "Raceway device box, 1-gang",
+  "surface-raceway-device-box-700": "Surface raceway device box, 700 series",
+  "surface-raceway-device-plate-700":
+    "Surface raceway device plate, 700 series",
   "raceway-entrance-end-fitting": "Raceway entrance end fitting",
 } as const satisfies Record<string, string>;
 

@@ -26,6 +26,9 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **The surface raceway receptacle starter is now in the library** — Wiremold
+  700 series with its matching device box and plate, Commercial, hours for
+  you to set. The raceway and wire come from the run you trace.
 - **Warnings are now the way to fix what they name.**
   - On the Materials screen, "Needs price" and "Needs hours" open that item
     with the cursor in the right box. On Labor rates, "Needs rate", "Set

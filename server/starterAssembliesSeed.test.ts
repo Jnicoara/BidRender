@@ -122,21 +122,18 @@ describe("the starter seed file", () => {
     ).toEqual([]);
   });
 
-  it("lists a missing part rather than adding it, and only surface raceway is missing", () => {
+  /*
+    Until 2026-10-08 DV34 was the one starter held for a missing part (its
+    700-series plate). Track A shipped the plate; Track B added the line and
+    emptied the list. So nothing waits now — and a listed part that SHIPS is
+    a stale list, which is a starter skipped for no reason.
+  */
+  it("lists a missing part rather than adding it, and no listed part ships", () => {
     const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
     const missing = BASELINE_ASSEMBLIES.filter(a => a.missingParts?.length);
-    expect(missing.map(a => a.ref)).toEqual(["DV34"]);
-    // One listed part now ships and is still listed, ON PURPOSE: Track A
-    // added DV34's 700-series plate on 2026-10-08 without touching recipes,
-    // and Track B adds the line and empties the list. Named, so any OTHER
-    // listed part that ships fails here as a stale list.
-    const shippedButAwaitingRecipe = new Set([
-      "Surface raceway device plate, 700 series",
-    ]);
-    for (const name of missing.flatMap(a => a.missingParts ?? [])) {
-      expect(name).toMatch(/^Surface raceway/);
-      expect(shipped.has(name)).toBe(shippedButAwaitingRecipe.has(name));
-    }
+    expect(missing.map(a => a.ref)).toEqual([]);
+    for (const name of missing.flatMap(a => a.missingParts ?? []))
+      expect(shipped.has(name), name).toBe(false);
   });
 
   it("gives every line a positive quantity and lists each part once per recipe", () => {
@@ -158,11 +155,13 @@ describe("the starter seed file", () => {
       categories: BASELINE_ASSEMBLIES.map(a => a.category),
       hoursCanBeUnset: true,
     };
+    // Empty since 2026-10-08: DV34, the last one held for a missing part,
+    // loaded once its 700-series plate shipped.
     expect(
       BASELINE_ASSEMBLIES.filter(a => starterHolds(a, open).length > 0).map(
         a => a.ref
       )
-    ).toEqual(["DV34"]);
+    ).toEqual([]);
 
     const closed = { categories: ["Devices"], hoursCanBeUnset: false };
     const ceiling = PLANNED_STARTER_ASSEMBLIES.find(a => a.ref === "LT3")!;

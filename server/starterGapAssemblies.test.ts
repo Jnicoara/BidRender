@@ -182,31 +182,25 @@ describe("DV34 surface raceway receptacle, per the owner's answers", () => {
     expect(parts.filter(n => unit.get(n) === "foot")).toEqual([]);
   });
 
-  it("uses the shipped raceway box and entrance fitting", () => {
+  it("is 700 series throughout — box AND matching plate — plus the entrance fitting", () => {
     expect(parts).toEqual(
       expect.arrayContaining([
-        "Raceway device box, 1-gang",
+        "Surface raceway device box, 700 series",
+        "Surface raceway device plate, 700 series",
         "Raceway entrance end fitting",
         "20A duplex receptacle",
       ])
     );
+    // Not the generic box it carried while it waited for the plate.
+    expect(parts).not.toContain("Raceway device box, 1-gang");
   });
 
   /*
-    Until 2026-10-08 this said "which the catalog lacks" and asserted the
-    plate was absent. Track A shipped it that day with the cover family
-    (raceUndergroundService.ts, exact name); the recipe is Track B's, so DV34
-    stays held — by its own list — until B adds the plate line and empties
-    `missingParts`. When B does, this test is the one to rewrite.
+    Until 2026-10-08 DV34 was held with the plate listed missing. Track A
+    shipped the plate (and a 700-series box) with the cover family; Track B
+    added both lines and emptied the list, so DV34 now LOADS.
   */
-  it("waits only on the 700-series device plate, which the catalog now ships", () => {
-    expect(dv34.missingParts).toEqual([
-      "Surface raceway device plate, 700 series",
-    ]);
-    expect(
-      BASELINE_MATERIALS.some(
-        m => m.name === "Surface raceway device plate, 700 series"
-      )
-    ).toBe(true);
+  it("waits on nothing — so it seeds", () => {
+    expect(dv34.missingParts ?? []).toEqual([]);
   });
 });

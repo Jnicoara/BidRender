@@ -76,6 +76,8 @@ const EXPECTED: Array<[string, string]> = [
   ["Detached garage / shop feeder and panel", "residential"],
   ["Kitchen countertop 20A circuit", "residential"],
   ["Bathroom 20A circuit", "residential"],
+  // Loaded 2026-10-08, once the 700-series plate shipped.
+  ["Surface raceway receptacle (block wall)", "commercial"],
 ];
 const NOT_WANTED = [
   'Wafer LED downlight, 3" (canless)',
