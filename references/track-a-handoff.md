@@ -4,6 +4,52 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
+## UPDATE 2026-10-08 (session 20) — START HERE
+
+**Where things stand.** Live = `24105ad`, migrations 0000–0104, untouched.
+Staging = `local-dev` (`9d2d854` + later docs), migrations 0000–0134, Gate
+green (run 37733963891). No Track A work is unfinished, and there is no WIP
+branch.
+
+- **Live release REHEARSED — passed.** `next-live-release-plan.md` § 5b:
+  backup `2026-10-08T05-35-31Z` verified, recount 0, 0105–0134 = 30 applied
+  in 4.5 s with no errors, 173/173 FKs, local-dev booted with 183 starters,
+  0 held, both live bids unchanged. Throwaway copy dropped.
+- **The release WAITS for three things** (owner): Track B's **white-box fix**
+  (plan opens with a blank white box, `todo.md` "FIRST: the white box…"),
+  Track B's **cover swaps** (starter recipes onto the new cover rows), and the
+  **owner's tablet look at staging**. Then re-run the § 5 checks on the
+  chosen candidate (a new commit means a new Gate, and if `drizzle/` has
+  changed, a new rehearsal).
+- **Before release: fix the flaky smoke step 10** ("undo and redo a mark",
+  `e2e/smoke/flow.spec.ts:410`). Evidence is at the top of `todo.md`: three
+  failures, all overlapping a staging redeploy or a second smoke on the
+  shared account. Two possible fixes are named there: one concurrency group
+  for smoke + the staging deploy, or a longer poll on step 10. The first
+  addresses the suspected cause; prefer it unless it turns out not to.
+- **Next build job: M1–M4 from `references/per-foot-items-plan.md`** (Track
+  C's plan, owner-approved 2026-10-08; § 4 has the columns, § 8 the tests that
+  must fail without it, § 9 the order). Numbered from **0135**. All four are
+  additive (step 1) and go to staging BEFORE any code that reads them; they
+  reach LIVE only with that code. If `ls drizzle/*.sql | tail -1` is not
+  `0134_example_labor_rates.sql` when you start, stop and find out why.
+  - M1 `takeoff_run_type_extras` (table); M2 `bid_line_items`: `extra` on
+    `runMaterialRole` (append only), `runExtraKey` NOT NULL DEFAULT 0, the
+    unique-index swap, `extraFeetPerFoot` NULL; M3
+    `assembly_materials.qtySource` enum NULL; M4 `snapshotTracedParts` +
+    `tracedPartAnswers` JSON NULL.
+  - **Also the seed content in that plan:** the underground run types with
+    warning tape as their extra, the seven 700-series fittings, the rename
+    `Surface raceway base, 700 series` → `Surface raceway, 700 series`
+    (through `RENAMED_BASELINE_MATERIALS`) and the RETIRE of `Surface
+raceway cover, 700 series` (`RETIRED_BASELINE_MATERIALS`). The owner
+    allows this rename and retire because those rows are not on live. The
+    seed writes extras rows, so it needs M1 on the database first. Starter
+    names and run types match by EXACT name: edit them in the same commit
+    (plan § 5, CLAUDE.md).
+- `pricing/` sheets: no change this session. The pricing and labor sheets
+  may hold the owner's typing — never rebuild them without `--only`.
+
 ## UPDATE 2026-10-08 (session 19)
 
 - **DV34 unlocked on `pricing/assembly-hours-starter.xlsx`** (B's `7641bb1`
