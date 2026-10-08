@@ -27,6 +27,8 @@ import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
 import { requireKnownKind } from "../knownHeightKind";
 import { heightList } from "../../shared/takeoffHeights";
+import { MOST_USED_WINDOW_DAYS, rankMostUsed } from "../../shared/mostUsed";
+import { resolveAssembly } from "../../shared/assemblyLookup";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -119,6 +121,35 @@ const toDecimal = (value: number) => value.toFixed(4);
 
 export const assembliesRouter = router({
   /** The working list, or the archive. Never returns `deleted` tombstones. */
+  /**
+   * "Most used" (references/top-assemblies-draft.md § 4): this company's
+   * top assemblies by number of bids in the last 12 months — EMPTY until it
+   * has 3 bids. Each resolved to the assembly the library shows now (a fork
+   * counts with its starter), and only ones still in the active library.
+   */
+  mostUsed: procedure.query(async ({ ctx }) => {
+    const now = new Date();
+    const since = new Date(
+      now.getTime() - MOST_USED_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    );
+    const [{ uses, bidCount }, library] = await Promise.all([
+      db.getAssemblyUses(ctx.scope.dataUserId, since),
+      db.getLibraryAssemblies(ctx.scope.dataUserId, "active"),
+    ]);
+    const ranked = rankMostUsed(uses, {
+      bidCount,
+      now,
+      resolve: id => resolveAssembly(library, id)?.id,
+    });
+    const byId = new Map(library.map(a => [a.id, a]));
+    return ranked.flatMap(entry => {
+      const a = byId.get(entry.assemblyId);
+      return a
+        ? [{ id: a.id, name: a.name, category: a.category, bids: entry.bids }]
+        : [];
+    });
+  }),
+
   list: procedure
     .input(
       z

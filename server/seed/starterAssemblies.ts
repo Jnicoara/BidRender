@@ -357,6 +357,39 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     p("14-2-nm-b", 20, { branchWhip: true }),
     p("wire-nuts", 2),
   ]),
+  /*
+    Wafer sizes, owner 2026-10-07: ship ONLY 2", 4", 6", 8" — LT8 is the 4"
+    and LT7 the 6", so these add the 2" and 8". Each on its OWN plain canless
+    wafer, never one assembly with the size swapped on the job, because a
+    bigger hole is more labor and the owner fills the hours per size. The 3"
+    and 5" wafers stay in the catalog with no starter. Tagged Both.
+  */
+  starter("LT31", 'Wafer LED downlight, 2" (canless)', "Lighting", "both", [
+    p("2in-canless-wafer-led-downlight", 1, { fixture: true }),
+    p("14-2-nm-b", 20, { branchWhip: true }),
+    p("wire-nuts", 2),
+  ]),
+  starter("LT32", 'Wafer LED downlight, 8" (canless)', "Lighting", "both", [
+    p("8in-canless-wafer-led-downlight", 1, { fixture: true }),
+    p("14-2-nm-b", 20, { branchWhip: true }),
+    p("wire-nuts", 2),
+  ]),
+  /*
+    Can lights, owner 2026-10-07: 4" and 6", new construction AND remodel,
+    each an IC housing plus its same-size LED retrofit trim, tagged Both.
+    Three already shipped — LT5 (4" new construction), LT4 (6" new
+    construction), LT6 (6" remodel) — so this adds only the 4" remodel. Named
+    like LT6, its 6" twin: a starter cannot be renamed in place (the seeder
+    matches starters by name, so a rename leaves the old row on every
+    database), so the four keep one naming family rather than splitting into
+    two. Renaming all four is an owner question (todo.md).
+  */
+  starter("LT33", 'Recessed can retrofit, 4"', "Lighting", "both", [
+    p("4in-recessed-can-remodel-ic", 1, { fixture: true }),
+    p("4in-led-retrofit-trim", 1),
+    p("14-2-nm-b", 20, { branchWhip: true }),
+    p("wire-nuts", 3),
+  ]),
   starter("LT9", "Shower light, wet-rated", "Lighting", "residential", [
     p("4in-recessed-can-new-construction-ic", 1, { fixture: true }),
     p("4in-shower-wet-rated-trim", 1),
@@ -1272,14 +1305,14 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
   ),
 
   // ── DR — Demo / retrofit ──
-  starter(
-    "DR1",
-    "Demo fixture, blank the box",
-    "Demo & Retrofit",
-    "commercial",
-    [p("4in-square-blank-cover", 1), p("wire-nuts", 3)]
-  ),
-  starter("DR2", "Demo device, blank plate", "Demo & Retrofit", "commercial", [
+  // DR1, DR2, DR16, DR17 are BOTH (owner, 2026-10-07; top-assemblies-draft.md
+  // § 3): demoing a device, blanking a box and replacing a receptacle are
+  // everyday residential remodel and service work too, not only retail.
+  starter("DR1", "Demo fixture, blank the box", "Demo & Retrofit", "both", [
+    p("4in-square-blank-cover", 1),
+    p("wire-nuts", 3),
+  ]),
+  starter("DR2", "Demo device, blank plate", "Demo & Retrofit", "both", [
     p("1-gang-blank-plate", 1),
     p("wire-nuts", 3),
   ]),
@@ -1383,16 +1416,13 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "DR16",
     "Replace receptacle like-for-like",
     "Demo & Retrofit",
-    "commercial",
+    "both",
     [p("20a-duplex-receptacle", 1), p("wall-plate", 1)]
   ),
-  starter(
-    "DR17",
-    "Replace receptacle with GFCI",
-    "Demo & Retrofit",
-    "commercial",
-    [p("20a-gfci-receptacle", 1), p("wall-plate", 1)]
-  ),
+  starter("DR17", "Replace receptacle with GFCI", "Demo & Retrofit", "both", [
+    p("20a-gfci-receptacle", 1),
+    p("wall-plate", 1),
+  ]),
   starter(
     "DR18",
     "Replace switch with occupancy sensor",
@@ -1545,5 +1575,157 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
   ]),
   starter("MS14", "Temporary lighting string, per 100 ft", "General", "both", [
     p("temporary-light-string-100-ft", 1),
+  ]),
+
+  /*
+    ── GC / GR — the gaps the top-30 lists found (2026-10-07) ──────────────
+    Drafted in references/top-assemblies-draft.md § 2b and loaded after the
+    names froze, against the final names. Hours NOT set, like every starter
+    here. Two places this differs from the draft, both on purpose:
+    - GR3 uses the 320A meter base. The draft used `400A meter base` only
+      "until it is in the catalog"; it now is.
+    - GR2 and GR5 leave out Underground warning tape. The draft gave it 1,
+      but the catalog sells it by the FOOT, so 1 would buy one foot of tape
+      for a whole trench. Its length is the trench's, which the traced run
+      owns — the owner decides (todo.md).
+  */
+  starter(
+    "GC1",
+    "Emergency battery pack added to a troffer",
+    "Lighting",
+    "commercial",
+    [p("emergency-battery-backup-pack", 1), p("wire-nuts", 4)]
+  ),
+  starter(
+    "GC2",
+    "Panelboard replacement, 3-phase, existing feeders",
+    "Panels",
+    "commercial",
+    [
+      p("225a-panelboard-3-phase-main-42-space", 1),
+      p("no12-thhn", 40),
+      p("wire-nuts", 20),
+      p("panel-knockout-seal", 4),
+      p("panel-directory-label", 1),
+      p("arc-flash-label", 1),
+    ]
+  ),
+  starter("GC3", "Site / parking lot pole light", "Lighting", "commercial", [
+    p("20-ft-light-pole", 1),
+    p("led-area-light", 1, { fixture: true }),
+    p("pole-anchor-bolt-kit", 1),
+    p("pole-base-cover", 1),
+    p("pole-base-grout", 1),
+    p("pole-handhole-cover", 1),
+    p("ground-rod-8-ft", 1),
+    p("ground-rod-clamp", 1),
+    p("wire-nuts", 3),
+    p("concrete-pole-base", 1),
+  ]),
+  starter("GC4", "Emergency light, remote head", "Lighting", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring-fixture", 1),
+    p("emergency-light-remote-head", 1, { fixture: true }),
+    p("18-2-control-wire", 25),
+    p("wire-nuts", 2),
+  ]),
+  starter(
+    "GC5",
+    "120V feed for door hardware / access control",
+    "Devices",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-blank-cover", 1),
+      p("12-2-mc-cable", 40),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+      p("20a-single-pole-breaker", 1),
+      p("wire-nuts", 3),
+    ]
+  ),
+  starter("GR1", "Single-pole switch, old work", "Devices", "residential", [
+    p("single-gang-old-work-box", 1),
+    p("single-pole-switch", 1),
+    p("wall-plate", 1),
+    p("14-2-nm-b", 20, { branchWhip: true }),
+    p("wire-nuts", 3),
+  ]),
+  starter("GR2", "Service upgrade 200A, underground", "Panels", "residential", [
+    p("200a-meter-base", 1),
+    p("200a-main-panel-40-space", 1),
+    p("2in-pvc-sch-40", 10),
+    p("2in-pvc-sch-40-90-degree-elbow", 1),
+    p("2in-pvc-sch-40-connector", 2),
+    p("4-0-4-0-4-0-2-0-ser-al", 10),
+    p("ground-rod-8-ft", 2),
+    p("ground-rod-clamp", 2),
+    p("no4-bare-cu-stranded", 30),
+    p("water-pipe-bonding-clamp", 1),
+    p("intersystem-bonding-bridge", 1),
+    p("panel-directory-label", 1),
+  ]),
+  starter(
+    "GR3",
+    "Service 320A / 400A residential (two 200A panels)",
+    "Panels",
+    "residential",
+    [
+      p("320a-meter-base", 1),
+      p("200a-main-panel-40-space", 2),
+      p("4-0-4-0-4-0-2-0-ser-al", 20),
+      p("ground-rod-8-ft", 2),
+      p("ground-rod-clamp", 2),
+      p("no4-bare-cu-stranded", 30),
+      p("water-pipe-bonding-clamp", 1),
+      p("intersystem-bonding-bridge", 1),
+      p("panel-directory-label", 2),
+    ]
+  ),
+  starter(
+    "GR4",
+    "Generator inlet and interlock, 50A",
+    "Panels",
+    "residential",
+    [
+      p("generator-interlock-kit", 1),
+      p("50a-power-inlet-box", 1),
+      p("50a-2-pole-breaker", 1),
+      p("6-3-nm-b", 25),
+      p("1in-cable-connector", 1),
+      p("50a-generator-cord", 1, { fixture: true }),
+    ]
+  ),
+  starter(
+    "GR5",
+    "Detached garage / shop feeder and panel",
+    "Panels",
+    "residential",
+    [
+      p("100a-main-panel-24-space", 1),
+      p("60a-2-pole-breaker", 1),
+      p("ground-rod-8-ft", 2),
+      p("ground-rod-clamp", 2),
+      p("no6-bare-cu-stranded", 20),
+      p("1in-pvc-sch-40-connector", 2),
+      p("panel-directory-label", 1),
+    ]
+  ),
+  // GR6 and GR7 carry their own home run, like DV3, so no line is a whip.
+  starter("GR6", "Kitchen countertop 20A circuit", "Devices", "residential", [
+    p("single-gang-box", 1),
+    p("20a-gfci-receptacle", 1),
+    p("wall-plate", 1),
+    p("12-2-nm-b", 35),
+    p("20a-1-pole-afci-breaker", 1),
+    p("wire-nuts", 3),
+  ]),
+  starter("GR7", "Bathroom 20A circuit", "Devices", "residential", [
+    p("single-gang-box", 1),
+    p("20a-gfci-receptacle", 1),
+    p("wall-plate", 1),
+    p("12-2-nm-b", 35),
+    p("20a-single-pole-breaker", 1),
+    p("wire-nuts", 3),
   ]),
 ];

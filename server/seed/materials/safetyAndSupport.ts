@@ -23,8 +23,10 @@ export const GROUNDING: BaselineMaterial[] = [
   {
     ...item("Grounding & Bonding"),
     // Named rod-first so that typing "ground rod" lands on the rod rather than
-    // on the clamp that goes with it.
-    name: "Ground rod, 8 ft",
+    // on the clamp that goes with it. The diameter is in the name since
+    // 2026-10-07 (owner): three rods, 5/8" x 8, 5/8" x 10, 3/4" x 10 — this
+    // is the one usually used.
+    name: 'Ground rod, 5/8" x 8 ft',
     searchAliases: aliases(
       "8ft eight foot 5/8 copper clad galvanized earth stake driven electrode"
     ),
@@ -59,7 +61,7 @@ export const GROUNDING: BaselineMaterial[] = [
     first, and a tie falls to catalog order.
   */
   ...[
-    { name: "Ground rod, 10 ft", slang: "10ft ten foot 5/8 copper clad" },
+    { name: 'Ground rod, 5/8" x 10 ft', slang: "10ft ten foot copper clad" },
     {
       name: 'Ground rod, 3/4" x 10 ft',
       slang: "10ft ten foot 3/4 three quarter copper clad heavy",

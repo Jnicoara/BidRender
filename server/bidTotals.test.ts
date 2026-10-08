@@ -7,7 +7,7 @@ type Row = SummableBid & { totalDue: number };
 const bid = (over: Partial<Row> = {}): Row => ({
   totalDue: 100,
   isSample: false,
-  notPriced: { lines: 0, parts: 0 },
+  notPriced: { lines: 0, parts: 0, hours: 0 },
   incomplete: false,
   ...over,
 });
@@ -18,14 +18,14 @@ describe("sumBidTotals — a total built from cards says what the cards leave ou
   it("adds up the unpriced lines and parts of every bid it sums", () => {
     const sum = sumBidTotals(
       [
-        bid({ notPriced: { lines: 3, parts: 0 } }),
-        bid({ notPriced: { lines: 1, parts: 2 } }),
+        bid({ notPriced: { lines: 3, parts: 0, hours: 0 } }),
+        bid({ notPriced: { lines: 1, parts: 2, hours: 0 } }),
         bid(),
       ],
       due
     );
     expect(sum.total).toBe(300);
-    expect(sum.notPriced).toEqual({ lines: 4, parts: 2 });
+    expect(sum.notPriced).toEqual({ lines: 4, parts: 2, hours: 0 });
     // The words the headline shows — the fault was showing none.
     expect(notPricedSuffix(sum.notPriced)).toBe(
       "+ 4 lines, 2 parts not priced"
@@ -34,7 +34,7 @@ describe("sumBidTotals — a total built from cards says what the cards leave ou
 
   it("keeps 'not priced' and 'can't be priced' apart", () => {
     const onlyUnpriced = sumBidTotals(
-      [bid({ notPriced: { lines: 2, parts: 0 } })],
+      [bid({ notPriced: { lines: 2, parts: 0, hours: 0 } })],
       due
     );
     expect(onlyUnpriced.incomplete).toBe(false);
@@ -57,7 +57,7 @@ describe("sumBidTotals — a total built from cards says what the cards leave ou
         bid({
           totalDue: 15000,
           isSample: true,
-          notPriced: { lines: 9, parts: 9 },
+          notPriced: { lines: 9, parts: 9, hours: 0 },
           incomplete: true,
         }),
         bid({ totalDue: 250 }),
@@ -68,7 +68,7 @@ describe("sumBidTotals — a total built from cards says what the cards leave ou
       total: 250,
       count: 1,
       sampleExcluded: 1,
-      notPriced: { lines: 0, parts: 0 },
+      notPriced: { lines: 0, parts: 0, hours: 0 },
       incomplete: false,
     });
   });
@@ -76,9 +76,9 @@ describe("sumBidTotals — a total built from cards says what the cards leave ou
   it("equals the sum of the cards it is built from", () => {
     // Forcing: the headline cannot count something the cards do not.
     const cards = [
-      bid({ notPriced: { lines: 2, parts: 1 } }),
-      bid({ notPriced: { lines: 0, parts: 4 }, incomplete: true }),
-      bid({ notPriced: { lines: 5, parts: 0 } }),
+      bid({ notPriced: { lines: 2, parts: 1, hours: 0 } }),
+      bid({ notPriced: { lines: 0, parts: 4, hours: 0 }, incomplete: true }),
+      bid({ notPriced: { lines: 5, parts: 0, hours: 0 } }),
     ];
     const sum = sumBidTotals(cards, due);
     expect(sum.notPriced.lines).toBe(
@@ -94,7 +94,7 @@ describe("sumBidTotals — a total built from cards says what the cards leave ou
       total: 0,
       count: 0,
       sampleExcluded: 0,
-      notPriced: { lines: 0, parts: 0 },
+      notPriced: { lines: 0, parts: 0, hours: 0 },
       incomplete: false,
     });
   });

@@ -18,7 +18,12 @@
  *      thing; or
  *   3. same size, and the longer name adds only QUALIFIERS to the shorter
  *      ("standard", "commercial", "spec grade"…) — never a word that could
- *      name a different part.
+ *      name a different part; or
+ *   4. the same words, and one name states MORE of the size than the other
+ *      (a diameter beside a length) while every size of the shorter is in
+ *      the longer; or
+ *   5. a NEW (waiting) row with no size and a shipped row with the same
+ *      words and a size.
  *
  * ── What keeps two different parts apart ─────────────────────────────────────
  * A CONFLICT group is a set of words of which a part has at most one: set
@@ -52,6 +57,9 @@ const SYNONYMS: [string, string[]][] = [
   ["4square", ['4" square', "4 square", "4in square", "1900"]],
   ["box", ["box", "bx"]],
   ["with", ["w/", "with"]],
+  // Two trade names for one fixture (owner review, 2026-10-07: the waiting
+  // `4" canless LED downlight` is the shipped `4" wafer LED downlight`).
+  ["wafer", ["canless", "wafer"]],
 ];
 
 /** At most one of each group per part. Different members = different parts. */
@@ -133,7 +141,8 @@ const QUALIFIERS = new Set([
   "purpose",
 ]);
 
-const FILLER = new Set(["the", "a", "an", "and", "for", "of", "to", "in"]);
+// "x" joins two dimensions — `3/4" x 10 ft` — and names nothing itself.
+const FILLER = new Set(["the", "a", "an", "and", "for", "of", "to", "in", "x"]);
 
 function fold(text: string): string {
   let s = ` ${text.toLowerCase()} `;
@@ -147,36 +156,51 @@ function fold(text: string): string {
 }
 
 /** The size tokens a name carries: #12, 1/2", 20A, 4 ft, 250 kcmil, 12/2 … */
-export function sizeTokens(name: string): string[] {
-  const s = name.toLowerCase();
+const SIZE_PATTERNS = [
+  // A hashed cable spec — "#3/4 MC cable": a #3 four-wire, ONE size. Before
+  // the gauge, which would take "#3" and leave "/4" behind as a word.
+  /#\d{1,2}\/[1-9](?![\d/])/g,
+  /#\s?\d+(?:\/0)?/g, // wire gauge
+  /\b\d+(?:-\d+\/\d+|\/\d+)?"/g, // trade size / inches
+  /\b\d+(?:\/\d+)?-?\d*\s?a\b/g, // amps: 20a, 15/20a
+  /\b\d+(?:\.\d+)?\s?(?:ft|')/g, // feet
+  /\b\d+\s?kcmil\b/g,
+  /\b\d+(?:\/\d+)?\s?kva\b/g,
+  /\b\d+[-/]\d+(?:[-/]\d+)*\b/g, // conductor sets 12-2, 4/0-4/0-2/0, aughts 1/0
+  /\b\d+\s?(?:v|w|hp|mm)\b/g,
+];
+
+/**
+ * The sizes a name carries, and the text left once they are taken out. Each
+ * pattern takes what it matched OUT before the next looks, so `1-1/4"` is one
+ * trade size and not also a conductor set "1-1/4" — and the REST is cut by
+ * the same patterns, so "10 ft" leaves no "10" and "ft" behind as words (it
+ * did: "Ground rod, 10 ft" read as the words "10 ft ground rod", 2026-10-07).
+ */
+function splitSizes(text: string): { sizes: string[]; rest: string } {
   const out: string[] = [];
-  const patterns = [
-    /#\s?\d+(?:\/0)?/g, // wire gauge
-    /\b\d+(?:-\d+\/\d+|\/\d+)?"/g, // trade size / inches
-    /\b\d+(?:\/\d+)?-?\d*\s?a\b/g, // amps: 20a, 15/20a
-    /\b\d+(?:\.\d+)?\s?(?:ft|')/g, // feet
-    /\b\d+\s?kcmil\b/g,
-    /\b\d+(?:\/\d+)?\s?kva\b/g,
-    /\b\d+[-/]\d+(?:[-/]\d+)*\b/g, // conductor sets 12-2, 4/0-4/0-2/0
-    /\b\d+\s?(?:v|w|hp|mm)\b/g,
-  ];
-  // Each pattern takes what it matched OUT before the next looks, so `1-1/4"`
-  // is one trade size and not also a conductor set "1-1/4".
-  let rest = s;
-  for (const p of patterns) {
+  let rest = text;
+  for (const p of SIZE_PATTERNS) {
     for (const m of rest.match(p) ?? []) out.push(m.replace(/\s+/g, ""));
     rest = rest.replace(p, " ");
   }
-  return Array.from(new Set(out)).sort();
+  // Repeats KEPT: `1-5/8" x 1-5/8"` strut is two sizes, not one — as a set it
+  // read as a subset of `1-5/8" x 13/16"` and paired different channels.
+  return { sizes: out.sort(), rest };
+}
+
+/** The size tokens a name carries: #12, 1/2", 20A, 4 ft, 250 kcmil, 12/2 … */
+export function sizeTokens(name: string): string[] {
+  return splitSizes(name.toLowerCase()).sizes;
 }
 
 export type Signature = { words: string[]; sizes: string[] };
 
 export function signature(name: string): Signature {
   const sizes = sizeTokens(name);
-  let s = fold(name);
-  // Strip the size text so "20A" is compared as a size, not a word.
-  for (const t of sizes) s = s.split(t).join(" ");
+  // Folded first (so `4" square` becomes one word), then cut by the size
+  // patterns themselves — never by the size STRINGS, which lose their spaces.
+  const s = splitSizes(fold(name)).rest;
   const words = s
     .replace(/["#()]/g, " ")
     .split(/[\s,;/]+/)
@@ -203,6 +227,8 @@ function conflicts(a: string[], b: string[]): string | null {
 export type DuplicateCandidate = {
   name: string;
   aliases?: string;
+  /** A row waiting to be ADDED (not shipped yet) — see rule 5. */
+  isNew?: boolean;
 };
 
 export type DuplicatePair = {
@@ -230,6 +256,57 @@ export function findPossibleDuplicates(
       const B = sigs[j];
       if (A.name === B.name) continue;
       const sameSizes = A.sig.sizes.join("|") === B.sig.sizes.join("|");
+      const sameWords = A.sig.words.join(" ") === B.sig.words.join(" ");
+
+      // 4. the same words, and one name only STATES MORE of the size — a
+      //    diameter the other leaves out: "Ground rod, 10 ft" and "Ground
+      //    rod, 3/4" x 10 ft" (missed until the owner caught it, 2026-10-07).
+      //    Every size of the shorter must be in the longer; a different size
+      //    anywhere is a different part.
+      // 5. a NEW row that names no size, against a shipped row with the
+      //    same words and a size: the new row is probably the shipped part
+      //    written loosely ("Mast roof flashing" / `2" mast roof flashing`).
+      //    New rows only — shipped "Duplex receptacle" and "20A duplex
+      //    receptacle" are two real parts.
+      if (
+        sameWords &&
+        A.sig.words.length > 0 &&
+        !!A.isNew !== !!B.isNew &&
+        (A.sig.sizes.length === 0) !== (B.sig.sizes.length === 0)
+      ) {
+        const sized = A.sig.sizes.length ? A : B;
+        pairs.push({
+          a: A.name,
+          b: B.name,
+          why: `same words; the new row names no size, the shipped one is ${sized.sig.sizes.join(", ")}`,
+        });
+        continue;
+      }
+
+      if (!sameSizes && sameWords && A.sig.words.length > 0) {
+        const [few, more] =
+          A.sig.sizes.length <= B.sig.sizes.length
+            ? [A.sig.sizes, B.sig.sizes]
+            : [B.sig.sizes, A.sig.sizes];
+        // A multiset subset: each size of the shorter, as many times as it
+        // appears, is in the longer — and the longer states strictly more.
+        const left = [...more];
+        const contained = few.every(s => {
+          const at = left.indexOf(s);
+          if (at < 0) return false;
+          left.splice(at, 1);
+          return true;
+        });
+        if (few.length > 0 && few.length < more.length && contained) {
+          const extra = left;
+          pairs.push({
+            a: A.name,
+            b: B.name,
+            why: `same words and size; one name also states ${extra.join(", ")}`,
+          });
+        }
+        continue;
+      }
       if (!sameSizes) continue;
       const clash = conflicts(A.sig.words, B.sig.words);
       if (clash) continue;

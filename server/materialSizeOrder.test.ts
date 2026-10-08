@@ -370,11 +370,25 @@ describe("dimensions and trailing sizes", () => {
     expect(materialTypeName("Ground rod, 8 ft")).toBe("Ground rod");
   });
 
-  it("does not read a size that is only PART of the text after the comma", () => {
+  it("reads a diameter-and-length after the comma as BOTH, never the length alone", () => {
     // "3/4\" x 10 ft" is a diameter and a length. Reading only the length would
-    // file a different product as the 10 ft rod; leaving it unsized keeps it
-    // labelled by its whole name, which sorts it straight after the family.
-    expect(hasSize('Ground rod, 3/4" x 10 ft')).toBe(false);
+    // file a different product as the 10 ft rod. Until 2026-10-07 this was
+    // left unsized for that reason; since the owner made the ground rods
+    // three items (5/8" x 8, 5/8" x 10, 3/4" x 10), the reader takes both —
+    // length, then diameter as the tiebreak — so the two 10 ft rods stay
+    // apart and in size order (server/sizeReadingNewNames.test.ts).
+    expect(hasSize('Ground rod, 3/4" x 10 ft')).toBe(true);
+    expect(
+      [
+        'Ground rod, 3/4" x 10 ft',
+        "Ground rod, 10 ft",
+        'Ground rod, 5/8" x 10 ft',
+      ].sort(compareBySize)
+    ).toEqual([
+      "Ground rod, 10 ft",
+      'Ground rod, 5/8" x 10 ft',
+      'Ground rod, 3/4" x 10 ft',
+    ]);
   });
 
   it("puts the real catalog's pull boxes and fans in size order on screen", () => {
@@ -458,14 +472,25 @@ describe("the real catalog", () => {
   });
 
   it("orders the real THHN family thinnest to thickest", () => {
+    // The solid rows and the stranded sizes (no "stranded" in the name),
+    // named "… THHN Copper" since 2026-10-07, aughts without the "#".
     const thhn = BASELINE_MATERIALS.filter(
-      m => /^#?\d.* THHN$/.test(m.name) || /kcmil THHN$/.test(m.name)
+      m =>
+        /^#?\d.* THHN Copper$/.test(m.name) || /kcmil THHN Copper$/.test(m.name)
     )
       .map(m => m.name)
       .sort(compareBySize);
-    expect(thhn[0]).toBe("#14 THHN");
-    expect(thhn[thhn.length - 1]).toBe("500 kcmil THHN");
-    expect(thhn.indexOf("#1 THHN")).toBeLessThan(thhn.indexOf("#1/0 THHN"));
+    expect(thhn[0]).toBe("#14 THHN Copper");
+    expect(thhn[thhn.length - 1]).toBe("500 kcmil THHN Copper");
+    expect(thhn.indexOf("#1 THHN Copper")).toBeLessThan(
+      thhn.indexOf("1/0 THHN Copper")
+    );
+    expect(thhn.indexOf("1/0 THHN Copper")).toBeLessThan(
+      thhn.indexOf("4/0 THHN Copper")
+    );
+    expect(thhn.indexOf("4/0 THHN Copper")).toBeLessThan(
+      thhn.indexOf("250 kcmil THHN Copper")
+    );
   });
 
   it("orders the real EMT family smallest to largest", () => {
@@ -481,6 +506,8 @@ describe("the real catalog", () => {
       '2" EMT',
       '2-1/2" EMT',
       '3" EMT',
+      // A full size for EMT since 2026-10-07 (owner) — between 3" and 4".
+      '3-1/2" EMT',
       '4" EMT',
     ]);
   });

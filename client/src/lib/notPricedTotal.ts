@@ -33,7 +33,7 @@
  */
 import {
   countNotPriced,
-  lineHoursNotSet,
+  lineHoursMissing,
   lineMaterialNotPriced,
   linePartsNotPriced,
   withDropsNotPriced,
@@ -57,7 +57,12 @@ export function partsNotPricedWords(parts: number): string {
 
 /**
  * "+ 4 lines not priced", "+ 1 part not priced",
- * "+ 2 lines, 3 parts not priced", or "" for none.
+ * "+ 2 lines, 3 parts not priced", "+ 1 part not priced, 1 line hours not
+ * set", or "" for none.
+ *
+ * Hours are NEVER lumped in with parts (owner, 2026-10-07): a part is priced
+ * on the Materials screen, hours are set on the assembly, and one number for
+ * both sent the estimator to the wrong screen (found on staging).
  */
 export function notPricedSuffix(notPriced: NotPricedTally): string {
   const lines = whole(notPriced.lines);
@@ -65,18 +70,24 @@ export function notPricedSuffix(notPriced: NotPricedTally): string {
   // Drops with no material (owner, 2026-10-07): in the same tally, so the
   // print's block and every total say them like any other gap.
   const drops = whole(notPriced.drops ?? 0);
-  const pieces = [
+  const hours = whole(notPriced.hours);
+  const priced = [
     lines > 0 ? plural(lines, "line") : "",
     parts > 0 ? plural(parts, "part") : "",
     drops > 0 ? plural(drops, "drop") : "",
   ].filter(Boolean);
-  return pieces.length === 0 ? "" : `+ ${pieces.join(", ")} not priced`;
+  const pieces = [
+    priced.length > 0 ? `${priced.join(", ")} not priced` : "",
+    hours > 0 ? `${plural(hours, "line")} hours not set` : "",
+  ].filter(Boolean);
+  return pieces.length === 0 ? "" : `+ ${pieces.join(", ")}`;
 }
 
 /**
  * The same tally as a sentence's subject: "1 line is not priced",
- * "3 parts are not priced", "2 lines and 1 part are not priced". `one` is
- * true when it names a single thing, so the sentence around it can say "it".
+ * "3 parts are not priced", "2 lines and 1 part are not priced",
+ * "1 part is not priced and 1 line has hours not set". `one` is true when it
+ * names a single thing, so the sentence around it can say "it".
  */
 export function notPricedHeadline(notPriced: NotPricedTally): {
   text: string;
@@ -85,18 +96,24 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
   const lines = whole(notPriced.lines);
   const parts = whole(notPriced.parts);
   const drops = whole(notPriced.drops ?? 0);
-  const pieces = [
+  const hours = whole(notPriced.hours);
+  const priced = [
     lines > 0 ? plural(lines, "line") : "",
     parts > 0 ? plural(parts, "part") : "",
     drops > 0 ? plural(drops, "drop") : "",
   ].filter(Boolean);
-  const one = lines + parts + drops === 1;
+  const pricedIsOne = lines + parts + drops === 1;
+  const pieces = [
+    priced.length > 0
+      ? `${priced.join(" and ")} ${pricedIsOne ? "is" : "are"} not priced`
+      : "",
+    hours > 0
+      ? `${plural(hours, "line")} ${hours === 1 ? "has" : "have"} hours not set`
+      : "",
+  ].filter(Boolean);
   return {
-    text:
-      pieces.length === 0
-        ? ""
-        : `${pieces.join(" and ")} ${one ? "is" : "are"} not priced`,
-    one,
+    text: pieces.join(" and "),
+    one: lines + parts + drops + hours === 1,
   };
 }
 
@@ -105,19 +122,16 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
  * "material not priced", "2 parts not priced", "hours not set", or both
  * joined: "1 part not priced, hours not set". "" when nothing is left out.
  *
- * The count is `linePartsNotPriced` (the total's rule); this only names the
- * pieces, so the cell and the total cannot disagree about how many there
- * are. Hours not set (D1) is said as what it is, never as a "part": there
- * is no part to price, the fix is the assembly's hours.
+ * Parts come from `linePartsNotPriced` and hours from `lineHoursMissing` —
+ * the total's own two rules, so the cell and the total cannot disagree.
+ * Hours not set (D1) is said as what it is, never as a "part".
  */
 export function lineShortfallWords(
   line: PartsLineLike,
   directCost: number | null
 ): string {
-  const total = whole(linePartsNotPriced(line, directCost));
-  if (total === 0) return "";
-  const hours = lineHoursNotSet(line) ? 1 : 0;
-  const parts = total - hours;
+  const parts = whole(linePartsNotPriced(line, directCost));
+  const hours = lineHoursMissing(line, directCost);
   const materialMissing =
     lineMaterialNotPriced(line, directCost) && whole(line.unpricedParts) === 0;
   return [
@@ -140,6 +154,34 @@ export function hoursNotSetWords(assemblies: number): string {
   const n = whole(assemblies);
   if (n === 0) return "";
   return `${n} ${n === 1 ? "assembly" : "assemblies"} with hours not set`;
+}
+
+/**
+ * The part of a bid's tally that belongs on its MATERIALS row: lines and
+ * parts nobody priced — never the hours, which are labor (found on staging
+ * 2026-10-07: "Materials $10.00 + 1 line hours not set"). The whole-bid rows
+ * (Direct cost, Bid price, Total due) keep the full tally.
+ */
+export function materialsShare(notPriced: NotPricedTally): NotPricedTally {
+  /*
+    Drops with no MATERIAL belong here too (Track C, 2026-10-07): what is
+    missing is the drop's pipe and wire. Found merging local-dev: this built
+    the share field by field and left `drops` behind, so the Materials row
+    lost "+ 205 drops not priced" while Bid price kept it.
+  */
+  const share: NotPricedTally = {
+    lines: notPriced.lines,
+    parts: notPriced.parts,
+    hours: 0,
+  };
+  return (notPriced.drops ?? 0) > 0
+    ? { ...share, drops: notPriced.drops }
+    : share;
+}
+
+/** The part that belongs on its LABOR row: lines whose hours are not set. */
+export function laborShare(notPriced: NotPricedTally): NotPricedTally {
+  return { lines: 0, parts: 0, hours: notPriced.hours };
 }
 
 /** Whether a total leaves anything out at all. */
@@ -177,26 +219,6 @@ export function materialMissingLines(
     line =>
       lineMaterialNotPriced(line, line.breakdown?.directCost ?? null) &&
       Math.floor(line.unpricedParts) <= 0
-  ).length;
-}
-
-/**
- * Lines whose ASSEMBLY HOURS were not set when added (D1) — counted in the
- * tally's parts (`linePartsNotPriced` adds one each), but there is no part
- * to price, so the advice is different: set the assembly's hours. Found on
- * staging 2026-10-07: without this the bid said "1 part is not priced …
- * price the part on the Materials screen" for a line whose parts were all
- * priced and whose HOURS were missing.
- */
-export function hoursNotSetLines(
-  lines: readonly (PartsLineLike & {
-    breakdown: { directCost: number } | null;
-  })[]
-): number {
-  return lines.filter(
-    line =>
-      lineHoursNotSet(line) &&
-      linePartsNotPriced(line, line.breakdown?.directCost ?? null) > 0
   ).length;
 }
 

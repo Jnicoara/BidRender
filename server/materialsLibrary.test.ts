@@ -114,7 +114,7 @@ describe.skipIf(!hasDb)("baseline material seeding", () => {
     await seedBaselineMaterials();
     const rows = await getLibraryMaterials(USER);
     const duplicated = rows.filter(
-      r => r.userId === null && r.name === "20A Single-Pole breaker"
+      r => r.userId === null && r.name === "20A 1-Pole breaker"
     );
     expect(duplicated).toHaveLength(1);
   });
@@ -261,7 +261,7 @@ describe.skipIf(!hasDb)("material categories", () => {
   it("restores the starter category on revert", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "6ft MC whip"
+      r => r.userId === null && r.name === "6 ft MC whip"
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
 

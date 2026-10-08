@@ -94,6 +94,7 @@ import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
+import { MostUsedRow } from "@/components/MostUsedRow";
 import { TapExplain } from "@/components/TapExplain";
 import {
   lineHoursNotSet,
@@ -103,8 +104,9 @@ import {
 import { laborInRunRate } from "@shared/runFittings";
 import {
   bidNotPricedCount,
-  hoursNotSetLines,
+  laborShare,
   materialMissingLines,
+  materialsShare,
 } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
 import {
@@ -286,6 +288,10 @@ export default function BidsPage({
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
+    // "Most used" counts bids per assembly, so adding or removing a line can
+    // move it — refreshed here, through the one helper every line mutation
+    // already uses (CLAUDE.md § "yesterday's answer").
+    void utils.assemblies.mostUsed.invalidate();
     void utils.bids.units.invalidate({ bidId });
     // Pushing, forking and archiving all change roles rather than lines, so a
     // refresh that skipped this would leave stale badges beside fresh totals.
@@ -374,6 +380,9 @@ export default function BidsPage({
     onError: error => toast.error(error.message),
     onSettled: refresh,
   });
+
+  /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
+  const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
 
   const assemblyResults = useMemo(() => {
     const q = assemblyQuery.trim().toLowerCase();
@@ -581,10 +590,10 @@ export default function BidsPage({
     : null;
   /** Of the tally's parts: lines with labor and no material at all. */
   const materialMissing = materialMissingLines(lines);
-  /** Of the tally's parts: lines whose assembly hours were not set (D1). */
-  const hoursNotSet = hoursNotSetLines(lines);
+  /** Lines whose assembly hours were not set (D1) — the tally's own count. */
+  const hoursNotSet = notPricedTally.hours;
   /** What is left: real PARTS with no price — the Materials screen's job. */
-  const partsNotPriced = notPricedTally.parts - materialMissing - hoursNotSet;
+  const partsNotPriced = notPricedTally.parts - materialMissing;
   /**
    * Traced lines whose part had no labor unit when sent — labor "Not
    * priced". Their own strip, because the next move is on the Materials
@@ -906,6 +915,20 @@ export default function BidsPage({
                   aria-label="Unit label"
                 />
               </div>
+
+              {/*
+                "MOST USED" (top-assemblies-draft.md § 4): this company's top
+                assemblies by number of bids, one click to add with the qty
+                and unit above. Only while the search box is empty — typing
+                means the person knows what they want. Nothing at all until
+                the company has 3 bids (the server returns []), so a new
+                account sees no empty row.
+              */}
+              <MostUsedRow
+                items={mostUsed}
+                query={assemblyQuery}
+                onAdd={addHighlighted}
+              />
 
               {assemblyResults.length > 0 && (
                 <div className="rounded-lg border border-border overflow-hidden">
@@ -1387,20 +1410,27 @@ export default function BidsPage({
                 </div>
               )}
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs text-muted-foreground">Materials</span>
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                  Materials
+                </span>
+                {/* Lines and parts only — hours belong on Labor below. */}
                 <NotPricedTotal
                   amount={money(totals.materialCost)}
-                  notPriced={notPricedTally}
+                  notPriced={materialsShare(notPricedTally)}
                   className="font-mono text-sm"
                 />
               </div>
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
                   Labor ({round(totals.totalLaborHours, 2)} h)
                 </span>
-                <span className="font-mono text-sm">
-                  {money(totals.laborCost)}
-                </span>
+                {/* "+ 1 line hours not set" lives HERE, on the labor it is
+                    missing from (staging check, 2026-10-07). */}
+                <NotPricedTotal
+                  amount={money(totals.laborCost)}
+                  notPriced={laborShare(notPricedTally)}
+                  className="font-mono text-sm"
+                />
               </div>
               {/*
                 The third part of Direct cost, named so the rows add up. A
@@ -1830,7 +1860,12 @@ export default function BidsPage({
               )}
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-xs font-medium">Direct cost</span>
+                {/* nowrap + shrink-0: the amber caveat beside the figure
+                    must not squeeze the label onto two lines (staging,
+                    2026-10-07). The caveat wraps under the figure instead. */}
+                <span className="text-xs font-medium shrink-0 whitespace-nowrap">
+                  Direct cost
+                </span>
                 <NotPricedTotal
                   amount={money(totals.directCost)}
                   notPriced={notPricedTally}
@@ -1912,7 +1947,7 @@ export default function BidsPage({
               </div>
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
-                <span className="text-sm font-medium">
+                <span className="text-sm font-medium shrink-0 whitespace-nowrap">
                   Bid price
                   {/* On the headline number itself: the one figure people
                       read without reading anything else on the card. */}
@@ -1944,7 +1979,7 @@ export default function BidsPage({
                   with nothing tying them together. This is that total. */}
               {totals.expensesTotal > 0 && salesTax.status === "disabled" && (
                 <div className="flex items-baseline justify-between gap-3 py-1">
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium shrink-0 whitespace-nowrap">
                     Total due{" "}
                     <IncompletePriceTag show={incomplete} className="ml-1" />
                   </span>
@@ -2016,7 +2051,7 @@ export default function BidsPage({
 
                   {salesTax.status !== "no-rate" && (
                     <div className="flex items-baseline justify-between gap-3 py-1">
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-medium shrink-0 whitespace-nowrap">
                         Total due{" "}
                         <IncompletePriceTag
                           show={incomplete}

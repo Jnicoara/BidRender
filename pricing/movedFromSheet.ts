@@ -32,25 +32,28 @@
 
 export const MERGED_FROM_SHEET: Record<string, string> = {
   // ── Batch 1: wire, conduit fittings, connectors, consumables, fasteners, strut
-  "10/2 MC cable": "10-2 MC cable",
-  "10/3 MC cable": "10-3 MC cable",
-  "12/3 MC cable": "12-3 MC cable",
-  "8/3 MC cable": "8-3 MC cable",
-  "10/3 NM-B": "10-3 NM-B",
-  "12/3 NM-B": "12-3 NM-B",
-  "14/3 NM-B": "14-3 NM-B",
-  "6/3 NM-B": "6-3 NM-B",
-  "8/3 NM-B": "8-3 NM-B",
-  "10/2 UF-B": "10-2 UF-B",
-  "12/2 UF-B": "12-2 UF-B",
-  "Bare copper, #2": "#2 bare CU, stranded",
-  "Bare copper, #4": "#4 bare CU, stranded",
-  "Bare copper, 1/0": "#1/0 bare CU, stranded",
+  // Values follow the catalog names frozen 2026-10-07 (metal spelled out,
+  // slash sizes, aughts without "#") — pricingSheetMoves.test.ts fails on a
+  // value the catalog does not ship.
+  "10/2 MC cable": "10/2 MC cable Copper",
+  "10/3 MC cable": "10/3 MC cable Copper",
+  "12/3 MC cable": "12/3 MC cable Copper",
+  "8/3 MC cable": "8/3 MC cable Copper",
+  "10/3 NM-B": "10/3 NM-B Copper",
+  "12/3 NM-B": "12/3 NM-B Copper",
+  "14/3 NM-B": "14/3 NM-B Copper",
+  "6/3 NM-B": "6/3 NM-B Copper",
+  "8/3 NM-B": "8/3 NM-B Copper",
+  "10/2 UF-B": "10/2 UF-B Copper",
+  "12/2 UF-B": "12/2 UF-B Copper",
+  "Bare copper, #2": "#2 bare stranded Copper",
+  "Bare copper, #4": "#4 bare stranded Copper",
+  "Bare copper, 1/0": "1/0 bare stranded Copper",
   // The sheet does not say copper or aluminum. XHHW-2 at these sizes is
   // bought as aluminum feeder, and the catalog ships it only that way.
-  "XHHW-2, #2": "#2 XHHW AL",
-  "XHHW-2, 1/0": "#1/0 XHHW AL",
-  "XHHW-2, 4/0": "#4/0 XHHW AL",
+  "XHHW-2, #2": "#2 XHHW Aluminum",
+  "XHHW-2, 1/0": "1/0 XHHW Aluminum",
+  "XHHW-2, 4/0": "4/0 XHHW Aluminum",
   '4" rigid coupling': '4" rigid conduit coupling',
   // The four cable connectors are sized by jacket diameter and already stand
   // for every style — snap-in, two-screw, duplex — see connectors.ts.
@@ -139,7 +142,7 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Acorn ground clamp": "Ground rod clamp",
   "Gas line bonding clamp": "Water pipe bonding clamp",
   // The shipped 8 ft rod is the 5/8" one.
-  "Ground rod, 5/8 in x 8 ft": "Ground rod, 8 ft",
+  "Ground rod, 5/8 in x 8 ft": 'Ground rod, 5/8" x 8 ft',
 
   // ── Batch 4: lighting and life safety
   "Direct burial splice kit": "Underground splice kit",
@@ -159,13 +162,13 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Dual-action pull station": "Fire alarm pull station",
 
   // ── Batch 5: low voltage, equipment and appliances
-  "18/2 thermostat wire": "18/2 control wire",
-  "Doorbell wire": "18/2 control wire",
+  "18/2 thermostat wire": "18/2 control wire Copper",
+  "Doorbell wire": "18/2 control wire Copper",
   "Low-voltage mounting bracket": "Low-voltage mud ring",
   "Video doorbell transformer": "Doorbell transformer",
   "Fan mounting brace, adjustable": "Ceiling fan brace box",
   "Fan wall control": "Fan speed control",
-  "Spa bonding wire, #8 solid": "#8 bare CU, solid",
+  "Spa bonding wire, #8 solid": "#8 bare solid Copper",
   // The shipped manual transfer switch already stands for both sizes.
   "Transfer switch, 6-circuit": "Manual transfer switch",
   "Transfer switch, 10-circuit": "Manual transfer switch",
@@ -177,8 +180,8 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   // added for them (connectors.ts) — as the 4/0 lugs folded into 2/0-4/0.
   "Compression lug, 350 kcmil": "250-350 kcmil crimp lug",
   "Mechanical lug, 350 kcmil": "250-350 kcmil crimp lug",
-  "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER AL",
-  "SER cable, 1/0-1/0-1/0-2": "1/0-1/0-1/0-2 SER AL",
+  "Aluminum SER, 4/0": "4/0-4/0-4/0-2/0 SER Aluminum",
+  "SER cable, 1/0-1/0-1/0-2": "1/0-1/0-1/0-2 SER Aluminum",
   // At 400A and 600A a safety switch is the fused one the catalog ships.
   "400A safety switch": "400A fused disconnect",
   "600A safety switch": "600A fused disconnect",
@@ -189,23 +192,24 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Spa manual disconnect": "50A GFCI spa disconnect",
   "Hot tub GFCI panel": "50A GFCI spa disconnect",
   "20A twist-lock receptacle": "L5-20 receptacle",
-  // The wafer's two-size rule: 5", 6" and 7" discs are one 5"/6" row.
-  '6" LED disc light': '5"/6" LED disc light',
-  '7" LED disc light': '5"/6" LED disc light',
+  // (5", 6" and 7" discs were folded into one 5"/6" row here until
+  // 2026-10-07, when the owner split it — "never folded together". The 5"
+  // and 6" now ship as themselves; a plain 7" is not shipped, and is no
+  // longer folded into another size.)
   "Wall plate extender": "Single-gang box extender",
 };
 
 export const RENAMED_FROM_SHEET: Record<string, string> = {
   // ── Batch 1
-  "14/2 UF-B": "14-2 UF-B",
-  "Fire alarm cable, 14/2": "14-2 fire alarm cable",
-  "Fire alarm cable, 16/2": "16-2 fire alarm cable",
-  "SJOOW cord, 14/3": "14-3 SJOOW cord",
-  "SOOW cord, 10/3": "10-3 SOOW cord",
-  "SOOW cord, 12/3": "12-3 SOOW cord",
-  "Tray cable, 12/3": "12-3 tray cable",
+  "14/2 UF-B": "14/2 UF-B Copper",
+  "Fire alarm cable, 14/2": "14/2 fire alarm cable Copper",
+  "Fire alarm cable, 16/2": "16/2 fire alarm cable Copper",
+  "SJOOW cord, 14/3": "14/3 SJOOW cord Copper",
+  "SOOW cord, 10/3": "10/3 SOOW cord Copper",
+  "SOOW cord, 12/3": "12/3 SOOW cord Copper",
+  "Tray cable, 12/3": "12/3 tray cable Copper",
   "Crimp sleeve, #2": "#2 crimp sleeve",
-  "Crimp sleeve, 4/0": "#4/0 crimp sleeve",
+  "Crimp sleeve, 4/0": "4/0 crimp sleeve",
   "Din rail": "DIN rail",
   "Caddy clip, 1/2 in": '1/2" conduit clip',
   "Caddy clip, 3/4 in": '3/4" conduit clip',
@@ -292,8 +296,8 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   "Smoke detector interconnect harness": "Detector wiring harness",
 
   // ── Batch 5
-  "18/5 thermostat wire": "18/5 control wire",
-  "18/8 thermostat wire": "18/8 control wire",
+  "18/5 thermostat wire": "18/5 control wire Copper",
+  "18/8 thermostat wire": "18/8 control wire Copper",
   // Velcro is a brand.
   "Velcro cable strap": "Hook-and-loop cable strap",
   "Bath fan, 50 CFM": "Bath exhaust fan, 50 CFM",
@@ -326,13 +330,12 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   // ── Batch 6
   // SE cable by its full conductor set, metal stated. The sheet named no
   // metal; these are stocked in aluminum (wireAndCable.ts).
-  "SER cable, 2-2-2-4": "2-2-2-4 SER AL",
-  "SER cable, 4-4-4-6": "4-4-4-6 SER AL",
-  "SEU cable, 2-2-4": "2-2-4 SEU AL",
-  "SEU cable, 4-4-6": "4-4-6 SEU AL",
-  "USE-2, 4/0": "#4/0 USE-2 AL",
-  "Aluminum URD, 1/0": "1/0 URD triplex AL",
-  '5" LED disc light': '5"/6" LED disc light',
+  "SER cable, 2-2-2-4": "2-2-2-4 SER Aluminum",
+  "SER cable, 4-4-4-6": "4-4-4-6 SER Aluminum",
+  "SEU cable, 2-2-4": "2-2-4 SEU Aluminum",
+  "SEU cable, 4-4-6": "4-4-6 SEU Aluminum",
+  "USE-2, 4/0": "4/0 USE-2 Aluminum",
+  "Aluminum URD, 1/0": "1/0 URD triplex Aluminum",
   ...Object.fromEntries(
     ["15", "30", "45", "75"].map(kva => [
       `Step-down transformer, ${kva} kVA`,

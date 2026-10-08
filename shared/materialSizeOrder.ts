@@ -40,6 +40,10 @@
  * people to pull. Add new sizes in position rather than at the end.
  */
 export const CONDUCTOR_SIZES = [
+  // 22 AWG: security cable ("22/2 security cable"), which until 2026-10-07
+  // grouped with nothing. 20 AWG is deliberately NOT here: "20/2" is the old
+  // two-pole breaker spelling, and the amps branch must keep reading it.
+  "22",
   "18",
   "16",
   "14",
@@ -140,7 +144,12 @@ const DIMENSION = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?=\s)/i;
  * 10 ft" is a diameter and a length, and reading only the length would file it
  * as the plain 10 ft rod.
  */
-const TRAILING = /,\s*(\d+(?:\.\d+)?)\s*(CFM|ft)$/i;
+// An optional diameter before the length — "Ground rod, 5/8\" x 8 ft" (owner,
+// 2026-10-07: three rods, 5/8" x 8, 5/8" x 10, 3/4" x 10). The length leads
+// the order and the diameter breaks a tie, so 5/8" x 10 sorts before 3/4" x
+// 10, which a name tiebreak ("3" < "5") would get backwards.
+const TRAILING =
+  /,\s*(?:(\d+(?:-\d+\/\d+)?(?:\/\d+)?)"\s*x\s*)?(\d+(?:\.\d+)?)\s*(CFM|ft)$/i;
 
 type SizeKey = {
   scale: number;
@@ -174,6 +183,15 @@ function inchesOf(token: string): number | null {
  * evidence of its unit; none of them settles for a bare number.
  */
 function readSize(name: string): SizeKey | null {
+  // A hashed CABLE spec — "#3/4 MC cable Copper": a #3 four-conductor cable,
+  // hashed so it never reads as 3/4 inch (owner, review-sheet Q2d,
+  // 2026-10-07). The count is 1–9, never 0, so "#1/0" stays an aught.
+  const hashedCable = name.match(/^#(\d{1,2})\/([1-9])(?![\d/])/);
+  if (hashedCable) {
+    const key = conductor(hashedCable[1]);
+    if (key) return { ...key, count: Number(hashedCable[2]) };
+  }
+
   // A hashed gauge — "#12 THHN", "#4/0 XHHW AL". Unambiguous.
   const hashed = name.match(/^#(\d{1,4}\/0|\d{1,4})(?![\d/])/);
   if (hashed) return conductor(hashed[1]);
@@ -226,6 +244,21 @@ function readSize(name: string): SizeKey | null {
     if (key) return { ...key, count: Number(cable[2]) };
   }
 
+  // The same cable spec with a SLASH — "12/2 NM-B Copper", "8/3 SER Copper",
+  // "18/2 control wire" — the trade style the catalog moves to (owner,
+  // 2026-10-01; naming plan § 1.3). Before 2026-10-07 these fell through to
+  // the amps branch below and sorted 10/2, 12/2, 14/2 as 10, 12 and 14 AMPS.
+  //
+  // What keeps a breaker out: the gauge must be a CONDUCTOR size, so tandem
+  // "15/20" and "20/2 breaker" (20 is not a gauge here) still reach the amps
+  // branch; the count is 1–9, so "1/0" stays an aught; the lookahead refuses
+  // an inch mark, so `1/2"` stays a trade size.
+  const slashCable = name.match(/^(\d{1,2})\/([1-9])(?![\d/"])/);
+  if (slashCable) {
+    const key = conductor(slashCable[1]);
+    if (key) return { ...key, count: Number(slashCable[2]) };
+  }
+
   // A kcmil element list — "250-250-250 SER AL". Written as three sizes
   // rather than a gauge and a count, so it needs its own branch; the leading
   // element is still what determines how big the cable is.
@@ -273,10 +306,13 @@ function readSize(name: string): SizeKey | null {
   // Last, because it reads the END of the name: a leading size always wins.
   const trailing = name.match(TRAILING);
   if (trailing) {
-    const value = Number(trailing[1]);
-    return trailing[2].toLowerCase() === "cfm"
+    const value = Number(trailing[2]);
+    // Thousandths of an inch, so the diameter tiebreak is an integer.
+    const diameter = trailing[1] ? inchesOf(trailing[1]) : null;
+    const count = diameter === null ? 0 : Math.round(diameter * 1000);
+    return trailing[3].toLowerCase() === "cfm"
       ? { scale: SCALE.airflow, value, count: 0 }
-      : { scale: SCALE.length, value: value * 12, count: 0 };
+      : { scale: SCALE.length, value: value * 12, count };
   }
 
   return null;
@@ -358,6 +394,10 @@ const SIZE_PREFIXES: RegExp[] = [
   /^\d{1,2}(?:-\d{1,2}(?:\/0)?){2,}\s+/,
   // Cable specs — "12-2 NM-B", "14-3 MC cable".
   /^\d{1,4}-\d(?![\d/])\s*/,
+  // The same in the slash form, hashed or not — "12/2 NM-B Copper", "#3/4
+  // MC cable Copper" (2026-10-07). Count 1–9 so "1/0" is not taken; the
+  // lookahead keeps `1/2"` and tandem "15/20" out.
+  /^#?\d{1,2}\/[1-9](?![\d/"])\s*/,
   // A hashed gauge — "#12 THHN".
   /^#\d{1,4}\s+/,
   // Raceway trade size or a plain measurement — "1-1/4\" EMT", "4\" square box".

@@ -3,6 +3,111 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
+
+From `references/track-b-plans-screen-gaps-plan.md`. Each item needs a file
+that Track C's `c-homerun-footage` also changes, so it waits for C to land
+(owner, 2026-10-07: build only in files C does not touch). Gap 1, a run end
+dragged off its mark keeping the old claim, is **DONE by Track C** on
+`c-homerun-footage` (owner, 2026-10-07).
+
+- [ ] **Delete the throwaway `example.com` test accounts from staging before
+      stress testing** (owner, 2026-10-07). Track B's on-screen probes signed
+      up about twenty (`track-b-check-*`, `track-b-upload-*`,
+      `track-b-flash-*`, `track-b-starters-*`); their bids are archived and
+      their plan sets removed, but the app cannot delete an account, so
+      they need removing on the staging database itself, by whoever owns it.
+- [ ] **Track A: rebuild `pricing/assembly-hours-starter.xlsx`** with
+      `pricing/buildStarterSheets.mts`. It was built from the 168 starters;
+      Track B added 15 on 2026-10-07 (GC1–GC5, GR1–GR7, LT31–LT33), so they
+      are not on the sheet the owner is filling in. The hours map is keyed by
+      name, so nothing breaks; they just have no row yet.
+- [ ] **Owner question: can light names.** You suggested names like
+      '4" can light, new construction' / '4" can light, remodel'. Three of
+      the four can lights already shipped under 'Recessed can new
+      construction, 4"/6"' and 'Recessed can retrofit, 6"' (LT5, LT4, LT6),
+      so the new 4" remodel (LT33) is 'Recessed can retrofit, 4"' to match.
+      A starter cannot be renamed in place today: the seeder matches
+      starters by NAME, so a rename adds a second row and leaves the old one
+      on every database, including staging. Renaming all four means a
+      starter-rename path first (like `RENAMED_BASELINE_MATERIALS`, for
+      assemblies). Say if you want it.
+- [ ] **Owner question: Underground warning tape on GR2 and GR5.** The draft
+      gave 1, but the catalog sells it by the foot, so it was left OUT of
+      both (a per-foot line of 1 is now a failing test). Either the length
+      is the trench's and stays with the traced run, or the starter carries
+      a typical length — the owner says which.
+
+- [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
+      2026-10-07). **Reproduced on staging** at laptop and tablet
+      (1180x820, touch) with `scripts/stagingOpenFlash.mts`, which prints
+      `FLASH` today. Screencast frame:
+      `laptop-renewed-0239` — a blank 58x29 white box at the sheet's corner
+      for 1.0–1.2 s, then the full sheet.
+  - **Cause:** `PlanPane`'s load effect (`TakeoffPage.tsx`, the
+    `setLoading(true)` at ~1894) re-runs whenever `doc.url` changes. That
+    happens when a signed link is renewed, or when the plan list refetches
+    with a new link after the cached one has already drawn sheet 1 (leave
+    Plans and come back on a slow connection).
+    - While loading, the canvas wrapper is unmounted (`loading ? null : …`),
+      so a NEW, blank canvas mounts after.
+    - `canvasSize` and `drawnPage` still hold the old raster's values, so
+      `planLoadState({ drawn: canvasSize.width > 0 })` says "sheet" at once.
+    - The browser draws an undrawn canvas at its default 300x150, white from
+      `bg-white`, scaled by the fit zoom, at the sheet's top-left, until the
+      new raster lands.
+    - **The same stale `drawnPage` lets the count pins draw over that blank**
+      (`marksMayShow`), and taps land on it.
+  - **Not reached by a fresh open**, a sheet change, zoom (up to the sharp
+    patch) or a reload with the view restored. All were clean frame by frame
+    on staging, layout AND painted pixels. That is why `2a939d2` looked done:
+    it fixed the first open, and this is the reopen.
+  - **Fix (one place):** in that effect, beside `setLoading(true)`, also
+    `setCanvasSize({ width: 0, height: 0 })` and `setDrawnPage(null)`. The
+    panel then says "Opening plan set…" → "Drawing sheet N…" and the pins
+    wait. Better still, have `planLoadState` take `drawnPage` instead of the
+    canvas size, so the one reset covers both.
+    - Alternative, if a reload should not blank the sheet at all: keep the
+      wrapper mounted across a reload of the SAME document, so the old raster
+      stays in place under the thin "drawing" bar. Bigger change; only if the
+      owner wants no panel on a renewal.
+  - **Tests:**
+    - a `planLoadState.test.ts` case: after a reload starts, the state is
+      "opening", not "sheet", even though a sheet was drawn before;
+    - `stagingOpenFlash.mts` must print "No flash" at both sizes.
+  - **Why not now:** `TakeoffPage.tsx` is on `c-homerun-footage`. A CSS-only
+    workaround (hide a canvas with no `width`) would hide the box and leave
+    the pins floating, so it was not done.
+
+- [ ] **Gap 2: `takeoffRuns.setLocation` has no lock check** — the one run
+      mutation without `refuseIfLocked` (`server/routers/takeoffRunsRouter.ts`).
+      One line. Test: refused on a locked bid. A label, not a number.
+- [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
+      screen (`TakeoffPage.tsx`). No status gate. Owner's call first (plan Q2).
+- [ ] **Gap 4a: "can't be undone" on the undo arrow** when the last change was
+      one undo does not cover (mark status/height/location, legs and tees,
+      circuits, run type, typed length, extras, trace mode, branch wiring,
+      symbol capture, scale, sheet name/number, plan set removal). The
+      wording can live in `client/src/lib/undoStack.ts`, but recording WHICH
+      change happened is in TakeoffPage's mutations — so it is built as one
+      piece, not as a helper nothing calls.
+- [ ] **Gap 4b: undoing a count deleted from several sheets refreshes every
+      sheet** (`client/src/lib/takeoffRefresh.ts` + its test). Today other
+      sheets flash their old marks until refetch (staleTime 0) — a flash, not
+      a lasting wrong number.
+- [ ] **Gap 4c: undo for run type, typed length, circuits, legs**, in that
+      order (TakeoffPage + router).
+- [ ] **Gap 6.1: open the viewer from the file on this machine while it
+      uploads** (`TakeoffPage.tsx`, `planUpload.ts`). Measured on staging
+      2026-10-07 (52.6 MB, 15 pages): the PUT is 11.5–16.4 s of a 16–22 s
+      wait to sheet 1, and the viewer re-reads the file from R2 afterwards.
+      Opening from disk would show sheet 1 in about 2 s.
+
+**Dropped, with the measurement:** Gap 6.2, a "Preparing sheets" line after
+attach. Staging shows no silent stretch: "Finishing…" (0.2 s) → "Opening plan
+set…" (2.9–4.0 s) → "Drawing sheet 1…" (1.4 s), with "Reading sheet numbers
+N of M" beside it.
+
 ## Open tabs keep running the OLD code after a deploy — plan, 2026-09-30
 
 > **BUILT 2026-09-30 on `a-version-bar`: steps 1–4 below.** Bar:
@@ -1063,6 +1168,47 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       symbol learning later. Nothing may export, pool or share it — even the
       anonymised half — until users have agreed to terms that say so. Not
       blocking the log itself; blocking the first read of it.
+- [ ] **Point DV34's recipe at the new surface-raceway names when they are
+      added** (owner, 2026-10-07, review sheet). DV34 is held for four
+      `missingParts` ("Surface raceway, 10 ft", "… device box", "… cover
+      plate", "… entrance fitting"), which the sheet marks SKIP because the
+      waiting Surface Raceway rows cover them under other names ("Surface
+      raceway base/cover, 500/700 series", "Raceway device box, 1-gang",
+      "Raceway entrance end fitting"; a standard wall plate for the cover).
+      When those rows are seeded: replace `missingParts` with `p(...)` lines
+      naming them (server/seed/starterAssemblies.ts, DV34), so DV34 seeds.
+- [ ] **TRACK B: NAMES ARE FROZEN — load the drafted starters now** (owner,
+      2026-10-07). The rename is on local-dev and staging (151 names, in
+      place); the adds follow. Load `references/top-assemblies-draft.md`'s
+      recipes (GC1–GC5, GR1–GR7) through `STARTER_PARTS` keys
+      (`server/seed/starterParts.ts`), never by display name — add a key per
+      new part, valued with the FINAL name. Final names to use, e.g.:
+      `Ground rod, 5/8" x 8 ft`, `#4 bare stranded Copper`,
+      `4/0-4/0-4/0-2/0 SER Aluminum`, `4" canless wafer LED downlight` (the
+      SAME row as LT8 — the new 4" wafer assembly uses it), `2/0 XHHW
+Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
+      drafts marked missing now ship: `Underground warning tape`,
+      `Concrete pole base`, `320A meter base`. Full list:
+      `pricing/frozen-names.json`; what is NOT shipped and why:
+      `shared/frozenAddsHeld.ts`. `server/frozenMaterialNames.test.ts` and
+      `server/starterAssembliesSeed.test.ts` go red on a stale name.
+- [x] **Seed the frozen ADDS** — 2026-10-07: **143 of 153 ship** (+15 rows
+      completing the 3-1/2" family, +5" canless = 159 new rows); 8 were
+      duplicates; 2 declined (QO-only 60A/70A). Reasons in
+      `shared/frozenAddsHeld.ts`. Point DV34 at the surface raceway rows
+      (line above).
+- [x] **Owner questions from the adds** — answered 2026-10-07: wafer
+      variants renamed "N" canless wafer LED downlight, <variant>" (the plain
+      one leads "N wafer"); the 5"/6" disc and retrofit trim split into 5"
+      and 6" (the combined row became the 6", same id).
+- [x] **How a SHIPPED hour says it is an example** — decided by the owner
+      2026-10-07: "Example hours", the price treatment (bid screen only,
+      clears on the shop's edit, warning before printing), shipped together
+      with the hours. Columns in Batch 5 (`migrations-next-batch.md`).
+- [ ] **Build the "Example price" / "Example hours" / "Example rate" tags**
+      (Batch 5 columns + the bid-screen tag + the print warning) — every
+      starter sheet's numbers wait on them (`server/starterValues.test.ts`),
+      and the brand-variant prices also wait on `materials.parentId`.
 - [ ] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while
@@ -1078,7 +1224,9 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       edits that price. One column, `materials.isExamplePrice`, plus the
       line's frozen `snapshotPriceWasExample` (Batch 5;
       `migrations-0098-batch-plan.md` B3, overridden there; CLAUDE.md
-      § "Where a priced catalog lands").
+      § "Where a priced catalog lands"). **Where it shows (owner, Q3,
+      2026-10-07): the bid screen only, never the customer quote; printing
+      or sending warns first when example-priced lines remain.**
 
 - [x] **400 kcmil lug ADDED 2026-09-26 (Track B)** — a single size, because
       above 350 kcmil a compression lug is sold per conductor size (Crescent
@@ -3110,6 +3258,18 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       the pack a part is sold in (a box of 100 wire nuts), because the catalog
       has no pack size yet — `references/material-markup.md` D3. When pack
       sizes land, round there too, in the same function.
+- [ ] **Load drafted starters after names freeze, using final names.**
+      (Owner, 2026-10-07.) Twelve recipes are drafted, not seeded, in
+      `references/top-assemblies-draft.md` § 2b: GC1–GC5 commercial (emergency
+      pack in a troffer, 3-phase panelboard replacement, site pole light,
+      emergency remote head, door-hardware 120V feed) and GR1–GR7
+      residential (old-work switch, 200A underground service, 320/400A
+      service, 50A generator inlet, detached-garage feeder, kitchen and bath
+      20A circuits). Their part names are TODAY's; re-check each against the
+      frozen catalog before seeding (the doc's check script pattern), and add
+      the three ‡ parts (concrete pole base, underground warning tape — used
+      twice — and a 320A class meter base) to the catalog first or leave those starters
+      held. Hours stay not set.
 - [ ] **Starter assemblies: the 168 are IN THE SEED (Track B, 2026-10-06);
       160 are held until Track A's 0122 and 0123.**
       (`references/starter-assemblies-plan.md`,

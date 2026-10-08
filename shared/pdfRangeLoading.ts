@@ -21,6 +21,23 @@
  * visited fetches it then, so there is a brief load where there would have been
  * none. On a set that size that is a far better deal than waiting for the whole
  * thing — and on a set below the threshold, nothing changes.
+ *
+ * ── disableAutoFetch alone did not stop it — measured 2026-10-07 ─────────────
+ * Until 2026-10-07 only `disableAutoFetch` was set, and the paragraph above was
+ * not true. pdf.js has TWO background downloads: auto-fetch (ranges for pages
+ * nobody asked for) and the STREAM — its first request carries no Range header,
+ * and while `disableStream` is false it reads that response to the end. In
+ * pdf.js 5.4 (`pdf.mjs`, PDFFetchStreamReader) the stream is cancelled only
+ * when streaming is disabled and ranges work, and the worker even forces
+ * auto-fetch off BECAUSE streaming covers it (`disableAutoFetch ||=
+ * isStreamingSupported`). So every set of every size was pulled down whole
+ * behind the viewer.
+ *
+ * Measured on staging (R2), the 52.6 MB Decant set: 2.2 MB of ranges drew
+ * sheet 1, and one 200 response with no Range header carried 52.55 MB more —
+ * on the first run it landed BEFORE sheet 1, so the estimator waited for it.
+ * `scripts/stagingUploadTiming.mts` is how; pdfRangeLoading.test.ts pins both
+ * switches, and pins the pdf.js line that makes the stream matter.
  */
 
 /**
@@ -79,7 +96,9 @@ export function pdfRangeLoadOptions(
     url: new URL(url, base),
     rangeChunkSize: PDF_RANGE_CHUNK_BYTES,
     disableRange: false,
-    disableStream: false,
+    // BOTH switches, not one — see "disableAutoFetch alone did not stop it"
+    // above. Off together above the threshold; on together below it.
+    disableStream: shouldDisableAutoFetch(byteSize),
     disableAutoFetch: shouldDisableAutoFetch(byteSize),
   } as const;
 }

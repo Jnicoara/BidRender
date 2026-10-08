@@ -45,9 +45,22 @@ homerun footage code** — the code that reads them, computes the footage and
 reads `bids.homerunRunTypeId` through the run-type resolver (its
 `forkableReferences.test.ts` entry must stop being "unreviewed" first).
 **Status 2026-10-07: the files are on branch `a-batch-c-0125` only — not on
-local-dev, not on staging; C's footage code is not written.** If any other
+local-dev, not on staging; C's footage code is not written.** **0131**
+(`bids.homerunExtraBends`, `takeoff_runs.runsAt`, nullable, no default) is
+planned into the same batch and follows the same rule
+(`migrations-next-batch.md` § 0131). If any other
 migration is applied anywhere shared before they merge, renumber them above
 it first (`migrations-next-batch.md`, Batch C).
+
+**Pairing rule 4 — the new catalog shelves (written 2026-10-07).** The
+catalog adds of 2026-10-07 seed 41 rows onto **Surface Raceway, Underground
+and Service Entrance**, which exist in `materials.category` only since
+**0117**. Live has 0104. A build with those rows booting against a database
+without 0117 fails its seed insert (the enum refuses the value). So 0117 is
+applied on live BEFORE that code — it is already inside the 0105–0124 batch
+below, so the batch rule covers it; never cherry-pick the catalog commits
+ahead of the batch. The catalog RENAME (151 names, in place) needs no
+migration and no pairing.
 
 **Every file 0105–0124 is step 1 (additive).** Apply all twenty BEFORE the
 push, drift before and after, exactly as staging was (`deploying.md` § 11).

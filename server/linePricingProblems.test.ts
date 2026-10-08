@@ -250,11 +250,12 @@ describe("rollUpBid isolation", () => {
       company,
       []
     );
-    expect(result.notPriced).toEqual({ lines: 2, parts: 0 });
+    expect(result.notPriced).toEqual({ lines: 2, parts: 0, hours: 0 });
     expect(result.incomplete).toBe(false);
     expect(rollUpBid(bidRow, [priced], company, []).notPriced).toEqual({
       lines: 0,
       parts: 0,
+      hours: 0,
     });
   });
 
@@ -275,7 +276,7 @@ describe("rollUpBid isolation", () => {
     });
     expect(
       rollUpBid(bidRow, [withPart, handBlank], company, []).notPriced
-    ).toEqual({ lines: 1, parts: 1 });
+    ).toEqual({ lines: 1, parts: 1, hours: 0 });
   });
 });
 

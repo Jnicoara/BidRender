@@ -1,5 +1,9 @@
 # Track B: Plans screen edits (drag points, live distance, undo/clear, PDF loading)
 
+> **2026-10-07: built (pieces a–g, added a–d). What is still open — including
+> a wrong number when a run's END is dragged off or onto a mark — is in
+> `references/track-b-plans-screen-gaps-plan.md`.**
+
 **PLANNED 2026-09-29 on `track-b` at `5f14947` (local-dev, already up to date).
 PLAN ONLY — no code yet. Not merged.**
 

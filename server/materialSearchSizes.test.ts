@@ -187,18 +187,29 @@ describe("counts and cable specs keep working", () => {
   });
 
   it("a cable spec typed with a space, and a conductor inside a spec", () => {
-    expect(search("6 3")[0]).toBe("6-3 NM-B");
-    expect(search("12 2")[0]).toBe("12-2 NM-B");
-    expect(search("2/0 ser")).toContain("2/0-2/0-2/0-1 SER AL");
+    expect(search("6 3")[0]).toBe("6/3 NM-B Copper");
+    expect(search("12 2")[0]).toBe("12/2 NM-B Copper");
+    expect(search("2/0 ser")).toContain("2/0-2/0-2/0-1 SER Aluminum");
   });
 
   it('"12" still finds #12 wire, and "#12" is only the gauge', () => {
-    expect(search("12 thhn")[0]).toBe("#12 THHN");
+    expect(search("12 thhn")[0]).toBe("#12 THHN Copper");
     expect(search("#12").some(n => /under-cabinet/.test(n))).toBe(false);
   });
 
-  it('a dual size is both: "6 wafer" finds the 5"/6" wafer', () => {
-    expect(search("6 wafer")).toContain('5"/6" wafer LED downlight');
+  it('"6 wafer" leads with the plain 6" canless wafer, at every size, and never leaks a size', () => {
+    // Was 'a dual size is both: "6 wafer" finds the 5"/6" wafer' while one
+    // row covered both openings. The owner split them (4" and 6"), then
+    // shipped every size 2"–8" with four variants each (2026-10-07). Named
+    // "6" wafer LED downlight, slim" the variants matched the typed phrase
+    // and led the plain row; the owner had them renamed "6" canless wafer LED
+    // downlight, slim" (third answers) so the plain one leads. This goes red
+    // if it stops.
+    for (const s of ["2", "3", "4", "5", "6", "8"]) {
+      const hits = search(`${s} wafer`).slice(0, 5);
+      onlySize(hits, s);
+      expect(hits[0], `${s} wafer`).toBe(`${s}" canless wafer LED downlight`);
+    }
   });
 });
 

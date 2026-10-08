@@ -92,6 +92,68 @@ async function settled(page: Page) {
   await page.waitForTimeout(1500);
 }
 
+/**
+ * MEASURED, not eyeballed: how many lines each totals label renders on (1 =
+ * no wrap — "Direct cost" and "Bid price" wrapped on laptop, 2026-10-07),
+ * and the text of the Materials and Labor rows (hours belong on Labor only).
+ */
+async function labelLines(page: Page) {
+  return page.evaluate(() => {
+    const out: Record<string, unknown> = {};
+    // Only inside the totals card — the sidebar also says "Materials" and
+    // "Labor rates", and the first version of this read those.
+    const heading = Array.from(
+      document.querySelectorAll("div, h2, h3, p")
+    ).find(el =>
+      /^(bid total|your figures)$/i.test((el.textContent ?? "").trim())
+    );
+    let card: Element | null | undefined = heading?.parentElement;
+    while (card && !/Direct cost/.test(card.textContent ?? ""))
+      card = card.parentElement;
+    if (!card) return { error: "no totals card found" };
+    const labels = ["Materials", "Direct cost", "Bid price", "Total due"];
+    for (const el of Array.from(card.querySelectorAll("span"))) {
+      const text = (el.textContent ?? "").trim();
+      const label = labels.find(l => text === l || text.startsWith(`${l} `));
+      if (!label || out[label] !== undefined) continue;
+      if (el.children.length > 1) continue;
+      const lh = parseFloat(getComputedStyle(el).lineHeight) || 16;
+      out[label] = Math.round(el.getBoundingClientRect().height / lh);
+      if (label === "Materials")
+        out.materialsRow = el.parentElement?.textContent?.trim();
+    }
+    const labor = Array.from(card.querySelectorAll("span")).find(s =>
+      (s.textContent ?? "").trim().startsWith("Labor")
+    );
+    out.laborRow = labor?.parentElement?.textContent?.trim();
+    return out;
+  });
+}
+
+/**
+ * The "Most used" row, MEASURED: absent, or present with its chips in order
+ * and the height of the first chip (44 px on touch, the tap-target rule).
+ */
+async function mostUsedRow(page: Page) {
+  return page.evaluate(() => {
+    const label = Array.from(document.querySelectorAll("div")).find(
+      d => (d.textContent ?? "").trim() === "Most used"
+    );
+    if (!label) return { present: false };
+    const chips = Array.from(
+      label.parentElement?.querySelectorAll("button") ?? []
+    );
+    return {
+      present: true,
+      chips: chips.map(c => (c.textContent ?? "").trim()),
+      chipHeight: Math.round(chips[0]?.getBoundingClientRect().height ?? 0),
+    };
+  });
+}
+
+/** Bids the "Most used" phase adds — archived in cleanup with the first. */
+const extraBids: number[] = [];
+
 const browser = await launchChrome();
 const laptop = {
   name: "laptop",
@@ -180,9 +242,16 @@ try {
 
     await go(page, `/bids/${bid.id}`);
     await shot("bid");
+    // ONE bid so far: the "Most used" row must not exist at all (< 3 bids).
+    console.log(
+      `${size.name} most used before 3 bids: ${JSON.stringify(await mostUsedRow(page))}`
+    );
     // "Bid price" is always there; "Total due" only once sales tax is set up.
     await page.getByText("Bid price").first().scrollIntoViewIfNeeded();
     await shot("bid-totals");
+    console.log(
+      `${size.name} bid totals: ${JSON.stringify(await labelLines(page))}`
+    );
 
     await page.getByRole("button", { name: /^Send/ }).click();
     // "quoteapp.panel" is an INTERNAL-tier feature: a fresh account does not
@@ -208,6 +277,9 @@ try {
 
     await go(page, `/bids/${bid.id}/proposal`);
     await shot("proposal");
+    console.log(
+      `${size.name} proposal figures: ${JSON.stringify(await labelLines(page))}`
+    );
 
     await go(page, "/library/assemblies");
     await page.getByPlaceholder("Search assemblies…").fill(`${stamp}`);
@@ -250,11 +322,81 @@ try {
     await shot("import-preview");
     await ctx.close();
   }
+
+  // ── "Most used": two more bids make three, and the row appears ───────────
+  const api = await (
+    await browser.newContext({ storageState: state })
+  ).newPage();
+  await api.goto(`${BASE}/`);
+  for (const assemblyIds of [[laborOnly.id, unsaid.id], [laborOnly.id]]) {
+    const b = await trpc(api, "bids.create", {
+      name: `Track B check ${stamp} more`,
+    });
+    extraBids.push(b.id);
+    for (const assemblyId of assemblyIds)
+      await trpc(api, "bids.addAssembly", { bidId: b.id, assemblyId });
+  }
+  for (const size of [laptop, tablet]) {
+    const ctx = await browser.newContext({
+      viewport: { width: size.width, height: size.height },
+      deviceScaleFactor: size.dpr,
+      hasTouch: size.touch,
+      isMobile: size.mobile,
+      serviceWorkers: "block",
+      storageState: state,
+    });
+    const page = await ctx.newPage();
+    await go(page, `/bids/${bid.id}`);
+    console.log(
+      `${size.name} most used after 3 bids: ${JSON.stringify(await mostUsedRow(page))}`
+    );
+    await page.screenshot({ path: `${OUT}/${size.name}-most-used.png` });
+    if (size === laptop) {
+      // One click on the top chip adds that assembly as a line.
+      const before = (await trpc(api, "bids.get", { id: bid.id }, false)).lines
+        .length;
+      await page.getByRole("button", { name: LABOR_ONLY }).first().click();
+      await page.waitForTimeout(1500);
+      const after = (await trpc(api, "bids.get", { id: bid.id }, false)).lines
+        .length;
+      console.log(`laptop chip click: lines ${before} -> ${after}`);
+    }
+
+    // Quick bid ("Count"): the same row, the same rules.
+    await go(page, `/bids/${bid.id}/count`);
+    console.log(
+      `${size.name} quick bid most used: ${JSON.stringify(await mostUsedRow(page))}`
+    );
+    await page.screenshot({ path: `${OUT}/${size.name}-quick-bid.png` });
+    await page.getByLabel("Search assemblies to count").fill("x");
+    await page.waitForTimeout(400);
+    console.log(
+      `${size.name} quick bid while typing: ${JSON.stringify(await mostUsedRow(page))}`
+    );
+    await page.getByLabel("Search assemblies to count").fill("");
+    await page.waitForTimeout(400);
+    if (size === laptop) {
+      // Quick bid MERGES a repeat into its line, so the quantity rises.
+      const qtyOf = async () =>
+        (await trpc(api, "bids.get", { id: bid.id }, false)).lines.reduce(
+          (s: number, l: { qty: string }) => s + Number(l.qty),
+          0
+        );
+      const before = await qtyOf();
+      await page.getByRole("button", { name: LABOR_ONLY }).first().click();
+      await page.waitForTimeout(1500);
+      console.log(
+        `laptop quick bid chip click: total qty ${before} -> ${await qtyOf()}`
+      );
+    }
+    await ctx.close();
+  }
 } finally {
   // Clean up through the app, in the throwaway account only.
   const ctx = await browser.newContext({ storageState: state });
   const page = await ctx.newPage();
   await trpc(page, "bids.archive", { id: bid.id });
+  for (const id of extraBids) await trpc(page, "bids.archive", { id });
   for (const a of [notSet, laborOnly, unsaid]) {
     await trpc(page, "assemblies.archive", { id: a.id }).catch(() => undefined);
     await trpc(page, "assemblies.deleteForever", { id: a.id }).catch(e =>

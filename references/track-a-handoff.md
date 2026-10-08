@@ -4,7 +4,119 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 9) — read this first
+## UPDATE 2026-10-07 (session 15) — read this first
+
+- **"Example hours" decided** (owner): the price treatment, shipped with the
+  hours, never alone. Plan § "Shipped HOURS" + Batch 5 columns.
+- **Four starter sheets**, all built by `pricing/buildStarterSheets.mts`,
+  all loadable by `pricing/loadStarterSheets.mts` (`--prices`, `--labor`,
+  `--brands`, `--assembly-hours`; dry run unless `--write`), all with a
+  "Residential / Commercial / Both" column:
+  `pricing/starter-catalog-pricing.xlsx` (1,715),
+  `pricing/labor-units-starter.xlsx` (1,715),
+  `pricing/brand-variants-pricing.xlsx` (508; 11 left off, parent declined),
+  `pricing/assembly-hours-starter.xlsx` (168, top-30 lists first).
+- Everything loaded stays inert until its tag exists
+  (`server/starterValues.test.ts`); brand prices also wait on
+  `materials.parentId`.
+
+## UPDATE 2026-10-07 (session 14)
+
+- **Wafer variants renamed** `N" canless wafer LED downlight, <variant>` —
+  the plain canless leads "N wafer" at every size (test pinned). **5"/6"
+  disc and retrofit trim split** into 5" and 6": the combined rows became
+  the 6" (same ids). On staging only the trim was used — 3 starter recipe
+  lines, all 6" jobs; 0 company copies, 0 bid lines.
+- **Example loaded rates APPROVED** (plan § 3b): still in Batch 5, shipped
+  only together with `isExampleRate`.
+- **File loader BUILT**: `pricing/loadStarterSheets.mts` → the seed
+  (`server/seed/materials/starterPrices.ts`, `starterLaborUnits.ts`, empty).
+  Labor hours now re-stamp on shipped rows like price. Inert until tagged —
+  `server/starterValues.test.ts`.
+- **Sheets for the owner**: `pricing/starter-catalog-pricing.xlsx`,
+  `pricing/labor-units-starter.xlsx` (`pricing/buildStarterSheets.mts`,
+  1,715 rows, most-used first, pack price, no store/date).
+- Open: how shipped labor HOURS say "example" (todo.md).
+
+## UPDATE 2026-10-07 (session 13)
+
+- **Adds on staging (`f440576`), CI full suite + deploy + smoke green.**
+  Staging 1,554 → **1,713** (159 added, 0 deleted, 0 renamed), every
+  reference identical, the 227 earlier bid lines identical (full-row hash),
+  LT8 #871 / LT7 #872 on the 4" / 6" canless wafers. **VERDICT CLEAN.**
+  Second restart: measured on the docs push after it (see the plan file).
+- **Owner's answers applied:** 3-1/2" full family for EMT + PVC Sch 40;
+  150–200A two-pole + 100–200A main breakers; every wafer / canless size
+  2"–8" its own item (+ slim, gimbal, wet, CCT) and CCT discs 4"–7";
+  "Surface raceway (wire mold), low voltage"; "wire mold"/"wiremold" on every
+  surface raceway item. Declined: QO-only 60A/70A. 143 of 153 frozen adds
+  ship; 8 duplicates; `shared/frozenAddsHeld.ts` has every reason.
+- **Open owner questions** (todo.md): "6 wafer" lists the four variants before
+  the plain canless 6"; the plain 5"/6" disc and 5"/6" retrofit trim are
+  still one row for two sizes.
+- **Part 2 plan:** `references/starter-vs-company-plan.md` — what reaches
+  every account vs one company; file loader now, admin screen later;
+  example LOADED labor rates (columns in Batch 5, no migration).
+- CI caught two things the local subset could not: the British "colour" in
+  a search word, and a typo test that used 175A as "a size we do not ship".
+
+## UPDATE 2026-10-07 (session 12)
+
+- **The rename is on staging** (`47f0942`): backup first, then merged, Gate +
+  deploy + smoke green, and staging checked directly — **VERDICT CLEAN**
+  (`materials-review-sheet-plan.md` § Order, step 8).
+- **The adds:** 86 of 153 seeded; 8 duplicates of shipped rows; **59 held
+  for the owner** with reasons in `shared/frozenAddsHeld.ts`. The three new
+  wire items ship with "Copper" (owner). The new shelves need **0117** — on
+  staging, NOT live: pairing rule 4 in `live-release-plan.md`.
+- **Search fix that came with them:** the head noun of a wire is the word
+  before its metal (`queryTier`) — "ser" had led with Service mast.
+- **Correction:** the session-11 rehearsal's "209 bid lines byte-identical"
+  used a `GROUP_CONCAT` digest truncated at 1,024 bytes. Staging was
+  checked with a full-row hash instead.
+- **Track C 0131** planned (not written, not merged): `bids.homerunExtraBends`
+  - `takeoff_runs.runsAt`, nullable, no DB default — "default 1,
+    unconfirmed" is NULL read by C's code. Batch 5 moves to 0132.
+- **Track B told** (todo.md): names frozen, load the drafted starters by
+  part key with final names.
+- **Open for the owner:** the 59 held adds (four questions, in
+  `frozenAddsHeld.ts`).
+
+## UPDATE 2026-10-07 (session 11)
+
+- **STOPPED BEFORE STAGING, as asked. The rename is on branch `a-rename`
+  (`3a6423e`), NOT on local-dev** — pushing local-dev deploys staging, and
+  the rename runs on a server start. Gate on `a-rename` green (no deploy).
+  To ship it to staging (owner's OK first): back up staging, merge
+  `a-rename` into local-dev, push, then re-run the compare against staging
+  (`materials-review-sheet-plan.md` § Order, step 9).
+- **On local-dev and staging (`a0ac3f6`, Gate + deploy + smoke green):** the
+  names freeze (`pricing/frozen-names.json`, read back by
+  `pricing/readMaterialsReview.mts`), the root fix for case-only name twins
+  (`server/seedNameCase.test.ts`, red on the old code), the size reader for
+  `5/8" x 8 ft`, and the multi-supplier answers (plan only).
+- **Rehearsed on a local copy of staging's data: VERDICT CLEAN** — 151 rows
+  renamed by id, nothing added or deleted, all 839 starter lines and the run
+  types' wire on the same ids, 209 saved bid lines byte-identical, a second
+  boot changes nothing; 257 of 258 old spellings find the renamed row first.
+- **Next for A:** owner's OK for staging; then the 153 adds (todo.md); then
+  regenerate the pricing sheet (naming plan § 5.1).
+- `fe2d3c0`'s Gate rerun: tests green; its deploy step correctly refused
+  (staging had moved past it). Every later run includes it.
+
+## UPDATE 2026-10-07 (session 10)
+
+- **Size reader landed** (`d86043b`, local-dev): 12/2, #3/4, bare 1/0 and
+  22 AWG read; the current names are unchanged.
+- **Sheet:** the owner's second answers are marked. Measured: 151 renames,
+  153 adds, 0 shipped rows cut, all Excel warnings 0.
+- **Name-lookup audit and the freeze/rename ORDER** are in
+  `materials-review-sheet-plan.md` (approved in session 11).
+- **Wafers:** 4" → `4" canless wafer LED downlight` and 5"/6" → `6" canless
+wafer LED downlight`, both renamed in place. LT8 and LT7 follow through
+  their ids; LT7 is the only user of the 5"/6" row.
+
+## UPDATE 2026-10-07 (session 9)
 
 | What              | State                                                                                                                                                                                                                                                                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

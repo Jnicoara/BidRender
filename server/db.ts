@@ -231,6 +231,7 @@ import {
   type StarterHold,
 } from "./seed/assemblyRecipe";
 import { starterPartName } from "./seed/starterParts";
+import { STARTER_ASSEMBLY_HOURS } from "./seed/starterAssemblyHours";
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import {
@@ -1442,11 +1443,20 @@ async function dedupeBaselineRows(
   const db = await getDb();
   if (!db) return;
   // Table name is a compile-time constant from the union above, never user input.
+  //
+  // ── BINARY: a duplicate is the SAME name, not the same name ignoring case ───
+  // The columns are utf8mb4_unicode_ci, so a plain GROUP BY folds case: a
+  // shipped "4/0-3 SER Aluminum" and a retired "4/0-3 SER aluminum" grouped
+  // as one name, and the higher id was DELETED — cascading its starter recipe
+  // lines with it — then re-inserted by the seed and deleted again on the next
+  // start (audit 2026-10-07, references/materials-review-sheet-plan.md). The
+  // seed itself matches names exactly (JS Sets), so this must too.
+  // server/seedNameCase.test.ts goes red without the BINARY.
   const result = await db.execute(
     sql.raw(
       `SELECT 1 FROM \`${table}\`
      WHERE userId IS NULL
-     GROUP BY name HAVING COUNT(*) > 1
+     GROUP BY BINARY name HAVING COUNT(*) > 1
      LIMIT 1`
     )
   );
@@ -1461,11 +1471,11 @@ async function dedupeBaselineRows(
     sql.raw(
       `DELETE dupe FROM \`${table}\` dupe
      JOIN (
-       SELECT name, MIN(id) AS keepId FROM \`${table}\`
+       SELECT BINARY name AS exactName, MIN(id) AS keepId FROM \`${table}\`
        WHERE userId IS NULL
-       GROUP BY name HAVING COUNT(*) > 1
+       GROUP BY BINARY name HAVING COUNT(*) > 1
      ) keeper
-       ON dupe.name = keeper.name AND dupe.id > keeper.keepId
+       ON BINARY dupe.name = keeper.exactName AND dupe.id > keeper.keepId
      WHERE dupe.userId IS NULL`
     )
   );
@@ -1978,14 +1988,18 @@ async function renameBaselineMaterials(): Promise<void> {
   const entries = Object.entries(RENAMED_BASELINE_MATERIALS);
   if (entries.length === 0) return;
 
-  const baselineNames = new Set(
-    (
-      await db
-        .select({ name: materials.name })
-        .from(materials)
-        .where(isNull(materials.userId))
-    ).map(row => row.name)
-  );
+  // Matched in JS, exactly, and written BY ID: the column ignores case, so
+  // `WHERE name = from` would also rename a row whose name differs from
+  // `from` only in capitals (see dedupeBaselineRows).
+  const baselineRows = await db
+    .select({ id: materials.id, name: materials.name })
+    .from(materials)
+    .where(isNull(materials.userId));
+  const idsByName = new Map<string, number[]>();
+  for (const row of baselineRows) {
+    idsByName.set(row.name, [...(idsByName.get(row.name) ?? []), row.id]);
+  }
+  const baselineNames = new Set(idsByName.keys());
 
   for (const [from, to] of entries) {
     if (!baselineNames.has(from)) continue; // already renamed, or never existed
@@ -2000,12 +2014,15 @@ async function renameBaselineMaterials(): Promise<void> {
       );
       continue;
     }
+    const ids = idsByName.get(from) ?? [];
     await db
       .update(materials)
       .set({ name: to })
-      .where(and(eq(materials.name, from), isNull(materials.userId)));
+      .where(and(inArray(materials.id, ids), isNull(materials.userId)));
     baselineNames.delete(from);
     baselineNames.add(to);
+    idsByName.delete(from);
+    idsByName.set(to, ids);
   }
 }
 
@@ -2026,16 +2043,22 @@ async function retireBaselineMaterials(retired: string[]): Promise<number> {
   if (!db) return 0;
   if (retired.length === 0) return 0;
 
-  const due = await db
-    .select({ id: materials.id })
-    .from(materials)
-    .where(
-      and(
-        isNull(materials.userId),
-        inArray(materials.name, retired),
-        eq(materials.isActive, true)
+  // The SQL match ignores case (utf8mb4_unicode_ci), so it is narrowed to the
+  // exact name here: retiring "4/0-3 SER aluminum" must not switch off a
+  // shipped "4/0-3 SER Aluminum" (see dedupeBaselineRows).
+  const exact = new Set(retired);
+  const due = (
+    await db
+      .select({ id: materials.id, name: materials.name })
+      .from(materials)
+      .where(
+        and(
+          isNull(materials.userId),
+          inArray(materials.name, retired),
+          eq(materials.isActive, true)
+        )
       )
-    );
+  ).filter(row => exact.has(row.name));
   if (due.length === 0) return 0;
 
   await db
@@ -2146,6 +2169,9 @@ export async function seedBaselineMaterialsFrom(
       trade: m.trade ?? "electrical",
       defaultQty: m.defaultQty != null ? m.defaultQty.toFixed(4) : null,
       ...racewayColumns(m),
+      // From the starter labor sheet (starterLaborUnits.ts); NULL = not set.
+      laborHours: m.laborHours ?? null,
+      fieldBendLaborHours: m.fieldBendLaborHours ?? null,
       userId: null,
     }));
 
@@ -2249,6 +2275,8 @@ async function backfillMaterialMetadata(
       stickJoint: materials.stickJoint,
       strapSpacingFeet: materials.strapSpacingFeet,
       strapFromBoxFeet: materials.strapFromBoxFeet,
+      laborHours: materials.laborHours,
+      fieldBendLaborHours: materials.fieldBendLaborHours,
     })
     .from(materials)
     .where(isNull(materials.userId));
@@ -2293,6 +2321,19 @@ async function backfillMaterialMetadata(
     }
     if (row.stickJoint !== wantRaceway.stickJoint) {
       patch.stickJoint = wantRaceway.stickJoint;
+    }
+
+    // Labor units, from the starter labor sheet (pricing/loadStarterSheets
+    // .mts) — re-stamped like the price, so a value loaded into the seed
+    // reaches every existing database on its next start. SHIPPED rows only,
+    // as everything in this pass: a company's own hours live on its fork and
+    // are never in this loop. Added 2026-10-07; measured that day, staging's
+    // 1,713 shipped rows held no hours at all, so the first run changes
+    // nothing. NULL compared as NULL, numbers numerically.
+    for (const key of ["laborHours", "fieldBendLaborHours"] as const) {
+      const want = intended[key] ?? null;
+      const have = row[key] === null ? null : Number(row[key]);
+      if (have !== (want === null ? null : Number(want))) patch[key] = want;
     }
 
     if (Object.keys(patch).length > 0) {
@@ -3024,6 +3065,63 @@ export type AssemblyDetail = Assembly & {
 };
 
 /** Starter assemblies plus the user's own, forked starters collapsed away. */
+/**
+ * The raw facts behind "Most used" (shared/mostUsed.ts): each assembly used
+ * on each of the company's bids since `since`, and how many bids the company
+ * has made in that time (the 3-bid threshold).
+ *
+ * Archived lines, archived bids and the SAMPLE bid are left out — a sample
+ * every new account gets would otherwise put its assemblies on top for
+ * everyone. Grouped per (assembly, bid) so the ranking counts BIDS, not
+ * lines. `bid_line_items.assemblyId` is a foreign key, so it is indexed.
+ */
+export async function getAssemblyUses(
+  userId: number,
+  since: Date
+): Promise<{
+  uses: { assemblyId: number; bidId: number; usedAt: Date }[];
+  bidCount: number;
+}> {
+  const db = await getDb();
+  if (!db) return { uses: [], bidCount: 0 };
+  const liveBid = and(
+    eq(bids.userId, userId),
+    isNull(bids.archivedAt),
+    eq(bids.isSample, false)
+  );
+  const [rows, [count]] = await Promise.all([
+    db
+      .select({
+        assemblyId: bidLineItems.assemblyId,
+        bidId: bidLineItems.bidId,
+        usedAt: sql<Date | string>`MAX(${bidLineItems.snapshotAt})`,
+      })
+      .from(bidLineItems)
+      .innerJoin(bids, eq(bids.id, bidLineItems.bidId))
+      .where(
+        and(
+          liveBid,
+          isNull(bidLineItems.archivedAt),
+          isNotNull(bidLineItems.assemblyId),
+          gte(bidLineItems.snapshotAt, since)
+        )
+      )
+      .groupBy(bidLineItems.assemblyId, bidLineItems.bidId),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(bids)
+      .where(and(liveBid, gte(bids.createdAt, since))),
+  ]);
+  return {
+    uses: rows.map(row => ({
+      assemblyId: row.assemblyId as number,
+      bidId: row.bidId,
+      usedAt: new Date(row.usedAt),
+    })),
+    bidCount: Number(count?.n ?? 0),
+  };
+}
+
 export async function getLibraryAssemblies(
   userId: number,
   status: LibraryStatus = "active"
@@ -3640,7 +3738,12 @@ export function assemblyHoursColumnValue(
 function starterHoursValue(
   spec: BaselineAssembly
 ): InsertAssembly["baseLaborHours"] {
-  return assemblyHoursColumnValue(spec.baseLaborHours, `"${spec.name}"`);
+  // The owner's starter hours sheet wins over the seed entry when it names
+  // this starter (server/seed/starterAssemblyHours.ts).
+  const sheet = STARTER_ASSEMBLY_HOURS[spec.name];
+  return sheet !== undefined
+    ? sheet
+    : assemblyHoursColumnValue(spec.baseLaborHours, `"${spec.name}"`);
 }
 
 export async function seedBaselineAssemblies(
@@ -3759,6 +3862,65 @@ export async function seedBaselineAssemblies(
       .from(assemblies)
       .where(isNull(assemblies.userId));
     const alreadySeeded = new Set(existingRows.map(row => row.name));
+
+    /**
+     * RE-STAMP the residential / commercial / both tag (`projectType`) on
+     * the SHARED starter rows from the seed, so a tag fixed in the seed file
+     * reaches databases already seeded (owner, 2026-10-07: DR1, DR2, DR16,
+     * DR17 → both). Same shape as the materials re-stamp of `category`:
+     * shared rows only (`userId IS NULL`) — a company's fork keeps its own
+     * tag — and only where it differs. Safe to repeat every start: the tag
+     * decides what a picker SHOWS, never what anything costs.
+     */
+    // One UPDATE per tag, not one per starter: this runs on every start.
+    const namesByTag = new Map<
+      NonNullable<BaselineAssembly["projectType"]>,
+      string[]
+    >();
+    for (const spec of specs) {
+      if (!alreadySeeded.has(spec.name) || spec.projectType === null) continue;
+      namesByTag.set(spec.projectType, [
+        ...(namesByTag.get(spec.projectType) ?? []),
+        spec.name,
+      ]);
+    }
+    for (const [tag, names] of Array.from(namesByTag.entries())) {
+      await db
+        .update(assemblies)
+        .set({ projectType: tag })
+        .where(
+          and(
+            isNull(assemblies.userId),
+            inArray(assemblies.name, names),
+            sql`NOT (${assemblies.projectType} <=> ${tag})`
+          )
+        );
+    }
+
+    /**
+     * RE-STAMP base hours from the owner's starter hours sheet
+     * (server/seed/starterAssemblyHours.ts, written by
+     * pricing/loadStarterSheets.mts) — for the starters LISTED there and no
+     * other, so a starter nobody filled in keeps whatever it has. Shared
+     * rows only; a company's fork has its own hours and is never in this
+     * pass. A sent bid never moves: its lines froze their hours. Inert while
+     * the map is empty (server/starterValues.test.ts keeps it empty until
+     * "Example hours" exists). Added 2026-10-07.
+     */
+    for (const spec of specs) {
+      const hours = STARTER_ASSEMBLY_HOURS[spec.name];
+      if (hours === undefined || !alreadySeeded.has(spec.name)) continue;
+      await db
+        .update(assemblies)
+        .set({ baseLaborHours: hours })
+        .where(
+          and(
+            isNull(assemblies.userId),
+            eq(assemblies.name, spec.name),
+            sql`NOT (${assemblies.baseLaborHours} <=> ${hours})`
+          )
+        );
+    }
 
     /**
      * Tick "Labor only" on a shipped starter that ships ticked but was seeded
@@ -11589,13 +11751,13 @@ function costSums(productivityPct: number) {
       only" (0106): its $0 material is an answer. `<=> TRUE`, so NULL and
       false both stay "not said". The live-recipe branch below says the same.
     */
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) ELSE 0 END), 0)`,
     /*
-      And a line whose HOURS are not set (NULL frozen from an assembly with
-      hours not set, D1) counts ONE more — `lineHoursNotSet` in
-      `linePartsNotPriced`. Counted whether or not the line froze its parts,
-      because the live-recipe path below counts parts only.
+      Lines whose HOURS were not set (D1) — `lineHoursMissing`: an assembly
+      line, not "Not priced" as a whole, with NULL frozen hours. Its OWN
+      count, never folded into parts (owner, 2026-10-07).
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) + (CASE WHEN ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END) ELSE 0 END), 0)`,
+    hoursMissing: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -11755,6 +11917,7 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     notPriced: {
       lines: Number(row.notPricedLines),
       parts: Number(row.frozenParts),
+      hours: Number(row.hoursMissing),
     },
   };
 }
@@ -12101,6 +12264,7 @@ export async function getDashboardBids(
     notPriced: {
       lines: Number(row.notPricedLines),
       parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
+      hours: Number(row.hoursMissing),
     },
     planLines: Number(row.planLines),
     plans: {

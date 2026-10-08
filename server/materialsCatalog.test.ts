@@ -131,16 +131,13 @@ describe("shipped catalog shape", () => {
   });
 
   /**
-   * Shelves migration 0117 made BEFORE Track C's rows for them ship (step 1:
-   * the column first). Their 50 rows wait in pricing/rows.json. A TRIPWIRE,
-   * not an exemption: the case below goes red as soon as C seeds a row onto
-   * one, and the name then comes off this list.
+   * Shelves a migration made BEFORE their rows ship (step 1: the column
+   * first). A TRIPWIRE, not an exemption: the case below goes red as soon as
+   * a row lands on one, and the name then comes off this list. Empty since
+   * 2026-10-07, when 0117's three shelves (Surface Raceway, Underground,
+   * Service Entrance) got their rows (seed/materials/raceUndergroundService.ts).
    */
-  const AWAITING_ROWS: readonly (typeof MATERIAL_CATEGORIES)[number][] = [
-    "Surface Raceway",
-    "Underground",
-    "Service Entrance",
-  ];
+  const AWAITING_ROWS: readonly (typeof MATERIAL_CATEGORIES)[number][] = [];
 
   it("fills every shelf it declares", () => {
     // An empty category renders as nothing and is dead weight in the picker.
@@ -191,8 +188,15 @@ describe("every part the bend count can ask for is shipped", () => {
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   it("reads a size and family off every rigid raceway row", () => {
-    // 5 rigid families x 9 trade sizes, + 2 flex families x 4 sizes.
-    expect(raceways).toHaveLength(53);
+    // 5 rigid families x 9 trade sizes, + 3-1/2" for EMT and PVC Sch 40
+    // (2026-10-07), + 2 flex families x 4 sizes.
+    expect(raceways).toHaveLength(55);
+    expect(
+      raceways
+        .filter(r => r.size === '3-1/2"')
+        .map(r => r.family)
+        .sort()
+    ).toEqual(["EMT", "PVC Sch 40"]);
   });
 
   it("ships a 90, a 45 and every body shape for every rigid raceway", () => {
@@ -217,10 +221,21 @@ describe("every part the bend count can ask for is shipped", () => {
   it("ships the PVC sweep matrix, and nothing outside it", () => {
     // Plan § 8 (owner, 2026-09-29): 1"–4", 90 and 45, 24" and 36" radius,
     // Schedule 40 and 80 = 56. Built through `sweepName`, so a run type's
-    // override and any later lookup find the same spelling.
+    // override and any later lookup find the same spelling. Plus 3-1/2" on
+    // Schedule 40 only (owner, 2026-10-07: 3-1/2" a full size for EMT and
+    // PVC Sch 40) = 60.
     const want: string[] = [];
     for (const family of ["PVC Sch 40", "PVC Sch 80"])
-      for (const size of ['1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'])
+      for (const size of [
+        '1"',
+        '1-1/4"',
+        '1-1/2"',
+        '2"',
+        '2-1/2"',
+        '3"',
+        ...(family === "PVC Sch 40" ? ['3-1/2"'] : []),
+        '4"',
+      ])
         for (const angle of [90, 45] as const)
           for (const radius of [24, 36])
             want.push(sweepName(size, family, angle, radius));
@@ -323,39 +338,53 @@ describe("alias hygiene across the whole catalog", () => {
     expect(byName.get("LED tape light")?.unitOfSale).toBe("foot");
   });
 
-  it("writes a stated metal as AL / CU, and keeps the full word findable", () => {
-    // Owner's decision, 2026-09-25 (wireAndCable.ts header). A new row
-    // written "… aluminum" would split its family from the renamed ones.
-    const spelled = BASELINE_MATERIALS.filter(m =>
-      /\b(aluminum|aluminium|copper)\b/i.test(m.name)
+  it("spells every wire's metal out at the END of its name, and keeps AL / CU findable", () => {
+    // Owner's naming rule, frozen 2026-10-07 (wireAndCable.ts header). It
+    // REPLACED the 2026-09-25 rule this test used to pin — metal written AL /
+    // CU, copper left unsaid — so the assertion is the same shape turned
+    // round: a row written the old way would split its family from the
+    // renamed ones.
+    const shortForm = BASELINE_MATERIALS.filter(m =>
+      /\b(AL|CU)\b/.test(m.name)
     ).map(m => m.name);
-    expect(spelled).toEqual([]);
+    expect(shortForm).toEqual([]);
 
-    const unfindable = BASELINE_MATERIALS.filter(m => {
-      const words = m.searchAliases.toLowerCase().split(/\s+/);
-      if (/\bAL\b/.test(m.name)) return !words.includes("aluminum");
-      if (/\bCU\b/.test(m.name)) return !words.includes("copper");
-      return false;
-    }).map(m => m.name);
+    const unstated = BASELINE_MATERIALS.filter(
+      m => m.category === "Wire & Cable" && !/ (Copper|Aluminum)$/.test(m.name)
+    ).map(m => m.name);
+    expect(unstated).toEqual([]);
+
+    // The short word a supply house writes still finds an aluminum row.
+    const unfindable = BASELINE_MATERIALS.filter(
+      m =>
+        / Aluminum$/.test(m.name) &&
+        !m.searchAliases.toLowerCase().split(/\s+/).includes("al")
+    ).map(m => m.name);
     expect(unfindable).toEqual([]);
   });
 
   it("names every SER cable by its full conductor set, never '-3' shorthand", () => {
     // The shorthand hides the ground size, which is the number that tells two
     // similar cables apart; it is how 4/0-3 and 4/0-4/0-4/0-2/0 once shipped as
-    // two rows for one cable (owner's decision 2026-09-25, wireAndCable.ts).
+    // two rows for one cable (owner's decision 2026-09-25, wireAndCable.ts;
+    // re-confirmed 2026-10-07 when the review sheet proposed "/3" back).
     const shorthand = BASELINE_MATERIALS.filter(m =>
       /^[\d/]+-\d (SER|SEU)\b/.test(m.name)
     ).map(m => m.name);
     expect(shorthand).toEqual([]);
+    const slashShort = BASELINE_MATERIALS.filter(m =>
+      /^\d+\/\d (SER|SEU)\b/.test(m.name)
+    ).map(m => m.name);
+    expect(slashShort).toEqual([]);
     // ...and the old spelling still finds the row.
     const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
     for (const [full, short] of [
-      ["8-8-8-8 SER CU", "8-3"],
-      ["1-1-1-3 SER CU", "1-3"],
-      ["3/0-3/0-3/0-1/0 SER AL", "3/0-3"],
+      ["8-8-8-8 SER Copper", "8-3"],
+      ["1-1-1-3 SER Copper", "1-3"],
+      ["3/0-3/0-3/0-1/0 SER Aluminum", "3/0-3"],
+      ["4/0-4/0-4/0-2/0 SER Aluminum", "4/0-3"],
     ]) {
-      expect(byName.get(full)?.searchAliases.split(" ")).toContain(short);
+      expect(byName.get(full)?.searchAliases.split(" "), full).toContain(short);
     }
   });
 
@@ -363,19 +392,42 @@ describe("alias hygiene across the whole catalog", () => {
     // "4/0-3" was the four-wire cable in shorthand — a duplicate, retired
     // 2026-09-25. The three-wire 4/0-4/0-2/0 is a different cable.
     const names = BASELINE_MATERIALS.map(m => m.name);
-    expect(names).toContain("4/0-4/0-2/0 SER AL");
-    expect(names).toContain("4/0-4/0-4/0-2/0 SER AL");
-    expect(names.filter(n => /^4\/0-3 SER/.test(n))).toEqual([]);
+    expect(names).toContain("4/0-4/0-2/0 SER Aluminum");
+    expect(names).toContain("4/0-4/0-4/0-2/0 SER Aluminum");
+    expect(names.filter(n => /^4\/0-3 SER/i.test(n))).toEqual([]);
   });
 
-  it("ships exactly two wafer sizes, with no duplicate 6 inch row", () => {
-    const wafers = BASELINE_MATERIALS.filter(m => m.name.includes("wafer")).map(
+  it("ships every wafer size as its own item, never folded together", () => {
+    // Owner, 2026-10-07, twice: first "4" and 6" separately" (the 5"/6" row
+    // became the 6"), then "ship ALL wafer/canless/CCT-disc sizes (2", 3",
+    // 4", 5", 6", 8"), each size its own separate item, never folded
+    // together". So: one canless wafer per size, four variants per size
+    // (named after the plain row, third answers: "6" canless wafer LED
+    // downlight, slim"), and no wafer, disc or retrofit-trim name carrying
+    // two sizes — the plain 5"/6" disc and trim were split the same day.
+    const names = new Set(BASELINE_MATERIALS.map(m => m.name));
+    for (const s of ['2"', '3"', '4"', '5"', '6"', '8"']) {
+      expect(names.has(`${s} canless wafer LED downlight`), s).toBe(true);
+      for (const v of ["CCT selectable", "gimbal", "slim", "wet rated"])
+        expect(
+          names.has(`${s} canless wafer LED downlight, ${v}`),
+          `${s} ${v}`
+        ).toBe(true);
+    }
+    const wafers = BASELINE_MATERIALS.filter(m => /wafer/.test(m.name)).map(
       m => m.name
     );
-    expect(wafers).toEqual([
-      '4" wafer LED downlight',
-      '5"/6" wafer LED downlight',
-    ]);
+    expect(wafers).toHaveLength(30);
+    const folded = BASELINE_MATERIALS.filter(m =>
+      /wafer|disc light|retrofit trim/.test(m.name)
+    ).filter(m => /"\/\d/.test(m.name));
+    expect(folded.map(m => m.name)).toEqual([]);
+    for (const s of ['4"', '5"', '6"']) {
+      expect(names.has(`${s} LED disc light`), s).toBe(true);
+      expect(names.has(`${s} LED retrofit trim`), s).toBe(true);
+    }
+    for (const s of ['4"', '5"', '6"', '7"'])
+      expect(names.has(`${s} LED disc light, CCT selectable`), s).toBe(true);
   });
 
   it("stocks a fuse for every fused disconnect amperage", () => {
@@ -466,7 +518,11 @@ describe("searching the enlarged catalog", () => {
     // Growth is exactly what breaks them, so they are pinned.
     expectHit("1900", '4" square box');
     expectHit("gem box", "Single-gang box");
-    expectHit("romex", "12-2 NM-B");
+    expectHit("romex", "12/2 NM-B Copper");
+    // The dash spelling the cable was named in until 2026-10-07 — and still
+    // the way plenty of people type it — finds the renamed row.
+    expectHit("12-2 romex", "12/2 NM-B Copper", 3);
+    expectHit("12-2", "12/2 NM-B Copper");
     expectHit("plug", "Duplex receptacle");
     expectHit("gfi", "GFCI receptacle");
     expectHit("marrette", "Wire nuts");
@@ -499,14 +555,17 @@ describe("searching the enlarged catalog", () => {
     expectHit("3/4 rigid tee", '3/4" rigid conduit T conduit body', 3);
     expectHit("crouse hinds tee", '1/2" rigid conduit T conduit body');
     expect(search("lb", 1)[0]).toMatch(/LB conduit body$/);
-    expectHit("mcm", "500 kcmil THHN");
-    // The 5"/6" wafer covers both trim openings, so "6 inch wafer" has to
-    // reach it — there is deliberately no standalone 6" row to find.
-    expectHit("wafer", '5"/6" wafer LED downlight');
-    expectHit("6 wafer", '5"/6" wafer LED downlight');
-    expectHit("bx", "12-2 MC cable");
+    expectHit("mcm", "500 kcmil THHN Copper");
+    // 4" and 6" are separate rows since 2026-10-07 (owner); each size finds
+    // its own, and the old 5"/6" spelling still reaches the 6".
+    expectHit("wafer", '6" canless wafer LED downlight');
+    expectHit("6 wafer", '6" canless wafer LED downlight');
+    expectHit("4 wafer", '4" canless wafer LED downlight');
+    expectHit('5"/6" wafer', '6" canless wafer LED downlight', 3);
+    expectHit("bx", "12/2 MC cable Copper");
+    expectHit("3-4 mc", "#3/4 MC cable Copper", 3);
     expectHit("acorn", "Ground rod clamp");
-    expectHit("driven electrode", "Ground rod, 8 ft");
+    expectHit("driven electrode", 'Ground rod, 5/8" x 8 ft');
     expectHit("wago", "Lever wire connector, 2-port");
     expectHit("tapcon", "Masonry screw");
     expectHit("evse", "EV charger");
@@ -517,7 +576,7 @@ describe("searching the enlarged catalog", () => {
     // outranked by something that only mentions it in passing.
     expect(search("recep", 1)[0]).toBe("Duplex receptacle");
     expect(search("wall plate", 1)[0]).toBe("Wall plate");
-    expect(search("ground rod", 1)[0]).toBe("Ground rod, 8 ft");
+    expect(search("ground rod", 1)[0]).toBe('Ground rod, 5/8" x 8 ft');
   });
 
   it('answers "plug" with a receptacle first', () => {
@@ -532,17 +591,25 @@ describe("searching the enlarged catalog", () => {
     // catalog actually introduced: "Cable staple" carried a "romex" alias, so
     // searching "romex" returned the staple above the cable it holds. An
     // accessory may be findable by the thing it serves; it may not outrank it.
-    expect(search("romex", 1)[0]).toMatch(/NM-B$/);
+    expect(search("romex", 1)[0]).toMatch(/NM-B Copper$/);
   });
 
   it("keeps solid and stranded 10 AWG distinguishable", () => {
     const hits = search("10 thhn", 4);
-    expect(hits).toContain("#10 THHN");
-    expect(hits).toContain("#10 THHN stranded");
+    expect(hits).toContain("#10 THHN Copper");
+    expect(hits).toContain("#10 THHN stranded Copper");
   });
 
   it("does not let aluminum outrank copper for a copper query", () => {
-    expect(search("#4 thhn", 1)[0]).toBe("#4 THHN");
+    expect(search("#4 thhn", 1)[0]).toBe("#4 THHN Copper");
+  });
+
+  it("finds an aught however it is written — with the # or without", () => {
+    // Aughts are named without the "#" since 2026-10-07 ("1/0 THHN Copper"),
+    // and the old names wrote it — so both spellings must land on the row.
+    expect(search("#1/0 thhn", 1)[0]).toBe("1/0 THHN Copper");
+    expect(search("1/0 thhn", 1)[0]).toBe("1/0 THHN Copper");
+    expect(search("#4/0 xhhw", 1)[0]).toBe("4/0 XHHW Aluminum");
   });
 });
 
@@ -883,22 +950,25 @@ describe("breakers", () => {
   });
 
   it("states the pole count on every amp-rated breaker", () => {
-    // Reversed 2026-09-24. This test used to be "leaves single-pole unmarked"
-    // and pinned the bare "20A breaker" form. Now every breaker named by its
-    // amperage says Single-Pole, 2-Pole or 3-Pole, and a one-pole breaker is
-    // never written "1-Pole". Loops over the shelf rather than naming rows, so
-    // a breaker added later without a pole count fails here.
+    // Reversed twice. Until 2026-09-24 this pinned the bare "20A breaker";
+    // until 2026-10-07 it pinned "Single-Pole" and refused "1-Pole". Since the
+    // frozen names (owner, 2026-10-05), every breaker named by its amperage
+    // says 1-Pole, 2-Pole or 3-Pole, and a breaker is never written
+    // "Single-Pole". Loops over the shelf rather than naming rows, so a
+    // breaker added later without a pole count fails here.
     const amped = breakers().filter(m => /^\d+A /.test(m.name));
     expect(amped.length).toBeGreaterThan(0);
     for (const m of amped) {
-      expect(m.name, `${m.name} has no pole count`).toMatch(
-        / (Single|2|3)-Pole /
-      );
-      expect(m.name).not.toMatch(/1-Pole/);
+      expect(m.name, `${m.name} has no pole count`).toMatch(/ (1|2|3)-Pole /);
+      expect(m.name).not.toMatch(/Single-Pole/);
     }
+    // Breakers only: a single-pole SWITCH keeps its name.
+    expect(named("20A single-pole switch")).toBeDefined();
   });
 
-  it("renames the single-pole rows in place", () => {
+  it("renames the single-pole rows in place, straight to today's name", () => {
+    // Both older spellings — the bare one and "Single-Pole" — point at the
+    // 1-Pole row directly, so no database depends on a chain.
     const old = [
       "15A breaker",
       "20A breaker",
@@ -911,12 +981,13 @@ describe("breakers", () => {
       "20A AFCI/GFCI combo breaker",
     ];
     for (const from of old) {
-      const to = RENAMED_BASELINE_MATERIALS[from];
-      expect(to, `${from} is not in the rename map`).toBe(
-        from.replace(/^(\d+A) /, "$1 Single-Pole ")
-      );
-      expect(named(to), `${to} is not shipped`).toBeDefined();
+      const final = from.replace(/^(\d+A) /, "$1 1-Pole ");
+      const middle = from.replace(/^(\d+A) /, "$1 Single-Pole ");
+      expect(RENAMED_BASELINE_MATERIALS[from], from).toBe(final);
+      expect(RENAMED_BASELINE_MATERIALS[middle], middle).toBe(final);
+      expect(named(final), `${final} is not shipped`).toBeDefined();
       expect(named(from), `${from} is still shipped`).toBeUndefined();
+      expect(named(middle), `${middle} is still shipped`).toBeUndefined();
     }
   });
 
@@ -934,15 +1005,17 @@ describe("breakers", () => {
         hit => BASELINE_MATERIALS[Number(hit.id)].name
       );
     const cases: Array<[string, string]> = [
-      ["20A breaker", "20A Single-Pole breaker"],
-      ["20 amp breaker", "20A Single-Pole breaker"],
-      ["single pole 20", "20A Single-Pole breaker"],
-      ["1-pole 20", "20A Single-Pole breaker"],
-      ["1 pole 20a", "20A Single-Pole breaker"],
-      ["sp 20", "20A Single-Pole breaker"],
-      ["20A AFCI breaker", "20A Single-Pole AFCI breaker"],
-      ["15a gfci breaker", "15A Single-Pole GFCI breaker"],
-      ["dual function 20", "20A Single-Pole AFCI/GFCI combo breaker"],
+      ["20A breaker", "20A 1-Pole breaker"],
+      ["20 amp breaker", "20A 1-Pole breaker"],
+      ["single pole 20", "20A 1-Pole breaker"],
+      // The name the row carried until 2026-10-07.
+      ["20A Single-Pole breaker", "20A 1-Pole breaker"],
+      ["1-pole 20", "20A 1-Pole breaker"],
+      ["1 pole 20a", "20A 1-Pole breaker"],
+      ["sp 20", "20A 1-Pole breaker"],
+      ["20A AFCI breaker", "20A 1-Pole AFCI breaker"],
+      ["15a gfci breaker", "15A 1-Pole GFCI breaker"],
+      ["dual function 20", "20A 1-Pole AFCI/GFCI combo breaker"],
     ];
     for (const [query, expected] of cases) {
       expect(find(query), `"${query}" should find ${expected}`).toContain(
@@ -951,19 +1024,19 @@ describe("breakers", () => {
     }
   });
 
-  it("finds a breaker by every supply-house pole spelling — today's names AND after the 1-Pole rename", () => {
+  it("finds a breaker by every supply-house pole spelling — as shipped AND as it was named before", () => {
     // Owner, 2026-10-05 (references/owner-questions.md § 1): Home Depot
     // writes "Single-Pole", Platt writes "1P", and an estimator types
-    // whichever their supply house prints. The catalog will be renamed to
-    // "1-Pole" later, so the same searches run against a copy with that
-    // rename applied: "single-pole" must keep finding a row whose name no
-    // longer says it.
+    // whichever their supply house prints. The catalog was renamed to
+    // "1-Pole" on 2026-10-07; the same searches also run against a copy
+    // carrying the OLD "Single-Pole" names, which is what a company's own
+    // copy of a breaker (a fork, never renamed by the seed) still says.
     const renamed = (name: string) =>
-      /breaker/i.test(name) ? name.replace(/Single-Pole/, "1-Pole") : name;
+      /breaker/i.test(name) ? name.replace(/1-Pole/, "Single-Pole") : name;
     const spellings: Array<[string[], string]> = [
       [
         ["1-pole", "1 pole", "1p", "single-pole", "single pole", "sp"],
-        "20A Single-Pole breaker",
+        "20A 1-Pole breaker",
       ],
       [
         ["2-pole", "2 pole", "2p", "double-pole", "double pole", "dp"],
@@ -976,7 +1049,7 @@ describe("breakers", () => {
     ];
     for (const [catalog, rename] of [
       ["as shipped", (n: string) => n],
-      ["renamed to 1-Pole", renamed],
+      ["under the old Single-Pole names", renamed],
     ] as const) {
       const names = BASELINE_MATERIALS.map(m => rename(m.name));
       const index = BASELINE_MATERIALS.map((m, i) => ({
@@ -1001,7 +1074,7 @@ describe("breakers", () => {
     for (const type of ["AFCI", "GFCI", "AFCI/GFCI combo"]) {
       for (const amps of ["15", "20"]) {
         expect(
-          named(`${amps}A Single-Pole ${type} breaker`),
+          named(`${amps}A 1-Pole ${type} breaker`),
           `${amps}A ${type} missing`
         ).toBeDefined();
       }

@@ -75,11 +75,10 @@ export const WIRE_AND_CABLE_PROPOSALS: readonly {
   { current: "4-2 MC cable", proposed: "4/2 MC cable Copper" },
   { current: "4-3 MC cable", proposed: "4/3 MC cable Copper" },
   { current: "3-3 MC cable", proposed: "3/3 MC cable Copper" },
-  {
-    current: "3-4 MC cable",
-    proposed: "3/4 MC cable Copper",
-    openQuestion: "Q2d",
-  },
+  // Q2d answered 2026-10-07: "#3/4", so a #3 four-wire does not read as
+  // 3/4 inch. The size parser does not read "#3/4" yet — the rename step's
+  // parser change must (references/materials-review-sheet-plan.md).
+  { current: "3-4 MC cable", proposed: "#3/4 MC cable Copper" },
   { current: "2-2 MC cable", proposed: "2/2 MC cable Copper" },
   { current: "2-3 MC cable", proposed: "2/3 MC cable Copper" },
   {
@@ -123,29 +122,66 @@ export const WIRE_AND_CABLE_PROPOSALS: readonly {
   { current: "#2 bare CU, stranded", proposed: "#2 bare stranded Copper" },
   { current: "#1/0 bare CU, stranded", proposed: "#1/0 bare stranded Copper" },
   { current: "#2/0 bare CU, stranded", proposed: "#2/0 bare stranded Copper" },
-  { current: "8-8-8-8 SER CU", proposed: "8/3 SER Copper" },
-  { current: "6-6-6-6 SER CU", proposed: "6/3 SER Copper" },
-  { current: "4-4-4-6 SER CU", proposed: "4/3 SER Copper" },
-  { current: "2-2-2-4 SER CU", proposed: "2/3 SER Copper" },
-  { current: "1-1-1-3 SER CU", proposed: "1/3 SER Copper" },
-  { current: "4-4-4-6 SER AL", proposed: "4/3 SER Aluminum" },
-  { current: "2-2-2-4 SER AL", proposed: "2/3 SER Aluminum" },
-  { current: "1/0-1/0-1/0-2 SER AL", proposed: "1/0-3 SER Aluminum" },
-  { current: "2/0-2/0-2/0-1 SER AL", proposed: "2/0-3 SER Aluminum" },
-  { current: "3/0-3/0-3/0-1/0 SER AL", proposed: "3/0-3 SER Aluminum" },
+  // SER names SPELL OUT THE FULL CONDUCTOR SET (owner, 2026-10-07, second
+  // answers): "4/0-4/0-4/0-2/0 SER Aluminum", never the "4/0-3" shorthand.
+  // This replaced the "N/3" short form these rows were first proposed with
+  // ("8/3 SER Copper"). The shorthand was also a real hazard: "4/0-3 SER
+  // Aluminum" differed only by capitals from the RETIRED "4/0-3 SER
+  // aluminum", which the seed's case-blind SQL turned into a row deleted on
+  // every start (server/seedNameCase.test.ts). The shorthand stays findable
+  // as a search word on each row.
+  { current: "8-8-8-8 SER CU", proposed: "8-8-8-8 SER Copper" },
+  { current: "6-6-6-6 SER CU", proposed: "6-6-6-6 SER Copper" },
+  { current: "4-4-4-6 SER CU", proposed: "4-4-4-6 SER Copper" },
+  { current: "2-2-2-4 SER CU", proposed: "2-2-2-4 SER Copper" },
+  { current: "1-1-1-3 SER CU", proposed: "1-1-1-3 SER Copper" },
+  { current: "4-4-4-6 SER AL", proposed: "4-4-4-6 SER Aluminum" },
+  { current: "2-2-2-4 SER AL", proposed: "2-2-2-4 SER Aluminum" },
   {
-    current: "4/0-4/0-2/0 SER AL",
-    proposed: "4/0-4/0-2/0 SER Aluminum",
-    openQuestion: "Q2",
+    current: "1/0-1/0-1/0-2 SER AL",
+    proposed: "1/0-1/0-1/0-2 SER Aluminum",
   },
-  { current: "4/0-4/0-4/0-2/0 SER AL", proposed: "4/0-3 SER Aluminum" },
   {
-    current: "250-250-250 SER AL",
-    proposed: "250-250-250 SER Aluminum",
-    openQuestion: "Q2",
+    current: "2/0-2/0-2/0-1 SER AL",
+    proposed: "2/0-2/0-2/0-1 SER Aluminum",
   },
+  {
+    current: "3/0-3/0-3/0-1/0 SER AL",
+    proposed: "3/0-3/0-3/0-1/0 SER Aluminum",
+  },
+  { current: "4/0-4/0-2/0 SER AL", proposed: "4/0-4/0-2/0 SER Aluminum" },
+  {
+    current: "4/0-4/0-4/0-2/0 SER AL",
+    proposed: "4/0-4/0-4/0-2/0 SER Aluminum",
+  },
+  { current: "250-250-250 SER AL", proposed: "250-250-250 SER Aluminum" },
   { current: "4-4-6 SEU AL", proposed: "4-4-6 SEU Aluminum" },
   { current: "2-2-4 SEU AL", proposed: "2-2-4 SEU Aluminum" },
   { current: "#4/0 USE-2 AL", proposed: "#4/0 USE-2 Aluminum" },
   { current: "1/0 URD triplex AL", proposed: "1/0 URD triplex Aluminum" },
+];
+
+/**
+ * Renames the OWNER decided row by row, on the review sheet (2026-10-07).
+ * Same rename-in-place as the rest: the row keeps its id, so every recipe
+ * pointing at it (starter LT7, LT8) follows without an edit.
+ *
+ * - Ground rods are three items, not duplicates: 5/8" x 8 ft is the one
+ *   usually used; the plain 10 ft is a 5/8" rod; 3/4" x 10 ft stays.
+ * - Wafers: 4" and 6" separately, as canless wafers. The combined 5"/6" row
+ *   BECOMES the 6" item (starter LT7, "Wafer LED downlight, 6" (canless)",
+ *   already prices from it) — this reverses the 5"/6" decision recorded in
+ *   server/seed/materials/lighting.ts, which says so.
+ */
+export const OWNER_RENAMES: readonly { current: string; proposed: string }[] = [
+  { current: "Ground rod, 8 ft", proposed: 'Ground rod, 5/8" x 8 ft' },
+  { current: "Ground rod, 10 ft", proposed: 'Ground rod, 5/8" x 10 ft' },
+  {
+    current: '4" wafer LED downlight',
+    proposed: '4" canless wafer LED downlight',
+  },
+  {
+    current: '5"/6" wafer LED downlight',
+    proposed: '6" canless wafer LED downlight',
+  },
 ];

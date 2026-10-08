@@ -52,13 +52,21 @@ describe("the one not-priced check counts drops", () => {
   });
 
   it("no drops leaves a lines-only tally exactly as it was", () => {
-    const lines = { lines: 1, parts: 2 };
+    const lines = { lines: 1, parts: 2, hours: 0 };
     expect(withDropsNotPriced(lines, 0)).toBe(lines);
     expect(withDropsNotPriced(lines, 205)).toEqual({
       lines: 1,
       parts: 2,
+      hours: 0,
       drops: 205,
     });
+  });
+
+  it("after the merge with local-dev: hours AND drops both hold the print", () => {
+    // Track B's hours and Track C's drops arrived as two tallyLeavesOut
+    // functions (2026-10-07 merge); the one kept must read both.
+    expect(tallyLeavesOut({ ...NOTHING_NOT_PRICED, hours: 1 })).toBe(true);
+    expect(tallyLeavesOut({ ...NOTHING_NOT_PRICED, drops: 1 })).toBe(true);
   });
 });
 

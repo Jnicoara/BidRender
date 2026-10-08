@@ -452,7 +452,12 @@ export type ProposalDocument = {
    * exclusion nobody read is an exclusion that does not settle the argument.
    */
   inclusions: { includes: string[]; excludes: string[] };
-  laborHours: number;
+  /**
+   * The job's labor hours — or NULL while any line's hours are not set, when
+   * the sum would be short. The sheet then prints "Hours pending", the way
+   * the price prints "Price pending"; never a partial number.
+   */
+  laborHours: number | null;
   unitPricing: ProposalUnitPrice[];
   investment: {
     /**
@@ -676,8 +681,15 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
   // which a client reads as a price.
   const noWork = mode === "full" && input.lines.length === 0;
   const pricePending =
-    // Lines, parts AND drops with no material (owner, 2026-10-07).
+    // Lines, parts, hours AND drops with no material (owner, 2026-10-07).
     noWork || (mode === "full" && tallyLeavesOut(notPriced));
+  /*
+    The labor-hours sentence is a NUMBER claim too. While any line's assembly
+    hours are not set (D1), the sum is short by them and would read as the
+    job's hours — so it is held, like the price (owner, 2026-10-07). In both
+    modes: scope-only prints the hours as well.
+  */
+  const hoursPending = notPriced.hours > 0;
 
   /**
    * A section appears when the user has not hidden it AND the mode allows it.
@@ -803,7 +815,9 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
       note: blank(bid.proposalNote) ? null : bid.proposalNote!.trim(),
     },
     scope,
-    laborHours: Math.round(totals.totalLaborHours * 100) / 100,
+    laborHours: hoursPending
+      ? null
+      : Math.round(totals.totalLaborHours * 100) / 100,
     unitPricing,
     mode,
     inclusions,

@@ -29,6 +29,13 @@ import {
   LIFE_SAFETY,
 } from "./safetyAndSupport";
 import { STRUT } from "./strut";
+import { STARTER_PRICES } from "./starterPrices";
+import { STARTER_LABOR_UNITS } from "./starterLaborUnits";
+import {
+  SERVICE_ENTRANCE,
+  SURFACE_RACEWAY,
+  UNDERGROUND,
+} from "./raceUndergroundService";
 import { WIRE_AND_CABLE } from "./wireAndCable";
 import { dropRestatedWords, type BaselineMaterial } from "./types";
 
@@ -104,5 +111,31 @@ export const BASELINE_MATERIALS: BaselineMaterial[] = (
     ...EQUIPMENT,
     ...DISTRIBUTION,
     ...CONSUMABLES,
+    // Since 2026-10-07; their categories need migration 0117 (see module).
+    ...SURFACE_RACEWAY,
+    ...UNDERGROUND,
+    ...SERVICE_ENTRANCE,
   ] as BaselineMaterial[]
-).map(dropRestatedWords);
+)
+  .map(dropRestatedWords)
+  .map(withStarterValues);
+
+/**
+ * The starter sheets' numbers, applied by NAME on top of the modules: the
+ * modules say what a row IS, the generated files say what it costs and how
+ * long it takes. Both files are written only by pricing/loadStarterSheets.mts.
+ */
+function withStarterValues(m: BaselineMaterial): BaselineMaterial {
+  const price = STARTER_PRICES[m.name];
+  const labor = STARTER_LABOR_UNITS[m.name];
+  return {
+    ...m,
+    ...(price !== undefined ? { costPerUnit: price } : {}),
+    ...(labor?.laborHours !== undefined
+      ? { laborHours: labor.laborHours }
+      : {}),
+    ...(labor?.fieldBendLaborHours !== undefined
+      ? { fieldBendLaborHours: labor.fieldBendLaborHours }
+      : {}),
+  };
+}

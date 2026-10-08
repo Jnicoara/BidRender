@@ -293,7 +293,58 @@ migration is applied to staging or live before this branch merges, these
 six must be renumbered above it first. Nothing is applied anywhere shared,
 so renumbering is still free.
 
-## Batch 5 — before the priced sheet (numbered from 0131 when written)
+### 0131 — Track C's two more columns: PLAN AND ORDER ONLY (owner, 2026-10-07)
+
+Owner: "add Track C's two columns (`takeoff_runs.runsAt`,
+`bids.homerunExtraBends` default 1, unconfirmed) to the a-batch-c-0125 batch —
+renumber if needed; pairs only with c-homerun-footage. Plan and order only,
+don't merge." Not written as a file yet; this is the plan.
+
+| #    | File (to write on `a-batch-c-0125`) | What it is                                                                                                                                                                    |
+| ---- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0131 | `0131_homerun_bends_runs_at`        | ONE file, two ALTERs: `bids.homerunExtraBends` INT NULL; `takeoff_runs.runsAt` VARCHAR(16) NULL (`'ceiling'` \| `'boxToBox'`). Both nullable, **no DB DEFAULT**, no backfill. |
+
+- **"Default 1, unconfirmed" lives in the CODE, not the column**, and that is
+  the owner's wording kept exactly. C's code already reads NULL as "counted
+  as 1, shown as not confirmed" (`homerunsCore.ts`, `DEFAULT_EXTRA_BENDS`).
+  A `DEFAULT 1` in the database would make an untouched bid and a bid
+  somebody CONFIRMED at 1 the same stored value — the "not yet set" vs
+  "deliberately this" collapse CLAUDE.md § "Deploying a migration" forbids.
+  NULL `runsAt` = `'ceiling'`, as today.
+- **Additive, step 1.** Moves no bid number by itself: 1 extra bend is
+  already counted, and `runsAt` changes nothing until someone picks box to
+  box (C's numbers, `migrations-next-batch.md` on `c-homerun-footage`).
+- **Numbering: 0131, after 0130, no renumber needed** — nothing above 0124
+  is applied anywhere shared (checked 2026-10-07: local-dev's `drizzle/`
+  ends at 0124; staging has 125 recorded). **Batch 5 below moves to 0132+.**
+  If anything else is applied first, renumber all seven (0125–0131) above it.
+- **Order:** write 0131 on `a-batch-c-0125` (with schema.ts and the
+  `schemaDrift` check) → C makes `RunEnds.runsAt` required, reads both
+  columns, enables the two held controls (C's list) → rehearse 0125–0131 on
+  a local copy of staging → staging (backup, migrate, then code) → live only
+  with C's footage code (pairing rule 3). **Not merged; nothing applied.**
+
+## Batch 5 — before the priced sheet (numbered from 0132 when written — 0131 is Track C's, above)
+
+**Added 2026-10-07 — "Example hours" (owner decision):** shipped labor hours
+get the price treatment — tag on the bid screen only, never the customer
+quote; clears when the shop edits it; warning before printing. Columns:
+`materials.isExampleLaborHours`, `assemblies.isExampleHours`,
+`bid_line_items.snapshotHoursWereExample`. Additive, nullable, no DB
+default. **Ships TOGETHER with the hours, never hours alone** — the starter
+loader's hours stay refused by `server/starterValues.test.ts` until these
+exist (`references/starter-vs-company-plan.md` § "Shipped HOURS").
+
+**Added 2026-10-07 — example LOADED labor rates, APPROVED by the owner the
+same day** (Foreman ~$70.50, Journeyman $59.22, Apprentice $36.66, Helper
+$33.84, 41% burden as parts; NEVER the rates without the flag — one
+release;
+`references/starter-vs-company-plan.md` § 3b): `labor_rates.isExampleRate`,
+`labor_rates.baseWage`, `payrollTaxPct`, `workersCompPct`, `insurancePct`,
+`benefitsPct`, and `bid_line_items.snapshotLaborRateWasExample`. All additive,
+nullable, no DB default. Same shape and same reason as the example-PRICE pair
+below: the shipped example rates must not land before `isExampleRate`, or
+`needsRate` reads every unconfigured shop as "rate set".
 
 § 10d + B2 of the batch plan: brand line ×2 (`pricing_defaults.brandLine`,
 `bids.brandLine`), `bid_line_items.panelId` + FK, `snapshotBrandLine`, and
@@ -328,6 +379,29 @@ dry run writes nothing, unforked row gains the line, forked row and the fork
 byte-identical, second run no-op, edited row skipped) and on a throwaway copy
 of `bidrender_local_b_new` (report: LT1, LT2 `would add`; apply: `added`;
 again: `already has it`; original untouched; copy dropped).
+
+## Requests from Track B, 2026-10-07 — for A to number (residential / commercial filter)
+
+Plan: `references/top-assemblies-draft.md` § 5. **Not built**; B builds the
+filter once these exist. Both ADDITIVE, nullable, **no DEFAULT**, no
+backfill — step 1 of the three. Bid number: **no** — the tag decides what
+the picker SHOWS, never what a line costs.
+
+| Column                                                                                                                       | Meaning                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `bids.projectType ENUM('residential','commercial','both') NULL`                                                              | The bid's work type; the picker shows matching + both + untagged. NULL = follow the company default. |
+| Company default, e.g. `pricing_defaults.defaultProjectType ENUM('residential','commercial','both') NULL` (A picks the table) | The shop's default for new bids. NULL = show everything, i.e. today.                                 |
+
+**NOT an assemblies column.** The owner's request said "the tag needs a new
+assemblies column"; it does not — `assemblies.projectType` (the same enum,
+nullable) already exists and every shipped starter is seeded with it (51
+residential, 81 commercial, 36 both). Writing a second one would be two
+tags that can disagree.
+
+**No index needed** for the "most used" row (§ 4 of the same plan):
+`bid_line_items.assemblyId` is a foreign key to `assemblies`, and MySQL
+indexes a foreign key column itself (checked in `drizzle/schema.ts`,
+2026-10-07).
 
 ## Not numbered — and why
 

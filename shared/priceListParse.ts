@@ -217,7 +217,7 @@ export function detectDelimiter(raw: string): Delimiter {
     // character is the real separator and this candidate split the row in the
     // wrong place. Decisive, and asymmetric on purpose: those three never
     // occur inside a material name or a price, whereas a comma frequently
-    // does — `#10 bare CU, stranded` is a real catalog row — so a comma
+    // does — `Ground rod, 5/8" x 10 ft` is a real catalog row — so a comma
     // inside a field is not evidence of anything.
     const foreign = DELIMITERS.filter(d => d !== delimiter && d !== ",").some(
       other =>

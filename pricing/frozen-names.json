@@ -1,0 +1,1416 @@
+{
+  "frozenFrom": "materials-review.xlsx",
+  "frozenAt": "2026-10-07",
+  "counts": {
+    "renames": 151,
+    "unchanged": 1403,
+    "shippedCuts": 0,
+    "waitingRowsDropped": 5,
+    "adds": 153
+  },
+  "renames": [
+    {
+      "current": "#14 bare CU, solid",
+      "final": "#14 bare solid Copper"
+    },
+    {
+      "current": "#12 bare CU, solid",
+      "final": "#12 bare solid Copper"
+    },
+    {
+      "current": "#10 bare CU, solid",
+      "final": "#10 bare solid Copper"
+    },
+    {
+      "current": "#8 bare CU, solid",
+      "final": "#8 bare solid Copper"
+    },
+    {
+      "current": "#10 bare CU, stranded",
+      "final": "#10 bare stranded Copper"
+    },
+    {
+      "current": "#8 bare CU, stranded",
+      "final": "#8 bare stranded Copper"
+    },
+    {
+      "current": "#6 bare CU, stranded",
+      "final": "#6 bare stranded Copper"
+    },
+    {
+      "current": "#4 bare CU, stranded",
+      "final": "#4 bare stranded Copper"
+    },
+    {
+      "current": "#2 bare CU, stranded",
+      "final": "#2 bare stranded Copper"
+    },
+    {
+      "current": "#1/0 bare CU, stranded",
+      "final": "1/0 bare stranded Copper"
+    },
+    {
+      "current": "#2/0 bare CU, stranded",
+      "final": "2/0 bare stranded Copper"
+    },
+    {
+      "current": "16-2 fire alarm cable",
+      "final": "16/2 fire alarm cable Copper"
+    },
+    {
+      "current": "14-2 fire alarm cable",
+      "final": "14/2 fire alarm cable Copper"
+    },
+    {
+      "current": "#18 fixture wire",
+      "final": "#18 fixture wire Copper"
+    },
+    {
+      "current": "#16 fixture wire",
+      "final": "#16 fixture wire Copper"
+    },
+    {
+      "current": "14-2 MC cable",
+      "final": "14/2 MC cable Copper"
+    },
+    {
+      "current": "14-3 MC cable",
+      "final": "14/3 MC cable Copper"
+    },
+    {
+      "current": "14-4 MC cable",
+      "final": "14/4 MC cable Copper"
+    },
+    {
+      "current": "12-2 MC cable",
+      "final": "12/2 MC cable Copper"
+    },
+    {
+      "current": "12-3 MC cable",
+      "final": "12/3 MC cable Copper"
+    },
+    {
+      "current": "12-4 MC cable",
+      "final": "12/4 MC cable Copper"
+    },
+    {
+      "current": "10-2 MC cable",
+      "final": "10/2 MC cable Copper"
+    },
+    {
+      "current": "10-3 MC cable",
+      "final": "10/3 MC cable Copper"
+    },
+    {
+      "current": "10-4 MC cable",
+      "final": "10/4 MC cable Copper"
+    },
+    {
+      "current": "8-2 MC cable",
+      "final": "8/2 MC cable Copper"
+    },
+    {
+      "current": "8-3 MC cable",
+      "final": "8/3 MC cable Copper"
+    },
+    {
+      "current": "8-4 MC cable",
+      "final": "8/4 MC cable Copper"
+    },
+    {
+      "current": "6-2 MC cable",
+      "final": "6/2 MC cable Copper"
+    },
+    {
+      "current": "6-3 MC cable",
+      "final": "6/3 MC cable Copper"
+    },
+    {
+      "current": "6-4 MC cable",
+      "final": "6/4 MC cable Copper"
+    },
+    {
+      "current": "4-2 MC cable",
+      "final": "4/2 MC cable Copper"
+    },
+    {
+      "current": "4-3 MC cable",
+      "final": "4/3 MC cable Copper"
+    },
+    {
+      "current": "3-3 MC cable",
+      "final": "3/3 MC cable Copper"
+    },
+    {
+      "current": "3-4 MC cable",
+      "final": "#3/4 MC cable Copper"
+    },
+    {
+      "current": "2-2 MC cable",
+      "final": "2/2 MC cable Copper"
+    },
+    {
+      "current": "2-3 MC cable",
+      "final": "2/3 MC cable Copper"
+    },
+    {
+      "current": "12-2 MC cable, isolated ground",
+      "final": "12/2 MC cable isolated ground Copper"
+    },
+    {
+      "current": "14-4 mini-split cable",
+      "final": "14/4 mini-split cable Copper"
+    },
+    {
+      "current": "14-2 NM-B",
+      "final": "14/2 NM-B Copper"
+    },
+    {
+      "current": "14-3 NM-B",
+      "final": "14/3 NM-B Copper"
+    },
+    {
+      "current": "12-2 NM-B",
+      "final": "12/2 NM-B Copper"
+    },
+    {
+      "current": "12-3 NM-B",
+      "final": "12/3 NM-B Copper"
+    },
+    {
+      "current": "10-2 NM-B",
+      "final": "10/2 NM-B Copper"
+    },
+    {
+      "current": "10-3 NM-B",
+      "final": "10/3 NM-B Copper"
+    },
+    {
+      "current": "8-2 NM-B",
+      "final": "8/2 NM-B Copper"
+    },
+    {
+      "current": "8-3 NM-B",
+      "final": "8/3 NM-B Copper"
+    },
+    {
+      "current": "6-3 NM-B",
+      "final": "6/3 NM-B Copper"
+    },
+    {
+      "current": "4-4-4-6 SER AL",
+      "final": "4-4-4-6 SER Aluminum"
+    },
+    {
+      "current": "2-2-2-4 SER AL",
+      "final": "2-2-2-4 SER Aluminum"
+    },
+    {
+      "current": "1/0-1/0-1/0-2 SER AL",
+      "final": "1/0-1/0-1/0-2 SER Aluminum"
+    },
+    {
+      "current": "2/0-2/0-2/0-1 SER AL",
+      "final": "2/0-2/0-2/0-1 SER Aluminum"
+    },
+    {
+      "current": "3/0-3/0-3/0-1/0 SER AL",
+      "final": "3/0-3/0-3/0-1/0 SER Aluminum"
+    },
+    {
+      "current": "4/0-4/0-2/0 SER AL",
+      "final": "4/0-4/0-2/0 SER Aluminum"
+    },
+    {
+      "current": "4/0-4/0-4/0-2/0 SER AL",
+      "final": "4/0-4/0-4/0-2/0 SER Aluminum"
+    },
+    {
+      "current": "250-250-250 SER AL",
+      "final": "250-250-250 SER Aluminum"
+    },
+    {
+      "current": "8-8-8-8 SER CU",
+      "final": "8-8-8-8 SER Copper"
+    },
+    {
+      "current": "6-6-6-6 SER CU",
+      "final": "6-6-6-6 SER Copper"
+    },
+    {
+      "current": "4-4-4-6 SER CU",
+      "final": "4-4-4-6 SER Copper"
+    },
+    {
+      "current": "2-2-2-4 SER CU",
+      "final": "2-2-2-4 SER Copper"
+    },
+    {
+      "current": "1-1-1-3 SER CU",
+      "final": "1-1-1-3 SER Copper"
+    },
+    {
+      "current": "4-4-6 SEU AL",
+      "final": "4-4-6 SEU Aluminum"
+    },
+    {
+      "current": "2-2-4 SEU AL",
+      "final": "2-2-4 SEU Aluminum"
+    },
+    {
+      "current": "14-3 SJOOW cord",
+      "final": "14/3 SJOOW cord Copper"
+    },
+    {
+      "current": "12-3 SOOW cord",
+      "final": "12/3 SOOW cord Copper"
+    },
+    {
+      "current": "10-3 SOOW cord",
+      "final": "10/3 SOOW cord Copper"
+    },
+    {
+      "current": "12-2 submersible pump cable",
+      "final": "12/2 submersible pump cable Copper"
+    },
+    {
+      "current": "#14 THHN",
+      "final": "#14 THHN Copper"
+    },
+    {
+      "current": "#12 THHN",
+      "final": "#12 THHN Copper"
+    },
+    {
+      "current": "#10 THHN",
+      "final": "#10 THHN Copper"
+    },
+    {
+      "current": "#8 THHN",
+      "final": "#8 THHN Copper"
+    },
+    {
+      "current": "#6 THHN",
+      "final": "#6 THHN Copper"
+    },
+    {
+      "current": "#4 THHN",
+      "final": "#4 THHN Copper"
+    },
+    {
+      "current": "#3 THHN",
+      "final": "#3 THHN Copper"
+    },
+    {
+      "current": "#2 THHN",
+      "final": "#2 THHN Copper"
+    },
+    {
+      "current": "#1 THHN",
+      "final": "#1 THHN Copper"
+    },
+    {
+      "current": "#1/0 THHN",
+      "final": "1/0 THHN Copper"
+    },
+    {
+      "current": "#2/0 THHN",
+      "final": "2/0 THHN Copper"
+    },
+    {
+      "current": "#3/0 THHN",
+      "final": "3/0 THHN Copper"
+    },
+    {
+      "current": "#4/0 THHN",
+      "final": "4/0 THHN Copper"
+    },
+    {
+      "current": "250 kcmil THHN",
+      "final": "250 kcmil THHN Copper"
+    },
+    {
+      "current": "300 kcmil THHN",
+      "final": "300 kcmil THHN Copper"
+    },
+    {
+      "current": "350 kcmil THHN",
+      "final": "350 kcmil THHN Copper"
+    },
+    {
+      "current": "400 kcmil THHN",
+      "final": "400 kcmil THHN Copper"
+    },
+    {
+      "current": "500 kcmil THHN",
+      "final": "500 kcmil THHN Copper"
+    },
+    {
+      "current": "#14 THHN stranded",
+      "final": "#14 THHN stranded Copper"
+    },
+    {
+      "current": "#12 THHN stranded",
+      "final": "#12 THHN stranded Copper"
+    },
+    {
+      "current": "#10 THHN stranded",
+      "final": "#10 THHN stranded Copper"
+    },
+    {
+      "current": "12-3 tray cable",
+      "final": "12/3 tray cable Copper"
+    },
+    {
+      "current": "14-2 UF-B",
+      "final": "14/2 UF-B Copper"
+    },
+    {
+      "current": "12-2 UF-B",
+      "final": "12/2 UF-B Copper"
+    },
+    {
+      "current": "10-2 UF-B",
+      "final": "10/2 UF-B Copper"
+    },
+    {
+      "current": "8-2 UF-B",
+      "final": "8/2 UF-B Copper"
+    },
+    {
+      "current": "1/0 URD triplex AL",
+      "final": "1/0 URD triplex Aluminum"
+    },
+    {
+      "current": "#4/0 USE-2 AL",
+      "final": "4/0 USE-2 Aluminum"
+    },
+    {
+      "current": "#8 XHHW AL",
+      "final": "#8 XHHW Aluminum"
+    },
+    {
+      "current": "#6 XHHW AL",
+      "final": "#6 XHHW Aluminum"
+    },
+    {
+      "current": "#4 XHHW AL",
+      "final": "#4 XHHW Aluminum"
+    },
+    {
+      "current": "#2 XHHW AL",
+      "final": "#2 XHHW Aluminum"
+    },
+    {
+      "current": "#1 XHHW AL",
+      "final": "#1 XHHW Aluminum"
+    },
+    {
+      "current": "#1/0 XHHW AL",
+      "final": "1/0 XHHW Aluminum"
+    },
+    {
+      "current": "#2/0 XHHW AL",
+      "final": "2/0 XHHW Aluminum"
+    },
+    {
+      "current": "#3/0 XHHW AL",
+      "final": "3/0 XHHW Aluminum"
+    },
+    {
+      "current": "#4/0 XHHW AL",
+      "final": "4/0 XHHW Aluminum"
+    },
+    {
+      "current": "250 kcmil XHHW AL",
+      "final": "250 kcmil XHHW Aluminum"
+    },
+    {
+      "current": "300 kcmil XHHW AL",
+      "final": "300 kcmil XHHW Aluminum"
+    },
+    {
+      "current": "350 kcmil XHHW AL",
+      "final": "350 kcmil XHHW Aluminum"
+    },
+    {
+      "current": "400 kcmil XHHW AL",
+      "final": "400 kcmil XHHW Aluminum"
+    },
+    {
+      "current": "500 kcmil XHHW AL",
+      "final": "500 kcmil XHHW Aluminum"
+    },
+    {
+      "current": "15A Single-Pole half-size breaker",
+      "final": "15A 1-Pole half-size breaker"
+    },
+    {
+      "current": "20A Single-Pole half-size breaker",
+      "final": "20A 1-Pole half-size breaker"
+    },
+    {
+      "current": "30A Single-Pole half-size breaker",
+      "final": "30A 1-Pole half-size breaker"
+    },
+    {
+      "current": "15A Single-Pole breaker",
+      "final": "15A 1-Pole breaker"
+    },
+    {
+      "current": "20A Single-Pole breaker",
+      "final": "20A 1-Pole breaker"
+    },
+    {
+      "current": "25A Single-Pole breaker",
+      "final": "25A 1-Pole breaker"
+    },
+    {
+      "current": "30A Single-Pole breaker",
+      "final": "30A 1-Pole breaker"
+    },
+    {
+      "current": "35A Single-Pole breaker",
+      "final": "35A 1-Pole breaker"
+    },
+    {
+      "current": "40A Single-Pole breaker",
+      "final": "40A 1-Pole breaker"
+    },
+    {
+      "current": "45A Single-Pole breaker",
+      "final": "45A 1-Pole breaker"
+    },
+    {
+      "current": "50A Single-Pole breaker",
+      "final": "50A 1-Pole breaker"
+    },
+    {
+      "current": "15A Single-Pole AFCI breaker",
+      "final": "15A 1-Pole AFCI breaker"
+    },
+    {
+      "current": "20A Single-Pole AFCI breaker",
+      "final": "20A 1-Pole AFCI breaker"
+    },
+    {
+      "current": "25A Single-Pole AFCI breaker",
+      "final": "25A 1-Pole AFCI breaker"
+    },
+    {
+      "current": "30A Single-Pole AFCI breaker",
+      "final": "30A 1-Pole AFCI breaker"
+    },
+    {
+      "current": "15A Single-Pole GFCI breaker",
+      "final": "15A 1-Pole GFCI breaker"
+    },
+    {
+      "current": "20A Single-Pole GFCI breaker",
+      "final": "20A 1-Pole GFCI breaker"
+    },
+    {
+      "current": "30A Single-Pole GFCI breaker",
+      "final": "30A 1-Pole GFCI breaker"
+    },
+    {
+      "current": "15A Single-Pole AFCI/GFCI combo breaker",
+      "final": "15A 1-Pole AFCI/GFCI combo breaker"
+    },
+    {
+      "current": "20A Single-Pole AFCI/GFCI combo breaker",
+      "final": "20A 1-Pole AFCI/GFCI combo breaker"
+    },
+    {
+      "current": "6ft MC whip",
+      "final": "6 ft MC whip"
+    },
+    {
+      "current": "4\" wafer LED downlight",
+      "final": "4\" canless wafer LED downlight"
+    },
+    {
+      "current": "5\"/6\" wafer LED downlight",
+      "final": "6\" canless wafer LED downlight"
+    },
+    {
+      "current": "Ground rod, 8 ft",
+      "final": "Ground rod, 5/8\" x 8 ft"
+    },
+    {
+      "current": "Ground rod, 10 ft",
+      "final": "Ground rod, 5/8\" x 10 ft"
+    },
+    {
+      "current": "Cat5e cable",
+      "final": "Cat5e cable Copper"
+    },
+    {
+      "current": "Cat6 cable",
+      "final": "Cat6 cable Copper"
+    },
+    {
+      "current": "Cat6 shielded cable",
+      "final": "Cat6 shielded cable Copper"
+    },
+    {
+      "current": "Cat6A cable",
+      "final": "Cat6A cable Copper"
+    },
+    {
+      "current": "18/2 control wire",
+      "final": "18/2 control wire Copper"
+    },
+    {
+      "current": "18/3 control wire",
+      "final": "18/3 control wire Copper"
+    },
+    {
+      "current": "18/4 control wire",
+      "final": "18/4 control wire Copper"
+    },
+    {
+      "current": "18/5 control wire",
+      "final": "18/5 control wire Copper"
+    },
+    {
+      "current": "18/8 control wire",
+      "final": "18/8 control wire Copper"
+    },
+    {
+      "current": "Landscape lighting cable",
+      "final": "Landscape lighting cable Copper"
+    },
+    {
+      "current": "RG11 coax cable",
+      "final": "RG11 coax cable Copper"
+    },
+    {
+      "current": "RG6 coax cable",
+      "final": "RG6 coax cable Copper"
+    },
+    {
+      "current": "22/2 security cable",
+      "final": "22/2 security cable Copper"
+    },
+    {
+      "current": "22/4 security cable",
+      "final": "22/4 security cable Copper"
+    },
+    {
+      "current": "Security camera cable",
+      "final": "Security camera cable Copper"
+    },
+    {
+      "current": "16/2 speaker wire",
+      "final": "16/2 speaker wire Copper"
+    },
+    {
+      "current": "14/2 speaker wire",
+      "final": "14/2 speaker wire Copper"
+    },
+    {
+      "current": "#4/0 crimp sleeve",
+      "final": "4/0 crimp sleeve"
+    }
+  ],
+  "cuts": [
+    {
+      "name": "Mast roof flashing",
+      "shipped": false,
+      "usedBy": "—",
+      "note": "Same part as \"2\" mast roof flashing\" (Possible duplicates tab) — anything using this moves to it."
+    },
+    {
+      "name": "Riser strap, 2\"",
+      "shipped": false,
+      "usedBy": "—",
+      "note": "Same part as \"2\" riser strap\" (Possible duplicates tab) — anything using this moves to it."
+    },
+    {
+      "name": "4\" canless LED downlight",
+      "shipped": false,
+      "usedBy": "—",
+      "note": "Same part as \"4\" wafer LED downlight\" (Possible duplicates tab) — anything using this moves to it."
+    },
+    {
+      "name": "5\" canless LED downlight",
+      "shipped": false,
+      "usedBy": "—",
+      "note": "Owner 2026-10-07: 4\" and 6\" only — this new row is not added."
+    },
+    {
+      "name": "6\" canless LED downlight",
+      "shipped": false,
+      "usedBy": "—",
+      "note": "Same part as \"5\"/6\" wafer LED downlight\" (Possible duplicates tab) — anything using this moves to it."
+    }
+  ],
+  "adds": [
+    {
+      "name": "3-1/2\" EMT",
+      "category": "Conduit",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40",
+      "category": "Conduit",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3-1/2\" EMT connector",
+      "category": "Conduit Fittings",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3-1/2\" EMT coupling",
+      "category": "Conduit Fittings",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Conduit body, 3-1/2\" LB",
+      "category": "Conduit Fittings",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway blank end plate",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway conduit connector",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway coupling",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway device box, 1-gang",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway device box, 2-gang",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway divider clip",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway end cap",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway entrance end fitting",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway fixture box",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway flat elbow",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway inside elbow",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway mounting strap",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway outside elbow",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Raceway tee fitting",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Surface raceway base, 500 series",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Surface raceway base, 700 series",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Surface raceway cover, 500 series",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Surface raceway cover, 700 series",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Surface raceway, 1500 series",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Surface raceway, 2400 series two-channel",
+      "category": "Surface Raceway",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Conduit spacer, 2\"",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Conduit spacer, 4\"",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Direct burial wire nut",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Duct bank spacer",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Mule tape, 1800 lb",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Pull rope, 1/4\"",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "PVC sweep, 2\" 36\" radius",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "PVC sweep, 3\" 36\" radius",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "PVC sweep, 4\" 36\" radius",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Tracer wire",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Tracer wire access box",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Trench marker post",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Underground warning tape",
+      "category": "Underground",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Ground rod access well",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Main bonding jumper kit",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Mast guy wire kit",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Meter seal",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Meter socket adapter ring",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Meter socket hub",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Riser strap, 3\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Service entrance cap",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Service entrance elbow",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Service mast, 2\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Service mast, 2-1/2\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Service mast, 3\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Weatherhead, 2\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Weatherhead, 2-1/2\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Weatherhead, 3\"",
+      "category": "Service Entrance",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "60A Single-Pole breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "70A Single-Pole breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "150A 2-Pole breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "175A 2-Pole breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "200A 2-Pole breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "100A 2-Pole main breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "125A 2-Pole main breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "150A 2-Pole main breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "200A 2-Pole main breaker",
+      "category": "Breakers",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" adjustable trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" adjustable trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" baffle trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" baffle trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "2\" canless LED downlight",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" canless LED downlight",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "8\" canless LED downlight",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" eyeball trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" eyeball trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" gimbal trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" gimbal trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "4\" LED disc light, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" LED disc light, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "6\" LED disc light, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "7\" LED disc light, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" open trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" open trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" recessed can, airtight shallow",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" recessed can, airtight shallow",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" recessed can, new construction IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" recessed can, new construction IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" recessed can, new construction non-IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" recessed can, new construction non-IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" recessed can, remodel IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" recessed can, remodel IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" recessed can, remodel non-IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" recessed can, remodel non-IC",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" recessed can, sloped ceiling",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" recessed can, sloped ceiling",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" reflector trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" reflector trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" shower wet-rated trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" shower wet-rated trim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "2\" wafer LED downlight, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" wafer LED downlight, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "4\" wafer LED downlight, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" wafer LED downlight, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "6\" wafer LED downlight, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "8\" wafer LED downlight, CCT selectable",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "2\" wafer LED downlight, gimbal",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" wafer LED downlight, gimbal",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "4\" wafer LED downlight, gimbal",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" wafer LED downlight, gimbal",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "6\" wafer LED downlight, gimbal",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "8\" wafer LED downlight, gimbal",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "2\" wafer LED downlight, slim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" wafer LED downlight, slim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "4\" wafer LED downlight, slim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" wafer LED downlight, slim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "6\" wafer LED downlight, slim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "8\" wafer LED downlight, slim",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "2\" wafer LED downlight, wet rated",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "3\" wafer LED downlight, wet rated",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "4\" wafer LED downlight, wet rated",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "5\" wafer LED downlight, wet rated",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "6\" wafer LED downlight, wet rated",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "8\" wafer LED downlight, wet rated",
+      "category": "Lighting Hardware",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "Wire mold for low voltage",
+      "category": "Low Voltage",
+      "source": "Review (new row)"
+    },
+    {
+      "name": "#3 XHHW Aluminum",
+      "category": "Wire & Cable",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" EMT 90-degree elbow",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" EMT 45-degree elbow",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40 connector",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40 coupling",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40 90-degree elbow",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40 45-degree elbow",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40 90-degree sweep, 24\" radius",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC Sch 40 90-degree sweep, 36\" radius",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" EMT one-hole strap",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" PVC one-hole strap",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" conduit bushing",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" conduit locknut",
+      "category": "Conduit Fittings",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3-1/2\" strut conduit strap",
+      "category": "Strut & Supports",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "#1 crimp sleeve",
+      "category": "Connectors & Terminations",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "1/0 crimp sleeve",
+      "category": "Connectors & Terminations",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "2/0 crimp sleeve",
+      "category": "Connectors & Terminations",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "3/0 crimp sleeve",
+      "category": "Connectors & Terminations",
+      "source": "Missing (Size gap)"
+    },
+    {
+      "name": "12/2 MC cable with 16/2 dimming Copper",
+      "category": "Wire & Cable",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "12/2 MC-AP cable Copper",
+      "category": "Wire & Cable",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "18/2 shielded fire alarm cable, FPLP Copper",
+      "category": "Wire & Cable",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "Cat6 plenum cable",
+      "category": "Low Voltage",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "1/2\" EMT insulated set-screw connector",
+      "category": "Conduit Fittings",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "1/2\" EMT to FMC transition coupling",
+      "category": "Conduit Fittings",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "3/8\" FMC (reduced wall)",
+      "category": "Conduit",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "1/2\" liquidtight 90-degree connector",
+      "category": "Conduit Fittings",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "1/2\" PVC female adapter",
+      "category": "Conduit Fittings",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "1/2\" PVC expansion fitting",
+      "category": "Conduit Fittings",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "1/2\" EMT offset connector",
+      "category": "Conduit Fittings",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "T-bar box hanger",
+      "category": "Strut & Supports",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "Fixture hanging kit, aircraft cable",
+      "category": "Lighting Hardware",
+      "source": "Missing (Typical job)"
+    },
+    {
+      "name": "Concrete pole base",
+      "category": "Lighting Hardware",
+      "source": "Missing (Owner)"
+    },
+    {
+      "name": "320A meter base",
+      "category": "Panels",
+      "source": "Missing (Owner)"
+    }
+  ]
+}

@@ -228,12 +228,21 @@ export function linePartsNotPriced(
   const parts = Math.max(0, Math.floor(line.unpricedParts));
   // Material missing entirely counts once — not on top of $0 recipe parts,
   // which already say the material is short (2026-10-05).
-  const material = lineMaterialNotPriced(line, directCost)
-    ? Math.max(parts, 1)
-    : parts;
-  // Hours not set: the labor is one more thing not priced (D1). Its own
-  // count, never folded into the material's.
-  return material + (lineHoursNotSet(line) ? 1 : 0);
+  return lineMaterialNotPriced(line, directCost) ? Math.max(parts, 1) : parts;
+}
+
+/**
+ * Whether a line's HOURS are missing from a total — an assembly line whose
+ * hours were not set when added (D1, `lineHoursNotSet`) and that is not
+ * already "Not priced" as a whole. Its own count, NEVER folded into parts
+ * (owner, 2026-10-07): a part is fixed on the Materials screen, hours on the
+ * assembly, and lumping them sent the estimator to the wrong screen.
+ */
+export function lineHoursMissing(
+  line: PartsLineLike,
+  directCost: number | null
+): boolean {
+  return lineHoursNotSet(line) && !lineNotPriced(line, directCost);
 }
 
 /**
@@ -244,6 +253,12 @@ export function linePartsNotPriced(
 export type NotPricedTally = {
   lines: number;
   parts: number;
+  /**
+   * Lines whose assembly HOURS were not set (`lineHoursMissing`) — said
+   * apart from parts: "1 part not priced, 1 line hours not set" (owner,
+   * 2026-10-07). Required, so every total says it.
+   */
+  hours: number;
   /**
    * Drops to counted devices NOT PRICED because their count has no drop
    * material ("drop material not set", `GroupDrop.notPricedDrops`; owner,
@@ -257,20 +272,29 @@ export type NotPricedTally = {
   drops?: number;
 };
 
-export const NOTHING_NOT_PRICED: NotPricedTally = { lines: 0, parts: 0 };
+export const NOTHING_NOT_PRICED: NotPricedTally = {
+  lines: 0,
+  parts: 0,
+  hours: 0,
+};
 
 /**
- * Whether a total leaves ANYTHING out. The one rule the print's "Price
- * pending" reads, so a kind of gap counted in the tally cannot be forgotten
- * by a caller that checked fields by hand.
+ * Whether a total leaves ANYTHING out — lines, parts, hours or drops. The one
+ * rule every "is this figure complete?" reads (the print's "Price pending",
+ * analytics' incomplete marker), so a new kind of gap cannot be counted in
+ * the tally and forgotten by a caller that checked two fields by hand —
+ * which is exactly what splitting hours out of parts would have done.
  *
- * MERGE NOTE (Track C, 2026-10-07): local-dev has its own `tallyLeavesOut`
- * (Track B, with `hours`). The merged one must read lines, parts, hours AND
- * drops — `server/dropsNotPriced.test.ts` goes red if drops fall out.
+ * MERGED 2026-10-07: Track B's (lines, parts, hours) and Track C's (lines,
+ * parts, drops) arrived as two functions of this name; this one reads all
+ * four. `server/dropsNotPriced.test.ts` goes red if drops fall out.
  */
 export function tallyLeavesOut(notPriced: NotPricedTally): boolean {
   return (
-    notPriced.lines > 0 || notPriced.parts > 0 || (notPriced.drops ?? 0) > 0
+    notPriced.lines > 0 ||
+    notPriced.parts > 0 ||
+    notPriced.hours > 0 ||
+    (notPriced.drops ?? 0) > 0
   );
 }
 
@@ -296,7 +320,7 @@ export function withDropsNotPriced(
  */
 export function notPricedLines<L extends PartsLineLike & { name: string }>(
   lines: readonly { line: L; directCost: number | null }[]
-): { name: string; wholeLine: boolean; parts: number }[] {
+): { name: string; wholeLine: boolean; parts: number; hoursNotSet: boolean }[] {
   return lines.flatMap(
     ({
       line,
@@ -305,12 +329,21 @@ export function notPricedLines<L extends PartsLineLike & { name: string }>(
       name: string;
       wholeLine: boolean;
       parts: number;
+      /** Its assembly hours were not set — said apart from parts. */
+      hoursNotSet: boolean;
     }[] => {
       if (lineNotPriced(line, directCost)) {
-        return [{ name: line.name, wholeLine: true, parts: 0 }];
+        return [
+          { name: line.name, wholeLine: true, parts: 0, hoursNotSet: false },
+        ];
       }
       const parts = linePartsNotPriced(line, directCost);
-      return parts > 0 ? [{ name: line.name, wholeLine: false, parts }] : [];
+      // A line whose ONLY gap is its hours is listed too: it used to appear
+      // because hours counted as a part, and must not drop out now they don't.
+      const hoursNotSet = lineHoursMissing(line, directCost);
+      return parts > 0 || hoursNotSet
+        ? [{ name: line.name, wholeLine: false, parts, hoursNotSet }]
+        : [];
     }
   );
 }
@@ -323,6 +356,7 @@ export function countNotPriced(
     (tally, { line, directCost }) => ({
       lines: tally.lines + (lineNotPriced(line, directCost) ? 1 : 0),
       parts: tally.parts + linePartsNotPriced(line, directCost),
+      hours: tally.hours + (lineHoursMissing(line, directCost) ? 1 : 0),
     }),
     NOTHING_NOT_PRICED
   );

@@ -1297,6 +1297,7 @@ describeDb("a company with a bid history", () => {
       expect(report.worstJobs.find(j => j.bidId === bidId)?.notPriced).toEqual({
         lines: 1,
         parts: 0,
+        hours: 0,
       });
     });
 

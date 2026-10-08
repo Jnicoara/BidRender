@@ -22,6 +22,24 @@ const data = JSON.parse(
   fs.readFileSync(path.join(HERE, "materials-review-rows.json"), "utf8")
 );
 
+/*
+  DECISIONS ALREADY MADE (pricing/materials-review-marks.json), applied over
+  the generated defaults so a regenerated sheet keeps them. Every mark must
+  find its row: one that matches nothing is reported and fails the run,
+  because a decision that silently does not apply is the worst outcome of a
+  review sheet.
+*/
+const MARKS_FILE = path.join(HERE, "materials-review-marks.json");
+const marks = fs.existsSync(MARKS_FILE)
+  ? JSON.parse(fs.readFileSync(MARKS_FILE, "utf8"))
+  : { duplicates: {}, questions: {}, questionNotes: {}, missing: {} };
+const usedMarks = new Set();
+const markFor = (kind, key) => {
+  const value = (marks[kind] || {})[key];
+  if (value !== undefined) usedMarks.add(`${kind}:${key}`);
+  return value;
+};
+
 const YELLOW = {
   type: "pattern",
   pattern: "solid",
@@ -165,8 +183,21 @@ header(review, [
   { header: "Question", key: "question", width: 9 },
 ]);
 const last = data.review.length + 1;
+// A duplicate pair marked "Same - keep X" makes the OTHER row a Cut here
+// too, so the two tabs never disagree (a dropped new row is simply never
+// added; a dropped shipped row is retired and its uses move to the kept one).
+const droppedFor = new Map();
+for (const [key, [decision]] of Object.entries(marks.duplicates || {})) {
+  const [a, b] = key.split("|");
+  if (decision === "Same - keep A") droppedFor.set(b, a);
+  if (decision === "Same - keep B") droppedFor.set(a, b);
+}
 data.review.forEach((r, i) => {
   const n = i + 2;
+  const key = r.current || r.proposed;
+  const keptAs = droppedFor.get(key);
+  // A direct Review mark (the owner's row-by-row call) wins over both.
+  const direct = markFor("review", key);
   const row = review.addRow({
     n: i + 1,
     category: r.category,
@@ -176,9 +207,15 @@ data.review.forEach((r, i) => {
     why: r.why,
     usedBy: r.usedBy,
     status: r.status,
-    decision: r.decision,
+    decision: direct ? direct[0] : keptAs ? "Cut" : r.decision,
     yourName: "",
-    note: r.question ? `Decided by ${r.question} (Questions tab)` : "",
+    note: direct
+      ? direct[1]
+      : keptAs
+        ? `Same part as "${keptAs}" (Possible duplicates tab) — anything using this moves to it.`
+        : r.question
+          ? `Decided by ${r.question} (Questions tab)`
+          : "",
     uses: r.usedByCount,
     question: r.question,
   });
@@ -215,6 +252,14 @@ header(missing, [
 ]);
 const missingRows = [
   ...data.missing,
+  // Rows the owner asked for by name, after the generated ones.
+  ...(marks.extraMissing || []).map(x => ({
+    source: "Owner",
+    category: x.category,
+    item: x.item,
+    detail: x.detail,
+    prefill: x.decision,
+  })),
   ...Array.from({ length: 25 }, () => ({
     source: "Your row",
     category: "",
@@ -223,14 +268,23 @@ const missingRows = [
   })),
 ];
 missingRows.forEach(r => {
+  // A mark wins; then the generator's pre-fill (typical-job "Add"); then the
+  // marks file's default for a blank found row. "Your row" lines stay blank.
+  const mark = r.source === "Your row" ? undefined : markFor("missing", r.item);
+  const fallback =
+    r.source !== "Your row" && !r.prefill ? marks.missingDefault : undefined;
+  // An optional third element is the name to add it under ("Your name"),
+  // when the owner renamed a found item (2026-10-07: "… Copper").
+  const [decision, note, yourName = ""] = mark ||
+    (r.prefill ? [r.prefill, ""] : fallback) || ["", ""];
   const row = missing.addRow({
     source: r.source,
     category: r.category,
     item: r.item,
     detail: r.detail,
-    decision: r.prefill || "",
-    yourName: "",
-    note: "",
+    decision,
+    yourName,
+    note,
   });
   for (const key of ["decision", "yourName", "note"])
     row.getCell(key).fill = YELLOW;
@@ -259,7 +313,8 @@ header(dups, [
   { header: "Note", key: "note", width: 30 },
 ]);
 data.duplicates.forEach(d => {
-  const row = dups.addRow({ ...d, decision: "", note: "" });
+  const [decision, note] = markFor("duplicates", `${d.a}|${d.b}`) || ["", ""];
+  const row = dups.addRow({ ...d, decision, note });
   row.getCell("decision").fill = YELLOW;
   row.getCell("note").fill = YELLOW;
   dropdown(row.getCell("decision"), DUPLICATE_DECISIONS);
@@ -282,7 +337,11 @@ header(questions, [
   { header: "Note", key: "note", width: 40 },
 ]);
 data.questions.forEach(q => {
-  const row = questions.addRow({ ...q, answer: "", note: "" });
+  const row = questions.addRow({
+    ...q,
+    answer: markFor("questions", q.id) || "",
+    note: markFor("questionNotes", q.id) || "",
+  });
   row.getCell("question").alignment = { wrapText: true, vertical: "top" };
   row.height = 45;
   row.getCell("answer").fill = YELLOW;
@@ -344,6 +403,25 @@ warn(
   // Excel, 2026-10-07).
   `${data.duplicates.length}-COUNTIF('Possible duplicates'!$H$2:$H$${data.duplicates.length + 1},"?*")`
 );
+
+const unmatched = [];
+for (const kind of [
+  "duplicates",
+  "questions",
+  "questionNotes",
+  "missing",
+  "review",
+]) {
+  for (const key of Object.keys(marks[kind] || {})) {
+    if (!usedMarks.has(`${kind}:${key}`)) unmatched.push(`${kind}: ${key}`);
+  }
+}
+if (unmatched.length) {
+  console.error(
+    `writeMaterialsReview: ${unmatched.length} mark(s) matched no row — nothing written:\n  ${unmatched.join("\n  ")}`
+  );
+  process.exit(1);
+}
 
 wb.xlsx.writeFile(OUT).then(() => {
   console.log(

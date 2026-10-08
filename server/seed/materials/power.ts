@@ -16,10 +16,14 @@
  * "20A breaker" form it defended is why a single-pole row and its brand
  * variants could not be named from one pattern, and why "15A breaker" sat
  * beside "15A 1-Pole breaker" in the pricing sheet as two rows for one part.
- * Every breaker now states its pole count, and a one-pole breaker says
- * "Single-Pole" rather than "1-Pole" because that is how it is said and
- * written. The old names are in RENAMED_BASELINE_MATERIALS, and "20A breaker"
- * still finds the row, because every word of it is still in the name.
+ * Every breaker now states its pole count. A one-pole breaker said
+ * "Single-Pole" from 2026-09-24 to 2026-10-07, and says **"1-Pole"** since
+ * ("20A 1-Pole breaker") — the owner's call (2026-10-05), applied with the
+ * frozen review-sheet names: it matches "2-Pole" and "3-Pole" beside it, and
+ * it is how a supply-house ticket writes it. Breakers only: a single-pole
+ * SWITCH keeps its name. The old names are in RENAMED_BASELINE_MATERIALS,
+ * and every supply-house spelling — single pole, single-pole, 1P, SP, one
+ * pole — is a search word on the row (SINGLE_POLE_SLANG).
  *
  * ── Panels and Breakers are separate shelves ─────────────────────────────────
  * A panel is a box you hang once; a breaker is a part you stock by the dozen.
@@ -39,6 +43,8 @@ const gear = (category: "Panels" | "Breakers" | "Distribution Equipment") => ({
 const BREAKER_SLANG = "circuit cb ocpd bolt on plug in load center";
 /** Said out loud and written on takeoff sheets; kept findable after the rename. */
 const TWO_POLE_SLANG = "2 pole double pole two pole dp 240 volt 240v";
+/** Every spelling of a one-pole breaker that is not "1-Pole", which the name says. */
+const SINGLE_POLE_SLANG = "single pole single-pole one pole 1p sp";
 
 /*
   Sizes: 15–50A, the run every plug-on and bolt-on line makes. 60A and 70A
@@ -57,12 +63,8 @@ const singlePole: BaselineMaterial[] = [
   "50",
 ].map(amps => ({
   ...gear("Breakers"),
-  name: `${amps}A Single-Pole breaker`,
-  searchAliases: aliases(
-    `${amps} amp`,
-    "single pole one pole 1p sp 1-pole",
-    BREAKER_SLANG
-  ),
+  name: `${amps}A 1-Pole breaker`,
+  searchAliases: aliases(`${amps} amp`, SINGLE_POLE_SLANG, BREAKER_SLANG),
 }));
 
 /*
@@ -75,8 +77,12 @@ const singlePole: BaselineMaterial[] = [
   which is the only place search reads.
 
   Above 125A a two-pole is a main breaker (a different frame, and usually part
-  of the panel), so 150A and up are deliberately NOT shipped as branch
-  breakers. The pricing sheet lists them; see the audit in CHANGELOG.md.
+  of the panel), so 150A and up were deliberately NOT shipped as branch
+  breakers. **Overridden by the owner, 2026-10-07** ("YES: 150A+ two-pole and
+  main breakers"): 150, 175 and 200A ship below, and the 2-Pole MAIN breakers
+  (100–200A) ship as their own rows (`mainBreakers`), because a main is a
+  different part from a branch breaker of the same amps — a service upgrade
+  or a panel swap buys one on its own.
 */
 const doublePole: BaselineMaterial[] = [
   "15",
@@ -94,6 +100,9 @@ const doublePole: BaselineMaterial[] = [
   "100",
   "110",
   "125",
+  "150",
+  "175",
+  "200",
 ].map(amps => ({
   ...gear("Breakers"),
   name: `${amps}A 2-Pole breaker`,
@@ -103,6 +112,20 @@ const doublePole: BaselineMaterial[] = [
     BREAKER_SLANG
   ),
 }));
+
+/** Main breakers — see the note above `doublePole`. */
+const mainBreakers: BaselineMaterial[] = ["100", "125", "150", "200"].map(
+  amps => ({
+    ...gear("Breakers"),
+    name: `${amps}A 2-Pole main breaker`,
+    searchAliases: aliases(
+      `${amps} amp ${amps}a ${amps}/2`,
+      "service disconnect main kit back fed backfed panel conversion",
+      TWO_POLE_SLANG,
+      BREAKER_SLANG
+    ),
+  })
+);
 
 /**
  * Three-pole breakers — rooftop units, 3-phase motors, panel feeders on a
@@ -172,10 +195,10 @@ const PROTECTED_TYPES: Protected[] = [
 const protectedSingle: BaselineMaterial[] = PROTECTED_TYPES.flatMap(type =>
   ["15", "20"].map(amps => ({
     ...gear("Breakers"),
-    name: `${amps}A Single-Pole ${type.suffix} breaker`,
+    name: `${amps}A 1-Pole ${type.suffix} breaker`,
     searchAliases: aliases(
       `${amps} amp`,
-      "single pole one pole 1p sp 1-pole",
+      SINGLE_POLE_SLANG,
       type.slang,
       BREAKER_SLANG
     ),
@@ -221,10 +244,10 @@ const protectedSingleLarge: BaselineMaterial[] = [
   { amps: "30", type: PROTECTED_TYPES[1] },
 ].map(({ amps, type }) => ({
   ...gear("Breakers"),
-  name: `${amps}A Single-Pole ${type.suffix} breaker`,
+  name: `${amps}A 1-Pole ${type.suffix} breaker`,
   searchAliases: aliases(
     `${amps} amp`,
-    "single pole one pole 1p sp 1-pole",
+    SINGLE_POLE_SLANG,
     type.slang,
     BREAKER_SLANG
   ),
@@ -238,8 +261,8 @@ const protectedSingleLarge: BaselineMaterial[] = [
 const halfSize: BaselineMaterial[] = [
   ...["15", "20", "30"].map(amps => ({
     amps,
-    pole: "Single-Pole",
-    slang: "single pole one pole 1p sp",
+    pole: "1-Pole",
+    slang: SINGLE_POLE_SLANG,
   })),
   ...["15", "20", "30", "40", "50"].map(amps => ({
     amps,
@@ -483,14 +506,19 @@ const panelParts: BaselineMaterial[] = [
   searchAliases: aliases(slang),
 }));
 
-const meterBases: BaselineMaterial[] = ["100", "200", "400"].map(amps => ({
-  ...gear("Panels"),
-  name: `${amps}A meter base`,
-  searchAliases: aliases(
-    `${amps} amp`,
-    "socket can meter main utility service ringless"
-  ),
-}));
+// 320A (owner add, 2026-10-07): the class-320 base a 400A residential
+// service lands on, with two 200A mains (GR3 in top-assemblies-draft.md).
+const meterBases: BaselineMaterial[] = ["100", "200", "320", "400"].map(
+  amps => ({
+    ...gear("Panels"),
+    name: `${amps}A meter base`,
+    searchAliases: aliases(
+      `${amps} amp`,
+      "socket can meter main utility service ringless",
+      amps === "320" ? "class 320 cl320 400a residential dual lug" : ""
+    ),
+  })
+);
 
 /*
   The hub an overhead mast threads into on top of a meter base (starter
@@ -805,6 +833,7 @@ export const DISTRIBUTION: BaselineMaterial[] = [
 export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...singlePole,
   ...doublePole,
+  ...mainBreakers,
   ...triplePole,
   ...protectedSingle,
   ...protectedSingleLarge,

@@ -193,13 +193,17 @@ families.forEach(({ category, names }, key) => {
     for (let i = Math.min(...at) + 1; i < Math.max(...at); i++) {
       if (have.has(i)) continue;
       const size = table.sizes[i];
-      const item = neighbourProposed.startsWith(
+      let item = neighbourProposed.startsWith(
         table.label === "wire size" ? `#${neighbourSize} ` : `${neighbourSize} `
       )
         ? neighbourProposed.replace(neighbourSize, size)
         : table.label === "wire size"
           ? `#${size} ${type}`
           : `${size} ${type}`;
+      // The family's own fallback can still spell an aught "#1/0"; the owner's
+      // trade style is bare (2026-10-07) — the same rule as the catalog names.
+      const named = item.replace(/#(\d\/0)(?![\d/])/g, "$1");
+      if (named !== item) item = named;
       if (newNames.has(item)) continue; // already waiting on the Review tab
       missing.push({
         source: "Size gap",
@@ -216,7 +220,7 @@ families.forEach(({ category, names }, key) => {
 // carries every needed word and size — pricing/materialsCompleteness.ts.
 const allRows = [
   ...BASELINE_MATERIALS.map(m => ({ name: m.name, aliases: m.searchAliases })),
-  ...waiting.map(w => ({ name: w.proposed, aliases: "" })),
+  ...waiting.map(w => ({ name: w.proposed, aliases: "", isNew: true })),
 ];
 const wordsOf = (text: string) => {
   const s = signature(text);

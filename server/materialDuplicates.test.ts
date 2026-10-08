@@ -27,6 +27,40 @@ describe("finds one part under two names", () => {
     expect(pairsOf('2" riser strap', 'Riser strap, 2"')).toHaveLength(1);
   });
 
+  it("one name states more of the size — the owner's catch, 2026-10-07", () => {
+    expect(pairsOf("Ground rod, 10 ft", 'Ground rod, 3/4" x 10 ft')).toEqual([
+      ["Ground rod, 10 ft", 'Ground rod, 3/4" x 10 ft'],
+    ]);
+    // ...but a DIFFERENT length is a different rod.
+    expect(pairsOf("Ground rod, 8 ft", 'Ground rod, 3/4" x 10 ft')).toEqual([]);
+  });
+
+  it("a waiting new row written without its size, against the shipped one", () => {
+    expect(
+      findPossibleDuplicates([
+        { name: '2" mast roof flashing' },
+        { name: "Mast roof flashing", isNew: true },
+      ])
+    ).toHaveLength(1);
+    // Two SHIPPED rows that differ only by a stated size are two parts.
+    expect(pairsOf("Duplex receptacle", "20A duplex receptacle")).toEqual([]);
+  });
+
+  it("canless and wafer are one fixture", () => {
+    expect(
+      pairsOf('4" canless LED downlight', '4" wafer LED downlight')
+    ).toHaveLength(1);
+  });
+
+  it("never pairs two strut channels of different depths (a repeated size is two sizes)", () => {
+    expect(
+      pairsOf(
+        '1-5/8" x 1-5/8" strut channel, 10 ft',
+        '1-5/8" x 13/16" strut channel, 10 ft'
+      )
+    ).toEqual([]);
+  });
+
   it("a name that only adds qualifiers", () => {
     expect(
       pairsOf(
@@ -75,6 +109,11 @@ describe("keeps different parts apart", () => {
 describe("reading a name", () => {
   it("separates size from words", () => {
     expect(sizeTokens('1-1/4" EMT')).toEqual(['1-1/4"']);
+    // "#3/4" is one size (a #3 four-wire), not "#3" plus a word "4".
+    expect(signature("#3/4 MC cable Copper")).toEqual({
+      words: expect.not.arrayContaining(["4"]),
+      sizes: ["#3/4"],
+    });
     expect(signature("20A Single-Pole breaker")).toEqual({
       words: ["1pole", "breaker"],
       sizes: ["20a"],

@@ -1,7 +1,11 @@
 /**
- * The 168 starter assemblies (references/starter-assemblies-plan.md): what the
+ * The 183 starter assemblies (references/starter-assemblies-plan.md): what the
  * seed file holds, what a database gets from it, and that a company's own
  * assemblies are never touched by it.
+ *
+ * 168 by the 2026-09-29 plan, plus 15 on 2026-10-07: the twelve top-30 gap
+ * starters (GC1–GC5, GR1–GR7, top-assemblies-draft.md § 2b), the 2" and 8"
+ * wafers (LT31, LT32; LT8/LT7 are the 4"/6") and the 4" remodel can (LT33).
  *
  * ── "A fresh database gets the full set" — how that is asserted ──────────────
  * The DB half checks that after seeding, EVERY starter the schema can hold is
@@ -57,7 +61,7 @@ function planRefs(): string[] {
     "utf8"
   );
   return Array.from(
-    plan.matchAll(/^\| ((?:DV|LT|RS|CS|PG|MH|DR|MS)\d+)\s+\|/gm),
+    plan.matchAll(/^\| ((?:DV|LT|RS|CS|PG|MH|DR|MS|GC|GR)\d+)\s+\|/gm),
     m => m[1]
   );
 }
@@ -65,9 +69,9 @@ function planRefs(): string[] {
 describe("the starter seed file", () => {
   it("holds every planned starter once, by plan row and by name", () => {
     const refs = BASELINE_ASSEMBLIES.map(a => a.ref);
-    expect(refs.length).toBe(168);
-    expect(new Set(refs).size).toBe(168);
-    expect(new Set(BASELINE_ASSEMBLIES.map(a => a.name)).size).toBe(168);
+    expect(refs.length).toBe(183);
+    expect(new Set(refs).size).toBe(183);
+    expect(new Set(BASELINE_ASSEMBLIES.map(a => a.name)).size).toBe(183);
     expect([...refs].sort()).toEqual([...planRefs()].sort());
   });
 
@@ -107,7 +111,7 @@ describe("the starter seed file", () => {
   });
 
   it("ships every new starter with hours NOT SET — never 0", () => {
-    expect(PLANNED_STARTER_ASSEMBLIES.length).toBe(160);
+    expect(PLANNED_STARTER_ASSEMBLIES.length).toBe(175);
     expect(
       PLANNED_STARTER_ASSEMBLIES.filter(a => a.baseLaborHours !== null).map(
         a => a.ref
@@ -217,7 +221,7 @@ describe.skipIf(!hasDb)("seeding a database", () => {
     );
 
     // The full set, less only what the schema names a reason for.
-    expect(canHold.length + held.length).toBe(168);
+    expect(canHold.length + held.length).toBe(183);
     expect(canHold.filter(a => !byName.has(a.name)).map(a => a.ref)).toEqual(
       []
     );
@@ -245,6 +249,26 @@ describe.skipIf(!hasDb)("seeding a database", () => {
         [...lines].sort((a, b) => a.materialId - b.materialId),
         spec.ref
       ).toEqual(expectedLines(spec, idByName));
+    }
+  });
+
+  it("re-stamps every shared starter's residential/commercial tag from the seed", async () => {
+    // DR1, DR2, DR16, DR17 moved commercial → both on 2026-10-07; a
+    // database seeded before must follow on the next start, not keep the
+    // old tag for ever. Forks are the company's and are not checked here.
+    const db = (await getDb())!;
+    const rows = await db
+      .select({ name: assemblies.name, projectType: assemblies.projectType })
+      .from(assemblies)
+      .where(isNull(assemblies.userId));
+    const tagOf = new Map(rows.map(r => [r.name, r.projectType]));
+    const wrong = BASELINE_ASSEMBLIES.filter(
+      a => tagOf.has(a.name) && tagOf.get(a.name) !== a.projectType
+    ).map(a => `${a.ref}: ${tagOf.get(a.name)} ≠ ${a.projectType}`);
+    expect(wrong).toEqual([]);
+    for (const ref of ["DR1", "DR2", "DR16", "DR17"]) {
+      const spec = BASELINE_ASSEMBLIES.find(a => a.ref === ref)!;
+      expect(spec.projectType, ref).toBe("both");
     }
   });
 
@@ -276,7 +300,7 @@ describe.skipIf(!hasDb)("seeding a database", () => {
         held.every(a => !starterHolds(a, schema).includes("hours-not-set"))
       ).toBe(true);
     } else {
-      expect(held.length).toBe(160);
+      expect(held.length).toBe(175);
     }
   });
 

@@ -57,6 +57,133 @@ This is the human-readable companion to the git history — read this to see wha
   one. Now the end takes the box it is let go on, or none in open space, the
   totals move at once, and undo puts the old box back. Found by Track B.
 
+- **15 more starter assemblies.** These are the jobs the top-30 lists found
+  missing, plus the wafer and can light sizes:
+  - commercial: an emergency battery pack, a 3-phase panelboard change, a
+    parking-lot pole light, an emergency remote head, and a 120V feed for
+    door hardware;
+  - residential: an old-work switch, a 200A underground service, a 320A
+    service, a 50A generator inlet, a detached garage feeder, and kitchen
+    and bathroom 20A circuits;
+  - canless wafer lights at 2" and 8", so wafers now come in 2", 4", 6"
+    and 8";
+  - a 4" remodel can light, so can lights now come in 4" and 6", each as
+    new construction or remodel.
+
+  Each starts with hours not set, for you to fill in.
+
+- **Two more starter sheets for the owner:** a brand-variants pricing sheet
+  with 508 panels and breakers, each under the generic item it stands for,
+  and an assembly-hours sheet with all 168 starter assemblies, his top-30
+  commercial and residential lists first. All four starter sheets now have a
+  "Residential / Commercial / Both" column to filter by.
+- **Decided: shipped labor hours carry an "Example hours" tag**, the same as
+  prices: shown on the bid screen and never on the customer quote, cleared
+  when the shop edits the number, with a warning before printing. Hours ship
+  only together with the tag.
+
+- **Searching "6 wafer" (any size) now leads with the plain canless wafer.**
+  The slim, gimbal, wet-rated and color-selectable versions are named after
+  it ("6" canless wafer LED downlight, slim") and follow it.
+- **The 5"/6" disc light and 5"/6" LED retrofit trim are now separate 5" and
+  6" items.** The combined item became the 6" one. The three 6" starter
+  recipes that used the trim are unchanged, and no saved bid moves.
+- **New starter pricing and labor sheets for the owner to fill in**, one row
+  per catalog item (1,715), most-used first, with a pack-price column. Filled
+  sheets are loaded by Track A into the shared starter that every shop gets.
+  Nothing loaded can ship until the app can tag a shipped number as an
+  example.
+
+- **Large plan sets no longer download whole in the background.** Opening a
+  plan set over 50 MB was meant to fetch only the pages you look at, but the
+  viewer was quietly pulling down the entire file as well. On a 52.6 MB set
+  that was 52.55 MB extra, sometimes before the first sheet appeared. Now it
+  fetches only what is on screen. Smaller sets still preload, so page-flipping
+  stays instant.
+- **Two new checks that a traced run never includes the line to your mouse.**
+  The saved length, the bid quantity and the totals always come from the
+  points you clicked, and the tests now fail if that ever changes.
+
+- **Quick bid has the "Most used" row too** — the same one as the bid
+  screen: your company's most-used assemblies, one tap to count onto the
+  bid, hidden while you type, and nothing extra until the company has three
+  bids.
+
+- **"Most used" assemblies, one click to add.** Under the bid's "Add an
+  assembly" box, a row shows the eight assemblies your company has put on
+  the most bids in the last year; click one to add it with the quantity and
+  unit already typed. It counts bids, not lines, counts your edited copy of
+  a starter together with the starter, leaves out the sample bid, and only
+  appears once the company has three bids — before that nothing extra
+  shows. It hides as soon as you start typing.
+
+- **159 new catalog items**, from the approved review sheet and the owner's
+  answers:
+  - Three new shelves: Surface Raceway, Underground and Service Entrance,
+    including warning tape, tracer wire, mule tape, service masts, SE caps
+    and a main bonding jumper kit. Every surface raceway item answers to
+    "wire mold" and "wiremold".
+  - 3-1/2" conduit as a full size for EMT and PVC Schedule 40: pipe,
+    elbows, every conduit body, fittings, straps and sweeps.
+  - 150A to 200A two-pole breakers, and 100A to 200A main breakers.
+  - Every wafer and canless downlight size from 2" to 8", each its own
+    item, with slim, gimbal, wet-rated and color-selectable versions, plus
+    color-selectable discs.
+  - 3" and 5" recessed cans and trims, a concrete pole base, a fixture
+    hanging kit and a 320A meter base.
+  - #3 aluminum wire, MC-AP and dimming MC cable, plenum Cat6, crimp sleeves
+    from #1 to 3/0, and the everyday 1/2" fittings a tenant improvement
+    uses.
+
+  Eight requested items were already in the catalog under another name and
+  weren't added twice. The QO-only 60A and 70A single-pole breakers stay off,
+  as the owner decided.
+
+- **Searching "ser" finds SER cable again.** It briefly found service masts
+  first, because the rename put "Copper" or "Aluminum" at the end of every
+  wire name.
+- **151 catalog items have their final names** (frozen from the owner's
+  review sheet). Every wire states its metal at the end ("#12 THHN Copper",
+  "12/2 NM-B Copper", "4/0 XHHW Aluminum"). Breakers say "1-Pole". SER cable
+  spells out every conductor ("4/0-4/0-4/0-2/0 SER Aluminum"). The ground rods
+  state their diameter, and the wafers are separate 4" and 6" items. Every
+  item keeps its identity, so saved bids, assemblies and counts are untouched.
+  Typing an old name still finds the item: "12-2", "#1/0 THHN", "20A
+  Single-Pole breaker", "6ft whip".
+- **Fixed a restart hazard:** two catalog names differing only by capital
+  letters could make the app delete one of them, along with the assembly lines
+  using it, on every restart. Names now have to match exactly.
+- **Supplier price imports and labor-sheet imports recognise a renamed item
+  under either name.** A company's own copy that still has an old name stays
+  one line on a supplier's materials list, not two.
+- **The app now reads sizes in the catalog's new wire names** — "12/2",
+  "#3/4" (a #3 four-wire, not 3/4 inch) and "1/0" without the "#" — so they
+  sort and group correctly. The current names still read exactly as before.
+  This comes before any rename. No material has been renamed yet.
+- **Materials review sheet: owner's second answers applied** (nothing renamed
+  yet). Three ground rods stay separate. 4" and 6" canless wafers are separate
+  items, and the old combined 5"/6" becomes the 6". #3 aluminum is added back.
+  The concrete pole base and the 320A meter base are added. The result is 151
+  renames, 153 adds and no shipped item cut.
+- **"Hours not set" now appears on the Labor line of a bid's totals, not on
+  Materials**, on the bid screen and in the proposal's own figures. And
+  "Direct cost", "Bid price" and "Total due" no longer break onto two lines
+  when the not-priced note sits beside them.
+- **Four demo/replace starters show on residential jobs too** — demo a
+  fixture, demo a device, replace a receptacle, replace with a GFCI are now
+  tagged for both residential and commercial work, including on databases
+  that already have them.
+
+- **Bid totals say missing hours apart from unpriced parts.** A total now
+  reads "+ 1 part not priced, 1 line hours not set" instead of lumping both
+  into "parts", so it is clear what to fix where: a part on the Materials
+  screen, hours on the assembly. The same goes for the dashboard, the
+  proposal's warning list and the reports.
+- **The proposal no longer prints a short labor-hours figure.** While any
+  line's hours are not set, it says "Labor hours: Hours pending" (and the
+  price says "Price pending") instead of "Estimated at 2.5 labor hours"
+  that silently left a line out.
+
 - **The materials review sheet is ready to mark** —
   `pricing/materials-review.xlsx`. Every shipped material with its proposed
   new name (wire and cable metal at the end, breakers "1-Pole"), who uses

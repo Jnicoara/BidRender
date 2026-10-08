@@ -22,6 +22,7 @@ import {
 } from "../shared/assemblyHours";
 import {
   countNotPriced,
+  lineHoursMissing,
   lineHoursNotSet,
   lineNotPriced,
   linePartsNotPriced,
@@ -109,14 +110,22 @@ describe("reading an assembly's hours", () => {
 });
 
 describe("a bid line whose assembly hours were not set", () => {
-  it("counts its labor as ONE thing not priced, beside its parts", () => {
+  it("counts its HOURS on their own, never as a part (owner, 2026-10-07)", () => {
     const noHours = aLine({ snapshotLaborHours: null });
     // Priced for its material (directCost 20), labor missing.
     expect(lineNotPriced(noHours, 20)).toBe(false);
     expect(lineHoursNotSet(noHours)).toBe(true);
-    expect(linePartsNotPriced(noHours, 20)).toBe(1);
-    expect(linePartsNotPriced({ ...noHours, unpricedParts: 2 }, 20)).toBe(3);
+    expect(lineHoursMissing(noHours, 20)).toBe(true);
+    // Parts are parts only: none here, two on the second.
+    expect(linePartsNotPriced(noHours, 20)).toBe(0);
+    expect(linePartsNotPriced({ ...noHours, unpricedParts: 2 }, 20)).toBe(2);
+    expect(
+      countNotPriced([
+        { line: { ...noHours, unpricedParts: 2 }, directCost: 20 },
+      ])
+    ).toEqual({ lines: 0, parts: 2, hours: 1 });
     // Hours set: nothing missing.
+    expect(lineHoursMissing(aLine(), 70)).toBe(false);
     expect(linePartsNotPriced(aLine(), 70)).toBe(0);
   });
 
@@ -131,6 +140,7 @@ describe("a bid line whose assembly hours were not set", () => {
     expect(countNotPriced([{ line: nothing, directCost: 0 }])).toEqual({
       lines: 1,
       parts: 0,
+      hours: 0,
     });
   });
 
@@ -165,7 +175,7 @@ describe("a bid line whose assembly hours were not set", () => {
         { line: noHours, directCost: 20 },
         { line: aLine(), directCost: 70 },
       ])
-    ).toEqual({ lines: 0, parts: 1 });
+    ).toEqual({ lines: 0, parts: 0, hours: 1 });
     expect(hoursNotSetWords(1)).toBe("1 assembly with hours not set");
     expect(hoursNotSetWords(3)).toBe("3 assemblies with hours not set");
     expect(hoursNotSetWords(0)).toBe("");

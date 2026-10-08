@@ -67,6 +67,16 @@ export type BaselineMaterial = {
    * Omitted on everything that is not a raceway.
    */
   raceway?: RacewayFacts;
+  /**
+   * Labor units, in the column's own units: hours per EACH, or per FOOT for
+   * a row sold by the foot (the sheet says "per 100 ft"; the loader divides).
+   * Never typed in a module: set ONLY by the starter labor sheet through
+   * pricing/loadStarterSheets.mts, into starterLaborUnits.ts. Omitted = no
+   * shipped hours (NULL, "not set" — never 0).
+   */
+  laborHours?: string;
+  /** Hours per field bend, raceways only. Same source and rule. */
+  fieldBendLaborHours?: string;
 };
 
 export type RacewayFacts = {
@@ -155,6 +165,8 @@ const SIZE_ALIASES: Record<string, string> = {
   '2"': "two inch",
   '2-1/2"': "2 1/2 2.5 two and a half",
   '3"': "three inch",
+  // EMT and PVC Sch 40 only (owner, 2026-10-07) — see conduit.ts.
+  '3-1/2"': "3 1/2 3.5 three and a half",
   '4"': "four inch",
 };
 
