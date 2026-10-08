@@ -18,7 +18,11 @@ This is the human-readable companion to the git history — read this to see wha
   older step on purpose. Also fixed: adding legs to a finished run left an
   undo step that would have deleted the whole run, and undoing a deleted
   count still briefly showed other sheets without its marks.
-
+- **The automatic staging check no longer fails at random on "undo a mark".**
+  The check was reading the mark count before the sheet had finished
+  loading, so it sometimes counted wrong and then judged undo by that wrong
+  number. It now takes the count from the server and waits for the screen to
+  agree. The app's undo was not at fault.
 - **Underground PVC and Wiremold 700 are now run types you can trace.** Ten
   underground PVC types (1/2" to 4") sit behind one "Underground (10)" fold
   in the conduit picker, each carrying underground warning tape for when

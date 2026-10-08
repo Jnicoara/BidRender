@@ -3,9 +3,44 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
-## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08)
+## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08) — FIXED (A, same day)
 
-- [ ] **"10. undo and redo a mark; delete one and Undo brings it back"**
+> **CAUSE FOUND, and it was neither suspect below: the TEST read a number
+> from a screen that had not loaded.** After step 9's reload, the "This
+> sheet" line reads "0 marks" until the sheet's mark list arrives (it counts
+> SAVED marks, default `[]`). Step 10 read `start` in that window — 0, with
+> step 8's mark already on sheet 2. The poll for `start + 1` was then met by
+> that OLD mark loading, Ctrl+Z went in before the new mark was saved (an
+> undo step is pushed only once the server confirms the write), so nothing
+> was undone and the tally sat at 2. Every red run that day (5: 37724027830,
+> 37728609820 ×2, 37733766674, 37825778891, 37835126975) shows the same
+> "Expected 0, Received 2" at the Ctrl+Z poll, and the screenshot shows two
+> marks with Redo greyed out. **Not a redeploy:** Gate runs on local-dev are
+> already one queued concurrency group, and none of the five overlapped
+> another run. **Not an undo bug in the app.**
+>
+> **Fix (`e2e/smoke/flow.spec.ts`):** step 10 takes `start` from the server
+> and waits for the screen to agree; it waits for the server to hold the new
+> mark before Ctrl+Z, and checks screen AND server after undo and redo.
+> **Forced:** step 9 now delays sheet 2's first mark list by 6 s after its
+> reload, so the window is there every run. The old step 10 under that hold
+> went red locally with the CI picture (Expected 0, Received 2); the fixed
+> one was 3/3 green locally.
+>
+> **Two app findings left open, NOT fixed here (owner/B to decide):**
+>
+> - [ ] **"This sheet: 0 marks" while the sheet's marks are loading** —
+>       `ThisSheetLine` is fed `stamps = []` before `listForSheet` answers,
+>       so it states a zero it does not know (CLAUDE.md: a number that is
+>       quietly wrong). Usually a fraction of a second; on a slow staging,
+>       long enough for a test — or a person — to read it.
+> - [ ] **Ctrl+Z on a mark still being saved does nothing, silently.** The
+>       undo step is pushed when the server confirms the write
+>       (`TakeoffPage` flush, `pushUndo` in `.then`). Press Ctrl+Z inside
+>       that window and the mark stays, with no message. By design (an undo
+>       guessing ids would be worse), but it could say "still saving".
+
+- [x] **"10. undo and redo a mark; delete one and Undo brings it back"**
       (`e2e/smoke/flow.spec.ts:410`) failed on local-dev run 37724027830
       (build b70f5d5), retry included.
   - **What failed:** the poll for the mark count to come back after Undo

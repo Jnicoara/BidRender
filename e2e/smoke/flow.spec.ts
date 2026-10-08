@@ -44,6 +44,41 @@ async function marksOnSheet(): Promise<number> {
   return Number(text.match(/(\d+) marks?/)?.[1] ?? NaN);
 }
 
+/** Step 9 holds the first mark list after its reload; step 10 checks it did. */
+let stampListDelayed = false;
+async function delayFirstStampList(route: Route) {
+  if (!stampListDelayed) {
+    stampListDelayed = true;
+    await new Promise(r => setTimeout(r, 6_000));
+  }
+  await route.continue();
+}
+
+/** The id of this bid's sheet on page `n` of its first plan set. */
+async function sheetIdOnPage(n: number): Promise<number> {
+  const plans = await trpc<{ id: number }[]>(page.request, "bidPdfs.list", {
+    bidId,
+  });
+  const sheets = await trpc<{ id: number; pageNumber: number }[]>(
+    page.request,
+    "bidPdfs.sheets",
+    { bidPdfId: plans[0].id }
+  );
+  const sheet = sheets.find(s => s.pageNumber === n);
+  if (!sheet) throw new Error(`no sheet on page ${n}`);
+  return sheet.id;
+}
+
+/** How many marks the SERVER holds on a sheet — what the tally should say. */
+async function savedMarks(sheetId: number): Promise<number> {
+  const rows = await trpc<unknown[]>(
+    page.request,
+    "takeoffStamps.listForSheet",
+    { sheetId }
+  );
+  return rows.length;
+}
+
 async function bidLines(): Promise<BidLine[]> {
   const bid = await trpc<{ lines: BidLine[] }>(page.request, "bids.get", {
     id: bidId,
@@ -395,6 +430,18 @@ test("9. a refresh keeps the sheet and the zoom", async () => {
     held = true; // never continued, fulfilled or aborted: a hung response
   };
   await page.route(/\/api\/trpc\/[^?]*bidPdfs\.list/, holdFirstPlansList);
+  /*
+    FORCED for step 10: this sheet's marks arrive LATE after the reload, so
+    step 10 starts while the tally still reads "0 marks" with a mark on the
+    sheet. That window is what made step 10 flaky (2026-10-08, five runs in
+    a day); held here it is there every time, and step 10 must not read a
+    number from it. Released by time, once — step 10 removes the route.
+  */
+  stampListDelayed = false;
+  await page.route(
+    /\/api\/trpc\/[^?]*takeoffStamps\.listForSheet/,
+    delayFirstStampList
+  );
   await page.reload();
   await expect(page.getByText(/^2\/2$/).first()).toBeVisible({
     timeout: 60_000,
@@ -426,9 +473,32 @@ test("10. undo and redo a mark; delete one and Undo brings it back", async () =>
     }
     await route.continue();
   };
+  /*
+    WAIT FOR THE SHEET'S MARKS BEFORE READING `start` (2026-10-08). The
+    tally counts SAVED marks only, and until this sheet's list arrives after
+    step 9's reload it reads "0 marks". Read in that window, `start` was 0
+    while step 8's mark was already on this sheet — so the poll for
+    `start + 1` was met by that OLD mark loading, Ctrl+Z went in before the
+    new mark was saved (no undo step exists until the server confirms), and
+    the tally sat at 2. Same picture in every red run that day: "Expected 0,
+    Received 2" at the Ctrl+Z poll, two marks drawn, Redo greyed out. Not a
+    staging redeploy — none of the five overlapped one. So both numbers come
+    from the SERVER, and the screen must agree with it.
+  */
+  const sheet2 = await sheetIdOnPage(2);
+  const start = await savedMarks(sheet2);
+  expect(start, "step 8 left a mark on this sheet").toBeGreaterThan(0);
+  await expect.poll(marksOnSheet).toBe(start);
+  await page.unroute(
+    /\/api\/trpc\/[^?]*takeoffStamps\.listForSheet/,
+    delayFirstStampList
+  );
+  expect(
+    stampListDelayed,
+    "the mark list was not delayed — nothing was forced"
+  ).toBe(true);
   await page.route(/\/api\/trpc\/[^?]*takeoffGroups\.create/, holdCreate);
   await armFromLegend("CI DUPLEX");
-  const start = await marksOnSheet();
   await placeAt(page, SYMBOLS.sheet2Duplex[1]);
   await expect.poll(() => heldCreate).toBe(true);
 
@@ -447,13 +517,17 @@ test("10. undo and redo a mark; delete one and Undo brings it back", async () =>
 
   release();
   // Counted once the count exists — exactly once, not lost and not doubled.
+  // The server first: the undo step is pushed when the write is confirmed.
+  await expect.poll(() => savedMarks(sheet2)).toBe(start + 1);
   await expect.poll(marksOnSheet).toBe(start + 1);
   await page.unroute(/\/api\/trpc\/[^?]*takeoffGroups\.create/, holdCreate);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Control+z");
   await expect.poll(marksOnSheet).toBe(start);
+  await expect.poll(() => savedMarks(sheet2)).toBe(start);
   await page.keyboard.press("Control+Shift+z");
   await expect.poll(marksOnSheet).toBe(start + 1);
+  await expect.poll(() => savedMarks(sheet2)).toBe(start + 1);
 
   // Select the mark just placed and delete it from the toolbar.
   await placeAt(page, SYMBOLS.sheet2Duplex[1]);
