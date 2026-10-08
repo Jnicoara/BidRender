@@ -109,6 +109,10 @@ describe("gap 4 — a shop can rename its own height type", () => {
     expect(s).toMatch(/trpc\.takeoffHeights\.renameType\.useMutation/);
     // Only the company's own types: a shipped name is ours.
     expect(s).toMatch(/row\.isShipped\s*\?\s*undefined/);
+    // Enter and blur save what is IN THE BOX — not state that can trail it
+    // by one change (a filled-and-entered name saved nothing on staging).
+    expect(s).toMatch(/onBlur=\{e => commit\(e\.currentTarget\.value\)\}/);
+    expect(s).toMatch(/"Enter"\) commit\(e\.currentTarget\.value\)/);
   });
 });
 

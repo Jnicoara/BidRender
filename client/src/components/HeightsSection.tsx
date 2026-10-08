@@ -89,8 +89,14 @@ function TypeName({
         {row.label}
       </button>
     );
-  const commit = () => {
-    const next = draft.trim();
+  /*
+    Reads the BOX'S value, not `draft`. The state captured by this render can
+    trail the box by one change — on staging (2026-10-08) a name filled and
+    entered at once saved nothing, because `draft` still held the old name
+    and "unchanged" was the right answer to the wrong question.
+  */
+  const commit = (typed: string) => {
+    const next = typed.trim();
     setDraft(null);
     if (next && next !== row.label) onRename(next);
   };
@@ -100,9 +106,9 @@ function TypeName({
       autoFocus
       onFocus={selectOnFocus}
       onChange={e => setDraft(e.target.value)}
-      onBlur={commit}
+      onBlur={e => commit(e.currentTarget.value)}
       onKeyDown={e => {
-        if (e.key === "Enter") commit();
+        if (e.key === "Enter") commit(e.currentTarget.value);
         if (e.key === "Escape") setDraft(null);
       }}
       className="h-7 text-sm w-48"
