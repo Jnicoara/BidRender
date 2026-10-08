@@ -123,6 +123,15 @@ export type ExtraFeetTotal = ExtraFeet & {
   unmeasurableCount: number;
   /** A sentence saying how the figure was reached. */
   why: string;
+  /**
+   * The same, WITHOUT the "N ft of <name>:" it opens with — for a row that
+   * already shows the name and the feet beside it (the Runs panel). Seen on
+   * screen 2026-10-08: "Underground warning tape 211.12 ft" over "211.12 ft
+   * of Underground warning tape: 211.12 ft over 2 runs…", the name and the
+   * number said twice in two lines. A bid line's note keeps `why`, where
+   * nothing else on the line says what the feet are of.
+   */
+  how: string;
 };
 
 /**
@@ -162,10 +171,12 @@ export function extraFeetForRuns(
   const rate = feetPerFootFor(extra, lineFeetPerFoot);
 
   let why: string;
+  let how: string;
   if (lineFeetPerFoot === 0) {
     why = `0 ft of ${name} — shared trench (set on this bid)`;
+    how = "Shared trench (set on this bid)";
   } else if (measured === 0 && unmeasurable === 0) {
-    why = "Nothing traced";
+    why = how = "Nothing traced";
   } else {
     const which =
       extra.appliesTo === "flat"
@@ -173,10 +184,14 @@ export function extraFeetForRuns(
         : "every foot, risers included";
     const per = rate === 1 ? "" : ` × ${trim(rate)} per foot`;
     const wastePart = waste > 0 ? ` + ${trim(waste)} ft waste` : "";
-    why = `${trim(bought)} ft of ${name}: ${trim(installed)} ft over ${plural(measured, "run")}, ${which}${per}${wastePart}`;
+    how = `${trim(installed)} ft over ${plural(measured, "run")}, ${which}${per}${wastePart}`;
+    why = `${trim(bought)} ft of ${name}: ${how}`;
   }
-  if (unmeasurable > 0)
-    why += ` (${plural(unmeasurable, "run")} on a sheet with no scale — not counted)`;
+  if (unmeasurable > 0) {
+    const tail = ` (${plural(unmeasurable, "run")} on a sheet with no scale — not counted)`;
+    why += tail;
+    how += tail;
+  }
 
   return {
     installedFeet: installed,
@@ -184,6 +199,7 @@ export function extraFeetForRuns(
     wasteFeet: waste,
     unmeasurableCount: unmeasurable,
     why,
+    how,
   };
 }
 

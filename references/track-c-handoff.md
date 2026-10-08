@@ -12,7 +12,87 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## WHERE THINGS STAND (2026-10-08, latest — read this first)
+## LATEST (2026-10-08, late) — wire on underground runs; tape line checked on screen
+
+Same branch, `c-per-foot-logic`, **still NOT merged into local-dev** (waits
+for A's 0139 — the section below still applies word for word). **No new
+column was needed**, so nothing here is for Track A.
+
+**How a user put wire on an underground run before this (the owner's
+question 1).** Only by editing the TYPE in the picker (pencil → Conductor,
+count, ground), which forks it for the whole shop and moves every run of it.
+From the warning itself there was no way: a route run's "Add wires" added a
+circuit the type named no material for, so the wire row read "can't go on
+the bid as it stands"; a quantity trace said "the type says no wire" and
+offered nothing. Ignored, **the bid came in without the feeder** — said in
+amber, never priced. "Empty pipe" did not exist as an answer at all: a
+spare conduit stayed flagged forever.
+
+**What is built (no column — D3(b), the existing per-run "Made of" path):**
+
+- **"Pick the wire"** on the run's no-wire line (route and quantity) opens
+  the run's `RunSpecEditor` with its wire, count — and a **ground** slot,
+  shown only when the type names no ground (otherwise picking the wire left
+  the circuit's ground counted with nothing named: seen on screen). Saving
+  goes through `takeoffRuns.respecify`, which points the run at a type
+  saying exactly that, found or made.
+- **"No wire (empty pipe)"** on the same line and inside the editor:
+  `respecify({ emptyPipe: true })` → a type with conductor count **0**
+  (already "says no wire" in `typeCarriesWire`; NULL stays "not said").
+  `runCarriesNoWire` now takes the type's answer (REQUIRED third argument,
+  `emptyPipeLookup(palette)`), so a 0-type run is not flagged; all three
+  callers (runs list, summary, plan attention) pass it. Refused, with the
+  way out named, on a route run whose circuits already carry wire.
+- **The trench keeps its tape.** `respecify` now carries the current
+  type's EXTRAS (rule 7 — the editor does not show them): a match must have
+  the same extras (`extrasSignature`), and a made type copies them. Before,
+  picking a wire for an underground run would have landed it on a tape-less
+  type and **dropped the tape off the bid** — the wrong number this job was
+  for, from the fix itself. Made types are named
+  `2" PVC Sch 40, 2 #6 THHN Copper, underground` /
+  `2" PVC Sch 40, empty pipe, underground` (`saysUnderground`); a type with
+  other extras gets `+ <extra>`.
+- **Send dialog, never stuck:** the "no wire" item reads "N conduit runs
+  with no wire picked — No wire picked, so none is priced. Pick the wire, or
+  say it is an empty pipe." with a button ("Go to the run and pick its
+  wire") that opens the first such run on its sheet with the editor open and
+  scrolled into view (`fixAt` on the item, `openRunAt` in TakeoffPage —
+  the drops readout uses the same function now).
+
+**Job 2 — the tape line on screen** (playwright, real viewports 1366×768,
+820×1180, 1180×820; a throwaway bid on the Old Blueridge set, deleted
+after, with its made types). No sideways scroll anywhere; the Send dialog
+scrolls its list inside with Cancel/Send on screen at 1366×768. Fixed:
+the Runs panel's tape explanation restated the row ("211.12 ft of
+Underground warning tape: 211.12 ft over 2 runs…" under "Underground
+warning tape 211.12 ft") — now `how`, the sentence without its opening;
+the bid note keeps the full `why`. The Send dialog showed tape = pipe feet
+with no word on why — it now carries the `how` under extra lines (`note`).
+Picker opened below the fold after the jump — now scrolls into view.
+
+**Seen, not changed:** at 820 wide the panel's tab strip runs "Legend" past
+the right edge (pre-existing; not checked whether it scrolls). The open
+run's own "Add wires to this run" (circuit editor) still adds a circuit on
+a type with no wire named — it then reads "can't go", visible, not silent.
+`takeoffSummary` keys a run row `run:<type>:<role>`, so a type with TWO
+extras would collide on `run:<type>:extra` — one shipped extra today, but
+it needs the extra key before a second ships. Picking wire without a ground
+and later with one makes a `(2)` twin name (labels do not name the ground).
+
+**Numbers:** HEAD `4147269` vs this tree, same `bidrender_local_c`, read
+only — `bids.get` + `bridgeForBid` + `materialsList.get` +
+`takeoffSummary.forBid`: identical on E111 1728359 (pipe 3,996.04 ft) and
+Bar layout check 1164558 ($378.15, 7 lines) except the reworded no-wire item
+and its new `fixAt` (and the list's timestamp). Note E111 1728359 is owned
+by local user 22173517 — run it as that user.
+
+**Tests** (`bidrender_test_c`): `runNoWire.test.ts` (+6, incl. 5 DB: asks,
+empty pipe keeps tape and reuses its type, picked wire priced with tape,
+ground named and sendable, refusal), `runRespecify.test.ts` (+8),
+`takeoffSummary.test.ts` (+2), `runExtrasPerFoot.test.ts` (`how`).
+**Mutation-checked, 13 of 13 red.**
+
+## WHERE THINGS STAND (2026-10-08, before the section above — still true)
 
 **Branch `c-per-foot-logic` now holds the per-foot SERVER HALF, wired**, on
 top of local-dev `08205a6` (A's 0135–0138 + seed). Pushed; **NOT merged

@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **An underground run can now be given its wire, or called an empty pipe,
+  right where the warning is.** The shipped underground types leave the wire
+  unsaid on purpose, so a traced trench sat at "no wire" with nothing that
+  fitted: the bid came in without the feeder and the only button added wire
+  with no material to price. Now the run's warning offers "Pick the wire"
+  (the wire, how many, and the ground) and "No wire (empty pipe)" for a spare
+  conduit; the Send dialog's warning has a button that opens the run.
+  Either way the trench keeps its warning tape. A spare conduit no longer
+  shows a warning forever. The tape's explanation stops repeating its own
+  name and number, and says why the tape matches the pipe in the Send dialog
+  too. No existing bid number moved.
 - **Underground warning tape now follows the trench, and a traced 700 run
   buys 700 parts.** Sending an underground run type to a bid adds a tape line
   sized to the flat trench length (not the risers), with the run's conduit

@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   foldNotOnBid,
   type NotOnBidFold,
+  type RunPlace,
   type SummaryItem,
   type TakeoffSummary,
 } from "@shared/takeoffSummary";
@@ -40,7 +41,15 @@ function qtyText(item: SummaryItem): string {
 }
 
 /** A row: 14px, its quantity never in the muted grey (plan § 2, items 2 and 5). */
-function ItemRow({ item, why }: { item: SummaryItem; why: string | null }) {
+function ItemRow({
+  item,
+  why,
+  onPickWire,
+}: {
+  item: SummaryItem;
+  why: string | null;
+  onPickWire?: (to: RunPlace) => void;
+}) {
   return (
     <li className="py-1">
       <div className="flex items-baseline gap-2 text-sm">
@@ -53,7 +62,41 @@ function ItemRow({ item, why }: { item: SummaryItem; why: string | null }) {
         <p className="truncate text-xs text-muted-foreground">{item.group}</p>
       ) : null}
       {why ? <p className="text-xs text-warning">{why}</p> : null}
+      <FixHere item={item} onPickWire={onPickWire} />
     </li>
+  );
+}
+
+/**
+ * THE FIX, WHERE THE PROBLEM IS SAID (never-stuck rule, 2026-10-08). An item
+ * no Send can fix used to end at a sentence: "Wire for 1 conduit run", and
+ * nothing to press. Now the "no wire" item opens the first such run with its
+ * wire picker open; that run's own line offers "No wire (empty pipe)" too.
+ */
+function FixHere({
+  item,
+  onPickWire,
+  onDone,
+}: {
+  item: SummaryItem;
+  onPickWire?: (to: RunPlace) => void;
+  onDone?: () => void;
+}) {
+  if (!item.fixAt || !onPickWire) return null;
+  const to = item.fixAt;
+  return (
+    <button
+      type="button"
+      className="mt-1 min-h-8 text-sm underline text-warning hover:text-foreground"
+      onClick={() => {
+        onDone?.();
+        onPickWire(to);
+      }}
+    >
+      {item.qty === 1
+        ? "Go to the run and pick its wire"
+        : "Go to the first one and pick its wire"}
+    </button>
   );
 }
 
@@ -62,7 +105,13 @@ function ItemRow({ item, why }: { item: SummaryItem; why: string | null }) {
  * warning row — amber on a tinted band — so it reads as a different kind of
  * row and not as another grey one.
  */
-function FoldRow({ fold }: { fold: NotOnBidFold }) {
+function FoldRow({
+  fold,
+  onPickWire,
+}: {
+  fold: NotOnBidFold;
+  onPickWire?: (to: RunPlace) => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <li className="rounded bg-warning/10">
@@ -87,7 +136,12 @@ function FoldRow({ fold }: { fold: NotOnBidFold }) {
           ) : null}
           <ul className="mt-0.5 divide-y divide-border/60">
             {fold.items.map(item => (
-              <ItemRow key={item.key} item={item} why={item.ownWhy} />
+              <ItemRow
+                key={item.key}
+                item={item}
+                why={item.ownWhy}
+                onPickWire={onPickWire}
+              />
             ))}
           </ul>
         </div>
@@ -100,11 +154,14 @@ export function TakeoffSummaryPanel({
   summary,
   sending,
   onSendAll,
+  onPickWire,
 }: {
   summary: TakeoffSummary | undefined;
   sending: boolean;
   /** Called with the keys the preview showed. */
   onSendAll: (expect: string[]) => void;
+  /** Open a run with no wire, its wire picker open. */
+  onPickWire: (to: RunPlace) => void;
 }) {
   const [showOnBid, setShowOnBid] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -126,7 +183,7 @@ export function TakeoffSummaryPanel({
           </p>
           <ul className="mt-1.5 space-y-1">
             {foldNotOnBid(notOnBid).map(fold => (
-              <FoldRow key={fold.id} fold={fold} />
+              <FoldRow key={fold.id} fold={fold} onPickWire={onPickWire} />
             ))}
           </ul>
           {n > 0 ? (
@@ -197,6 +254,11 @@ export function TakeoffSummaryPanel({
               <span className="min-w-0 flex-1">
                 {item.group ? `${item.group} · ` : ""}
                 {item.name}
+                {item.note ? (
+                  <span className="block text-xs text-muted-foreground">
+                    {item.note}
+                  </span>
+                ) : null}
               </span>
               <span className="shrink-0 tabular-nums">{qtyText(item)}</span>
               <span className="shrink-0 text-xs">
@@ -222,6 +284,11 @@ export function TakeoffSummaryPanel({
                     {item.name}
                   </span>
                   <span className="block text-xs">{item.why}</span>
+                  <FixHere
+                    item={item}
+                    onPickWire={onPickWire}
+                    onDone={() => setPreviewing(false)}
+                  />
                 </li>
               ))}
             </ul>

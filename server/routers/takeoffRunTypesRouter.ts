@@ -934,6 +934,8 @@ export const takeoffRunTypesRouter = router({
               extraKey: row.extraKey,
               /** How an extra's feet were reached; null on the others. */
               why: row.why,
+              /** The same without "N ft of <name>:", for the panel row. */
+              how: row.how,
               materialId: row.materialId,
               materialName: row.materialName,
               feet: row.feet,

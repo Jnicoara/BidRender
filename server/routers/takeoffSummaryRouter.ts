@@ -28,7 +28,7 @@ import { refuseSendIfLocked } from "../lockGuard";
 import { takeoffGroupsRouter } from "./takeoffGroupsRouter";
 import { takeoffRunTypesRouter } from "./takeoffRunTypesRouter";
 import { runsNotOnBid } from "../../shared/runsNotOnBid";
-import { countRunsWithNoWire } from "../../shared/runNoWire";
+import { emptyPipeLookup, runsWithNoWire } from "../../shared/runNoWire";
 import {
   sameSendList,
   takeoffSummary,
@@ -57,7 +57,19 @@ async function summaryFor(
     db.getBidLineItems(bidId),
   ]);
   // The same read the bid page's "no wire" warning makes (planAttention.ts).
-  const wire = await db.getWireCircuitsForRuns(runs, userId);
+  const [wire, palette] = await Promise.all([
+    db.getWireCircuitsForRuns(runs, userId),
+    db.getRunTypesFor(userId, true),
+  ]);
+  const noWire = runsWithNoWire(runs, wire, emptyPipeLookup(palette));
+  // Where the first of them is drawn, so the item can open it.
+  const firstNoWire =
+    noWire.length === 0 ? null : runs.find(r => r.id === noWire[0]);
+  const places = firstNoWire
+    ? await db.getSheetPlacesForBid(bidId, userId)
+    : null;
+  const firstPlace = firstNoWire ? places?.get(firstNoWire.sheetId) : null;
+  const firstPoint = firstNoWire?.points?.[0] ?? { x: 0, y: 0 };
   const sentTypes = new Set(
     lines.flatMap(line =>
       line.takeoffRunTypeId === null ? [] : [line.takeoffRunTypeId]
@@ -74,7 +86,16 @@ async function summaryFor(
       fittings: t.fittings,
     })),
     untypedRuns: runsNotOnBid(runs, sentTypes).noType,
-    runsWithNoWire: countRunsWithNoWire(runs, wire),
+    runsWithNoWire: noWire.length,
+    firstRunWithNoWire: firstNoWire
+      ? {
+          runId: firstNoWire.id,
+          bidPdfId: firstPlace?.bidPdfId ?? null,
+          pageNumber: firstPlace?.pageNumber ?? null,
+          x: firstPoint.x,
+          y: firstPoint.y,
+        }
+      : null,
   });
 }
 

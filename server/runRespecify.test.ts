@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   circuitPlan,
+  extrasSignature,
   findMatchingRunType,
   respecifiedLabel,
   wantedSpec,
@@ -35,6 +36,7 @@ describe("the spec a run is being given", () => {
       racewayMaterialId: emt34,
       conductorMaterialId: thhn10,
       conductorCount: 3,
+      emptyPipe: false,
       current,
     });
     expect(want).toEqual({
@@ -53,6 +55,7 @@ describe("the spec a run is being given", () => {
       racewayMaterialId: emt34,
       conductorMaterialId: thhn12,
       conductorCount: null,
+      emptyPipe: false,
       current,
     });
     expect(want.conductorCount).toBe(2);
@@ -64,6 +67,7 @@ describe("the spec a run is being given", () => {
       racewayMaterialId: emt34,
       conductorMaterialId: null,
       conductorCount: 3,
+      emptyPipe: false,
       current: null,
     });
     expect(want.conductorCount).toBeNull();
@@ -83,6 +87,7 @@ describe("the spec a run is being given", () => {
       racewayMaterialId: emt12,
       conductorMaterialId: mc122,
       conductorCount: null,
+      emptyPipe: false,
       current: cable,
     });
     expect(same.racewayMaterialId).toBeNull();
@@ -94,6 +99,7 @@ describe("the spec a run is being given", () => {
       racewayMaterialId: null,
       conductorMaterialId: mc103,
       conductorCount: null,
+      emptyPipe: false,
       current: cable,
     });
     // The old jacket's 2 + ground says nothing about a 10-3.
@@ -101,6 +107,9 @@ describe("the spec a run is being given", () => {
     expect(other.groundCount).toBeNull();
   });
 });
+
+/** No type in the palette carries an extra. */
+const NO_EXTRAS = { want: "", of: () => "" };
 
 describe("finding a type that already says it", () => {
   const palette = [
@@ -111,16 +120,31 @@ describe("finding a type that already says it", () => {
 
   it("matches exactly, and prefers the run's current type in a tie", () => {
     expect(
-      findMatchingRunType(palette, { ...current, conductorCount: 3 }, 3)?.id
+      findMatchingRunType(
+        palette,
+        { ...current, conductorCount: 3 },
+        3,
+        NO_EXTRAS
+      )?.id
     ).toBe(3);
     expect(
-      findMatchingRunType(palette, { ...current, conductorCount: 3 }, 1)?.id
+      findMatchingRunType(
+        palette,
+        { ...current, conductorCount: 3 },
+        1,
+        NO_EXTRAS
+      )?.id
     ).toBe(2);
   });
 
   it("does not match a type differing only in its ground", () => {
     expect(
-      findMatchingRunType(palette, { ...current, groundMaterialId: null }, 1)
+      findMatchingRunType(
+        palette,
+        { ...current, groundMaterialId: null },
+        1,
+        NO_EXTRAS
+      )
     ).toBeUndefined();
   });
 });
@@ -130,7 +154,12 @@ describe("naming a type made here", () => {
     expect(
       respecifiedLabel(
         { ...current, conductorCount: 3 },
-        { raceway: '3/4" EMT', conductor: "#12 THHN" },
+        {
+          raceway: '3/4" EMT',
+          conductor: "#12 THHN",
+          extras: [],
+          underground: false,
+        },
         new Set()
       )
     ).toBe('3/4" EMT, 3 #12 THHN');
@@ -140,7 +169,12 @@ describe("naming a type made here", () => {
     expect(
       respecifiedLabel(
         { ...current, conductorCount: 3 },
-        { raceway: '3/4" EMT', conductor: "#12 THHN" },
+        {
+          raceway: '3/4" EMT',
+          conductor: "#12 THHN",
+          extras: [],
+          underground: false,
+        },
         new Set(['3/4" emt, 3 #12 thhn', '3/4" emt, 3 #12 thhn (2)'])
       )
     ).toBe('3/4" EMT, 3 #12 THHN (3)');
@@ -150,10 +184,176 @@ describe("naming a type made here", () => {
     expect(
       respecifiedLabel(
         { ...current, pathType: "cable" },
-        { raceway: null, conductor: "12-2 MC cable" },
+        {
+          raceway: null,
+          conductor: "12-2 MC cable",
+          extras: [],
+          underground: false,
+        },
         new Set()
       )
     ).toBe("12-2 MC cable");
+  });
+});
+
+describe("the ground, when the editor shows it (2026-10-08)", () => {
+  const noGround: RunTypeSpecFields = {
+    ...current,
+    groundMaterialId: null,
+    groundCount: null,
+  };
+
+  it("takes a picked ground, one per circuit when the type said none", () => {
+    const want = wantedSpec({
+      pathType: "conduit",
+      racewayMaterialId: emt12,
+      conductorMaterialId: thhn10,
+      conductorCount: 2,
+      emptyPipe: false,
+      groundMaterialId: bare12,
+      current: noGround,
+    });
+    expect(want.groundMaterialId).toBe(bare12);
+    expect(want.groundCount).toBe(1);
+  });
+
+  it("keeps the type's ground when the editor did not show it (rule 7)", () => {
+    const want = wantedSpec({
+      pathType: "conduit",
+      racewayMaterialId: emt12,
+      conductorMaterialId: thhn10,
+      conductorCount: 2,
+      emptyPipe: false,
+      current,
+    });
+    expect(want.groundMaterialId).toBe(bare12);
+    expect(want.groundCount).toBe(1);
+  });
+});
+
+describe("an empty pipe, and a trench keeping its tape (2026-10-08)", () => {
+  const pvc2 = 500;
+  const tape = 600;
+  const trench: RunTypeSpecFields = {
+    pathType: "conduit",
+    racewayMaterialId: pvc2,
+    conductorMaterialId: null,
+    conductorCount: null,
+    groundMaterialId: null,
+    groundCount: null,
+  };
+  const TAPE = extrasSignature([
+    { materialId: tape, feetPerFoot: 1, appliesTo: "flat" },
+  ]);
+
+  it("says no wire as ZERO, never as the NULL of 'not said', and drops the ground", () => {
+    const want = wantedSpec({
+      pathType: "conduit",
+      racewayMaterialId: emt12,
+      conductorMaterialId: null,
+      conductorCount: null,
+      emptyPipe: true,
+      current,
+    });
+    expect(want).toEqual({
+      pathType: "conduit",
+      racewayMaterialId: emt12,
+      conductorMaterialId: null,
+      conductorCount: 0,
+      groundMaterialId: null,
+      groundCount: 0,
+    });
+  });
+
+  it("never lands a trench run on a same-pipe, same-wire type WITHOUT its tape", () => {
+    // A shop's own "2in PVC, 2 #6" with no tape is the trap: same materials,
+    // and matching it would drop the tape off the bid.
+    const plain = {
+      id: 7,
+      ...trench,
+      conductorMaterialId: thhn10,
+      conductorCount: 2,
+    };
+    const want = { ...plain };
+    expect(
+      findMatchingRunType([plain], want, null, {
+        want: TAPE,
+        of: () => "",
+      })
+    ).toBeUndefined();
+    expect(
+      findMatchingRunType([plain], want, null, {
+        want: TAPE,
+        of: () => TAPE,
+      })?.id
+    ).toBe(7);
+  });
+
+  it("reads extras in any order, and leaves out one whose material is gone", () => {
+    expect(
+      extrasSignature([
+        { materialId: 2, feetPerFoot: 1, appliesTo: "all" },
+        { materialId: 1, feetPerFoot: 0.5, appliesTo: "flat" },
+        { materialId: null, feetPerFoot: 1, appliesTo: "flat" },
+      ])
+    ).toBe(
+      extrasSignature([
+        { materialId: 1, feetPerFoot: 0.5, appliesTo: "flat" },
+        { materialId: 2, feetPerFoot: 1, appliesTo: "all" },
+      ])
+    );
+    expect(extrasSignature([])).toBe("");
+  });
+
+  it("names an empty pipe and what it carries", () => {
+    expect(
+      respecifiedLabel(
+        { ...trench, conductorCount: 0, groundCount: 0 },
+        {
+          raceway: '2" PVC Sch 40',
+          conductor: null,
+          extras: ["Underground warning tape"],
+          underground: false,
+        },
+        new Set()
+      )
+    ).toBe('2" PVC Sch 40, empty pipe + Underground warning tape');
+    expect(
+      respecifiedLabel(
+        { ...trench, conductorMaterialId: thhn10, conductorCount: 2 },
+        {
+          raceway: '2" PVC Sch 40',
+          conductor: "#6 THHN Copper",
+          extras: ["Underground warning tape"],
+          underground: false,
+        },
+        new Set()
+      )
+    ).toBe('2" PVC Sch 40, 2 #6 THHN Copper + Underground warning tape');
+  });
+
+  it("names a type made from an UNDERGROUND one by that word, not its tape", () => {
+    // Seen in the Send dialog 2026-10-08: the type name heads every row, and
+    // "+ Underground warning tape" on each made a tablet dialog a wall.
+    const names = {
+      raceway: '2" PVC Sch 40',
+      extras: ["Underground warning tape"],
+      underground: true,
+    };
+    expect(
+      respecifiedLabel(
+        { ...trench, conductorCount: 0, groundCount: 0 },
+        { ...names, conductor: null },
+        new Set()
+      )
+    ).toBe('2" PVC Sch 40, empty pipe, underground');
+    expect(
+      respecifiedLabel(
+        { ...trench, conductorMaterialId: thhn10, conductorCount: 2 },
+        { ...names, conductor: "#6 THHN Copper" },
+        new Set()
+      )
+    ).toBe('2" PVC Sch 40, 2 #6 THHN Copper, underground');
   });
 });
 

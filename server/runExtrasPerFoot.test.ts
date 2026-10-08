@@ -103,6 +103,11 @@ describe("waste applies to tape (decision 5)", () => {
     expect(total.why).toBe(
       "152 ft of Underground warning tape: 140 ft over 2 runs, the flat length only, not the risers + 12 ft waste"
     );
+    // The Runs panel's row already shows the name and the 152 — its line
+    // says only how they were reached (seen on screen 2026-10-08).
+    expect(total.how).toBe(
+      "140 ft over 2 runs, the flat length only, not the risers + 12 ft waste"
+    );
   });
 });
 

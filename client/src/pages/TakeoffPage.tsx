@@ -437,6 +437,7 @@ import {
   type GroupBridgeState,
 } from "@/components/takeoff/RunsPanel";
 import { TakeoffSummaryPanel } from "@/components/takeoff/TakeoffSummaryPanel";
+import type { RunPlace } from "@shared/takeoffSummary";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   countDeleteQuestion,
@@ -3160,6 +3161,11 @@ export default function TakeoffPage({
   const [tracePathType, setTracePathType] = useState<RunPathType>("conduit");
   const [tracePoints, setTracePoints] = useState<PagePoint[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  /**
+   * The run whose "Made of" editor should open on its wire — "Pick the wire"
+   * on a run with none (2026-10-08). Cleared once the editor has opened.
+   */
+  const [pickWireFor, setPickWireFor] = useState<number | null>(null);
   /** The server row this trace is autosaving into, once one exists. */
   const draftRunId = useRef<number | null>(null);
   /** How many points the server has. Drives the unsaved-work warning. */
@@ -4784,6 +4790,38 @@ export default function TakeoffPage({
       );
     },
   });
+
+  /**
+   * Open a run where it is drawn — another sheet, maybe another plan, first.
+   * The drops readout and the bid's "no wire" item both go through here.
+   */
+  const openRunAt = (to: RunPlace) => {
+    if (to.bidPdfId !== null && to.bidPdfId !== doc?.id)
+      setSelectedDocId(to.bidPdfId);
+    if (to.pageNumber !== null) setPage(to.pageNumber);
+    setSelectedRunId(to.runId);
+    // Same commit as the page change, so PlanPane fits the new sheet first
+    // and then centres this spot on it.
+    jumpTo({ x: to.x, y: to.y });
+  };
+
+  /**
+   * "No wire (empty pipe)" on a run with none: the same respecify as the
+   * "Made of" editor, keeping the run's pipe — and its tape, server side.
+   */
+  const makeEmptyPipe = (runId: number) => {
+    const run = runs.find(r => r.id === runId);
+    if (!run) return;
+    respecifyRun.mutate({
+      id: runId,
+      racewayMaterialId:
+        resolveRunType(runTypes.data ?? [], run.runTypeId)?.racewayMaterialId ??
+        null,
+      conductorMaterialId: null,
+      conductorCount: null,
+      emptyPipe: true,
+    });
+  };
 
   const groupForAssembly = trpc.takeoffGroups.forAssembly.useMutation({
     onError: e => toast.error(e.message),
@@ -11131,6 +11169,10 @@ export default function TakeoffPage({
                   summary={bidSummary.data}
                   sending={sendAll.isPending}
                   onSendAll={expect => sendAll.mutate({ bidId, expect })}
+                  onPickWire={to => {
+                    openRunAt(to);
+                    setPickWireFor(to.runId);
+                  }}
                 />
               }
               onAnswerBranchWiring={(runId, answer) =>
@@ -11236,6 +11278,8 @@ export default function TakeoffPage({
                       onSave={patch =>
                         respecifyRun.mutateAsync({ id: run.id, ...patch })
                       }
+                      openRequested={pickWireFor === run.id}
+                      onOpened={() => setPickWireFor(null)}
                     />
                   </div>
                 );
@@ -11533,6 +11577,11 @@ export default function TakeoffPage({
               onCardUndo={() => void stepBack("undo")}
               onCommitRun={id => commitRun.mutate({ id })}
               onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
+              onPickWire={runId => {
+                setSelectedRunId(runId);
+                setPickWireFor(runId);
+              }}
+              onEmptyPipe={makeEmptyPipe}
               onAddCircuit={(runId, name, conductorCount, groundCount) =>
                 addCircuit.mutate({ runId, name, conductorCount, groundCount })
               }
@@ -11547,16 +11596,7 @@ export default function TakeoffPage({
                 <BidDropsReadout
                   bidId={bidId}
                   runColors={runColors}
-                  onJump={to => {
-                    // Another sheet, maybe on another plan: open it first.
-                    if (to.bidPdfId !== null && to.bidPdfId !== doc?.id)
-                      setSelectedDocId(to.bidPdfId);
-                    if (to.pageNumber !== null) setPage(to.pageNumber);
-                    setSelectedRunId(to.runId);
-                    // Same commit as the page change, so PlanPane fits the
-                    // new sheet first and then centres this spot on it.
-                    jumpTo({ x: to.x, y: to.y });
-                  }}
+                  onJump={openRunAt}
                 />
               }
             />

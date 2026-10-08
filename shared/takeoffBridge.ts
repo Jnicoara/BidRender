@@ -387,6 +387,12 @@ export type RunTypeRow = {
   extraKey: number;
   /** How the feet were reached — set on an `extra` row, which needs saying. */
   why: string | null;
+  /**
+   * `why` without its "N ft of <name>:" opening, for a screen row that shows
+   * the name and the feet already (runExtrasPerFoot.ts `how`). Null where
+   * `why` is.
+   */
+  how: string | null;
   /** The material this role points at, or null when the type never said. */
   materialId: number | null;
   materialName: string | null;
@@ -445,6 +451,7 @@ function materialRows(type: Parameters<typeof runTypeRows>[0]): RunTypeRow[] {
     role,
     extraKey: 0,
     why: null,
+    how: null,
     materialId,
     materialName,
     feet: bought,
@@ -525,6 +532,7 @@ function extraRows(type: Parameters<typeof runTypeRows>[0]): RunTypeRow[] {
       role: "extra" as const,
       extraKey: extra.key,
       why: total.why,
+      how: total.how,
       materialId: extra.materialId,
       materialName: extra.materialName,
       feet: total.boughtFeet,

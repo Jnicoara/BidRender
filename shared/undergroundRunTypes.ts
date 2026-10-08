@@ -31,3 +31,20 @@ export function isShippedUndergroundType(type: {
 }): boolean {
   return type.isShipped && type.label.endsWith(SUFFIX);
 }
+
+/**
+ * Whether a label says "underground" the way the shipped types do — a shipped
+ * type, a shop's fork of one, or a type `takeoffRuns.respecify` made from one.
+ * Unlike `isShippedUndergroundType` this does not care whose it is: it is for
+ * NAMING, so a run given a wire on `2" PVC Sch 40, underground` lands on
+ * `2" PVC Sch 40, 2 #6 THHN Copper, underground` rather than a name spelling
+ * out its tape (2026-10-08, seen on screen in the Send dialog).
+ */
+export function saysUnderground(label: string): boolean {
+  return label.endsWith(SUFFIX);
+}
+
+/** `2" PVC Sch 40, empty pipe` -> `2" PVC Sch 40, empty pipe, underground`. */
+export function withUndergroundSuffix(label: string): string {
+  return `${label}${SUFFIX}`;
+}
