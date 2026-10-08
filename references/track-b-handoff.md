@@ -1,5 +1,96 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-08, closing for a Claude Code update (READ FIRST)
+
+**State:**
+
+- `track-b` is pushed and merged into `local-dev`. Nothing is unfinished,
+  and there is no WIP branch.
+- The last local-dev run (3a1f3ef) was green: tests, staging deploy, smoke.
+- Nothing is on `main`, nothing deployed live, and no migrations were
+  written by B.
+- B's local databases (`bidrender_test_b`, `bidrender_local_b_new`) are
+  migrated to 0134 (all 135). `scripts/schemaDrift.mts` says both match.
+- **Track C has MERGED into local-dev** (`bea4d8f`). Everything parked
+  "after Track C merges" is unblocked.
+
+**Shipped this session**, details in the sessions below:
+
+- never-stuck gaps 1–7, plus two faults the staging check found;
+- DV34 loaded (700 series box + plate);
+- 15 starters (GC/GR, 2"/8" wafers, 4" remodel can);
+- the large-plan download fix;
+- the "Most used" row in Quick bid.
+
+**NEXT JOBS, in this order:**
+
+**(a) The white-box fix on plan open, plus the six parked fixes, in 2–3
+small batches.** All are in todo.md: "White box on plan open" and "Plans
+screen gaps — AFTER TRACK C MERGES".
+
+- **The white box:**
+  - Cause, fix and tests are written in todo.md.
+  - The fix is in `TakeoffPage.tsx` `PlanPane`'s load effect: reset
+    `canvasSize` and `drawnPage` when a load starts.
+  - `scripts/stagingOpenFlash.mts` prints `FLASH` today and must print
+    "No flash" after.
+- **The six parked fixes:**
+  - Gap 2: the `setLocation` lock check.
+  - Gap 3: a won bid offers "lock it?" once. Owner's call first.
+  - Gap 4a: "can't be undone" on the undo arrow.
+  - Gap 4b: undoing a multi-sheet count delete refreshes every sheet.
+  - Gap 4c: undo for run type, typed length, circuits, legs.
+  - Gap 6.1: open the viewer from the local file while it uploads.
+- **Suggested batches:**
+  1. white box + Gap 2 + Gap 4b, all small;
+  2. Gap 4a + Gap 4c, undo;
+  3. Gap 6.1 + Gap 3.
+
+**(b) The cover swaps** (`references/cover-plates-audit.md` § 3; Track A
+shipped the parts, B changes the recipes):
+
+- CS6, CS7, CS8 → `4" square raised cover, single receptacle`;
+- RS17, CS5, RS1, RS2, RS13, MS12, per the audit;
+- the device recipes onto the new duplex/toggle/decora plates.
+
+Notes:
+
+- A starter recipe change on a database that already has the starter: the
+  seeder never rewrites a starter's lines. Check how the audit wants
+  existing rows handled before assuming a seed change reaches them.
+- DV34 is already done.
+
+**(c) The "fix this line" panel** (`references/never-stuck-plan.md`, gap
+11, as amended):
+
+- It saves the number onto that one line.
+- It has an "Also save to my library" tick box, ON by default.
+- Sent and locked bids never change.
+- It needs `bids.fixLine` and no migration.
+- **Track C's per-foot plan (`references/per-foot-items-plan.md`) builds on
+  it**, so it goes before C needs it.
+
+**Standing, not B's to build:**
+
+- Extra per-foot items (warning tape) is Track C's plan, and Track A
+  builds only its database parts. Wiremold 700 is its own run type, not an
+  extra (owner).
+- The starter RENAME path, then the can-light names, is in todo.md (B,
+  later).
+
+**Watch out for:**
+
+- **Smoke step 10 (undo a mark) failed 3 times on 2026-10-08.** Every
+  failure overlapped a staging redeploy or another smoke run, and the head
+  run passed. Evidence and fixes are in todo.md. If it fails again with
+  nothing overlapping, it is real.
+- **After pulling local-dev, migrate B's databases**
+  (`npx tsx scripts/migrate.mts` with DATABASE_URL at each, then
+  `scripts/schemaDrift.mts`), or the suite fails by the hundred on missing
+  columns. It did on 2026-10-08: 811 failures, all "Unknown column".
+- **About twenty throwaway `example.com` accounts on staging** come from B's
+  probes. todo.md says to delete them before stress testing.
+
 State at handoff: `track-b` = `origin/track-b` = `origin/local-dev` at
 **`d9d805d`**, working tree clean. Nothing on `main`, no deploy. Track B's own
 databases (`bidrender_local_b_new`, `bidrender_test_b`) are migrated to 105

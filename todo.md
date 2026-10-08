@@ -97,93 +97,34 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       if outdoor); generic `Wall plate` → typed duplex / toggle / decorator
       plates. Nylon or stainless per recipe is the owner's call.
 
-## Track A: ONE feature — extra per-foot items on a traced run (owner, 2026-10-07)
+## Extra per-foot items on a traced run — warning tape (owner, 2026-10-08)
 
-**The owner's ask:** a traced run can carry MORE THAN ONE per-foot item,
-each charged by the run's length. One feature, two jobs:
-
-- **Underground warning tape on a trench.** The tape follows the traced
-  trench (underground run) length, per foot of actual length, like wire.
-  If no trench is traced, the tape shows **"not priced"**, never 1 ft and
-  never $0. It goes back into GR2 (200A underground service) and GR5
-  (detached garage feeder) that way.
-- **The 700-series raceway: base + cover.** The catalog sells Wiremold 700
-  as two per-foot rows, `Surface raceway base, 700 series` and
-  `Surface raceway cover, 700 series`. A run type holds ONE raceway
-  material, so the cover is never counted today. With extra per-foot items,
-  a 700-series run type carries the base as its raceway and the cover as an
-  extra, both charged by the same length. DV34 then takes its length from
-  that traced run, which is the owner's answer.
-
-**Why it is one feature:** both are "a second material priced off the same
-traced feet". Two special cases would drift.
-
-> **PLANNED 2026-10-08 by Track C: `references/per-foot-items-plan.md`.**
-> That plan supersedes the shape below where they differ. § 2 of the plan
-> lists four corrections: no shipped run type is underground, so an extra
-> needs an "only where Underground" condition; the bid's unique index allows
-> one line per type and role, so it must widen; a bid line does not freeze
-> parts one by one, so traced parts need their own snapshot; and DV34's
-> plate and box are already per device. Four migrations (M1–M4) and four
-> owner questions are in the plan.
+> **Corrected 2026-10-08 (owner decision).** This entry used to say one
+> feature would cover two jobs, warning tape AND the Wiremold 700 cover. That
+> was wrong for the 700:
 >
-> **REVISED 2026-10-08 with the owner's answers (plan § 0).** Wiremold 700
-> is NOT an extra: it is its own run type (`700 series surface raceway`),
-> traced like EMT, with 700-series fittings; DV34 is device + box + plate.
-> Tape is the only shipped extra, on ten new `PVC Sch 40, underground` run
-> types. The "only where Underground" condition is DROPPED. M2 gains
-> `extraFeetPerFoot` ("shared trench" = 0), M3 gains `traced_or_default`
-> (GR2's 10 ft "default length"). **The shape and tests below are
-> superseded by the plan** — read it, not this entry.
+> - **Wiremold 700 is its OWN run type you pick and trace**
+>   (`700 series surface raceway`, traced like EMT, with 700-series
+>   fittings). It is not an extra on another run. DV34 is device + box +
+>   plate, and its raceway comes from that traced run.
+> - **Warning tape is the ONLY extra.** It follows the traced
+>   trench/underground run length, per foot of actual length, like wire. With
+>   no trench traced it shows "not priced", never 1 ft and never $0. It goes
+>   back into GR2 and GR5 that way.
+>
+> **Who does what:**
+>
+> - **Track C owns the plan:** `references/per-foot-items-plan.md`. Read it,
+>   not this entry; it has the shape, the migrations, the tests and the
+>   owner's answers (§ 0).
+> - **Track A builds only the database parts** (the plan's migrations).
+> - Track B builds nothing here. Its "fix this line" panel (never-stuck gap 11) is what the plan builds on.
+>
+> The draft shape and tests that stood below this note until 2026-10-08
+> were removed. They described the 700 as an extra, and the plan supersedes
+> them.
 
-**Track C has merged** (`bea4d8f`), so nothing waits on C. Track A writes
-the migration; B or A builds the rest.
-
-### The shape (for A to settle)
-
-- **A table, not columns.** `takeoff_run_type_extras (id, runTypeId,
-materialId, feetPerFoot DECIMAL NOT NULL, appliesTo
-ENUM('horizontal','all') NOT NULL, userId)`. A table, because the ask is
-  "more than one"; columns cap it at one.
-  - `feetPerFoot` is 1.0 for tape and for the cover.
-  - `appliesTo` is `horizontal` for tape (it lies in the trench, not up the
-    riser) and `all` for the raceway cover (it covers every foot of the
-    raceway, verticals included).
-  - Additive, so it is applied BEFORE the code ships (CLAUDE.md, three
-    steps).
-- **The arithmetic** rides the same path as raceway footage:
-  - `server/runTypeFootageCore.ts` groups the run's length;
-  - each extra becomes a bid quantity of `length × feetPerFoot` through
-    `takeoffRunTypes.bridgeForBid`;
-  - so it moves when the run moves, and an undo or a clear moves it too.
-- **Shipped:**
-  - underground run types carry `Underground warning tape` (horizontal,
-    1.0);
-  - a "700 series surface raceway" run type carries the base as its raceway
-    and the cover as an extra (all, 1.0).
-- **The assembly side, for "not priced" with no trench:** GR2/GR5 list
-  `Underground warning tape` with quantity source "from the traced run"
-  (`assembly_materials.qtySource ENUM('fixed','traced') NULL`, NULL =
-  fixed, which is today's meaning; frozen onto the bid line like every
-  snapshot).
-  - With no matching run on the bid, the line's quantity is NULL and it
-    says "not priced". `shared/lineNotPriced.ts` learns "quantity from a
-    run, none traced".
-  - **Never counted twice:** when the run carries the tape, the run's
-    quantity IS the line's quantity, so there is one tape line, not two.
-
-### Tests that must fail without it
-
-- tape = traced underground HORIZONTAL feet, and moves when the run moves;
-  risers add none;
-- the cover = every foot of the 700 run, verticals included, alongside the
-  base;
-- a run type with two extras charges both off one length;
-- no trench → "not priced" on the line and on the total, never 1 ft and
-  never $0;
-- one tape line, not two;
-- the per-foot guard (`server/starterGapAssemblies.test.ts`) still forbids a
-  fixed 1 ft.
+## White box on plan open — Track B, NEXT (unblocked: Track C has merged)
 
 - [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet
