@@ -719,6 +719,32 @@ describe("a count before its noun matches that count, never a size", () => {
     expect(top.map(kindOf)).toEqual(top.map(() => kind));
   });
 
+  /*
+    A count typed with a HYPHEN is the same query (owner, 2026-10-08). "2-gang"
+    led with "Raceway device box, 2-gang" and never found Double-gang box at
+    all; "1-hole strap" led with EMT strap. splitHyphenatedCounts reads it as
+    "2 gang".
+  */
+  it.each([
+    ["2-gang", "Double-gang box"],
+    ["1-gang", "Single-gang box"],
+    ["2-gang box", "Double-gang box"],
+    ["1-hole strap", '1/2" EMT one-hole strap'],
+  ])('"%s" leads with %s', (query, expected) => {
+    expect(ranked(query)[0]).toBe(expected);
+  });
+
+  it.each([
+    ["2-gang", "2 gang"],
+    ["3-gang", "3 gang"],
+    ["2-gang plate", "2 gang plate"],
+    ["3-way switch", "3 way switch"],
+    ["2-pole 20", "2 pole 20"],
+    ["2-hole strap", "2 hole strap"],
+  ])('"%s" lists exactly what "%s" lists', (hyphen, spaced) => {
+    expect(ranked(hyphen, 10)).toEqual(ranked(spaced, 10));
+  });
+
   it('"single gang" never offers a 2-gang row in its top five', () => {
     expect(ranked("single gang").filter(n => /2-gang|double/i.test(n))).toEqual(
       []

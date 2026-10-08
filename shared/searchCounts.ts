@@ -38,6 +38,27 @@ function bare(word: string): string {
 }
 
 /**
+ * A count typed with a hyphen, split into the two words a count is read as:
+ * "2-gang" → "2 gang", "3-way switch" → "3 way switch". Query side only.
+ *
+ * The matcher reads a count as a number followed by its noun (countNounAfter),
+ * which is what lets "2" find "Double-gang box". Typed as ONE word, "2-gang"
+ * never took that path: it was matched as a plain word, so it found only rows
+ * spelling "2-gang" and led with "Raceway device box, 2-gang" while "2 gang"
+ * led with Double-gang box (owner, 2026-10-08). A size — "1-1/4", "12-2" —
+ * has no count noun after its hyphen and is left alone.
+ */
+export function splitHyphenatedCounts(query: string): string {
+  return query
+    .split(" ")
+    .map(word => {
+      const m = /^(\d+)-(.+)$/.exec(word);
+      return m && COUNT_NOUN.test(m[2]) ? `${m[1]} ${m[2]}` : word;
+    })
+    .join(" ");
+}
+
+/**
  * The noun a query word is a count OF, or null when it is not a count: "2"
  * followed by "gang" is a count of gangs; "2" followed by "emt" is a size.
  */

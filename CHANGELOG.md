@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **A count typed with a hyphen searches the same as with a space.** "2-gang"
+  now finds Double-gang box first, exactly like "2 gang" — before, it missed
+  that box entirely. The same fix put "1-hole strap" on the one-hole straps
+  instead of the plain EMT strap, and "3-way switch", "2-pole 20" and the
+  rest now match their spaced versions row for row.
+
 - **Searching "1 gang", "2 gang" or "3 gang" now shows boxes, mud rings and
   plates together.** Before, the top five were all wall plates and you had to
   scroll past thirty of them to find a box. "2 gang box", "2 gang plate" and

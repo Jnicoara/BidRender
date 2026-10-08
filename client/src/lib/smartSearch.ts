@@ -21,6 +21,7 @@
 import {
   countNounAfter,
   phraseHoldsCount,
+  splitHyphenatedCounts,
   wordIsCount,
   wordsHoldCount,
 } from "@shared/searchCounts";
@@ -648,7 +649,11 @@ function sizeTier(term: string, indexed: IndexedItem<SearchableItem>): number {
  * number says how many, and the word is the thing — so these are matched as
  * words, the way they were before sizes became strict. As sizes they lost
  * every item that spells the count out ("Double-gang box" for "2 gang box").
- * The query joins "2 gang" into "2-gang" first; see normalizeQuerySizes.
+ * This said "the query joins '2 gang' into '2-gang' first" until 2026-10-08.
+ * It was never true: no join existed, and a typed "2-gang" missed
+ * Double-gang box. The query now SPLITS "2-gang" into "2 gang"
+ * (normalizeQuerySizes), so a typed count never reaches this as one word;
+ * item text and aliases still do.
  */
 const COUNT_TOKEN = /^\d+-(?:gang|pole|way|hole|head|light|space|circuit)s?$/;
 
@@ -787,11 +792,15 @@ export function normalizeSizeWords(text: string): string {
 const SPOKEN_CABLE = /(^|\s)(14|12|10|8|6|4|2) ([234])(?=\s|$)/g;
 
 /**
- * The QUERY's spelling: normalizeSizeWords, plus the join only a person typing
- * needs — a cable spec typed with a space. Not applied to item text.
+ * The QUERY's spelling: normalizeSizeWords, plus what only a person typing
+ * needs — a cable spec typed with a space joined ("12 2" → 12-2), and a count
+ * typed with a hyphen split ("2-gang" → "2 gang", splitHyphenatedCounts).
+ * Not applied to item text.
  */
 export function normalizeQuerySizes(query: string): string {
-  return normalizeSizeWords(query).replace(SPOKEN_CABLE, "$1$2-$3");
+  return splitHyphenatedCounts(
+    normalizeSizeWords(query).replace(SPOKEN_CABLE, "$1$2-$3")
+  );
 }
 
 /**
