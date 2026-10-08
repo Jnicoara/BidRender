@@ -87,18 +87,23 @@ describe("the frozen ADDS (2026-10-07)", () => {
     }
   });
 
-  it("measured 2026-10-07: 153 adds = 143 shipped + 8 duplicates + 2 declined", () => {
+  it("measured 2026-10-08: 153 adds = 142 shipped + 8 duplicates + 2 declined + 1 retired", () => {
     // 86 shipped on the first pass and 59 were held; the owner's second
     // answers shipped 57 of them and declined 2. If this count moves, a row
     // was seeded, held or dropped since — find out which before trusting the
     // summary in materials-review-sheet-plan.md.
+    //
+    // 143 -> 142 on 2026-10-08: the 700 cover was retired (owner; 700 is
+    // one-piece raceway, per-foot-items-plan.md § 3c). The 700 base still
+    // counts as shipped, renamed to "Surface raceway, 700 series".
     const held = Object.values(FROZEN_ADDS_NOT_SEEDED);
     expect(adds).toHaveLength(153);
     expect(held.filter(h => h.kind === "duplicate")).toHaveLength(8);
     expect(held.filter(h => h.kind === "declined")).toHaveLength(2);
+    expect(held.filter(h => h.kind === "retired")).toHaveLength(1);
     expect(
       adds.filter(a => shipped.has(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name))
-    ).toHaveLength(143);
+    ).toHaveLength(142);
   });
 });
 

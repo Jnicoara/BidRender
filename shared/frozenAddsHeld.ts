@@ -34,6 +34,9 @@ export const FROZEN_ADDS_SHIPPED_AS: Readonly<Record<string, string>> = {
   '8" canless LED downlight': '8" canless wafer LED downlight',
   // Owner, 2026-10-07: generic name first, the trade word beside it.
   "Wire mold for low voltage": "Surface raceway (wire mold), low voltage",
+  // Owner, 2026-10-08: 700 is one-piece raceway and its own run type; the
+  // base row was renamed in place (per-foot-items-plan.md § 3c).
+  "Surface raceway base, 700 series": "Surface raceway, 700 series",
   // Owner's third answers, 2026-10-07: the variants carry "canless" so the
   // plain canless wafer leads a typed "6 wafer" (lighting.ts).
   ...Object.fromEntries(
@@ -47,7 +50,12 @@ export const FROZEN_ADDS_SHIPPED_AS: Readonly<Record<string, string>> = {
 };
 
 export type HeldAdd = {
-  kind: "duplicate" | "declined";
+  /**
+   * `retired`: shipped once, then retired by a later owner decision — the row
+   * still exists, inactive (RETIRED_BASELINE_MATERIALS), so nothing that
+   * points at it breaks.
+   */
+  kind: "duplicate" | "declined" | "retired";
   why: string;
 };
 
@@ -81,4 +89,8 @@ export const FROZEN_ADDS_NOT_SEEDED: Readonly<Record<string, HeldAdd>> = {
   },
   "60A Single-Pole breaker": QO_ONLY,
   "70A Single-Pole breaker": QO_ONLY,
+  "Surface raceway cover, 700 series": {
+    kind: "retired",
+    why: "Owner, 2026-10-08: 700 is one-piece raceway and a run type of its own, so a separate cover row describes a part nobody buys. Shipped 2026-10-07 on staging only, retired 2026-10-08 (per-foot-items-plan.md § 3c).",
+  },
 };

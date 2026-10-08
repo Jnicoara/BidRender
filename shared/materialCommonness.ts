@@ -269,8 +269,8 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // Added 2026-10-07 with the shelf. Every row answers "wiremold" through the
   // same search word, so without these the tie fell to the alphabet and led
   // with "Raceway blank end plate" — an accessory before the raceway.
-  "Surface raceway base, 700 series": "common",
-  "Surface raceway cover, 700 series": "common",
+  // 700 renamed to one row on 2026-10-08 (one-piece; the cover retired).
+  "Surface raceway, 700 series": "common",
 
   // ── Grounding: on every service ──
   'Ground rod, 5/8" x 8 ft': "common",

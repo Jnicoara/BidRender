@@ -215,6 +215,11 @@ const AFTER_FREEZE: Record<string, string> = {
   ),
   '5"/6" LED disc light': '6" LED disc light',
   '5"/6" LED retrofit trim': '6" LED retrofit trim',
+  // 700 is one-piece raceway and a run type of its own (owner, 2026-10-08;
+  // per-foot-items-plan.md § 3c): the "base" row BECOMES the raceway, same
+  // id, and the cover is retired (server/seed/materials/index.ts). Allowed
+  // because neither row had reached live (0117 is staging-only).
+  "Surface raceway base, 700 series": "Surface raceway, 700 series",
 };
 
 /** Today's name for a name some rename above produced. */

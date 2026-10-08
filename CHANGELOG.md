@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Underground PVC and Wiremold 700 are now run types you can trace.** Ten
+  underground PVC types (1/2" to 4") sit behind one "Underground (10)" fold
+  in the conduit picker, each carrying underground warning tape for when
+  tape pricing ships; they carry no wire, because what goes in a trench
+  varies by job. "700 series surface raceway" is traced like EMT and priced
+  from one per-foot row, with seven 700-series fittings in the catalog. The
+  700 "base" row is now just "Surface raceway, 700 series" and the separate
+  cover row is retired. Staging only; no bid total moved.
+- **The database can now hold per-foot extras, "shared trench" and traced
+  parts** (migrations 0135–0138). Nothing reads them yet — they are the
+  groundwork for warning tape that follows the trench and for assemblies
+  like GR2 that need a traced length.
+
 - **A count typed with a hyphen searches the same as with a space.** "2-gang"
   now finds Double-gang box first, exactly like "2 gang" — before, it missed
   that box entirely. The same fix put "1-hole strap" on the one-hole straps

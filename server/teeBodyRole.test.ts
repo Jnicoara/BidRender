@@ -54,10 +54,17 @@ describe("the runMaterialRole enum", () => {
     return match![1].split(",").map(v => v.trim().replace(/'/g, ""));
   };
 
-  it("in schema.ts is exactly the NEWEST migration's list (0118, locknut and bushing appended)", () => {
+  it("in schema.ts is exactly the NEWEST migration's list (0136, extra appended)", () => {
     expect([...RUN_MATERIAL_ROLES]).toEqual(
-      rolesIn("0118_locknut_bushing_roles.sql")
+      rolesIn("0136_bid_line_extras.sql")
     );
+  });
+
+  it("only ever APPENDS: 0118's list is still the opening run of 0136's, with extra last", () => {
+    const at0118 = rolesIn("0118_locknut_bushing_roles.sql");
+    const at0136 = rolesIn("0136_bid_line_extras.sql");
+    expect(at0136.slice(0, at0118.length)).toEqual(at0118);
+    expect(at0136.slice(at0118.length)).toEqual(["extra"]);
   });
 
   it("only ever APPENDS: 0096's list, teeBody last, is still its opening run", () => {

@@ -1,5 +1,22 @@
 # Extra per-foot items on a traced run (PLAN, 2026-10-08)
 
+> **BUILT 2026-10-08 (Track A): § 9 step 1 and the seed content.** M1–M4 are
+> migrations **0135–0138** (`0135_run_type_extras`, `0136_bid_line_extras`,
+> `0137_assembly_material_qty_source`, `0138_traced_parts`). Seeded: the ten
+> underground types with tape (`server/seed/baselineRunTypes.ts`, labels
+> through `shared/undergroundRunTypes.ts`), the 700 type, the seven 700
+> fittings, the 700 rename and cover retire, and the picker's "Underground
+> (10)" fold (`client/src/lib/runTypeFold.ts`, sorted by SIZE).
+> `forkRunType` already copies a type's extras. **Not built, still C's
+> server half (step 2):** the extras' footage (`feetForRole`'s `extra` case
+> is a tripwire answering 0 — replace it), the 700 fitting family (until
+> then a 700 run's fittings say "no catalog match"), `setExtraShared`, the
+> extras CRUD, and a resolver for `takeoff_run_type_extras.materialId`
+> (`server/forkableReferences.test.ts` lists it as unreviewed). **Not
+> touched, B's step 3:** DV34/GR2/GR5 recipes — `qtySource` ships unset on
+> every part. Clip spacing ships NULL; no Sch 80 types; 500 series not
+> merged (§ 7, Q1–Q3 still open). Record: `deploying.md` § 11.
+
 **Status: plan only. Nothing is built.** Written by Track C, on
 `c-homerun-wiring`, for the owner's ask of 2026-10-07. The first sketch is in
 `todo.md` § "Track A: ONE feature — extra per-foot items on a traced run".

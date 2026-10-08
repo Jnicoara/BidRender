@@ -433,6 +433,9 @@ describe("stored files", () => {
           // bid_line_items.quoteItemKey (0115) — which item of a supplier
           // quote a line is. An identifier, not a file.
           "quoteItemKey",
+          // bid_line_items.runExtraKey (0136) — which extra of a run type a
+          // line is, an extra's id or 0. An integer, not a file.
+          "runExtraKey",
         ].includes(column)
       ) {
         continue;

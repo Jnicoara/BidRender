@@ -203,6 +203,15 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-09-21",
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
+  "takeoff_run_type_extras.runTypeId": {
+    kind: "exempt",
+    why: "Ownership (0135), like assembly_materials.assemblyId: forkRunType copies a shipped type's extras onto the fork, so an extra already points at the type it belongs to.",
+  },
+  "takeoff_run_type_extras.materialId": {
+    kind: "unreviewed",
+    since: "2026-10-08",
+    why: "Migration 0135 (per-foot items plan, M1). Track A seeds the shipped tape rows; NOTHING prices from this id yet. It is this file's bug shape the day the extras' footage ships: a company that prices its fork of Underground warning tape must see the tape priced, so the plan's server half must read it through resolveMaterial, like takeoff_run_types.racewayMaterialId, and turn this entry into a resolver.",
+  },
   "bids.homerunRunTypeId": {
     kind: "resolver",
     resolver: "resolveRunType",
@@ -400,7 +409,10 @@ describe("every stored id into a forkable row is accounted for", () => {
     // before its code exists; its entry says what C's footage code owes.
     // 7 → 6 on 2026-10-07 (Track C): that code reads it through
     // resolveRunType, so it is a resolver now.
-    expect(unreviewed.length).toBeLessThanOrEqual(6);
+    // 6 → 7 on 2026-10-08 (Track A): takeoff_run_type_extras.materialId
+    // (0135), added before anything prices from it; its entry says what the
+    // per-foot plan's server half owes.
+    expect(unreviewed.length).toBeLessThanOrEqual(7);
   });
 
   it("unused group labor rate: nothing on the server reads takeoff_groups.laborRateId", () => {

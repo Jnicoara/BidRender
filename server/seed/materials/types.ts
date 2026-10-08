@@ -97,8 +97,13 @@ export type BaselineMaterial = {
 export type RacewayFacts = {
   stickLengthFeet: number | null;
   stickJoint: StickJoint;
-  strapSpacingFeet: number;
-  strapFromBoxFeet: number;
+  /**
+   * NULL = not set: the fitting count then says "straps not counted" rather
+   * than counting at a spacing nobody chose. Only the 700 surface raceway
+   * ships it so (2026-10-08, owner has not given a figure).
+   */
+  strapSpacingFeet: number | null;
+  strapFromBoxFeet: number | null;
 };
 
 /**

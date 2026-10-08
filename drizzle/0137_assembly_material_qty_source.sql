@@ -1,0 +1,21 @@
+-- M3 of the per-foot items plan (references/per-foot-items-plan.md § 3d, § 4):
+-- where an assembly part's QUANTITY comes from.
+--
+--   'fixed'              the part's own qty — today's meaning.
+--   'traced'             from a traced run; nothing traced = NOT PRICED
+--                        (underground warning tape on GR2/GR5).
+--   'traced_or_default'  from a traced run; nothing traced = the part's own
+--                        qty, labelled "default length" (owner decision 6:
+--                        GR2's 10 ft of 2" PVC).
+--
+-- NULL reads as 'fixed', which is what every existing part means, so there is
+-- no backfill and no default: NULL stays "nobody said", which a DEFAULT
+-- 'fixed' would erase.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- No UPDATE. Old code ignores the column. Nothing ships set until the bid
+-- half of the plan (Track B, after gap 11) reads it — a 'traced' part read by
+-- code that does not know the word would price its seed qty of 0.
+--
+-- Hand-written, not generated.
+ALTER TABLE `assembly_materials` ADD `qtySource` enum('fixed','traced','traced_or_default');

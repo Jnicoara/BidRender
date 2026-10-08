@@ -1161,6 +1161,14 @@ export type InsertAssembly = typeof assemblies.$inferInsert;
 
 // ─── Assembly Materials ───────────────────────────────────────────────────────
 // Which materials (and how many) make up an assembly.
+/** `assembly_materials.qtySource` (0137). NULL reads as `fixed`. */
+export const ASSEMBLY_QTY_SOURCES = [
+  "fixed",
+  "traced",
+  "traced_or_default",
+] as const;
+export type AssemblyQtySource = (typeof ASSEMBLY_QTY_SOURCES)[number];
+
 export const assemblyMaterials = mysqlTable(
   "assembly_materials",
   {
@@ -1226,6 +1234,22 @@ export const assemblyMaterials = mysqlTable(
      * routing later retires them per DEVICE, never per assembly.
      */
     isBranchWhip: boolean("isBranchWhip").default(false).notNull(),
+
+    /**
+     * Where this part's QUANTITY comes from (0137,
+     * references/per-foot-items-plan.md § 3d).
+     *
+     * `fixed`              `qty` — what every part meant before the column.
+     * `traced`             a traced run's length; nothing traced is NOT
+     *                      PRICED, never `qty` (underground warning tape).
+     * `traced_or_default`  a traced run's length; nothing traced is `qty`,
+     *                      labelled "default length" (GR2's 10 ft of pipe).
+     *
+     * NULL reads as `fixed`, with no default, so "nobody said" stays visible.
+     * Nothing ships set until the code that reads it does: code that does not
+     * know `traced` would price a tape part's seed qty of 0 as a real zero.
+     */
+    qtySource: mysqlEnum("qtySource", ASSEMBLY_QTY_SOURCES),
 
     sortOrder: int("sortOrder").default(0).notNull(),
   },
@@ -2772,6 +2796,64 @@ export type TakeoffRunType = typeof takeoffRunTypes.$inferSelect;
 export type InsertTakeoffRunType = typeof takeoffRunTypes.$inferInsert;
 export type RunPathType = (typeof RUN_PATH_TYPES)[number];
 
+/**
+ * Which feet of a run an extra follows (0135).
+ *
+ * `flat`  the traced horizontal length only — tape and tracer wire lie in the
+ *         trench, not up the riser.
+ * `all`   every installed foot, verticals included — a pull rope or mule tape
+ *         goes through every foot of pipe.
+ */
+export const RUN_EXTRA_APPLIES_TO = ["flat", "all"] as const;
+export type RunExtraAppliesTo = (typeof RUN_EXTRA_APPLIES_TO)[number];
+
+/**
+ * A run type's EXTRAS (0135, references/per-foot-items-plan.md § 3a) —
+ * per-foot items that follow the traced length: underground warning tape,
+ * and whatever a shop adds later (tracer wire, mule tape, pull rope).
+ *
+ * A type keeps its one raceway, conductor and ground; extras are a list
+ * beside them. Same ownership model as the type: `userId` NULL is shipped,
+ * set is the company OWNER's id, and forking a shipped type copies its
+ * extras with `baselineExtraId` pointing back (`forkRunType`), so a fork's
+ * bid line keeps its key. Nothing is copied down to runs: editing an extra
+ * re-prices every run of the type.
+ */
+export const takeoffRunTypeExtras = mysqlTable(
+  "takeoff_run_type_extras",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** NULL = shipped. Set = the company owner's id. */
+    userId: int("userId").references(() => users.id, { onDelete: "cascade" }),
+    runTypeId: int("runTypeId")
+      .notNull()
+      .references(() => takeoffRunTypes.id, { onDelete: "cascade" }),
+    /** The shipped extra this was copied from. NULL = shipped, or the shop's own. */
+    baselineExtraId: int("baselineExtraId"),
+    /**
+     * The per-foot material. `set null` like every provenance link here: a
+     * deleted material leaves the extra saying so and pricing nothing.
+     */
+    materialId: int("materialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    /** Feet of the extra per foot of run. 1.0 for tape. */
+    feetPerFoot: decimal("feetPerFoot", { precision: 8, scale: 4 }).notNull(),
+    appliesTo: mysqlEnum("appliesTo", RUN_EXTRA_APPLIES_TO).notNull(),
+    sortOrder: int("sortOrder").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("takeoff_run_type_extras_runTypeId_idx").on(t.runTypeId),
+    index("takeoff_run_type_extras_userId_idx").on(t.userId),
+  ]
+);
+
+export type TakeoffRunTypeExtra = typeof takeoffRunTypeExtras.$inferSelect;
+export type InsertTakeoffRunTypeExtra =
+  typeof takeoffRunTypeExtras.$inferInsert;
+
 /** Draft = still being traced or autosaved; committed = the user finished. */
 /**
  * Which of a run type's three materials a bid line stands for (D18, § 5f.2).
@@ -2824,6 +2906,13 @@ export const RUN_MATERIAL_ROLES = [
   // Track C's locknut/bushing code ships — and that code is what moves totals.
   "locknut",
   "bushing",
+  /*
+    A run type's EXTRA — a per-foot item that follows the traced length, like
+    underground warning tape (0136, references/per-foot-items-plan.md § 3a).
+    A type may carry several, so these lines are told apart by `runExtraKey`.
+    Nothing writes it until the plan's server half ships.
+  */
+  "extra",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 
@@ -4211,6 +4300,24 @@ export type StoredMarkupSource = {
   parts: Array<{ materialId: number | null; cost: number }>;
 };
 
+/**
+ * One entry of `bid_line_items.snapshotTracedParts` (0138): an assembly part
+ * whose quantity comes from a traced run, frozen when the line was added.
+ * `defaultQty` is NULL on a `traced` part and the part's own qty on a
+ * `traced_or_default` one. `unitCost` is a decimal string, like every other
+ * frozen cost.
+ */
+export type SnapshotTracedPart = {
+  materialId: number;
+  baselineMaterialId: number | null;
+  name: string;
+  unitCost: string;
+  defaultQty: number | null;
+};
+
+/** One answer in `bid_line_items.tracedPartAnswers` (0138). */
+export type TracedPartAnswer = { feet: number } | { notOnJob: true };
+
 export const MARKUP_RULE_KINDS = ["item", "category", "band"] as const;
 
 /**
@@ -4422,6 +4529,38 @@ export const bidLineItems = mysqlTable(
     runMaterialId: int("runMaterialId").references(() => materials.id, {
       onDelete: "set null",
     }),
+    /**
+     * WHICH EXTRA a role-`extra` line stands for (0136): the extra's
+     * `baselineExtraId ?? id`, so a fork of the type keeps its line.
+     *
+     * 0 means "not an extra" — true of every other line, and a value no extra
+     * produces. NOT NULL with that default because it is in
+     * `bid_line_items_bid_runtype_role_extra_uq`, where NULLs never collide and
+     * would quietly allow two raceway lines for one type.
+     */
+    runExtraKey: int("runExtraKey").default(0).notNull(),
+    /**
+     * "Shared trench? Set this extra to 0" (0136, owner decision 4): NULL =
+     * follow the run type's extra; 0 = this extra counts nothing on THIS bid.
+     * Only read on a role-`extra` line. Per bid and per type, not per run.
+     */
+    extraFeetPerFoot: decimal("extraFeetPerFoot", { precision: 8, scale: 4 }),
+    /**
+     * A line's TRACED PARTS, frozen when it is added (0138,
+     * references/per-foot-items-plan.md § 3d) — the assembly parts whose
+     * quantity comes from a traced run. NULL on a line with none. Never
+     * written again: the snapshot rule.
+     */
+    snapshotTracedParts: json("snapshotTracedParts").$type<
+      SnapshotTracedPart[]
+    >(),
+    /**
+     * The estimator's answers about those parts on THIS line, keyed by
+     * material id (0138): a typed length, or "not on this job". A hand edit
+     * to their own line, which the snapshot rule allows. NULL = none given.
+     */
+    tracedPartAnswers:
+      json("tracedPartAnswers").$type<Record<string, TracedPartAnswer>>(),
 
     // ── The snapshot: four inputs, frozen ──
     /**
@@ -4575,10 +4714,13 @@ export const bidLineItems = mysqlTable(
     // The same half of R3 for traced footage: one type, one role, at most one
     // live line. MySQL allows many NULLs in a unique index, which is what lets
     // every hand-added line share it without colliding. See drizzle/0070.
-    unique("bid_line_items_bid_runtype_role_uq").on(
+    // Widened by `runExtraKey` (0136) so one type can carry several extras;
+    // that column is NOT NULL so the widening cannot let a duplicate through.
+    unique("bid_line_items_bid_runtype_role_extra_uq").on(
       t.bidId,
       t.takeoffRunTypeId,
-      t.runMaterialRole
+      t.runMaterialRole,
+      t.runExtraKey
     ),
   ]
 );

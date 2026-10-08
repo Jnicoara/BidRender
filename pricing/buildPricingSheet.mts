@@ -1054,8 +1054,9 @@ addAll(
   [
     "Surface raceway base, 500 series",
     "Surface raceway cover, 500 series",
-    "Surface raceway base, 700 series",
-    "Surface raceway cover, 700 series",
+    // 700 is one-piece (owner, 2026-10-08): the base row was renamed and
+    // the cover retired, so neither old name may come back as a "new" row.
+    "Surface raceway, 700 series",
     "Surface raceway, 1500 series",
     "Surface raceway, 2400 series two-channel",
     "Raceway inside elbow",

@@ -1,0 +1,32 @@
+-- M2 of the per-foot items plan (references/per-foot-items-plan.md § 4):
+-- a bid line for each EXTRA on a run type, and "0 on this bid".
+--
+--   runMaterialRole   'extra' APPENDED, like 0084/0085/0096/0118 — every
+--                     stored value keeps its index.
+--   runExtraKey       WHICH extra a role-'extra' line is: the extra's
+--                     `baselineExtraId ?? id`. NOT NULL DEFAULT 0, and 0 means
+--                     "not an extra" — TRUE of every row that exists today, and
+--                     a value nothing else produces (an extra's id is never 0).
+--                     NOT NULL because it goes in a unique key, where NULLs
+--                     never collide and would quietly allow duplicate lines.
+--   extraFeetPerFoot  NULL = follow the run type's extra; 0 = "shared
+--                     trench" on this bid (owner decision 4). Only read on a
+--                     role-'extra' line. NULL, no default: "follow the type"
+--                     is a value nothing else produces.
+--
+-- The unique key widens from (bidId, takeoffRunTypeId, runMaterialRole) to
+-- add runExtraKey, so one type can carry two extras (tape + tracer wire).
+-- ADD before DROP, in one statement: the new key covers everything the old
+-- one did, so no moment exists without it. Every existing row has
+-- runExtraKey 0, so the new key holds exactly the rows the old one did.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- No UPDATE. Old code never writes 'extra' and inserts runExtraKey 0 by
+-- default, so the wider key refuses exactly what the old key refused.
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_line_items` MODIFY COLUMN `runMaterialRole` enum('raceway','conductor','ground','coupling','connector','strap','elbow90','elbow45','fieldBend','lb','pullBox','teeBox','teeCover','teeBody','locknut','bushing','extra');
+--> statement-breakpoint
+ALTER TABLE `bid_line_items` ADD `runExtraKey` int NOT NULL DEFAULT 0, ADD `extraFeetPerFoot` decimal(8,4);
+--> statement-breakpoint
+ALTER TABLE `bid_line_items` ADD UNIQUE INDEX `bid_line_items_bid_runtype_role_extra_uq` (`bidId`,`takeoffRunTypeId`,`runMaterialRole`,`runExtraKey`), DROP INDEX `bid_line_items_bid_runtype_role_uq`;

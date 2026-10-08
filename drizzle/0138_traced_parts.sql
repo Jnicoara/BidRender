@@ -1,0 +1,18 @@
+-- M4 of the per-foot items plan (references/per-foot-items-plan.md § 3d, § 4):
+-- a bid line's TRACED PARTS, frozen, and the estimator's answers about them.
+--
+--   snapshotTracedParts  FROZEN when the line is added, like every snapshot
+--                        column: [{ materialId, baselineMaterialId, name,
+--                        unitCost, defaultQty }], defaultQty NULL on a
+--                        'traced' part. NULL on every line with no traced part.
+--                        Never written again.
+--   tracedPartAnswers    the estimator's answers on THIS line, keyed by
+--                        material: { feet } | { notOnJob: true }. A hand edit
+--                        to their own line, which the snapshot rule allows.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Nullable JSON, no default, no backfill: every existing line has no traced
+-- part, which is what NULL says. Old code ignores both.
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_line_items` ADD `snapshotTracedParts` json, ADD `tracedPartAnswers` json;
