@@ -2,8 +2,37 @@ import { describe, it, expect } from "vitest";
 import {
   countNounAfter,
   phraseHoldsCount,
+  splitHyphenatedCounts,
   wordIsCount,
 } from "../shared/searchCounts";
+import { normalizeQuerySizes } from "../client/src/lib/smartSearch";
+
+describe("a count typed with a hyphen is split into number and noun", () => {
+  it.each([
+    ["2-gang", "2 gang"],
+    ["2-gang box", "2 gang box"],
+    ["3-way switch", "3 way switch"],
+    ["42-spaces", "42 spaces"],
+    ["20a 2-pole", "20a 2 pole"],
+  ])("%s → %s", (query, expected) => {
+    expect(splitHyphenatedCounts(query)).toBe(expected);
+  });
+
+  it.each([
+    // Sizes and specs keep their hyphen: no count noun follows it.
+    ['1-1/4" emt', '1-1/4" emt'],
+    ["12-2 romex", "12-2 romex"],
+    ["90-degree", "90-degree"],
+    ["double-gang", "double-gang"],
+  ])("%s is left as %s", (query, expected) => {
+    expect(splitHyphenatedCounts(query)).toBe(expected);
+  });
+
+  it("is part of the query's spelling, after sizes are read", () => {
+    expect(normalizeQuerySizes("2-gang")).toBe("2 gang");
+    expect(normalizeQuerySizes("1 1/4 inch emt")).toBe('1-1/4" emt');
+  });
+});
 
 describe("a count in a search", () => {
   it("is a number followed by a count noun, and nothing else", () => {
