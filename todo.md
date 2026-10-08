@@ -18,6 +18,19 @@ left as written rather than rewritten to match the rename.
     re-run past a real failure.
   - **Suspects:** the undo round trip on staging taking over 20 s under
     load, or the mark list's refetch racing the poll.
+  - **Update, same night:** it failed twice more, on run 37728609820
+    (1bf619d, a docs-only commit), at lines 450 and 454. Meanwhile run
+    37729182697 on 97e72d6, which contains everything, passed smoke.
+    - Both 1bf619d attempts OVERLAPPED other work on staging. The first ran
+      while staging was being redeployed to 97e72d6 (04:47–05:18). The
+      re-run started a minute after 97e72d6's own smoke, on the same shared
+      smoke account.
+    - **Strongest suspect: a staging redeploy, or a second smoke, landing
+      mid-run.** This step holds `takeoffGroups.create`, reloads, then
+      polls for 20 s, which is exactly the window a restart breaks.
+    - Two possible fixes: put smoke runs in one concurrency group with the
+      staging deploy, or give step 10 a longer poll.
+    - Nothing in any of these diffs touches marks or undo.
 
 ## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
 
