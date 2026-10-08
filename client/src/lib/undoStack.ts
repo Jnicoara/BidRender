@@ -25,9 +25,61 @@
  *   keeps it; another tab or a colleague's change is not on it.
  */
 
+import type { inferRouterInputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 import type { EndClaims } from "./legSnap";
 
 export const UNDO_LIMIT = 50;
+
+type RunInputs = inferRouterInputs<AppRouter>["takeoffRuns"];
+
+/**
+ * A run edit that moves a number on the bid, as the call that makes it (Gap
+ * 4c, 2026-10-08). Each returns the run's network as it was, sealed, so undo
+ * is `takeoffRuns.restore` and redo is the SAME call sent again.
+ */
+export type RunEditCall =
+  | { proc: "setRunType"; input: RunInputs["setRunType"] }
+  | { proc: "respecify"; input: RunInputs["respecify"] }
+  | { proc: "setTypedLength"; input: RunInputs["setTypedLength"] }
+  | { proc: "addCircuit"; input: RunInputs["addCircuit"] }
+  | { proc: "updateCircuit"; input: RunInputs["updateCircuit"] }
+  | { proc: "removeCircuit"; input: RunInputs["removeCircuit"] }
+  | { proc: "addLeg"; input: RunInputs["addLeg"] };
+
+/**
+ * The changes on the Plans screen that undo does NOT cover (Gap 4a,
+ * 2026-10-08), and what the undo arrow calls each.
+ *
+ * Before this, undo pressed after one of these quietly took back whatever
+ * came before it — an older step, for a change the person was not thinking
+ * about. Now the screen notes each one (`noteNotUndoable`) and the arrow says
+ * so first. `client/src/lib/notUndoableWired.test.ts` fails on a key the
+ * screen never notes, so an entry here cannot be a promise nothing keeps.
+ */
+export const NOT_UNDOABLE = {
+  markStatus: "mark status changed",
+  markHeight: "mark height changed",
+  markDrop: "mark drop changed",
+  countDrop: "count's drop changed",
+  countSource: "count's assembly changed",
+  countLook: "count's look changed",
+  countSent: "count sent to the bid",
+  runExtras: "run extras changed",
+  runTraceMode: "trace mode changed",
+  runBranchWiring: "branch wiring answered",
+  runRunsAt: "ceiling or box-to-box changed",
+  runPullPoint: "pull point answered",
+  runDrops: "proposed drop answered",
+  runSuggestion: "suggested route accepted",
+  symbol: "symbol changed",
+  scale: "sheet scale set",
+  sheetName: "sheet renamed",
+  sheetNumber: "sheet number changed",
+  planRemoved: "plan set removed",
+} as const;
+
+export type NotUndoableChange = keyof typeof NOT_UNDOABLE;
 
 /** A sealed server packet: opaque here. */
 export type Packet = { kind: string; data: string; sig: string };
@@ -89,7 +141,16 @@ export type UndoOp =
    * Put marks under these counts (takeoffStamps.moveToGroup), one entry per
    * count. Its own reverse: the server says where each mark was.
    */
-  | { kind: "moveMarks"; moves: { groupId: number; ids: number[] }[] };
+  | { kind: "moveMarks"; moves: { groupId: number; ids: number[] }[] }
+  /** Send this run edit again (redo of an undone one). */
+  | { kind: "runEdit"; runId: number; call: RunEditCall }
+  /** Put a run's network back as it was before this edit. */
+  | {
+      kind: "restoreRunEdit";
+      packet: Packet;
+      runId: number;
+      call: RunEditCall;
+    };
 
 export type UndoEntry = {
   /** What the step was, as the button's tooltip names it: "3 marks placed". */
@@ -127,7 +188,17 @@ export type CountCardSnapshot = {
   position: number;
 };
 
-export type UndoState = { past: UndoEntry[]; future: UndoEntry[] };
+export type UndoState = {
+  past: UndoEntry[];
+  future: UndoEntry[];
+  /**
+   * The newest change, when it is one undo does not cover (Gap 4a). While it
+   * is set, undo takes NOTHING back: the arrow and the first press say so,
+   * and that press clears it, so the next press reaches the older step on
+   * purpose rather than by surprise.
+   */
+  notCovered: NotUndoableChange | null;
+};
 
 /**
  * The step a card's undo arrow would take back — only the NEWEST step, and
@@ -139,6 +210,8 @@ export function undoForSubject(
   state: UndoState,
   subject: UndoSubject
 ): UndoEntry | null {
+  // Something newer than any step happened, and undo cannot take it back.
+  if (state.notCovered !== null) return null;
   const top = nextUndo(state);
   return top?.subject &&
     top.subject.kind === subject.kind &&
@@ -147,11 +220,62 @@ export function undoForSubject(
     : null;
 }
 
-export const EMPTY_UNDO: UndoState = { past: [], future: [] };
+export const EMPTY_UNDO: UndoState = { past: [], future: [], notCovered: null };
 
 /** A new step. Clears redo; drops the oldest past the limit. */
 export function pushStep(state: UndoState, entry: UndoEntry): UndoState {
-  return { past: [...state.past, entry].slice(-UNDO_LIMIT), future: [] };
+  return {
+    past: [...state.past, entry].slice(-UNDO_LIMIT),
+    future: [],
+    notCovered: null,
+  };
+}
+
+/**
+ * A change undo does not cover just happened (Gap 4a). It is a new change, so
+ * it clears redo as a step would; the past stays, reachable after the arrow
+ * has said so once (`acknowledgeNotUndoable`).
+ */
+export function noteNotUndoable(
+  state: UndoState,
+  change: NotUndoableChange
+): UndoState {
+  return { past: state.past, future: [], notCovered: change };
+}
+
+/** Undo was pressed and said "can't be undone": the next press goes on. */
+export function acknowledgeNotUndoable(state: UndoState): UndoState {
+  return state.notCovered === null ? state : { ...state, notCovered: null };
+}
+
+/**
+ * What a press of undo says while the newest change is not covered, or null
+ * when undo can simply go ahead.
+ */
+export function notUndoableMessage(state: UndoState): string | null {
+  if (state.notCovered === null) return null;
+  const what = NOT_UNDOABLE[state.notCovered];
+  const said = `${what.charAt(0).toUpperCase()}${what.slice(1)} can't be undone.`;
+  const older = nextUndo(state);
+  return older
+    ? `${said} Press undo again to take back the step before it: ${older.label}.`
+    : said;
+}
+
+/**
+ * What a press of undo says while placed marks are still on their way to the
+ * server, or null when none are.
+ *
+ * A mark's undo step is pushed only once the server confirms which ids it
+ * wrote (`TakeoffPage`'s flush) — an undo guessing ids would be worse. So in
+ * that window the newest step is something OLDER, and before this a press
+ * either did nothing at all or took back that older step, with no word
+ * either way (todo.md, smoke step 10). Now it says so and takes nothing.
+ * Every mark still drawn from the queue counts — queued, in flight, or
+ * waiting on a count or sheet the server has not made yet.
+ */
+export function stillSavingMessage(queue: readonly unknown[]): string | null {
+  return queue.length > 0 ? "Still saving — try again in a second." : null;
 }
 
 export function nextUndo(state: UndoState): UndoEntry | null {
@@ -165,7 +289,7 @@ export function nextUndo(state: UndoState): UndoEntry | null {
  * marks, not the delete the toast was about. Same rule as a card's arrow.
  */
 export function isNewestStep(state: UndoState, entry: UndoEntry): boolean {
-  return nextUndo(state) === entry;
+  return state.notCovered === null && nextUndo(state) === entry;
 }
 
 export function nextRedo(state: UndoState): UndoEntry | null {
@@ -184,6 +308,7 @@ export function settleUndo(
 ): UndoState {
   if (nextUndo(state) !== entry) return state;
   return {
+    ...state,
     past: state.past.slice(0, -1),
     future: [...state.future, { ...entry, redo }],
   };
@@ -197,6 +322,7 @@ export function settleRedo(
 ): UndoState {
   if (nextRedo(state) !== entry) return state;
   return {
+    ...state,
     past: [...state.past, { ...entry, undo }].slice(-UNDO_LIMIT),
     future: state.future.slice(0, -1),
   };
@@ -205,6 +331,7 @@ export function settleRedo(
 /** The server refused this step: it goes, from whichever side it was on. */
 export function dropStep(state: UndoState, entry: UndoEntry): UndoState {
   return {
+    ...state,
     past: state.past.filter(e => e !== entry),
     future: state.future.filter(e => e !== entry),
   };
@@ -212,6 +339,9 @@ export function dropStep(state: UndoState, entry: UndoEntry): UndoState {
 
 /** "Undo: 3 marks placed", or why there is nothing. */
 export function undoTitle(state: UndoState): string {
+  // Said first, and plainly (Gap 4a): the newest change is not on the stack.
+  if (state.notCovered !== null)
+    return `Can't be undone: ${NOT_UNDOABLE[state.notCovered]} (Ctrl+Z)`;
   const e = nextUndo(state);
   // "in this tab": the history is the tab's (@/lib/undoPersist), so a new tab
   // starts empty on a bid with plenty done to it.

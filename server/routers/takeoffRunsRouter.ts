@@ -32,6 +32,7 @@ import {
   RUN_STATUSES,
   TAKEOFF_LOCATIONS,
   TRACE_MODES,
+  type TakeoffRun,
 } from "../../drizzle/schema";
 import {
   pathRealInches,
@@ -196,6 +197,23 @@ async function refuseIfRunLocked(
     throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
   const run = await requireRun(runId, userId);
   await refuseIfLocked(run.bidId, userId, what);
+  return run;
+}
+
+/**
+ * Make one run edit one undo step (Track B Gap 4c, 2026-10-08): the run's
+ * whole network as it was, sealed, which `restore` puts back — the same
+ * packet a drag or an end change returns. Used by the edits that change a
+ * NUMBER on the bid: run type, typed length, circuits and legs. Redo is the
+ * screen sending the same call again.
+ */
+async function asUndoStep<R>(
+  run: Pick<TakeoffRun, "id" | "parentRunId" | "bidId">,
+  userId: number,
+  change: () => Promise<R>
+) {
+  const { result, snapshot } = await withNetworkSnapshot(run, userId, change);
+  return { result, undo: sealPacket(RUN_PACKET, userId, snapshot) };
 }
 
 /**
@@ -836,6 +854,14 @@ export const takeoffRunsRouter = router({
       }
       return {
         id: input.id,
+        /**
+         * The run was finished BEFORE this call — legs added to an existing
+         * run commit it again. The screen pushes "run finished" (undo =
+         * delete the run) only when this is false: before 2026-10-08 it
+         * pushed it every time, so undoing a leg added to a finished run
+         * deleted the whole run (Gap 4c).
+         */
+        wasCommitted: run.status === "committed" && !run.isSuggestion,
         /** This row alone, as drawn. Null with no scale. */
         lengthFeet: inches === null ? null : toBillableFeet(inches),
         /**
@@ -926,13 +952,15 @@ export const takeoffRunsRouter = router({
         ctx.scope.dataUserId,
         "a run's length cannot be typed or cleared"
       );
-      await db.updateRun(input.id, ctx.scope.dataUserId, {
-        typedLengthInches:
-          input.typedLengthInches === null
-            ? null
-            : input.typedLengthInches.toFixed(4),
-      });
-      return { success: true };
+      const { undo } = await asUndoStep(run, ctx.scope.dataUserId, () =>
+        db.updateRun(input.id, ctx.scope.dataUserId, {
+          typedLengthInches:
+            input.typedLengthInches === null
+              ? null
+              : input.typedLengthInches.toFixed(4),
+        })
+      );
+      return { success: true, undo };
     }),
 
   setLocation: procedure
@@ -986,11 +1014,13 @@ export const takeoffRunsRouter = router({
       await refuseIfLocked(run.bidId, ctx.scope.dataUserId);
 
       if (input.runTypeId === null) {
-        await db.updateRun(input.id, ctx.scope.dataUserId, {
-          runTypeId: null,
-          runTypeLabel: null,
-        });
-        return { success: true, label: null };
+        const { undo } = await asUndoStep(run, ctx.scope.dataUserId, () =>
+          db.updateRun(input.id, ctx.scope.dataUserId, {
+            runTypeId: null,
+            runTypeLabel: null,
+          })
+        );
+        return { success: true, label: null, undo };
       }
 
       const type = await db.getRunTypeById(
@@ -1017,11 +1047,13 @@ export const takeoffRunsRouter = router({
           message: `"${type.label}" is a ${type.pathType} type, and this is a ${run.pathType} run.`,
         });
 
-      await db.updateRun(input.id, ctx.scope.dataUserId, {
-        runTypeId: type.id,
-        runTypeLabel: type.label,
-      });
-      return { success: true, label: type.label };
+      const { undo } = await asUndoStep(run, ctx.scope.dataUserId, () =>
+        db.updateRun(input.id, ctx.scope.dataUserId, {
+          runTypeId: type.id,
+          runTypeLabel: type.label,
+        })
+      );
+      return { success: true, label: type.label, undo };
     }),
 
   /**
@@ -1178,48 +1210,59 @@ export const takeoffRunsRouter = router({
         created = true;
       }
 
-      // The stored id, then the label snapshot beside it — as setRunType does.
-      if (run.runTypeId !== type.id || run.runTypeLabel !== type.label) {
-        await db.updateRun(run.id, userId, {
-          runTypeId: type.id,
-          runTypeLabel: type.label,
-        });
-      }
+      /*
+        One undo step (Gap 4c): the type link and any circuit it adds or
+        changes. A type made just now stays in the palette after an undo —
+        nothing points at it, and a palette entry changes no number.
+      */
+      const chosen = type;
+      const { result: plan, undo } = await asUndoStep(run, userId, async () => {
+        // The stored id, then the label snapshot beside it — as setRunType
+        // does.
+        if (run.runTypeId !== chosen.id || run.runTypeLabel !== chosen.label) {
+          await db.updateRun(run.id, userId, {
+            runTypeId: chosen.id,
+            runTypeLabel: chosen.label,
+          });
+        }
 
-      const circuits = await db.getCircuitsForRuns([run.id], userId);
-      const plan = circuitPlan(
-        run.pathType,
-        circuits,
-        // The TYPE's count after matching, so a cable never reaches here and
-        // a conduit run gets exactly the number typed.
-        want.conductorMaterialId === null ? null : input.conductorCount
-      );
-      if (plan.kind === "add") {
-        await db.createRunCircuit({
-          runId: run.id,
-          userId,
-          name: "Ckt 1",
-          conductorCount: plan.conductors,
-          /*
-            What the type says, else one — the same answer "Add wires" gives
-            (client/src/lib/runCircuits.ts `newCircuitFor`), where a type's
-            deliberate zero is kept rather than replaced.
-          */
-          groundCount: type.groundCount ?? 1,
-          separateGround: false,
-        });
-      } else if (plan.kind === "update") {
-        await db.updateRunCircuit(plan.circuitId, userId, {
-          conductorCount: plan.conductors,
-        });
-      }
+        const circuits = await db.getCircuitsForRuns([run.id], userId);
+        const plan = circuitPlan(
+          run.pathType,
+          circuits,
+          // The TYPE's count after matching, so a cable never reaches here
+          // and a conduit run gets exactly the number typed.
+          want.conductorMaterialId === null ? null : input.conductorCount
+        );
+        if (plan.kind === "add") {
+          await db.createRunCircuit({
+            runId: run.id,
+            userId,
+            name: "Ckt 1",
+            conductorCount: plan.conductors,
+            /*
+                What the type says, else one — the same answer "Add wires"
+                gives (client/src/lib/runCircuits.ts `newCircuitFor`), where a
+                type's deliberate zero is kept rather than replaced.
+              */
+            groundCount: chosen.groundCount ?? 1,
+            separateGround: false,
+          });
+        } else if (plan.kind === "update") {
+          await db.updateRunCircuit(plan.circuitId, userId, {
+            conductorCount: plan.conductors,
+          });
+        }
+        return plan;
+      });
 
       return {
-        runTypeId: type.id,
-        label: type.label,
+        runTypeId: chosen.id,
+        label: chosen.label,
         created,
         circuits: plan.kind,
         circuitCount: plan.kind === "several" ? plan.count : undefined,
+        undo,
       };
     }),
 
@@ -1510,15 +1553,29 @@ export const takeoffRunsRouter = router({
 
       const sheet = await requireSheet(root.sheetId, userId);
       const measurability = measurabilityOf(sheetScale(sheet));
-      return db.addBranchLeg(userId, {
-        root,
-        points: input.points,
-        start,
-        endKind: input.endKind,
-        runTypeId,
-        runTypeLabel,
-        ratio: measurability.ok ? measurability.ratio : null,
-      });
+      // One undo step (Gap 4c): a tee cuts the leg it stands on, so the whole
+      // network goes back, not only the new row.
+      const { result, undo } = await asUndoStep(root, userId, () =>
+        db.addBranchLeg(userId, {
+          root,
+          points: input.points,
+          start,
+          endKind: input.endKind,
+          runTypeId,
+          runTypeLabel,
+          ratio: measurability.ok ? measurability.ratio : null,
+        })
+      );
+      return {
+        ...result,
+        undo,
+        /**
+         * The run is still a draft being traced: finishing it is the undo
+         * step (it deletes the run, legs and all), so the screen does not
+         * push one per leg as well.
+         */
+        onDraft: root.status !== "committed",
+      };
     }),
 
   // ── Circuits on a run ──────────────────────────────────────────────────────
@@ -1579,15 +1636,20 @@ export const takeoffRunsRouter = router({
             "A cable run carries its own conductors — circuits are only assigned to conduit runs.",
         });
       }
-      const id = await db.createRunCircuit({
-        runId: input.runId,
-        userId: ctx.scope.dataUserId,
-        name: input.name,
-        conductorCount: input.conductorCount,
-        groundCount: input.groundCount,
-        separateGround: input.separateGround,
-      });
-      return { id };
+      const { result: id, undo } = await asUndoStep(
+        run,
+        ctx.scope.dataUserId,
+        () =>
+          db.createRunCircuit({
+            runId: input.runId,
+            userId: ctx.scope.dataUserId,
+            name: input.name,
+            conductorCount: input.conductorCount,
+            groundCount: input.groundCount,
+            separateGround: input.separateGround,
+          })
+      );
+      return { id, undo };
     }),
 
   updateCircuit: procedure
@@ -1616,26 +1678,30 @@ export const takeoffRunsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { id, ...patch } = input;
       const userId = ctx.scope.dataUserId;
-      await refuseIfRunLocked(
+      const run = await refuseIfRunLocked(
         await db.getRunIdOfCircuit(id, userId),
         userId,
         "circuits cannot be changed"
       );
-      await db.updateRunCircuit(id, userId, patch);
-      return { success: true };
+      const { undo } = await asUndoStep(run, userId, () =>
+        db.updateRunCircuit(id, userId, patch)
+      );
+      return { success: true, undo };
     }),
 
   removeCircuit: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
-      await refuseIfRunLocked(
+      const run = await refuseIfRunLocked(
         await db.getRunIdOfCircuit(input.id, userId),
         userId,
         "circuits cannot be changed"
       );
-      await db.deleteRunCircuit(input.id, userId);
-      return { success: true };
+      const { undo } = await asUndoStep(run, userId, () =>
+        db.deleteRunCircuit(input.id, userId)
+      );
+      return { success: true, undo };
     }),
 
   /**

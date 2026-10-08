@@ -36,6 +36,7 @@ import {
 } from "../drizzle/schema";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 import { PLANNED_STARTER_ASSEMBLIES } from "./seed/starterAssemblies";
+import { STARTER_COVER_SWAPS, wasRecipe } from "./seed/starterCoverSwaps";
 import {
   liveStarterSchema,
   starterHolds,
@@ -102,9 +103,12 @@ describe("the starter seed file", () => {
   });
 
   it("uses every part in the table — no orphan keys to go stale", () => {
-    const used = new Set(
-      BASELINE_ASSEMBLIES.flatMap(a => a.materials.map(l => l.part))
-    );
+    // A swapped-out cover is still used: the cover repair needs its key to
+    // recognise the old recipe on a database seeded before the swap.
+    const used = new Set([
+      ...BASELINE_ASSEMBLIES.flatMap(a => a.materials.map(l => l.part)),
+      ...STARTER_COVER_SWAPS.flatMap(s => s.was.map(l => l.part)),
+    ]);
     expect(
       Object.keys(STARTER_PARTS).filter(k => !used.has(k as never))
     ).toEqual([]);
@@ -251,10 +255,19 @@ describe.skipIf(!hasDb)("seeding a database", () => {
         })
         .from(assemblyMaterials)
         .where(eq(assemblyMaterials.assemblyId, row.id));
-      expect(
-        [...lines].sort((a, b) => a.materialId - b.materialId),
-        spec.ref
-      ).toEqual(expectedLines(spec, idByName));
+      // A database seeded before the cover swap (2026-10-08) still holds the
+      // old covers until scripts/repairStarterCovers.mts runs; either recipe
+      // is right, anything else is not.
+      const have = [...lines].sort((a, b) => a.materialId - b.materialId);
+      const old = expectedLines(
+        { ...spec, materials: wasRecipe(spec.ref, spec.materials) },
+        idByName
+      );
+      expect(have, spec.ref).toEqual(
+        JSON.stringify(have) === JSON.stringify(old)
+          ? old
+          : expectedLines(spec, idByName)
+      );
     }
   });
 

@@ -313,6 +313,7 @@ import {
 } from "@shared/multipartPlan";
 import { uploadInParts } from "@/lib/multipartUpload";
 import {
+  EVERY_SHEET_REFETCH,
   QUERIES_MOVED_BY,
   sheetsAnUndoMoves,
   sheetsToRefresh,
@@ -320,19 +321,25 @@ import {
   type TakeoffQuery,
 } from "@/lib/takeoffRefresh";
 import {
+  acknowledgeNotUndoable,
   countLabel,
   dropStep,
   isNewestStep,
   nextRedo,
   nextUndo,
+  noteNotUndoable,
+  notUndoableMessage,
   pushStep,
   redoTitle,
   settleRedo,
   settleUndo,
+  stillSavingMessage,
   undoForSubject,
   undoTitle,
   type EndsPatch,
+  type NotUndoableChange,
   type Packet,
+  type RunEditCall,
   type UndoEntry,
   type UndoOp,
   type UndoState,
@@ -3360,6 +3367,8 @@ export default function TakeoffPage({
    */
   const [pendingMarks, setPendingMarks] = useState<PendingMark[]>([]);
   const pendingStamps = useRef<PendingMark[]>([]);
+  // `flushStamps` for code above its definition (undo); set where it is made.
+  const flushStampsRef = useRef<() => void>(() => {});
   const setPending = useCallback((next: PendingMark[]) => {
     pendingStamps.current = next;
     setPendingMarks(next);
@@ -3668,17 +3677,25 @@ export default function TakeoffPage({
       // a step that reaches them all. @/lib/takeoffRefresh.
       const sheetIds = sheetsToRefresh(activeSheet?.id, stepSheetId);
       const bidPdfId = doc?.id;
+      // "every" refetches the sheets not on screen too — @/lib/takeoffRefresh
+      // EVERY_SHEET_REFETCH says why (Gap 4b, seen on screen 2026-10-08).
       switch (query) {
         case "takeoffRuns.listForSheet":
           if (sheetIds === "every")
-            void utils.takeoffRuns.listForSheet.invalidate();
+            void utils.takeoffRuns.listForSheet.invalidate(
+              undefined,
+              EVERY_SHEET_REFETCH
+            );
           else
             for (const sheetId of sheetIds)
               void utils.takeoffRuns.listForSheet.invalidate({ sheetId });
           return;
         case "takeoffStamps.listForSheet":
           if (sheetIds === "every")
-            void utils.takeoffStamps.listForSheet.invalidate();
+            void utils.takeoffStamps.listForSheet.invalidate(
+              undefined,
+              EVERY_SHEET_REFETCH
+            );
           else
             for (const sheetId of sheetIds)
               void utils.takeoffStamps.listForSheet.invalidate({ sheetId });
@@ -3777,6 +3794,45 @@ export default function TakeoffPage({
     // Handed back so a toast can take back exactly this step (deletedToast).
     return entry;
   }, []);
+  /**
+   * A change undo does not cover just landed (Gap 4a, @/lib/undoStack
+   * NOT_UNDOABLE). Called from that mutation's onSuccess, so a refused change
+   * is not noted; `notUndoableWired.test.ts` fails on a kind never noted.
+   */
+  const notUndoable = useCallback((change: NotUndoableChange) => {
+    setUndoState(s => noteNotUndoable(s, change));
+  }, []);
+  /**
+   * Send a run edit (Gap 4c) and hand back the packet that undoes it. Through
+   * the plain client rather than a hook per procedure: these are the undo's
+   * own calls, and an undo must not push a step of its own.
+   */
+  const sendRunEdit = useCallback(
+    async (call: RunEditCall): Promise<Packet | null> => {
+      const c = utils.client.takeoffRuns;
+      switch (call.proc) {
+        case "setRunType":
+          return (await c.setRunType.mutate(call.input)).undo;
+        case "respecify":
+          return (await c.respecify.mutate(call.input)).undo;
+        case "setTypedLength":
+          return (await c.setTypedLength.mutate(call.input)).undo;
+        case "addCircuit":
+          return (await c.addCircuit.mutate(call.input)).undo;
+        case "updateCircuit":
+          return (await c.updateCircuit.mutate(call.input)).undo;
+        case "removeCircuit":
+          return (await c.removeCircuit.mutate(call.input)).undo;
+        case "addLeg":
+          return (await c.addLeg.mutate(call.input)).undo;
+        default: {
+          const unhandled: never = call;
+          return unhandled;
+        }
+      }
+    },
+    [utils]
+  );
   const undoRemoveMarks = trpc.takeoffStamps.removeMany.useMutation();
   const undoRestoreMarks = trpc.takeoffStamps.restore.useMutation();
   const undoRemoveRun = trpc.takeoffRuns.remove.useMutation();
@@ -3874,6 +3930,20 @@ export default function TakeoffPage({
             ? { kind: "moveMarks", moves: reverse }
             : null;
         }
+        case "runEdit": {
+          const packet = await sendRunEdit(op.call);
+          return packet
+            ? {
+                kind: "restoreRunEdit",
+                packet,
+                runId: op.runId,
+                call: op.call,
+              }
+            : null;
+        }
+        case "restoreRunEdit":
+          await undoRestoreRun.mutateAsync({ undo: op.packet });
+          return { kind: "runEdit", runId: op.runId, call: op.call };
         case "restoreSheet":
         case "clearSheet":
           // Wired with the tool that makes them (clear sheet), further down.
@@ -3894,6 +3964,7 @@ export default function TakeoffPage({
       undoRestoreGroup,
       undoRemoveGroup,
       undoMoveMarks,
+      sendRunEdit,
     ]
   );
 
@@ -3901,6 +3972,33 @@ export default function TakeoffPage({
     async (direction: "undo" | "redo") => {
       if (undoBusy) return;
       const state = undoRef.current;
+      /*
+        The newest change is one undo does not cover (Gap 4a): say so and
+        take nothing back. Before, this press quietly undid the step BEFORE
+        it. The press clears the note, so pressing again reaches that older
+        step knowingly — the message names it.
+      */
+      /*
+        Marks still being saved have no undo step yet — it is pushed when the
+        server confirms their ids — so undo now would do nothing, or take back
+        something older. Say so, take nothing, and send the queue now rather
+        than at its timer, so "a second" is true (a batch that failed waits
+        for the next flush, and this is one).
+      */
+      const saving =
+        direction === "undo" ? stillSavingMessage(pendingStamps.current) : null;
+      if (saving !== null) {
+        flushStampsRef.current();
+        toast.message(saving);
+        return;
+      }
+      const notCovered =
+        direction === "undo" ? notUndoableMessage(state) : null;
+      if (notCovered !== null) {
+        setUndoState(s => acknowledgeNotUndoable(s));
+        toast.message(notCovered);
+        return;
+      }
       const entry = direction === "undo" ? nextUndo(state) : nextRedo(state);
       const op = direction === "undo" ? entry?.undo : entry?.redo;
       if (!entry || !op) return;
@@ -4021,6 +4119,8 @@ export default function TakeoffPage({
 
   const remove = trpc.bidPdfs.remove.useMutation({
     onSuccess: () => {
+      // Its own warning asked first; undo cannot bring a plan set back.
+      notUndoable("planRemoved");
       toast.success("Plan removed from this bid.");
       setSelectedDocId(null);
       setPage(1);
@@ -4086,6 +4186,7 @@ export default function TakeoffPage({
       }
       toast.error(error.message);
     },
+    onSuccess: () => notUndoable("sheetName"),
     onSettled: refreshSheets,
   });
 
@@ -4124,6 +4225,7 @@ export default function TakeoffPage({
         );
       toast.error(error.message);
     },
+    onSuccess: () => notUndoable("sheetNumber"),
     onSettled: refreshSheets,
   });
 
@@ -4204,6 +4306,8 @@ export default function TakeoffPage({
 
   const setSheetScale = trpc.bidPdfs.setSheetScale.useMutation({
     onSuccess: async sheet => {
+      // Scale has its own confirmation; undo does not take it back.
+      notUndoable("scale");
       // Plain words, matching the chip — "Scale set to 1:64.015002" is a
       // confirmation nobody can read back to check.
       toast.success(
@@ -4242,6 +4346,7 @@ export default function TakeoffPage({
 
   const clearSheetScale = trpc.bidPdfs.clearSheetScale.useMutation({
     onSuccess: async sheet => {
+      notUndoable("scale");
       await writeSavedSheet(sheet);
       refreshSheets();
     },
@@ -4276,6 +4381,29 @@ export default function TakeoffPage({
   /** The root of the run a row belongs to — what a run card is keyed by. */
   const rootOfRun = (id: number) =>
     runs.find(r => r.id === id)?.parentRunId ?? id;
+  /** The run a circuit is on, from the sheet's rows. */
+  const runOfCircuit = (circuitId: number) =>
+    runs.find(r => r.circuits.some(c => c.id === circuitId))?.id ?? null;
+  /**
+   * A run edit that moves a number, as one undo step (Gap 4c): undo puts the
+   * run's network back from the server's packet, redo sends `call` again.
+   * No packet (no restore secret configured) means no step, as for a drag.
+   */
+  const pushRunEdit = (
+    label: string,
+    runId: number | null,
+    call: RunEditCall,
+    packet: Packet | null
+  ) => {
+    if (!packet || runId === null || !activeSheet) return;
+    pushUndo({
+      label,
+      sheetId: activeSheet.id,
+      undo: { kind: "restoreRunEdit", packet, runId, call },
+      redo: null,
+      subject: { kind: "run", id: rootOfRun(runId) },
+    });
+  };
   const { data: totals } = trpc.takeoffRuns.totals.useQuery({ bidId });
   /*
     Which colour each run type gets on THIS bid (T14): first used, first
@@ -4761,7 +4889,13 @@ export default function TakeoffPage({
   /** Say what an already-traced run is. D3(b), the way to change it later. */
   const setRunTypeFor = trpc.takeoffRuns.setRunType.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: result => {
+    onSuccess: (result, input) => {
+      pushRunEdit(
+        "run type changed",
+        input.id,
+        { proc: "setRunType", input },
+        result.undo
+      );
       refreshRuns();
       toast.success(
         result.label
@@ -4780,7 +4914,13 @@ export default function TakeoffPage({
    */
   const respecifyRun = trpc.takeoffRuns.respecify.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: result => {
+    onSuccess: (result, input) => {
+      pushRunEdit(
+        "run type changed",
+        input.id,
+        { proc: "respecify", input },
+        result.undo
+      );
       void runTypes.refetch();
       refreshRuns();
       toast.success(
@@ -4852,6 +4992,9 @@ export default function TakeoffPage({
   );
   const setGroupDrop = trpc.takeoffGroups.setDrop.useMutation({
     onError: e => toast.error(e.message),
+    // The count's own "Undo drops" (@/lib/dropUndo) covers this; the
+    // toolbar arrow does not.
+    onSuccess: () => notUndoable("countDrop"),
     onSettled: () => refreshFor("groupDrop"),
   });
 
@@ -4895,6 +5038,7 @@ export default function TakeoffPage({
   const setGroupSource = trpc.takeoffGroups.setSource.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: (_result, vars) => {
+      notUndoable("countSource");
       const label =
         bidCounts.data?.groups.find(g => g.id === vars.id)?.label ?? "count";
       const assembly = allAssemblies.find(a => a.id === vars.assemblyId);
@@ -4919,6 +5063,7 @@ export default function TakeoffPage({
   const sendToBid = trpc.takeoffGroups.sendToBid.useMutation({
     onError: e => toast.error(e.message),
     onSuccess: result => {
+      notUndoable("countSent");
       // The bid's lines, the materials list and the summary move too — the
       // count list alone left them stale until 2026-09-29.
       refreshFor("sentToBid");
@@ -5189,6 +5334,7 @@ export default function TakeoffPage({
   */
   const setMarkStatus = trpc.takeoffStamps.setStatus.useMutation({
     onSuccess: (r, input) => {
+      notUndoable("markStatus");
       const n = r.updated;
       const what = n === 1 ? "mark" : "marks";
       toast.success(
@@ -5210,6 +5356,7 @@ export default function TakeoffPage({
   */
   const setMarkHeight = trpc.takeoffStamps.setHeight.useMutation({
     onSuccess: (r, input) => {
+      notUndoable("markHeight");
       const what = r.updated === 1 ? "mark" : "marks";
       toast.success(
         input.inches === null
@@ -5224,6 +5371,7 @@ export default function TakeoffPage({
   });
   const setMarkDropExcluded = trpc.takeoffStamps.setDropExcluded.useMutation({
     onSuccess: (r, input) => {
+      notUndoable("markDrop");
       const what = r.updated === 1 ? "mark" : "marks";
       toast.success(
         input.excluded
@@ -5241,12 +5389,14 @@ export default function TakeoffPage({
     reload, the staleness CLAUDE.md warns about.
   */
   const setLook = trpc.takeoffGroups.setLook.useMutation({
-    onSuccess: r =>
+    onSuccess: r => {
+      notUndoable("countLook");
       toast.success(
         r.savedOn === "count"
           ? "Look saved on this job."
           : `Look saved on ${r.savedOn === "symbol" ? "the legend symbol" : "the assembly"} “${r.name}” — every job.`
-      ),
+      );
+    },
     onError: e => toast.error(e.message),
     onSettled: () => {
       refreshFor("pinLook");
@@ -5330,6 +5480,7 @@ export default function TakeoffPage({
   });
   const captureSymbol = trpc.takeoffStamps.captureSymbol.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => notUndoable("symbol"),
     onSettled: () => {
       // A capture can add a look, so the legend row's open look list and
       // Find all matching's looks move with it.
@@ -5374,8 +5525,10 @@ export default function TakeoffPage({
         utils.takeoffStamps.symbols.setData(undefined, context.before);
       toast.error(e.message);
     },
-    onSuccess: r =>
-      toast.success(`Linked to ${r.assemblyName} — one click from now on.`),
+    onSuccess: r => {
+      notUndoable("symbol");
+      toast.success(`Linked to ${r.assemblyName} — one click from now on.`);
+    },
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
   const unlinkSymbol = trpc.takeoffStamps.unlinkSymbol.useMutation({
@@ -5385,6 +5538,7 @@ export default function TakeoffPage({
         utils.takeoffStamps.symbols.setData(undefined, context.before);
       toast.error(e.message);
     },
+    onSuccess: () => notUndoable("symbol"),
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
   /*
@@ -5396,6 +5550,7 @@ export default function TakeoffPage({
     label: string;
     renamedCountId: number | null;
   }) => {
+    notUndoable("symbol");
     setArmedGroup(armed =>
       armed && armed.groupId === r.renamedCountId
         ? { ...armed, label: r.label }
@@ -5421,7 +5576,10 @@ export default function TakeoffPage({
   });
   const removeSymbol = trpc.takeoffStamps.removeSymbol.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: () => toast.success("Legend symbol deleted."),
+    onSuccess: () => {
+      notUndoable("symbol");
+      toast.success("Legend symbol deleted.");
+    },
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
   /*
@@ -5914,6 +6072,7 @@ export default function TakeoffPage({
         });
     }
   }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
+  flushStampsRef.current = flushStamps;
   /**
    * Take a click: draw it now, send it shortly after.
    *
@@ -7301,7 +7460,9 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
     onSuccess: (result, vars) => {
       // Undoing a finish deletes the run, legs and all; redo puts it back.
-      if (activeSheet)
+      // Not for a run that was ALREADY finished (legs added to it): each of
+      // those legs is its own step, and this one would delete the whole run.
+      if (activeSheet && !result.wasCommitted)
         pushUndo({
           label: "run finished",
           sheetId: activeSheet.id,
@@ -7513,6 +7674,7 @@ export default function TakeoffPage({
         utils.takeoffRuns.listForSheet.setData(context.key, context.before);
       toast.error(e.message);
     },
+    onSuccess: () => notUndoable("runRunsAt"),
     onSettled: () => refreshFor("runEnds"),
   });
 
@@ -7681,6 +7843,17 @@ export default function TakeoffPage({
    */
   const addLeg = trpc.takeoffRuns.addLeg.useMutation({
     onError: e => toast.error(e.message),
+    // A leg of a run still being traced is not its own step: finishing the
+    // run is, and undoing that takes every leg (server `onDraft`).
+    onSuccess: (result, input) =>
+      result.onDraft
+        ? undefined
+        : pushRunEdit(
+            "leg added",
+            input.runId,
+            { proc: "addLeg", input },
+            result.undo
+          ),
     onSettled: refreshRuns,
   });
   /**
@@ -7690,6 +7863,7 @@ export default function TakeoffPage({
    */
   const answerDrops = trpc.takeoffRuns.answerDrops.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => notUndoable("runDrops"),
     onSettled: refreshRuns,
   });
   /** The drop opened from its marker or its row — one at a time. */
@@ -7776,31 +7950,64 @@ export default function TakeoffPage({
    */
   const setRunTraceMode = trpc.takeoffRuns.setTraceMode.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: (result, variables) =>
+    onSuccess: (result, variables) => {
+      notUndoable("runTraceMode");
       toast.success(
         variables.mode === "quantity"
           ? "Counted as quantity now — flat footage, drops proposed."
           : result.circuitsAdded > 0
             ? `A route now. ${result.circuitsAdded} leg${result.circuitsAdded === 1 ? "" : "s"} got the type's wires as a circuit.`
             : "A route now — its ends are questions again."
-      ),
+      );
+    },
     onSettled: refreshRuns,
   });
   const acceptSuggestion = trpc.takeoffRuns.acceptSuggestion.useMutation({
     onError: e => toast.error(e.message),
-    onSuccess: () => toast.success("Route accepted — finish it to count it."),
+    onSuccess: () => {
+      notUndoable("runSuggestion");
+      toast.success("Route accepted — finish it to count it.");
+    },
     onSettled: refreshRuns,
   });
+  /*
+    Circuits are wire the length of the run, so each change is an undo step
+    (Gap 4c). The circuit's run is looked up BEFORE the call settles: once a
+    removal refreshes, the circuit is no longer on any row.
+  */
   const addCircuit = trpc.takeoffRuns.addCircuit.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: (result, input) =>
+      pushRunEdit(
+        "circuit added",
+        input.runId,
+        { proc: "addCircuit", input },
+        result.undo
+      ),
     onSettled: refreshRuns,
   });
   const updateCircuit = trpc.takeoffRuns.updateCircuit.useMutation({
+    onMutate: input => ({ runId: runOfCircuit(input.id) }),
     onError: e => toast.error(e.message),
+    onSuccess: (result, input, context) =>
+      pushRunEdit(
+        "circuit changed",
+        context?.runId ?? null,
+        { proc: "updateCircuit", input },
+        result.undo
+      ),
     onSettled: refreshRuns,
   });
   const removeCircuit = trpc.takeoffRuns.removeCircuit.useMutation({
+    onMutate: input => ({ runId: runOfCircuit(input.id) }),
     onError: e => toast.error(e.message),
+    onSuccess: (result, input, context) =>
+      pushRunEdit(
+        "circuit removed",
+        context?.runId ?? null,
+        { proc: "removeCircuit", input },
+        result.undo
+      ),
     onSettled: refreshRuns,
   });
   /**
@@ -7815,6 +8022,7 @@ export default function TakeoffPage({
    */
   const setBranchWiring = trpc.takeoffRuns.setEnds.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => notUndoable("runBranchWiring"),
     onSettled: refreshRuns,
   });
   /**
@@ -7824,11 +8032,22 @@ export default function TakeoffPage({
    */
   const setTypedLength = trpc.takeoffRuns.setTypedLength.useMutation({
     onError: e => toast.error(e.message),
+    // One undo step (Gap 4c): it is the length the bid prices.
+    onSuccess: (result, input) =>
+      pushRunEdit(
+        input.typedLengthInches === null
+          ? "typed length cleared"
+          : "length typed",
+        input.id,
+        { proc: "setTypedLength", input },
+        result.undo
+      ),
     onSettled: refreshRuns,
   });
   /** A run's own extra and makeup — moves its row, the totals and the bridge. */
   const setRunExtras = trpc.takeoffRuns.setExtras.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => notUndoable("runExtras"),
     onSettled: refreshRuns,
   });
   /**
@@ -7841,10 +8060,12 @@ export default function TakeoffPage({
    */
   const answerPullPoint = trpc.takeoffRuns.answerPullPoint.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => notUndoable("runPullPoint"),
     onSettled: refreshRuns,
   });
   const undoPullPoint = trpc.takeoffRuns.clearPullPointAnswer.useMutation({
     onError: e => toast.error(e.message),
+    onSuccess: () => notUndoable("runPullPoint"),
     onSettled: refreshRuns,
   });
 
@@ -9526,7 +9747,13 @@ export default function TakeoffPage({
                 variant="ghost"
                 className="h-7 w-7 px-0"
                 onClick={() => void stepBack("undo")}
-                disabled={undoBusy || nextUndo(undoState) === null}
+                // Live while the newest change is not covered, so the press
+                // can say so (Gap 4a) rather than sit greyed out.
+                disabled={
+                  undoBusy ||
+                  (nextUndo(undoState) === null &&
+                    undoState.notCovered === null)
+                }
                 title={undoTitle(undoState)}
                 aria-label={undoTitle(undoState)}
               >

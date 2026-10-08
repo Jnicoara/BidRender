@@ -15,12 +15,13 @@
 -- No UPDATE. Old code never writes 'elbowFlat'; the MODIFY only widens the
 -- list. Re-running it is harmless (the same list again).
 --
--- ── TRACK C'S STAND-IN ───────────────────────────────────────────────────────
--- Written on `c-per-foot-logic` so the branch's CI can apply the role its
--- code writes. Track A is writing the real 0139 (owner, 2026-10-08). When
--- A's lands on local-dev, TAKE A'S FILE AND JOURNAL ENTRY and delete this
--- one in the merge — the statement is the same enum, so a database that ran
--- this one accepts A's unchanged.
+-- ── TRACK A'S FILE, REPLACING TRACK C'S STAND-IN (2026-10-08) ───────────────
+-- Track C wrote a stand-in 0139 on `c-per-foot-logic` so its CI could apply
+-- the role its code writes. This is the real one: the same file name, the
+-- same journal entry (idx 139, when 1789962900000) and the SAME statement.
+-- The migrator decides "applied" by `when` (scripts/migrate.mts reads
+-- MAX(created_at)), so a database that ran C's stand-in counts this one as
+-- applied and needs nothing more. In C's merge, take this file.
 --
 -- Hand-written, not generated.
 ALTER TABLE `bid_line_items` MODIFY COLUMN `runMaterialRole` enum('raceway','conductor','ground','coupling','connector','strap','elbow90','elbow45','fieldBend','lb','pullBox','teeBox','teeCover','teeBody','locknut','bushing','extra','elbowFlat');

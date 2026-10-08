@@ -3,9 +3,49 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
-## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08)
+## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08) — FIXED (A, same day)
 
-- [ ] **"10. undo and redo a mark; delete one and Undo brings it back"**
+> **CAUSE FOUND, and it was neither suspect below: the TEST read a number
+> from a screen that had not loaded.** After step 9's reload, the "This
+> sheet" line reads "0 marks" until the sheet's mark list arrives (it counts
+> SAVED marks, default `[]`). Step 10 read `start` in that window — 0, with
+> step 8's mark already on sheet 2. The poll for `start + 1` was then met by
+> that OLD mark loading, Ctrl+Z went in before the new mark was saved (an
+> undo step is pushed only once the server confirms the write), so nothing
+> was undone and the tally sat at 2. Every red run that day (5: 37724027830,
+> 37728609820 ×2, 37733766674, 37825778891, 37835126975) shows the same
+> "Expected 0, Received 2" at the Ctrl+Z poll, and the screenshot shows two
+> marks with Redo greyed out. **Not a redeploy:** Gate runs on local-dev are
+> already one queued concurrency group, and none of the five overlapped
+> another run. **Not an undo bug in the app.**
+>
+> **Fix (`e2e/smoke/flow.spec.ts`):** step 10 takes `start` from the server
+> and waits for the screen to agree; it waits for the server to hold the new
+> mark before Ctrl+Z, and checks screen AND server after undo and redo.
+> **Forced:** step 9 now delays sheet 2's first mark list by 6 s after its
+> reload, so the window is there every run. The old step 10 under that hold
+> went red locally with the CI picture (Expected 0, Received 2); the fixed
+> one was 3/3 green locally, then on staging Gate 37845117225 green and
+> its smoke re-run 5 of 5 green (2026-10-08).
+>
+> **Two app findings left open, NOT fixed here (owner/B to decide):**
+>
+> - [ ] **"This sheet: 0 marks" while the sheet's marks are loading** —
+>       `ThisSheetLine` is fed `stamps = []` before `listForSheet` answers,
+>       so it states a zero it does not know (CLAUDE.md: a number that is
+>       quietly wrong). Usually a fraction of a second; on a slow staging,
+>       long enough for a test — or a person — to read it.
+> - [x] **Ctrl+Z on a mark still being saved does nothing, silently.**
+>       **DONE 2026-10-08 (B):** every undo press goes through `stepBack`,
+>       which now asks `stillSavingMessage` (`@/lib/undoStack`) first: while
+>       any mark is in the queue it says "Still saving — try again in a
+>       second.", takes nothing back, and flushes the queue (so a batch that
+>       failed is resent too). `client/src/lib/undoWhileSaving.test.ts`, red
+>       without the page change. Seen on screen at laptop and tablet with the
+>       drop held 5 s: message shown, mark kept, then Ctrl+Z after the save
+>       took it back (6 → 7 → 6).
+
+- [x] **"10. undo and redo a mark; delete one and Undo brings it back"**
       (`e2e/smoke/flow.spec.ts:410`) failed on local-dev run 37724027830
       (build b70f5d5), retry included.
   - **What failed:** the poll for the mark count to come back after Undo
@@ -85,8 +125,29 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
 box, 700 series`. **Correction:** this line said DV34 then "seeds by
       itself on the next start". It does not — `assemblyRecipe.ts` holds a
       starter while `missingParts` is non-empty, whatever the catalog has.
-- [ ] **Track B: the cover swaps** (owner, 2026-10-08 — Track A shipped
-      the parts and changed no recipe). **DV34 DONE 2026-10-08 by B:** the
+- [x] **Track B: the cover swaps — DONE 2026-10-08 (B), seed AND repair.**
+      48 starters, listed with their old and new cover lines in
+      `server/seed/starterCoverSwaps.ts`; recipes changed to match. Nylon
+      throughout (stainless is still the owner's call). Nothing was missing
+      from the catalog. `server/starterCoverSwaps.test.ts` (5, all red
+      before). **Existing databases need `scripts/repairStarterCovers.mts
+    --apply` at the next release — TRACK A runs it** (staging, then live;
+      the seeder never rewrites an existing starter): swaps a shared starter
+      only if its lines are EXACTLY the old recipe, and unlike the LT1/LT2
+      repair it DOES swap a forked one (the fork keeps its own lines; the
+      shared row is what every other company sees). Rehearsed on a local
+      copy of staging (backup `before-0139`): 48 would swap → 48 swapped →
+      second run 48 "already has it"; `bidTotals` 732 bids, $20,333.43
+      before and after, all unchanged. Note: an open bid's supplier
+      materials list reads the recipe live, so it names the typed plate
+      after the repair (its prices are snapshots and do not move).
+      `server/starterCoverRepair.test.ts`, red with the write disabled.
+      **For the owner:** RS1/RS2 put a 1-gang 30A/50A plate on a
+      double-gang box (as the audit said); RS13 got no in-use cover (the
+      starter does not say outdoor); DV33's generic floor box cover was not
+      in scope.
+- [x] **The original entry, superseded by the one above** (owner,
+      2026-10-08 — Track A shipped the parts and changed no recipe). **DV34 DONE 2026-10-08 by B:** the
       700-series plate AND 700-series box lines, `missingParts` emptied, so
       it loads. Its tests are rewritten, and the seed and plan tests now say
       nothing is held. Still to do, the rest per `references/cover-plates-audit.md` § 3: CS6/7/8 → `4"
@@ -184,23 +245,47 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       ANY run mutation without `refuseIfLocked`/`refuseIfRunLocked` (it was
       the only one). Both red without the check.
 - [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
-      screen (`TakeoffPage.tsx`). No status gate. Owner's call first (plan Q2).
-- [ ] **Gap 4a: "can't be undone" on the undo arrow** when the last change was
-      one undo does not cover (mark status/height/location, legs and tees,
-      circuits, run type, typed length, extras, trace mode, branch wiring,
-      symbol capture, scale, sheet name/number, plan set removal). The
-      wording can live in `client/src/lib/undoStack.ts`, but recording WHICH
-      change happened is in TakeoffPage's mutations — so it is built as one
-      piece, not as a helper nothing calls.
-- [x] **DONE 2026-10-08 (batch 1): Gap 4b.** `sheetsAnUndoMoves` in
-      `client/src/lib/takeoffRefresh.ts` says "every" for a count restored or
-      deleted again, a switch over every undo kind (a new kind must decide),
-      and the screen invalidates every sheet's marks and runs for it. Red
-      without the rule. **Not seen on screen** — it is a refetch timing, and
-      the batch's on-screen check was the white box; look at it with the
-      next undo work (batch 2).
-- [ ] **Gap 4c: undo for run type, typed length, circuits, legs**, in that
-      order (TakeoffPage + router).
+      screen (`TakeoffPage.tsx`). No status gate. **Owner DECIDED
+      2026-10-08:** when a bid is marked Won, OFFER "Lock this bid?" —
+      never auto-lock, and "Not now" exactly as easy as "Lock". Batch 3.
+- [x] **DONE 2026-10-08 (batch 2): Gap 4a, "can't be undone" on the undo
+      arrow.** `NOT_UNDOABLE` in `client/src/lib/undoStack.ts` names 19
+      changes undo does not cover; the screen notes each on success
+      (`notUndoable`), the arrow reads "Can't be undone: …", the first press
+      says so (naming the older step) and takes nothing back, and the second
+      press reaches the older step. Card arrows and toast Undo buttons offer
+      nothing meanwhile. Kept across a reload (`undoPersist`).
+      `client/src/lib/notUndoableWired.test.ts` reads TakeoffPage and fails
+      on a kind nobody notes, a run edit nobody pushes, or ANY run / mark /
+      count / sheet mutation that neither pushes a step nor notes itself
+      (its allowlist needs a reason per entry). Red against the old page.
+      Seen on screen at laptop and tablet.
+- [x] **DONE 2026-10-08 (batch 1), FINISHED in batch 2: Gap 4b.** Batch 1's
+      rule was right but the screen still FLASHED: "every" invalidated with
+      React Query's default `refetchType: "active"`, so closed sheets were
+      only marked stale and painted their old copy when opened. Seen on
+      screen in batch 2 at laptop and tablet ("0 marks" then "2 marks").
+      `EVERY_SHEET_REFETCH` (`refetchType: "all"`) fixes it; after, the other
+      sheet shows only "2 marks". Test in `takeoffRefresh.test.ts`.
+- [x] **DONE 2026-10-08 (batch 2): Gap 4c, undo for run type, typed length,
+      circuits, legs.** `setRunType`, `respecify`, `setTypedLength`,
+      `addCircuit`, `updateCircuit`, `removeCircuit` and `addLeg` return the
+      run's network as it was (`asUndoStep`, the packet a drag returns);
+      undo is `takeoffRuns.restore`, redo resends the same call
+      (`runEdit` / `restoreRunEdit`). `server/runEditUndo.test.ts` reads the
+      run list, totals and bridge before, after (must MOVE) and after the
+      restore, then redoes; 9 red on the old router. On screen at laptop and
+      tablet: 70→120→70→120 ft, wire 210→350→210, Ckt 1 removed and back,
+      type changed and back.
+      **Found on the way and fixed:** adding legs to a FINISHED run ends with
+      `commit`, and the screen pushed "run finished" for it — whose undo
+      deletes the whole run. `commit` now returns `wasCommitted` and that
+      step is pushed only for a new run; `addLeg` returns `onDraft`, so a leg
+      of a run still being traced is covered by the finish, not its own step.
+      **Not on screen:** a leg added through the trace tool (server-tested).
+      **Still not covered, by choice:** branch wiring, run extras, trace
+      mode, runs-at — each says "can't be undone". Branch wiring would be
+      cheap (it is `setEnds`, which already returns a packet).
 - [ ] **Gap 6.1: open the viewer from the file on this machine while it
       uploads** (`TakeoffPage.tsx`, `planUpload.ts`). Measured on staging
       2026-10-07 (52.6 MB, 15 pages): the PUT is 11.5–16.4 s of a 16–22 s

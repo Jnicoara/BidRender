@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { UNDO_STORAGE_PREFIX, loadUndo, saveUndo } from "./undoPersist";
 import {
   EMPTY_UNDO,
+  noteNotUndoable,
   pushStep,
   undoTitle,
   type UndoEntry,
@@ -121,5 +122,56 @@ describe("a deleted count on the kept history (2026-09-29)", () => {
     const state = pushStep(pushStep(EMPTY_UNDO, deleted), countDeleted);
     saveUndo(store, 12, state);
     expect(loadUndo(store, 12)).toEqual(state);
+  });
+});
+
+describe("Gap 4a/4c on the kept history (2026-10-08)", () => {
+  const typeChanged: UndoEntry = {
+    label: "run type changed",
+    sheetId: 7,
+    undo: {
+      kind: "restoreRunEdit",
+      packet: { kind: "run", data: "a", sig: "b" },
+      runId: 88,
+      call: { proc: "setRunType", input: { id: 88, runTypeId: 3 } },
+    },
+    redo: null,
+    subject: { kind: "run", id: 88 },
+  };
+
+  it("keeps a run edit step across a reload, rather than dropping the history", () => {
+    const store = tab();
+    const state = pushStep(pushStep(EMPTY_UNDO, deleted), typeChanged);
+    saveUndo(store, 12, state);
+    expect(loadUndo(store, 12)).toEqual(state);
+  });
+
+  it("keeps the 'can't be undone' note across a reload", () => {
+    const store = tab();
+    const state = noteNotUndoable(pushStep(EMPTY_UNDO, deleted), "markHeight");
+    saveUndo(store, 12, state);
+    expect(loadUndo(store, 12)).toEqual(state);
+    // Even with no steps under it, the note is kept, not the key removed.
+    const alone = noteNotUndoable(EMPTY_UNDO, "scale");
+    saveUndo(store, 13, alone);
+    expect(loadUndo(store, 13).notCovered).toBe("scale");
+  });
+
+  it("reads an older build's history, or an unknown note, as nothing newer", () => {
+    const store = tab();
+    store.setItem(
+      UNDO_STORAGE_PREFIX + 12,
+      JSON.stringify({ past: [deleted], future: [] })
+    );
+    expect(loadUndo(store, 12)).toEqual({
+      past: [deleted],
+      future: [],
+      notCovered: null,
+    });
+    store.setItem(
+      UNDO_STORAGE_PREFIX + 12,
+      JSON.stringify({ past: [deleted], future: [], notCovered: "toString" })
+    );
+    expect(loadUndo(store, 12).notCovered).toBeNull();
   });
 });

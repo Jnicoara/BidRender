@@ -82,7 +82,7 @@ const FIRST_STARTERS: BaselineAssembly[] = [
     materials: [
       p("single-gang-box", 1),
       p("duplex-receptacle", 1),
-      p("wall-plate", 1),
+      p("1-gang-wall-plate-duplex-nylon", 1),
       p("12-2-nm-b", 25, { branchWhip: true }),
       p("wire-nuts", 3),
     ],
@@ -96,7 +96,7 @@ const FIRST_STARTERS: BaselineAssembly[] = [
     materials: [
       p("single-gang-box", 1),
       p("gfci-receptacle", 1),
-      p("wall-plate", 1),
+      p("1-gang-wall-plate-decorator-nylon", 1),
       p("12-2-nm-b", 25, { branchWhip: true }),
       p("wire-nuts", 3),
     ],
@@ -118,7 +118,7 @@ const FIRST_STARTERS: BaselineAssembly[] = [
     materials: [
       p("single-gang-box", 1),
       p("duplex-receptacle", 1),
-      p("wall-plate", 1),
+      p("1-gang-wall-plate-duplex-nylon", 1),
       p("12-2-nm-b", 35),
       p("20a-single-pole-breaker", 1),
       p("wire-nuts", 3),
@@ -133,7 +133,7 @@ const FIRST_STARTERS: BaselineAssembly[] = [
     materials: [
       p("single-gang-box", 1),
       p("single-pole-switch", 1),
-      p("wall-plate", 1),
+      p("1-gang-wall-plate-toggle-nylon", 1),
       p("14-2-nm-b", 20, { branchWhip: true }),
       p("wire-nuts", 3),
     ],
@@ -147,7 +147,7 @@ const FIRST_STARTERS: BaselineAssembly[] = [
     materials: [
       p("single-gang-box", 1),
       p("dimmer", 1),
-      p("wall-plate", 1),
+      p("1-gang-wall-plate-decorator-nylon", 1),
       p("14-2-nm-b", 20, { branchWhip: true }),
       p("wire-nuts", 3),
     ],

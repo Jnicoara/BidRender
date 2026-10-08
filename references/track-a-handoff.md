@@ -4,7 +4,70 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-08 (session 21) — START HERE
+## UPDATE 2026-10-08 (session 23) — START HERE
+
+**Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
+`local-dev`, **migrations 0000–0139 (140)**.
+
+- **0139 BUILT and on staging**: `0139_elbow_flat_role` appends
+  `elbowFlat` to `bid_line_items.runMaterialRole` (after `extra`). Why: a
+  700 run needs an inside elbow (`elbow90`) AND a flat elbow, and the bid
+  allows one line per run type + role. **Matches C's stand-in exactly** —
+  name, journal entry (`when` 1789962900000) and statement; only the header
+  comment differs. C takes A's file at merge; a DB that ran the stand-in
+  needs nothing (the migrator goes by `when`).
+- Safety steps as for 0135–0138: backup
+  `staging-2026-10-08T22-38-43Z-before-0139.sql`, restored, 73/73 counts
+  equal; rehearsed (1 applied, re-run nothing, matches 176/176, **732/732
+  totals unchanged**); staging 22:44 UTC the same, **732/732 unchanged**,
+  old code still serving. Record: `deploying.md` § 11 "0139".
+- Code: `RUN_MATERIAL_ROLES` + `elbowFlat`; a **tripwire** `elbowFlat` case
+  in `feetForRole` (`server/db.ts`) answering 0 — C's code puts the role in
+  `FITTING_KINDS`, the label stops compiling, delete it then.
+  `server/teeBodyRole.test.ts` now takes its list from 0139 (C's same edit).
+- Test: `server/migration0139.test.ts` — red on a DB at 0138 ("Data
+  truncated for column 'runMaterialRole'", and the enum check), green after.
+- **Next live release**: batch is now **0105–0139 (35)**, expect 140 and
+  176/176; re-rehearse first (`next-live-release-plan.md` § 3).
+- **Commit `2caf1f6`**: pushed to `staging` by hand, then `local-dev`;
+  staging served it 22:59 UTC; drift "matches" 176/176 and **732/732
+  totals unchanged** with the new code too. **Gate 37856771424 green**
+  (test, deploy-staging, smoke). Local suite: 355 files, 5,936 passed.
+- Local DBs at 140: `bidrender_local`, `bidrender_test_localdev`. Scratch
+  `bidrender_staging_restore_0139` dropped.
+- **Track C can now merge `c-per-foot-logic`**: take A's 0139 file and
+  journal entry. Not checked: whether C's `drizzle-guard` clears after
+  that — it lists branch commits touching `drizzle/`, and C's stand-in
+  commit is one; it may stay red by rule until merged to local-dev.
+
+## UPDATE 2026-10-08 (session 22)
+
+**Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
+`local-dev` = `27d5ca0` (+ this docs commit), migrations 0000–0138, no
+migration this session.
+
+- **Smoke step 10 flake FIXED — release blocker cleared.** Cause, in plain
+  words: the TEST read the mark count before the sheet had loaded. After
+  step 9's reload the tally says "0 marks" until the list arrives; step 10
+  took that 0 as its start (step 8's mark was already there), its "one more"
+  check was met by the old mark loading, and Ctrl+Z went in before the new
+  mark was saved — so nothing was undone and it read 2. Same "Expected 0,
+  Received 2" in all five red runs that day. **Not a redeploy** (local-dev
+  Gate runs are already one queued concurrency group; none of the five
+  overlapped another), **not an undo bug.** So no concurrency change was
+  made — it would not have touched this.
+- **Fix** (`e2e/smoke/flow.spec.ts`): start comes from the server and the
+  screen must agree; the server must hold the new mark before Ctrl+Z; undo
+  and redo are checked on screen AND server. Step 9 delays sheet 2's first
+  mark list 6 s, so the window is forced every run. Old step 10 under the
+  hold: red locally with the CI picture. New: 3/3 locally, Gate
+  37845117225 green, then smoke re-run on staging **5 of 5 green**.
+- **Two app findings logged, NOT fixed** (`todo.md` top): the tally states
+  "0 marks" while loading; Ctrl+Z on a mark still saving does nothing and
+  says nothing.
+- Local `bidrender_smoke` (port 3018 smoke DB) migrated 105 → 139 to run it.
+
+## UPDATE 2026-10-08 (session 21)
 
 **Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
 `local-dev` = `06791ea` (+ this docs commit), **migrations 0000–0138**.

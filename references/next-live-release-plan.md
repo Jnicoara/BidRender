@@ -14,12 +14,12 @@ in the state it describes, and those want opposite responses.
 
 ## 1. Where things stand
 
-| What      | State (2026-10-08)                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Live      | `24105ad` (`origin/main`), database 0000–0104 (105 migrations)                                                           |
-| Staging   | follows `local-dev`; database 0000–0134 (135), all applied before their code (`deploying.md` § 11)                       |
-| Gap       | `git rev-list --count origin/main..origin/local-dev` = 178 commits before this file (merges and docs included)           |
-| Candidate | not chosen. Must be a commit with a green Gate (test, deploy-staging, smoke) — `live-release-plan.md` § 0 if not the tip |
+| What      | State (2026-10-08)                                                                                                            |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Live      | `24105ad` (`origin/main`), database 0000–0104 (105 migrations)                                                                |
+| Staging   | follows `local-dev`; database 0000–0139 (140) since 2026-10-08 22:44 UTC, all applied before their code (`deploying.md` § 11) |
+| Gap       | `git rev-list --count origin/main..origin/local-dev` = 178 commits before this file (merges and docs included)                |
+| Candidate | not chosen. Must be a commit with a green Gate (test, deploy-staging, smoke) — `live-release-plan.md` § 0 if not the tip      |
 
 ## 2. What is on staging and not live — by theme
 
@@ -73,11 +73,18 @@ left out. One line per theme; the commits say the rest.
 - Reset page says a dead link is dead on open (`6518fc5`); reset logs why
   nothing was sent (`4a76181`); slow-request logging (`c0f7fbe`).
 
-## 3. Migrations a live release would run: 0105–0134 (30 files)
+## 3. Migrations a live release would run: 0105–0139 (35 files)
 
-All thirty are **step 1, additive** — no `UPDATE` to an older column — per
-`migrations-next-batch.md` and the two staging records in `deploying.md`
-§ 11. So all thirty go on BEFORE the push, in one run, in order.
+> **Grew 2026-10-08 (sessions 21 and 23):** 0135–0138 (per-foot items
+> M1–M4) and **0139** (`0139_elbow_flat_role`, the `elbowFlat` role)
+> joined the batch, both on staging (`deploying.md` § 11). The
+> rehearsal in § 5b was of the thirty only — **re-rehearse before the
+> day, expecting 35 applied, 140, matches, 176/176.** The "30 / 135 /
+> 173" figures below are the thirty's, kept as the record of that run.
+
+All thirty-five are **step 1, additive** — no `UPDATE` to an older column —
+per `migrations-next-batch.md` and the staging records in `deploying.md`
+§ 11. So all go on BEFORE the push, in one run, in order.
 
 | Files     | What                                                                                                                            |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -86,15 +93,21 @@ All thirty are **step 1, additive** — no `UPDATE` to an older column — per
 | 0117–0124 | catalog shelves (0117), locknut/bushing, `parentId` + FK, brand, assembly shelves (0122), nullable hours (0123), legend entries |
 | 0125–0131 | Track C: `bid_panels`, `bid_panel_circuits`, homerun settings, run-circuit panel, height areas, bends + `runsAt`                |
 | 0132–0134 | example price / hours / labor-rate flags and wage parts                                                                         |
+| 0135–0138 | per-foot items M1–M4: `takeoff_run_type_extras`, `extra` role + `runExtraKey` key swap, `qtySource`, traced-part JSON           |
+| 0139      | `elbowFlat` appended to `bid_line_items.runMaterialRole` (the 700 flat elbow)                                                   |
 
-- **Expect: "Applied 30 migrations", then 135; a second run applies nothing;
-  `schemaDrift` "matches"; foreign keys 173/173** (staging's number). If any
-  differs, stop.
+- **Expect: "Applied 35 migrations", then 140; a second run applies nothing;
+  `schemaDrift` "matches"; foreign keys 176/176** (staging's number,
+  2026-10-08 after 0139). If any differs, stop and find out why — either
+  this line is stale or live is not where you think.
+- **0136 swaps a unique key too** (`bid_line_items_bid_runtype_role_uq` →
+  `…_role_extra_uq`, ADD before DROP in one statement). Rehearsed on staging's
+  copy.
 - **0115 swaps a unique key** on `bid_line_items` (`bid_group_uq` →
   `bid_group_role_uq`). Rehearsed; the one file worth reading twice.
 - **Order is a hard rule:** the migrator skips a file whose `when` is older
   than the newest applied. Never apply 0132–0134 without 0125–0131 first, and
-  never a subset of the thirty.
+  never a subset of the thirty-five.
 - **Step 3 — nothing in this release.** Folding the "EXISTING TO REMAIN"
   twins and clearing the 8 starters' hours wait until this code is LIVE.
 
@@ -126,9 +139,14 @@ lines: expected, and labelled as such in § 1b of the checklist.)
 ## 5. Check first — before the window
 
 1. **Owner's yes** to release, and to which candidate commit.
-2. **Green Gate on that exact commit** (test, deploy-staging, smoke). Smoke
-   step 10 (undo a mark) flaked once on 2026-10-08 and passed on re-run
-   (`todo.md` top) — a red step 10 is re-run once, a second red stops it.
+2. **Green Gate on that exact commit** (test, deploy-staging, smoke).
+   ~~Smoke step 10 (undo a mark) is flaky~~ — **DONE 2026-10-08 (`27d5ca0`).**
+   It was the test, not undo and not a redeploy: step 10 read the mark count
+   while the sheet was still loading ("0 marks"), so it judged undo against a
+   wrong start (`todo.md` top). Fixed and FORCED (the slow load now happens
+   every run); Gate 37845117225 green, then its smoke re-run against staging
+   5 of 5 green. **A red step 10 is now a real failure — do NOT re-run past
+   it**; find out why first.
 3. **The white box on plan open** (`todo.md` "FIRST: the white box…") is
    reproduced on staging and **not fixed**. Owner decides: fix first, or ship
    with it (it is not a wrong number, but pins can draw over the blank and
@@ -196,8 +214,9 @@ worktree were removed afterwards.
 ## SHORT SUMMARY
 
 - Live `24105ad` / 0104; staging = `local-dev` / 0134; 178 commits apart.
-- A release runs 0105–0134 (30, all additive) before the push, in one
-  ordered run; expect 135, matches, 173/173 FKs.
+- A release runs 0105–0139 (35, all additive) before the push, in one
+  ordered run; expect 140, matches, 176/176 FKs (0135–0139 added since the
+  rehearsal — re-rehearse).
 - Pairing rules 1–5 all met on `local-dev`; rule 2 now expects ZERO holds
   (DV34 loads).
 - Check first: owner's yes, green Gate on the candidate, the unfixed white
