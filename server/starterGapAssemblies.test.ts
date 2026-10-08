@@ -161,3 +161,45 @@ describe("no starter buys a single foot of a by-the-foot material", () => {
     expect(oneFoot).toEqual([]);
   });
 });
+
+/*
+  DV34, owner's answers 2026-10-07: 700-series metal raceway whose LENGTH
+  comes from the traced run (so no per-foot raceway line in the recipe), a
+  matching 700-series device plate, wire left to the run, hours not set,
+  Commercial. Held until the plate ships — never seeded half-built.
+*/
+describe("DV34 surface raceway receptacle, per the owner's answers", () => {
+  const dv34 = BASELINE_ASSEMBLIES.find(a => a.ref === "DV34")!;
+  const unit = new Map(BASELINE_MATERIALS.map(m => [m.name, m.unitOfSale]));
+  const parts = dv34.materials.map(l => starterPartName(l.part));
+
+  it("is Commercial, with hours not set", () => {
+    expect(dv34.projectType).toBe("commercial");
+    expect(dv34.baseLaborHours).toBeNull();
+  });
+
+  it("carries no per-foot line — the raceway and the wire come from the traced run", () => {
+    expect(parts.filter(n => unit.get(n) === "foot")).toEqual([]);
+  });
+
+  it("uses the shipped raceway box and entrance fitting", () => {
+    expect(parts).toEqual(
+      expect.arrayContaining([
+        "Raceway device box, 1-gang",
+        "Raceway entrance end fitting",
+        "20A duplex receptacle",
+      ])
+    );
+  });
+
+  it("waits only on the 700-series device plate, which the catalog lacks", () => {
+    expect(dv34.missingParts).toEqual([
+      "Surface raceway device plate, 700 series",
+    ]);
+    expect(
+      BASELINE_MATERIALS.some(
+        m => m.name === "Surface raceway device plate, 700 series"
+      )
+    ).toBe(false);
+  });
+});

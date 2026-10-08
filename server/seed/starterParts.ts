@@ -384,6 +384,9 @@ export const STARTER_PARTS = {
   "pole-base-cover": "Pole base cover",
   "pole-base-grout": "Pole base grout",
   "pole-handhole-cover": "Pole handhole cover",
+  // DV34 (surface raceway receptacle), owner's answers 2026-10-07.
+  "raceway-device-box-1-gang": "Raceway device box, 1-gang",
+  "raceway-entrance-end-fitting": "Raceway entrance end fitting",
 } as const satisfies Record<string, string>;
 
 export type StarterPart = keyof typeof STARTER_PARTS;

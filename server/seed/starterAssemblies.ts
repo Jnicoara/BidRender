@@ -303,23 +303,29 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     p("20a-duplex-receptacle", 1),
     p("wire-nuts", 3),
   ]),
-  // DV34: held until surface raceway is in the catalog (retail plan R3, which
-  // waits on a materials category from Track A's 0117). Never seeded with
-  // only the two parts that exist.
+  /*
+    DV34, owner's answers 2026-10-07: Wiremold 700 series (metal); the
+    raceway LENGTH comes from the traced run, per foot, like wire — so no
+    raceway line here; a matching 700-series device plate; wire stays with
+    the traced run. Hours not set, Commercial.
+
+    STILL HELD — never seeded half-built. The catalog has no 700-series
+    device plate (it has the raceway, boxes and fittings since Track A's
+    adds). The moment a row of that name ships and this list is emptied, it
+    seeds by itself. todo.md has the part for Track A.
+  */
   starter(
     "DV34",
     "Surface raceway receptacle (block wall)",
     "Devices",
     "commercial",
-    [p("20a-duplex-receptacle", 1), p("wire-nuts", 3)],
-    {
-      missingParts: [
-        "Surface raceway, 10 ft",
-        "Surface raceway device box",
-        "Surface raceway cover plate",
-        "Surface raceway entrance fitting",
-      ],
-    }
+    [
+      p("raceway-device-box-1-gang", 1),
+      p("20a-duplex-receptacle", 1),
+      p("raceway-entrance-end-fitting", 1),
+      p("wire-nuts", 3),
+    ],
+    { missingParts: ["Surface raceway device plate, 700 series"] }
   ),
 
   // ── LT — Lighting ──

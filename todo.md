@@ -22,21 +22,85 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       Track B added 15 on 2026-10-07 (GC1–GC5, GR1–GR7, LT31–LT33), so they
       are not on the sheet the owner is filling in. The hours map is keyed by
       name, so nothing breaks; they just have no row yet.
-- [ ] **Owner question: can light names.** You suggested names like
-      '4" can light, new construction' / '4" can light, remodel'. Three of
-      the four can lights already shipped under 'Recessed can new
-      construction, 4"/6"' and 'Recessed can retrofit, 6"' (LT5, LT4, LT6),
-      so the new 4" remodel (LT33) is 'Recessed can retrofit, 4"' to match.
-      A starter cannot be renamed in place today: the seeder matches
-      starters by NAME, so a rename adds a second row and leaves the old one
-      on every database, including staging. Renaming all four means a
-      starter-rename path first (like `RENAMED_BASELINE_MATERIALS`, for
-      assemblies). Say if you want it.
-- [ ] **Owner question: Underground warning tape on GR2 and GR5.** The draft
-      gave 1, but the catalog sells it by the foot, so it was left OUT of
-      both (a per-foot line of 1 is now a failing test). Either the length
-      is the trench's and stays with the traced run, or the starter carries
-      a typical length — the owner says which.
+- [ ] **Build a starter RENAME path, then rename the four can lights**
+      (owner, 2026-10-07). Keep 'Recessed can new construction, 4"/6"' and
+      'Recessed can retrofit, 4"/6"' (LT5, LT4, LT33, LT6) until then.
+  - **Why it is needed:** the seeder matches starters by NAME, so today a
+    rename adds a second row and leaves the old one on every database.
+  - **The feature:** a `RENAMED_BASELINE_ASSEMBLIES` map, the same shape as
+    the materials one. On start it renames the SHARED row in place (same
+    id, so bid lines, kits and forks still point at it), and never touches a
+    company's fork.
+  - **Tests:** a renamed starter keeps its id; a second start is a no-op; a
+    fork keeps its own name; and no database ends with both names (seed
+    twice, count rows).
+  - **Then rename all four** to the '4" can light, new construction' /
+    '4" can light, remodel' style (and 6").
+  - **Files:** `server/db.ts`, which Track C changes on `c-homerun-footage`,
+    so this lands after C merges; plus `server/seed/*`.
+- [ ] **Track A: one missing part for DV34.** Owner, 2026-10-07: "matching
+      700-series device plate". The catalog has none, so DV34 is held with
+      exactly that listed (`missingParts`). Add "Surface raceway device
+      plate, 700 series" (or tell B the name you give it) and DV34 seeds by
+      itself on the next start.
+  - **Also for A:** the catalog's 700 series is TWO per-foot rows (base and
+    cover). Wiremold 700 is one-piece metal. A traced surface-raceway run
+    type holds ONE raceway material, so with two rows the cover would never
+    be counted. Either one row "Surface raceway, 700 series", or a run type
+    that carries two per-foot materials (see the warning tape plan below:
+    the same "second per-foot material" seam).
+
+## Underground warning tape follows the traced trench — AFTER TRACK C MERGES
+
+Owner, 2026-10-07: tape follows the traced trench (underground run) length,
+charged per foot of actual length, like wire. If no trench run is traced, the
+tape shows **"not priced"**, never 1 ft and never $0. It goes back into GR2
+(200A underground service) and GR5 (detached garage feeder) that way.
+
+**Why it waits:** it needs columns (Track A) and a change to the run
+footage code Track C is rewriting on `c-homerun-footage`
+(`server/runTypeFootage.ts`, `server/runTypeFootageCore.ts`,
+`shared/takeoffQuantities.ts`, `server/db.ts`). Nothing was built.
+
+**The two halves:**
+
+1. **The trench side: a per-foot accessory on a run type.** Today a run
+   type carries a raceway, conductors, a ground and fittings, and nothing
+   else per foot.
+   - Add an accessory material plus a feet-per-foot figure (1.0 for tape),
+     on HORIZONTAL traced length only, since tape is laid in the trench and
+     not up the riser.
+   - Shipped underground run types carry Underground warning tape. It
+     reaches the bid through the same bridge as raceway footage
+     (`takeoffRunTypes.bridgeForBid`).
+   - Columns for A: `takeoff_run_types.accessoryMaterialId` and
+     `accessoryPerFoot` (nullable, no default). Or a small
+     `takeoff_run_type_accessories` table, if the 700-series cover above
+     also wants this seam.
+2. **The assembly side: a line whose quantity is "from the traced run".**
+   - GR2/GR5 get `Underground warning tape` with quantity source = traced,
+     not a number.
+   - On a bid, the line's quantity is the bid's traced underground
+     horizontal length. With no such run it is NULL, and the line says "not
+     priced" (`shared/lineNotPriced.ts` learns "quantity from a run, none
+     traced").
+   - Columns for A: `assembly_materials.qtySource` ENUM('fixed','traced')
+     NULL (NULL = fixed, today's meaning), frozen onto the bid line like
+     every snapshot.
+   - Never counted twice: if the run type also carries tape (half 1), the
+     bid shows ONE tape line. Decide which half owns it before building. B's
+     recommendation is the run type, with the assembly line only saying
+     "from the run" so a bid with no trench still shows "not priced".
+
+**Tests that must fail without it:**
+
+- tape quantity = traced underground horizontal feet, and moves when the
+  run moves;
+- no trench → "not priced" on the line and on the total, never 1 ft or $0;
+- risers add no tape;
+- one tape line, not two;
+- the per-foot guard (`server/starterGapAssemblies.test.ts`) still forbids
+  a fixed 1 ft.
 
 - [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet

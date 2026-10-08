@@ -234,6 +234,20 @@ _(All three ship since 2026-10-07 — see the note at the top of § 2b.)_
 
 ### The one flagged gap left — DV34, surface raceway — DRAFT, NOT LOADED
 
+> **Owner answered 2026-10-07:**
+>
+> - 700 series, metal;
+> - raceway length from the traced run, per foot, like wire;
+> - a matching 700-series device plate;
+> - wire stays with the run;
+> - Commercial, hours not set.
+>
+> DV34's recipe in the seed now says exactly that: box, receptacle, entrance
+> fitting and wire nuts, with no per-foot line. It is **still held**,
+> because the catalog has no 700-series device plate (todo.md, for Track
+> A). It seeds by itself once that ships. The draft and questions below are
+> the record.
+
 The last gap the top-30 lists flagged. DV34 is in the seed but **held** for
 missing parts, and Track A's new items now carry a surface raceway family
 (500/700 two-piece base + cover, 1500, 2400, boxes and fittings). Drafted
