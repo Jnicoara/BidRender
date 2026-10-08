@@ -103,7 +103,12 @@ const onboarding = await trpc(setup, "onboarding.state", undefined, false);
 if (onboarding.isFirstRun) await trpc(setup, "onboarding.completeFirstRun");
 
 // ── The data ─────────────────────────────────────────────────────────────────
-const library = (await trpc(setup, "assemblies.list", undefined, false)) as {
+const library = (await trpc(
+  setup,
+  "assemblies.list",
+  { status: "active" },
+  false
+)) as {
   name: string;
   projectType: string | null;
   baseLaborHours: string | number | null;
@@ -169,7 +174,9 @@ for (const size of [
   console.log(`\n== ${size.name} ${size.width}x${size.height}`);
 
   // The Assemblies screen.
-  await page.goto(`${BASE}/#/assemblies`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}/#/library/assemblies`, {
+    waitUntil: "domcontentloaded",
+  });
   await page
     .waitForLoadState("networkidle", { timeout: 20000 })
     .catch(() => undefined);
