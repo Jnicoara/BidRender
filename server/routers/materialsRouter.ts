@@ -41,6 +41,7 @@ import { assemblyHours } from "../../shared/assemblyHours";
 import { STICK_JOINTS } from "../../shared/runFittings";
 import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
 import { RENAMED_BASELINE_MATERIALS } from "../../shared/renamedMaterials";
+import { materialFlagsClearedBy } from "../../shared/exampleTags";
 import {
   parseLaborSheet,
   planAssemblyHoursImport,
@@ -372,6 +373,28 @@ export const materialsRouter = router({
           ? { costPerUnit: toDecimal(costPerUnit), priceUpdatedAt: new Date() }
           : {}),
         /*
+          "Example price" / "Example hours" CLEAR when the shop edits that
+          number (owner, 2026-10-07) — compared against the row as it was,
+          so writing the same number back is not an edit and a field the
+          form does not send leaves its flag alone (shared/exampleTags.ts).
+        */
+        ...materialFlagsClearedBy(target, {
+          costPerUnit:
+            costPerUnit === undefined ? undefined : toDecimal(costPerUnit),
+          laborHours:
+            laborHours === undefined
+              ? undefined
+              : laborHours === null
+                ? null
+                : toDecimal(laborHours),
+          fieldBendLaborHours:
+            fieldBendLaborHours === undefined
+              ? undefined
+              : fieldBendLaborHours === null
+                ? null
+                : toDecimal(fieldBendLaborHours),
+        }),
+        /*
           OMITTED leaves it alone; NULL clears it back to unset.
 
           Spelled out rather than folded into `rest`, because the two cases
@@ -615,6 +638,8 @@ export const materialsRouter = router({
           costPerUnit: toDecimal(row.costPerUnit),
           supplierName: input.supplierName,
           priceUpdatedAt: stamped,
+          // A supplier's price is the shop's own — never "Example price".
+          isExamplePrice: false,
         });
         priced.push(target.name);
       }
@@ -678,6 +703,8 @@ export const materialsRouter = router({
                 : target.id;
             await db.updateAssembly(editableId, userId, {
               baseLaborHours: toDecimal(change.to),
+              // The shop's own hours now — no longer "Example hours".
+              isExampleHours: false,
             });
           }
         return {
@@ -726,6 +753,8 @@ export const materialsRouter = router({
           }
           await db.updateMaterial(editableId, userId, {
             [change.field]: toDecimal(change.to),
+            // The shop's own hours now — no longer "Example hours".
+            isExampleLaborHours: false,
           });
         }
       }

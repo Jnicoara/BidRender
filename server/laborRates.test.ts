@@ -151,15 +151,23 @@ describe.skipIf(!hasDb)("starter roles", () => {
     }
   });
 
-  it("ships every hourly role unrated, waiting for the contractor's number", async () => {
-    // These used to assert $38 and $22. Starter roles now ship at $0 on
-    // purpose: a plausible rate nobody chose is indistinguishable on screen
-    // from one they did, and the labor rate multiplies every line of a bid.
+  it("ships the field roles at an EXAMPLE rate, still waiting for the contractor's number", async () => {
+    // These asserted $38 and $22, then $0 (a plausible rate nobody chose is
+    // indistinguishable from one they did). Since 0134 (owner, 2026-10-07)
+    // they ship at the approved example LOADED rate — tagged, so it is never
+    // mistaken for the shop's, and still "needs a rate" until replaced.
     const rows = await caller().laborRates.list();
-    for (const name of ["Journeyman", "Apprentice"]) {
+    for (const [name, rate] of [
+      ["Journeyman", 59.22],
+      ["Apprentice", 36.66],
+      ["Helper", 33.84],
+      ["Foreman/Master Electrician", 70.5],
+    ] as const) {
       const role = rows.find(r => r.name === name)!;
-      expect(needsRate(role), `${name} shipped with a rate`).toBe(true);
-      expect(role.effectiveHourlyRate).toBe(0);
+      expect(role, name).toBeDefined();
+      expect(role.isExampleRate, name).toBe(true);
+      expect(needsRate(role), `${name} counts as the shop's own`).toBe(true);
+      expect(role.effectiveHourlyRate).toBeCloseTo(rate, 2);
     }
   });
 

@@ -77,6 +77,13 @@ export type BaselineMaterial = {
   laborHours?: string;
   /** Hours per field bend, raceways only. Same source and rule. */
   fieldBendLaborHours?: string;
+  /**
+   * "Example price" / "Example hours" (0132 / 0133): set ONLY by
+   * `withStarterValues` (index.ts) on a row whose number came from the
+   * starter sheets — the number and its tag cannot be separated.
+   */
+  isExamplePrice?: true;
+  isExampleLaborHours?: true;
 };
 
 export type RacewayFacts = {

@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **"Example price", "Example hours" and "Example rate" tags (not live
+  yet).** Any number BidRidge ships, rather than one the shop set, is
+  tagged on that line of the bid. The tag never appears on the customer's
+  quote, and printing warns first. It clears the moment the shop edits that
+  number. A line keeps the tag it was priced with, so old bids stay
+  truthful.
+- **Example labor rates and a Helper role (not live yet).** Foreman,
+  Journeyman, Apprentice and the new Helper start at example loaded rates
+  ($70.50, $59.22, $36.66 and $33.84). Each is a wage plus payroll tax,
+  workers' comp, insurance and benefits, shown as those parts and editable
+  part by part. New shops are asked for their own rates, and a banner stays
+  up until they set them.
+
 - **15 more starter assemblies.** These are the jobs the top-30 lists found
   missing, plus the wafer and can light sizes:
   - commercial: an emergency battery pack, a 3-phase panelboard change, a

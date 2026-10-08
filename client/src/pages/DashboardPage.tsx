@@ -39,6 +39,7 @@ import { ArchiveBidDialog } from "@/components/ArchiveBidDialog";
 import { useCompany } from "@/hooks/useCompany";
 import { type PendingArchive } from "@/lib/archiveBid";
 import { GettingStartedChecklist } from "@/components/GettingStartedChecklist";
+import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { NavigationHelper } from "@/components/NavigationHelper";
 import { BidSearchPanel } from "@/components/BidSearchPanel";
 import { NewBidMenu, StartBidCards } from "@/components/StartBidCards";
@@ -490,6 +491,7 @@ export default function DashboardPage({
             </div>
           )}
           <SampleBidCard onOpenBid={onOpenBid} />
+          <ExampleRatesBanner className="max-w-xl" />
           <GettingStartedChecklist />
           <NavigationHelper className="max-w-xl" />
         </div>

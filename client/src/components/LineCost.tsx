@@ -19,15 +19,18 @@ import {
   type PartsLineLike,
 } from "@shared/lineNotPriced";
 import { lineShortfallWords } from "@/lib/notPricedTotal";
+import type { LineExampleFlags } from "@shared/exampleTags";
+import { ExampleTags } from "./ExampleTags";
 
 export function LineCost({
   line,
   className,
 }: {
-  line: PartsLineLike & {
-    breakdown: { directCost: number } | null;
-    problem?: { message: string; ref?: string | null } | null;
-  };
+  line: PartsLineLike &
+    LineExampleFlags & {
+      breakdown: { directCost: number } | null;
+      problem?: { message: string; ref?: string | null } | null;
+    };
   /** Width and alignment, which differ between the two screens. */
   className?: string;
 }) {
@@ -102,6 +105,25 @@ export function LineCost({
         >
           + {parts}
         </span>
+        <ExampleTags line={line} only={["price"]} />
+      </span>
+    );
+  }
+  /*
+    "Example price" (0132): the money is real, but BidRidge's number, not
+    the shop's. Wraps under the figure on a narrow column, like "+ parts".
+    The hours and rate tags sit in the hours cell, beside what they explain.
+  */
+  if (line.snapshotPriceWasExample) {
+    return (
+      <span
+        className={cn(
+          "inline-flex flex-wrap items-baseline justify-end gap-x-1",
+          className
+        )}
+      >
+        <span className="font-mono text-sm">{money(cost)}</span>
+        <ExampleTags line={line} only={["price"]} />
       </span>
     );
   }

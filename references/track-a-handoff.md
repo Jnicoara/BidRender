@@ -4,7 +4,30 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-07 (session 15) — read this first
+## UPDATE 2026-10-07 (session 16) — read this first
+
+- **Example tags BUILT on branch `a-example-tags`** (from local-dev
+  `615f122`; NOT merged, NOT on staging). Migrations **0132–0134**
+  (`migrations-next-batch.md` § Batch 5): apply ONLY together with, and
+  AFTER, C's 0125–0131 from `a-batch-c-0125` — the migrator skips older
+  `when`s.
+- What ships: "Example price / hours / rate" tags on the bid screen (frozen
+  per line), never on the proposal; a warning (not a block) before
+  printing; a sky "example rates" banner on the Dashboard and the bid until
+  every role is the shop's own; first-run shows the example and asks for
+  their own; Labor rates shows wage + burden parts and edits them
+  ("Build from wage"). Any real edit clears the tag; an untouched save does
+  not.
+- **New Helper role.** Field roles ship at the approved example loaded rates
+  (Foreman $70.50, Journeyman $59.22, Apprentice $36.66, Helper $33.84 =
+  wage × 1.41). Supervisor and PM stay unrated.
+- Tests: `server/exampleTagsFlow.test.ts` (DB, 10) and
+  `server/exampleTags.test.ts` (12); `starterValues.test.ts` now requires a
+  shipped number to carry its tag. Red verified by breaking three pieces.
+  Local scratch DB `bidrender_test_exampletags` — throwaway.
+- Next step (owner): migrate C's batch and this one together.
+
+## UPDATE 2026-10-07 (session 15)
 
 - **"Example hours" decided** (owner): the price treatment, shipped with the
   hours, never alone. Plan § "Shipped HOURS" + Batch 5 columns.

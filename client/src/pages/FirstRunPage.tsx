@@ -46,6 +46,9 @@ export default function FirstRunPage() {
   /** Only the hourly roles. A salary needs two numbers and a conversation. */
   const hourly = rates.filter(r => r.rateType === "hourly");
   const anyRateSet = rates.some(r => !needsRate(r));
+  // Shipped example rates (0134) price labor at BidRidge's number until the
+  // shop types its own — so "skip" is not $0 any more, it is someone else's.
+  const anyExample = rates.some(r => r.isExampleRate === true);
 
   const save = async (id: number) => {
     const raw = drafts[id];
@@ -121,7 +124,17 @@ export default function FirstRunPage() {
                 const draft = drafts[rate.id];
                 return (
                   <div key={rate.id} className="flex items-center gap-3">
-                    <span className="flex-1 text-sm truncate">{rate.name}</span>
+                    <span className="flex-1 text-sm truncate">
+                      {rate.name}
+                      {rate.isExampleRate && (
+                        <span
+                          title="BidRidge's example loaded rate — wage plus payroll tax, workers' comp, insurance and benefits. Type your own to replace it."
+                          className="ml-2 rounded border border-sky-500/40 px-1 text-[10px] leading-4 text-sky-400 whitespace-nowrap"
+                        >
+                          Example rate ${Number(rate.hourlyCost).toFixed(2)}
+                        </span>
+                      )}
+                    </span>
                     {unset ? (
                       <>
                         <div className="relative">
@@ -144,7 +157,11 @@ export default function FirstRunPage() {
                               if (drafts[rate.id]?.trim()) void save(rate.id);
                             }}
                             inputMode="decimal"
-                            placeholder="0.00"
+                            placeholder={
+                              rate.isExampleRate
+                                ? Number(rate.hourlyCost).toFixed(2)
+                                : "0.00"
+                            }
                             aria-label={`${rate.name} hourly rate`}
                             className="h-9 w-32 pl-6 text-sm text-right"
                           />
@@ -195,7 +212,9 @@ export default function FirstRunPage() {
           >
             {anyRateSet
               ? "You can add the rest of your roles later."
-              : "You can skip this, but bids will price labor at $0 until a rate is set."}
+              : anyExample
+                ? "You can skip this, but bids will use BidRidge's example rates, tagged on every line, until you set your own."
+                : "You can skip this, but bids will price labor at $0 until a rate is set."}
           </span>
         </div>
 

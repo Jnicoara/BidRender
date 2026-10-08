@@ -121,8 +121,15 @@ describe("getting-started checklist", () => {
 // ─── Labor rates at $0 ────────────────────────────────────────────────────────
 
 describe("labor rates ship unrated", () => {
-  it("ships every starter role at $0", () => {
+  it("ships every starter role at $0 — or at a TAGGED example rate", () => {
+    // Since 0134 (owner, 2026-10-07) the field roles ship at an example
+    // loaded rate; the rule this test holds is now "never a number that does
+    // not say it is an example", which is the same promise.
     for (const rate of BASELINE_LABOR_RATES) {
+      if (rate.example) {
+        expect(needsRate({ ...rate, isExampleRate: true })).toBe(true);
+        continue;
+      }
       expect(
         needsPricing(rate.hourlyCost),
         `${rate.name} has an hourly rate`

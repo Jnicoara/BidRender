@@ -49,6 +49,7 @@ import {
   notPricedHeadline,
 } from "@/lib/notPricedTotal";
 import { NOTHING_NOT_PRICED } from "@shared/lineNotPriced";
+import { exampleWarning } from "@shared/exampleTags";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -223,8 +224,18 @@ export default function ProposalPage({
   // total is $0.00 and there is nothing to price, so the list is empty and
   // the dialog says to add work instead.
   const noWork = mode === "full" && !!data?.document.investment.noWork;
+  /*
+    Example numbers WARN rather than block (owner, 2026-10-07): the money is
+    real, just BidRidge's rather than the shop's, so the shop may decide it is
+    close enough. Checked after the block, so a bid that is both short and
+    example-priced is told about the short total first. Scope-only prints no
+    money and is never asked.
+  */
+  const examples = mode === "full" && data ? data.examples : null;
+  const [confirmExamples, setConfirmExamples] = useState(false);
   const requestPrint = () => {
     if (noWork || anyNotPriced(notPriced)) setConfirmPrint(true);
+    else if (examples && examples.lines > 0) setConfirmExamples(true);
     else print();
   };
   // Ctrl+P goes through the same question as the button. A ref, so the
@@ -702,6 +713,33 @@ export default function ProposalPage({
             <AlertDialogCancel>Close</AlertDialogCancel>
             <AlertDialogAction onClick={onBack}>
               Back to the bid
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* A warning, not a block: this one DOES have a button that prints. */}
+      <AlertDialog open={confirmExamples} onOpenChange={setConfirmExamples}>
+        <AlertDialogContent className="bp-no-print">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Check the example numbers</AlertDialogTitle>
+            <AlertDialogDescription>
+              {examples ? exampleWarning(examples) : null} The customer's copy
+              does not show which lines these are.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onBack}>
+              Back to the bid
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmExamples(false);
+                // After the dialog closes, so it is not in the print.
+                setTimeout(print, 0);
+              }}
+            >
+              Print anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

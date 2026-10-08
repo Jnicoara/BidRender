@@ -10,10 +10,9 @@
  * screen from one the shop chose — so a bid can go out on a price or an hour
  * nobody at the shop looked at. The owner's rule (2026-10-07): a shipped
  * price shows "Example price" on the bid screen and printing warns first,
- * from `materials.isExamplePrice` / `snapshotPriceWasExample` (Batch 5, not
- * yet written). This file is what keeps the loader's output inert until then:
- * it goes red the moment either map holds a value while the column that tags
- * it does not exist.
+ * from `materials.isExamplePrice` / `snapshotPriceWasExample` (0132–0134).
+ * This file kept the loader's output inert until those columns existed, and
+ * now holds the other half: a shipped number ALWAYS arrives with its tag.
  */
 import { describe, expect, it } from "vitest";
 import { assemblies, materials } from "../drizzle/schema";
@@ -21,31 +20,60 @@ import { STARTER_PRICES } from "./seed/materials/starterPrices";
 import { STARTER_LABOR_UNITS } from "./seed/materials/starterLaborUnits";
 import { STARTER_BRAND_PRICES } from "./seed/materials/starterBrandPrices";
 import { STARTER_ASSEMBLY_HOURS } from "./seed/starterAssemblyHours";
-import { BASELINE_MATERIALS } from "./seed/materials";
+import { BASELINE_MATERIALS, withStarterValues } from "./seed/materials";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
+import { BASELINE_LABOR_RATES } from "./seed/baselineLaborRates";
 
 const hasColumn = (name: string) => name in materials;
 
-describe("starter sheet values", () => {
-  it("ship no PRICE until materials.isExamplePrice exists", () => {
-    if (!hasColumn("isExamplePrice")) {
-      expect(Object.keys(STARTER_PRICES)).toEqual([]);
-    }
+describe("a shipped number always says it is an example (0132–0134)", () => {
+  it("the tag columns exist", () => {
+    expect(hasColumn("isExamplePrice")).toBe(true);
+    expect(hasColumn("isExampleLaborHours")).toBe(true);
+    expect("isExampleHours" in assemblies).toBe(true);
   });
 
-  it('ship no LABOR HOURS until shipped hours can say "Example hours"', () => {
-    // Owner, 2026-10-07: hours get the price treatment — an "Example hours"
-    // tag on the bid screen (never the customer quote), cleared when the shop
-    // edits it, a warning before printing; shipped together with the hours,
-    // never hours alone. Columns in Batch 5: materials.isExampleLaborHours,
-    // assemblies.isExampleHours.
-    if (!hasColumn("isExampleLaborHours")) {
-      expect(Object.keys(STARTER_LABOR_UNITS)).toEqual([]);
-    }
-    if (!("isExampleHours" in assemblies)) {
-      expect(Object.keys(STARTER_ASSEMBLY_HOURS)).toEqual([]);
-    }
+  it("a sheet price or sheet hours arrive WITH their tag", () => {
+    const row = BASELINE_MATERIALS[0];
+    const priced = withStarterValues(row, { [row.name]: "1.2500" }, {});
+    expect(priced.costPerUnit).toBe("1.2500");
+    expect(priced.isExamplePrice).toBe(true);
+    expect(priced.isExampleLaborHours).toBeUndefined();
+
+    const timed = withStarterValues(
+      row,
+      {},
+      {
+        [row.name]: { laborHours: "0.2000" },
+      }
+    );
+    expect(timed.laborHours).toBe("0.2000");
+    expect(timed.isExampleLaborHours).toBe(true);
+    expect(timed.isExamplePrice).toBeUndefined();
+
+    // Not on the sheet: untouched, untagged.
+    const plain = withStarterValues(row, {}, {});
+    expect(plain.isExamplePrice).toBeUndefined();
+    expect(plain.isExampleLaborHours).toBeUndefined();
   });
+
+  it("no shipped material carries a price without the tag", () => {
+    for (const m of BASELINE_MATERIALS)
+      if (Number(m.costPerUnit) > 0)
+        expect(m.isExamplePrice, `${m.name} priced, untagged`).toBe(true);
+  });
+
+  it("no shipped labor rate carries a number without the tag", () => {
+    for (const r of BASELINE_LABOR_RATES)
+      if (Number(r.hourlyCost) > 0 || Number(r.annualSalary ?? 0) > 0)
+        expect(r.example, `${r.name} rated, untagged`).toBeDefined();
+  });
+});
+
+describe("starter sheet values", () => {
+  // The price and hours guards that stood here ("ship nothing until the
+  // column exists") retired with 0132–0133; "the tag columns exist" above is
+  // what they became.
 
   it("ship no BRAND VARIANT price until the variant model and the price tag exist", () => {
     // Nothing reads these until materials.parentId exists (ASSEMBLIES_PLAN.md

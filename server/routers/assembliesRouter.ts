@@ -27,6 +27,7 @@ import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
 import { MOST_USED_WINDOW_DAYS, rankMostUsed } from "../../shared/mostUsed";
 import { resolveAssembly } from "../../shared/assemblyLookup";
+import { changed } from "../../shared/exampleTags";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -242,7 +243,12 @@ export const assembliesRouter = router({
     if (rest.projectType !== undefined) patch.projectType = rest.projectType;
     if (rest.laborRateId !== undefined) patch.laborRateId = rest.laborRateId;
     if (rest.laborOnly !== undefined) patch.laborOnly = rest.laborOnly;
-    if (hours !== undefined) patch.baseLaborHours = hours;
+    if (hours !== undefined) {
+      patch.baseLaborHours = hours;
+      // "Example hours" clears when the shop edits the hours — and only
+      // when it actually changes them (shared/exampleTags.ts).
+      if (changed(target.baseLaborHours, hours)) patch.isExampleHours = false;
+    }
     // Reaches the fork, never the starter — `editableId` above is already the
     // user's own copy when the target was a shipped row. Setting overhead
     // hours on a starter gives you your own assembly, exactly like editing

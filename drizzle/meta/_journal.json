@@ -876,6 +876,27 @@
       "when": 1789961400000,
       "tag": "0124_bid_pdf_legend_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "5",
+      "when": 1789962200000,
+      "tag": "0132_example_price",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "5",
+      "when": 1789962300000,
+      "tag": "0133_example_hours",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "5",
+      "when": 1789962400000,
+      "tag": "0134_example_labor_rates",
+      "breakpoints": true
     }
   ]
 }

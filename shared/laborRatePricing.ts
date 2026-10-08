@@ -22,6 +22,12 @@ export type RateLike = {
   hourlyCost: string | number | null;
   annualSalary: string | number | null;
   annualHours: string | number | null;
+  /**
+   * TRUE on a shipped role carrying BidRidge's example loaded rate (0134).
+   * Optional so a caller that never selected it is not broken — but every
+   * screen that asks "has this shop set its rate?" must pass it.
+   */
+  isExampleRate?: boolean | null;
 };
 
 /**
@@ -37,6 +43,11 @@ export type RateLike = {
  * a division by zero and refuses it rather than returning "free".
  */
 export function needsRate(rate: RateLike): boolean {
+  // An EXAMPLE rate is BidRidge's number, not the shop's (owner, 2026-10-07).
+  // This line is the trap starter-vs-company-plan.md § 3b names: once shipped
+  // rates are non-zero, "$0 = needs a rate" alone would call every
+  // unconfigured shop "rate set", and the first-run prompt would stop asking.
+  if (rate.isExampleRate) return true;
   if (rate.rateType === "salary") {
     if (needsPricing(rate.annualSalary)) return true;
     const hours = Number(rate.annualHours ?? 0);
