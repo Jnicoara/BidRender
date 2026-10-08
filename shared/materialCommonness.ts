@@ -231,6 +231,13 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "20A single-pole switch": "common",
   Dimmer: "common",
   "Occupancy sensor switch": "common",
+  // The everyday plates of the cover family (2026-10-08). Without them "1
+  // gang" led with the 30A/50A power plate, second only to the blank plate.
+  "1-gang wall plate, duplex, nylon": "common",
+  "1-gang wall plate, toggle, nylon": "common",
+  "1-gang wall plate, decorator, nylon": "common",
+  "2-gang wall plate, toggle/toggle, nylon": "common",
+  "2-gang wall plate, decorator/decorator, nylon": "common",
 
   // ── Lighting: the 4 ft tube is the one most retrofits buy ──
   // Added 2026-09-25 with the tubes. Without it "fluorescent" and "t8" led

@@ -192,7 +192,14 @@ describe("DV34 surface raceway receptacle, per the owner's answers", () => {
     );
   });
 
-  it("waits only on the 700-series device plate, which the catalog lacks", () => {
+  /*
+    Until 2026-10-08 this said "which the catalog lacks" and asserted the
+    plate was absent. Track A shipped it that day with the cover family
+    (raceUndergroundService.ts, exact name); the recipe is Track B's, so DV34
+    stays held — by its own list — until B adds the plate line and empties
+    `missingParts`. When B does, this test is the one to rewrite.
+  */
+  it("waits only on the 700-series device plate, which the catalog now ships", () => {
     expect(dv34.missingParts).toEqual([
       "Surface raceway device plate, 700 series",
     ]);
@@ -200,6 +207,6 @@ describe("DV34 surface raceway receptacle, per the owner's answers", () => {
       BASELINE_MATERIALS.some(
         m => m.name === "Surface raceway device plate, 700 series"
       )
-    ).toBe(false);
+    ).toBe(true);
   });
 });

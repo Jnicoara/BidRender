@@ -34,6 +34,7 @@ import {
   type AccountingExport,
 } from "@shared/accountingExport";
 import { money } from "@/lib/money";
+import { ClientLinkField } from "@/components/ClientLinkField";
 
 export function AccountingExportDialog({
   bidId,
@@ -50,6 +51,22 @@ export function AccountingExportDialog({
     { enabled: open, retry: false }
   );
   const [downloaded, setDownloaded] = useState(false);
+
+  /*
+    "Customer: not set" is fixed HERE, with the same client picker the bid
+    screen uses, rather than by closing the export and hunting for the card
+    (references/never-stuck-plan.md, gap 5). Attaching one re-reads the
+    export, so the line it said "not set" on fills in.
+  */
+  const utils = trpc.useUtils();
+  const bidQuery = trpc.bids.get.useQuery({ id: bidId }, { enabled: open });
+  const linkClient = trpc.bids.update.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      void utils.bids.get.invalidate({ id: bidId });
+      void utils.accounting.quickbooks.invalidate({ bidId });
+    },
+  });
 
   const doc = data as AccountingExport | undefined;
   const empty = !doc || doc.lines.length === 0;
@@ -105,9 +122,24 @@ export function AccountingExportDialog({
                     <span className="text-muted-foreground">Reference </span>
                     <span className="font-mono">{doc.invoiceNo}</span>
                   </span>
-                  <span>
+                  <span className="inline-flex items-center gap-1.5">
                     <span className="text-muted-foreground">Customer </span>
-                    {doc.customer || (
+                    {doc.customer ? (
+                      doc.customer
+                    ) : bidQuery.data ? (
+                      <ClientLinkField
+                        bid={{
+                          id: bidQuery.data.bid.id,
+                          clientId: bidQuery.data.bid.clientId,
+                          clientName: bidQuery.data.bid.clientName,
+                          siteAddress: bidQuery.data.bid.siteAddress,
+                        }}
+                        client={bidQuery.data.client}
+                        onLink={clientId =>
+                          linkClient.mutate({ id: bidId, clientId })
+                        }
+                      />
+                    ) : (
                       <span className="text-amber-400">not set</span>
                     )}
                   </span>

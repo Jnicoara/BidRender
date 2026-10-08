@@ -18,6 +18,17 @@ This is the human-readable companion to the git history — read this to see wha
   existing bid moved. A run end that is level with the run no longer shows
   an amber "no height for this type" warning that wasn't true.
 
+- **A full set of cover plates is now in the starter catalog — 103 new
+  items, 1,818 in all.** Every standard flush plate from 1 to 3 gangs
+  (toggle, duplex, decora, blank and every mix of them) plus the common
+  4-gang ones, in both nylon and stainless, with midway and oversized sizes.
+  Also the single-receptacle plate, 30A/50A range, dryer and RV plates and
+  covers, more raised covers for 4" and 4-11/16" boxes, a heavy-duty metal
+  in-use cover, floor box covers by type with a carpet flange, and the
+  Wiremold 700 device plate and box. Colors are search words, not separate
+  items. Nothing was renamed or removed, and no starter assembly changed.
+  The pricing and labor-units sheets were rebuilt with the new rows.
+
 - **The starter assembly-hours sheet now lists all 183 starters.** It has
   the 15 Track B added, marked NEW so they are easy to find. DV34 (surface
   raceway receptacle) is listed but greyed out as HELD, because its 700-series
@@ -26,6 +37,21 @@ This is the human-readable companion to the git history — read this to see wha
   untouched.
 
 ## [2026-10-07]
+
+- **Warnings are now the way to fix what they name.**
+  - On the Materials screen, "Needs price" and "Needs hours" open that item
+    with the cursor in the right box. On Labor rates, "Needs rate", "Set
+    hours" and "Example rate" do the same, and each says why in plain words
+    you can read on a tablet.
+  - On a bid, "Not priced", "Can't price", "+ … not priced" and the
+    "Example" tags explain themselves on a tap, not just a mouse hover.
+  - Elsewhere:
+    - a kit now lists the assemblies whose hours aren't set, each with an
+      hours box right there;
+    - the accounting export lets you pick the customer when it says "not
+      set";
+    - Analytics names the unpriced bids so you can open them;
+    - you can rename your own job height types.
 
 - **The Circuits view no longer draws a line from a device to its panel
   (branch `c-homerun-footage`).** Picking a circuit still rings its devices

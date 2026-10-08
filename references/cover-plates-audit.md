@@ -6,6 +6,13 @@ and all 183 recipes in `BASELINE_ASSEMBLIES`. If a recipe below no longer
 matches what `server/seed/starterAssemblies.ts` says, the file moved after
 this was written: re-read the recipe before acting on the line here.
 
+> **Since then (2026-10-08): § 1's "missing" catalog rows were ADDED by
+> Track A in `3eefc35`** (103 cover rows: typed plates, single-receptacle,
+> 30/50A plates and raised covers, heavy-duty in-use, floor box covers,
+> Wiremold 700). That commit changed NO starter recipe, so § 2's "wrong
+> cover" and "no cover" assemblies still stand; § 3's assembly list is the
+> remaining work.
+
 The owner's question: do we have device cover plates, and do the starter
 assemblies include them? They add up on real bids.
 

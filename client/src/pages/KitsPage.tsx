@@ -22,6 +22,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { InlineNumberField } from "@/components/InlineNumberField";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import {
@@ -132,6 +133,14 @@ function KitBuilder({
     { enabled: !isNew }
   );
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
+  /** An assembly's hours, set from the kit panel (never-stuck gap 6). */
+  const setAssemblyHours = trpc.assemblies.update.useMutation({
+    onError: e => toast.error(e.message),
+    onSettled: () => {
+      void utils.kits.price.invalidate();
+      void utils.assemblies.list.invalidate();
+    },
+  });
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -444,9 +453,47 @@ function KitBuilder({
                       and the panel says so rather than letting a short labor
                       total read as the whole job. */}
                   {priceQuery.data.totals.hoursNotSet > 0 && (
-                    <p className="text-[11px] text-[#F5C518] text-right">
-                      + {hoursNotSetWords(priceQuery.data.totals.hoursNotSet)}
-                    </p>
+                    <>
+                      <p className="text-[11px] text-[#F5C518] text-right">
+                        + {hoursNotSetWords(priceQuery.data.totals.hoursNotSet)}
+                      </p>
+                      {/*
+                        Which ones, and their hours RIGHT HERE — the count
+                        alone sent the estimator off to the Assemblies list to
+                        find them (references/never-stuck-plan.md, gap 6).
+                        Saving writes the assembly in the library (a starter
+                        forks, as any edit does) and the kit's figures move,
+                        because kit pricing resolves forks.
+                      */}
+                      <div className="space-y-1">
+                        {priceQuery.data.items
+                          .filter(p => p.breakdown.hoursNotSet)
+                          .map(p => (
+                            <div
+                              key={p.item.assemblyId}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <span className="text-xs truncate">
+                                {p.item.name}
+                              </span>
+                              <InlineNumberField
+                                value={null}
+                                whenUnset={{ placeholder: "set hours" }}
+                                rules={{ min: 0, max: 999 }}
+                                suffix="h"
+                                ariaLabel={`Hours for ${p.item.name}`}
+                                className="w-24"
+                                onSave={hours =>
+                                  setAssemblyHours.mutate({
+                                    id: p.item.assemblyId,
+                                    baseLaborHours: hours,
+                                  })
+                                }
+                              />
+                            </div>
+                          ))}
+                      </div>
+                    </>
                   )}
                   <div className="border-t border-border my-2" />
                   <div className="flex items-baseline justify-between gap-3 py-1">

@@ -53,6 +53,12 @@ import { DEFAULT_ANNUAL_HOURS, effectiveHourlyRate } from "@shared/pricing";
 import { countNeedingRate, needsRate } from "@shared/laborRatePricing";
 import { money, moneyWhole } from "@/lib/money";
 import {
+  EXAMPLE_RATE_WHY,
+  focusOnOpen,
+  NEEDS_WHY,
+  type NeedsField,
+} from "@/lib/needsFix";
+import {
   EXAMPLE_BURDEN,
   loadedRate,
   readParts,
@@ -268,12 +274,19 @@ function RateFields({
   onChange,
   autoFocusName,
   allowBreakdown,
+  openedFor = null,
 }: {
   draft: Draft;
   onChange: (next: Draft) => void;
   autoFocusName?: boolean;
   /** Edit only — `create` takes one number; break it down after. */
   allowBreakdown?: boolean;
+  /**
+   * The warning that opened this editor, if one did: the cursor lands in the
+   * number it named — the rate (or salary), or the yearly hours a salaried
+   * role needs (@/lib/needsFix).
+   */
+  openedFor?: NeedsField | null;
 }) {
   const preview = draftHourlyRate(draft);
   const b = draft.breakdown;
@@ -285,7 +298,7 @@ function RateFields({
         onChange={e => onChange({ ...draft, name: e.target.value })}
         className="h-8 flex-1 min-w-[10rem] text-sm"
         placeholder="Role name"
-        autoFocus={autoFocusName}
+        autoFocus={autoFocusName && focusOnOpen(openedFor, "name")}
       />
 
       <Select
@@ -320,6 +333,13 @@ function RateFields({
             onFocus={selectOnFocus}
             placeholder="0.00"
             aria-label="Base wage per hour"
+            /*
+              A rate built from a wage — every shipped example rate is — opens
+              in this breakdown, so "the rate" a warning names is the wage.
+              Without this, Example rate opened the editor with the cursor
+              nowhere (measured on staging, 2026-10-08: focus = BODY).
+            */
+            autoFocus={focusOnOpen(openedFor, "rate")}
           />
           <span className="text-xs text-muted-foreground">wage</span>
           {BURDEN_FIELDS.map(([key, label]) => (
@@ -371,6 +391,7 @@ function RateFields({
             onFocus={selectOnFocus}
             placeholder="0.00"
             aria-label="Hourly rate"
+            autoFocus={focusOnOpen(openedFor, "rate")}
           />
           <span className="text-xs text-muted-foreground">/hr</span>
           {allowBreakdown && (
@@ -405,6 +426,7 @@ function RateFields({
             onFocus={selectOnFocus}
             placeholder="60000"
             aria-label="Annual salary"
+            autoFocus={focusOnOpen(openedFor, "rate")}
           />
           <span className="text-xs text-muted-foreground">/yr ÷</span>
           <Input
@@ -415,6 +437,7 @@ function RateFields({
             placeholder={String(DEFAULT_ANNUAL_HOURS)}
             onFocus={selectOnFocus}
             aria-label="Working hours per year"
+            autoFocus={focusOnOpen(openedFor, "hours")}
           />
           <span className="text-xs text-muted-foreground">h</span>
           {preview !== null && (
@@ -444,6 +467,20 @@ function LaborRateRow({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  /**
+   * The warning that opened the editor and what it said, so the editor can
+   * land on that number and show the reason as visible text — it used to be
+   * a hover-only tooltip on the label (@/lib/needsFix).
+   */
+  const [openedFor, setOpenedFor] = useState<{
+    field: NeedsField;
+    why: string;
+  } | null>(null);
+  const openEditor = (opened: { field: NeedsField; why: string } | null) => {
+    setDraft(draftFrom(rate));
+    setOpenedFor(opened);
+    setEditing(true);
+  };
   const parts =
     rate.rateType === "hourly"
       ? readParts({
@@ -474,7 +511,13 @@ function LaborRateRow({
           onChange={setDraft}
           autoFocusName
           allowBreakdown
+          openedFor={openedFor?.field ?? null}
         />
+        {openedFor && (
+          <p className="basis-full text-xs text-[#F5C518]" role="note">
+            {openedFor.why}
+          </p>
+        )}
         <div className="flex items-center gap-1 ml-auto">
           <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={save}>
             <Check className="w-3 h-3" /> Save
@@ -540,7 +583,17 @@ function LaborRateRow({
           finished number. */}
       <span className="text-sm font-mono md:w-28 text-right shrink-0">
         {rate.rateError ? (
-          <span className="text-destructive text-xs font-sans">Set hours</span>
+          // Each label here is the way to fix what it names (@/lib/needsFix).
+          <button
+            type="button"
+            onClick={() =>
+              openEditor({ field: "hours", why: String(rate.rateError) })
+            }
+            className="text-destructive text-xs font-sans underline decoration-dotted underline-offset-2 hover:decoration-solid"
+            aria-label={`Set working hours for ${rate.name}`}
+          >
+            Set hours
+          </button>
         ) : rate.isExampleRate ? (
           /* Checked BEFORE needsRate, which also says yes to an example
              (so first run keeps asking) — but here the number is real and
@@ -550,20 +603,26 @@ function LaborRateRow({
               {money(rate.effectiveHourlyRate)}
               <span className="text-muted-foreground">/hr</span>
             </span>
-            <span
-              title="BidRidge's example loaded rate, not your shop's. Edit it to set your own."
-              className="rounded border border-sky-500/40 px-1 text-[10px] leading-4 font-sans text-sky-400 whitespace-nowrap"
+            <button
+              type="button"
+              onClick={() =>
+                openEditor({ field: "rate", why: EXAMPLE_RATE_WHY })
+              }
+              className="rounded border border-sky-500/40 px-1 text-[10px] leading-4 font-sans text-sky-400 whitespace-nowrap hover:bg-sky-500/10"
+              aria-label={`Set your own rate for ${rate.name}`}
             >
               Example rate
-            </span>
+            </button>
           </span>
         ) : needsRate(rate) ? (
-          <span
-            className="text-xs font-sans font-medium text-[#F5C518]"
-            title="No rate yet — this prices every hour on every bid at nothing until you set one."
+          <button
+            type="button"
+            onClick={() => openEditor({ field: "rate", why: NEEDS_WHY.rate })}
+            className="text-xs font-sans font-medium text-[#F5C518] underline decoration-dotted underline-offset-2 hover:decoration-solid"
+            aria-label={`Set a rate for ${rate.name}`}
           >
             Needs rate
-          </span>
+          </button>
         ) : (
           <>
             {money(rate.effectiveHourlyRate)}
@@ -577,10 +636,7 @@ function LaborRateRow({
           size="sm"
           variant="ghost"
           className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-          onClick={() => {
-            setDraft(draftFrom(rate));
-            setEditing(true);
-          }}
+          onClick={() => openEditor(null)}
           title={rate.userId === null ? "Edit — creates your own copy" : "Edit"}
           aria-label={`Edit ${rate.name}`}
         >

@@ -5,6 +5,9 @@ left as written rather than rewritten to match the rename.
 
 ## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
 
+> **Track C HAS MERGED into local-dev** (`bea4d8f`, 2026-10-07). Every item
+> below is now unblocked; none is built yet.
+
 From `references/track-b-plans-screen-gaps-plan.md`. Each item needs a file
 that Track C's `c-homerun-footage` also changes, so it waits for C to land
 (owner, 2026-10-07: build only in files C does not touch). Gap 1, a run end
@@ -18,7 +21,7 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
 - [x] **DONE 2026-10-08:** rebuilt with `--only assembly-hours --new-since
-    <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
+  <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
       NEW, DV34 grey with "HELD - no 700 plate yet". The old copy had 0 typed
       hours, so nothing needed carrying across. The other three sheets were
       not rebuilt (byte-identical before and after). Original item:
@@ -46,69 +49,95 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
     '4" can light, remodel' style (and 6").
   - **Files:** `server/db.ts`, which Track C changes on `c-homerun-footage`,
     so this lands after C merges; plus `server/seed/*`.
-- [ ] **Track A: one missing part for DV34.** Owner, 2026-10-07: "matching
-      700-series device plate". The catalog has none, so DV34 is held with
-      exactly that listed (`missingParts`). Add "Surface raceway device
-      plate, 700 series" (or tell B the name you give it) and DV34 seeds by
-      itself on the next start.
-  - **Also for A:** the catalog's 700 series is TWO per-foot rows (base and
-    cover). Wiremold 700 is one-piece metal. A traced surface-raceway run
-    type holds ONE raceway material, so with two rows the cover would never
-    be counted. Either one row "Surface raceway, 700 series", or a run type
-    that carries two per-foot materials (see the warning tape plan below:
-    the same "second per-foot material" seam).
+- [x] **Track A: add a 700-series device plate to the catalog** (owner,
+      2026-10-07: "matching 700-series device plate"). **Done 2026-10-08**
+      with the cover family: `Surface raceway device plate, 700 series`
+      ships under exactly the listed name, plus `Surface raceway device
+    box, 700 series`. **Correction:** this line said DV34 then "seeds by
+      itself on the next start". It does not — `assemblyRecipe.ts` holds a
+      starter while `missingParts` is non-empty, whatever the catalog has.
+- [ ] **Track B: the cover swaps** (owner, 2026-10-08 — Track A shipped
+      the parts and changed no recipe). DV34: add the 700 plate line (a
+      `STARTER_PARTS` key) and empty `missingParts`, then rewrite the DV34
+      test in `server/starterGapAssemblies.test.ts` and drop the name from
+      `shippedButAwaitingRecipe` in `server/starterAssembliesSeed.test.ts`.
+      The rest per `references/cover-plates-audit.md` § 3: CS6/7/8 → `4"
+    square raised cover, single receptacle`; RS17, CS5 → a single-
+      receptacle wall plate; RS1, RS2 → `1-gang wall plate, 30A/50A power
+    receptacle, …`; RS13 → `4-11/16" square raised cover, 30A/50A power
+    receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
+      if outdoor); generic `Wall plate` → typed duplex / toggle / decorator
+      plates. Nylon or stainless per recipe is the owner's call.
 
-## Underground warning tape follows the traced trench — AFTER TRACK C MERGES
+## Track A: ONE feature — extra per-foot items on a traced run (owner, 2026-10-07)
 
-Owner, 2026-10-07: tape follows the traced trench (underground run) length,
-charged per foot of actual length, like wire. If no trench run is traced, the
-tape shows **"not priced"**, never 1 ft and never $0. It goes back into GR2
-(200A underground service) and GR5 (detached garage feeder) that way.
+**The owner's ask:** a traced run can carry MORE THAN ONE per-foot item,
+each charged by the run's length. One feature, two jobs:
 
-**Why it waits:** it needs columns (Track A) and a change to the run
-footage code Track C is rewriting on `c-homerun-footage`
-(`server/runTypeFootage.ts`, `server/runTypeFootageCore.ts`,
-`shared/takeoffQuantities.ts`, `server/db.ts`). Nothing was built.
+- **Underground warning tape on a trench.** The tape follows the traced
+  trench (underground run) length, per foot of actual length, like wire.
+  If no trench is traced, the tape shows **"not priced"**, never 1 ft and
+  never $0. It goes back into GR2 (200A underground service) and GR5
+  (detached garage feeder) that way.
+- **The 700-series raceway: base + cover.** The catalog sells Wiremold 700
+  as two per-foot rows, `Surface raceway base, 700 series` and
+  `Surface raceway cover, 700 series`. A run type holds ONE raceway
+  material, so the cover is never counted today. With extra per-foot items,
+  a 700-series run type carries the base as its raceway and the cover as an
+  extra, both charged by the same length. DV34 then takes its length from
+  that traced run, which is the owner's answer.
 
-**The two halves:**
+**Why it is one feature:** both are "a second material priced off the same
+traced feet". Two special cases would drift.
 
-1. **The trench side: a per-foot accessory on a run type.** Today a run
-   type carries a raceway, conductors, a ground and fittings, and nothing
-   else per foot.
-   - Add an accessory material plus a feet-per-foot figure (1.0 for tape),
-     on HORIZONTAL traced length only, since tape is laid in the trench and
-     not up the riser.
-   - Shipped underground run types carry Underground warning tape. It
-     reaches the bid through the same bridge as raceway footage
-     (`takeoffRunTypes.bridgeForBid`).
-   - Columns for A: `takeoff_run_types.accessoryMaterialId` and
-     `accessoryPerFoot` (nullable, no default). Or a small
-     `takeoff_run_type_accessories` table, if the 700-series cover above
-     also wants this seam.
-2. **The assembly side: a line whose quantity is "from the traced run".**
-   - GR2/GR5 get `Underground warning tape` with quantity source = traced,
-     not a number.
-   - On a bid, the line's quantity is the bid's traced underground
-     horizontal length. With no such run it is NULL, and the line says "not
-     priced" (`shared/lineNotPriced.ts` learns "quantity from a run, none
-     traced").
-   - Columns for A: `assembly_materials.qtySource` ENUM('fixed','traced')
-     NULL (NULL = fixed, today's meaning), frozen onto the bid line like
-     every snapshot.
-   - Never counted twice: if the run type also carries tape (half 1), the
-     bid shows ONE tape line. Decide which half owns it before building. B's
-     recommendation is the run type, with the assembly line only saying
-     "from the run" so a bid with no trench still shows "not priced".
+**Track C has merged** (`bea4d8f`), so nothing waits on C. Track A writes
+the migration; B or A builds the rest.
 
-**Tests that must fail without it:**
+### The shape (for A to settle)
 
-- tape quantity = traced underground horizontal feet, and moves when the
-  run moves;
-- no trench → "not priced" on the line and on the total, never 1 ft or $0;
-- risers add no tape;
+- **A table, not columns.** `takeoff_run_type_extras (id, runTypeId,
+materialId, feetPerFoot DECIMAL NOT NULL, appliesTo
+ENUM('horizontal','all') NOT NULL, userId)`. A table, because the ask is
+  "more than one"; columns cap it at one.
+  - `feetPerFoot` is 1.0 for tape and for the cover.
+  - `appliesTo` is `horizontal` for tape (it lies in the trench, not up the
+    riser) and `all` for the raceway cover (it covers every foot of the
+    raceway, verticals included).
+  - Additive, so it is applied BEFORE the code ships (CLAUDE.md, three
+    steps).
+- **The arithmetic** rides the same path as raceway footage:
+  - `server/runTypeFootageCore.ts` groups the run's length;
+  - each extra becomes a bid quantity of `length × feetPerFoot` through
+    `takeoffRunTypes.bridgeForBid`;
+  - so it moves when the run moves, and an undo or a clear moves it too.
+- **Shipped:**
+  - underground run types carry `Underground warning tape` (horizontal,
+    1.0);
+  - a "700 series surface raceway" run type carries the base as its raceway
+    and the cover as an extra (all, 1.0).
+- **The assembly side, for "not priced" with no trench:** GR2/GR5 list
+  `Underground warning tape` with quantity source "from the traced run"
+  (`assembly_materials.qtySource ENUM('fixed','traced') NULL`, NULL =
+  fixed, which is today's meaning; frozen onto the bid line like every
+  snapshot).
+  - With no matching run on the bid, the line's quantity is NULL and it
+    says "not priced". `shared/lineNotPriced.ts` learns "quantity from a
+    run, none traced".
+  - **Never counted twice:** when the run carries the tape, the run's
+    quantity IS the line's quantity, so there is one tape line, not two.
+
+### Tests that must fail without it
+
+- tape = traced underground HORIZONTAL feet, and moves when the run moves;
+  risers add none;
+- the cover = every foot of the 700 run, verticals included, alongside the
+  base;
+- a run type with two extras charges both off one length;
+- no trench → "not priced" on the line and on the total, never 1 ft and
+  never $0;
 - one tape line, not two;
-- the per-foot guard (`server/starterGapAssemblies.test.ts`) still forbids
-  a fixed 1 ft.
+- the per-foot guard (`server/starterGapAssemblies.test.ts`) still forbids a
+  fixed 1 ft.
 
 - [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet

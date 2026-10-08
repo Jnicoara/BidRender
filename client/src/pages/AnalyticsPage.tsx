@@ -158,7 +158,7 @@ export default function AnalyticsPage({
                     title="Winning work"
                     note="Which of the bids you wrote came back yes."
                   />
-                  <OutcomesPanel report={outcomes} />
+                  <OutcomesPanel report={outcomes} onOpenBid={onOpenBid} />
                 </section>
               )
             )}

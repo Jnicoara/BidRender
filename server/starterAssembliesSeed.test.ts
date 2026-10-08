@@ -126,9 +126,16 @@ describe("the starter seed file", () => {
     const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
     const missing = BASELINE_ASSEMBLIES.filter(a => a.missingParts?.length);
     expect(missing.map(a => a.ref)).toEqual(["DV34"]);
+    // One listed part now ships and is still listed, ON PURPOSE: Track A
+    // added DV34's 700-series plate on 2026-10-08 without touching recipes,
+    // and Track B adds the line and empties the list. Named, so any OTHER
+    // listed part that ships fails here as a stale list.
+    const shippedButAwaitingRecipe = new Set([
+      "Surface raceway device plate, 700 series",
+    ]);
     for (const name of missing.flatMap(a => a.missingParts ?? [])) {
       expect(name).toMatch(/^Surface raceway/);
-      expect(shipped.has(name)).toBe(false);
+      expect(shipped.has(name)).toBe(shippedButAwaitingRecipe.has(name));
     }
   });
 
