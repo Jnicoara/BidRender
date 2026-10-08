@@ -3,6 +3,22 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08)
+
+- [ ] **"10. undo and redo a mark; delete one and Undo brings it back"**
+      (`e2e/smoke/flow.spec.ts:410`) failed on local-dev run 37724027830
+      (build b70f5d5), retry included.
+  - **What failed:** the poll for the mark count to come back after Undo
+    timed out at 20 s.
+  - **Why it looks flaky, not broken:** the same job re-run against the
+    SAME build passed. The build before it (e0b1a74) passed too, and
+    nothing between the two touched marks or undo (one commit: DV34's
+    starter recipe).
+  - **Why it is worth finding anyway:** a flaky smoke trains people to
+    re-run past a real failure.
+  - **Suspects:** the undo round trip on staging taking over 20 s under
+    load, or the mark list's refetch racing the poll.
+
 ## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
 
 > **Track C HAS MERGED into local-dev** (`bea4d8f`, 2026-10-07). Every item
