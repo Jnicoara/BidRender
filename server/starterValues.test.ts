@@ -16,10 +16,13 @@
  * it does not exist.
  */
 import { describe, expect, it } from "vitest";
-import { materials } from "../drizzle/schema";
+import { assemblies, materials } from "../drizzle/schema";
 import { STARTER_PRICES } from "./seed/materials/starterPrices";
 import { STARTER_LABOR_UNITS } from "./seed/materials/starterLaborUnits";
+import { STARTER_BRAND_PRICES } from "./seed/materials/starterBrandPrices";
+import { STARTER_ASSEMBLY_HOURS } from "./seed/starterAssemblyHours";
 import { BASELINE_MATERIALS } from "./seed/materials";
+import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 
 const hasColumn = (name: string) => name in materials;
 
@@ -30,12 +33,25 @@ describe("starter sheet values", () => {
     }
   });
 
-  it("ship no LABOR HOURS until shipped hours can be tagged as an example", () => {
-    // No column decided yet for hours (owner question, plan § 3). The name
-    // below is the one the plan proposes; this goes red if hours are loaded
-    // before it exists, and is edited when the decision is made.
+  it('ship no LABOR HOURS until shipped hours can say "Example hours"', () => {
+    // Owner, 2026-10-07: hours get the price treatment — an "Example hours"
+    // tag on the bid screen (never the customer quote), cleared when the shop
+    // edits it, a warning before printing; shipped together with the hours,
+    // never hours alone. Columns in Batch 5: materials.isExampleLaborHours,
+    // assemblies.isExampleHours.
     if (!hasColumn("isExampleLaborHours")) {
       expect(Object.keys(STARTER_LABOR_UNITS)).toEqual([]);
+    }
+    if (!("isExampleHours" in assemblies)) {
+      expect(Object.keys(STARTER_ASSEMBLY_HOURS)).toEqual([]);
+    }
+  });
+
+  it("ship no BRAND VARIANT price until the variant model and the price tag exist", () => {
+    // Nothing reads these until materials.parentId exists (ASSEMBLIES_PLAN.md
+    // § "Parent items and brand variants").
+    if (!hasColumn("parentId") || !hasColumn("isExamplePrice")) {
+      expect(Object.keys(STARTER_BRAND_PRICES)).toEqual([]);
     }
   });
 
@@ -55,6 +71,15 @@ describe("starter sheet values", () => {
           shipped.get(name)!.raceway,
           `${name}: bend hours on a non-raceway`
         ).toBeDefined();
+    }
+    for (const [name, v] of Object.entries(STARTER_BRAND_PRICES)) {
+      expect(shipped.has(v.parent), `${name}: parent ${v.parent}`).toBe(true);
+      expect(Number(v.price), name).toBeGreaterThan(0);
+    }
+    const starters = new Set(BASELINE_ASSEMBLIES.map(a => a.name));
+    for (const [name, hours] of Object.entries(STARTER_ASSEMBLY_HOURS)) {
+      expect(starters.has(name), name).toBe(true);
+      expect(Number(hours), name).toBeGreaterThan(0);
     }
   });
 });

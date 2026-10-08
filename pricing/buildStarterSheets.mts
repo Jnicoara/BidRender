@@ -24,16 +24,27 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  ASSEMBLY_COLUMNS,
+  ASSEMBLY_HOURS_FILE,
+  ASSEMBLY_SHEET,
+  BRAND_COLUMNS,
+  BRAND_SHEET,
+  BRANDS_FILE,
   FIRST_DATA_ROW,
   HEADER_ROW,
+  KIND_COLUMN,
   LABOR_COLUMNS,
   LABOR_FILE,
   LABOR_SHEET,
   PRICE_COLUMNS,
   PRICE_SHEET,
   PRICES_FILE,
+  assembliesInSheetOrder,
+  assemblyKind,
+  brandVariants,
   catalogInSheetOrder,
   hoursPer,
+  materialKind,
   packFor,
   usedBy,
 } from "./starterSheetLayout";
@@ -105,7 +116,7 @@ function howTo(wb: any, lines: [string, string][]) {
     PRICE_SHEET,
     C,
     `STARTER PRICES — every item BidRidge ships to every shop (${rows.length} rows). Type the YELLOW 'Pack price' only; 'Price per unit' works itself out. Change 'Pack size' / 'Pack qty' if you buy a different pack. Most-used items first. Send the file back to Track A — do NOT import it in the app (that would price your company only).`,
-    [6, 18, 22, 52, 12, 16, 10, 12, 14, 50]
+    [6, 18, 18, 22, 52, 12, 16, 10, 12, 14, 50]
   );
   const packPrice = letter(col(C, "Pack price"));
   const packQty = letter(col(C, "Pack qty"));
@@ -115,6 +126,7 @@ function howTo(wb: any, lines: [string, string][]) {
     const row = ws.getRow(r);
     row.getCell(col(C, "#")).value = i + 1;
     row.getCell(col(C, "Used by")).value = usedBy(m.name).text;
+    row.getCell(col(C, KIND_COLUMN)).value = materialKind(m.name);
     row.getCell(col(C, "Category")).value = m.category;
     row.getCell(col(C, "Name")).value = m.name;
     row.getCell(col(C, "Unit of sale")).value = m.unitOfSale;
@@ -187,7 +199,7 @@ function howTo(wb: any, lines: [string, string][]) {
     LABOR_SHEET,
     C,
     `STARTER LABOR UNITS — every item BidRidge ships to every shop (${rows.length} rows). Type YELLOW 'MY HOURS' per the 'Hours per' column (each, or per 100 ft), and 'Bend hours' per field bend on raceways only (grey = not a raceway). Leave blank for "not set" — never type 0 to mean unknown. Send the file back to Track A — do NOT import it in the app.`,
-    [6, 18, 22, 52, 10, 12, 16, 50]
+    [6, 18, 18, 22, 52, 10, 12, 16, 50]
   );
   let raceways = 0;
   rows.forEach((m, i) => {
@@ -195,6 +207,7 @@ function howTo(wb: any, lines: [string, string][]) {
     const row = ws.getRow(r);
     row.getCell(col(C, "#")).value = i + 1;
     row.getCell(col(C, "Used by")).value = usedBy(m.name).text;
+    row.getCell(col(C, KIND_COLUMN)).value = materialKind(m.name);
     row.getCell(col(C, "Category")).value = m.category;
     row.getCell(col(C, "Name")).value = m.name;
     row.getCell(col(C, "Hours per")).value = hoursPer(m);
@@ -238,12 +251,149 @@ function howTo(wb: any, lines: [string, string][]) {
     ],
     [
       "Not in this sheet",
-      "Starter ASSEMBLY hours. Those are set per starter in the seed already; changing them shared is a separate decision.",
+      `Starter ASSEMBLY hours — they have their own sheet, ${ASSEMBLY_HOURS_FILE}.`,
     ],
   ]);
   const out = path.join(HERE, LABOR_FILE);
   await wb.xlsx.writeFile(out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${rows.length} rows (${raceways} raceways take bend hours)`
+  );
+}
+
+// ── Brand variants sheet ────────────────────────────────────────────────────
+{
+  const { kept, dropped } = brandVariants();
+  const wb = new ExcelJS.Workbook();
+  const C = BRAND_COLUMNS;
+  const ws = sheetWithHeader(
+    wb,
+    BRAND_SHEET,
+    C,
+    `BRAND VARIANTS — panels and breakers only (${kept.length} rows), each under its generic PARENT. A breaker of one line does not fit another's panel, which is why brand matters here and nowhere else. Type the YELLOW 'Pack price' only. Most-used parents first. Send the file back to Track A — do NOT import it in the app.`,
+    [6, 18, 18, 14, 14, 52, 40, 12, 16, 10, 12, 14]
+  );
+  const packPrice = letter(col(C, "Pack price"));
+  const packQty = letter(col(C, "Pack qty"));
+  kept.forEach((v, i) => {
+    const r = FIRST_DATA_ROW + i;
+    const [packText, qty] = packFor(v.parent);
+    const row = ws.getRow(r);
+    row.getCell(col(C, "#")).value = i + 1;
+    row.getCell(col(C, "Used by")).value = usedBy(v.parent.name).text;
+    row.getCell(col(C, KIND_COLUMN)).value = materialKind(v.parent.name);
+    row.getCell(col(C, "Category")).value = v.parent.category;
+    row.getCell(col(C, "Brand")).value = v.brand;
+    row.getCell(col(C, "Name")).value = v.name;
+    row.getCell(col(C, "Parent (generic item)")).value = v.parent.name;
+    row.getCell(col(C, "Unit of sale")).value = v.parent.unitOfSale;
+    row.getCell(col(C, "Pack size")).value = packText;
+    row.getCell(col(C, "Pack qty")).value = qty;
+    row.getCell(col(C, "Price per unit")).value = {
+      formula: `IFERROR(IF(N(${packPrice}${r})=0,"",${packPrice}${r}/${packQty}${r}),"")`,
+    };
+    row.getCell(col(C, "Price per unit")).numFmt = "$#,##0.0000";
+    row.getCell(col(C, "Pack price")).numFmt = "$#,##0.00";
+    for (const k of ["Pack price", "Pack size", "Pack qty"])
+      row.getCell(col(C, k)).fill = YELLOW;
+    row.getCell(col(C, "Pack price")).dataValidation = {
+      type: "decimal",
+      operator: "greaterThanOrEqual",
+      formulae: [0],
+      allowBlank: true,
+      showErrorMessage: true,
+      error: "A price is a number, 0 or more.",
+    };
+  });
+  howTo(wb, [
+    [
+      "What this is",
+      "Brand-specific panels and breakers — Square D QO / Homeline, Eaton BR / CH, Siemens, ABB/GE, Leviton — each under the generic item it stands for. A recipe always names the generic parent; a shop's preferred brand picks the variant.",
+    ],
+    [
+      "What you type",
+      "Pack price only (yellow). Leave a row blank to keep it unpriced.",
+    ],
+    [
+      "Not yet in the app",
+      'The app has no parent/variant model yet. These prices are loaded and kept ready, and reach shops when that model is built — nothing ships before it, and nothing before the "Example price" tag.',
+    ],
+    [
+      "Left off",
+      dropped.length
+        ? `${dropped.length} variants whose generic parent the catalog does not ship (the owner declined it): ${dropped.join("; ")}.`
+        : "Nothing.",
+    ],
+    [
+      "Do NOT",
+      "import this through Materials › Import prices — that prices YOUR company only.",
+    ],
+  ]);
+  const out = path.join(HERE, BRANDS_FILE);
+  await wb.xlsx.writeFile(out);
+  console.log(
+    `wrote ${path.relative(process.cwd(), out)}: ${kept.length} rows (${dropped.length} left off — parent not shipped)`
+  );
+}
+
+// ── Assembly hours sheet ────────────────────────────────────────────────────
+{
+  const { rows: assemblies, notShipped } = assembliesInSheetOrder();
+  const wb = new ExcelJS.Workbook();
+  const C = ASSEMBLY_COLUMNS;
+  const ws = sheetWithHeader(
+    wb,
+    ASSEMBLY_SHEET,
+    C,
+    `STARTER ASSEMBLY HOURS — every shipped starter (${assemblies.length}). Your top-30 commercial list first, then the top-30 residential, then the rest. Type YELLOW 'MY HOURS' per assembly (one installed). 'Hours now' is what ships today (blank = not set). Leave blank to keep it. Send the file back to Track A — do NOT edit hours in the app for this.`,
+    [6, 26, 18, 8, 18, 52, 10, 12, 40]
+  );
+  assemblies.forEach((a, i) => {
+    const row = ws.getRow(FIRST_DATA_ROW + i);
+    row.getCell(col(C, "#")).value = i + 1;
+    row.getCell(col(C, "Top-30 list")).value = a.top;
+    row.getCell(col(C, KIND_COLUMN)).value = assemblyKind(a.projectType);
+    row.getCell(col(C, "Ref")).value = a.ref;
+    row.getCell(col(C, "Category")).value = a.category;
+    row.getCell(col(C, "Assembly")).value = a.name;
+    row.getCell(col(C, "Hours now")).value = a.hoursNow;
+    row.getCell(col(C, "MY HOURS")).fill = YELLOW;
+    row.getCell(col(C, "MY HOURS")).dataValidation = {
+      type: "decimal",
+      operator: "greaterThan",
+      formulae: [0],
+      allowBlank: true,
+      showErrorMessage: true,
+      error: "Hours are a number above 0 — leave it blank to keep what ships.",
+    };
+  });
+  howTo(wb, [
+    [
+      "What this is",
+      "Labor hours for each starter assembly EVERY shop starts with — one installed, at the role the assembly is set to.",
+    ],
+    [
+      "What you type",
+      "MY HOURS (yellow). Blank keeps 'Hours now' (blank there means not set). Never 0 for unknown.",
+    ],
+    [
+      "Order",
+      "Your top-30 commercial list, then the top-30 residential list (references/top-assemblies-draft.md), then every other starter by category.",
+    ],
+    [
+      "Not in this sheet",
+      notShipped.length
+        ? `On your lists but not shipped yet (drafted recipes): ${notShipped.join(", ")}.`
+        : "Nothing — every listed starter ships.",
+    ],
+    [
+      "What happens next",
+      'Send the file to Track A; it is checked row by row and written into the seed. Shipped hours carry an "Example hours" tag; nothing ships before that tag exists in the app.',
+    ],
+  ]);
+  const out = path.join(HERE, ASSEMBLY_HOURS_FILE);
+  await wb.xlsx.writeFile(out);
+  console.log(
+    `wrote ${path.relative(process.cwd(), out)}: ${assemblies.length} rows (${notShipped.length} listed refs not shipped: ${notShipped.join(", ")})`
   );
 }

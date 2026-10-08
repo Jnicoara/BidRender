@@ -124,24 +124,51 @@ screen must NOT exist before he fills the sheets.** Reasons:
 > 1.2 h per 100 ft -> 0.0120 h/ft, three bad rows refused.
 > **Inert until tagged:** `server/starterValues.test.ts` fails while either
 > generated file holds a value and its example tag does not exist
-> (`materials.isExamplePrice`; for hours, a tag still to be decided — owner
-> question). The sheets, rebuilt from the frozen catalog that day:
+> (`materials.isExamplePrice` for prices; the hours tag below for hours).
+> The sheets, rebuilt from the frozen catalog that day:
 > `pricing/starter-catalog-pricing.xlsx` and `pricing/labor-units-starter.xlsx`
 > (`pricing/buildStarterSheets.mts`, 1,715 rows each — the 1,713 plus the
 > 5" disc and 5" retrofit trim split out the same day).
+>
+> **Two more sheets, same loader, same checks (owner, 2026-10-07):**
+> `pricing/brand-variants-pricing.xlsx` — 508 panel and breaker brand
+> variants under their generic parent (the curated list
+> `buildPricingSheet.mts` has generated since 2026-09-24, with the frozen
+> naming rules; 11 left off because their parent — the QO-only 60A
+> single-pole — was declined). They load into
+> `server/seed/materials/starterBrandPrices.ts`, which nothing reads until
+> the parent/variant model (`materials.parentId`) exists.
+> `pricing/assembly-hours-starter.xlsx` — all 168 starter assemblies, the
+> owner's top-30 commercial and residential lists first; loads into
+> `server/seed/starterAssemblyHours.ts`, applied at insert and re-stamped on
+> shipped starters for the names it lists only. All four sheets carry a
+> "Residential / Commercial / Both" column: an assembly's own tag; a
+> material's from the starters that use it ("Not in an assembly" if none);
+> a variant's from its parent.
+
+### Shipped HOURS get the price treatment — owner, 2026-10-07
+
+**Decided:** a shipped labor unit or starter-assembly hour shows an
+**"Example hours"** tag on the shop's bid screen — **never on the customer
+quote** — the tag **clears when the shop edits** that number (its fork), and
+**printing or sending warns first** when a bid still has example-hours
+lines, the same shape as "Example price". **Shipped together with the hours,
+never hours alone** — `server/starterValues.test.ts` refuses a loaded hour
+until the columns exist. Columns (Batch 5, not written):
+`materials.isExampleLaborHours`, `assemblies.isExampleHours`,
+`bid_line_items.snapshotHoursWereExample` (frozen at add time, drives the
+print warning).
 
 **What the loader needs before the first real prices load** (in order):
 
 1. `materials.isExamplePrice` + `bid_line_items.snapshotPriceWasExample`
    (Batch 5), so a shipped price shows "Example price" and printing warns.
 2. The `snapshotUnpricedParts` one-time freeze (todo.md), so nothing old moves.
-3. Seed fields for unit hours: `laborHours` / `fieldBendLaborHours` in the
-   material seed, and a re-stamp pass for them and for assembly
-   `baseLaborHours` (insert-only today). Without it the labor sheet can only
-   ever be a per-company import.
-4. `pricing/loadStarterSheet.mts` (new): reads the filled sheet, writes the
-   seed modules, refuses a row it cannot match by id/name, prints a
-   before/after of every changed value. Run by Track A, reviewed, committed.
+3. ~~Seed fields for unit hours and a re-stamp pass~~ — **done 2026-10-07**
+   (materials' `laborHours` / `fieldBendLaborHours`; starter assembly hours
+   for listed names).
+4. ~~The loader~~ — **done 2026-10-07**, `pricing/loadStarterSheets.mts`.
+5. The "Example hours" columns above, before any shipped hour loads.
 
 **The screen later (Shape B)** — when the owner wants to edit the starter
 without Track A: a `role = "starter-editor"` login that belongs to no company,

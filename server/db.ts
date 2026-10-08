@@ -221,6 +221,7 @@ import {
   type StarterHold,
 } from "./seed/assemblyRecipe";
 import { starterPartName } from "./seed/starterParts";
+import { STARTER_ASSEMBLY_HOURS } from "./seed/starterAssemblyHours";
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import {
@@ -3685,7 +3686,12 @@ export function assemblyHoursColumnValue(
 function starterHoursValue(
   spec: BaselineAssembly
 ): InsertAssembly["baseLaborHours"] {
-  return assemblyHoursColumnValue(spec.baseLaborHours, `"${spec.name}"`);
+  // The owner's starter hours sheet wins over the seed entry when it names
+  // this starter (server/seed/starterAssemblyHours.ts).
+  const sheet = STARTER_ASSEMBLY_HOURS[spec.name];
+  return sheet !== undefined
+    ? sheet
+    : assemblyHoursColumnValue(spec.baseLaborHours, `"${spec.name}"`);
 }
 
 export async function seedBaselineAssemblies(
@@ -3835,6 +3841,31 @@ export async function seedBaselineAssemblies(
             isNull(assemblies.userId),
             inArray(assemblies.name, names),
             sql`NOT (${assemblies.projectType} <=> ${tag})`
+          )
+        );
+    }
+
+    /**
+     * RE-STAMP base hours from the owner's starter hours sheet
+     * (server/seed/starterAssemblyHours.ts, written by
+     * pricing/loadStarterSheets.mts) — for the starters LISTED there and no
+     * other, so a starter nobody filled in keeps whatever it has. Shared
+     * rows only; a company's fork has its own hours and is never in this
+     * pass. A sent bid never moves: its lines froze their hours. Inert while
+     * the map is empty (server/starterValues.test.ts keeps it empty until
+     * "Example hours" exists). Added 2026-10-07.
+     */
+    for (const spec of specs) {
+      const hours = STARTER_ASSEMBLY_HOURS[spec.name];
+      if (hours === undefined || !alreadySeeded.has(spec.name)) continue;
+      await db
+        .update(assemblies)
+        .set({ baseLaborHours: hours })
+        .where(
+          and(
+            isNull(assemblies.userId),
+            eq(assemblies.name, spec.name),
+            sql`NOT (${assemblies.baseLaborHours} <=> ${hours})`
           )
         );
     }

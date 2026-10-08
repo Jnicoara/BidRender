@@ -21,6 +21,16 @@ This is the human-readable companion to the git history — read this to see wha
 
   Each starts with hours not set, for you to fill in.
 
+- **Two more starter sheets for the owner:** a brand-variants pricing sheet
+  with 508 panels and breakers, each under the generic item it stands for,
+  and an assembly-hours sheet with all 168 starter assemblies, his top-30
+  commercial and residential lists first. All four starter sheets now have a
+  "Residential / Commercial / Both" column to filter by.
+- **Decided: shipped labor hours carry an "Example hours" tag**, the same as
+  prices: shown on the bid screen and never on the customer quote, cleared
+  when the shop edits the number, with a warning before printing. Hours ship
+  only together with the tag.
+
 - **Searching "6 wafer" (any size) now leads with the plain canless wafer.**
   The slim, gimbal, wet-rated and color-selectable versions are named after
   it ("6" canless wafer LED downlight, slim") and follow it.
