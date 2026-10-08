@@ -393,6 +393,20 @@ need 0117 (staging has it; live does not — `next-live-release-plan.md`).
   `(bidId, takeoffRunTypeId, runMaterialRole, runExtraKey)`. It must NOT
   use a nullable column: MySQL lets NULLs repeat in a unique index, which
   would quietly allow duplicate raceway lines.
+- **Append `elbowFlat` after `extra` — BUILT 2026-10-08 (Track A), migration
+  `0139_elbow_flat_role`, on staging.** Was OPEN in Track C's note: the flat
+  elbow had no role. A 700 type buys an inside elbow (`elbow90`) at a plan
+  corner AND a flat elbow at an end drop — two parts on one type — and the
+  unique index allows one line per (type, role, extra key). Reusing
+  `elbow45` would fit the database and lie on every screen that labels the
+  role. The other 700 parts fit existing roles (entrance end `connector`,
+  clip `strap`, inside elbow `elbow90`, tee `teeBox`). Same file name,
+  journal entry (`when` 1789962900000) and statement as C's stand-in on
+  `c-per-foot-logic`, so C takes A's file at merge and a database that ran
+  the stand-in needs nothing more. Until C's 700 code ships nothing writes
+  it: `feetForRole` (`server/db.ts`) has an `elbowFlat` tripwire case that
+  stops compiling when C adds the role to `FITTING_KINDS` — delete it then.
+  Test: `server/migration0139.test.ts` (red without the migration).
 - **New: add `extraFeetPerFoot DECIMAL(8,4) NULL`** (decision 4). NULL =
   follow the run type's extra; `0` = "shared trench" on this bid. Only read
   on a role-`extra` line. NULL with no default, so "follow the type" is a

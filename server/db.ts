@@ -6051,6 +6051,16 @@ function feetForRole(
     */
     case "extra":
       return { bought: 0, installed: 0 };
+    /*
+      0139's `elbowFlat` role (the 700 surface raceway flat elbow,
+      references/per-foot-items-plan.md § 4 M2), the same tripwire as
+      `teeBody`, `locknut` and `bushing`: a flat elbow is a COUNT, added before
+      the code that counts it. Nothing writes an `elbowFlat` line until Track
+      C's 700 fitting family ships; that code adds it to FITTING_KINDS, this
+      label then fails to compile, and it is deleted.
+    */
+    case "elbowFlat":
+      return { bought: 0, installed: 0 };
   }
 }
 
