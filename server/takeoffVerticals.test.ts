@@ -591,6 +591,7 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
     endStampId: 41,
     startCountsVertical: false,
     endCountsVertical: true,
+    boxToBox: false,
   };
   const STAMPED_RECEPTACLE = { stampId: 41, verticalFeet: 8.5 };
 
@@ -623,18 +624,21 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
         endStampId: null,
         startCountsVertical: true,
         endCountsVertical: false,
+        boxToBox: false,
       },
       {
         startStampId: null,
         endStampId: 8,
         startCountsVertical: false,
         endCountsVertical: true,
+        boxToBox: false,
       },
       {
         startStampId: null,
         endStampId: null,
         startCountsVertical: true,
         endCountsVertical: true,
+        boxToBox: false,
       },
     ]);
     // Array.from rather than spread: tsconfig sets no `target`, so the
@@ -654,6 +658,7 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
       endStampId: null,
       startCountsVertical: false,
       endCountsVertical: false,
+      boxToBox: false,
     };
     expect(stampsClaimedByRuns([legFromMark]).size).toBe(0);
     const totals = totalVerticalFeet({
@@ -675,6 +680,7 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
           endStampId: 5,
           startCountsVertical: false,
           endCountsVertical: true,
+          boxToBox: false,
         },
         {
           verticalFeet: 2,
@@ -682,6 +688,7 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
           endStampId: null,
           startCountsVertical: true,
           endCountsVertical: false,
+          boxToBox: false,
         },
       ],
       stamps: [{ stampId: 5, verticalFeet: 2 }],
@@ -700,6 +707,7 @@ describe("a vertical belongs to the run or the stamp, never both", () => {
           endStampId: null,
           startCountsVertical: false,
           endCountsVertical: false,
+          boxToBox: false,
         },
       ],
       stamps: [
@@ -1221,6 +1229,7 @@ describe("resolving a stored run's verticals", () => {
     traceMode: null,
     startStampId: null,
     endStampId: null,
+    runsAt: null,
   };
 
   describe("an end LINKED to a mark (vertical-drops-plan § 2)", () => {

@@ -547,6 +547,8 @@ export type PanelRun = {
    * no D18 question; its wire comes from the type and its drops are proposed.
    */
   traceMode: TraceMode;
+  /** Through the ceiling or box to box (0131), NULL already read as ceiling. */
+  runsAt: "ceiling" | "boxToBox";
 };
 
 const feet = (value: number) =>

@@ -44,6 +44,7 @@ function run(over: Partial<GroupableRun> & { id: number }): GroupableRun {
     startTeeId: null,
     endTeeId: null,
     traceMode: null,
+    runsAt: null,
     conduitExtraPct: null,
     wireExtraPct: null,
     makeupDeviceInches: null,

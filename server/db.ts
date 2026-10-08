@@ -257,6 +257,7 @@ import {
   verticalsForRunRow,
   type HeightContext,
   type RunEnds,
+  type RunsAt,
 } from "./runVerticals";
 import {
   groupDrops,
@@ -8544,8 +8545,10 @@ export async function addBranchLeg(
       startStampId: start.kind === "stamp" ? start.stampId : null,
       startTeeId: teeId,
       endKind: input.endKind,
-      // Every row of a run carries its mode (D21, 0086).
+      // Every row of a run carries its mode (D21, 0086)...
       traceMode: root.traceMode,
+      // ...and how it gets between its boxes (0131), for the same reason.
+      runsAt: root.runsAt,
       // ...and its own extra and makeup (0091), kept equal across the run's
       // rows like the mode, so a leg reads the run's figure from its own row.
       ...runExtraColumns(root),
@@ -8610,6 +8613,33 @@ export async function setRunExtras(
   const [result] = await db
     .update(takeoffRuns)
     .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(
+        or(
+          eq(takeoffRuns.id, rootRunId),
+          eq(takeoffRuns.parentRunId, rootRunId)
+        ),
+        eq(takeoffRuns.userId, userId)
+      )
+    );
+  return { rows: result.affectedRows };
+}
+
+/**
+ * Through the ceiling (NULL) or box to box (0131), on EVERY row of the run in
+ * one statement — the `traceMode` rule: it describes the whole run, and a leg
+ * reads it from its own row, so no leg may be left saying the other thing.
+ */
+export async function setRunRunsAt(
+  rootRunId: number,
+  userId: number,
+  runsAt: RunsAt | null
+): Promise<{ rows: number }> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db
+    .update(takeoffRuns)
+    .set({ runsAt, updatedAt: new Date() })
     .where(
       and(
         or(
@@ -13915,6 +13945,7 @@ export async function loadGroupDrops(
           endStampId: r.endStampId,
           startCountsVertical: v.start.counted,
           endCountsVertical: v.end.counted,
+          boxToBox: r.runsAt === "boxToBox",
         };
       }),
     heights: {
@@ -14503,6 +14534,7 @@ export async function setBidHomerunSettings(
     homerunMinimumFt?: number | null;
     homerunRoutingPct?: number | null;
     homerunRunTypeId?: number | null;
+    homerunExtraBends?: number | null;
   }
 ) {
   const db = await getDb();
@@ -14520,6 +14552,8 @@ export async function setBidHomerunSettings(
     set.homerunRoutingPct = dec(patch.homerunRoutingPct, 4);
   if (patch.homerunRunTypeId !== undefined)
     set.homerunRunTypeId = patch.homerunRunTypeId;
+  if (patch.homerunExtraBends !== undefined)
+    set.homerunExtraBends = patch.homerunExtraBends;
   if (Object.keys(set).length === 0) return;
   await db
     .update(bids)
@@ -14773,9 +14807,8 @@ export async function loadBidHomeruns(
       homerunMinimumFt: numOrNull(bid.homerunMinimumFt),
       homerunRoutingPct: numOrNull(bid.homerunRoutingPct),
       homerunRunTypeId: bid.homerunRunTypeId,
-      // No column yet: `bids.homerunExtraBends` is asked of Track A. NULL
-      // is "nobody set it" — the starter 1, said "not confirmed".
-      homerunExtraBends: null,
+      // 0131. NULL is "nobody set it" — the starter 1, said "not confirmed".
+      homerunExtraBends: bid.homerunExtraBends,
     },
     sheets,
     panels: panels.map(p => ({

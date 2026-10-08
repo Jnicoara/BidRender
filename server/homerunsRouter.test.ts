@@ -400,6 +400,117 @@ describeDb(
   }
 );
 
+describeDb("extra bends per homerun (0131, owner 2026-10-07)", () => {
+  /** One ½" EMT homerun, 40 ft from the panel, ready to read. */
+  async function oneHomerun() {
+    const b = await aBid();
+    const emt = (await caller().materials.list()).find(
+      m => m.name === '1/2" EMT'
+    )!;
+    const type = await caller().takeoffRunTypes.create({
+      label: `1/2" EMT bends ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: emt.id,
+      conductorCount: 2,
+    });
+    await caller().homeruns.setBidSettings({
+      bidId: b.bidId,
+      runTypeId: type.id,
+    });
+    await caller().homeruns.syncSheet({
+      bidId: b.bidId,
+      sheetId: b.sheetId,
+      circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
+    });
+    await caller().homeruns.placePanel({
+      bidId: b.bidId,
+      panel: "2B",
+      spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
+    });
+    return { ...b, typeId: type.id };
+  }
+
+  /** Every number "Send to bid" would carry for the homerun type. */
+  async function bridgeOf(bidId: number, typeId: number) {
+    const entry = (await caller().takeoffRunTypes.bridgeForBid({ bidId })).find(
+      t => t.runTypeId === typeId
+    )!;
+    // ½" EMT is bent in the field, so the count is the field-bend row (the
+    // elbow row says "included"); a factory-elbow raceway would be elbow90.
+    const bend = entry.fittings.find(
+      f =>
+        (f.role === "elbow90" || f.role === "fieldBend") &&
+        f.status === "counted"
+    )!;
+    return {
+      numbers: {
+        rows: entry.rows.map(r => [r.role, r.feet]),
+        fittings: entry.fittings.map(f => [f.role, f.qty]),
+      },
+      bend,
+    };
+  }
+
+  it("unset counts the starter 1 and says so; Accept moves NO number, only the label", async () => {
+    const { bidId, typeId } = await oneHomerun();
+    expect((await homeruns(bidId)).settings.extraBends).toBeNull();
+    const before = await bridgeOf(bidId, typeId);
+    expect(before.bend.why).toMatch(
+      /1 homerun corner set on the bid \(not confirmed\)/
+    );
+
+    await caller().homeruns.setBidSettings({ bidId, extraBends: 1 });
+
+    expect((await homeruns(bidId)).settings.extraBends).toBe(1);
+    const after = await bridgeOf(bidId, typeId);
+    // The owner's rule: the default is already counted, so accepting it
+    // changes nothing on the bid — every row and every fitting the same.
+    expect(after.numbers).toEqual(before.numbers);
+    expect(after.bend.why).toMatch(/1 homerun corner set on the bid/);
+    expect(after.bend.why).not.toMatch(/not confirmed/);
+  });
+
+  it("3 extra bends adds two bends to the homerun; 0 takes the one away", async () => {
+    const { bidId, typeId } = await oneHomerun();
+    const starter = Number((await bridgeOf(bidId, typeId)).bend.qty);
+
+    await caller().homeruns.setBidSettings({ bidId, extraBends: 3 });
+    const three = await bridgeOf(bidId, typeId);
+    expect(Number(three.bend.qty)).toBe(starter + 2);
+    expect(three.bend.why).toMatch(/3 homerun corners set on the bid/);
+
+    await caller().homeruns.setBidSettings({ bidId, extraBends: 0 });
+    expect(Number((await bridgeOf(bidId, typeId)).bend.qty)).toBe(starter - 1);
+
+    // NULL puts the question back: the starter again, unconfirmed.
+    await caller().homeruns.setBidSettings({ bidId, extraBends: null });
+    const reset = await bridgeOf(bidId, typeId);
+    expect(Number(reset.bend.qty)).toBe(starter);
+    expect(reset.bend.why).toMatch(/not confirmed/);
+  });
+
+  it("a LOCKED bid refuses it, and none of its numbers move", async () => {
+    const { bidId, typeId } = await oneHomerun();
+    await caller().bids.lockQuantities({ bidId });
+    const before = await bridgeOf(bidId, typeId);
+    await expect(
+      caller().homeruns.setBidSettings({ bidId, extraBends: 3 })
+    ).rejects.toThrow(/locked/i);
+    expect((await homeruns(bidId)).settings.extraBends).toBeNull();
+    expect((await bridgeOf(bidId, typeId)).numbers).toEqual(before.numbers);
+  });
+
+  it("refuses a negative count and more than four", async () => {
+    const { bidId } = await aBid();
+    await expect(
+      caller().homeruns.setBidSettings({ bidId, extraBends: -1 })
+    ).rejects.toThrow();
+    await expect(
+      caller().homeruns.setBidSettings({ bidId, extraBends: 5 })
+    ).rejects.toThrow();
+  });
+});
+
 describeDb("every total the bid line agrees with includes homeruns", () => {
   it("the Totals tab and the materials list carry the homerun pipe", async () => {
     const { bidId, sheetId, near } = await aBid();

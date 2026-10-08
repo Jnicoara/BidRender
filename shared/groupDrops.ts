@@ -98,6 +98,8 @@ export type DropRunEnd = {
    */
   startCountsVertical: boolean;
   endCountsVertical: boolean;
+  /** Box to box (0131): claims its linked marks with nothing to count. */
+  boxToBox: boolean;
 };
 
 /** What the drop's run type is — already resolved through any fork. */

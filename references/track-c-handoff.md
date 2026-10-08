@@ -1,15 +1,46 @@
 # Track C — handoff, 2026-10-06
 
-Written for a restart. Worktree `C:\dev\BidPhase-C`. **Two branches now
-(2026-10-07):** `track-c` (= local-dev `87affe0` when written, green) and
-`c-homerun-footage` (track-c + Track A's `a-batch-c-0125` + the homerun
-footage work — NOT for local-dev, see "The exact next step"). The worktree
-was left on `c-homerun-footage`; `git checkout track-c` for anything else.
-`main` was `24105ad`. C's databases `bidrender_local_c` and
-`bidrender_test_c` both have 131 migrations (through 0130). If `git log
+Written for a restart. Worktree `C:\dev\BidPhase-C`. **Updated 2026-10-08:**
+`c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
+0125–0134); that branch is finished. Current work is on
+`c-homerun-wiring` (from local-dev), merged into local-dev by C once CI is
+green. `main` was `24105ad`. C's databases `bidrender_local_c` and
+`bidrender_test_c` both have **135** migrations (through 0134). If `git log
 origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
+
+## Latest (2026-10-08) — 0131's two columns WIRED, branch `c-homerun-wiring`
+
+- **Extra bends per homerun** (`bids.homerunExtraBends`): read by
+  `loadBidHomeruns` and `forBid`, written by `setBidSettings`
+  (`extraBends`, 0–4, NULL puts the question back). Stepper + "Accept 1" in
+  HomerunControls; the folded card says "N extra bends per homerun · not
+  confirmed" on its own line (the summary line is cut on a tablet).
+- **Through ceiling / Box to box** (`takeoff_runs.runsAt`):
+  `takeoffRuns.setRunsAt` writes root + every leg, NULL for ceiling; new legs
+  copy it. Two gaps the old list did not name are fixed:
+  `GroupableRun` lacked it (bid path) and `stampsClaimedByRuns` let a
+  box-to-box run's marks drop on their own (`boxToBox` on the claim, required).
+- **Run-ends list wording** (`@/lib/runEndWords`): amber only when
+  something is missing; a level end says "level with the run" / "box to box
+  — no drop". It used to say "no height for this type" for every uncounted
+  end, which was true of one reason in four.
+- **Numbers, E111 bid 1728359:** old code (worktree of local-dev) vs new,
+  same database: identical — 3,996.04 ft conduit, 11,988.13 ft wire, 114
+  field bends (38 "not confirmed"). Accept 1 moved nothing but the label. A
+  10.09 ft run between duplexes 231916/231918: 27.09 → 10.09 ft conduit
+  (−17.00), its 2B-1 wire 54.18 → 20.18 ft; field bends 116 → 114. Fixture run
+  deleted after; the bid diffed back to identical.
+- **Tests:** `runsAtBoxToBox.test.ts` (5), `homerunsRouter.test.ts` (+4),
+  `groupDrops.test.ts` (+1), `runEndWords.test.ts` (4),
+  `homerunText.test.ts` (+3). Five go red with the claim, leg copy or loader
+  read taken out.
+- **Sent / won bids:** there is no automatic freeze on status (by design,
+  `shared/quantityLock.ts`). They are safe here because NULL was already
+  counted as 1, so no stored bid changes number. A LOCKED bid refuses both
+  controls and moves nothing (tested).
+- **Cover plates audit:** `references/cover-plates-audit.md` (report only).
 
 ## How C merges (owner's rule, 2026-10-06)
 

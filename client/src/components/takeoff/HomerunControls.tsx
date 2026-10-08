@@ -24,10 +24,12 @@ import {
 } from "@shared/homerunFootage";
 import { formatElevation } from "@shared/takeoffHeights";
 import {
+  bendsWords,
   ft,
   homerunBreakdown,
   methodText,
   refusalText,
+  stepExtraBends,
 } from "@/lib/homerunText";
 
 export type HomerunsData = inferRouterOutputs<AppRouter>["homeruns"]["forBid"];
@@ -39,6 +41,7 @@ export type BidHomerunPatch = {
   minimumFt?: number | null;
   routingPct?: number | null;
   runTypeId?: number | null;
+  extraBends?: number | null;
 };
 
 const CEILING_FROM: Record<string, string> = {
@@ -125,6 +128,23 @@ export function HomerunSettings({
           · {runTypes.find(r => r.id === s.runTypeId)?.label ?? "no run type"}
         </span>
       </button>
+      {/*
+        Its own line, never inside the truncated summary above: on a tablet
+        that line is cut at about 50 characters, and "(not confirmed)" was
+        the part cut (seen on screen 2026-10-07). Counted either way, so it
+        is said either way.
+      */}
+      {!open && (
+        <div className="-mt-1 pl-[1.125rem] text-muted-foreground">
+          {bendsWords(s.extraBends ?? data.extraBendsDefault)} per homerun
+          {s.extraBends === null && (
+            <span className="text-[#B45309] dark:text-[#F59E0B]">
+              {" "}
+              · not confirmed
+            </span>
+          )}
+        </div>
+      )}
 
       {open && (
         <>
@@ -230,49 +250,17 @@ export function HomerunSettings({
 
           {/*
             EXTRA BENDS PER HOMERUN (owner, 2026-10-07): its corners, which
-            nobody drew. Starts at 1 and says "not confirmed" until set. The
-            number is applied today; SETTING it waits on Track A's
-            `bids.homerunExtraBends`, so the stepper is shown and held.
+            nobody drew. Starts at 1 and says "not confirmed" until somebody
+            accepts or changes it (`bids.homerunExtraBends`, 0131). Accepting
+            writes the 1 that was already counted, so no number moves.
           */}
-          <div className="flex items-center gap-2">
-            <span className="w-24 shrink-0 text-muted-foreground">
-              Extra bends
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-11 w-11"
-                aria-label="One fewer extra bend per homerun"
-                disabled
-              >
-                −
-              </Button>
-              <span className="w-8 text-center text-sm font-medium">
-                {s.extraBends ?? data.extraBendsDefault}
-              </span>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-11 w-11"
-                aria-label="One more extra bend per homerun"
-                disabled
-              >
-                +
-              </Button>
-            </div>
-            <span className="min-w-0 text-[#B45309] dark:text-[#F59E0B]">
-              {s.extraBends === null
-                ? "per homerun · not confirmed"
-                : "per homerun"}
-            </span>
-          </div>
-          {s.extraBends === null && (
-            <div className="text-[0.7rem] text-muted-foreground -mt-1">
-              For each homerun's corners, on top of a bend at each drop.
-              Changing it arrives with the next database update.
-            </div>
-          )}
+          <ExtraBends
+            value={s.extraBends}
+            starter={data.extraBendsDefault}
+            max={data.extraBendsMax}
+            locked={locked}
+            onSave={extraBends => onBid({ extraBends })}
+          />
 
           <label className="flex items-center gap-2">
             <span className="w-24 shrink-0 text-muted-foreground">Made of</span>
@@ -462,6 +450,97 @@ export function HomerunLine({
               onClear={() => onUpdate({ ceilingInches: null })}
             />
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Extra bends per homerun (0131): a stepper, and — while it is the starter
+ * nobody chose — "not confirmed" with an Accept beside it.
+ *
+ * Accept writes the starter itself, so the count every homerun already
+ * carries does not move; only the label goes. `value` is the cached
+ * `forBid` answer, which the page writes optimistically before the save
+ * goes out (and puts back if it fails) — so two quick taps make 3, not 2,
+ * and a failed save never leaves a number on screen that was not stored.
+ */
+function ExtraBends({
+  value,
+  starter,
+  max,
+  locked,
+  onSave,
+}: {
+  value: number | null;
+  starter: number;
+  max: number;
+  locked: boolean;
+  onSave: (next: number | null) => void;
+}) {
+  const shown = value ?? starter;
+  const unconfirmed = value === null;
+  const step = (delta: -1 | 1) => {
+    const next = stepExtraBends(value, starter, delta, max);
+    if (next !== null) onSave(next);
+  };
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="w-24 shrink-0 text-muted-foreground">Extra bends</span>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-11 w-11"
+            aria-label="One fewer extra bend per homerun"
+            disabled={locked || shown <= 0}
+            onClick={() => step(-1)}
+          >
+            −
+          </Button>
+          <span
+            className="w-8 text-center text-sm font-medium"
+            aria-live="polite"
+          >
+            {shown}
+          </span>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-11 w-11"
+            aria-label="One more extra bend per homerun"
+            disabled={locked || shown >= max}
+            onClick={() => step(1)}
+          >
+            +
+          </Button>
+        </div>
+        {unconfirmed ? (
+          <span className="min-w-0 text-[#B45309] dark:text-[#F59E0B]">
+            per homerun · not confirmed
+          </span>
+        ) : (
+          <span className="min-w-0 text-muted-foreground">per homerun</span>
+        )}
+      </div>
+      {unconfirmed && (
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 text-[0.7rem] text-muted-foreground">
+            For each homerun's corners, on top of a bend at each drop. Counted
+            as {starter} until you say otherwise.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="min-h-11 shrink-0 text-xs"
+            disabled={locked}
+            onClick={() => onSave(starter)}
+          >
+            <Check className="w-3.5 h-3.5 mr-1" />
+            Accept {starter}
+          </Button>
         </div>
       )}
     </div>

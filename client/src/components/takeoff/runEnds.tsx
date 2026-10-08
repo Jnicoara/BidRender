@@ -42,6 +42,7 @@ import { HeightFields } from "@/components/HeightFields";
 import { availablePicks } from "@/lib/runEndPicks";
 import { cn } from "@/lib/utils";
 import { heightSourceWords } from "@/lib/heightSourceWords";
+import { runEndWords } from "@/lib/runEndWords";
 import {
   DISTRIBUTION_KIND,
   END_NO_DROP_LABEL,
@@ -50,6 +51,7 @@ import {
   formatElevation,
 } from "@shared/takeoffHeights";
 import type { EndVertical, RunVerticals } from "@shared/takeoffHeights";
+import type { RunsAt } from "../../../../server/runVerticals";
 
 /** The sentinel the Select uses for "nobody has said" — "" is not allowed. */
 const NOT_ANSWERED = "__none__";
@@ -253,9 +255,17 @@ export function RunEndsEditor({
   suggestion,
   teeEnds = { start: false, end: false },
   onSave,
+  runsAt,
+  onRunsAt,
+  locked,
   endsElsewhere = false,
 }: {
   bidId: number;
+  /** Through the ceiling or box to box (0131) — the whole run's answer. */
+  runsAt: RunsAt;
+  onRunsAt: (runsAt: RunsAt) => void;
+  /** A locked bid shows the choice and refuses to change it. */
+  locked: boolean;
   /**
    * Save through the PAGE, never a mutation of this component's own. The one
    * this had refreshed `takeoffRuns` only, so the bid's lines, the Send
@@ -367,7 +377,7 @@ export function RunEndsEditor({
         unlabelled-until-used, because it is the exception rather than the
         routine — the sliders are for the run that differs (§ 2.5).
       */}
-      <RunsAtChoice />
+      <RunsAtChoice value={runsAt} onChange={onRunsAt} locked={locked} />
 
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-xs text-muted-foreground">This run sits at</span>
@@ -400,43 +410,47 @@ export function RunEndsEditor({
  *   Through ceiling          up and down at every box — the drops counted
  *   Box to box, same height  along the wall — flat length, no drops
  *
- * The arithmetic is built and tested (`runsAt` in server/runVerticals.ts),
- * but the choice needs a place to be KEPT — `takeoff_runs.runsAt`, asked of
- * Track A (migrations-next-batch.md). Until it lands every run is through
- * the ceiling, and this says so rather than offering a switch that would
- * forget itself. Two large buttons, for a finger on a tablet.
+ * Kept in `takeoff_runs.runsAt` (0131) on every row of the run; blank is
+ * through the ceiling, the same as every run before it. Two large buttons,
+ * for a finger on a tablet.
  */
-function RunsAtChoice() {
+function RunsAtChoice({
+  value,
+  onChange,
+  locked,
+}: {
+  value: RunsAt;
+  onChange: (runsAt: RunsAt) => void;
+  locked: boolean;
+}) {
+  const option = (runsAt: RunsAt, label: string) => (
+    <Button
+      size="sm"
+      variant={value === runsAt ? "secondary" : "outline"}
+      className="min-h-11 text-xs whitespace-normal"
+      role="radio"
+      aria-checked={value === runsAt}
+      disabled={locked}
+      onClick={() => {
+        if (value !== runsAt) onChange(runsAt);
+      }}
+    >
+      {label}
+    </Button>
+  );
   return (
     <div className="space-y-1 pt-1">
       <div className="text-xs text-muted-foreground">
         Between its boxes this run goes
       </div>
       <div className="grid grid-cols-2 gap-1.5" role="radiogroup">
-        <Button
-          size="sm"
-          variant="secondary"
-          className="min-h-11 text-xs whitespace-normal"
-          role="radio"
-          aria-checked
-        >
-          Through ceiling
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="min-h-11 text-xs whitespace-normal"
-          role="radio"
-          aria-checked={false}
-          disabled
-          title="Waiting for the next database update"
-        >
-          Box to box, same height
-        </Button>
+        {option("ceiling", "Through ceiling")}
+        {option("boxToBox", "Box to box, same height")}
       </div>
       <div className="text-[0.7rem] text-muted-foreground">
-        Box to box (no drops, flat length) arrives with the next database
-        update; until then every run drops at its boxes.
+        {value === "boxToBox"
+          ? "Along the wall at box height — flat length, no drops at its boxes."
+          : "Up and down at every box — each drop counted."}
       </div>
     </div>
   );
@@ -465,6 +479,8 @@ export type RunEndsLeg = {
   verticals: RunVerticals | null;
   teeEnds: { start: boolean; end: boolean };
   points: readonly { x: number; y: number }[];
+  /** Box to box (0131): its ends are level ON PURPOSE, and say so. */
+  runsAt: RunsAt;
 };
 
 /**
@@ -535,6 +551,12 @@ export function RunEndsSection({
           const heightField =
             which === "start" ? "startHeightInches" : "endHeightInches";
           const effective = own ?? heightOf(kind);
+          const endWords = runEndWords({
+            vertical,
+            kind,
+            onTee,
+            runsAt: leg.runsAt,
+          });
           return (
             <div
               key={`${leg.id}-${which}`}
@@ -561,17 +583,20 @@ export function RunEndsSection({
                   with a triangle (GroupDrop.tsx) — one fact, two weights.
                   "Carries on" and a tee are answers, so they stay grey.
                 */}
-                {!onTee && !vertical?.counted && kind !== DISTRIBUTION_KIND ? (
+                {/*
+                  Worded by the REASON (@/lib/runEndWords): a level end —
+                  every end of a box-to-box run — is an answer and stays
+                  grey; only an end that is missing something is amber.
+                */}
+                {endWords?.warn ? (
                   <span className="text-xs text-[#F5C518] text-right inline-flex items-center gap-1">
                     <TriangleAlert className="w-3 h-3 shrink-0" />
-                    {kind === null
-                      ? "nothing there — no drop counted"
-                      : "no height for this type — no drop counted"}
+                    {endWords.text}
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground text-right">
-                    {onTee
-                      ? "branch tee — no drop"
+                    {endWords
+                      ? endWords.text
                       : vertical?.counted
                         ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft${sourceWords ? ` · ${sourceWords}` : ""}`
                         : "no drop here"}
