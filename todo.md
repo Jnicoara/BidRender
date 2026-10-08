@@ -126,6 +126,15 @@ traced feet". Two special cases would drift.
 > parts one by one, so traced parts need their own snapshot; and DV34's
 > plate and box are already per device. Four migrations (M1–M4) and four
 > owner questions are in the plan.
+>
+> **REVISED 2026-10-08 with the owner's answers (plan § 0).** Wiremold 700
+> is NOT an extra: it is its own run type (`700 series surface raceway`),
+> traced like EMT, with 700-series fittings; DV34 is device + box + plate.
+> Tape is the only shipped extra, on ten new `PVC Sch 40, underground` run
+> types. The "only where Underground" condition is DROPPED. M2 gains
+> `extraFeetPerFoot` ("shared trench" = 0), M3 gains `traced_or_default`
+> (GR2's 10 ft "default length"). **The shape and tests below are
+> superseded by the plan** — read it, not this entry.
 
 **Track C has merged** (`bea4d8f`), so nothing waits on C. Track A writes
 the migration; B or A builds the rest.

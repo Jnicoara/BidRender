@@ -12,6 +12,13 @@ this file is stale or the state moved.
 
 ## Latest (2026-10-08) — 0131's two columns WIRED, branch `c-homerun-wiring`
 
+- **Per-foot extras plan REVISED with the owner's answers**
+  (`references/per-foot-items-plan.md` § 0, docs only): 700 is its own run
+  type with 700 fittings; tape is the only shipped extra, on ten new
+  underground PVC Sch 40 types; M1–M4 for Track A (M1 lost `onlyLocation`,
+  M2 gained `extraFeetPerFoot`, M3 gained `traced_or_default`). Five small
+  owner questions left in § 7; none blocks the migrations.
+
 - **Extra bends per homerun** (`bids.homerunExtraBends`): read by
   `loadBidHomeruns` and `forBid`, written by `setBidSettings`
   (`extraBends`, 0–4, NULL puts the question back). Stepper + "Accept 1" in
