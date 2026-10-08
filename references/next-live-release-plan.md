@@ -126,9 +126,14 @@ lines: expected, and labelled as such in § 1b of the checklist.)
 ## 5. Check first — before the window
 
 1. **Owner's yes** to release, and to which candidate commit.
-2. **Green Gate on that exact commit** (test, deploy-staging, smoke). Smoke
-   step 10 (undo a mark) flaked once on 2026-10-08 and passed on re-run
-   (`todo.md` top) — a red step 10 is re-run once, a second red stops it.
+2. **Green Gate on that exact commit** (test, deploy-staging, smoke).
+   ~~Smoke step 10 (undo a mark) is flaky~~ — **DONE 2026-10-08 (`27d5ca0`).**
+   It was the test, not undo and not a redeploy: step 10 read the mark count
+   while the sheet was still loading ("0 marks"), so it judged undo against a
+   wrong start (`todo.md` top). Fixed and FORCED (the slow load now happens
+   every run); Gate 37845117225 green, then its smoke re-run against staging
+   5 of 5 green. **A red step 10 is now a real failure — do NOT re-run past
+   it**; find out why first.
 3. **The white box on plan open** (`todo.md` "FIRST: the white box…") is
    reproduced on staging and **not fixed**. Owner decides: fix first, or ship
    with it (it is not a wrong number, but pins can draw over the blank and

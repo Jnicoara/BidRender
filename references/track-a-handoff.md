@@ -4,7 +4,34 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-08 (session 21) — START HERE
+## UPDATE 2026-10-08 (session 22) — START HERE
+
+**Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
+`local-dev` = `27d5ca0` (+ this docs commit), migrations 0000–0138, no
+migration this session.
+
+- **Smoke step 10 flake FIXED — release blocker cleared.** Cause, in plain
+  words: the TEST read the mark count before the sheet had loaded. After
+  step 9's reload the tally says "0 marks" until the list arrives; step 10
+  took that 0 as its start (step 8's mark was already there), its "one more"
+  check was met by the old mark loading, and Ctrl+Z went in before the new
+  mark was saved — so nothing was undone and it read 2. Same "Expected 0,
+  Received 2" in all five red runs that day. **Not a redeploy** (local-dev
+  Gate runs are already one queued concurrency group; none of the five
+  overlapped another), **not an undo bug.** So no concurrency change was
+  made — it would not have touched this.
+- **Fix** (`e2e/smoke/flow.spec.ts`): start comes from the server and the
+  screen must agree; the server must hold the new mark before Ctrl+Z; undo
+  and redo are checked on screen AND server. Step 9 delays sheet 2's first
+  mark list 6 s, so the window is forced every run. Old step 10 under the
+  hold: red locally with the CI picture. New: 3/3 locally, Gate
+  37845117225 green, then smoke re-run on staging **5 of 5 green**.
+- **Two app findings logged, NOT fixed** (`todo.md` top): the tally states
+  "0 marks" while loading; Ctrl+Z on a mark still saving does nothing and
+  says nothing.
+- Local `bidrender_smoke` (port 3018 smoke DB) migrated 105 → 139 to run it.
+
+## UPDATE 2026-10-08 (session 21)
 
 **Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
 `local-dev` = `06791ea` (+ this docs commit), **migrations 0000–0138**.
