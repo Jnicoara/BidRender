@@ -38,7 +38,24 @@ type Pt = { x: number; y: number };
 
 // ── Method ─────────────────────────────────────────────────────────────────
 
-export type HomerunMethod = "measured" | "average" | "measured-minimum";
+/** The stored values of `bids.homerunMethod` / `bid_pdf_sheets.homerunMethod` (0127, 0128). */
+export const HOMERUN_METHODS = ["measured", "average", "measuredMin"] as const;
+export type HomerunMethod = (typeof HOMERUN_METHODS)[number];
+
+/** A stored value, or NULL for anything this build does not know. */
+export function parseHomerunMethod(
+  raw: string | null | undefined
+): HomerunMethod | null {
+  return (HOMERUN_METHODS as readonly string[]).includes(raw ?? "")
+    ? (raw as HomerunMethod)
+    : null;
+}
+
+export const HOMERUN_METHOD_LABELS: Record<HomerunMethod, string> = {
+  measured: "Measured",
+  average: "Average",
+  measuredMin: "Measured with a minimum",
+};
 
 /** The default when neither the area nor the bid says. */
 export const DEFAULT_HOMERUN_METHOD: HomerunMethod = "measured";
@@ -136,11 +153,11 @@ export type HeightArea = {
  * sales floor — never just the lower height (owner, 2026-10-06). A device
  * in no area returns null and follows the sheet.
  */
-export function heightAreaAt(
+export function heightAreaAt<A extends Pick<HeightArea, "outline">>(
   point: Pt,
-  areas: readonly HeightArea[]
-): HeightArea | null {
-  let best: HeightArea | null = null;
+  areas: readonly A[]
+): A | null {
+  let best: A | null = null;
   let bestSize = Infinity;
   for (const area of areas) {
     if (!insidePolygon(point, area.outline)) continue;
@@ -161,7 +178,7 @@ export function heightAreaAt(
  * one lying strictly inside the other (containment, either way round).
  */
 export function overlappingHeightAreas(
-  areas: readonly HeightArea[]
+  areas: readonly Pick<HeightArea, "id" | "outline">[]
 ): [number, number][] {
   const out: [number, number][] = [];
   for (let i = 0; i < areas.length; i++)
@@ -171,6 +188,64 @@ export function overlappingHeightAreas(
   return out;
 }
 
+/**
+ * The smallest outline worth keeping, in square page points: a 12 pt box
+ * (about 4 in on paper at 1/4" — under a foot of building). A tap that
+ * wandered, or two taps on one spot, is not an area anybody meant.
+ */
+export const MIN_AREA_POINTS2 = 144;
+
+/**
+ * An outline from the corners somebody tapped (the drawing tool, tablet
+ * first: taps, not drags). TWO taps are opposite corners of a box; three or
+ * more are the outline's corners in order. NULL when it would be nothing —
+ * fewer than two taps, or smaller than `MIN_AREA_POINTS2`.
+ */
+export function outlineFromTaps(taps: readonly Pt[]): Pt[] | null {
+  if (taps.length < 2) return null;
+  const outline =
+    taps.length === 2
+      ? [
+          {
+            x: Math.min(taps[0].x, taps[1].x),
+            y: Math.min(taps[0].y, taps[1].y),
+          },
+          {
+            x: Math.max(taps[0].x, taps[1].x),
+            y: Math.min(taps[0].y, taps[1].y),
+          },
+          {
+            x: Math.max(taps[0].x, taps[1].x),
+            y: Math.max(taps[0].y, taps[1].y),
+          },
+          {
+            x: Math.min(taps[0].x, taps[1].x),
+            y: Math.max(taps[0].y, taps[1].y),
+          },
+        ]
+      : taps.map(t => ({ x: t.x, y: t.y }));
+  return polygonArea(outline) >= MIN_AREA_POINTS2 ? outline : null;
+}
+
+/**
+ * Each overlap as the sentence the sheet shows: which two, and which one
+ * wins (the smaller outline). Shared walls never appear here.
+ */
+export function heightAreaWarnings(
+  areas: readonly (Pick<HeightArea, "id" | "outline"> & { name: string })[]
+): string[] {
+  const byId = new Map(areas.map(a => [a.id, a]));
+  return overlappingHeightAreas(areas).map(([a, b]) => {
+    const one = byId.get(a)!;
+    const two = byId.get(b)!;
+    const [small, big] =
+      polygonArea(one.outline) <= polygonArea(two.outline)
+        ? [one, two]
+        : [two, one];
+    return `"${small.name}" and "${big.name}" overlap — "${small.name}" is smaller, so its height wins where they overlap`;
+  });
+}
+
 // ── The calculator ─────────────────────────────────────────────────────────
 
 /** A device on the circuit. Its height is already resolved (mark → count …). */
@@ -178,8 +253,11 @@ export type HomerunDevice = {
   id: number;
   x: number;
   y: number;
-  /** Height-type key, for the drop rule: "receptacle", "floor-box", … */
-  kind: string;
+  /**
+   * Height-type key, for the drop rule: "receptacle", "floor-box", … NULL =
+   * the count never said what it is: the up-drop is "no kind", never guessed.
+   */
+  kind: string | null;
   /** Through `resolveDeviceHeight`. NULL = never set anywhere. */
   heightInches: number | null;
 };
@@ -342,7 +420,7 @@ export function homerunFootage(input: HomerunInput): HomerunFootage {
         return { state: "refused", reason: "no-scale", confirmed };
       measuredFt = inchesToFeet(inches);
       runFt = measuredFt;
-      if (method === "measured-minimum") {
+      if (method === "measuredMin") {
         if (input.method.minimumFt === null)
           return { state: "refused", reason: "no-minimum", confirmed };
         if (measuredFt < input.method.minimumFt) {
@@ -458,17 +536,121 @@ export function homerunTotals(
       totals.traced++;
       continue;
     }
-    if (!h.confirmed) totals.unconfirmed++;
+    /*
+      "+ N unconfirmed" counts homeruns IN the total that nobody confirmed.
+      A refused one is not in the total, so it is not "unconfirmed" — it is
+      "no number yet". Counting it as both read "0 homeruns + 38
+      unconfirmed" on UNCC E111 (seen on screen, 2026-10-07).
+    */
     if (h.state === "refused") {
       totals.notCounted++;
       continue;
     }
+    if (!h.confirmed) totals.unconfirmed++;
     totals.laborFt += h.laborFt;
     totals.conduitFt += h.conduitFt ?? 0;
     if (h.wireFt === null) totals.notCounted++;
     else totals.wireFt += h.wireFt;
   }
   return totals;
+}
+
+/**
+ * ONE homerun as a run-type line reads it: installed and bought feet per
+ * role, the same split every traced run and count drop lands in
+ * (`server/runTypeFootageCore.ts`).
+ *
+ * ── Installed = what is put in; bought = installed + waste ────────────────
+ * The owner's Q5 (2026-09-28) for every footage line: material is BOUGHT
+ * footage, labour is INSTALLED footage, and makeup is installed work. So:
+ *
+ *   routed     = (L + V) × (1 + routing)    — routing is real route, so
+ *                                             it is installed, on labour too
+ *   conduit    installed routed, bought routed + (L + V) × conduit extra
+ *   wire/wire  installed routed + makeup,  bought + (L + V) × wire extra
+ *   cable      the cable is the wire: one tail of makeup, wire extra (Q3)
+ *
+ * Plan § 5 wrote labour as (L + V) × (1 + R) with no makeup. That is the
+ * conduit's labour; for WIRE it would have been the only footage line on a
+ * bid whose labour left the makeup out, so wire follows Q5 instead —
+ * recorded in homerun-footage-plan.md § 10.
+ */
+export type HomerunLineFootage = {
+  pathType: "conduit" | "cable";
+  /** L + V, before anything is added — what "Homeruns" shows apart. */
+  homerunFeet: number;
+  conduitInstalledFeet: number;
+  conduitBoughtFeet: number;
+  cableInstalledFeet: number;
+  cableBoughtFeet: number;
+  /** Every wire, ground included — as `DropFootage` counts it. */
+  wireInstalledFeet: number;
+  wireBoughtFeet: number;
+  groundInstalledFeet: number;
+  groundBoughtFeet: number;
+  routingFeet: number;
+  conduitExtraFeet: number;
+  wireExtraFeet: number;
+  makeupFeet: number;
+  /** A conduit homerun whose type has no conductor count: no wire on it. */
+  wireNotCounted: boolean;
+};
+
+export function homerunLineFootage(
+  h: Extract<HomerunFootage, { state: "computed" }>,
+  input: Pick<
+    HomerunInput,
+    | "routingPct"
+    | "wireExtraPct"
+    | "conduitExtraPct"
+    | "conductorCount"
+    | "groundCount"
+  >
+): HomerunLineFootage {
+  const base = h.pieces.installedFt;
+  const routed = base * (1 + input.routingPct);
+  const makeup = h.pieces.makeupFt;
+  const wireWaste = base * input.wireExtraPct;
+  if (input.conduitExtraPct === null) {
+    return {
+      pathType: "cable",
+      homerunFeet: base,
+      conduitInstalledFeet: 0,
+      conduitBoughtFeet: 0,
+      cableInstalledFeet: routed + makeup,
+      cableBoughtFeet: routed + makeup + wireWaste,
+      wireInstalledFeet: 0,
+      wireBoughtFeet: 0,
+      groundInstalledFeet: 0,
+      groundBoughtFeet: 0,
+      routingFeet: routed - base,
+      conduitExtraFeet: 0,
+      wireExtraFeet: wireWaste,
+      makeupFeet: makeup,
+      wireNotCounted: false,
+    };
+  }
+  const grounds = input.groundCount ?? 0;
+  const wires =
+    input.conductorCount === null ? 0 : input.conductorCount + grounds;
+  const groundWires = input.conductorCount === null ? 0 : grounds;
+  return {
+    pathType: "conduit",
+    homerunFeet: base,
+    conduitInstalledFeet: routed,
+    conduitBoughtFeet: routed + base * input.conduitExtraPct,
+    cableInstalledFeet: 0,
+    cableBoughtFeet: 0,
+    wireInstalledFeet: wires * (routed + makeup),
+    wireBoughtFeet: wires * (routed + makeup + wireWaste),
+    groundInstalledFeet: groundWires * (routed + makeup),
+    groundBoughtFeet: groundWires * (routed + makeup + wireWaste),
+    routingFeet: routed - base,
+    conduitExtraFeet: base * input.conduitExtraPct,
+    wireExtraFeet: wires * wireWaste,
+    makeupFeet: wires * makeup,
+    wireNotCounted: input.conductorCount === null,
+  };
 }
 
 /** "+ 3 unconfirmed", or nothing when all are confirmed. */

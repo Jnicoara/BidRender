@@ -80,6 +80,7 @@ function group(
     pullPointAnswersByRun: new Map(),
     teesById: new Map(tees.map(t => [t.id, t])),
     markDrops: [],
+    homeruns: [],
   });
 }
 

@@ -162,6 +162,11 @@ export const takeoffExportRouter = router({
           const key = `${drop.sheetId}|committed`;
           if (!partitions.has(key)) partitions.set(key, []);
         }
+        // HOMERUNS the same way: the sheet their leaving device is on.
+        for (const homerun of footageInput.homeruns) {
+          const key = `${homerun.sheetId}|committed`;
+          if (!partitions.has(key)) partitions.set(key, []);
+        }
         partitions.forEach((partRuns, key) => {
           const [sheetIdText, status] = key.split("|");
           const grouped = groupRunFootage({
@@ -171,6 +176,14 @@ export const takeoffExportRouter = router({
               status === "committed"
                 ? footageInput.markDrops.filter(
                     d => d.sheetId === Number(sheetIdText)
+                  )
+                : [],
+            // Filtered per sheet like the drops; spreading the whole list
+            // into every partition would count each homerun once per sheet.
+            homeruns:
+              status === "committed"
+                ? footageInput.homeruns.filter(
+                    h => h.sheetId === Number(sheetIdText)
                   )
                 : [],
           });

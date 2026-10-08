@@ -41,8 +41,10 @@ import {
 import { HeightFields } from "@/components/HeightFields";
 import { availablePicks } from "@/lib/runEndPicks";
 import { cn } from "@/lib/utils";
+import { heightSourceWords } from "@/lib/heightSourceWords";
 import {
   DISTRIBUTION_KIND,
+  END_NO_DROP_LABEL,
   NOT_ANSWERED_LABEL,
   endKindLabel,
   formatElevation,
@@ -105,7 +107,7 @@ export function EndKindSelect({
       <SelectContent>
         <SelectItem value={NOT_ANSWERED}>{NOT_ANSWERED_LABEL}</SelectItem>
         <SelectItem value={DISTRIBUTION_KIND}>
-          Continues at run height
+          {END_NO_DROP_LABEL} — continues at run height
         </SelectItem>
         {types.map(row => (
           <SelectItem key={row.typeKey} value={row.typeKey}>
@@ -365,6 +367,8 @@ export function RunEndsEditor({
         unlabelled-until-used, because it is the exception rather than the
         routine — the sliders are for the run that differs (§ 2.5).
       */}
+      <RunsAtChoice />
+
       <div className="flex items-center justify-between gap-2 pt-1">
         <span className="text-xs text-muted-foreground">This run sits at</span>
         <HeightFields
@@ -378,12 +382,61 @@ export function RunEndsEditor({
               ? () => save({ distributionHeightInches: null })
               : undefined
           }
-          clearLabel="Follow the job"
-          // Empty here means "follows the job", and a real height IS in
-          // effect. "Not set" would read as "nothing applies to this run".
-          unsetLabel="the job's run height"
+          clearLabel="Follow the ceiling"
+          // Empty here means a real height IS in effect — the ceiling at
+          // each box: its height area, else the sheet's, else the job's
+          // (shared/ceilingHeights.ts). This said "the job's run height"
+          // until 2026-10-07, when that stopped being the whole answer.
+          unsetLabel="the ceiling at each box"
           setLabel="Override"
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HOW THIS RUN GETS BETWEEN ITS BOXES (owner, 2026-10-07, case d):
+ *   Through ceiling          up and down at every box — the drops counted
+ *   Box to box, same height  along the wall — flat length, no drops
+ *
+ * The arithmetic is built and tested (`runsAt` in server/runVerticals.ts),
+ * but the choice needs a place to be KEPT — `takeoff_runs.runsAt`, asked of
+ * Track A (migrations-next-batch.md). Until it lands every run is through
+ * the ceiling, and this says so rather than offering a switch that would
+ * forget itself. Two large buttons, for a finger on a tablet.
+ */
+function RunsAtChoice() {
+  return (
+    <div className="space-y-1 pt-1">
+      <div className="text-xs text-muted-foreground">
+        Between its boxes this run goes
+      </div>
+      <div className="grid grid-cols-2 gap-1.5" role="radiogroup">
+        <Button
+          size="sm"
+          variant="secondary"
+          className="min-h-11 text-xs whitespace-normal"
+          role="radio"
+          aria-checked
+        >
+          Through ceiling
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-11 text-xs whitespace-normal"
+          role="radio"
+          aria-checked={false}
+          disabled
+          title="Waiting for the next database update"
+        >
+          Box to box, same height
+        </Button>
+      </div>
+      <div className="text-[0.7rem] text-muted-foreground">
+        Box to box (no drops, flat length) arrives with the next database
+        update; until then every run drops at its boxes.
       </div>
     </div>
   );
@@ -400,19 +453,7 @@ export type EndAbout = {
   onExisting: boolean;
 };
 
-/** Words for a height that did not come from the type's own setting. */
-export function heightSourceWords(source: string): string | null {
-  switch (source) {
-    case "mark-typed":
-      return "this mark's height";
-    case "mark-read":
-      return "read from the plan";
-    case "count":
-      return "the count's height";
-    default:
-      return null;
-  }
-}
+export { heightSourceWords };
 
 /** One end of one leg, as the Run ends section lists it. */
 export type RunEndsLeg = {
@@ -523,7 +564,9 @@ export function RunEndsSection({
                 {!onTee && !vertical?.counted && kind !== DISTRIBUTION_KIND ? (
                   <span className="text-xs text-[#F5C518] text-right inline-flex items-center gap-1">
                     <TriangleAlert className="w-3 h-3 shrink-0" />
-                    not set — no drop counted
+                    {kind === null
+                      ? "nothing there — no drop counted"
+                      : "no height for this type — no drop counted"}
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground text-right">
@@ -531,7 +574,7 @@ export function RunEndsSection({
                       ? "branch tee — no drop"
                       : vertical?.counted
                         ? `${vertical.direction === "drop" ? "Drop" : "Rise"} ${vertical.feet.toFixed(2)} ft${sourceWords ? ` · ${sourceWords}` : ""}`
-                        : "no drop — carries on"}
+                        : "no drop here"}
                   </span>
                 )}
               </div>
@@ -586,6 +629,20 @@ export function RunEndsSection({
                 <TeeEnd />
               ) : (
                 <>
+                  {/*
+                    THE TWO WAYS OUT of "nothing there" (owner, 2026-10-07):
+                    say what is here — it then drops to that type's default
+                    height — or "No drop here" for an end meant to have none
+                    (measuring, an unmarked ceiling box, continues as another
+                    run), which is saved on the end and clears the warning.
+                    Neither is chosen for you: the warning stays until one is.
+                  */}
+                  {kind === null && !locked && (
+                    <p className="text-xs text-muted-foreground">
+                      Pick what is here — it drops to that type's default height
+                      — or <span className="font-medium">No drop here</span>.
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-1">
                     {picks.map(pick => (
                       <button
@@ -620,7 +677,7 @@ export function RunEndsSection({
                         })
                       }
                       ariaLabel={`Something else at the ${which} of ${leg.label}`}
-                      className="h-6 w-28 text-xs"
+                      className="h-6 w-auto min-w-28 max-w-full gap-1 text-xs"
                     />
                   </div>
                   {kind !== null && kind !== DISTRIBUTION_KIND && !locked && (

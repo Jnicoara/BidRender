@@ -680,7 +680,9 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
   // lines is pending too: its total is a true $0.00 for work nobody has added,
   // which a client reads as a price.
   const noWork = mode === "full" && input.lines.length === 0;
-  const pricePending = noWork || (mode === "full" && tallyLeavesOut(notPriced));
+  const pricePending =
+    // Lines, parts, hours AND drops with no material (owner, 2026-10-07).
+    noWork || (mode === "full" && tallyLeavesOut(notPriced));
   /*
     The labor-hours sentence is a NUMBER claim too. While any line's assembly
     hours are not set (D1), the sum is short by them and would read as the

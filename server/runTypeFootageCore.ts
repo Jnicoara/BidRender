@@ -33,7 +33,7 @@ import {
 import { runOnBid } from "../shared/runOnBid";
 import { legFromRun, type FittingLeg } from "../shared/runFittings";
 import type { TeeRef } from "../shared/runNetwork";
-import type { PullPointAnswer } from "../shared/runBends";
+import { endDropOf, type PullPointAnswer } from "../shared/runBends";
 import { pointsToRealInches } from "../shared/takeoffGeometry";
 import { uncountedEnds } from "../shared/takeoffHeights";
 import {
@@ -43,6 +43,7 @@ import {
 } from "./runVerticals";
 import type { ExtrasRow } from "../shared/runExtras";
 import { dropsFootage, type MarkDropEntry } from "../shared/groupDrops";
+import type { HomerunEntry } from "./homerunsCore";
 import type { TraceMode, WireCircuits } from "../shared/traceMode";
 
 export type RunTypeFootageRow = {
@@ -90,6 +91,15 @@ export type RunTypeFootageRow = {
    */
   markDropFeet: number;
   markDropCount: number;
+  /**
+   * COMPUTED HOMERUNS on this type (homerun-footage-plan.md § 10): their run
+   * + drops before routing, waste and makeup — already INSIDE the figures
+   * above — how many, and how many nobody has confirmed. Unconfirmed ones
+   * count (owner Q3); the screen says "+ N unconfirmed".
+   */
+  homerunFeet: number;
+  homerunCount: number;
+  homerunUnconfirmedCount: number;
   /** Runs of this type that could not be measured, so are NOT in the above. */
   unmeasurableCount: number;
   /** Runs of this type nobody has answered the branch question for. */
@@ -146,6 +156,53 @@ export type RunTypeFootageRow = {
    */
   tees: TeeRef[];
 };
+
+/** Node key prefix for a homerun's two ends — its own, never a mark's. */
+export const HOMERUN_NODE = "homerun:";
+
+/**
+ * A computed homerun as ONE fitting leg (owner, 2026-10-07: homerun
+ * footage adds the couplings, connectors and straps a run of that type
+ * adds — the same rules, never new rates).
+ *
+ * - `feet`: the routed run + drops, WITHOUT waste — what is installed, as a
+ *   traced leg's `feet` is traced + counted verticals.
+ * - Two ends of its own: the device box and the panel. Never the mark's
+ *   node, so a traced run ending on the same device cannot make it read as
+ *   an in-and-out box; each conduit end takes a connector either way.
+ * - Bends: a 90 at each counted drop, plus the bid's "extra bends per
+ *   homerun" for its corners (owner, 2026-10-07). This said "bends are not
+ *   counted for it" until then — the owner approved counting drops from the
+ *   verticals and corners from a per-bid number rather than leaving both
+ *   out (homerun-footage-plan.md § 10).
+ */
+export function homerunFittingLeg(entry: HomerunEntry): FittingLeg {
+  const id = `${HOMERUN_NODE}${entry.circuitId}`;
+  return {
+    id,
+    runId: id,
+    from: `${id}:device`,
+    to: `${id}:panel`,
+    feet: round2(entry.line.homerunFeet + entry.line.routingFeet),
+    feetIsFloor: entry.feetIsFloor,
+    /*
+      BENDS (owner, 2026-10-07). Its two real ends as a straight path, so
+      the bend count adds a 90 at each COUNTED drop — up at the device,
+      down at the panel — by the same rule a traced run's drops use, and
+      reads no corner off the line. Its corners come from the bid's "extra
+      bends per homerun" (`extraCorners`), because a homerun has no drawn
+      path to read them from. Elbow or field bend, and the hours, follow
+      the type exactly as a traced run's do.
+    */
+    points: [entry.from, entry.to ?? entry.from],
+    feetPerPoint: null,
+    startDrop: endDropOf(entry.upDrop),
+    endDrop: endDropOf(entry.downAtPanel),
+    answers: [],
+    noPullPoints: true,
+    extraCorners: entry.extraCorners,
+  };
+}
 
 /** A run row, as far as grouping its footage is concerned. */
 export type GroupableRun = {
@@ -233,6 +290,13 @@ export function groupRunFootage(input: {
    * `[]` where a caller genuinely has none.
    */
   markDrops: readonly MarkDropEntry[];
+  /**
+   * COMPUTED HOMERUNS (homerun-footage-plan.md § 10 step 4), on the bid's
+   * homerun run type. REQUIRED for the same reason as `markDrops`; `[]`
+   * where a caller has none. Unconfirmed ones COUNT (owner Q3) and are
+   * tallied on the row so a screen can say "+ N unconfirmed".
+   */
+  homeruns: readonly HomerunEntry[];
 }): Map<number, RunTypeFootageRow> {
   const byType = new Map<number, RunTypeFootageRow>();
 
@@ -456,7 +520,40 @@ export function groupRunFootage(input: {
     }
   }
 
+  for (const entry of input.homeruns) {
+    const f = entry.line;
+    const row = rowFor(byType, entry.runTypeId, f.pathType);
+    row.homerunFeet += f.homerunFeet;
+    row.homerunCount += 1;
+    // Its couplings, connectors and straps: one LEG, counted by the same
+    // rules and the same raceway settings as every traced run of this type.
+    if (f.pathType === "cable") row.cableLegs.push(homerunFittingLeg(entry));
+    else row.legs.push(homerunFittingLeg(entry));
+    if (!entry.confirmed) row.homerunUnconfirmedCount += 1;
+    row.conduitBoughtFeet += f.conduitBoughtFeet;
+    row.conduitInstalledFeet += f.conduitInstalledFeet;
+    row.cableBoughtFeet += f.cableBoughtFeet;
+    row.cableInstalledFeet += f.cableInstalledFeet;
+    row.groundBoughtFeet += f.groundBoughtFeet;
+    row.groundInstalledFeet += f.groundInstalledFeet;
+    row.insulatedBoughtFeet += Math.max(
+      0,
+      f.wireBoughtFeet - f.groundBoughtFeet
+    );
+    row.insulatedInstalledFeet += Math.max(
+      0,
+      f.wireInstalledFeet - f.groundInstalledFeet
+    );
+    row.makeupFeet += f.makeupFeet;
+    if (f.pathType === "cable") row.racewayExtraFeet += f.wireExtraFeet;
+    else {
+      row.wireExtraFeet += f.wireExtraFeet;
+      row.racewayExtraFeet += f.conduitExtraFeet;
+    }
+  }
+
   for (const row of Array.from(byType.values())) {
+    row.homerunFeet = round2(row.homerunFeet);
     row.markDropFeet = round2(row.markDropFeet);
     row.conduitBoughtFeet = round2(row.conduitBoughtFeet);
     row.conduitInstalledFeet = round2(row.conduitInstalledFeet);
@@ -505,6 +602,9 @@ function rowFor(
       noExtraCount: 0,
       markDropFeet: 0,
       markDropCount: 0,
+      homerunFeet: 0,
+      homerunCount: 0,
+      homerunUnconfirmedCount: 0,
       unmeasurableCount: 0,
       unansweredCount: 0,
       branchCount: 0,

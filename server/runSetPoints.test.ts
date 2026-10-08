@@ -21,11 +21,14 @@ import {
   bidPdfs,
   bids,
   materials,
+  takeoffHeightDefaults,
   takeoffRunTypes,
   takeoffRuns,
+  takeoffStamps,
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { UNCONFIRMED_MARK_REFUSAL } from "./routers/takeoffRunsRouter";
 
 const USER = 9935;
 const hasDb = Boolean(process.env.DATABASE_URL);
@@ -87,7 +90,7 @@ async function scenario() {
       { x: ft(40), y: ft(30) },
     ],
   });
-  return { bidId: bid.id, sheetId, runId: run.id };
+  return { bidId: bid.id, sheetId, runId: run.id, typeId: type.id };
 }
 
 async function row(id: number) {
@@ -131,6 +134,9 @@ beforeEach(async () => {
     .delete(takeoffRunTypes)
     .where(eq(takeoffRunTypes.userId, USER));
   await database.delete(materials).where(eq(materials.userId, USER));
+  await database
+    .delete(takeoffHeightDefaults)
+    .where(eq(takeoffHeightDefaults.userId, USER));
 });
 
 withDb("moving a run's points", () => {
@@ -316,5 +322,211 @@ withDb("moving a run's points", () => {
     await expect(
       caller().takeoffRuns.setPoints({ id: s.runId, points: [{ x: 0, y: 0 }] })
     ).rejects.toThrow();
+  });
+});
+
+/*
+  A RUN END DRAGGED OFF ITS MARK, OR ONTO ANOTHER (Track B Gap 1,
+  2026-10-07). `setPoints` wrote the points and nothing else, so the run kept
+  claiming the box it no longer touched — its drop came from the wrong box and
+  that box's own drop stayed suppressed. Run height 10'-0"; a receptacle drops
+  8.50 ft. Mark A sits at the run's end (40, 30), mark B at (80, 30).
+*/
+withDb("an end dragged off or onto a mark", () => {
+  async function withMarks() {
+    const s = await scenario();
+    await caller().takeoffHeights.setCompanyDistribution({ inches: 120 });
+    const group = await caller().takeoffGroups.create({
+      bidId: s.bidId,
+      label: "Receptacle",
+    });
+    await caller().takeoffStamps.drop({
+      bidId: s.bidId,
+      sheetId: s.sheetId,
+      groupId: group.id,
+      at: [
+        { x: ft(40), y: ft(30) },
+        { x: ft(80), y: ft(30) },
+      ],
+    });
+    await caller().takeoffGroups.setDrop({
+      id: group.id,
+      dropKind: "receptacle",
+      dropRunTypeId: s.typeId,
+    });
+    const marks = await caller().takeoffStamps.listForSheet({
+      sheetId: s.sheetId,
+    });
+    const a = marks.find(m => Number(m.x) === ft(40))!.id;
+    const b = marks.find(m => Number(m.x) === ft(80))!.id;
+    // The end is ON mark A and claims it, as accepting the link does.
+    await caller().takeoffRuns.setEnds({ id: s.runId, endStampId: a });
+    return { ...s, a, b };
+  }
+
+  /** The run's own drop at its end, and how many marks still drop. */
+  async function drops(bidId: number) {
+    const [readout, totals] = await Promise.all([
+      caller().takeoffRuns.drops({ bidId }),
+      caller().takeoffRuns.totals({ bidId }),
+    ]);
+    return {
+      runEndFeet: readout.drops
+        .filter(d => d.end === "end")
+        .reduce((sum, d) => sum + d.feet, 0),
+      markDrops: totals.markDropCount,
+    };
+  }
+
+  const offTheMark = [
+    { x: 0, y: 0 },
+    { x: ft(40), y: 0 },
+    { x: ft(40), y: ft(50) },
+  ];
+  const ontoB = [
+    { x: 0, y: 0 },
+    { x: ft(40), y: 0 },
+    { x: ft(80), y: ft(30) },
+  ];
+
+  it("starts claimed: the run drops 8.50 ft into A, and only B drops on its own", async () => {
+    const s = await withMarks();
+    expect(await drops(s.bidId)).toEqual({ runEndFeet: 8.5, markDrops: 1 });
+  });
+
+  it("dragged OFF A into open space: the claim goes, the run drops nothing, A drops on its own", async () => {
+    const s = await withMarks();
+    await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: offTheMark,
+      endStampId: null,
+    });
+    expect((await row(s.runId)).endStampId).toBeNull();
+    // Before the fix: still { 8.5, 1 } — A's drop counted from a box the
+    // run no longer touches, and A's own drop held back.
+    expect(await drops(s.bidId)).toEqual({ runEndFeet: 0, markDrops: 2 });
+  });
+
+  it("dragged ONTO B: claims B and lets A go — A drops again on its own", async () => {
+    const s = await withMarks();
+    await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: ontoB,
+      endStampId: s.b,
+    });
+    expect((await row(s.runId)).endStampId).toBe(s.b);
+    const after = await drops(s.bidId);
+    // Before the fix: B unclaimed AND A still claimed — the run's 8.50 ft
+    // read from A, B dropping on its own too. One mark drops on its own now,
+    // and with B the claimed one, that mark is A.
+    expect(after).toEqual({ runEndFeet: 8.5, markDrops: 1 });
+  });
+
+  it("a wall-connection answer about the old box is cleared with the claim", async () => {
+    const s = await withMarks();
+    const database = (await getDb())!;
+    await database
+      .update(takeoffRuns)
+      .set({ endConnect: "confirmed" })
+      .where(eq(takeoffRuns.id, s.runId));
+    await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: ontoB,
+      endStampId: s.b,
+    });
+    expect((await row(s.runId)).endConnect).toBeNull();
+  });
+
+  it("an end that did not move keeps its claim (nothing sent for it)", async () => {
+    const s = await withMarks();
+    await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: [
+        { x: 0, y: 0 },
+        { x: ft(30), y: 0 },
+        { x: ft(40), y: ft(30) },
+      ],
+    });
+    expect((await row(s.runId)).endStampId).toBe(s.a);
+    expect(await drops(s.bidId)).toEqual({ runEndFeet: 8.5, markDrops: 1 });
+  });
+
+  it("undo puts the old claim back, and the drops with it", async () => {
+    const s = await withMarks();
+    const edit = await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: offTheMark,
+      endStampId: null,
+    });
+    await caller().takeoffRuns.restore({ undo: edit.undo! });
+    expect((await row(s.runId)).endStampId).toBe(s.a);
+    expect(await drops(s.bidId)).toEqual({ runEndFeet: 8.5, markDrops: 1 });
+  });
+
+  it("refuses an UNCONFIRMED mark and leaves the run as it was", async () => {
+    const s = await withMarks();
+    const database = (await getDb())!;
+    const [unchecked] = await database.insert(takeoffStamps).values({
+      bidId: s.bidId,
+      sheetId: s.sheetId,
+      userId: USER,
+      x: String(ft(60)),
+      y: String(ft(60)),
+      status: "unconfirmed",
+    });
+    const before = await row(s.runId);
+    await expect(
+      caller().takeoffRuns.setPoints({
+        id: s.runId,
+        points: [
+          { x: 0, y: 0 },
+          { x: ft(60), y: ft(60) },
+        ],
+        endStampId: unchecked.insertId,
+      })
+    ).rejects.toThrow(UNCONFIRMED_MARK_REFUSAL);
+    const after = await row(s.runId);
+    expect(after.points).toEqual(before.points);
+    expect(after.endStampId).toBe(s.a);
+  });
+
+  /*
+    OPEN SPACE (owner, 2026-10-07): an end let go on no mark, with no type of
+    its own, is "nothing there" — no drop, and the fittings say the length
+    is short. "No drop here" is the answer for an end meant to have none: it
+    is saved ON the end (the "at run height" kind, which already means no
+    drop) and the warning goes. Before 2026-10-07 that chip read "Nothing",
+    the same word as the unanswered state it clears.
+  */
+  it("open space: warned until 'No drop here' is picked, which is saved on the end", async () => {
+    const s = await withMarks();
+    // The fixture's start is unanswered too; answer it, so only the END is
+    // under test here.
+    await caller().takeoffRuns.setEnds({
+      id: s.runId,
+      startKind: "distribution",
+    });
+    await caller().takeoffRuns.setPoints({
+      id: s.runId,
+      points: offTheMark,
+      endStampId: null,
+    });
+    const strapWhy = async () => {
+      const [entry] = await caller().takeoffRunTypes.bridgeForBid({
+        bidId: s.bidId,
+      });
+      return entry.fittings.find(f => f.role === "strap")?.why ?? "";
+    };
+    expect((await row(s.runId)).endKind).toBeNull();
+    expect(await strapWhy()).toMatch(/a drop with no height/);
+
+    // The "No drop here" chip: the end says it carries on at run height.
+    await caller().takeoffRuns.setEnds({
+      id: s.runId,
+      endKind: "distribution",
+    });
+    expect((await row(s.runId)).endKind).toBe("distribution");
+    expect(await strapWhy()).not.toMatch(/a drop with no height/);
+    expect(await drops(s.bidId)).toEqual({ runEndFeet: 0, markDrops: 2 });
   });
 });

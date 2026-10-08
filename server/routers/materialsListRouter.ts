@@ -419,14 +419,18 @@ export const materialsListRouter = router({
       );
       // Drops from counted marks (§ 3) — what the bid prices, so the list a
       // supplier orders from has them too. Claimed against every run.
-      const markDrops = markDropEntries(
-        await db.loadGroupDrops(
-          input.bidId,
-          ctx.scope.dataUserId,
-          heights,
-          runs,
-          scales
-        )
+      const groupDropRows = await db.loadGroupDrops(
+        input.bidId,
+        ctx.scope.dataUserId,
+        heights,
+        runs,
+        scales
+      );
+      const markDrops = markDropEntries(groupDropRows);
+      // Drops left unpriced for want of a material — said, never 0 ft.
+      const notPricedDrops = groupDropRows.reduce(
+        (n, d) => n + d.notPricedDrops,
+        0
       );
       const totals = totalQuantities(
         realRuns.map(run => {
@@ -447,7 +451,11 @@ export const materialsListRouter = router({
             runKey: rootOf(run),
           };
         }),
-        markDrops
+        markDrops,
+        // Homeruns, as the bid prices them — and as `footage` above already
+        // counts their couplings, connectors and straps.
+        (await db.loadBidHomeruns(input.bidId, ctx.scope.dataUserId, heights))
+          ?.entries ?? []
       );
 
       // ── Notes: everything the reader needs to read the list correctly ──────
@@ -461,6 +469,25 @@ export const materialsListRouter = router({
           } to counted devices (${totals.markDropFeet.toLocaleString("en-US", {
             maximumFractionDigits: 2,
           })} ft of raceway or cable). Connectors and elbows for those drops are NOT counted — add them by hand.`
+        );
+      }
+      if (notPricedDrops > 0) {
+        notes.push(
+          `NOT on this list: ${notPricedDrops} ${
+            notPricedDrops === 1 ? "drop" : "drops"
+          } to counted devices — drop material not set. Pick what each drop is made of on its count.`
+        );
+      }
+      // Homeruns: their couplings, connectors, straps AND bends are above
+      // with their type's fittings (bends since 2026-10-07, owner: one at
+      // each counted drop + the bid's extra bends per homerun).
+      if (totals.homerunCount > 0) {
+        notes.push(
+          `Includes ${totals.homerunCount} ${
+            totals.homerunCount === 1 ? "homerun" : "homeruns"
+          } (${totals.homerunFeet.toLocaleString("en-US", {
+            maximumFractionDigits: 2,
+          })} ft of run and drops, before routing, waste and makeup). Their couplings, connectors, straps and bends are counted — a bend at each drop, plus the bid's extra bends per homerun for corners (1 each unless set).`
         );
       }
       if (untypedRuns > 0) {

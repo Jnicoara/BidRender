@@ -402,6 +402,79 @@ asks for a column on `takeoff_run_circuits`.
   marked" never creates a circuit row; the count stays the estimator's, as
   the column's own comment in `drizzle/schema.ts` requires.
 
+**Shop default heights + "No drop here" (Track C, 2026-10-07): NO new
+column for Track A** — asked alongside `bids.homerunExtraBends` and
+`takeoff_runs.runsAt` (migrations-next-batch.md § Batch C, where the table
+is). Shop height per type = `takeoff_mounting_heights`; per device =
+`takeoff_stamps.mountHeightInches` (0098); which type a device is =
+`assemblies.mountHeightTypeKey` (0110, now read and set on
+`c-homerun-footage`); "No drop here" = run end kind `'distribution'`.
+Search those before asking for a height column.
+
+- [x] **Decided 2026-10-07 (owner), built on `c-homerun-footage`:** a
+      "Data / TV / Low voltage" height type ships at 18" (`low-voltage`,
+      common), and the data / TV starters (MS6, MS7, MS8) ship "Mounts at"
+      it — seeded on new databases, and filled on existing ones only where
+      nothing was said. UNCC E111: 76 of 76 homerun drops.
+- [x] **Decided 2026-10-07 (owner: YES), built:** a count's OWN drops follow
+      its item's "Mounts at" when the count has no "Each drops to"; the row
+      says "— from the item" and "(default height)". A drop still needs its
+      "made of" run type, asked per count as before. **And no box counts
+      twice:** a box a computed homerun rises from (up-drop counted) carries
+      no count drop (`homerunClaims`, beside the run-end claim). The old rule
+      double-counted 22 duplex boxes on E111.
+- [x] The run-end dropdown says "No drop here" like the chip beside it
+      (`END_NO_DROP_LABEL` via `endKindLabel` — every END label, the trace
+      toolbar's included). `DISTRIBUTION_LABEL` ("Run height") still names
+      the height itself.
+- [x] **Fixed 2026-10-07 (owner):** a finished run's NAME says "No drop
+      here" for an end at run height ("Panel → No drop here",
+      `runNameParts`), the same words as its Run ends row, chip and picker.
+      Owner's example said "No drop"; the full phrase was kept so all four
+      read identically.
+- [x] **Fixed 2026-10-07 — WRONG-NUMBER RISK: viewing re-pointed homeruns.**
+      Opening the Circuits panel re-pointed every UNCONFIRMED homerun to the
+      device now closest, so totals moved from looking (E111: 4,119.31 →
+      3,987.54 ft). Now a visit only CREATES circuits (leaving device written
+      once); re-pointing is "Re-match homeruns on this sheet" or placing a
+      panel by hand. A "PANEL 2B" label only fills a panel with no spot.
+- [x] **Fixed 2026-10-07:** a count with no drop material says "Drop material
+      not set — N drops not priced" on its row, "N drops not priced — drop
+      material not set on M counted items" on the Totals tab, and "NOT on this
+      list: N drops …" in the materials list notes (`notPricedDrops`).
+- [x] **Decided 2026-10-07 (owner: YES), built on `c-homerun-footage`:** drops
+      with no material are in the bid's not-priced tally (`NotPricedTally.drops`,
+      `withDropsNotPriced`), so the totals read "+ N drops not priced", the
+      bid page says "N drops not priced — drop material not set", the
+      proposal says "Price pending" and Print is blocked (its dialog points
+      at the Plans screen when drops are the gap).
+- [x] **DONE 2026-10-08 (merged local-dev into c-homerun-footage: one tallyLeavesOut with hours AND drops; materialsShare carries drops — track-c-handoff.md merge note). Was: FOR TRACK B — merge note for the not-priced check (small, on purpose).**
+      C's branch touched B-owned files: `shared/lineNotPriced.ts` (optional
+      `drops` on the tally, `tallyLeavesOut`, `withDropsNotPriced`),
+      `client/src/lib/notPricedTotal.ts` (suffix/headline say drops;
+      `bidNotPricedCount(lines, dropsNotPriced)` — second argument REQUIRED),
+      `shared/proposal.ts` (pricePending via `tallyLeavesOut`), `BidsPage.tsx`
+      (the strip), `ProposalPage.tsx` (dialog wording), and one-token edits
+      in `notPricedTotal.test.ts` / `dashboardFollowsDrawing.test.ts`.
+      **local-dev already has its own `tallyLeavesOut` (with `hours`): the
+      merged one must read lines, parts, hours AND drops** —
+      `server/dropsNotPriced.test.ts` goes red if drops fall out.
+- [ ] **Drops not priced are NOT in analytics or the dashboard cards** — those
+      list many bids and do not load each one's takeoff. A bid card can still
+      read complete while its bid page says drops are not priced. Owner's call.
+- [x] **Patent review (US 11,120,171) — Option A chosen and built 2026-10-07:**
+      the dashed device-to-panel line is gone from the Circuits layer (rings
+      and the panel mark stay; length math unchanged), guarded by
+      `server/noHomerunPath.test.ts`. `references/homerun-patent-notes.md` § 4
+      sets claims 1, 13 and dependents 4–9 beside what the app does.
+- [ ] **Patent — for the attorney:** the Measured number |Δx| + |Δy| equals the
+      length of a one-corner right-angle path although none is generated or
+      drawn (notes § 4, claim 13 flag). If that matters, Option B (user traces
+      each homerun) or C (typed lengths) removes it. Also: never add a
+      "direct"/straight-line choice — claim 1 names exactly that.
+- [ ] Claim text in the notes was read through a summarising fetch tool —
+      the attorney should check it against the official text.
+
 **Homerun footage** (Track C, 2026-10-06; DESIGN ONLY —
 `references/homerun-footage-plan.md`; nothing computes footage yet). Owner:
 method per bid with a per-area override, ceiling height per area, a per-job
@@ -787,6 +860,15 @@ Design: `references/homerun-footage-plan.md` § 4.
       job → company. Unset
       stays unset — never 0. Works on a tablet (draw by drag, 44 px targets).
       Later, the same areas give count drops their height.
+      **BUILT 2026-10-07 on branch `c-homerun-footage`** (by taps, not drag —
+      a drag pans), and since the same day EVERY drop reads it: regular runs
+      at each end's box, count drops at each mark, homeruns at their device
+      (`shared/ceilingHeights.ts`). Reached from "Ceilings" on every scaled
+      sheet.
+- [ ] **Reshape a height area after drawing — BEFORE BETA** (owner,
+      2026-10-07). Today an outline is fixed once drawn: remove and redraw.
+      Drag a corner (tablet: tap a corner, tap where it goes), add or drop a
+      corner; the server already takes `outline` on `updateHeightArea`.
 - [ ] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
       else changes):
   - `id`; `bidId` FK `bids.id` ON DELETE CASCADE; `userId` (the company

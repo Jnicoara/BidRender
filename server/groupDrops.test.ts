@@ -14,6 +14,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  DROP_MATERIAL_NOT_SET,
   groupDrops,
   markDropEntries,
   type DropGroup,
@@ -22,6 +23,7 @@ import {
   type DropTypeSpec,
 } from "../shared/groupDrops";
 import { NO_EXTRAS_CONTEXT, type ExtrasContext } from "../shared/runExtras";
+import { NO_CEILINGS, type CeilingLayers } from "../shared/ceilingHeights";
 import { totalQuantities } from "../shared/takeoffQuantities";
 
 const RATIO = 48; // 1/4" = 1'-0": 1 page point = 48/72 real inches
@@ -43,6 +45,7 @@ const MC_CABLE: DropTypeSpec = { ...EMT_2_AND_GROUND, pathType: "cable" };
 const group = (over: Partial<DropGroup> = {}): DropGroup => ({
   id: 1,
   dropKind: "receptacle",
+  dropKindFromItem: false,
   dropHeightInches: null,
   dropRunTypeId: 7,
   ...over,
@@ -65,9 +68,12 @@ function drops(input: {
   marks?: DropMark[];
   runs?: DropRunEnd[];
   companyInches?: number | null;
+  /** Sheet heights and height areas, over the company ceiling. */
+  ceilings?: Partial<CeilingLayers>;
   extras?: ExtrasContext;
   type?: DropTypeSpec | null;
   ratio?: number | null;
+  homerunClaims?: ReadonlySet<number>;
 }) {
   return groupDrops({
     groups: input.groups ?? [group()],
@@ -76,13 +82,16 @@ function drops(input: {
     heights: {
       // Receptacle ships at 1'-6"; the run height is set here.
       layers: { company: new Map(), job: new Map() },
-      companyInches:
-        input.companyInches === undefined ? 120 : input.companyInches,
-      jobInches: null,
+      ceilings: {
+        ...NO_CEILINGS,
+        company: input.companyInches === undefined ? 120 : input.companyInches,
+        ...(input.ceilings ?? {}),
+      },
     },
     extras: input.extras ?? NO_EXTRAS_CONTEXT,
     typeFor: () => (input.type === undefined ? EMT_2_AND_GROUND : input.type),
     ratioFor: () => (input.ratio === undefined ? RATIO : input.ratio),
+    homerunClaims: input.homerunClaims ?? new Set(),
   });
 }
 
@@ -110,7 +119,7 @@ describe("thirty receptacles at 18 inches under a 10 ft run height", () => {
     const [entry] = markDropEntries([d]);
     expect(entry.count).toBe(30);
     // § 2.4's own example: 255 ft of pipe.
-    const totals = totalQuantities([], markDropEntries([d]));
+    const totals = totalQuantities([], markDropEntries([d]), []);
     expect(totals.conduitBoughtFeet).toBe(255);
     // Three wires down each drop (2 + a ground).
     expect(totals.wireBoughtFeet).toBe(765);
@@ -139,7 +148,7 @@ describe("a mark's own height, and a mark with its drop left off", () => {
     const [d] = drops({ marks: withHeight(marks(3), 0, 54, "typed") });
     expect(d.ownHeightCount).toBe(1);
     expect(d.totalDropFeet).toBe(8.5 + 8.5 + 5.5);
-    const totals = totalQuantities([], markDropEntries([d]));
+    const totals = totalQuantities([], markDropEntries([d]), []);
     expect(totals.conduitBoughtFeet).toBe(22.5); // NOT 25.5
     expect(totals.markDropCount).toBe(3);
     expect(d.buckets.map(b => [b.deviceInches, b.marks.length]).sort()).toEqual(
@@ -186,9 +195,9 @@ describe("a mark's own height, and a mark with its drop left off", () => {
     const [d] = drops({ marks: list });
     expect(d.excludedCount).toBe(1);
     expect(d.countedMarks).toHaveLength(29);
-    expect(totalQuantities([], markDropEntries([d])).conduitBoughtFeet).toBe(
-      246.5
-    );
+    expect(
+      totalQuantities([], markDropEntries([d]), []).conduitBoughtFeet
+    ).toBe(246.5);
   });
 });
 
@@ -226,9 +235,9 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
     const [d] = drops({ marks: marks(3), runs: [leg] });
     expect(d.claimedCount).toBe(0);
     expect(d.countedMarks).toHaveLength(3);
-    expect(totalQuantities([], markDropEntries([d])).conduitBoughtFeet).toBe(
-      25.5
-    );
+    expect(
+      totalQuantities([], markDropEntries([d]), []).conduitBoughtFeet
+    ).toBe(25.5);
   });
 
   it("FLAGS a mark near an unlinked run end, and still counts it", () => {
@@ -306,7 +315,8 @@ describe("a drop that is wanted but cannot be counted says why", () => {
   it("names a missing run type", () => {
     const [d] = drops({ type: null });
     expect(d.status).toBe("no-type");
-    expect(d.reason).toMatch(/made of/);
+    // Owner, 2026-10-07: the words are "drop material not set".
+    expect(d.reason).toBe("drop material not set");
     expect(markDropEntries([d])).toEqual([]);
   });
 
@@ -330,5 +340,79 @@ describe("the export splits drops by sheet", () => {
       [1, 2],
       [2, 3],
     ]);
+  });
+});
+
+/*
+  NO BOX COUNTS ITS DROP TWICE (owner, 2026-10-07). A homerun rising from a
+  box already buys the pipe up from it; a count drop at the same box would be
+  the same vertical counted again. Red before: `homerunClaims` did not exist
+  and every mark carried a count drop whatever rose from it.
+*/
+describe("a box a homerun rises from carries no count drop", () => {
+  it("12 marks, 3 of them homerun boxes: 9 drops, and the row says why", () => {
+    const [d] = drops({ homerunClaims: new Set([100, 101, 102]) });
+    expect(d.countedMarks).toHaveLength(9);
+    expect(d.homerunClaimedCount).toBe(3);
+    expect(d.claimedCount).toBe(0);
+    // 9 × 8.5 ft, not 12 × 8.5.
+    expect(d.totalDropFeet).toBe(76.5);
+  });
+
+  it("a box both a run end and a homerun claim is counted once, as the run's", () => {
+    const [d] = drops({
+      marks: marks(2),
+      homerunClaims: new Set([100]),
+      runs: [
+        {
+          sheetId: 1,
+          points: [
+            { x: 0, y: 0 },
+            { x: 5000, y: 5000 },
+          ],
+          startStampId: null,
+          endStampId: 100,
+          startCountsVertical: false,
+          endCountsVertical: true,
+        },
+      ],
+    });
+    expect(d.claimedCount).toBe(1);
+    expect(d.homerunClaimedCount).toBe(0);
+    expect(d.countedMarks.map(m => m.id)).toEqual([101]);
+  });
+
+  it("passes the item's kind through, said as the item's", () => {
+    const [d] = drops({ groups: [group({ dropKindFromItem: true })] });
+    expect(d.dropKind).toBe("receptacle");
+    expect(d.dropKindFromItem).toBe(true);
+    expect(d.status).toBe("counted");
+  });
+});
+
+/*
+  NO DROP MATERIAL (owner, 2026-10-07): "drop material not set", counted as
+  NOT PRICED — never a silent 0 ft. Red before: the reason read "say what the
+  drop is made of" and nothing said how many drops it left out.
+*/
+describe("a count with no drop material", () => {
+  it("says 'drop material not set' and how many drops it leaves unpriced", () => {
+    const [d] = drops({ type: null });
+    expect(d.status).toBe("no-type");
+    expect(d.reason).toBe(DROP_MATERIAL_NOT_SET);
+    expect(d.reason).toBe("drop material not set");
+    expect(d.notPricedDrops).toBe(12);
+    // Nothing reaches a bid line, and no footage is claimed as 0.
+    expect(d.totalDropFeet).toBeNull();
+    expect(markDropEntries([d])).toEqual([]);
+  });
+
+  it("leaves claimed and level boxes out of the unpriced count", () => {
+    const [d] = drops({ type: null, homerunClaims: new Set([100, 101]) });
+    expect(d.notPricedDrops).toBe(10);
+  });
+
+  it("a counted drop has none unpriced", () => {
+    expect(drops({})[0].notPricedDrops).toBe(0);
   });
 });

@@ -17,7 +17,11 @@
  * Both carry a location, which is what lets clicking a list row jump the viewer
  * to the mark on the drawing.
  */
-import { heightTypeLabel } from "./takeoffHeights";
+import {
+  DISTRIBUTION_KIND,
+  END_NO_DROP_LABEL,
+  heightTypeLabel,
+} from "./takeoffHeights";
 import type { PagePoint } from "./takeoffGeometry";
 import {
   emptySplit,
@@ -281,8 +285,17 @@ export function runNameParts(
   },
   endTypes?: readonly { typeKey: string; label: string }[]
 ): { type: string; ends: string | null } {
-  const from = heightTypeLabel(run.startKind, endTypes);
-  const to = heightTypeLabel(run.endKind, endTypes);
+  /*
+    An end at run height reads "No drop here" in the run's NAME too (owner,
+    2026-10-07) — the chip, the picker and the Run ends row all say it, and
+    the name said "Run height", one answer under two names on one card.
+  */
+  const endLabel = (kind: string | null | undefined) =>
+    kind === DISTRIBUTION_KIND
+      ? END_NO_DROP_LABEL
+      : heightTypeLabel(kind, endTypes);
+  const from = endLabel(run.startKind);
+  const to = endLabel(run.endKind);
   return {
     type: runName(run),
     // Both, or neither. "Panel → …" is a half-sentence that reads like a bug.

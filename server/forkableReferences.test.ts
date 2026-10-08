@@ -203,6 +203,12 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-09-21",
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
+  "bids.homerunRunTypeId": {
+    kind: "resolver",
+    resolver: "resolveRunType",
+    readBy: "server/runVerticals.ts",
+    note: "Migration 0127 (Track C's homerun footage). Registered 'unreviewed' by Track A before its code existed; resolved 2026-10-07 by that code: server/homerunsCore.ts reaches the type ONLY through `HeightContext.dropTypeFor`, which follows the stored id through resolveRunType — so a homerun on a forked shipped type prices from the fork, as a traced run and a count drop do. The bid line records the stored id, like takeoff_runs.runTypeId.",
+  },
   "materials.parentId": {
     kind: "unreviewed",
     since: "2026-10-06",
@@ -390,6 +396,10 @@ describe("every stored id into a forkable row is accounted for", () => {
     );
     // 9 → 6 on 2026-09-27: bid_line_items.assemblyId resolved,
     // takeoff_groups.materialId and .laborRateId reviewed and exempt.
+    // 6 → 7 on 2026-10-07 (Track A): bids.homerunRunTypeId (0127), added
+    // before its code exists; its entry says what C's footage code owes.
+    // 7 → 6 on 2026-10-07 (Track C): that code reads it through
+    // resolveRunType, so it is a resolver now.
     expect(unreviewed.length).toBeLessThanOrEqual(6);
   });
 

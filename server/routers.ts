@@ -27,6 +27,7 @@ import { sampleRouter } from "./routers/sampleRouter";
 import { proposalsRouter } from "./routers/proposalsRouter";
 import { bidPdfsRouter } from "./routers/bidPdfsRouter";
 import { takeoffHeightsRouter } from "./routers/takeoffHeightsRouter";
+import { homerunsRouter } from "./routers/homerunsRouter";
 import { takeoffRunsRouter } from "./routers/takeoffRunsRouter";
 import { takeoffGroupsRouter } from "./routers/takeoffGroupsRouter";
 import { takeoffSummaryRouter } from "./routers/takeoffSummaryRouter";
@@ -90,6 +91,7 @@ export const appRouter = router({
   bidPdfs: bidPdfsRouter,
   takeoffRuns: takeoffRunsRouter,
   takeoffHeights: takeoffHeightsRouter,
+  homeruns: homerunsRouter,
   takeoffGroups: takeoffGroupsRouter,
   takeoffSummary: takeoffSummaryRouter,
   takeoffRunTypes: takeoffRunTypesRouter,

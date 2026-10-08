@@ -243,7 +243,7 @@ export default function QuickBidPage({
   const detail = detailQuery.data;
   const lines = detail?.lines ?? [];
   /** Lines the totals leave out — the rule the line cells use. */
-  const notPriced = bidNotPricedCount(lines);
+  const notPriced = bidNotPricedCount(lines, detail?.dropsNotPriced ?? 0);
   // Newest first: what you just counted is what you want to check.
   const recent = [...lines].reverse();
 

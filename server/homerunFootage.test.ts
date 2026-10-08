@@ -6,6 +6,8 @@
 import { describe, expect, it } from "vitest";
 import {
   heightAreaAt,
+  heightAreaWarnings,
+  outlineFromTaps,
   homerunFootage,
   homerunTotals,
   overlappingHeightAreas,
@@ -98,9 +100,7 @@ describe("the plan's § 5 worked example, all three methods", () => {
 
   it("Measured with a minimum of 50 ft: L = 50", () => {
     const h = computed(
-      homerunFootage(
-        base({ method: method("measured-minimum", { minimumFt: 50 }) })
-      )
+      homerunFootage(base({ method: method("measuredMin", { minimumFt: 50 }) }))
     );
     expect(h.pieces.measuredFt).toBeCloseTo(40, 3);
     expect(h.pieces.minimumApplied).toBe(true);
@@ -109,9 +109,7 @@ describe("the plan's § 5 worked example, all three methods", () => {
 
   it("a minimum below the measured length changes nothing", () => {
     const h = computed(
-      homerunFootage(
-        base({ method: method("measured-minimum", { minimumFt: 30 }) })
-      )
+      homerunFootage(base({ method: method("measuredMin", { minimumFt: 30 }) }))
     );
     expect(h.pieces.minimumApplied).toBe(false);
     expect(h.pieces.installedFt).toBeCloseTo(52.5, 3);
@@ -240,7 +238,10 @@ describe("unconfirmed homeruns count (owner Q3)", () => {
       homerunFootage(base({ conductorCount: null })),
     ]);
     expect(t.notCounted).toBe(2);
-    expect(t.unconfirmed).toBe(2);
+    // Only the one IN the total is "unconfirmed"; the refused one is not in
+    // it. This asserted 2 until 2026-10-07, when the screen read "0
+    // homeruns + 38 unconfirmed" on a sheet with no scale.
+    expect(t.unconfirmed).toBe(1);
   });
 });
 
@@ -418,9 +419,9 @@ describe("method resolution: area → bid → Measured", () => {
   it("the bid beats the default", () => {
     const m = resolveHomerunMethod({
       area: { method: null, averageFt: null, minimumFt: null },
-      bid: { method: "measured-minimum", averageFt: null, minimumFt: 20 },
+      bid: { method: "measuredMin", averageFt: null, minimumFt: 20 },
     });
-    expect(m.method).toBe("measured-minimum");
+    expect(m.method).toBe("measuredMin");
     expect(m.methodFrom).toBe("bid");
   });
 
@@ -523,5 +524,78 @@ describe("height areas inside a sheet", () => {
     const h = computed(homerunFootage(base({ ceiling })));
     expect(h.pieces.upDrop.counted && h.pieces.upDrop.feet).toBe(16.5);
     expect(h.confirmed).toBe(false);
+  });
+});
+
+describe("drawing a height area by taps (tablet first)", () => {
+  it("two taps are opposite corners of a box, either way round", () => {
+    expect(
+      outlineFromTaps([
+        { x: 300, y: 50 },
+        { x: 100, y: 200 },
+      ])
+    ).toEqual([
+      { x: 100, y: 50 },
+      { x: 300, y: 50 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ]);
+  });
+
+  it("three or more taps are the outline, in order", () => {
+    const taps = [
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 0, y: 200 },
+    ];
+    expect(outlineFromTaps(taps)).toEqual(taps);
+  });
+
+  it("one tap, two taps on one spot, or a sliver is nothing", () => {
+    expect(outlineFromTaps([{ x: 5, y: 5 }])).toBeNull();
+    expect(
+      outlineFromTaps([
+        { x: 5, y: 5 },
+        { x: 5, y: 5 },
+      ])
+    ).toBeNull();
+    expect(
+      outlineFromTaps([
+        { x: 0, y: 0 },
+        { x: 500, y: 0.2 },
+      ])
+    ).toBeNull();
+  });
+});
+
+describe("the overlap warning names the pair and which one wins", () => {
+  const box = (
+    id: number,
+    name: string,
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number
+  ) => ({
+    id,
+    name,
+    outline: outlineFromTaps([
+      { x: x0, y: y0 },
+      { x: x1, y: y1 },
+    ])!,
+  });
+  const sales = box(1, "Sales floor", 0, 0, 1000, 600);
+  const stock = box(2, "Stockroom", 600, 300, 900, 550);
+
+  it("nested: the smaller outline is named as the winner", () => {
+    expect(heightAreaWarnings([sales, stock])).toEqual([
+      '"Stockroom" and "Sales floor" overlap — "Stockroom" is smaller, so its height wins where they overlap',
+    ]);
+  });
+
+  it("a shared wall does not warn", () => {
+    expect(
+      heightAreaWarnings([sales, box(3, "Office", 1000, 0, 1400, 600)])
+    ).toEqual([]);
   });
 });

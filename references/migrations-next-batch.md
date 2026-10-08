@@ -228,6 +228,65 @@ Branch `a-batch-c-0125` — **not merged into local-dev, not on staging**
 footage code.** Applying moves no number; C's code then computes homerun
 footage (intended).
 
+**Track C's code for this batch: branch `c-homerun-footage`, pushed
+2026-10-07** (homerun-footage-plan.md § 10). Merge it WITH this branch,
+never before the migrations. Every column is read and written as A wrote
+it — **no column is missing or wrong.** Two notes for A, neither a new
+migration:
+
+- **0126's comment on `homerunFromStampId` says "NULL = closest"; the code
+  stores the closest.** The server cannot work out "closest" (it keeps a
+  page's text, not word positions), so the browser writes the closest
+  device when the homerun is made; since 2026-10-07 only "Re-match
+  homeruns" or a hand-placed panel re-points an UNCONFIRMED one (a visit no
+  longer does); once confirmed (or picked) it is left alone. NULL now
+  means "the device was deleted" (SET NULL), and that homerun gets no
+  number. Please reword the comment in `0126` and in `drizzle/schema.ts`
+  when convenient — a comment edit, no SQL change.
+- **`bids.homerunRunTypeId` is resolved** — `forkableReferences.test.ts`
+  moved it from "unreviewed" to `resolveRunType` (via `dropTypeFor`), and
+  the unreviewed ceiling from 7 back to 6.
+
+**Two NEW columns asked of Track A (Track C, 2026-10-07)** — both owner-
+approved features whose arithmetic is built and tested on the branch and
+whose control is on screen but held until the column exists. Both ADDITIVE,
+nullable, **no DEFAULT**, no backfill (step 1). They can join Batch C (it is
+not applied anywhere) or follow it:
+
+| Column                   | Type             | NULL means                                     | Owner's words                                                   |
+| ------------------------ | ---------------- | ---------------------------------------------- | --------------------------------------------------------------- |
+| `bids.homerunExtraBends` | INT NULL         | not set: counted as 1 and said "not confirmed" | "Extra bends per homerun … starting at 1, shown as unconfirmed" |
+| `takeoff_runs.runsAt`    | VARCHAR(16) NULL | `'ceiling'` — drops at every box, as today     | "'Through ceiling' (default) or 'Box to box, same height'"      |
+
+- `runsAt` values: `'ceiling'` | `'boxToBox'` (varchar, like `homerunMethod`,
+  so a third is code rather than a migration). Like `traceMode` it describes
+  the whole run: C's code will keep it equal on the root and every leg.
+- What C's code owes when they land: read `bids.homerunExtraBends` in
+  `loadBidHomeruns` (now a literal NULL) and add it to `setBidSettings`;
+  carry `runsAt` on the run rows (`RunEnds.runsAt` is optional ONLY until
+  then — make it required) and add it to `setEnds`; enable the two held
+  controls (`RunsAtChoice` in runEnds.tsx, the stepper in
+  HomerunControls.tsx). Nothing reads a column that does not exist.
+- Bid numbers: `homerunExtraBends` moves none on its own (1 is already
+  counted); `runsAt` moves none until somebody picks box to box.
+
+**Shop default heights and "No drop here" (owner, 2026-10-07) — NO new
+column.** Asked in the same breath as the two above; searched first, and
+every answer already has a home. Do NOT add any of these again:
+
+| What the owner asked                           | Where it already lives                                                                                                       |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Shop default height per device type            | `takeoff_mounting_heights` (Settings › Heights; shipped receptacle 18", switch 48")                                          |
+| Changed per device                             | `takeoff_stamps.mountHeightInches` + `mountHeightSource` (0098; the selection pill's height field)                           |
+| Which TYPE a device is, so its default applies | `assemblies.mountHeightTypeKey` (**0110**, vertical-drops-plan § 7 col 2) — live column, first READ by C's branch            |
+| "No drop here" saved on a run end              | `takeoff_runs.startKind` / `endKind` = `'distribution'` ("at run height" = level = no drop; the chip was labelled "Nothing") |
+
+- What C's branch adds is code only: `assemblies.mountHeightTypeKey` is
+  read for homeruns and linked run ends (`deviceKind`), set in the assembly
+  editor ("Mounts at"), and validated like a run end's kind.
+- The branch needs 0110 applied wherever it runs. It is on local-dev; check
+  staging with `scripts/schemaDrift.mts` before merging.
+
 **Numbering hazard, written down so it is not discovered:** the migrator
 skips a file numbered below one already applied (§ R.1). If ANY other
 migration is applied to staging or live before this branch merges, these

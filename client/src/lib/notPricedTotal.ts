@@ -36,6 +36,7 @@ import {
   lineHoursMissing,
   lineMaterialNotPriced,
   linePartsNotPriced,
+  withDropsNotPriced,
   type NotPricedTally,
   type PartsLineLike,
 } from "@shared/lineNotPriced";
@@ -66,10 +67,14 @@ export function partsNotPricedWords(parts: number): string {
 export function notPricedSuffix(notPriced: NotPricedTally): string {
   const lines = whole(notPriced.lines);
   const parts = whole(notPriced.parts);
+  // Drops with no material (owner, 2026-10-07): in the same tally, so the
+  // print's block and every total say them like any other gap.
+  const drops = whole(notPriced.drops ?? 0);
   const hours = whole(notPriced.hours);
   const priced = [
     lines > 0 ? plural(lines, "line") : "",
     parts > 0 ? plural(parts, "part") : "",
+    drops > 0 ? plural(drops, "drop") : "",
   ].filter(Boolean);
   const pieces = [
     priced.length > 0 ? `${priced.join(", ")} not priced` : "",
@@ -90,12 +95,14 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
 } {
   const lines = whole(notPriced.lines);
   const parts = whole(notPriced.parts);
+  const drops = whole(notPriced.drops ?? 0);
   const hours = whole(notPriced.hours);
   const priced = [
     lines > 0 ? plural(lines, "line") : "",
     parts > 0 ? plural(parts, "part") : "",
+    drops > 0 ? plural(drops, "drop") : "",
   ].filter(Boolean);
-  const pricedIsOne = lines + parts === 1;
+  const pricedIsOne = lines + parts + drops === 1;
   const pieces = [
     priced.length > 0
       ? `${priced.join(" and ")} ${pricedIsOne ? "is" : "are"} not priced`
@@ -106,7 +113,7 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
   ].filter(Boolean);
   return {
     text: pieces.join(" and "),
-    one: lines + parts + hours === 1,
+    one: lines + parts + drops + hours === 1,
   };
 }
 
@@ -156,7 +163,20 @@ export function hoursNotSetWords(assemblies: number): string {
  * (Direct cost, Bid price, Total due) keep the full tally.
  */
 export function materialsShare(notPriced: NotPricedTally): NotPricedTally {
-  return { lines: notPriced.lines, parts: notPriced.parts, hours: 0 };
+  /*
+    Drops with no MATERIAL belong here too (Track C, 2026-10-07): what is
+    missing is the drop's pipe and wire. Found merging local-dev: this built
+    the share field by field and left `drops` behind, so the Materials row
+    lost "+ 205 drops not priced" while Bid price kept it.
+  */
+  const share: NotPricedTally = {
+    lines: notPriced.lines,
+    parts: notPriced.parts,
+    hours: 0,
+  };
+  return (notPriced.drops ?? 0) > 0
+    ? { ...share, drops: notPriced.drops }
+    : share;
 }
 
 /** The part that belongs on its LABOR row: lines whose hours are not set. */
@@ -205,12 +225,21 @@ export function materialMissingLines(
 export function bidNotPricedCount(
   lines: readonly (PartsLineLike & {
     breakdown: { directCost: number } | null;
-  })[]
+  })[],
+  /**
+   * The bid's drops with no material (`bids.get` → `dropsNotPriced`).
+   * REQUIRED, so no bid screen can build its tally and forget them (owner,
+   * 2026-10-07): they are not lines, so the lines alone cannot see them.
+   */
+  dropsNotPriced: number
 ): NotPricedTally {
-  return countNotPriced(
-    lines.map(line => ({
-      line,
-      directCost: line.breakdown?.directCost ?? null,
-    }))
+  return withDropsNotPriced(
+    countNotPriced(
+      lines.map(line => ({
+        line,
+        directCost: line.breakdown?.directCost ?? null,
+      }))
+    ),
+    dropsNotPriced
   );
 }

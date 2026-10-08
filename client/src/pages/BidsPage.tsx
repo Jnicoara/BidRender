@@ -109,6 +109,11 @@ import {
   materialsShare,
 } from "@/lib/notPricedTotal";
 import { planCountLabel } from "@shared/planCounts";
+import {
+  parseHomerunMethod,
+  resolveHomerunMethod,
+} from "@shared/homerunFootage";
+import { homerunSummaryLine } from "@/lib/homerunText";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -258,6 +263,7 @@ export default function BidsPage({
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
+  const { data: homeruns } = trpc.homeruns.forBid.useQuery({ bidId });
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
   const { data: units = [] } = trpc.bids.units.useQuery({ bidId });
   const { data: unitStates = [] } = trpc.bids.unitStates.useQuery({ bidId });
@@ -500,6 +506,7 @@ export default function BidsPage({
     incomplete,
     problems,
     staleRates,
+    dropsNotPriced,
   } = detailQuery.data;
 
   /**
@@ -541,7 +548,46 @@ export default function BidsPage({
    * lines that are otherwise priced (0087). Through the same rule the server's
    * cards use, so this screen and the search result for it cannot disagree.
    */
-  const notPricedTally = bidNotPricedCount(lines);
+  const notPricedTally = bidNotPricedCount(lines, dropsNotPriced);
+  /** "Homeruns: Measured, +15% routing · 12 homeruns", when there are any. */
+  const homerunLine = homeruns?.rows.length
+    ? {
+        text: homerunSummaryLine({
+          method: resolveHomerunMethod({
+            area: null,
+            bid: {
+              method: parseHomerunMethod(homeruns.settings.method),
+              averageFt: homeruns.settings.averageFt,
+              minimumFt: homeruns.settings.minimumFt,
+            },
+          }),
+          routing: {
+            pct: homeruns.settings.routingPct ?? 0,
+            applied: homeruns.settings.routingPct !== null,
+          },
+          counted: homeruns.rows.filter(r => r.footage.state === "computed")
+            .length,
+          // Said beside the line in amber, not inside it.
+          unconfirmed: 0,
+          sheetsDiffering: homeruns.sheetMethods.length,
+        }),
+        unconfirmed: homeruns.totals.unconfirmed,
+        /*
+          Whether that footage is IN the total above. A line says "38
+          homeruns" whether or not the homerun type was ever sent, and on
+          a bid where it was not, that read as priced (seen on screen,
+          2026-10-07). So it says which.
+        */
+        offBid:
+          homeruns.settings.runTypeId === null
+            ? "no run type picked, so none of it is on this bid"
+            : lines.some(
+                  l => l.takeoffRunTypeId === homeruns.settings.runTypeId
+                )
+              ? null
+              : "not on this bid yet — send the homerun type from the",
+      }
+    : null;
   /** Of the tally's parts: lines with labor and no material at all. */
   const materialMissing = materialMissingLines(lines);
   /** Lines whose assembly hours were not set (D1) — the tally's own count. */
@@ -1428,6 +1474,31 @@ export default function BidsPage({
                 hand-priced line can take a typed price and a line sent from
                 the plans froze its price when it was sent.
               */}
+              {/*
+                DROPS NOT PRICED (owner, 2026-10-07): a count whose drops have
+                no material leaves them out of every figure here, and they are
+                not lines, so the strip above cannot list them. Said under the
+                totals they are missing from, with where to fix it; they are
+                in `notPricedTally` too, so the totals carry "+ N drops not
+                priced" and a priced print is blocked until they are priced.
+              */}
+              {dropsNotPriced > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {dropsNotPriced} drop{dropsNotPriced === 1 ? "" : "s"} not
+                      priced — drop material not set
+                    </span>{" "}
+                    — the totals above leave{" "}
+                    {dropsNotPriced === 1 ? "it" : "them"} out, and a priced
+                    proposal cannot print until{" "}
+                    {dropsNotPriced === 1 ? "it is" : "they are"} priced. Pick
+                    what each drop is made of on its count, on the{" "}
+                    <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
               {notPriced.length > 0 && (
                 <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
                   <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
@@ -1685,6 +1756,33 @@ export default function BidsPage({
                     <PlansLink bidId={bidId} />.
                   </p>
                 </div>
+              )}
+
+              {/*
+                HOMERUNS (homerun-footage-plan.md § 7): one line saying how
+                they were made — the method, the routing, how many — and the
+                unconfirmed ones, which ARE in the total (owner Q3), tallied
+                beside it so nothing is silently trusted.
+              */}
+              {homerunLine && (
+                <p className="text-[11px] leading-snug text-muted-foreground my-1 px-0.5">
+                  {homerunLine.text}
+                  {homerunLine.unconfirmed > 0 && (
+                    <span className="text-[#B45309] dark:text-[#F59E0B]">
+                      {" "}
+                      + {homerunLine.unconfirmed} unconfirmed
+                    </span>
+                  )}
+                  {homerunLine.offBid ? (
+                    <span className="text-[#B45309] dark:text-[#F59E0B]">
+                      {" — "}
+                      {homerunLine.offBid}{" "}
+                    </span>
+                  ) : (
+                    " — "
+                  )}
+                  <PlansLink bidId={bidId} />
+                </p>
               )}
 
               {/*

@@ -1,11 +1,13 @@
 # Track C — handoff, 2026-10-06
 
-Written for a restart. Worktree `C:\dev\BidPhase-C`, branch `track-c`.
-At the time of writing, track-c and local-dev were the same commit, everything
-was committed and pushed, and `main` was `24105ad`. C's databases
-`bidrender_local_c` and `bidrender_test_c` had 105 migrations (through
-0104); `bidrender_local_c` was brought to all 125 (through 0124) on
-2026-10-06 to run the Plans screen, `bidrender_test_c` was not. If `git log origin/local-dev` or `scripts/schemaDrift.mts` says
+Written for a restart. Worktree `C:\dev\BidPhase-C`. **Two branches now
+(2026-10-07):** `track-c` (= local-dev `87affe0` when written, green) and
+`c-homerun-footage` (track-c + Track A's `a-batch-c-0125` + the homerun
+footage work — NOT for local-dev, see "The exact next step"). The worktree
+was left on `c-homerun-footage`; `git checkout track-c` for anything else.
+`main` was `24105ad`. C's databases `bidrender_local_c` and
+`bidrender_test_c` both have 131 migrations (through 0130). If `git log
+origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
@@ -293,28 +295,282 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ## The exact next step
 
-**Homerun footage: C IS WAITING ON TRACK A'S COLUMNS** before any footage
-math is built (`references/homerun-footage-plan.md`, all owner questions
-answered 2026-10-06). The columns, as listed in todo.md § "Track A next
-migration batch" → "Homerun footage" and § "Before beta: height areas
-inside a sheet":
+### MERGE NOTE FOR TRACK A (2026-10-08) — `c-homerun-footage` is ready; A merges it
 
-- `bids`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`,
-  `homerunRoutingPct`, `homerunRunTypeId`.
-- `bid_pdf_sheets`: `homerunMethod`, `homerunAverageFt`, `homerunMinimumFt`
-  (the area override; the sheet's ceiling is 0108's
-  `distributionHeightInches`, already numbered).
-- `bid_panels`: `planSheetId`, `planX`, `planY` (where the panel sits).
-- `bid_panel_circuits`: `homerunOverrideFt`, `homerunFromStampId`,
-  `homerunConfirmedAt`, `homerunCeilingInches`.
-- New table `bid_height_areas` (before beta).
-- Also `takeoff_run_circuits.panelCircuitId` (a traced homerun replaces the
-  computed one).
+**local-dev (`615f122`) is merged INTO the branch** (merge `96635c1`). A
+merges the branch into local-dev WITH migrations 0125–0130 (pairing rule).
+**local-dev still ends at 0124 — no renumbering needed;** if anything lands
+above 0124 first, renumber 0125–0130 above it before merging.
 
-Step 1 of plan § 10 (the pure calculator) is DONE and standalone. Until
-the columns land, C wires nothing of it in. Once they do: plan § 10
-steps 2–4, reading `shared/homerunFootage.ts` as the one place the
-arithmetic lives.
+**What clashed, and how it was fixed:**
+
+| File                                                        | Clash                                                                                                                                              | Fix                                                                            |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `shared/lineNotPriced.ts`                                   | B's `hours` and C's `drops` on `NotPricedTally`; **git kept TWO `tallyLeavesOut` functions** (B's read hours, C's read drops)                      | One type with both; ONE `tallyLeavesOut` reading lines, parts, hours AND drops |
+| `shared/proposal.ts`                                        | same `pricePending` line                                                                                                                           | kept B's `hoursPending`                                                        |
+| `client/src/lib/notPricedTotal.ts`                          | B restructured suffix/headline (priced items, then hours)                                                                                          | B's shape, drops in the priced group                                           |
+| `client/src/lib/notPricedTotal.ts` — **NO conflict marker** | B's new `materialsShare` (totals split) built the tally field by field and **silently dropped `drops`**: Materials row lost "+ N drops not priced" | carries drops (missing drop MATERIAL); `laborShare` unchanged                  |
+| `notPricedTotal.test.ts`, `dashboardFollowsDrawing.test.ts` | C's one-token `, 0` edits vs B's edits                                                                                                             | took B's files whole, re-added the required `dropsNotPriced` argument          |
+| `server/routers/assembliesRouter.ts`                        | imports                                                                                                                                            | both kept                                                                      |
+| `CHANGELOG.md`                                              | both sides' 2026-10-07 entries                                                                                                                     | both kept                                                                      |
+
+**Kept from local-dev, checked present:** Most used row (`MostUsedRow`,
+both pickers), totals split (`materialsShare`/`laborShare`), upload stream
+fix (`disableStream` in `shared/pdfRangeLoading.ts`), Labor-only tick box
+(beside C's "Mounts at" in the assembly editor).
+
+**Checked:** `pnpm check` clean; touched tests 152/152 locally
+(dropsNotPriced, notPricedTotal, dashboardFollowsDrawing, proposal,
+deviceMountKind, groupDrops, assemblies). Full suite: GitHub Actions run
+37709024423 on the mirror branch `a-ci-c-homerun-footage` (the Gate does
+not run on `c-*`; a `track-*` name would trip drizzle-guard on A's 0125–0130
+commits). **Delete `a-ci-c-homerun-footage` after merging.** On screen at
+1180x820 touch: E111 38 homeruns / 11,988.1 ft wire / 2B-1 42.8 ft
+(unchanged by the merge); Ceilings panel opens; Most used row shows (3
+throwaway bids made for it, deleted); bid totals "Materials $0.00 + 205
+drops not priced", Labor without it; no page errors.
+
+**A must check after merging:** (1) CI green on local-dev; (2) apply
+0125–0130 to staging BEFORE the code reaches it (step 1, additive — the
+Gate's deploy refuses a drizzle/ change anyway). The catalog rename was
+checked: no test this branch adds or changes looks a material up by a
+renamed name (`'1/2" EMT'` is not renamed; `"#12 THHN"` is used only in
+local-dev's own tests).
+
+**Patent Option A — DONE on `c-homerun-footage` (2026-10-07).** The dashed
+one-corner device-to-panel line is removed from `CircuitLayer`; a picked
+circuit's devices are ringed (leaving device larger) and the panel stays
+marked, with NO path between them. Length math untouched (homerun suites
+pass unchanged). Guard: `server/noHomerunPath.test.ts` (reads the layer's
+source, comments stripped; red on the old file). Seen at 1180x820 touch on
+E111, circuit 2B-1: 7 rings, 1 panel mark, 0 line elements, 42.8 ft.
+`references/homerun-patent-notes.md` § 4 now quotes claims 1, 13 and 4–9
+(fetched from Google Patents; attorney to verify the wording) and says per
+element what the app does. Honest flag in it: |Δx| + |Δy| equals the length
+of the one-corner orthogonal path even with nothing drawn. Do NOT add a
+straight-line / "direct" option (claim 1).
+
+**Drops not priced are in the bid's not-priced check — DONE on
+`c-homerun-footage` (2026-10-07, owner YES).** `NotPricedTally.drops`
+(optional, so B's lines-only tallies need no edit), `withDropsNotPriced`
+(adds nothing when 0), `tallyLeavesOut` (the print's gate),
+`db.bidDropsNotPriced` → `bids.get.dropsNotPriced` and the proposal's tally.
+`bidNotPricedCount(lines, dropsNotPriced)` takes it as a REQUIRED argument.
+Seen at 1180x820 touch on E111 (a $100 line added for the check, removed
+after): totals "$100.00 + 205 drops not priced", strip "205 drops not priced
+— drop material not set …", proposal "Price pending", Print blocked:
+"205 drops are not priced … until they are priced on the Plans screen".
+**Merge hazard for A/B:** local-dev's own `tallyLeavesOut` (with `hours`)
+must keep drops — `server/dropsNotPriced.test.ts` guards it (todo.md).
+Not in analytics or dashboard cards (todo, owner's call).
+
+**Patent notes — PLAN ONLY:** `references/homerun-patent-notes.md` for the
+attorney (US 11,120,171): how each method gets its length (right-angle
+distance, no route stored, one dashed display line when a circuit is
+picked), nothing like avoid-areas or tray-following, and options A (drop the
+display line), B (user traces every homerun), C (typed lengths only).
+
+**Viewing never changes a saved number; drop material not set is said; run
+names say "No drop here" — DONE on `c-homerun-footage` (2026-10-07).**
+
+- **Homeruns:** `syncHomerunCircuit` takes `repoint` (required). A visit's
+  `homeruns.syncSheet` only creates circuits it has not seen (leaving device
+  written once); `rematch: true` re-points UNCONFIRMED ones (confirmed never)
+  and returns `{ created, repointed }`. Sent by "Re-match homeruns on this
+  sheet" (Circuits panel, beside Confirm) and by the first sync after a
+  panel is placed or removed BY HAND (`rematchOnNextSync`). A "PANEL 2B"
+  label only fills a panel with no saved spot — it used to move a
+  hand-placed one back on every visit.
+- **Seen at 1180x820 touch, UNCC E111:** three open/close visits — totals
+  identical (38 homeruns, 3,996.04 ft pipe, 11,988.13 ft wire, same leaving
+  devices). Then 3 unconfirmed homerun devices pointed elsewhere by SQL (as an
+  old sync left them): 3 visits identical at 4,271.28 / 12,813.84 ft (the old
+  code moved them on the first); "Re-match" → toast "3 homeruns re-matched
+  to the device now closest", 3,996.04 / 11,988.13 ft; 3 more visits
+  identical.
+- **No drop material:** `groupDrops` reason is `DROP_MATERIAL_NOT_SET`
+  ("drop material not set") with `notPricedDrops` (wanted, with a height,
+  not claimed); row "Drop material not set — 86 drops not priced";
+  Totals "205 drops not priced — drop material not set on 5 counted items.
+  Not in these totals."; materials list "NOT on this list: …". Never 0 ft.
+  The BID page does not say it yet (todo, owner's call).
+- **Run name:** `runNameParts` names an end at run height
+  `END_NO_DROP_LABEL` — "Panel → No drop here" (owner wrote "No drop";
+  kept the full phrase so name, row, chip and picker are one string).
+- Tests: `homerunsRouter.test.ts` (three visits identical — red with the old
+  re-pointing; Re-match re-points unconfirmed only), `groupDrops.test.ts`
+  +3 (+1 reworded), `deviceMountKind.test.ts` +1 (Totals + materials list),
+  `takeoffVerticals.test.ts` run name.
+
+**Count drops from the item, Data/TV type, "No drop here" picker — DONE on
+`c-homerun-footage` (2026-10-07, owner's three YESes), no new column.**
+
+- **Count drops:** `loadGroupDrops` resolves each count's kind with
+  `deviceKind` (count's "Each drops to", else its item's "Mounts at"; the
+  row says "— from the item" and "(default height)"). The run type a drop is
+  made of is still asked per count. **No box twice:** a box a computed
+  homerun rises from (up-drop counted) is claimed like a run end's
+  (`groupDrops` `homerunClaims`, REQUIRED); the row says "N marks are where
+  a homerun rises". `takeoffRuns.drops` labels by the resolved kind.
+- **Data / TV / Low voltage:** shipped type `low-voltage`, 18", common.
+  Starters MS6/MS7/MS8 ship `mountsAt: "low-voltage"` (insert, plus a
+  fill-only pass in `seedBaselineAssemblies` — never over an answer).
+- **Wording:** `endKindLabel(distribution)` = `END_NO_DROP_LABEL` ("No drop
+  here"), so the picker beside the chip and the trace toolbar match it; the
+  picker now sizes to its text (it cut "No drop he" at tablet size — seen).
+  The "Mounts at" picker was widened too (cut "Data / TV / Low voltage –").
+- **Measured, old rule vs new on the SAME data** (code switched, all
+  counts given 1/2" EMT as their drop type, items: duplex, double duplex,
+  USB, GFCI → Receptacle; switch → Switch; J-box → wall J-box; data/TV →
+  Data/TV):
+  - UNCC E111: count drops 108 → 205, pipe 918.00 → 1,645.00 ft, wire
+    3,672.00 → 6,580.00 ft; **boxes counted twice 22 → 0**; homeruns
+    76/76 either way (3,996.04 ft).
+  - Weld 1 E-200 (answer-key bid 1728355): count drops 0 → 30, pipe 0 →
+    173.50 ft, wire 0 → 694.00 ft (no homeruns on that bid).
+  - Data/TV on E111: homerun drops 75 → 76 of 76, installed 3,987.54 →
+    3,996.04 ft, wire 11,962.63 → 11,988.13 ft.
+  - Hand checks: E111 190 × 8.5 + 15 × 2 = 1,645; Weld 11 × 2 + 15 × 8.5 +
+    4 × 6 = 173.5.
+- **Seen at 1180x820 touch:** "Mounts at" lists "Data / TV / Low voltage —
+  1'-6"" and saved it on the data item; the five E111 counts read "… — from
+  the item", "(default height)", "22 / 5 / 7 / 1 marks are where a homerun
+  rises"; a run end at "No drop here" shows it on chip and picker.
+- **Left in C's local DB:** the "Mounts at" answers on user 22173517's
+  items (that is the shop library). Every count's drop type and the test
+  runs were put back.
+- **Measuring note:** opening the Circuits panel re-points unconfirmed
+  homeruns, so homerun numbers move between visits (todo.md).
+- Tests: `deviceMountKind.test.ts` +5 (2 red with the change switched off),
+  `groupDrops.test.ts` +3 (homerun claims), `takeoffVerticals.test.ts`
+  (new type; end label — red before).
+
+**Shop default heights + "No drop here" — DONE on `c-homerun-footage`
+(2026-10-07), no new column** (the owner asked for columns; every answer
+already had one — table in `migrations-next-batch.md` § Batch C, todo.md
+beside it).
+
+- **Device type from the item:** `deviceKind(dropKind, assemblies.mountHeightTypeKey)`
+  (0110, unread until now) for homeruns (`loadBidHomeruns`) and linked run
+  ends (`getMarksLinkedByRuns`), resolved through forks
+  (`getAssemblyMountKinds`). Set as "Mounts at" in the assembly editor
+  (`assemblies.mountTypes`, library permission); refused if not a height
+  type (`server/knownHeightKind.ts`, shared with run ends). Count drops
+  unchanged (todo, owner's call).
+- **"default height"** where the type's height is in use: homerun rows
+  ("8.5 ft up (default height)", `homerunBreakdown` takes the source,
+  required) and run ends (`@/lib/heightSourceWords`). A device with no type:
+  "up not counted — device type not said".
+- **Open space:** the chip "Nothing" is now **"No drop here"** (same saved
+  answer: end kind `distribution`); an unanswered end reads "nothing there —
+  no drop counted" with "Pick what is here … or No drop here"; a drag that
+  leaves an end bare lights it in Run ends and says so in a toast.
+- **UNCC E111 (bid 1728359), duplex count answered as Receptacle, panel
+  6'-0" on the bid:** before 62 of 76 homerun drops (14 up missing: 7 USB,
+  3 GFCI, 3 J-box, 1 TV data), 4,028.31 ft pipe, 12,084.94 ft wire. After
+  "Mounts at" (USB by tablet screen; GFCI — a shipped item, forked — and
+  J-box by API): 75 of 76, 4,119.31 ft (+91.00 = 10 × 8.5 + 3 × 2), wire
+  12,357.94. The 16 in the earlier note could not be reproduced: the
+  leaving devices have been re-synced since. Circuits panel on screen: 37
+  rows "(default height)", 1 "device type not said".
+- **Open-space end, on screen at 1180x820 touch:** a run onto duplex A,
+  8.5 ft drop, 3 straps. Dragged into open space: end lit, "nothing there —
+  no drop counted", 17 ft, "At least 3 straps … (1 run has a drop with no
+  height …)". "No drop here": "no drop here", warning gone, 3 straps, kind
+  `distribution` saved. Fixture run removed; the homerun setup on the bid
+  (scale, panel spot, homerun type, duplex Receptacle, panel 6'-0", the
+  three "Mounts at") is LEFT for the next check.
+- Tests: `server/deviceMountKind.test.ts` (8; 5 red with `deviceKind`
+  ignoring the item), runSetPoints +1, `heightSourceWords.test.ts`,
+  homerunText +2, runEndPicks label.
+
+**Track B's Gap 1 is FIXED on `c-homerun-footage` (2026-10-07)** —
+`references/track-b-plans-screen-gaps-plan.md` on branch `track-b`, which C
+cannot edit: **Track B, mark Gap 1 done there and do not build it again.**
+A run end that is dragged (or moved by removing an end point) now claims the
+mark it is let go on, or nothing in open space. What "claimed" means is
+unchanged: `startStampId` / `endStampId`, the run takes that box's drop and
+the mark's own drop is held back (`endOfRun`, `groupDrops`).
+
+- Client: `endClaimsAfterEdit` (`@/lib/legSnap`) in TraceLayer's one
+  `commitEdit`, same `snapToMark` as a trace click (never an unconfirmed
+  mark); an exact hit on a mark's connect point wins, since the drag snapped
+  there. An end that did not move and a tee end are not sent. Undo and redo
+  carry the claims (`undoStack` `setPoints` / `restorePoints` `ends`).
+- Server: `setPoints` takes optional `startStampId` / `endStampId`, checked by
+  `requireClaimableMarks` (shared with `setEnds`: own sheet, confirmed),
+  refuses a mark on a tee end, and clears that end's `startConnect` /
+  `endConnect` when the claim changes. The end keeps its KIND.
+- Tests: `server/runSetPoints.test.ts` (7 new; 3 go red with the claim write
+  off — off the mark, onto B, connect cleared) and `legSnap.test.ts` (6).
+- **Seen on screen, 1180x820 touch, UNCC E111** (bid 1728359, fixture removed
+  after): a 10 ft run ending on duplex A. Before: run 10 + 8.50 drop,
+  107 duplexes drop on their own (909.50 ft), EMT 928.00 ft. Dragged onto B:
+  claims B, run `13.28 + 8.50`, A drops again, EMT 931.28. Dragged into open
+  space: claim gone, run 17 ft with no drop, 108 duplexes drop (918.00), EMT
+  935.00 — before the fix this read 17 + 8.50 from A and 107. Ctrl+Z:
+  "Undone: run points edited", back on A, `9.98 + 8.50`, 107.
+- **Seen and left as is:** an end dragged off a mark that had no kind of its
+  own (it read the mark's) is "nothing there", so the fittings say "1 run has
+  a drop with no height, so its length is short". True — nobody has said what
+  is at that end — but owner's call whether the end should keep the device's
+  kind instead.
+
+**`c-homerun-footage` IS READY FOR TRACK A** (since 2026-10-07, when
+homerun couplings, connectors and straps landed — the owner's condition:
+"this must be done before Track A merges the branch"). Everything added
+since (height areas; one ceiling rule for every drop; pass-through drops;
+homerun bends) is on the same branch and ready with it.
+
+**THE MERGE RULE — for Track A:**
+
+1. **The branch merges TOGETHER WITH A's migrations 0125–0130**
+   (`a-batch-c-0125`, already merged into the branch). Never the branch
+   without them: its code reads `bid_panels`, `bid_panel_circuits`,
+   `bid_height_areas`, the `bids` / `bid_pdf_sheets` homerun columns and
+   `takeoff_run_circuits.panelCircuitId`, and a bare `select()` on a
+   database without them takes the Plans screen down. Never the migrations
+   without the code either (pairing rule).
+2. **If ANY other migration lands on staging or live first, A renumbers
+   0125–0130 above it before merging.** The migrator skips a file numbered
+   below one already applied (§ R.1 in migrations-next-batch.md), so a
+   0125 behind an applied 0131 is silently never run. Checked 2026-10-07:
+   local-dev still ends at 0124, so no renumbering yet.
+3. **Two more columns are asked** (migrations-next-batch.md § Batch C):
+   `bids.homerunExtraBends` and `takeoff_runs.runsAt`. The branch does NOT
+   need them to merge — it treats them as not set (1 extra bend,
+   unconfirmed; every run through the ceiling) and holds their two
+   controls. When they land, C wires them (the list of what is owed is in
+   that section).
+4. **These change bid numbers** (owner-approved): runs and count drops now
+   read the sheet's ceiling and height areas; a pass-through box counts two
+   drops; homeruns count bends. Before/after for UNCC E111 are in
+   homerun-footage-plan.md § 10.
+
+**Homerun footage steps 2–4 are BUILT on branch `c-homerun-footage`
+(2026-10-07), on Track A's 0125–0130 (`a-batch-c-0125`). DO NOT merge that
+branch into track-c or local-dev:** staging would get code that asks for
+columns it does not have. Track A merges it WITH the migrations (pairing
+rule 3). What is on it, and what is not, is in
+`homerun-footage-plan.md` § 10; the two notes for A are in
+`migrations-next-batch.md` § Batch C. **track-c itself does not have this
+work** — anything new on track-c meanwhile must not touch
+`groupRunFootage`'s inputs, or the merge will conflict (the branch makes
+`homeruns` a required input).
+
+C's two local databases (`bidrender_local_c`, `bidrender_test_c`) are at
+**131 migrations** (through 0130) since 2026-10-07 — ahead of track-c's
+code, which is fine (additive). The server tests for the branch need
+`bidrender_test_c`: `server/homerunsRouter.test.ts` (12),
+`server/homerunsCore.test.ts` (22), `server/homerunFootage.test.ts` (44),
+plus `client/src/lib/homerunSync.test.ts` and `homerunText.test.ts`.
+
+Homerun fittings: DONE (plan § 10), bends included since 2026-10-07.
+Height areas: DONE, reachable from "Ceilings" on every scaled sheet, read
+by every drop. Reshaping an area is a before-beta todo. Next on homeruns,
+when the owner says: tying a traced run
+to a circuit (`panelCircuitId` is read, nothing sets it); per-sheet
+average/minimum amounts on screen.
 
 **Older next step (still open), item 1, the on-screen pass**, then item 2. For the screen: Weld 1 E-200
 (vector) on "Legend capture check" (bid 1728356) and the trick from

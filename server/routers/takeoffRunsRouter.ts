@@ -63,6 +63,7 @@ import {
   runNameParts,
 } from "../../shared/takeoffCounts";
 import * as db from "../db";
+import { requireKnownKind } from "../knownHeightKind";
 import {
   RUN_PACKET,
   openPacket,
@@ -121,27 +122,6 @@ const kindSchema = z.string().trim().min(1).max(64).nullable();
 
 /** An elevation override on one run, in inches. Same range as the settings. */
 const runInchesSchema = z.number().int().min(-240).max(600).nullable();
-
-/**
- * Refuse a height type this company does not have.
- *
- * An unknown key is not harmless: it resolves to "not set", so the run quietly
- * counts no vertical and nothing on screen says why. Refusing the save beats
- * storing something that silently means nothing.
- */
-async function requireKnownKind(
-  kind: string | null,
-  userId: number
-): Promise<void> {
-  if (kind === null || kind === DISTRIBUTION_KIND) return;
-  if (shippedHeightType(kind)) return;
-  const own = await db.getMountingHeights(userId);
-  if (own.some(row => row.typeKey === kind)) return;
-  throw new TRPCError({
-    code: "BAD_REQUEST",
-    message: "That is not one of your height types.",
-  });
-}
 
 /**
  * A traced vertex, in PDF page points.
@@ -213,6 +193,42 @@ async function refuseIfRunLocked(
     throw new TRPCError({ code: "NOT_FOUND", message: "Run not found." });
   const run = await requireRun(runId, userId);
   await refuseIfLocked(run.bidId, userId, what);
+}
+
+/**
+ * The marks a run end may claim: on the run's OWN sheet, and confirmed.
+ * One check for `setEnds` and `setPoints`, so a link chosen in the panel and
+ * one made by dragging an end onto a mark cannot be held to different rules.
+ *
+ * Linking across sheets would suppress a vertical somewhere the estimator is
+ * not looking, which is the one thing this link must never do quietly.
+ */
+async function requireClaimableMarks(
+  sheetId: number,
+  ids: readonly (number | null | undefined)[],
+  userId: number
+) {
+  const claiming = ids.filter((id): id is number => typeof id === "number");
+  if (claiming.length === 0) return;
+  const onSheet = await db.getStampsForSheet(sheetId, userId);
+  const byId = new Map(onSheet.map(stamp => [stamp.id, stamp]));
+  for (const stampId of claiming) {
+    const stamp = byId.get(stampId);
+    if (!stamp) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "That mark is not on this sheet.",
+      });
+    }
+    // Rule 2 of shared/markStatus.ts, enforced here as well as in the
+    // client's snap.
+    if (!markIsSnapTarget(stamp.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: UNCONFIRMED_MARK_REFUSAL,
+      });
+    }
+  }
 }
 
 /**
@@ -1196,20 +1212,64 @@ export const takeoffRunsRouter = router({
    * point whose corner moved is dropped so it is proposed again, and the
    * count is returned so the screen can say so. Refused on a locked bid.
    *
+   * ── An end that MOVED says which mark it now sits on ─────────────────────
+   * Track B's Gap 1 (2026-10-07): this wrote the points and nothing else, so
+   * an end dragged OFF a receptacle still claimed it — the run kept that
+   * box's drop and the box's own drop stayed suppressed — and an end dragged
+   * ONTO another mark claimed nothing. The drawing said one thing and the
+   * wire footage another. Now the client sends `startStampId` / `endStampId`
+   * for an end it moved: the mark it landed on, or null for open space.
+   * Omitted means the end did not move and its claim stays. The end keeps
+   * its KIND either way (an end off a mark falls back to its kind's height,
+   * as an end that never had one does), and a changed claim clears that
+   * end's wall-connection answer, which was about the old box.
+   *
    * Returns `undo`: the run's whole network as it was, which puts back the
-   * points AND any pull-point answer the move cleared.
+   * points, the claims AND any pull-point answer the move cleared.
    */
   setPoints: procedure
     .input(
       z.object({
         id: z.number().int().positive(),
         points: pointsSchema.min(2),
+        startStampId: z.number().int().positive().nullable().optional(),
+        endStampId: z.number().int().positive().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const run = await requireRun(input.id, userId);
       await refuseIfLocked(run.bidId, userId);
+      // A tee end belongs to no mark (D20) — the same guard as `setEnds`.
+      if (
+        (run.startTeeId !== null && input.startStampId != null) ||
+        (run.endTeeId !== null && input.endStampId != null)
+      )
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "That end is a branch tee — it carries on at run height, so it has no kind, height or mark.",
+        });
+      await requireClaimableMarks(
+        run.sheetId,
+        [input.startStampId, input.endStampId],
+        userId
+      );
+      const claims: Record<string, unknown> = {};
+      if (
+        input.startStampId !== undefined &&
+        input.startStampId !== run.startStampId
+      ) {
+        claims.startStampId = input.startStampId;
+        claims.startConnect = null;
+      }
+      if (
+        input.endStampId !== undefined &&
+        input.endStampId !== run.endStampId
+      ) {
+        claims.endStampId = input.endStampId;
+        claims.endConnect = null;
+      }
       const sheet = await requireSheet(run.sheetId, userId);
       const measurability = measurabilityOf(sheetScale(sheet));
       const ratio = measurability.ok ? measurability.ratio : null;
@@ -1227,6 +1287,7 @@ export const takeoffRunsRouter = router({
             points,
             lengthInches: inches === null ? null : inches.toFixed(4),
             scaleRatioUsed: ratio === null ? null : String(ratio),
+            ...claims,
           });
           return db.dropOrphanedPullPoints(input.id, userId, points);
         }
@@ -1566,11 +1627,16 @@ export const takeoffRunsRouter = router({
         await db.getSheetScalesForBid(input.bidId, ctx.scope.dataUserId)
       );
       const dropEntries = markDropEntries(drops);
+      // Homeruns too, as the bid line has them (homerun plan § 10).
+      const homerunEntries =
+        (await db.loadBidHomeruns(input.bidId, ctx.scope.dataUserId, heights))
+          ?.entries ?? [];
 
       const measure = (
         rows: typeof runs,
         withWire: (id: number) => boolean,
-        markDrops: typeof dropEntries
+        markDrops: typeof dropEntries,
+        homeruns: typeof homerunEntries
       ) =>
         totalQuantities(
           rows.map(run => ({
@@ -1586,13 +1652,19 @@ export const takeoffRunsRouter = router({
             // A branched run is several rows and ONE run in the counts (D20).
             runKey: rootOf(run),
           })),
-          markDrops
+          markDrops,
+          homeruns
         );
 
-      const totals = measure(runs, id => wireCounts.has(id), dropEntries);
-      // Untyped RUNS only: a drop with no type is not footage anybody can
-      // price, and is counted below as its own note.
-      const untyped = measure(noType, () => true, []);
+      const totals = measure(
+        runs,
+        id => wireCounts.has(id),
+        dropEntries,
+        homerunEntries
+      );
+      // Untyped RUNS only: a drop or homerun with no type is not footage
+      // anybody can price, and is counted elsewhere.
+      const untyped = measure(noType, () => true, [], []);
       const roots = (rows: typeof allRuns) => new Set(rows.map(rootOf)).size;
       const leftOut: RunTotalsLeftOut = {
         noType: {
@@ -1621,6 +1693,8 @@ export const takeoffRunsRouter = router({
          */
         markDropNotes: {
           noTypeGroups: drops.filter(d => d.status === "no-type").length,
+          /** Drops NOT PRICED for want of a drop material — said, never 0 ft. */
+          notPricedDrops: drops.reduce((n, d) => n + d.notPricedDrops, 0),
           noHeightGroups: drops.filter(d => d.status === "no-height").length,
           mayDoubleCount: drops.reduce((n, d) => n + d.mayDoubleCount, 0),
         },
@@ -1700,33 +1774,11 @@ export const takeoffRunsRouter = router({
       if (input.endKind !== undefined)
         await requireKnownKind(input.endKind, userId);
 
-      // A stamp may only be claimed by a run on its OWN sheet. Linking across
-      // sheets would suppress a vertical somewhere the estimator is not
-      // looking, which is the one thing this link must never do quietly.
-      const claiming = [input.startStampId, input.endStampId].filter(
-        (id): id is number => typeof id === "number"
+      await requireClaimableMarks(
+        run.sheetId,
+        [input.startStampId, input.endStampId],
+        userId
       );
-      if (claiming.length > 0) {
-        const onSheet = await db.getStampsForSheet(run.sheetId, userId);
-        const byId = new Map(onSheet.map(stamp => [stamp.id, stamp]));
-        for (const stampId of claiming) {
-          const stamp = byId.get(stampId);
-          if (!stamp) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "That mark is not on this sheet.",
-            });
-          }
-          // Rule 2 of shared/markStatus.ts, enforced here as well as in the
-          // client's snap.
-          if (!markIsSnapTarget(stamp.status)) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: UNCONFIRMED_MARK_REFUSAL,
-            });
-          }
-        }
-      }
 
       const patch: Record<string, unknown> = {};
       const fields = [
@@ -2058,10 +2110,8 @@ export const takeoffRunsRouter = router({
           groupId: d.groupId,
           groupLabel: groupLabel.get(d.groupId) ?? "Count",
           label:
-            heightTypeLabel(
-              groups.find(g => g.id === d.groupId)?.dropKind ?? "",
-              heights.types
-            ) ?? "",
+            // The RESOLVED kind: the count's, else its item's "Mounts at".
+            heightTypeLabel(d.dropKind ?? "", heights.types) ?? "",
           count: d.countedMarks.length,
           // One length only when every mark drops the same: a mark at its
           // own height makes "N × one drop" false, so it is never sent.

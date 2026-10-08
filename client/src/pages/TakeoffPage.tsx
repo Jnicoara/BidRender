@@ -92,11 +92,20 @@ import {
   markIsSnapTarget,
   type UserMarkStatus,
 } from "@shared/markStatus";
+import { groupByCircuit } from "@/lib/circuitGroups";
+import { outlineFromTaps } from "@shared/homerunFootage";
+import { formatElevation } from "@shared/takeoffHeights";
 import {
-  groupByCircuit,
-  readPanelSpots,
-  rememberPanelSpot,
-} from "@/lib/circuitGroups";
+  HeightAreasLayer,
+  HeightAreasSection,
+  CeilingsPanel,
+  CeilingsToggle,
+} from "@/components/takeoff/HeightAreas";
+import {
+  confirmableHomeruns,
+  homerunSyncPayload,
+  syncSignature,
+} from "@/lib/homerunSync";
 import {
   CircuitLayer,
   CircuitsPanel,
@@ -441,6 +450,7 @@ import {
 } from "@/lib/traceDraft";
 import {
   legSnapLabel,
+  newRunStart,
   quantitySnap,
   resolveLegStart,
   type LegSnap,
@@ -3666,6 +3676,9 @@ export default function TakeoffPage({
         case "takeoffHeights.forBid":
           void utils.takeoffHeights.forBid.invalidate({ bidId });
           return;
+        case "homeruns.forBid":
+          void utils.homeruns.forBid.invalidate({ bidId });
+          return;
         case "bidPdfs.list":
           void utils.bidPdfs.list.invalidate({ bidId });
           return;
@@ -3769,6 +3782,7 @@ export default function TakeoffPage({
           const r = await undoSetPoints.mutateAsync({
             id: op.runId,
             points: op.points,
+            ...op.ends,
           });
           return r.undo
             ? {
@@ -3776,12 +3790,18 @@ export default function TakeoffPage({
                 packet: r.undo,
                 runId: op.runId,
                 points: op.points,
+                ends: op.ends,
               }
             : null;
         }
         case "restorePoints":
           await undoRestoreRun.mutateAsync({ undo: op.packet });
-          return { kind: "setPoints", runId: op.runId, points: op.points };
+          return {
+            kind: "setPoints",
+            runId: op.runId,
+            points: op.points,
+            ends: op.ends,
+          };
         case "setEnds": {
           const r = await undoSetEnds.mutateAsync({
             id: op.runId,
@@ -4297,15 +4317,27 @@ export default function TakeoffPage({
   const [showCircuits, setShowCircuits] = useState(false);
   const [circuitPick, setCircuitPick] = useState<CircuitPick>(null);
   const [placingPanel, setPlacingPanel] = useState<string | null>(null);
-  const [panelSpots, setPanelSpots] = useState<
-    Record<string, { x: number; y: number }>
-  >({});
+  /*
+    HOMERUNS (homerun-footage-plan.md § 10). The panels' spots live on the
+    server now (`bid_panels`, 0125) — they were kept per browser until
+    2026-10-07, so a colleague's tablet never saw them and nothing could be
+    priced from them. Per BID: the footage on every sheet lands on one line.
+  */
+  const homerunsQuery = trpc.homeruns.forBid.useQuery({ bidId });
+  const homerunData = homerunsQuery.data ?? null;
+  const panelSpots = useMemo(() => {
+    const spots: Record<string, { x: number; y: number }> = {};
+    for (const p of homerunData?.panels ?? [])
+      if (
+        p.name &&
+        p.planSheetId === activeSheet?.id &&
+        p.planX !== null &&
+        p.planY !== null
+      )
+        spots[p.name] = { x: p.planX, y: p.planY };
+    return spots;
+  }, [homerunData, activeSheet?.id]);
   useEffect(() => {
-    setPanelSpots(
-      circuitDocId === null
-        ? {}
-        : readPanelSpots(browserStorage(), circuitDocId, page)
-    );
     setCircuitPick(null);
     setPlacingPanel(null);
   }, [circuitDocId, page]);
@@ -4324,15 +4356,211 @@ export default function TakeoffPage({
         : null,
     [circuitText, stamps, panelSpots]
   );
+  const placePanel = trpc.homeruns.placePanel.useMutation({
+    // Applied at once; the server write follows (CLAUDE.md § Responsiveness).
+    onMutate: async input => {
+      await utils.homeruns.forBid.cancel({ bidId });
+      const before = utils.homeruns.forBid.getData({ bidId });
+      utils.homeruns.forBid.setData({ bidId }, data => {
+        if (!data) return data;
+        const spot = input.spot;
+        const at = {
+          planSheetId: spot?.sheetId ?? null,
+          planX: spot?.x ?? null,
+          planY: spot?.y ?? null,
+        };
+        const known = data.panels.some(
+          p => (p.name ?? "").toUpperCase() === input.panel.toUpperCase()
+        );
+        return {
+          ...data,
+          panels: known
+            ? data.panels.map(p =>
+                (p.name ?? "").toUpperCase() === input.panel.toUpperCase()
+                  ? { ...p, ...at }
+                  : p
+              )
+            : [...data.panels, { id: -1, name: input.panel, ...at }],
+        };
+      });
+      return { before };
+    },
+    onError: (error, _input, context) => {
+      if (context?.before)
+        utils.homeruns.forBid.setData({ bidId }, context.before);
+      toast.error(error.message);
+    },
+    onSettled: () => refreshFor("homerun"),
+  });
+  /*
+    Placing a panel BY HAND is a person's action, so the homeruns it moves
+    may be re-pointed (owner, 2026-10-07). The device closest to the new
+    spot is only known once the circuit read re-runs with it, so this arms
+    the NEXT sync to be a re-match rather than re-matching on the old read.
+  */
+  const rematchOnNextSync = useRef(false);
   const placePanelSpot = useCallback(
     (panel: string, spot: { x: number; y: number } | null) => {
-      if (circuitDocId === null) return;
-      setPanelSpots(
-        rememberPanelSpot(browserStorage(), circuitDocId, page, panel, spot)
-      );
+      if (!activeSheet) return;
+      rematchOnNextSync.current = true;
+      placePanel.mutate({
+        bidId,
+        panel,
+        spot: spot ? { sheetId: activeSheet.id, ...spot } : null,
+      });
     },
-    [circuitDocId, page]
+    [activeSheet, bidId, placePanel]
   );
+  /*
+    SYNC THE CIRCUITS READ HERE (plan § 10 step 2). Whenever this sheet's
+    circuits change — a mark placed, moved or deleted, a panel placed — the
+    server is told each circuit and the device its homerun leaves from, so
+    the bid line can price it. Only on a real change (`syncSignature`), and
+    never on a locked bid, whose quantities do not move.
+
+    A panel found by its "PANEL 2B" LABEL is a spot only this browser can
+    read, so it is saved too; otherwise Measured would show a number here
+    and price none on the bid.
+  */
+  const syncHomeruns = trpc.homeruns.syncSheet.useMutation({
+    onSuccess: () => refreshFor("homerun"),
+  });
+  const homerunSaved = {
+    onError: (e: { message: string }) => toast.error(e.message),
+    onSettled: () => refreshFor("homerun"),
+  };
+  const setHomerunSettings =
+    trpc.homeruns.setBidSettings.useMutation(homerunSaved);
+  const updateHomerun = trpc.homeruns.update.useMutation(homerunSaved);
+  const confirmHomeruns = trpc.homeruns.confirmMany.useMutation(homerunSaved);
+  const setSheetHomerunMethod =
+    trpc.homeruns.setSheetMethod.useMutation(homerunSaved);
+  /*
+    HEIGHT AREAS (0130, plan § 4): drawn by taps on the sheet while the
+    Circuits panel is open. An area moves the ceiling of every homerun
+    leaving a device inside it, so each change refreshes the homeruns too.
+  */
+  const heightAreasQuery = trpc.homeruns.heightAreas.useQuery({ bidId });
+  const [showCeilings, setShowCeilings] = useState(false);
+  const [drawingArea, setDrawingArea] = useState(false);
+  const [areaTaps, setAreaTaps] = useState<{ x: number; y: number }[]>([]);
+  const [areaError, setAreaError] = useState<string | null>(null);
+  const areaSaved = {
+    onError: (e: { message: string }) => toast.error(e.message),
+    onSettled: () => {
+      void utils.homeruns.heightAreas.invalidate({ bidId });
+      // A ceiling moves EVERY drop now — runs, count drops and homeruns
+      // (shared/ceilingHeights.ts) — so the heights change, not "homerun".
+      refreshFor("heights");
+    },
+  };
+  const setSheetCeiling = trpc.homeruns.setSheetCeiling.useMutation(areaSaved);
+  const sheetCeiling =
+    heightAreasQuery.data?.sheetCeilings.find(
+      s => s.sheetId === activeSheet?.id
+    )?.inches ?? null;
+  const above = heightAreasQuery.data?.above;
+  const aboveCeilingLabel =
+    above && above.inches !== null
+      ? `the ${above.source}, ${formatElevation(above.inches)}`
+      : "the job — not set, no drops counted";
+  const createHeightArea =
+    trpc.homeruns.createHeightArea.useMutation(areaSaved);
+  const updateHeightArea =
+    trpc.homeruns.updateHeightArea.useMutation(areaSaved);
+  const removeHeightArea =
+    trpc.homeruns.removeHeightArea.useMutation(areaSaved);
+  const sheetAreas = (heightAreasQuery.data?.areas ?? []).filter(
+    a => a.sheetId === activeSheet?.id
+  );
+  const sheetAreaWarnings = (heightAreasQuery.data?.warnings ?? [])
+    .filter(w => w.sheetId === activeSheet?.id)
+    .map(w => w.text);
+  useEffect(() => {
+    setDrawingArea(false);
+    setAreaTaps([]);
+    setAreaError(null);
+  }, [activeSheet?.id]);
+  const finishArea = () => {
+    if (!activeSheet) return;
+    const outline = outlineFromTaps(areaTaps);
+    if (!outline) {
+      setAreaError("Too small to be a room — tap its corners further apart.");
+      return;
+    }
+    createHeightArea.mutate({
+      bidId,
+      sheetId: activeSheet.id,
+      name: `Area ${sheetAreas.length + 1}`,
+      outline,
+      heightInches: null,
+    });
+    setDrawingArea(false);
+    setAreaTaps([]);
+    setAreaError(null);
+  };
+  const lastHomerunSync = useRef<string | null>(null);
+  /** "Re-match homeruns on this sheet" — the person's own action. */
+  const rematchHomeruns = () => {
+    if (!circuitReport || !activeSheet) return;
+    syncHomeruns.mutate(
+      {
+        bidId,
+        sheetId: activeSheet.id,
+        circuits: homerunSyncPayload(circuitReport),
+        rematch: true,
+      },
+      {
+        onSuccess: r =>
+          toast.message(
+            r.repointed === 0
+              ? "Every unconfirmed homerun already leaves from the closest device."
+              : `${r.repointed} homerun${r.repointed === 1 ? "" : "s"} re-matched to the device now closest.`
+          ),
+        onError: e => toast.error(e.message),
+      }
+    );
+  };
+  useEffect(() => {
+    if (!circuitReport || !activeSheet || !homerunData || homerunData.locked)
+      return;
+    const sheetId = activeSheet.id;
+    for (const p of circuitReport.panels) {
+      if (p.spot?.source !== "label") continue;
+      const saved = homerunData.panels.find(
+        s => (s.name ?? "").toUpperCase() === p.name.toUpperCase()
+      );
+      /*
+        A label FILLS a panel with no spot; it never moves a saved one
+        (owner, 2026-10-07: viewing must never change a saved number). It
+        used to re-save whenever the two differed, so a panel moved by hand
+        went back to the label on the next visit — and every homerun with it.
+      */
+      if (saved?.planSheetId != null) continue;
+      placePanel.mutate({
+        bidId,
+        panel: p.name,
+        spot: { sheetId, x: p.spot.x, y: p.spot.y },
+      });
+    }
+    const payload = homerunSyncPayload(circuitReport);
+    const signature = syncSignature(sheetId, payload);
+    if (signature === lastHomerunSync.current) return;
+    const timer = window.setTimeout(() => {
+      lastHomerunSync.current = signature;
+      /*
+        A visit only CREATES the circuits it has not seen; the server leaves
+        every existing homerun as it is. The one exception is the sync right
+        after a panel was placed by hand (`rematchOnNextSync`).
+      */
+      const rematch = rematchOnNextSync.current;
+      rematchOnNextSync.current = false;
+      syncHomeruns.mutate({ bidId, sheetId, circuits: payload, rematch });
+    }, 600);
+    return () => window.clearTimeout(timer);
+    // Not the mutation objects: their state changes with every call, and an
+    // effect re-run per call would sync again on its own success.
+  }, [circuitReport, activeSheet?.id, homerunData, bidId]);
 
   const { data: symbols = [] } = trpc.takeoffStamps.symbols.useQuery();
   const { data: allAssemblies = [] } = trpc.assemblies.list.useQuery();
@@ -7279,6 +7507,10 @@ export default function TakeoffPage({
             packet: result.undo,
             runId: vars.id,
             points: result.points,
+            ends: {
+              startStampId: vars.startStampId,
+              endStampId: vars.endStampId,
+            },
           },
           redo: null,
           subject: { kind: "run", id: rootOfRun(vars.id) },
@@ -7292,6 +7524,26 @@ export default function TakeoffPage({
           `${result.clearedAnswers} pull-point ${result.clearedAnswers === 1 ? "answer" : "answers"} cleared — the corner moved. Ctrl+Z puts ${result.clearedAnswers === 1 ? "it" : "them"} back.`
         );
       const run = runs.find(r => r.id === vars.id);
+      /*
+        An end let go in OPEN SPACE with no type of its own is "nothing
+        there" and counts no drop (owner, 2026-10-07). Said now, with that
+        end lit in Run ends where its two answers are — a type, or "No drop
+        here" — rather than left for the totals to come up short.
+      */
+      // A quantity trace's unanswered end is level by decision (D21).
+      const leftBare = (["start", "end"] as const).find(end =>
+        run?.traceMode === "quantity"
+          ? false
+          : end === "start"
+            ? vars.startStampId === null && run?.ends?.startKind == null
+            : vars.endStampId === null && run?.ends?.endKind == null
+      );
+      if (leftBare) {
+        setEndHighlight({ runId: vars.id, end: leftBare });
+        toast.message(
+          "Nothing there — that end counts no drop. Pick what is there in Run ends, or No drop here."
+        );
+      }
       if (run?.typedLengthInches != null)
         toast.message(
           "This run has a typed length, and that is still what the bid uses — the drawing changed, the bid did not."
@@ -7691,6 +7943,20 @@ export default function TakeoffPage({
     // A quantity trace has no ends to answer (D21): its drops are proposed
     // afterwards, so nothing from the ends pickers is written onto it.
     const quantity = activeTraceMode === "quantity";
+    /*
+      A RUN THAT STARTS ON A BOX (owner, 2026-10-07, case a): its first
+      click snapped onto a mark, so it leaves THAT box — down to it and back
+      up is two drops, one on the run that arrived and one here. Until then
+      the start took the toolbar's sticky "From" (Nothing), so a run passing
+      through a receptacle counted ONE drop. The start is linked to the mark
+      and given no kind of its own, so it reads what the count says the
+      device is (`endOfRun`) and claims the mark (no count drop twice).
+    */
+    const start0 = newRunStart({
+      snap: legStart,
+      fromKind: traceEnds.startKind,
+      quantity,
+    });
     if (rootId === null) {
       const saved = await saveRun.mutateAsync({
         bidId,
@@ -7700,13 +7966,18 @@ export default function TakeoffPage({
         pathType: tracePathType,
         points: tracePoints,
         status: "draft",
-        startKind: quantity ? null : traceEnds.startKind,
+        startKind: start0.startKind,
         endKind: quantity ? null : traceEnds.endKind,
         runTypeId: armedRunType[tracePathType]?.id ?? null,
         traceMode,
       });
       rootId = saved.id;
       setLegRootMode(traceMode);
+      if (start0.startStampId !== null)
+        await saveEnds.mutateAsync({
+          id: saved.id,
+          startStampId: start0.startStampId,
+        });
     } else {
       const start = legStart ?? {
         kind: "free" as const,
@@ -9393,14 +9664,19 @@ export default function TakeoffPage({
               />
             )}
 
-            {/* Devices grouped by circuit tag, read-only; only where tagged. */}
+            {/* Devices grouped by circuit tag, with each circuit's homerun. */}
             {!phone && circuitReport && (
               <CircuitsToggle
                 count={circuitReport.circuits.length}
                 on={showCircuits}
                 onChange={on => {
                   setShowCircuits(on);
-                  if (!on) {
+                  if (on) {
+                    // One panel docks on the right at a time.
+                    setShowCeilings(false);
+                    setDrawingArea(false);
+                    setAreaTaps([]);
+                  } else {
                     setCircuitPick(null);
                     setPlacingPanel(null);
                   }
@@ -9409,11 +9685,51 @@ export default function TakeoffPage({
             )}
             {!phone && showCircuits && circuitReport && (
               <CircuitsPanel
+                homeruns={
+                  homerunData && activeSheet
+                    ? {
+                        data: homerunData,
+                        sheetMethod:
+                          homerunData.sheetMethods.find(
+                            s => s.sheetId === activeSheet.id
+                          )?.method ?? null,
+                        runTypes: (runTypes.data ?? []).map(t => ({
+                          id: t.id,
+                          label: t.label,
+                        })),
+                        confirmable: confirmableHomeruns(
+                          homerunData.rows,
+                          activeSheet.id,
+                          circuitReport.panels
+                            .filter(p => p.spot?.source === "label")
+                            .map(p => p.name)
+                        ),
+                        onBid: patch =>
+                          setHomerunSettings.mutate({ bidId, ...patch }),
+                        onSheet: method =>
+                          setSheetHomerunMethod.mutate({
+                            bidId,
+                            sheetId: activeSheet.id,
+                            method,
+                          }),
+                        onUpdate: (circuitId, patch) =>
+                          updateHomerun.mutate({ circuitId, ...patch }),
+                        onConfirmAll: circuitIds =>
+                          confirmHomeruns.mutate({ bidId, circuitIds }),
+                        onRematch: () => rematchHomeruns(),
+                      }
+                    : null
+                }
                 report={circuitReport}
                 pick={circuitPick}
                 onPick={setCircuitPick}
                 placing={placingPanel}
-                onPlace={setPlacingPanel}
+                onPlace={panel => {
+                  // One tool at a time: placing a panel ends drawing an area.
+                  setDrawingArea(false);
+                  setAreaTaps([]);
+                  setPlacingPanel(panel);
+                }}
                 onUnplace={panel => placePanelSpot(panel, null)}
                 onClose={() => {
                   setShowCircuits(false);
@@ -9426,6 +9742,81 @@ export default function TakeoffPage({
                     : null
                 }
               />
+            )}
+
+            {/*
+              CEILINGS — the sheet's own and its height areas, on EVERY scaled
+              sheet (owner, 2026-10-07). It sat on the Circuits panel, which
+              only a sheet with circuit tags has; every drop reads it now.
+            */}
+            {!phone && activeSheet?.scaleRatio != null && (
+              <CeilingsToggle
+                on={showCeilings}
+                onChange={on => {
+                  setShowCeilings(on);
+                  if (on) {
+                    // One panel docks on the right at a time.
+                    setShowCircuits(false);
+                    setPlacingPanel(null);
+                  } else {
+                    // A tap after closing must not add a corner nobody sees.
+                    setDrawingArea(false);
+                    setAreaTaps([]);
+                  }
+                }}
+              />
+            )}
+            {!phone && showCeilings && activeSheet && (
+              <CeilingsPanel
+                sheetCeiling={sheetCeiling}
+                aboveLabel={aboveCeilingLabel}
+                locked={homerunData?.locked ?? false}
+                onSheetCeiling={inches =>
+                  setSheetCeiling.mutate({
+                    bidId,
+                    sheetId: activeSheet.id,
+                    inches,
+                  })
+                }
+                onClose={() => {
+                  setShowCeilings(false);
+                  setDrawingArea(false);
+                  setAreaTaps([]);
+                }}
+              >
+                <HeightAreasSection
+                  areas={sheetAreas}
+                  warnings={sheetAreaWarnings}
+                  drawing={drawingArea}
+                  taps={areaTaps}
+                  locked={homerunData?.locked ?? false}
+                  sheetHeightLabel={
+                    sheetCeiling === null
+                      ? aboveCeilingLabel
+                      : `this sheet, ${formatElevation(sheetCeiling)}`
+                  }
+                  finishError={areaError}
+                  onStartDraw={() => {
+                    // One tool at a time: a tap is either a corner or a panel.
+                    setPlacingPanel(null);
+                    setAreaTaps([]);
+                    setAreaError(null);
+                    setDrawingArea(true);
+                  }}
+                  onUndoTap={() => setAreaTaps(t => t.slice(0, -1))}
+                  onFinish={finishArea}
+                  onCancel={() => {
+                    setDrawingArea(false);
+                    setAreaTaps([]);
+                    setAreaError(null);
+                  }}
+                  onRename={(id, name) => updateHeightArea.mutate({ id, name })}
+                  onHeight={(id, inches) =>
+                    updateHeightArea.mutate({ id, heightInches: inches })
+                  }
+                  onRemove={id => removeHeightArea.mutate({ id })}
+                />
+              </CeilingsPanel>
             )}
 
             {/* Homeruns read off the sheet, read-only; only where it has one. */}
@@ -10196,8 +10587,8 @@ export default function TakeoffPage({
                       onPickEnd={(runId, end) =>
                         setEndHighlight({ runId, end })
                       }
-                      onEditPoints={(id, points) =>
-                        editPoints.mutate({ id, points })
+                      onEditPoints={(id, points, ends) =>
+                        editPoints.mutate({ id, points, ...ends })
                       }
                       /*
                         The structural half of "one tool at a time", as for
@@ -10386,6 +10777,21 @@ export default function TakeoffPage({
                             onClose={() => setFindSession(null)}
                           />
                         </>
+                      )}
+                    {(showCeilings || showCircuits) &&
+                      (drawingArea || sheetAreas.length > 0) && (
+                        <HeightAreasLayer
+                          width={size.width}
+                          height={size.height}
+                          renderScale={size.renderScale}
+                          areas={sheetAreas}
+                          drawing={drawingArea}
+                          taps={areaTaps}
+                          onTap={at => {
+                            setAreaError(null);
+                            setAreaTaps(t => [...t, at]);
+                          }}
+                        />
                       )}
                     {showCircuits && circuitReport && (
                       <CircuitLayer

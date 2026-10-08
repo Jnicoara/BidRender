@@ -34,9 +34,9 @@
  * because a run's flat length is unknown; a mark has no flat length to be
  * unknown, and its drop is arithmetic between two heights the estimator set.
  */
+import { ceilingAt, type CeilingLayers } from "./ceilingHeights";
 import {
   resolveDeviceHeight,
-  resolveDistributionHeight,
   stampsClaimedByRuns,
   SUGGEST_WITHIN_INCHES,
   verticalAtEnd,
@@ -55,8 +55,13 @@ import { pointsToRealInches } from "./takeoffGeometry";
 /** A counted group, as far as its drops are concerned. */
 export type DropGroup = {
   id: number;
-  /** The height type at the device. NULL is "not answered" — no drop. */
+  /**
+   * The height type at the device — ALREADY resolved: the count's own, else
+   * its item's "Mounts at" (`deviceKind`). NULL is "not answered" — no drop.
+   */
   dropKind: string | null;
+  /** `dropKind` came from the item, not the count — said on the row. */
+  dropKindFromItem: boolean;
   /** This group's own device height, inches. NULL follows the kind. */
   dropHeightInches: number | null;
   /** What the drop is made of — the STORED id, resolved by the caller. */
@@ -150,6 +155,18 @@ export type GroupDrop = {
   markCount: number;
   /** Marks whose drop a run end already counts — left out, by the rule. */
   claimedCount: number;
+  /**
+   * Marks a computed HOMERUN rises from, its up-drop counted — left out the
+   * same way (owner, 2026-10-07: no box counts its drop twice).
+   */
+  homerunClaimedCount: number;
+  /**
+   * The height type the drops go to: the count's "Each drops to", else its
+   * item's "Mounts at" (`deviceKind`). NULL when neither says.
+   */
+  dropKind: string | null;
+  /** True when `dropKind` came from the item, not the count. */
+  dropKindFromItem: boolean;
   /** The marks that each carry a drop, at whatever height. */
   countedMarks: readonly { id: number; sheetId: number }[];
   /**
@@ -178,7 +195,15 @@ export type GroupDrop = {
   mayDoubleCount: number;
   /** One drop's footage; null unless counted. */
   perDrop: DropFootage | null;
+  /**
+   * Drops that are wanted, with a height, but NOT PRICED because the count
+   * has no drop material ("no-type"). 0 otherwise. Said, never a silent 0 ft.
+   */
+  notPricedDrops: number;
 };
+
+/** The words for a count whose drops have no material — one string everywhere. */
+export const DROP_MATERIAL_NOT_SET = "drop material not set";
 
 /** Drops at one device height. */
 export type DropBucket = {
@@ -272,20 +297,31 @@ export function groupDrops(input: {
   runs: readonly DropRunEnd[];
   heights: {
     layers: HeightLayers;
-    companyInches: number | null;
-    jobInches: number | null;
+    /**
+     * Every ceiling layer: each MARK's drop reads the area it sits in, then
+     * its sheet, job, company (shared/ceilingHeights.ts, owner 2026-10-07).
+     * Until then a count's drops read job → company only.
+     */
+    ceilings: CeilingLayers;
   };
   extras: ExtrasContext;
   /** The run type a STORED id means, fork followed; null when gone. */
   typeFor: (runTypeId: number) => DropTypeSpec | null;
   /** Each sheet's usable scale ratio, for the proximity flag. */
   ratioFor: (sheetId: number) => number | null;
+  /**
+   * Marks a computed homerun rises from, with its up-drop COUNTED. REQUIRED
+   * (owner, 2026-10-07): the homerun already buys the pipe up from that box,
+   * so a count drop there would be the same box counted twice.
+   */
+  homerunClaims: ReadonlySet<number>;
 }): GroupDrop[] {
   const claimed = stampsClaimedByRuns(input.runs);
-  const distribution = resolveDistributionHeight({
-    company: input.heights.companyInches,
-    job: input.heights.jobInches,
-  }).inches;
+  // The job's (or company's) ceiling: what a mark outside every area and
+  // on a sheet with no height of its own reads, and what the row leads with.
+  const distribution = ceilingAt(input.heights.ceilings, null, null).inches;
+  const ceilingOf = (mark: DropMark) =>
+    ceilingAt(input.heights.ceilings, mark.sheetId, mark).inches;
 
   // Unclaimed run ends, for the proximity flag.
   const openEnds: { sheetId: number; x: number; y: number }[] = [];
@@ -310,14 +346,22 @@ export function groupDrops(input: {
 
   return input.groups.map(group => {
     const marks = input.marks.filter(m => m.groupId === group.id);
-    const unclaimed = marks.filter(m => !claimed.has(m.id));
+    const byHomerun = marks.filter(
+      m => !claimed.has(m.id) && input.homerunClaims.has(m.id)
+    ).length;
+    const unclaimed = marks.filter(
+      m => !claimed.has(m.id) && !input.homerunClaims.has(m.id)
+    );
     // "No drop on these" — skipped like a claimed mark, and said on the row.
     const wanting = unclaimed.filter(m => !m.dropExcluded);
     const base = {
       groupId: group.id,
       runTypeId: group.dropRunTypeId,
       markCount: marks.length,
-      claimedCount: marks.length - unclaimed.length,
+      claimedCount: marks.length - unclaimed.length - byHomerun,
+      homerunClaimedCount: byHomerun,
+      dropKind: group.dropKind,
+      dropKindFromItem: group.dropKindFromItem,
       excludedCount: unclaimed.length - wanting.length,
       distributionInches: distribution,
     };
@@ -338,6 +382,7 @@ export function groupDrops(input: {
       uncounted: null,
       mayDoubleCount: 0,
       perDrop: null,
+      notPricedDrops: 0,
     });
 
     if (group.dropKind === null) return none("not-answered", null, null);
@@ -362,17 +407,41 @@ export function groupDrops(input: {
       r === "no-distribution-height"
         ? "no run height set for this job"
         : "no height set for that type";
-    if (!vertical.counted && vertical.reason === "level")
+    /*
+      The count-wide answers hold only where EVERY mark agrees: a mark in a
+      height area, or on a sheet with its own ceiling, has a drop the
+      job-level answer cannot see.
+    */
+    const allAtJobCeiling = wanting.every(m => ceilingOf(m) === distribution);
+    if (!vertical.counted && vertical.reason === "level" && allAtJobCeiling)
       return none("level", null, device);
-    if (!vertical.counted && vertical.reason === "no-distribution-height")
+    if (
+      !vertical.counted &&
+      vertical.reason === "no-distribution-height" &&
+      allAtJobCeiling
+    )
       return none("no-height", reasonOf(vertical.reason), device);
 
     const type =
       group.dropRunTypeId === null ? null : input.typeFor(group.dropRunTypeId);
+    /*
+      NO DROP MATERIAL (owner, 2026-10-07): the drops are wanted and have a
+      height, but nothing says what they are made of, so none can be priced.
+      Counted as NOT PRICED — how many, said on the row, the totals and the
+      materials list — never as 0 ft.
+    */
     if (!type)
       return {
-        ...none("no-type", "say what the drop is made of", device),
+        ...none("no-type", DROP_MATERIAL_NOT_SET, device),
         perDropFeet: vertical.counted ? vertical.feet : null,
+        notPricedDrops: wanting.filter(
+          mark =>
+            verticalAtEnd({
+              kind,
+              endInches: heightFor(mark.height).inches,
+              distributionInches: ceilingOf(mark),
+            }).counted
+        ).length,
       };
 
     const wirePct =
@@ -385,7 +454,7 @@ export function groupDrops(input: {
         .value ?? 0;
 
     // Each mark at its own height where it has one, else the count's.
-    const buckets = new Map<number, DropBucket>();
+    const buckets = new Map<string, DropBucket>();
     let uncountedMarks = 0;
     let ownHeightCount = 0;
     const countedMarks: DropMark[] = [];
@@ -394,7 +463,8 @@ export function groupDrops(input: {
       const at = verticalAtEnd({
         kind,
         endInches: own.inches,
-        distributionInches: distribution,
+        // This mark's own ceiling — its area, its sheet, then the job's.
+        distributionInches: ceilingOf(mark),
       });
       if (!at.counted) {
         // Level is an answer (a mark at run height); anything else is a
@@ -405,14 +475,17 @@ export function groupDrops(input: {
       if (own.source === "mark-typed" || own.source === "mark-read")
         ownHeightCount += 1;
       countedMarks.push(mark);
-      const bucket = buckets.get(at.endInches) ?? {
+      // Keyed by the DROP, device and ceiling both: two marks at 18" under
+      // different ceilings are two different drops.
+      const key = `${at.endInches}:${at.distributionInches}`;
+      const bucket = buckets.get(key) ?? {
         deviceInches: at.endInches,
         source: own.source,
         perDropFeet: at.feet,
         perDrop: oneDrop(at.feet, type, wirePct, makeup, conduitPct),
         marks: [],
       };
-      buckets.set(at.endInches, {
+      buckets.set(key, {
         ...bucket,
         marks: [...bucket.marks, { id: mark.id, sheetId: mark.sheetId }],
       });
@@ -449,6 +522,7 @@ export function groupDrops(input: {
       perDrop: vertical.counted
         ? oneDrop(vertical.feet, type, wirePct, makeup, conduitPct)
         : null,
+      notPricedDrops: 0,
     };
   });
 }
@@ -472,6 +546,9 @@ export function notAnsweredDrop(
     deviceInches: null,
     markCount: 0,
     claimedCount: 0,
+    homerunClaimedCount: 0,
+    dropKind: null,
+    dropKindFromItem: false,
     excludedCount: 0,
     countedMarks: [],
     buckets: [],
@@ -480,6 +557,7 @@ export function notAnsweredDrop(
     uncounted: null,
     mayDoubleCount: 0,
     perDrop: null,
+    notPricedDrops: 0,
   };
 }
 

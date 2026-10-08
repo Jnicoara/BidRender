@@ -672,7 +672,17 @@ export default function ProposalPage({
                 <>
                   {headline.text}, so the total would be short. The proposal
                   can't be printed or saved until{" "}
-                  {headline.one ? "it is" : "they are"} priced on the bid.
+                  {headline.one ? "it is" : "they are"} priced
+                  {/*
+                    Drops are priced on the PLANS screen, not the bid (owner,
+                    2026-10-07): "on the bid" sent the estimator to the wrong
+                    screen when drops were the only gap.
+                  */}
+                  {(notPriced.drops ?? 0) > 0
+                    ? notPriced.lines + notPriced.parts > 0
+                      ? " — lines on the bid, drops on the Plans screen (pick each count's drop material)."
+                      : " on the Plans screen — pick each count's drop material."
+                    : " on the bid."}
                 </>
               )}
             </AlertDialogDescription>

@@ -188,6 +188,11 @@ Average 25 ft instead: L = 25, the rest the same. Minimum 50 ft: L = 50.
 - A re-read (a mark moved, a panel moved, the scale changed) re-computes an
   UNCONFIRMED homerun and leaves a confirmed or overridden one alone, but
   marks it "inputs changed since confirmed".
+  > **Narrowed 2026-10-07 (owner): viewing never changes a saved number.**
+  > A re-read still re-computes the length from the saved leaving device,
+  > but no longer PICKS a new device — that happens once, when the homerun
+  > is made, and again only on "Re-match homeruns" or a panel placed by
+  > hand (§ 10, track-c-handoff.md).
 
 ## 7. What the bid shows
 
@@ -235,6 +240,119 @@ Height areas inside a sheet (before beta) are a new table,
 2. Panel spots move from this browser to `bid_panels` (needs the column).
 3. Homerun rows on the Circuits panel: method, footage, confirm/override.
 4. Bid summary line and export; the bid line with its snapshot rules.
+
+**Steps 2–4 BUILT 2026-10-07 on branch `c-homerun-footage`** (track-c +
+Track A's `a-batch-c-0125`). **Not on local-dev or track-c, on purpose:**
+staging would get code asking for columns it does not have. Track A merges
+and migrates them together (pairing rule 3).
+
+- **2 — saved.** "Place panel" writes `bid_panels.planSheetId/X/Y`; a panel
+  found by its printed "PANEL 2B" label is saved too (only the browser can
+  read it). The browser `syncSheet`s each sheet's circuits — the server
+  keeps page TEXT, not word positions, so it cannot read the "2B-1" tags
+  itself. `homerunFromStampId` holds the leaving device: the closest as
+  read when the homerun was MADE (until 2026-10-07 re-pointed on every
+  re-read, which moved totals from viewing — now only "Re-match homeruns"
+  or a hand-placed panel re-points an unconfirmed one), left alone
+  once confirmed — the guard is in the UPDATE's WHERE
+  (`syncHomerunCircuit`). With no panel placed, the circuit's first device,
+  so Average still has a sheet. A two-pole tag is one row, on its first
+  circuit. The old per-browser spots (`bidridge:panel-spots:`) are not
+  carried over.
+- **3 — rows.** `HomerunControls`: per circuit "Homerun 42.8 ft — 30.3 ft
+  run + 8.5 ft up + 4 ft down at the panel · unconfirmed", Confirm; picked,
+  a typed length and the homerun's own ceiling (`HeightFields`, "follows the
+  job, 10'-0""). Bid settings fold to one line once a run type is picked.
+  "Confirm N on this sheet" takes only Average, or Measured to a LABELLED
+  panel (§ 6). A refused homerun says its fix ("Set this sheet's scale to
+  measure it") and is NOT counted as unconfirmed — it is "no number yet";
+  counting it as both read "0 homeruns + 38 unconfirmed" on screen.
+- **4 — the bid line.** Homeruns join `groupRunFootage` as a REQUIRED input
+  (like count drops) and land on the bid's homerun run type's existing
+  lines: live quantity, frozen pricing, sent with the ordinary "Send to
+  bid". The bid page says "Homeruns: Measured, +15% routing · 38 homeruns
+  - 37 unconfirmed", and whether the type is on the bid at all. The takeoff
+    export splits them per sheet.
+- **Labour on WIRE includes the panel makeup** — the owner's Q5
+  (2026-09-28: labour on installed footage, makeup is installed work),
+  which every footage line follows. § 5's "labour = (L + V) × (1 + R)" is
+  the conduit's labour; for wire it would have been the only footage line
+  leaving makeup out of labour. Routing is installed footage (real route);
+  waste never is.
+- **Couplings, connectors and straps — BUILT 2026-10-07 (owner: "the
+  same fitting/support materials a normal run of that run type adds, …
+  don't invent new rates").** Each homerun is ONE fitting leg on its run
+  type (`homerunFittingLeg`, `server/runTypeFootageCore.ts`): feet = its
+  routed run + drops, no waste; two ends of its own (device box, panel),
+  so 2 connectors each; counted by the same `countFittings` /
+  `countCableFittings` with the raceway's own stick length and strap
+  spacing. A drop that could not be counted makes the counts "at least",
+  as on a traced run. **Elbows are NOT counted for homeruns** — a homerun
+  has no drawn path, and counting only its two drops' 90s while missing
+  the corner would be half an answer said as a whole one; the Totals tab
+  and the materials list say so. Seen on UNCC E111: 38 homeruns → 429
+  couplings, 76 connectors, 482 straps on the Totals tab, equal to a hand
+  count from each homerun's own pipe. The Totals tab and the materials
+  list now include homerun footage too (`totalQuantities` takes
+  `homeruns`, required): it read "Conduit 0 ft" beside 4,476 ft of
+  homerun pipe until then. Wording left as it is: the homerun type's rows
+  sit under "Traced, not sent yet" though nothing was traced.
+- **Height areas — BUILT 2026-10-07** (§ 4; `bid_height_areas`, 0130).
+  On the Circuits panel: "Draw", then TAP the corners on the sheet — two
+  taps are opposite corners of a box, three or more an outline
+  (`outlineFromTaps`; a drag still pans) — then Finish. Saved at once as
+  "Area N" with no height ("follows the sheet"); name and ceiling are
+  edited on its row (`HeightFields`), Remove beside it. On the sheet each
+  area is outlined and labelled; where two overlap both turn amber and
+  dashed, and the panel says which wins (`heightAreaWarnings`: the SMALLER
+  outline, never the lower height). A shared wall does not warn. The
+  server checks the outline with the same rule. Seen at 1180×820 with
+  touch on UNCC E111: a box round 2B-1's device set to 18'-0" moved it to
+  58.8 ft (30.3 + 16.5 up + 12 down); a bigger 9'-0" area over it left
+  18'-0" in force and warned "Area 1 is smaller"; a third sharing a wall
+  added no warning. **Limits:** reached from the Circuits panel, so only on
+  a sheet with circuit tags; an outline cannot be reshaped after drawing
+  (remove and redraw); count drops do not read areas yet (plan § 4 says
+  they later will).
+- **Homerun BENDS — BUILT 2026-10-07 (owner-approved).** A 90 at each
+  COUNTED drop (up at the device, down at the panel), plus the bid's
+  "extra bends per homerun" for corners — starter 1, applied, and said
+  "not confirmed" until set. Elbow or field bend and the hours follow the
+  run type exactly as a traced run's bends do (a field bend's hours are the
+  raceway's `fieldBendLaborHours`). The setting needs
+  `bids.homerunExtraBends` (asked of Track A); until it lands the stepper
+  shows 1 and is held. **UNCC E111, 38 homeruns on 1/2" EMT (bent in the
+  field):** before 0 bends; after **98 field bends** = 60 at drops (76 ends,
+  16 with no device height so no drop) + 38 corners. Hours: 0 before;
+  after, 98 × the 1/2" EMT field-bend hours — UNSET in the shipped catalog
+  (starter labour ships unpriced), so the bid line reads hours not set
+  rather than inventing one.
+- **One ceiling for every drop — BUILT 2026-10-07** (owner):
+  `shared/ceilingHeights.ts`. Per box: run's own → height area → sheet →
+  job → company. Regular runs read it at each END, count drops at each
+  MARK, homeruns at their device. `HeightContext.companyInches/jobInches`
+  were removed so nothing reads a ceiling around it. **UNCC E111, seen at
+  1180×820:** a run ending at 2B-1's receptacle: 8.5 ft (job 10'-0") →
+  10.5 (sheet 12'-0") → **16.5** (18'-0" area drawn by taps); a run ending
+  outside the area stays 10.5.
+- **Drops on regular runs — the four cases (2026-10-07):** (a) through a
+  box: was ONE drop (the leaving run took the toolbar's "From": Nothing),
+  now TWO — a run whose first click snaps onto a mark starts at that box
+  (`newRunStart`); E111: 8.5 → 17 ft at the box (16.5 + 10.5 in the area
+  test). (b) ends at a box: one drop — unchanged, 8.5 ft. (c) a switch leg
+  off a tee: none at the tee, its own at the switch — unchanged, 6 ft. (d)
+  box to box at one height: was 8.5 + 8.5 = 17 ft of drops, becomes 0 with
+  "Box to box, same height" — built and tested, held until
+  `takeoff_runs.runsAt` (asked of Track A).
+- **Not built:** setting `takeoff_run_circuits.panelCircuitId`
+  (read — a traced homerun suppresses the computed one — but no screen
+  ties a trace to a circuit yet); the per-sheet method has no "average" /
+  "minimum" amounts of its own on screen (the bid's are used).
+- **Seen on screen** (UNCC E111, laptop and 1180×820): 2B-1 = 42.8 ft, the
+  hand-worked known answer; Confirm moved "+ 38" to "+ 37" on the panel
+  and the bid page; Send put raceway 4,476.42 / conductor 8,952.85 /
+  ground 4,476.42 ft on the bid, conductor + ground = the panel's 13,429.3
+  ft of wire. Fixture values were put back afterwards.
 
 ## 11. Questions for the owner — ANSWERED 2026-10-06
 

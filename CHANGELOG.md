@@ -6,6 +6,57 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-07]
 
+- **The Circuits view no longer draws a line from a device to its panel
+  (branch `c-homerun-footage`).** Picking a circuit still rings its devices
+  and marks the panel, but nothing is drawn between them — the owner's
+  choice after the patent review. Homerun lengths are worked out exactly as
+  before. The attorney's notes now compare each claim of the patent with
+  what the app does.
+
+- **A bid cannot print a price while drops are unpriced (branch
+  `c-homerun-footage`).** Drops whose material was never picked now count as
+  "not priced" on the bid itself: the totals read "+ 205 drops not priced",
+  the bid page says why and where to fix it, and the proposal shows "Price
+  pending" and will not print until they are priced. Also written: notes for
+  the patent attorney on exactly how homerun lengths are worked out today
+  (`references/homerun-patent-notes.md`).
+
+- **Looking at a sheet no longer changes its homerun numbers (branch
+  `c-homerun-footage`).** Opening the Circuits panel used to re-point every
+  unconfirmed homerun to whichever device was now closest, so the bid's
+  totals could move just from viewing. Now each homerun keeps the device it
+  was made with until someone presses "Re-match homeruns" or moves the panel
+  by hand. Also: a count with no drop material now says "drop material not
+  set" and how many drops that leaves unpriced — on the count, the Totals
+  tab and the materials list — and a run's name says "No drop here" for an
+  end with no drop, like the rest of the screen.
+
+- **Counts drop to their item's type, data/TV outlets have a height, and no
+  box is counted twice (branch `c-homerun-footage`).** A count nobody set a
+  drop on now drops to what its item "Mounts at", said as "from the item"
+  and "default height". A box a homerun already rises from no longer gets a
+  second drop from its count — on UNCC E111 the old rule counted 22 boxes
+  twice. A "Data / TV / Low voltage" height ships at 18" and the data and TV
+  starters use it, which brings E111 to 76 of 76 homerun drops. The run-end
+  picker now says "No drop here", like the button beside it.
+
+- **A device takes its type's default height, and an open run end can say
+  "No drop here" (branch `c-homerun-footage`).** An assembly can now say what
+  it "Mounts at" (receptacle, switch, wall J-box…), once in the library, and
+  every homerun or run end at that device uses the shop's height for that
+  type — on UNCC E111 the homeruns with no rise from their device went from
+  14 to 1. Where a type's height is used, the screen says "default height".
+  An end left in open space says "nothing there" until someone picks what is
+  there or taps "No drop here" (the chip that used to read "Nothing").
+
+- **Dragging a run's end now moves its drop with it (branch
+  `c-homerun-footage`).** A run end dragged off a receptacle used to keep
+  counting that receptacle's drop — and kept the receptacle's own drop
+  switched off — and one dragged onto a different receptacle picked nothing
+  up. The wire footage followed the old box while the drawing showed the new
+  one. Now the end takes the box it is let go on, or none in open space, the
+  totals move at once, and undo puts the old box back. Found by Track B.
+
 - **15 more starter assemblies.** These are the jobs the top-30 lists found
   missing, plus the wafer and can light sizes:
   - commercial: an emergency battery pack, a 3-phase panelboard change, a
@@ -139,6 +190,46 @@ This is the human-readable companion to the git history — read this to see wha
   it, and a pre-filled decision; the new rows waiting to be added; what the
   catalog is missing; and five naming questions. Only the yellow columns are
   typed in. Once it is marked and checked, material names freeze.
+
+- **Every drop reads the right ceiling, and drops through a box count
+  twice (same branch).** Regular runs and counted drops now climb to the
+  ceiling of the height area their box sits in, then the sheet's own
+  ceiling, then the job's — before, only homeruns did, so a stockroom box
+  could drop 16.5 ft on its homerun and 8.5 ft on the run beside it. A
+  sheet's ceiling and its areas are set from a new "Ceilings" button on
+  every scaled sheet. A run that starts by tapping onto a device now
+  starts at that box, so a run passing through a receptacle counts the
+  drop down and the rise back up. Homeruns count their bends: one at each
+  drop plus one per homerun for corners, marked "not confirmed" until set.
+  Two choices — box-to-box runs with no drops, and changing the bends per
+  homerun — are on screen and wait for the next database update.
+
+- **Height areas (same branch).** On a sheet with two ceilings — a sales
+  floor and a stockroom open to deck — draw the stockroom by tapping its
+  corners and give it its own height; every homerun leaving a device inside
+  it climbs to that height. Where two areas overlap, the smaller one wins
+  and the sheet says so; two areas that only share a wall say nothing.
+  Works by tapping, so it works on a tablet.
+
+- **Homeruns buy their couplings, connectors and straps (same branch).**
+  Each homerun now adds the fittings a run of its type adds — counted from
+  the pipe's own stick length and strap spacing, two connectors per
+  homerun — so a bid priced by homeruns is not short of the small parts.
+  Elbows for homeruns are not counted yet, and the screen and the
+  materials list say so. The plan's footage totals also include homeruns
+  now; they had read 0 ft beside them.
+
+- **Homeruns are priced (on a branch, waiting for its database changes).**
+  The Circuits panel now shows each circuit's homerun — "42.8 ft: 30.3 ft
+  run + 8.5 ft up + 4 ft down at the panel" — with Confirm, a typed length
+  and its own ceiling. The bid picks how homeruns are measured (Measured by
+  default, Average, or Measured with a minimum), a routing factor, and what
+  they are made of; a sheet can use its own method. Where a panel sits is
+  saved with the bid instead of in one browser. Homerun footage lands on
+  the bid's lines like any traced run: routing and waste add, waste never
+  touches labor, 5 ft of makeup per wire at the panel, and unconfirmed
+  homeruns count with "+ N unconfirmed" beside them. A homerun with no
+  panel or no scale gets no number and says what is missing.
 
 ## [2026-10-06]
 

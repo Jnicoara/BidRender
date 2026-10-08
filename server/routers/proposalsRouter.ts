@@ -44,7 +44,7 @@ import {
 import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import { resolveBidClient } from "../../shared/bidClient";
 import { explainTaxStatus } from "../../shared/salesTax";
-import { notPricedLines } from "../../shared/lineNotPriced";
+import { notPricedLines, withDropsNotPriced } from "../../shared/lineNotPriced";
 import { storagePresignPut } from "../storage";
 import * as db from "../db";
 import { setLogoReleasingOld } from "../storedFiles";
@@ -347,17 +347,33 @@ export const proposalsRouter = router({
         markedUp: row.markedUp,
       }));
 
-      const { priced, units, totals, salesTax, problems, notPriced } =
-        bidRollup(
-          bid,
-          lines,
-          company,
-          {
-            rules: taxRules,
-            jurisdictions: jurisdictionRows.map(toTaxJurisdiction),
-          },
-          expenses
-        );
+      const {
+        priced,
+        units,
+        totals,
+        salesTax,
+        problems,
+        notPriced: linesNotPriced,
+      } = bidRollup(
+        bid,
+        lines,
+        company,
+        {
+          rules: taxRules,
+          jurisdictions: jurisdictionRows.map(toTaxJurisdiction),
+        },
+        expenses
+      );
+      /*
+        Drops with no material are NOT PRICED like a line (owner, 2026-10-07):
+        added to the same tally, so the document says "Price pending" and
+        Print is blocked until they are — a bid can never print a price
+        while drops are missing.
+      */
+      const notPriced = withDropsNotPriced(
+        linesNotPriced,
+        await db.bidDropsNotPriced(bid.id, ctx.scope.dataUserId)
+      );
 
       // A proposal built on a total that leaves a line out is a wrong price
       // sent to a client. Refuse, with the references. See pricingProblems.ts.

@@ -64,8 +64,10 @@ import {
 } from "@shared/takeoffGeometry";
 import type { Measurability, RunPathType } from "@shared/takeoffQuantities";
 import {
+  endClaimsAfterEdit,
   legSnapLabel,
   snapToMark,
+  type EndClaims,
   type LegSnap,
   type SnapStamp,
 } from "@/lib/legSnap";
@@ -327,7 +329,12 @@ export function TraceLayer({
    */
   editableRunId?: number | null;
   /** A drag, an added point or a removed one, finished: save these points. */
-  onEditPoints?: (runId: number, points: PagePoint[]) => void;
+  onEditPoints?: (
+    runId: number,
+    points: PagePoint[],
+    /** The mark each MOVED end now sits on; an end left out did not move. */
+    ends: EndClaims
+  ) => void;
   /** An end of the selected run clicked (not dragged): show it in Run ends. */
   onPickEnd?: (runId: number, end: "start" | "end") => void;
   /** Which colour each run type gets on this bid — `takeoffRuns.typeColors`. */
@@ -830,12 +837,27 @@ export function TraceLayer({
       : settled && settled.runId === run.id
         ? settled.points
         : run.points;
+  /*
+    Every edit — drag, add, remove — says which mark each MOVED end now sits
+    on (Track B Gap 1): a run end dragged off its receptacle used to keep
+    claiming it, so its drop came from a box the run no longer touched.
+  */
   const commitEdit = useCallback(
     (runId: number, points: PagePoint[]) => {
       setSettled({ runId, points });
-      onEditPoints?.(runId, points);
+      const run = existingRuns.find(r => r.id === runId);
+      const ends = run
+        ? endClaimsAfterEdit({
+            before: run.points,
+            after: points,
+            teeEnds: { start: !!run.startTee, end: !!run.endTee },
+            tolerance: snapReach(),
+            stamps: snapStamps,
+          })
+        : {};
+      onEditPoints?.(runId, points, ends);
     },
-    [onEditPoints]
+    [onEditPoints, existingRuns, snapReach, snapStamps]
   );
 
   /**

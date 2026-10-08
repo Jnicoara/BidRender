@@ -198,6 +198,14 @@ export type BendLeg = {
    * `legFromRun`, requires the mode, so no traced leg can leave it out.
    */
   noPullPoints?: boolean;
+  /**
+   * Corners NOBODY DREW, counted as 90s — a HOMERUN's corners (owner,
+   * 2026-10-07): a homerun has no traced path, so its corners are a
+   * per-bid "extra bends per homerun" rather than read off points. Absent on
+   * every traced leg. `confirmed` false says the number is the starter 1,
+   * which the sentence repeats so nobody reads it as measured.
+   */
+  extraCorners?: { count: number; confirmed: boolean };
 };
 
 /** Stored coordinates are the trace's own floats; an edit that did not move a
@@ -768,6 +776,15 @@ export function countBends(
   let replaced = 0;
   let wobble = 0;
   let unknownDrops = 0;
+  // Homerun corners nobody drew (`extraCorners`): 90s, said apart.
+  let extra = 0;
+  let extraUnconfirmed = false;
+  for (const leg of legs) {
+    if (!leg.extraCorners || leg.extraCorners.count <= 0) continue;
+    extra += leg.extraCorners.count;
+    n90 += leg.extraCorners.count;
+    if (!leg.extraCorners.confirmed) extraUnconfirmed = true;
+  }
   for (const { bends, pullPoints } of perLeg) {
     wobble += bends.wobble;
     unknownDrops += bends.unknownDrops;
@@ -830,13 +847,21 @@ export function countBends(
               : `At least ${plural(qty, what)}: ${parts}${tail}`,
         };
 
-  const partsFor = (degrees: number[], withDrops: number) => {
+  const partsFor = (
+    degrees: number[],
+    withDrops: number,
+    withExtra: number = 0
+  ) => {
     const list: string[] = [];
     if (degrees.length > 0)
       list.push(
         `${plural(degrees.length, "corner")} (${degrees.map(d => `${d}°`).join(", ")})`
       );
     if (withDrops > 0) list.push(plural(withDrops, "drop"));
+    if (withExtra > 0)
+      list.push(
+        `${plural(withExtra, "homerun corner")} set on the bid${extraUnconfirmed ? " (not confirmed)" : ""}`
+      );
     return list.join(" + ");
   };
 
@@ -846,7 +871,7 @@ export function countBends(
     if (method.method !== "factory")
       return { kind, status: "included", why: method.why };
     return kind === "elbow90"
-      ? counted(kind, n90, words.elbow90.one, partsFor(corners90, drops))
+      ? counted(kind, n90, words.elbow90.one, partsFor(corners90, drops, extra))
       : counted(kind, n45, words.elbow45.one, partsFor(corners45, 0));
   };
 
@@ -858,9 +883,9 @@ export function countBends(
       return { kind, status: "included", why: method.why };
     // A corner past 112° is bent twice (a 90 and a 45), so the quantity can
     // exceed corners + drops; the sentence says so rather than not adding up.
-    const twice = n90 + n45 - allCorners.length - drops;
+    const twice = n90 + n45 - allCorners.length - drops - extra;
     const parts =
-      partsFor(allCorners, drops) +
+      partsFor(allCorners, drops, extra) +
       (twice > 0 ? `, ${plural(twice, "corner")} past 112° bent twice` : "");
     return counted(kind, n90 + n45, "field bend", `${parts} — ${method.why}`);
   })();

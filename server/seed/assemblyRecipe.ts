@@ -87,6 +87,13 @@ export type BaselineAssembly = {
    * existing conduit, a trouble-shoot hour, a core drill) sets this.
    */
   laborOnly?: true;
+  /**
+   * The height TYPE this starter's device mounts at (0110, "Mounts at") —
+   * a key of the shipped height list, never inches, so it follows the
+   * shop's height for that type. Only where the device IS that type
+   * (owner, 2026-10-07: data / TV outlets → "low-voltage").
+   */
+  mountsAt?: string;
 };
 
 /** One recipe line. */
@@ -105,7 +112,11 @@ export function starter(
   category: StarterCategory,
   projectType: ProjectType,
   materials: BaselineAssemblyMaterial[],
-  extra: { missingParts?: string[]; modifiers?: string[] } = {}
+  extra: {
+    missingParts?: string[];
+    modifiers?: string[];
+    mountsAt?: string;
+  } = {}
 ): BaselineAssembly {
   return {
     ref,

@@ -205,6 +205,80 @@ export function quantitySnap(snap: LegSnap): LegSnap {
   return { kind: "free", point: { ...snap.point } };
 }
 
+/**
+ * How a NEW run's start is saved (owner, 2026-10-07, case a: "run passes
+ * THROUGH a box = TWO drops there").
+ *
+ * A first click that snapped onto a MARK starts at that box: the start is
+ * linked to the mark and saved with NO kind, so it reads what the mark's
+ * count says the device is and counts the rise back up — the second of the
+ * two drops a pass-through makes. Any other start keeps the toolbar's
+ * "From". A quantity trace is level at every unanswered end (D21) and is
+ * never linked here.
+ *
+ * Until 2026-10-07 every start took the sticky "From" (Nothing by default),
+ * so a run through a receptacle counted one drop.
+ */
+export function newRunStart(input: {
+  snap: LegSnap | null;
+  fromKind: string | null;
+  quantity: boolean;
+}): { startKind: string | null; startStampId: number | null } {
+  if (input.quantity) return { startKind: null, startStampId: null };
+  if (input.snap?.kind === "stamp")
+    return { startKind: null, startStampId: input.snap.stampId };
+  return { startKind: input.fromKind, startStampId: null };
+}
+
+/** The claim each MOVED end of an edited run sends; an absent end did not move. */
+export type EndClaims = {
+  startStampId?: number | null;
+  endStampId?: number | null;
+};
+
+/**
+ * Which mark each end of an edited run sits on, for the ends that MOVED
+ * (Track B Gap 1, 2026-10-07). A run end that claims a mark takes that box's
+ * drop and holds back the box's own; the claim used to stay put when the end
+ * was dragged away, so the drop came from a box the run no longer touched.
+ *
+ * An end that moved claims the mark it now sits on — the one whose connect
+ * point it was snapped to, else the one `snapToMark` finds in reach (so an
+ * unconfirmed mark never) — or NOTHING, which is sent as null so the server
+ * lets the old one go. An end that did not move is left out and keeps its
+ * claim. A tee end belongs to no mark (D20) and is never sent.
+ */
+export function endClaimsAfterEdit(input: {
+  before: readonly PagePoint[];
+  after: readonly PagePoint[];
+  teeEnds: { start: boolean; end: boolean };
+  tolerance: number;
+  stamps: readonly SnapStamp[];
+}): EndClaims {
+  const { before, after, stamps } = input;
+  const claimAt = (p: PagePoint): number | null => {
+    // Exactly on a mark's meeting point: the drag's snap put it there.
+    const exact = stamps.find(s => {
+      if (!markIsSnapTarget(s.status)) return false;
+      const at = s.connect ?? s;
+      return at.x === p.x && at.y === p.y;
+    });
+    if (exact) return exact.id;
+    return snapToMark(p, input.tolerance, stamps)?.stamp.id ?? null;
+  };
+  const same = (a: PagePoint | undefined, b: PagePoint | undefined) =>
+    !!a && !!b && a.x === b.x && a.y === b.y;
+  const claims: EndClaims = {};
+  if (after.length === 0) return claims;
+  const start = after[0];
+  const end = after[after.length - 1];
+  if (!input.teeEnds.start && !same(before[0], start))
+    claims.startStampId = claimAt(start);
+  if (!input.teeEnds.end && !same(before[before.length - 1], end))
+    claims.endStampId = claimAt(end);
+  return claims;
+}
+
 export function legSnapLabel(snap: LegSnap): string {
   switch (snap.kind) {
     case "free":

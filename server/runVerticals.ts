@@ -19,6 +19,7 @@
  * the double-count rule all live there, tested.
  */
 import {
+  deviceKind,
   heightList,
   resolveDeviceHeight,
   resolveDistributionHeight,
@@ -30,6 +31,11 @@ import {
   type RunVerticals,
 } from "../shared/takeoffHeights";
 import { heightAtEnd, kindAtEnd } from "../shared/runNetwork";
+import {
+  ceilingAt,
+  NO_CEILINGS,
+  type CeilingLayers,
+} from "../shared/ceilingHeights";
 import { kindForMode, type TraceMode } from "../shared/traceMode";
 import {
   extraNumber,
@@ -60,10 +66,18 @@ import {
 
 /** Everything needed to resolve any run on one bid, loaded once. */
 export type HeightContext = {
-  /** The company's distribution height, or null if the gate is shut. */
-  companyInches: number | null;
-  /** This bid's own, or null to inherit the company's. */
-  jobInches: number | null;
+  /*
+    `companyInches` and `jobInches` lived here until 2026-10-07, and every
+    drop read them directly — which is how the sheet's ceiling and height
+    areas reached homeruns and nothing else. Removed rather than kept beside
+    `ceilings`, so nothing can read a ceiling around the one rule.
+  */
+  /**
+   * EVERY layer a box's ceiling can come from — area, sheet, job, company —
+   * read through `ceilingAt` (shared/ceilingHeights.ts). Runs, count drops
+   * and homeruns all resolve through it, so one box has one ceiling.
+   */
+  ceilings: CeilingLayers;
   layers: HeightLayers;
   /**
    * Every height type this company can use, merged — what each end is CALLED.
@@ -175,6 +189,25 @@ export function buildHeightContext(input: {
     status: string | null;
     dropKind: string | null;
     dropHeightInches: number | null;
+    /** The type its ITEM mounts at (`assemblies.mountHeightTypeKey`). */
+    itemKind: string | null;
+  }[];
+  /**
+   * Each sheet's own ceiling (0109) and the bid's height areas (0130).
+   * REQUIRED (owner, 2026-10-07): every drop on the bid reads the ceiling
+   * of the area its box sits in, then the sheet's — a context without them
+   * would price a box under an 18'-0" stockroom at the job's 10'-0".
+   */
+  sheetCeilings: readonly {
+    id: number;
+    distributionHeightInches: number | null;
+  }[];
+  heightAreas: readonly {
+    id: number;
+    sheetId: number;
+    name: string;
+    distributionHeightInches: number | null;
+    region: readonly (readonly [number, number])[];
   }[];
 }): HeightContext {
   const {
@@ -196,7 +229,7 @@ export function buildHeightContext(input: {
             m.mountHeightInches === null ? null : Number(m.mountHeightInches),
           source: m.mountHeightSource,
         },
-        countKind: m.dropKind,
+        countKind: deviceKind(m.dropKind, m.itemKind),
         countInches: m.dropHeightInches,
         status: m.status,
       },
@@ -242,8 +275,27 @@ export function buildHeightContext(input: {
         return type ? typeExtras(type) : null;
       },
     },
-    companyInches: defaults?.distributionHeightInches ?? null,
-    jobInches: bidDistributionInches,
+    ceilings: {
+      company: defaults?.distributionHeightInches ?? null,
+      job: bidDistributionInches,
+      sheets: new Map(
+        input.sheetCeilings.map(s => [s.id, s.distributionHeightInches])
+      ),
+      // An area with no height yet follows the sheet: not an area here.
+      areas: input.heightAreas.flatMap(a =>
+        a.distributionHeightInches === null
+          ? []
+          : [
+              {
+                id: a.id,
+                sheetId: a.sheetId,
+                name: a.name,
+                ceilingInches: a.distributionHeightInches,
+                outline: a.region.map(([x, y]) => ({ x, y })),
+              },
+            ]
+      ),
+    },
     layers: {
       company: new Map(
         company
@@ -262,8 +314,7 @@ export function buildHeightContext(input: {
  * nothing, rather than to a borrowed number.
  */
 export const EMPTY_HEIGHT_CONTEXT: HeightContext = {
-  companyInches: null,
-  jobInches: null,
+  ceilings: NO_CEILINGS,
   layers: { company: new Map(), job: new Map() },
   // The shipped types, with nothing set on any of them. A name is a different
   // question from a height: there is nothing to resolve here, but anything that
@@ -306,8 +357,30 @@ export function extrasViewForRunRow(run: ExtrasRow, context: HeightContext) {
   };
 }
 
+/**
+ * How a run gets between its boxes (owner, 2026-10-07):
+ *   ceiling    up to the ceiling and down at each box — every drop counted
+ *   boxToBox   along the wall at box height — no drops, flat length only
+ * NULL reads as `ceiling`, today's behaviour.
+ */
+export const RUNS_AT = ["ceiling", "boxToBox"] as const;
+export type RunsAt = (typeof RUNS_AT)[number];
+
 /** A run row, as far as its verticals are concerned. */
 export type RunEnds = {
+  /**
+   * Where the run is, so each END reads the ceiling of the area its box
+   * sits in (shared/ceilingHeights.ts). REQUIRED: a caller without them
+   * would price every end at the job's ceiling with nothing to say so.
+   */
+  sheetId: number;
+  points: readonly { x: number; y: number }[] | null;
+  /**
+   * Box to box at one height, or through the ceiling. OPTIONAL only
+   * because its column (`takeoff_runs.runsAt`) is asked of Track A and no
+   * run row carries it yet; make it required when the column lands.
+   */
+  runsAt?: RunsAt | null;
   startKind: string | null;
   endKind: string | null;
   startHeightInches: number | null;
@@ -346,11 +419,21 @@ export function verticalsForRunRow(
   run: RunEnds,
   context: HeightContext
 ): RunVerticals {
-  const distribution = resolveDistributionHeight({
-    company: context.companyInches,
-    job: context.jobInches,
-    run: run.distributionHeightInches,
-  });
+  /*
+    THE CEILING AT EACH END (owner, 2026-10-07): the run's own "This run
+    sits at" wins — a person's answer about this run; otherwise the ceiling
+    of the area the END's box sits in, then the sheet, job, company
+    (shared/ceilingHeights.ts). Per END, because a run from a stockroom box
+    out to the sales floor has a different ceiling at each.
+  */
+  const own = resolveDistributionHeight({ run: run.distributionHeightInches });
+  const points = run.points ?? [];
+  const ceilingFor = (at: { x: number; y: number } | null) =>
+    own.inches !== null
+      ? own.inches
+      : ceilingAt(context.ceilings, run.sheetId, at).inches;
+  const startCeiling = ceilingFor(points[0] ?? null);
+  const endCeiling = ceilingFor(points[points.length - 1] ?? null);
 
   const start = endOfRun(
     run.startKind,
@@ -369,16 +452,32 @@ export function verticalsForRunRow(
     context
   );
 
+  /*
+    BOX TO BOX, SAME HEIGHT (owner, 2026-10-07, case d): the pipe runs
+    along the wall between the boxes, never up to the ceiling — so neither
+    end has a drop. The ends KEEP their kinds (a receptacle box still takes
+    device makeup); each is simply level with the run. `runsAt` waits on
+    Track A's column; until it lands every run reads as through the ceiling.
+  */
+  if (run.runsAt === "boxToBox") {
+    const level = (e: typeof start) => ({
+      kind: e.kind,
+      endInches: e.inches ?? 0,
+      distributionInches: e.inches ?? 0,
+    });
+    return verticalsForRun(level(start), level(end));
+  }
+
   return verticalsForRun(
     {
       kind: start.kind,
       endInches: start.inches,
-      distributionInches: distribution.inches,
+      distributionInches: startCeiling,
     },
     {
       kind: end.kind,
       endInches: end.inches,
-      distributionInches: distribution.inches,
+      distributionInches: endCeiling,
     }
   );
 }

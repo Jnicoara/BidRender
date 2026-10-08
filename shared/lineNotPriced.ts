@@ -259,6 +259,17 @@ export type NotPricedTally = {
    * 2026-10-07). Required, so every total says it.
    */
   hours: number;
+  /**
+   * Drops to counted devices NOT PRICED because their count has no drop
+   * material ("drop material not set", `GroupDrop.notPricedDrops`; owner,
+   * 2026-10-07: "a bid can never print a price while drops are missing").
+   * Not a line — they come from the takeoff — so `countNotPriced` cannot
+   * see them; the BID's loaders add them (`withDropsNotPriced`: bids.get,
+   * the proposal). Optional, absent = 0, ONLY so the many lines-only tallies
+   * (and Track B's tests building them) need no edit — the bid page and the
+   * print are pinned by `server/dropsNotPriced.test.ts` instead.
+   */
+  drops?: number;
 };
 
 export const NOTHING_NOT_PRICED: NotPricedTally = {
@@ -268,14 +279,38 @@ export const NOTHING_NOT_PRICED: NotPricedTally = {
 };
 
 /**
- * Whether a total leaves ANYTHING out — lines, parts or hours. The one rule
- * every "is this figure complete?" reads (the print's "Price pending",
+ * Whether a total leaves ANYTHING out — lines, parts, hours or drops. The one
+ * rule every "is this figure complete?" reads (the print's "Price pending",
  * analytics' incomplete marker), so a new kind of gap cannot be counted in
  * the tally and forgotten by a caller that checked two fields by hand —
  * which is exactly what splitting hours out of parts would have done.
+ *
+ * MERGED 2026-10-07: Track B's (lines, parts, hours) and Track C's (lines,
+ * parts, drops) arrived as two functions of this name; this one reads all
+ * four. `server/dropsNotPriced.test.ts` goes red if drops fall out.
  */
 export function tallyLeavesOut(notPriced: NotPricedTally): boolean {
-  return notPriced.lines > 0 || notPriced.parts > 0 || notPriced.hours > 0;
+  return (
+    notPriced.lines > 0 ||
+    notPriced.parts > 0 ||
+    notPriced.hours > 0 ||
+    (notPriced.drops ?? 0) > 0
+  );
+}
+
+/**
+ * A lines-only tally with the bid's unpriced drops added. With none, the
+ * tally comes back AS IT WAS — no `drops: 0` — so a bid with no takeoff gaps
+ * reads exactly like the lines-only tally every other surface builds (the
+ * dashboard card is compared to the bid screen field for field).
+ */
+export function withDropsNotPriced(
+  tally: NotPricedTally,
+  drops: number
+): NotPricedTally {
+  const add = Number.isFinite(drops) ? Math.max(0, Math.floor(drops)) : 0;
+  if (add === 0) return tally;
+  return { ...tally, drops: (tally.drops ?? 0) + add };
 }
 
 /**

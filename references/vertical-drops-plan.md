@@ -132,6 +132,26 @@ a line saying so (both files, CLAUDE.md).
 switch…) comes from its count's `dropKind`. Nothing ties a device family,
 an assembly or a legend symbol to a height type today (§ 7 option B).
 
+> **Built 2026-10-07 (Track C, branch `c-homerun-footage`; owner: "a device
+> with no height uses its type's default, so every drop counts").** The type
+> is now `deviceKind(count's dropKind, its assembly's mountHeightTypeKey)`
+> (`shared/takeoffHeights.ts`), read for HOMERUNS and LINKED RUN ENDS, set as
+> "Mounts at" in the assembly editor. The count's answer still wins. This
+> **narrows** the § 7 "Track B after A" line: the key is read live (not
+> copied onto a new count), so setting it once re-prices every job — the
+> same inheritance as every other height. A count's OWN drops still need
+> its "Each drops to"; starting those answered from the key is still
+> Track B's, and still open (todo.md). A height from the type says "default
+> height" on screen. UNCC E111: 14 homeruns with no up-drop → 1.
+>
+> **Extended the same day (owner: YES): a count's OWN drops read it too**
+> when the count has no "Each drops to" ("— from the item" on the row). This
+> replaces the "a NEW count starts with dropKind answered" half of § 7's
+> Track B line: read live, so existing counts follow too. The run type a
+> drop is made of is still asked per count. **The claim rule grew one
+> case:** a box a computed homerun rises from carries no count drop
+> (`groupDrops` `homerunClaims`), as a run end's box already did not.
+
 ### The run end — the gate
 
 Run height resolves run → job → company (`resolveDistributionHeight`) and
@@ -163,6 +183,23 @@ Once A adds the column (§ 7), the run height chain becomes
 **run → sheet → job → company**, still with no shipped layer, and a
 sheet's own height is set on the sheet row with the same `HeightFields`
 control ("follows the job" when empty).
+
+> **Overridden 2026-10-07 by the owner, for ALL drops** ("regular runs,
+> count drops and homeruns all read the ceiling height of the area each box
+> sits in"). The "nothing here changes for runs" above, and "Per-AREA
+> heights … stay out", no longer hold. The chain, per BOX, is now:
+> **run's own → the height area the box sits in (smaller outline wins) →
+> sheet → job → company** — `shared/ceilingHeights.ts`, read by every run
+> END, every count drop's MARK and every homerun. Built on branch
+> `c-homerun-footage` (homerun-footage-plan.md § 10). The sheet's own
+> height is set on the "Ceilings" panel, not the sheet row.
+>
+> **And two drop rules, same day:** (a) a run whose first click snaps onto
+> a mark starts AT that box — linked to it, no kind — so a run passing
+> through a box counts TWO drops there (§ 3 had one: the leaving run took
+> the sticky "From", Nothing). (d) a per-run "Box to box, same height"
+> makes both ends level with their kinds kept — waiting on Track A's
+> `takeoff_runs.runsAt`.
 
 ## 3. How a drop adds to a run
 

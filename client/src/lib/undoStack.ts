@@ -25,6 +25,8 @@
  *   keeps it; another tab or a colleague's change is not on it.
  */
 
+import type { EndClaims } from "./legSnap";
+
 export const UNDO_LIMIT = 50;
 
 /** A sealed server packet: opaque here. */
@@ -53,7 +55,13 @@ export type UndoOp =
   /** Put a deleted run back, whole network. `id` is the row redo removes. */
   | { kind: "restoreRun"; packet: Packet; id: number }
   /** Write these points onto a run again (redo of a drag). */
-  | { kind: "setPoints"; runId: number; points: { x: number; y: number }[] }
+  | {
+      kind: "setPoints";
+      runId: number;
+      points: { x: number; y: number }[];
+      /** The marks the moved ends claimed (Track B Gap 1), for redo. */
+      ends?: EndClaims;
+    }
   /**
    * Put a run back as it was before a drag: its points AND any pull-point
    * answer the move cleared. `points` is the edit, for redo.
@@ -63,6 +71,7 @@ export type UndoOp =
       packet: Packet;
       runId: number;
       points: { x: number; y: number }[];
+      ends?: EndClaims;
     }
   /** Set a run's ends again (redo of an end change). */
   | { kind: "setEnds"; runId: number; patch: EndsPatch }

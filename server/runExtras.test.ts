@@ -474,10 +474,13 @@ describe("fittings are counted over INSTALLED pipe, not bought", () => {
         extraDefaults: undefined,
         runTypes: [],
         linkedMarks: [],
+        sheetCeilings: [],
+        heightAreas: [],
       }),
       pullPointAnswersByRun: new Map(),
       teesById: new Map(),
       markDrops: [],
+      homeruns: [],
     }).get(7)!;
     expect(footage.conduitBoughtFeet).toBe(120);
     expect(footage.conduitInstalledFeet).toBe(100);

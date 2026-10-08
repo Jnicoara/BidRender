@@ -47,6 +47,7 @@ import {
 import { uncountedEnds, type RunVerticals } from "./takeoffHeights";
 import type { RunExtras } from "./runExtras";
 import { dropsFootage, type MarkDropEntry } from "./groupDrops";
+import type { HomerunLineFootage } from "./homerunFootage";
 
 /** What kind of raceway a traced run represents. */
 export const RUN_PATH_TYPES = ["conduit", "cable"] as const;
@@ -950,7 +951,14 @@ export function totalQuantities(
    * the bid line has them — the disagreement shared/runOnBid.ts ended for
    * runs. `[]` where a caller has none.
    */
-  markDrops: readonly MarkDropEntry[]
+  markDrops: readonly MarkDropEntry[],
+  /**
+   * Computed homeruns (homerun-footage-plan.md § 10). REQUIRED for the same
+   * reason as `markDrops`: the Totals tab once read "Conduit 0 ft" beside
+   * 4,476 ft of homerun pipe the bid line priced (seen on screen,
+   * 2026-10-07). `[]` where a caller has none.
+   */
+  homeruns: readonly { line: HomerunLineFootage }[]
 ): {
   /**
    * The drops from marks inside the figures below: how many, and the pipe or
@@ -958,6 +966,13 @@ export function totalQuantities(
    */
   markDropCount: number;
   markDropFeet: number;
+  /**
+   * The computed homeruns inside the figures below, and their run + drops
+   * before routing, waste and makeup. Their fittings ARE counted, on the
+   * homerun type's lines.
+   */
+  homerunCount: number;
+  homerunFeet: number;
   /**
    * What gets BOUGHT: flat, vertical, extra and (on wire and cable) makeup.
    * Renamed from `conduitFeet` / `cableFeet` / `wireFeet` on 2026-09-29 when
@@ -1176,6 +1191,31 @@ export function totalQuantities(
     }
   }
 
+  /*
+    COMPUTED HOMERUNS (homerun-footage-plan.md § 10), exactly as the bid's
+    run-type lines carry them — so this total, the materials list and the
+    bid line cannot disagree. Their vertical is inside their own run + drops
+    and is not split out here; their routing is installed footage.
+  */
+  let homerunCount = 0;
+  let homerunFeet = 0;
+  for (const { line: h } of homeruns) {
+    homerunCount++;
+    homerunFeet += h.homerunFeet;
+    conduit += h.conduitBoughtFeet;
+    cable += h.cableBoughtFeet;
+    wire += h.wireBoughtFeet;
+    wireGround += h.groundBoughtFeet;
+    if (h.pathType === "conduit") {
+      conduitExtra += h.conduitExtraFeet;
+      wireExtra += h.wireExtraFeet;
+      wireMakeup += h.makeupFeet;
+    } else {
+      cableExtra += h.wireExtraFeet;
+      cableMakeup += h.makeupFeet;
+    }
+  }
+
   let unmeasurable = 0;
   let flatOnly = 0;
   let partialVertical = 0;
@@ -1196,6 +1236,8 @@ export function totalQuantities(
   return {
     markDropCount,
     markDropFeet: round2(markDropFeet),
+    homerunCount,
+    homerunFeet: round2(homerunFeet),
     conduitBoughtFeet: round2(conduit),
     cableBoughtFeet: round2(cable),
     wireBoughtFeet: round2(wire),

@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest";
 import {
   DISTRIBUTION_KIND,
   DISTRIBUTION_LABEL,
+  END_NO_DROP_LABEL,
   SHIPPED_HEIGHT_TYPES,
   heightList,
   heightTypeLabel,
@@ -51,6 +52,7 @@ import {
 } from "../shared/takeoffQuantities";
 import type { PagePoint } from "../shared/takeoffGeometry";
 import { runDisplayName, runNameParts } from "../shared/takeoffCounts";
+import { NO_CEILINGS } from "../shared/ceilingHeights";
 import {
   EMPTY_HEIGHT_CONTEXT,
   verticalsForRunRow,
@@ -61,9 +63,10 @@ import {
 function totalsOf(
   runs: Omit<Parameters<typeof totalQuantities>[0][number], "runKey">[]
 ) {
-  // No drops from marks here — those have their own suite (groupDrops).
+  // No drops from marks or homeruns here — those have their own suites.
   return totalQuantities(
     runs.map((entry, i) => ({ ...entry, runKey: i })),
+    [],
     []
   );
 }
@@ -140,7 +143,18 @@ describe("the shipped height types", () => {
       "ceiling-box",
       "junction-box-wall",
       "disconnect",
+      // Owner, 2026-10-07: data / TV outlets are on most jobs, above the fold.
+      "low-voltage",
     ]);
+  });
+
+  it('ships Data / TV / Low voltage at 18" (owner, 2026-10-07)', () => {
+    // Red before: no such type, so a data outlet's homerun had no rise.
+    expect(resolveMountingHeight("low-voltage", noLayers, null)).toEqual({
+      inches: 18,
+      source: "shipped",
+    });
+    expect(heightTypeLabel("low-voltage")).toBe("Data / TV / Low voltage");
   });
 
   it("has no duplicate keys — a run points at one of these forever", () => {
@@ -801,7 +815,7 @@ describe("a bid with no heights set reads exactly as it did before", () => {
       runKey: 40,
       extras: NO_EXTRAS,
     };
-    const flat = totalQuantities([leg, leg, leg], []);
+    const flat = totalQuantities([leg, leg, leg], [], []);
     expect(flat.conduitBoughtFeet).toBe(300);
     expect(flat.flatOnlyCount).toBe(1);
 
@@ -810,6 +824,7 @@ describe("a bid with no heights set reads exactly as it did before", () => {
         { ...leg, ratio: null },
         { ...leg, ratio: null },
       ],
+      [],
       []
     );
     expect(unscaled.unmeasurableCount).toBe(1);
@@ -1023,14 +1038,16 @@ describe("what a run is called, ends and all", () => {
     ).toBe('Panel → Pull can, high bay, 1/2" EMT, 2 #12 + ground');
   });
 
-  it("says the pipe carries on, rather than showing the slug", () => {
+  it("names an end at run height 'No drop here', as its Run ends row does", () => {
+    // Owner, 2026-10-07. Red before: "Run height → Switch" on the run's name
+    // beside "no drop here" on its own Run ends row.
     expect(
       runDisplayName({
         ...conduit,
         startKind: DISTRIBUTION_KIND,
         endKind: "switch",
       })
-    ).toBe('Run height → Switch, 1/2" EMT, 2 #12 + ground');
+    ).toBe('No drop here → Switch, 1/2" EMT, 2 #12 + ground');
   });
 
   it("drops BOTH ends when only one is answered", () => {
@@ -1184,13 +1201,16 @@ describe("resolving a stored run's verticals", () => {
     // became part of it — harmlessly, since verticalsForRunRow never reads
     // `types`, but unseen, because pnpm check skips tests.
     ...EMPTY_HEIGHT_CONTEXT,
-    companyInches: 120,
+    // The ceiling a run end reads (shared/ceilingHeights.ts, 2026-10-07).
+    ceilings: { ...NO_CEILINGS, company: 120 },
     // Fresh maps rather than the constant's, so no test can write into a
     // module-level value shared by every other test.
     layers: { company: new Map(), job: new Map() },
   };
 
   const PANEL_TO_RECEPTACLE = {
+    sheetId: 1,
+    points: null,
     startKind: DISTRIBUTION_KIND,
     endKind: "receptacle",
     startHeightInches: null,
@@ -1306,7 +1326,7 @@ describe("resolving a stored run's verticals", () => {
     // run, without anybody editing a run.
     const verticals = verticalsForRunRow(PANEL_TO_RECEPTACLE, {
       ...COMPANY,
-      jobInches: 144,
+      ceilings: { ...COMPANY.ceilings, job: 144 },
     });
     expect(verticals.feet).toBe(10.5);
   });
@@ -1314,7 +1334,7 @@ describe("resolving a stored run's verticals", () => {
   it("lets one run sit at its own elevation", () => {
     const verticals = verticalsForRunRow(
       { ...PANEL_TO_RECEPTACLE, distributionHeightInches: 96 },
-      { ...COMPANY, jobInches: 144 }
+      { ...COMPANY, ceilings: { ...COMPANY.ceilings, job: 144 } }
     );
     expect(verticals.feet).toBe(6.5);
   });
@@ -1652,9 +1672,12 @@ describe("what the ARMED ENDS are called over the drawing", () => {
     expect(endKindLabel("")).toBe(NOT_ANSWERED_LABEL);
   });
 
-  it("calls run height by its SHORT name, not the picker's sentence", () => {
-    // The open list says "Continues at run height" because it has the room.
-    expect(endKindLabel(DISTRIBUTION_KIND)).toBe(DISTRIBUTION_LABEL);
+  it("calls an end at run height 'No drop here', the chip's words", () => {
+    // Owner, 2026-10-07: the picker said "Run height" beside a chip saying
+    // "No drop here" — one answer, two names. Red before: DISTRIBUTION_LABEL.
+    // The open list adds "— continues at run height" because it has the room.
+    expect(endKindLabel(DISTRIBUTION_KIND)).toBe("No drop here");
+    expect(endKindLabel(DISTRIBUTION_KIND)).toBe(END_NO_DROP_LABEL);
     expect(endKindLabel(DISTRIBUTION_KIND)).not.toMatch(/continues/i);
   });
 
@@ -1684,7 +1707,7 @@ describe("what the ARMED ENDS are called over the drawing", () => {
     // "carries on at run height" with nothing said about where it finishes.
     expect(
       traceEndsLabel({ startKind: DISTRIBUTION_KIND, endKind: null })
-    ).toBe(`${DISTRIBUTION_LABEL} → ${NOT_ANSWERED_LABEL}`);
+    ).toBe(`${END_NO_DROP_LABEL} → ${NOT_ANSWERED_LABEL}`);
   });
 
   it("agrees with the run row about what an end is called", () => {
