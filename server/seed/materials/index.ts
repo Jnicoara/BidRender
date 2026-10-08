@@ -16,8 +16,13 @@
  * every one of them.
  */
 import { CONDUIT } from "./conduit";
-import { BOXES } from "./boxes";
-import { COVER_PLATES, RECEPTACLES, SWITCHES } from "./devices";
+import { BOX_COVER_FAMILY, BOXES } from "./boxes";
+import {
+  COVER_PLATE_FAMILY,
+  COVER_PLATES,
+  RECEPTACLES,
+  SWITCHES,
+} from "./devices";
 import { CONNECTORS, CONSUMABLES } from "./connectors";
 import { DISTRIBUTION, PANELS_AND_BREAKERS } from "./power";
 import { LIGHTING } from "./lighting";
@@ -101,6 +106,10 @@ export const BASELINE_MATERIALS: BaselineMaterial[] = (
     ...RECEPTACLES,
     ...SWITCHES,
     ...COVER_PLATES,
+    // The full cover family, owner 2026-10-08 (adds only). The box covers
+    // sit here, after the receptacles, not with BOXES — see boxes.ts.
+    ...COVER_PLATE_FAMILY,
+    ...BOX_COVER_FAMILY,
     ...PANELS_AND_BREAKERS,
     ...LIGHTING,
     ...GROUNDING,

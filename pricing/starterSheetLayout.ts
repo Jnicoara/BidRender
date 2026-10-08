@@ -133,6 +133,8 @@ const KIND: Record<string, JobKind> = {
   both: "Both",
 };
 
+const materialByName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
+
 /** An assembly's own tag, as the sheets show it. */
 export const assemblyKind = (projectType: string | null | undefined): JobKind =>
   (projectType && KIND[projectType]) || "Both";
@@ -141,11 +143,17 @@ export const assemblyKind = (projectType: string | null | undefined): JobKind =>
  * A material's Residential / Commercial / Both — from the starter
  * assemblies that USE it (owner, 2026-10-07): only residential ones ->
  * Residential, only commercial ones -> Commercial, any "both" or a mix ->
- * Both, none -> "Not in an assembly" (a run type alone does not count).
+ * Both, none -> the row's own `jobKind` if it has one (the cover family,
+ * 2026-10-08), else "Not in an assembly" (a run type alone does not count).
+ * The starters win when both exist, so a tag can never contradict the
+ * recipes that use the row.
  */
 export function materialKind(name: string): JobKind {
   const users = starterUses.get(name);
-  if (!users || users.size === 0) return "Not in an assembly";
+  if (!users || users.size === 0) {
+    const own = materialByName.get(name)?.jobKind;
+    return own ? KIND[own] : "Not in an assembly";
+  }
   // Array.from, not a spread: this file is typechecked through
   // server/starterSheetLayout.test.ts, and tsconfig has no `target` yet.
   const tags = new Set(

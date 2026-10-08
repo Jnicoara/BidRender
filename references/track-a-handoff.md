@@ -4,7 +4,22 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-08 (session 17) — read this first
+## UPDATE 2026-10-08 (session 18) — the cover family
+
+- **103 cover rows added, catalog 1,715 → 1,818.** Adds only, nothing renamed or
+  retired, no recipe changed. Spec: the owner's list (the audit,
+  `references/cover-plates-audit.md`, arrived mid-session and asks for nothing
+  the list lacks). Generators: `COVER_PLATE_FAMILY` (devices.ts) and
+  `BOX_COVER_FAMILY` (boxes.ts, listed after the receptacles: raw search
+  ties keep catalog order, and with the boxes "recep" led with a raised cover).
+  Guard: `server/coverPlateFamily.test.ts` (builds the expected names itself).
+- **New seed field `jobKind`** (Residential / Commercial / Both) for a row no
+  starter uses; sheets only, never the database (`materialKind`).
+- **DV34's plate ships** under its exact listed name; DV34 stays held until
+  Track B adds the line and empties `missingParts` (todo.md, B's swaps).
+- Pricing + labor-units sheets rebuilt (both checked empty first: 0 set).
+
+## UPDATE 2026-10-08 (session 17)
 
 - **local-dev = staging = `bea4d8f`**, which merges `c-homerun-footage` and
   `a-example-tags` and adds **0131** (`bids.homerunExtraBends`,

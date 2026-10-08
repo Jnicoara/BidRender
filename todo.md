@@ -21,7 +21,7 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
 - [x] **DONE 2026-10-08:** rebuilt with `--only assembly-hours --new-since
-    <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
+  <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
       NEW, DV34 grey with "HELD - no 700 plate yet". The old copy had 0 typed
       hours, so nothing needed carrying across. The other three sheets were
       not rebuilt (byte-identical before and after). Original item:
@@ -49,12 +49,25 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
     '4" can light, remodel' style (and 6").
   - **Files:** `server/db.ts`, which Track C changes on `c-homerun-footage`,
     so this lands after C merges; plus `server/seed/*`.
-- [ ] **Track A: add a 700-series device plate to the catalog** (owner,
-      2026-10-07: "matching 700-series device plate"). DV34 (surface
-      raceway receptacle) is held with exactly that part listed
-      (`missingParts: ["Surface raceway device plate, 700 series"]`). Ship
-      that row, with slang, or tell B the name you give it, and DV34 seeds
-      by itself on the next start.
+- [x] **Track A: add a 700-series device plate to the catalog** (owner,
+      2026-10-07: "matching 700-series device plate"). **Done 2026-10-08**
+      with the cover family: `Surface raceway device plate, 700 series`
+      ships under exactly the listed name, plus `Surface raceway device
+    box, 700 series`. **Correction:** this line said DV34 then "seeds by
+      itself on the next start". It does not — `assemblyRecipe.ts` holds a
+      starter while `missingParts` is non-empty, whatever the catalog has.
+- [ ] **Track B: the cover swaps** (owner, 2026-10-08 — Track A shipped
+      the parts and changed no recipe). DV34: add the 700 plate line (a
+      `STARTER_PARTS` key) and empty `missingParts`, then rewrite the DV34
+      test in `server/starterGapAssemblies.test.ts` and drop the name from
+      `shippedButAwaitingRecipe` in `server/starterAssembliesSeed.test.ts`.
+      The rest per `references/cover-plates-audit.md` § 3: CS6/7/8 → `4"
+    square raised cover, single receptacle`; RS17, CS5 → a single-
+      receptacle wall plate; RS1, RS2 → `1-gang wall plate, 30A/50A power
+    receptacle, …`; RS13 → `4-11/16" square raised cover, 30A/50A power
+    receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
+      if outdoor); generic `Wall plate` → typed duplex / toggle / decorator
+      plates. Nylon or stainless per recipe is the owner's call.
 
 ## Track A: ONE feature — extra per-foot items on a traced run (owner, 2026-10-07)
 
