@@ -35,8 +35,10 @@ release record is `deploying.md` § 11 "LIVE: `24105ad`".
   (test, deploy-staging, smoke). Local suite: 355 files, 5,936 passed.
 - Local DBs at 140: `bidrender_local`, `bidrender_test_localdev`. Scratch
   `bidrender_staging_restore_0139` dropped.
-- **Track C can now merge `c-per-foot-logic`**: take A's 0139 file (C's
-  `drizzle-guard` stops being red once the branch's drizzle/ matches).
+- **Track C can now merge `c-per-foot-logic`**: take A's 0139 file and
+  journal entry. Not checked: whether C's `drizzle-guard` clears after
+  that — it lists branch commits touching `drizzle/`, and C's stand-in
+  commit is one; it may stay red by rule until merged to local-dev.
 
 ## UPDATE 2026-10-08 (session 22)
 
