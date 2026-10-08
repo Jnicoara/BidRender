@@ -1,6 +1,9 @@
 # Extra per-foot items on a traced run (PLAN, 2026-10-08)
 
-**Status: plan only. Nothing is built.** Written by Track C, on
+**Status: plan, plus the column-free counting** — the 700 rules, the
+extras' feet and the traced-part fallback, as pure functions with tests on
+branch `c-per-foot-logic` (2026-10-08, not merged; `track-c-handoff.md`).
+Nothing reads them yet. Written by Track C, on
 `c-homerun-wiring`, for the owner's ask of 2026-10-07. The first sketch is in
 `todo.md` § "Track A: ONE feature — extra per-foot items on a traced run".
 
@@ -376,6 +379,14 @@ need 0117 (staging has it; live does not — `next-live-release-plan.md`).
   `(bidId, takeoffRunTypeId, runMaterialRole, runExtraKey)`. It must NOT
   use a nullable column: MySQL lets NULLs repeat in a unique index, which
   would quietly allow duplicate raceway lines.
+- **OPEN (found 2026-10-08, Track C, building § 3c's counting): the flat
+  elbow has no role.** The 700 type sends an inside elbow and a flat elbow,
+  two parts on one type, and the unique index allows one line per role. The
+  other 700 parts fit existing roles (entrance end `connector`, clip
+  `strap`, inside elbow `elbow90`, tee `teeBox`). Suggested: append
+  `elbowFlat` here beside `extra`, append-only like 0084. Undecided — see
+  `track-c-handoff.md`. The counting is built
+  (`shared/surfaceRacewayFittings.ts`) and does not depend on the answer.
 - **New: add `extraFeetPerFoot DECIMAL(8,4) NULL`** (decision 4). NULL =
   follow the run type's extra; `0` = "shared trench" on this bid. Only read
   on a role-`extra` line. NULL with no default, so "follow the type" is a

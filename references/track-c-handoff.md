@@ -10,7 +10,63 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## WHERE THINGS STAND (2026-10-08, end of session — read this first)
+## WHERE THINGS STAND (2026-10-08, later — read this first)
+
+**Branch `c-per-foot-logic`** (from local-dev `df25451`), pushed, **NOT
+merged into local-dev — on purpose.** The owner's instruction: it merges
+when A's M1–M4 have landed and C wires it up. It holds the per-foot plan's
+counting that needs NO new column, as pure functions with tests:
+
+- `shared/surfaceRacewayFittings.ts` — the 700 family (plan § 3c): couplings
+  off 10 ft lengths; ONE entrance end per run at its start (none on a branch
+  leg, none at an open quantity-trace start); corner = inside elbow, end drop
+  = flat elbow (read by `legBends`, the same as a pipe's elbows); tee = a 700
+  tee fitting (none on a tee standing on a counted box); clips "not set"
+  while spacing is NULL; a corner that is not square buys its 90s and NAMES
+  the 45° part it cannot buy. No field bend, 45, LB or pull box.
+- `shared/runExtrasPerFoot.ts` — tape and any extra (§ 3a): `flat` or `all`
+  feet × feet per foot, the run's raceway waste on top (bought, not
+  installed), the line's shared-trench 0 vs NULL, unmeasurable runs counted
+  apart and never added as 0.
+- `shared/tracedParts.ts` — a part "from the traced run" (§ 3d): traced
+  beats typed beats default; GR2's pipe falls back to its own 10 ft
+  "default length" (read from the GR2 recipe in the test, not restated);
+  tape with nothing traced is NOT PRICED; covered = priced on the run line,
+  0 on the assembly line; coverage by material lineage.
+- Tests: `surfaceRacewayFittings.test.ts` (18), `runExtrasPerFoot.test.ts`
+  (10), `tracedParts.test.ts` (16). **Mutation-checked:** removing the
+  branch-leg skip, counting drops as inside elbows, buying a tee on a mark,
+  tape following risers, dropping waste and ignoring coverage each turn a
+  named test red.
+
+**Real numbers (local `bidrender_local_c`, read only, nothing written):**
+
+- **E111 bid 1728359** — its footage is all 38 computed homeruns (no
+  hand-traced runs left): pipe 3,996.04 ft (matches the earlier figure) =
+  3,553.53 ft flat + 442.51 ft drops. As 700: 380 couplings, 38 entrance
+  ends, 38 inside elbows (homerun corners), 76 flat elbows (2 drops each),
+  clips not set. As a trench at 5% waste: 3,553.53 ft tape + 177.70 waste =
+  3,731.23 ft — the drops are NOT in the tape.
+- **Bar layout check 1164558** (real traced runs): the 2" PVC run's one
+  corner is past 90°, so it buys 1 inside elbow and says the 45° part needs
+  adding by hand. That case is why the sentence names the angle, and is now
+  a test.
+
+**FOR TRACK A, before M2 is final — a role the plan missed.** The 700 type
+counts an inside elbow AND a flat elbow, two different parts on ONE run
+type. `bid_line_items_bid_runtype_role_uq` allows one line per (bid, type,
+role), so both cannot go out as `elbow90`. Entrance end → `connector`, clip
+→ `strap`, tee → `teeBox` and inside elbow → `elbow90` can reuse existing
+roles; **the flat elbow needs its own** (e.g. append `elbowFlat` to
+`runMaterialRole` in M2, beside `extra`). Reusing `elbow45` would work in
+the database and lie on every screen that labels the role. Not decided —
+A's and the owner's call. Plan § 4 M2 says the same.
+
+**Not done, and still waiting:** everything that reads a new column (extras
+CRUD, the bridge, `setExtraShared`, freezing traced parts), and the seed
+content (A's). The five owner questions below are still unanswered.
+
+## Before that (2026-10-08, end of session)
 
 **No job is in progress.** Working tree clean; `c-homerun-wiring` and
 `local-dev` both at `11dbd02` (or later, if this commit). No WIP anywhere.
