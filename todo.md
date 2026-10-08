@@ -17,6 +17,11 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       `track-b-flash-*`, `track-b-starters-*`); their bids are archived and
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
+- [ ] **Track A: rebuild `pricing/assembly-hours-starter.xlsx`** with
+      `pricing/buildStarterSheets.mts`. It was built from the 168 starters;
+      Track B added 15 on 2026-10-07 (GC1–GC5, GR1–GR7, LT31–LT33), so they
+      are not on the sheet the owner is filling in. The hours map is keyed by
+      name, so nothing breaks; they just have no row yet.
 - [ ] **Owner question: can light names.** You suggested names like
       '4" can light, new construction' / '4" can light, remodel'. Three of
       the four can lights already shipped under 'Recessed can new
