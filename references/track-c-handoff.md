@@ -297,6 +297,14 @@ totals / capture. C's local DB was brought to all 125 migrations to run it.
 
 ### MERGE NOTE FOR TRACK A (2026-10-08) — `c-homerun-footage` is ready; A merges it
 
+> **DONE by Track A, 2026-10-08:** merged into local-dev as `bea4d8f` with
+> 0131 (`bids.homerunExtraBends`, `takeoff_runs.runsAt`, both NULL = today's
+> behaviour) and the example tags (0132–0134). Staging was migrated through
+> 0134 first, with every bid total unchanged, and now serves `bea4d8f` (Gate
+> green). Mirror branch deleted. **Nothing reads the two new columns yet**:
+> C wires them and enables the two held controls (`track-a-handoff.md`
+> session 17).
+
 **local-dev (`615f122`) is merged INTO the branch** (merge `96635c1`). A
 merges the branch into local-dev WITH migrations 0125–0130 (pairing rule).
 **local-dev still ends at 0124 — no renumbering needed;** if anything lands

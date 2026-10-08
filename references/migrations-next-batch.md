@@ -1,6 +1,14 @@
 # Next migrations — ONE list, every track's asks. 0105–0124 WRITTEN, 2026-10-06
 
-## Status: 0105–0124 ON STAGING and on `local-dev` — NOT on live
+## Status: 0105–0134 ON STAGING and on `local-dev` — NOT on live
+
+**0125–0134 added 2026-10-08 ~01:50 UTC (Track A)**: C's homerun batch
+(0125–0130), the 0131 C asked for, and the example tags (0132–0134), merged
+into `local-dev` as `bea4d8f` and applied to staging together, in order,
+before the code. 10 applied, 135, matches, 173/173 foreign keys; every
+staging bid total unchanged before and after, including after the new code
+seeded the example rates. Record: `deploying.md` § 11. **Live still has
+0000–0104.**
 
 **Written 2026-10-06 (Track A) on `a-batch-0105`; applied to STAGING
 2026-10-07 00:16 UTC** (owner: the pairing rules are for LIVE, not staging)
@@ -210,10 +218,12 @@ index after the drop (the new key starts with `bidId`). Detail:
 | ---- | ----------------------------- | ---------------------------------------------------------------- | -------- | ----------- | -------------------------- |
 | 0124 | `0124_bid_pdf_legend_entries` | Table, **with** `lookId int NULL → symbol_looks, SET NULL` in it | A/C      | No.         | Step 1. After 0102 (done). |
 
-## Batch C — 0125–0130, Track C's homerun footage: WRITTEN 2026-10-07, ON A BRANCH ONLY
+## Batch C — 0125–0130, Track C's homerun footage: ON STAGING since 2026-10-08
 
-Branch `a-batch-c-0125` — **not merged into local-dev, not on staging**
-(owner). Every file additive (step 1), nullable, no defaults:
+Written on branch `a-batch-c-0125`; **merged into local-dev with
+`c-homerun-footage` (`bea4d8f`) and applied to staging 2026-10-08**, with
+0131 and 0132–0134 (status above). Not on live. Every file additive (step
+1), nullable, no defaults:
 
 | #    | File                          | What it is                                                                                                                                                                                                                     |
 | ---- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -293,7 +303,13 @@ migration is applied to staging or live before this branch merges, these
 six must be renumbered above it first. Nothing is applied anywhere shared,
 so renumbering is still free.
 
-### 0131 — Track C's two more columns: PLAN AND ORDER ONLY (owner, 2026-10-07)
+### 0131 — Track C's two more columns: WRITTEN AND ON STAGING 2026-10-08
+
+> **Written as `0131_homerun_bends_runs_at`** in the local-dev merge
+> (`bea4d8f`), exactly as planned below: two ALTERs, nullable, no DEFAULT, no
+> backfill; `when` between 0130 and 0132. `runsAt` is typed
+> `"ceiling" | "boxToBox"` in schema.ts. Nothing reads either column yet;
+> C wires them (told 2026-10-08). The plan below stays as written.
 
 Owner: "add Track C's two columns (`takeoff_runs.runsAt`,
 `bids.homerunExtraBends` default 1, unconfirmed) to the a-batch-c-0125 batch —
@@ -326,8 +342,9 @@ don't merge." Not written as a file yet; this is the plan.
 
 ## Batch 5 — before the priced sheet (numbered from 0132 when written — 0131 is Track C's, above)
 
-**WRITTEN 2026-10-07 as 0132–0134, branch `a-example-tags` — not merged into
-local-dev, not on staging.** The example-tag part of this batch only; brand
+**WRITTEN 2026-10-07 as 0132–0134 on branch `a-example-tags`; merged into
+local-dev (`bea4d8f`) and ON STAGING since 2026-10-08, after 0125–0131 in the
+same run.** The example-tag part of this batch only; brand
 line and `panelId` are still unwritten.
 
 | #    | File                       | What it adds (all nullable, no DB default, no `UPDATE` — step 1, additive)                                                                              |
