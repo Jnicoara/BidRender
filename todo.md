@@ -18,7 +18,7 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
 - [x] **DONE 2026-10-08:** rebuilt with `--only assembly-hours --new-since
-      <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
+    <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
       NEW, DV34 grey with "HELD - no 700 plate yet". The old copy had 0 typed
       hours, so nothing needed carrying across. The other three sheets were
       not rebuilt (byte-identical before and after). Original item:
