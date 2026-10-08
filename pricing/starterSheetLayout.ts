@@ -282,8 +282,9 @@ export type AssemblyRow = {
 };
 
 /**
- * The note a held starter carries on the sheet. Today only missing parts
- * hold one (DV34, no 700-series device plate in the catalog).
+ * The note a held starter carries on the sheet. Only missing parts hold
+ * one. None does today: DV34 was the last (no 700-series plate), and it
+ * loads since Track B's 7641bb1 — its sheet row unlocked 2026-10-08.
  */
 export function heldNote(a: {
   missingParts?: readonly string[];

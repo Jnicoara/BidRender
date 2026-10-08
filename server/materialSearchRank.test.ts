@@ -17,6 +17,7 @@ import { describe, it, expect } from "vitest";
 import {
   ROLE,
   TIER,
+  bareGangCount,
   compareByRole,
   familyKey,
   familySizes,
@@ -669,6 +670,73 @@ describe("a count before its noun matches that count, never a size", () => {
     ["42 space", "200A main panel, 42-space"],
   ])('"%s" leads with %s', (query, expected) => {
     expect(ranked(query)[0]).toBe(expected);
+  });
+
+  /*
+    A BARE gang count names no product (owner, 2026-10-08). "1 gang", "2 gang"
+    and "3 gang" showed only wall plates in the top five — 30 plate variants
+    start with "2-gang" and outranked every box. Now the boxes, mud rings and
+    plates take turns (mixGangLanes); with a noun typed nothing changes.
+  */
+  const kindOf = (name: string): "box" | "ring" | "plate" | "other" =>
+    / box\b/i.test(` ${name}`)
+      ? "box"
+      : /mud ring/i.test(name)
+        ? "ring"
+        : /\bplate\b/i.test(name)
+          ? "plate"
+          : "other";
+
+  it.each([
+    ["1 gang", ["box", "ring", "plate"]],
+    ["2 gang", ["box", "ring", "plate"]],
+    ["double gang", ["box", "ring", "plate"]],
+    // No 3-gang mud ring ships, so boxes and plates.
+    ["3 gang", ["box", "plate"]],
+  ])('"%s" shows a mix in its top five: %j', (query, kinds) => {
+    const top = ranked(query).map(kindOf);
+    for (const kind of kinds) expect(top).toContain(kind);
+    expect(top.filter(k => k === "plate").length).toBeLessThan(3);
+  });
+
+  it.each([
+    ["1 gang", "Single-gang box"],
+    ["2 gang", "Double-gang box"],
+    ["3 gang", "Triple-gang box"],
+  ])('"%s" leads with %s', (query, expected) => {
+    expect(ranked(query)[0]).toBe(expected);
+  });
+
+  it.each([
+    ["2 gang plate", "plate"],
+    ["3 gang plate", "plate"],
+    ["2 gang box", "box"],
+    ["1 gang box", "box"],
+    ["2 gang mud ring", "ring"],
+  ])('"%s" still lists only its noun: every top row is a %s', (query, kind) => {
+    const top = ranked(query);
+    expect(top.length).toBeGreaterThan(0);
+    expect(top.map(kindOf)).toEqual(top.map(() => kind));
+  });
+
+  it('"single gang" never offers a 2-gang row in its top five', () => {
+    expect(ranked("single gang").filter(n => /2-gang|double/i.test(n))).toEqual(
+      []
+    );
+  });
+
+  it.each([
+    ["2 gang", 2],
+    ["2-gang", 2],
+    ["Double gang", 2],
+    ["single gang", 1],
+    ["3 gangs", 3],
+    ["2 gang box", null],
+    ["2 gang plate", null],
+    ["gang box", null],
+    ["2 pole", null],
+  ])('bareGangCount("%s") is %s', (query, expected) => {
+    expect(bareGangCount(query)).toBe(expected);
   });
 
   it.each([

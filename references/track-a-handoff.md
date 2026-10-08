@@ -4,6 +4,22 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
+## UPDATE 2026-10-08 (session 19)
+
+- **DV34 unlocked on `pricing/assembly-hours-starter.xlsx`** (B's `7641bb1`
+  emptied its `missingParts`, which is all `heldNote` reads). Rebuilt with
+  `--only assembly-hours --new-since <a019453's copy>`, so the 15 NEW marks
+  stay; 0 HELD. Checked first: 0 MY HOURS typed. Loader dry run with 0.75 h
+  on DV34 accepts it. Pricing and labor sheets NOT touched (owner typing).
+- **Bare gang search mixes** (`mixGangLanes`, `shared/materialSearchRank.ts`):
+  "1/2/3 gang", "double gang" take turns box → mud ring → plate; a row
+  naming a different count goes last. With a noun the old ranking stands.
+  7 guards red on the old code (`server/materialSearchRank.test.ts`).
+  Not changed: a typed "2-gang" (hyphen) leads its box lane with "Raceway
+  device box, 2-gang", not "Double-gang box" — that is the base ranking for
+  the hyphenated form, older than this.
+- Next live release planned: `references/next-live-release-plan.md`.
+
 ## UPDATE 2026-10-08 (session 18) — the cover family
 
 - **103 cover rows added, catalog 1,715 → 1,818.** Adds only, nothing renamed or

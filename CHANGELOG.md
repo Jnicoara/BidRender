@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Searching "1 gang", "2 gang" or "3 gang" now shows boxes, mud rings and
+  plates together.** Before, the top five were all wall plates and you had to
+  scroll past thirty of them to find a box. "2 gang box", "2 gang plate" and
+  "2 gang mud ring" still go straight to that one thing.
+- **The surface raceway receptacle (DV34) is open on the assembly-hours
+  sheet.** It was greyed out and locked while its 700-series parts were
+  missing; they ship now, so hours typed for it load like any other.
+
 - **Two homerun controls now work: "Extra bends per homerun" and "Box to
   box, same height".** Extra bends is set once per bid. It starts at 1, is
   labelled "not confirmed" until somebody accepts or changes it, and that

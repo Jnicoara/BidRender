@@ -36,6 +36,9 @@ the reading code a reader could price them at 0 h. Expected on the first
 boot after the release: ONE "Holding" line, for DV34 (rehearsed: 167 shared
 starters, 159 with NULL hours, none at 0). **If the boot logs more holds, or
 any new starter has hours 0, stop.**
+**Stale since 2026-10-08:** DV34 loads (`7641bb1`), so the expected number
+of "Holding" lines is now ZERO, and the starter count is higher than 167 —
+re-measure it in the rehearsal (`next-live-release-plan.md` § 4).
 
 **Pairing rule 3 — homerun footage (written 2026-10-07).** Migrations
 **0125–0130** (`bid_panels`, `bid_panel_circuits`, the bid and sheet homerun

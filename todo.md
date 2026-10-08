@@ -118,6 +118,15 @@ each charged by the run's length. One feature, two jobs:
 **Why it is one feature:** both are "a second material priced off the same
 traced feet". Two special cases would drift.
 
+> **PLANNED 2026-10-08 by Track C: `references/per-foot-items-plan.md`.**
+> That plan supersedes the shape below where they differ. § 2 of the plan
+> lists four corrections: no shipped run type is underground, so an extra
+> needs an "only where Underground" condition; the bid's unique index allows
+> one line per type and role, so it must widen; a bid line does not freeze
+> parts one by one, so traced parts need their own snapshot; and DV34's
+> plate and box are already per device. Four migrations (M1–M4) and four
+> owner questions are in the plan.
+
 **Track C has merged** (`bea4d8f`), so nothing waits on C. Track A writes
 the migration; B or A builds the rest.
 
