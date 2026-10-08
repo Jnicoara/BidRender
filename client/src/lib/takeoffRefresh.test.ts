@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   BID_QUANTITY_QUERIES,
+  EVERY_SHEET_REFETCH,
   QUERIES_MOVED_BY,
   type TakeoffChange,
   sheetsAnUndoMoves,
@@ -136,6 +138,26 @@ describe("undoing a count deleted from several sheets (gap 4b, 2026-10-08)", () 
   it("keeps a one-sheet step to its own sheet", () => {
     expect(sheetsAnUndoMoves({ kind: "removeMarks", ids: [1, 2] }, 2)).toBe(2);
     expect(sheetsToRefresh(4, 2)).toEqual([4, 2]);
+  });
+
+  /*
+    Batch 2 (2026-10-08): the rule above was right and the screen still
+    flashed, because "every" invalidated with React Query's default
+    refetchType "active" — the closed sheets were only marked stale and
+    painted their old copy when opened. Seen on screen at laptop and tablet.
+  */
+  it("REFETCHES the sheets not on screen, rather than only marking them stale", () => {
+    expect(EVERY_SHEET_REFETCH.refetchType).toBe("all");
+    const page = readFileSync(
+      new URL("../pages/TakeoffPage.tsx", import.meta.url),
+      "utf8"
+    );
+    for (const proc of ["takeoffRuns", "takeoffStamps"])
+      expect(page, proc).toMatch(
+        new RegExp(
+          `utils\\.${proc}\\.listForSheet\\.invalidate\\(\\s*undefined,\\s*EVERY_SHEET_REFETCH\\s*\\)`
+        )
+      );
   });
 });
 

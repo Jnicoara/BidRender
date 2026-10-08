@@ -555,7 +555,9 @@ async function restoreNetworkIn(
   const now = await networkRows(tx, snapshot.rootId, userId);
   if (fingerprint(now) !== snapshot.after)
     refuse(
-      "That run has been changed since it was deleted, so it cannot be put back as it was."
+      // Not "since it was deleted": a drag, an end change and (Gap 4c) a
+      // type, length, circuit or leg edit are put back through here too.
+      "That run has been changed since, so it cannot be put back as it was."
     );
 
   const stampIds = Array.from(

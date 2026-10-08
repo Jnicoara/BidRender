@@ -1,6 +1,39 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, after batch 1 (READ FIRST)
+## WHERE B STANDS — 2026-10-08, after batch 2 (READ FIRST)
+
+**Batch 2 of 3 is built** (undo), details ticked in todo.md:
+
+- **Gap 4a:** the undo arrow reads "Can't be undone: …" after any of 19
+  changes undo does not cover (`NOT_UNDOABLE` in `undoStack.ts`). The first
+  press says so and names the older step; the second press takes it.
+  `notUndoableWired.test.ts` fails on any Plans-screen mutation that
+  neither pushes a step nor notes itself.
+- **Gap 4c:** run type (and respecify), typed length, add/change/remove
+  circuit, and add leg are undo steps with redo. Server: `asUndoStep` in
+  `takeoffRunsRouter.ts`; `server/runEditUndo.test.ts`.
+- **Found and fixed:** adding legs to a FINISHED run left a "run finished"
+  step whose undo deleted the whole run (`commit` now says `wasCommitted`).
+- **Gap 4b was NOT fixed by batch 1.** Seen on screen: the other sheet still
+  showed "0 marks" before "2 marks". The invalidate only marked closed
+  sheets stale; `EVERY_SHEET_REFETCH` now refetches them.
+- **On screen, laptop 1536x864 and tablet 1180x820, ALL PASS:** 4b (no 0
+  frame), 4c (70→120→70→120 ft; wire 210→350→210; circuit out and back;
+  type out and back), 4a (message, nothing moved, second press 90→70 ft).
+  Driven with a throwaway playwright script on `deviceAudit.mts` helpers
+  (deleted after). It left ~8 throwaway "B batch 2 undo check" bids for
+  user 1 in `bidrender_local_b_new`, local only.
+- **Not seen on screen:** a leg added with the trace tool (server-tested).
+
+**Left for batch 3:** Gap 6.1 (open the viewer from the local file while
+it uploads) and Gap 3 (won bid offers "lock it?" once; owner's call first).
+Then (b) the cover swaps and (c) the "fix this line" panel, as below.
+
+**State:** no migrations. B's databases are still at 139. Full suite before
+the last 4b change: 354 files, 5,930 passed, 6 skipped; the touched files
+after it: 116 files, 1,393 passed. `pnpm check` clean. No dev server running.
+
+## WHERE B STOOD — 2026-10-08, after batch 1
 
 **Batch 1 of 3 is built**, details in todo.md (each item ticked there):
 

@@ -185,22 +185,44 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       the only one). Both red without the check.
 - [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
       screen (`TakeoffPage.tsx`). No status gate. Owner's call first (plan Q2).
-- [ ] **Gap 4a: "can't be undone" on the undo arrow** when the last change was
-      one undo does not cover (mark status/height/location, legs and tees,
-      circuits, run type, typed length, extras, trace mode, branch wiring,
-      symbol capture, scale, sheet name/number, plan set removal). The
-      wording can live in `client/src/lib/undoStack.ts`, but recording WHICH
-      change happened is in TakeoffPage's mutations — so it is built as one
-      piece, not as a helper nothing calls.
-- [x] **DONE 2026-10-08 (batch 1): Gap 4b.** `sheetsAnUndoMoves` in
-      `client/src/lib/takeoffRefresh.ts` says "every" for a count restored or
-      deleted again, a switch over every undo kind (a new kind must decide),
-      and the screen invalidates every sheet's marks and runs for it. Red
-      without the rule. **Not seen on screen** — it is a refetch timing, and
-      the batch's on-screen check was the white box; look at it with the
-      next undo work (batch 2).
-- [ ] **Gap 4c: undo for run type, typed length, circuits, legs**, in that
-      order (TakeoffPage + router).
+- [x] **DONE 2026-10-08 (batch 2): Gap 4a, "can't be undone" on the undo
+      arrow.** `NOT_UNDOABLE` in `client/src/lib/undoStack.ts` names 19
+      changes undo does not cover; the screen notes each on success
+      (`notUndoable`), the arrow reads "Can't be undone: …", the first press
+      says so (naming the older step) and takes nothing back, and the second
+      press reaches the older step. Card arrows and toast Undo buttons offer
+      nothing meanwhile. Kept across a reload (`undoPersist`).
+      `client/src/lib/notUndoableWired.test.ts` reads TakeoffPage and fails
+      on a kind nobody notes, a run edit nobody pushes, or ANY run / mark /
+      count / sheet mutation that neither pushes a step nor notes itself
+      (its allowlist needs a reason per entry). Red against the old page.
+      Seen on screen at laptop and tablet.
+- [x] **DONE 2026-10-08 (batch 1), FINISHED in batch 2: Gap 4b.** Batch 1's
+      rule was right but the screen still FLASHED: "every" invalidated with
+      React Query's default `refetchType: "active"`, so closed sheets were
+      only marked stale and painted their old copy when opened. Seen on
+      screen in batch 2 at laptop and tablet ("0 marks" then "2 marks").
+      `EVERY_SHEET_REFETCH` (`refetchType: "all"`) fixes it; after, the other
+      sheet shows only "2 marks". Test in `takeoffRefresh.test.ts`.
+- [x] **DONE 2026-10-08 (batch 2): Gap 4c, undo for run type, typed length,
+      circuits, legs.** `setRunType`, `respecify`, `setTypedLength`,
+      `addCircuit`, `updateCircuit`, `removeCircuit` and `addLeg` return the
+      run's network as it was (`asUndoStep`, the packet a drag returns);
+      undo is `takeoffRuns.restore`, redo resends the same call
+      (`runEdit` / `restoreRunEdit`). `server/runEditUndo.test.ts` reads the
+      run list, totals and bridge before, after (must MOVE) and after the
+      restore, then redoes; 9 red on the old router. On screen at laptop and
+      tablet: 70→120→70→120 ft, wire 210→350→210, Ckt 1 removed and back,
+      type changed and back.
+      **Found on the way and fixed:** adding legs to a FINISHED run ends with
+      `commit`, and the screen pushed "run finished" for it — whose undo
+      deletes the whole run. `commit` now returns `wasCommitted` and that
+      step is pushed only for a new run; `addLeg` returns `onDraft`, so a leg
+      of a run still being traced is covered by the finish, not its own step.
+      **Not on screen:** a leg added through the trace tool (server-tested).
+      **Still not covered, by choice:** branch wiring, run extras, trace
+      mode, runs-at — each says "can't be undone". Branch wiring would be
+      cheap (it is `setEnds`, which already returns a packet).
 - [ ] **Gap 6.1: open the viewer from the file on this machine while it
       uploads** (`TakeoffPage.tsx`, `planUpload.ts`). Measured on staging
       2026-10-07 (52.6 MB, 15 pages): the PUT is 11.5–16.4 s of a 16–22 s

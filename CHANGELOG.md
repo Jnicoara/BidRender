@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Undo on the Plans screen now covers a run's type, typed length,
+  circuits and added legs, and says plainly when something can't be
+  undone.** Before, pressing undo after one of those quietly took back the
+  step BEFORE it. Now changing a run's type, typing or clearing a length,
+  adding, changing or removing a circuit, and adding a leg to a finished run
+  are each one undo step, with redo. Changes undo still does not cover (a
+  mark's status or height, sending a count to the bid, the scale, sheet
+  names, and so on) make the arrow read "Can't be undone: …"; the first
+  press says so and takes nothing back, and a second press reaches the
+  older step on purpose. Also fixed: adding legs to a finished run left an
+  undo step that would have deleted the whole run, and undoing a deleted
+  count still briefly showed other sheets without its marks.
+
 - **Underground PVC and Wiremold 700 are now run types you can trace.** Ten
   underground PVC types (1/2" to 4") sit behind one "Underground (10)" fold
   in the conduit picker, each carrying underground warning tape for when

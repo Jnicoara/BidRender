@@ -243,6 +243,17 @@ export function sheetsToRefresh(
  * so another sheet showed the count's marks still gone until its own
  * refetch landed. A switch over every kind, so a new step has to say.
  */
+/**
+ * How an "every sheet" refresh invalidates: REFETCHING the sheets not on
+ * screen, not only marking them stale. React Query's default
+ * (`refetchType: "active"`) leaves another sheet's cached marks in place
+ * until it is opened, and opening it paints that stale copy first — batch 1
+ * of Gap 4b did exactly that, and it was seen on screen on 2026-10-08:
+ * "0 marks" then "2 marks" on a sheet whose count had just been put back.
+ * The cached sheets are the few this bid has visited, so it is cheap.
+ */
+export const EVERY_SHEET_REFETCH = { refetchType: "all" } as const;
+
 export function sheetsAnUndoMoves(
   op: UndoOp,
   stepSheetId: number
@@ -263,6 +274,10 @@ export function sheetsAnUndoMoves(
     case "clearSheet":
     // Marks moved between counts are a selection on the step's sheet.
     case "moveMarks":
+    // A run's type, length, circuits and legs (Gap 4c) are on its own sheet;
+    // the bid-wide figures they move are refreshed whichever sheet it is.
+    case "runEdit":
+    case "restoreRunEdit":
       return stepSheetId;
     default: {
       const unhandled: never = op;
