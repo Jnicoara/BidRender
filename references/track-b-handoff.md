@@ -11,7 +11,10 @@
     it.
   - The local run needs `RENEW_HOLD_MS=14000 BASE=http://127.0.0.1:3002`.
     At 5 s the renewal lands before sheet 1 is drawn, so it cannot fail.
-  - **Staging: STAGING-RESULT-PENDING**
+  - **Staging (serving `06791ea`, which contains it): "No flash" at
+    laptop and tablet.** Sheet 1 was drawn at ~9 s and the renewal landed
+    at ~10.5 s, so the walk was able to fail. On 2026-10-07 it printed
+    FLASH.
 - **Gap 2:** `setLocation` now checks the lock.
   `server/runMutationsCheckLock.test.ts` fails on any run mutation that does
   not check it.
@@ -30,6 +33,18 @@
 - Gap 3: a won bid offers "lock it?" once. Owner's call first (plan Q2).
 
 **Then (b) the cover swaps and (c) the "fix this line" panel**, as below.
+
+**State:**
+
+- `track-b` = `origin/local-dev` at `06791ea` plus this handoff commit.
+- B's databases are at 139 (0135–0138 from A), and `schemaDrift` says
+  both match.
+- **The local-dev run for `14fead9` went red at deploy-staging only.** Its
+  tests passed. The deploy was refused because Track A had pushed staging
+  by hand (0135–0138). That staging push (`06791ea`) contains B's commit,
+  so staging runs it anyway. The `06791ea` local-dev run was still queued
+  at handoff.
+- No dev server is running.
 
 **Watch out:** stopping dev servers by matching `pnpm` in the command line
 also kills a `pnpm test` running in the same worktree. Its vitest then
