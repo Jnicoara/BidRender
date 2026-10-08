@@ -13,6 +13,9 @@ import { describe, expect, it } from "vitest";
 import {
   SURFACE_RACEWAY_PARTS,
   countSurfaceRacewayFittings,
+  isSurfaceRaceway700,
+  surfaceRacewayFittingRows,
+  surfaceRacewayPartName,
   type SurfaceRacewayCount,
   type SurfaceRacewaySpec,
 } from "../shared/surfaceRacewayFittings";
@@ -24,6 +27,7 @@ import {
 } from "../shared/runFittings";
 import { ELBOW_WORDS, type EndDrop } from "../shared/runBends";
 import type { TeeRef } from "../shared/runNetwork";
+import { fittingRowSpeaks } from "../shared/runFittingMaterials";
 
 const R700: SurfaceRacewaySpec = {
   name: "Surface raceway, 700 series",
@@ -293,5 +297,94 @@ describe("factory 700 parts only", () => {
       if (part === "tee") continue;
       expect(got[part]).toMatchObject({ qty: 0, why: "Nothing traced" });
     }
+  });
+});
+
+describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
+  const names = new Map(
+    SURFACE_RACEWAY_PARTS.map((part, i) => [
+      surfaceRacewayPartName(part),
+      { id: 900 + i, name: surfaceRacewayPartName(part), costPerUnit: 0 },
+    ])
+  );
+  const found = (name: string) => names.get(name);
+  const counts = countSurfaceRacewayFittings(
+    [
+      leg("1", 40, {
+        turn: 90,
+        startDrop: { state: "counted", feet: 3 },
+        endDrop: { state: "counted", feet: 3.5 },
+      }),
+    ],
+    R700,
+    []
+  );
+
+  it("go out under six DIFFERENT roles — the inside and flat elbows apart", () => {
+    const rows = surfaceRacewayFittingRows(counts, {}, found);
+    expect(rows.map(r => r.role)).toEqual([
+      "coupling",
+      "connector",
+      "strap",
+      "elbow90",
+      "elbowFlat",
+      "teeBox",
+    ]);
+    expect(new Set(rows.map(r => r.role)).size).toBe(rows.length);
+    const by = (role: string) => rows.find(r => r.role === role)!;
+    expect(by("elbow90").qty).toBe(1);
+    expect(by("elbowFlat").qty).toBe(2);
+    expect(by("connector").qty).toBe(1);
+    expect(by("elbowFlat").pick).toMatchObject({
+      ok: true,
+      name: "Surface raceway flat elbow, 700 series",
+    });
+    expect(by("connector").pick).toMatchObject({
+      ok: true,
+      name: "Surface raceway entrance end fitting, 700 series",
+    });
+  });
+
+  it("the type's own choice of part wins, and a missing part says so by name", () => {
+    const own = { id: 5, name: "Shop's own 700 coupling", costPerUnit: 1.5 };
+    const rows = surfaceRacewayFittingRows(counts, { coupling: own }, name =>
+      name.includes("tee") ? undefined : found(name)
+    );
+    expect(rows.find(r => r.role === "coupling")!.pick).toMatchObject({
+      ok: true,
+      materialId: 5,
+      override: true,
+    });
+    expect(rows.find(r => r.role === "teeBox")!.pick).toEqual({
+      ok: false,
+      why: "No catalog match for Surface raceway tee, 700 series",
+    });
+  });
+
+  it("is recognised by the SHIPPED raceway name only", () => {
+    expect(isSurfaceRaceway700("Surface raceway, 700 series")).toBe(true);
+    expect(isSurfaceRaceway700("Surface raceway, 500 series")).toBe(false);
+    expect(isSurfaceRaceway700(null)).toBe(false);
+  });
+
+  it("a PIPE never buys a flat elbow, and that 0 stays quiet", () => {
+    const pipe = asPipe([leg("1", 40, { turn: 90 })]);
+    expect(pipe.elbowFlat).toMatchObject({ status: "counted", qty: 0 });
+    expect(
+      fittingRowSpeaks({
+        role: "elbowFlat",
+        status: "counted",
+        qty: 0,
+        onBid: false,
+      })
+    ).toBe(false);
+    expect(
+      fittingRowSpeaks({
+        role: "elbowFlat",
+        status: "counted",
+        qty: 2,
+        onBid: false,
+      })
+    ).toBe(true);
   });
 });

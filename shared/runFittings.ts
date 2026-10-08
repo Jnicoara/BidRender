@@ -153,6 +153,14 @@ export const FITTING_KINDS = [
   // The box at a branch tee and its cover (D20). Counted once per tee, by the
   // run type that owns it — `teeBoxOwners` in runNetwork.ts.
   ...TEE_KINDS,
+  /*
+    A 700 surface raceway FLAT elbow, at an end drop (per-foot-items-plan.md
+    § 3c). Its own kind because the 700 type buys an inside elbow (`elbow90`)
+    at a corner AND this at a drop — two parts, and a bid line is one per
+    type and role. Only the 700 family counts one; a pipe answers 0 here and
+    the row stays quiet (`fittingRowSpeaks`).
+  */
+  "elbowFlat",
 ] as const;
 export type FittingKind = (typeof FITTING_KINDS)[number];
 
@@ -171,6 +179,7 @@ export const FITTING_KIND_LABELS: Record<
   pullBox: { one: "pull box", many: "pull boxes" },
   teeBox: { one: "tee box", many: "tee boxes" },
   teeCover: { one: "tee box cover", many: "tee box covers" },
+  elbowFlat: { one: "flat elbow", many: "flat elbows" },
 };
 
 /**
@@ -341,8 +350,18 @@ export function countFittings(
       bends.words
     ).counts,
     ...teeFittingCounts(ownedTees, raceway.teeCoverIncluded),
+    elbowFlat: NO_FLAT_ELBOW_ON_PIPE,
   };
 }
+
+/** A pipe never buys a flat elbow — that part is surface raceway's alone. */
+export const NO_FLAT_ELBOW_ON_PIPE: FittingCount = {
+  kind: "elbowFlat",
+  status: "counted",
+  qty: 0,
+  atLeast: false,
+  why: "Only surface raceway takes a flat elbow",
+};
 
 /**
  * MC cable is strapped within 12 in of each box and every 6 ft after it

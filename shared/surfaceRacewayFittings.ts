@@ -20,13 +20,12 @@
  * Plus: factory fittings only — no field bend, no 45 (none is shipped), no
  * LB or pull box (the legs' pull-point answers are not read).
  *
- * ── Not wired yet ────────────────────────────────────────────────────────────
- * Pure counting, with tests (`server/surfaceRacewayFittings.test.ts`). Nothing
- * calls it until the 700 run type ships (Track A's seed, after M1–M4) and the
- * bid path is taught which ROLE each part goes out under. Note for that
- * wiring: an inside elbow and a flat elbow are two different parts on one run
- * type, and `bid_line_items_bid_runtype_role_uq` allows one line per role —
- * so they cannot both go out as `elbow90`. See track-c-handoff.md.
+ * ── Wired (2026-10-08) ───────────────────────────────────────────────────────
+ * `fittingRowsByRunType` (server/db.ts) sends a type whose raceway is the
+ * shipped 700 row here instead of to `countFittings`, and each part goes out
+ * under the role `SURFACE_RACEWAY_PART_ROLE` names. The flat elbow has its own
+ * role, `elbowFlat` (0139), because an inside elbow and a flat elbow are two
+ * parts on one type and a line is one per type and role.
  */
 import {
   MERGE_WITHIN_FEET,
@@ -38,8 +37,11 @@ import {
   OPEN_NODE,
   sticksFor,
   strapsFor,
+  type FittingCount,
+  type FittingKind,
   type FittingLeg,
 } from "./runFittings";
+import type { FittingRow } from "./runFittingMaterials";
 import { countTeeBoxes, type TeeRef } from "./runNetwork";
 
 /** Every part a 700 run counts, in the order a screen lists them. */
@@ -64,6 +66,95 @@ export const SURFACE_RACEWAY_PART_LABELS: Record<
   flatElbow: { one: "flat elbow", many: "flat elbows" },
   tee: { one: "tee", many: "tees" },
 };
+
+/** The shipped raceway row the 700 type prices — matched by BASELINE name. */
+export const SURFACE_RACEWAY_700 = "Surface raceway, 700 series";
+
+/**
+ * Whether a raceway is the 700 family, by its SHIPPED name, so a company's
+ * renamed fork of the row still counts as 700. A raceway the company made
+ * itself has no shipped name and is not (it falls to the pipe path, which
+ * says "no catalog match" rather than guessing).
+ */
+export function isSurfaceRaceway700(baselineName: string | null): boolean {
+  return baselineName === SURFACE_RACEWAY_700;
+}
+
+/**
+ * Which bid-line ROLE each part goes out under. A line is one per run type
+ * and role, so the six must be six roles: the inside elbow is `elbow90` (a
+ * 90 at a plan corner, as on a pipe) and the flat elbow has its own
+ * `elbowFlat` (0139) — reusing `elbow45` would fit the database and lie on
+ * every screen that labels the role.
+ */
+export const SURFACE_RACEWAY_PART_ROLE = {
+  coupling: "coupling",
+  entranceEnd: "connector",
+  clip: "strap",
+  insideElbow: "elbow90",
+  flatElbow: "elbowFlat",
+  tee: "teeBox",
+} as const satisfies Record<SurfaceRacewayPart, FittingKind>;
+
+const PART_NAME_WORDS: Record<SurfaceRacewayPart, string> = {
+  coupling: "coupling",
+  entranceEnd: "entrance end fitting",
+  clip: "support clip",
+  insideElbow: "inside elbow",
+  flatElbow: "flat elbow",
+  tee: "tee",
+};
+
+/** The shipped catalog name of one 700 part (seed: raceUndergroundService). */
+export function surfaceRacewayPartName(part: SurfaceRacewayPart): string {
+  return `Surface raceway ${PART_NAME_WORDS[part]}, 700 series`;
+}
+
+/** A part as a pick needs it. */
+type Part = { id: number; name: string; costPerUnit: string | number };
+
+/**
+ * The 700 type's fitting ROWS for the bid — one per part, under its role
+ * (`SURFACE_RACEWAY_PART_ROLE`). The type's own choice of part wins where
+ * the type has a column for that role; otherwise the 700 catalog row.
+ */
+export function surfaceRacewayFittingRows(
+  counts: Record<SurfaceRacewayPart, SurfaceRacewayCount>,
+  overrides: Partial<Record<SurfaceRacewayPart, Part | null>>,
+  found: (name: string) => Part | undefined
+): FittingRow[] {
+  return SURFACE_RACEWAY_PARTS.map(part => {
+    const c = counts[part];
+    const role = SURFACE_RACEWAY_PART_ROLE[part];
+    const count: FittingCount =
+      c.status === "counted"
+        ? {
+            kind: role,
+            status: "counted",
+            qty: c.qty,
+            atLeast: c.atLeast,
+            why: c.why,
+          }
+        : { kind: role, status: "unknown", why: c.why };
+    const override = overrides[part] ?? null;
+    const wanted = surfaceRacewayPartName(part);
+    const row = override ?? found(wanted);
+    return {
+      role,
+      count,
+      pick: row
+        ? {
+            ok: true as const,
+            materialId: row.id,
+            name: row.name,
+            costPerUnit: row.costPerUnit,
+            override: override !== null,
+          }
+        : { ok: false as const, why: `No catalog match for ${wanted}` },
+      qty: count.status === "counted" ? count.qty : 0,
+    };
+  });
+}
 
 /** Same three shapes as `FittingCount`, over the 700 parts. */
 export type SurfaceRacewayCount =

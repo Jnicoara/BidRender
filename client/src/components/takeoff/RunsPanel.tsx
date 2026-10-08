@@ -1027,7 +1027,12 @@ export type PanelStampGroup = {
  * for future use has one too, and that is a real thing to bid.
  */
 export type RunTypeBridgeRow = {
-  role: "raceway" | "conductor" | "ground";
+  /** `extra` is a per-foot extra on the type, like underground tape (0135). */
+  role: "raceway" | "conductor" | "ground" | "extra";
+  /** Which extra, on an `extra` row; 0 on the others. */
+  extraKey: number;
+  /** How an extra's feet were reached; null on the others. */
+  why: string | null;
   materialName: string | null;
   feet: number;
   onBid: boolean;
@@ -1986,7 +1991,7 @@ export function RunsPanel({
                   </p>
                   <div className="mt-1 space-y-0.5">
                     {entry.rows.map(row => (
-                      <div key={row.role}>
+                      <div key={`${row.role}:${row.extraKey}`}>
                         <div className="flex items-baseline justify-between gap-2">
                           <span
                             className={cn(
@@ -2000,6 +2005,14 @@ export function RunsPanel({
                             {row.feet} ft
                           </span>
                         </div>
+                        {/* An extra says how its feet were reached — tape
+                            follows the flat length, not the risers — the
+                            way every fitting below carries its sentence. */}
+                        {row.why && (
+                          <p className="text-xs text-muted-foreground leading-snug">
+                            {row.why}
+                          </p>
+                        )}
                         {row.resend && (
                           <p className="text-xs text-warning leading-snug">
                             {resendSentence(row.resend)}

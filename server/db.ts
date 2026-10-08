@@ -113,6 +113,7 @@ import {
   takeoffRunTypeExtras,
   InsertTakeoffRunTypeExtra,
   TakeoffRunType,
+  TakeoffRunTypeExtra,
   TakeoffLocation,
   InsertSymbolLink,
   SymbolLink,
@@ -305,6 +306,13 @@ import {
   type FittingRow,
 } from "../shared/runFittingMaterials";
 import {
+  SURFACE_RACEWAY_PARTS,
+  countSurfaceRacewayFittings,
+  isSurfaceRaceway700,
+  surfaceRacewayFittingRows,
+  surfaceRacewayPartName,
+} from "../shared/surfaceRacewayFittings";
+import {
   canRejoin,
   cutPathAt,
   joinPaths,
@@ -331,7 +339,11 @@ import {
   type MarkupPart,
   type MarkupRuleSet,
 } from "../shared/materialMarkup";
-import { resolveLineQty } from "../shared/takeoffBridge";
+import {
+  resolveLineQty,
+  type RunTypeExtraInput,
+} from "../shared/takeoffBridge";
+import { extraFeetForRuns, extraKeyOf } from "../shared/runExtrasPerFoot";
 import { followsDrawing } from "../shared/quantityLock";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
 import {
@@ -5944,6 +5956,30 @@ async function withTracedFootage(
   const fittings = rows.some(row => isFittingRole(row.runMaterialRole))
     ? await fittingRowsByRunType(bid.userId, footage)
     : new Map<number, FittingRow[]>();
+  /*
+    EXTRAS (per-foot-items-plan.md § 3a): only when an extra line is on the
+    bid. Read off the RESOLVED type, so a company's fork of an underground
+    type prices from its own extras; the line keeps the stored type id and
+    its `runExtraKey`, which a fork's copy carries forward.
+  */
+  const extraOf = await (async () => {
+    if (!rows.some(row => row.runMaterialRole === "extra")) return () => null;
+    const palette = await getRunTypesFor(bid.userId, true);
+    const resolvedId = (storedId: number) =>
+      resolveRunType(palette, storedId)?.id ?? null;
+    const extras = await getRunTypeExtrasFor(
+      bid.userId,
+      Array.from(footage.keys())
+        .map(resolvedId)
+        .filter((id): id is number => id !== null)
+    );
+    return (storedId: number, key: number) => {
+      const id = resolvedId(storedId);
+      return id === null
+        ? null
+        : (extras.get(id)?.find(extra => extra.key === key) ?? null);
+    };
+  })();
 
   return rows.map(row => {
     if (row.takeoffRunTypeId === null || row.runMaterialRole === null) {
@@ -5963,6 +5999,32 @@ async function withTracedFootage(
       return { ...row, qty: (fitting?.qty ?? 0).toFixed(4) };
     }
     const f = footage.get(row.takeoffRunTypeId);
+    /*
+      AN EXTRA (tape) is the type's runs × its feet per foot — flat or all —
+      with the run's raceway waste on the material only, through THIS line's
+      "shared trench" answer: `extraFeetPerFoot` 0 is the answer, NULL follows
+      the type. An extra the type no longer carries, or a type with nothing
+      traced, is 0 and the line stays — the same rule as the raceway below.
+    */
+    if (role === "extra") {
+      const extra = extraOf(row.takeoffRunTypeId, row.runExtraKey);
+      const total =
+        f && extra
+          ? extraFeetForRuns(
+              f.extraRuns,
+              extra,
+              row.extraFeetPerFoot === null
+                ? null
+                : Number(row.extraFeetPerFoot),
+              extra.materialName ?? row.name
+            )
+          : { boughtFeet: 0, installedFeet: 0 };
+      return {
+        ...row,
+        qty: total.boughtFeet.toFixed(4),
+        laborQty: total.installedFeet.toFixed(4),
+      };
+    }
     /*
       A type with nothing traced under it any more is 0, not the stored number.
       Falling back to what the line last held is how a bid keeps money for work
@@ -5992,7 +6054,9 @@ async function withTracedFootage(
  */
 function feetForRole(
   footage: RunTypeFootageRow,
-  role: Exclude<RunMaterialRole, FittingKind>
+  // An `extra` is read by its own path in `withTracedFootage`: its feet need
+  // the extra and the line's shared-trench answer, not just the footage row.
+  role: Exclude<RunMaterialRole, FittingKind | "extra">
 ): { bought: number; installed: number } {
   switch (role) {
     case "raceway":
@@ -6042,15 +6106,11 @@ function feetForRole(
     case "bushing":
       return { bought: 0, installed: 0 };
     /*
-      0136's `extra` role, the same tripwire for the same reason: the column
-      arrives before the code (references/per-foot-items-plan.md § 9). Nothing
-      writes an `extra` line until the plan's server half ships — `sendToBid`
-      builds no candidate with the role. That half REPLACES this case with the
-      extra's own feet (flat or all, × feetPerFoot, read through
-      `extraFeetPerFoot`); it must not leave it answering 0.
+      0136's `extra` role had a tripwire here answering 0 until the plan's
+      server half shipped (2026-10-08). It is now read in `withTracedFootage`
+      from the extra itself, and excluded from this switch's type, so it
+      cannot fall back into a quiet 0 here.
     */
-    case "extra":
-      return { bought: 0, installed: 0 };
   }
 }
 
@@ -6367,6 +6427,32 @@ export async function getArchivedBidLineItems(
       and(eq(bidLineItems.bidId, bidId), isNotNull(bidLineItems.archivedAt))
     )
     .orderBy(asc(bidLineItems.sortOrder), asc(bidLineItems.id));
+}
+
+/**
+ * An extra line's "shared trench" answer (0136 `extraFeetPerFoot`): 0 is
+ * shared, NULL follows the run type. Writes only that column — the snapshot
+ * columns are never touched, and the quantity is re-derived on every read.
+ */
+export async function setLineExtraFeetPerFoot(
+  id: number,
+  bidId: number,
+  feetPerFoot: 0 | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(bidLineItems)
+    .set({
+      extraFeetPerFoot: feetPerFoot === null ? null : feetPerFoot.toFixed(4),
+    })
+    .where(
+      and(
+        eq(bidLineItems.id, id),
+        eq(bidLineItems.bidId, bidId),
+        eq(bidLineItems.runMaterialRole, "extra")
+      )
+    );
 }
 
 export async function getBidLineItem(
@@ -6878,7 +6964,11 @@ async function legacyMarkupParts(
           ? type.racewayMaterialId
           : line.runMaterialRole === "conductor"
             ? type.conductorMaterialId
-            : type.groundMaterialId;
+            : line.runMaterialRole === "ground"
+              ? type.groundMaterialId
+              : // A fitting or an extra: the type names no such column, and
+                // only the line's own part says what it is.
+                line.runMaterialId;
     if (materialId === null) return [];
     const material = resolveMaterial(
       await getMaterialsByIds([materialId], userId),
@@ -7164,24 +7254,27 @@ export async function saveLineAsAssembly(input: {
  */
 async function releaseArchivedPlanSlot(
   bidId: number,
-  slot: { groupId: number } | { runTypeId: number; role: RunMaterialRole }
+  slot:
+    | { groupId: number }
+    | { runTypeId: number; role: RunMaterialRole; extraKey: number }
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db
-    .delete(bidLineItems)
-    .where(
-      and(
-        eq(bidLineItems.bidId, bidId),
-        isNotNull(bidLineItems.archivedAt),
-        "groupId" in slot
-          ? eq(bidLineItems.takeoffGroupId, slot.groupId)
-          : and(
-              eq(bidLineItems.takeoffRunTypeId, slot.runTypeId),
-              eq(bidLineItems.runMaterialRole, slot.role)
-            )
-      )
-    );
+  await db.delete(bidLineItems).where(
+    and(
+      eq(bidLineItems.bidId, bidId),
+      isNotNull(bidLineItems.archivedAt),
+      "groupId" in slot
+        ? eq(bidLineItems.takeoffGroupId, slot.groupId)
+        : and(
+            eq(bidLineItems.takeoffRunTypeId, slot.runTypeId),
+            eq(bidLineItems.runMaterialRole, slot.role),
+            // The fourth column of the unique key (0136): one extra's
+            // archived line must not be cleared for another's.
+            eq(bidLineItems.runExtraKey, slot.extraKey)
+          )
+    )
+  );
 }
 
 /** The live bid line for a counted group, if it has one. */
@@ -9369,6 +9462,236 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
     );
   }
   return forkId;
+}
+
+/**
+ * The EXTRAS on these run types (0135, per-foot-items-plan.md § 3a), keyed
+ * by the type id given — pass RESOLVED ids (`resolveRunType`), so a company
+ * that forked an underground type reads its fork's extras, not the shipped
+ * ones.
+ *
+ * ── The material is read through `resolveMaterial` ───────────────────────────
+ * `materialId` stores the shipped tape's id on a shipped extra. A company that
+ * priced its own copy of the tape must see THAT copy's name here and that
+ * price on the line, so the name comes off the resolved row; the stored id
+ * goes out unchanged and `addRunTypeRowToBid` resolves it again to price it,
+ * the same as a type's raceway. server/forkableReferences.test.ts.
+ *
+ * A NULL material (deleted, `set null`) stays NULL and says so — the row
+ * prices nothing and cannot be sent, never a different part.
+ */
+/** One extra row, scoped like its type: shipped (NULL) or this company's. */
+export async function getRunTypeExtraById(
+  id: number,
+  userId: number
+): Promise<TakeoffRunTypeExtra | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(takeoffRunTypeExtras)
+    .where(
+      and(
+        eq(takeoffRunTypeExtras.id, id),
+        or(
+          isNull(takeoffRunTypeExtras.userId),
+          eq(takeoffRunTypeExtras.userId, userId)
+        )
+      )
+    )
+    .limit(1);
+  return row;
+}
+
+/** The fork's copy of a shipped extra — `forkRunType` points it back. */
+export async function getForkedExtra(
+  forkTypeId: number,
+  baselineExtraId: number,
+  userId: number
+): Promise<TakeoffRunTypeExtra | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(takeoffRunTypeExtras)
+    .where(
+      and(
+        eq(takeoffRunTypeExtras.runTypeId, forkTypeId),
+        eq(takeoffRunTypeExtras.baselineExtraId, baselineExtraId),
+        eq(takeoffRunTypeExtras.userId, userId)
+      )
+    )
+    .limit(1);
+  return row;
+}
+
+/** A company's own extra on its own type. Never a shipped row (userId set). */
+export async function createRunTypeExtra(row: {
+  userId: number;
+  runTypeId: number;
+  materialId: number;
+  feetPerFoot: number;
+  appliesTo: "flat" | "all";
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [{ next }] = (await db
+    .select({
+      next: sql<number>`COALESCE(MAX(${takeoffRunTypeExtras.sortOrder}), -1) + 1`,
+    })
+    .from(takeoffRunTypeExtras)
+    .where(eq(takeoffRunTypeExtras.runTypeId, row.runTypeId))) as {
+    next: number;
+  }[];
+  const [result] = await db.insert(takeoffRunTypeExtras).values({
+    ...row,
+    feetPerFoot: row.feetPerFoot.toFixed(4),
+    sortOrder: Number(next),
+  });
+  return result.insertId;
+}
+
+/** Edit a company's own extra. The `userId` filter keeps shipped rows out. */
+export async function updateRunTypeExtra(
+  id: number,
+  userId: number,
+  patch: {
+    materialId?: number;
+    feetPerFoot?: number;
+    appliesTo?: "flat" | "all";
+  }
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const { feetPerFoot, ...rest } = patch;
+  await db
+    .update(takeoffRunTypeExtras)
+    .set({
+      ...rest,
+      ...(feetPerFoot !== undefined
+        ? { feetPerFoot: feetPerFoot.toFixed(4) }
+        : {}),
+    })
+    .where(
+      and(
+        eq(takeoffRunTypeExtras.id, id),
+        eq(takeoffRunTypeExtras.userId, userId)
+      )
+    );
+}
+
+/**
+ * Remove a company's own extra. Its bid lines stay and read 0 ft with "no
+ * longer carries this extra" — the same rule as a type with nothing traced:
+ * a line is never deleted because the library changed.
+ */
+export async function deleteRunTypeExtra(
+  id: number,
+  userId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .delete(takeoffRunTypeExtras)
+    .where(
+      and(
+        eq(takeoffRunTypeExtras.id, id),
+        eq(takeoffRunTypeExtras.userId, userId)
+      )
+    );
+}
+
+/** A type's extras for the editor: the row's own id and whose it is. */
+export async function getRunTypeExtrasDetailed(
+  userId: number,
+  runTypeId: number
+) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(takeoffRunTypeExtras)
+    .where(
+      and(
+        eq(takeoffRunTypeExtras.runTypeId, runTypeId),
+        or(
+          isNull(takeoffRunTypeExtras.userId),
+          eq(takeoffRunTypeExtras.userId, userId)
+        )
+      )
+    )
+    .orderBy(asc(takeoffRunTypeExtras.sortOrder), asc(takeoffRunTypeExtras.id));
+  const materialRows = await getMaterialsByIds(
+    rows.map(r => r.materialId).filter((id): id is number => id !== null),
+    userId
+  );
+  return rows.map(row => {
+    const material =
+      row.materialId === null
+        ? undefined
+        : resolveMaterial(materialRows, row.materialId);
+    return {
+      id: row.id,
+      key: extraKeyOf(row),
+      shipped: row.userId === null,
+      materialId: row.materialId,
+      /** NULL for a deleted material: the extra says so and prices nothing. */
+      materialName: material?.name ?? null,
+      feetPerFoot: Number(row.feetPerFoot),
+      appliesTo: row.appliesTo,
+    };
+  });
+}
+
+/** An extra as the bridge needs it, plus what the materials list files it under. */
+export type RunTypeExtraRow = RunTypeExtraInput & {
+  unitOfSale: Material["unitOfSale"] | null;
+  category: string | null;
+};
+
+export async function getRunTypeExtrasFor(
+  userId: number,
+  runTypeIds: readonly number[]
+): Promise<Map<number, RunTypeExtraRow[]>> {
+  const out = new Map<number, RunTypeExtraRow[]>();
+  const db = await getDb();
+  const ids = Array.from(new Set(runTypeIds));
+  if (!db || ids.length === 0) return out;
+  const rows = await db
+    .select()
+    .from(takeoffRunTypeExtras)
+    .where(
+      and(
+        inArray(takeoffRunTypeExtras.runTypeId, ids),
+        or(
+          isNull(takeoffRunTypeExtras.userId),
+          eq(takeoffRunTypeExtras.userId, userId)
+        )
+      )
+    )
+    .orderBy(asc(takeoffRunTypeExtras.sortOrder), asc(takeoffRunTypeExtras.id));
+  const materialRows = await getMaterialsByIds(
+    rows.map(r => r.materialId).filter((id): id is number => id !== null),
+    userId
+  );
+  for (const row of rows) {
+    const material =
+      row.materialId === null
+        ? undefined
+        : resolveMaterial(materialRows, row.materialId);
+    const list = out.get(row.runTypeId) ?? [];
+    list.push({
+      key: extraKeyOf(row),
+      materialId: material ? row.materialId : null,
+      materialName: material?.name ?? null,
+      feetPerFoot: Number(row.feetPerFoot),
+      appliesTo: row.appliesTo,
+      unitOfSale: material?.unitOfSale ?? null,
+      category: material?.category ?? null,
+    });
+    out.set(row.runTypeId, list);
+  }
+  return out;
 }
 
 export async function updateRunType(
@@ -13289,6 +13612,9 @@ export async function fittingRowsByRunType(
         }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
+        // The 700 family names its own parts (per-foot plan § 3c).
+        if (isSurfaceRaceway700(name))
+          return SURFACE_RACEWAY_PARTS.map(surfaceRacewayPartName);
         return FITTING_KINDS.map(kind =>
           fittingMaterialName(name, kind, type!.fittingStyle)
         ).filter((n): n is string => n !== null);
@@ -13386,6 +13712,48 @@ export async function fittingRowsByRunType(
     const ownedTees = row.tees.filter(
       tee => teeOwners.get(tee.id) === storedId
     );
+    /*
+      THE 700 FAMILY (per-foot plan § 3c): one entrance end per run, corner =
+      inside elbow, end drop = flat elbow, a tee is a fitting, factory parts
+      only. Its own counter so a pipe cannot pick up a 700 rule — see
+      shared/surfaceRacewayFittings.ts. The type's own coupling, connector,
+      strap and 90 choices still win, as on any type.
+    */
+    if (raceway && isSurfaceRaceway700(racewayBaselineName(raceway))) {
+      const counts = countSurfaceRacewayFittings(
+        row.legs,
+        {
+          name: raceway.name,
+          stickLengthFeet:
+            raceway.stickLengthFeet === null
+              ? null
+              : Number(raceway.stickLengthFeet),
+          strapSpacingFeet:
+            raceway.strapSpacingFeet === null
+              ? null
+              : Number(raceway.strapSpacingFeet),
+          strapFromBoxFeet:
+            raceway.strapFromBoxFeet === null
+              ? null
+              : Number(raceway.strapFromBoxFeet),
+        },
+        ownedTees
+      );
+      out.set(
+        storedId,
+        surfaceRacewayFittingRows(
+          counts,
+          {
+            coupling: resolved(t.couplingMaterialId) ?? null,
+            entranceEnd: resolved(t.connectorMaterialId) ?? null,
+            clip: resolved(t.strapMaterialId) ?? null,
+            insideElbow: resolved(t.elbow90MaterialId) ?? null,
+          },
+          found
+        )
+      );
+      continue;
+    }
     const spec: RacewayFittingSpec | null = raceway
       ? {
           name: raceway.name,
@@ -13456,6 +13824,8 @@ export async function fittingRowsByRunType(
       // (`teeBoxFor`). A company that wants another box forks the row.
       teeBox: null,
       teeCover: null,
+      // A pipe never counts one (NO_FLAT_ELBOW_ON_PIPE); 700 has its own path.
+      elbowFlat: null,
     };
     const picks = Object.fromEntries(
       FITTING_KINDS.map(kind => {
@@ -13538,6 +13908,11 @@ export async function addRunTypeRowToBid(
   input: {
     runTypeId: number;
     role: RunMaterialRole;
+    /**
+     * Which EXTRA (0136 `runExtraKey`): `extraKeyOf(extra)` on an `extra`
+     * line, 0 on every other — the unique key's fourth column.
+     */
+    extraKey: number;
     materialId: number;
     /** What the line is called — the type's label plus what this row is. */
     name: string;
@@ -13569,11 +13944,13 @@ export async function addRunTypeRowToBid(
   await releaseArchivedPlanSlot(bidId, {
     runTypeId: input.runTypeId,
     role: input.role,
+    extraKey: input.extraKey,
   });
   const [result] = await db.insert(bidLineItems).values({
     bidId,
     takeoffRunTypeId: input.runTypeId,
     runMaterialRole: input.role,
+    runExtraKey: input.extraKey,
     // Which part this is, so Send-again can refill or swap it (0083). For a
     // field bend, the raceway — so a changed pipe is seen.
     runMaterialId: input.materialId,

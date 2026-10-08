@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Underground warning tape now follows the trench, and a traced 700 run
+  buys 700 parts.** Sending an underground run type to a bid adds a tape line
+  sized to the flat trench length (not the risers), with the run's conduit
+  waste on the material only; it moves when the trench is redrawn. A bid can
+  set one tape line to 0 for a shared trench without touching any other bid.
+  A traced Wiremold 700 run now buys 700 couplings, one entrance end per run,
+  an inside elbow at each corner and a flat elbow at each drop, instead of
+  "no catalog match". The tape is on the materials list too. No existing bid
+  number moved.
 - **Underground PVC and Wiremold 700 are now run types you can trace.** Ten
   underground PVC types (1/2" to 4") sit behind one "Underground (10)" fold
   in the conduit picker, each carrying underground warning tape for when

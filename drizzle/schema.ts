@@ -2910,9 +2910,17 @@ export const RUN_MATERIAL_ROLES = [
     A run type's EXTRA — a per-foot item that follows the traced length, like
     underground warning tape (0136, references/per-foot-items-plan.md § 3a).
     A type may carry several, so these lines are told apart by `runExtraKey`.
-    Nothing writes it until the plan's server half ships.
+    Written by the plan's server half (Track C, 2026-10-08).
   */
   "extra",
+  /*
+    A 700 surface raceway FLAT elbow (0139, per-foot-items-plan.md § 3c). The
+    700 type buys an inside elbow (`elbow90`) at a plan corner AND a flat
+    elbow at an end drop — two parts on one type, and a line is keyed by type
+    + role, so the flat elbow needs a role of its own. Reusing `elbow45` would
+    fit the database and lie on every screen that labels the role.
+  */
+  "elbowFlat",
 ] as const;
 export type RunMaterialRole = (typeof RUN_MATERIAL_ROLES)[number];
 

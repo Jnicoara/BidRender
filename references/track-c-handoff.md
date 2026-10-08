@@ -1,6 +1,8 @@
 # Track C — handoff, 2026-10-06
 
-Written for a restart. Worktree `C:\dev\BidPhase-C`. **Updated 2026-10-08:**
+Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
+section below** (per-foot server half on `c-per-foot-logic`; C's databases
+have 140 migrations, including a stand-in 0139). **Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
 `c-homerun-wiring` (from local-dev), merged into local-dev by C once CI is
@@ -10,7 +12,82 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## WHERE THINGS STAND (2026-10-08, later — read this first)
+## WHERE THINGS STAND (2026-10-08, latest — read this first)
+
+**Branch `c-per-foot-logic` now holds the per-foot SERVER HALF, wired**, on
+top of local-dev `08205a6` (A's 0135–0138 + seed). Pushed; **NOT merged
+into local-dev, on purpose: it waits for A's 0139 (`elbowFlat`) to be on
+local-dev.** The branch carries a STAND-IN `drizzle/0139_elbow_flat_role.sql`
+(+ journal entry) only so its CI can apply the role. **At merge: take A's
+0139 file and journal entry, delete the stand-in**, re-point
+`server/teeBodyRole.test.ts` (it names `0139_elbow_flat_role.sql` as the
+newest list) at A's file name, and run that test. Same enum statement, so a
+database that ran the stand-in accepts A's unchanged. C's databases
+(`bidrender_local_c`, `bidrender_test_c`) have 140 recorded (the stand-in).
+
+What is built (plan § 9 step 2):
+
+- **Extras' feet.** `groupRunFootage` keeps every counted run's flat and
+  vertical feet + resolved raceway waste on the type row (`extraRuns`;
+  traced runs, mark drops as vertical only, homeruns), and
+  `extraFeetForRuns` sums them. `feetForRole`'s `extra` tripwire is gone —
+  the role is excluded from its switch and read in `withTracedFootage`
+  through the line's `extraFeetPerFoot`.
+- **One bid line per extra.** `runTypeRows` takes the type's extras
+  (required) and emits role `extra` + `extraKey`. Bridge, send, Send again
+  and `releaseArchivedPlanSlot` match lines by `runLineSlot(role,
+runExtraKey)`, never the role alone. RunsPanel's send preview shows the
+  extra's sentence (the one screen change — see "not looked at" below).
+- **`bids.setExtraShared({ bidId, lineId, shared })`** — 0 / NULL on one
+  extra line; refused on a locked bid and on any non-extra line. There is
+  no "sent" marker in the schema; the lock is the only freeze.
+  `bids.get` lines carry `extraNote` (how the feet were reached) and
+  `extraShared`.
+- **Materials list** lists each extra off the same runs, through the bid
+  line's shared answer; unscaled runs go in the notes.
+- **Extras CRUD**: `takeoffRunTypes.extras / addExtra / updateExtra /
+removeExtra`; foot-sold materials only; a shipped type forks first (and a
+  type already forked is resolved, not forked twice). No editor UI yet.
+- **`takeoff_run_type_extras.materialId`** is now a resolver in
+  `server/forkableReferences.test.ts` (`getRunTypeExtrasFor`).
+- **700 family wired**: `fittingRowsByRunType` sends a type whose SHIPPED
+  raceway is `Surface raceway, 700 series` to `countSurfaceRacewayFittings`;
+  parts go out as coupling / connector (entrance end) / strap (clip, not set)
+  / elbow90 (inside) / **elbowFlat** / teeBox (`SURFACE_RACEWAY_PART_ROLE`).
+  `elbowFlat` is in `FITTING_KINDS`; a pipe answers 0 and the row stays
+  quiet (`fittingRowSpeaks`).
+
+**Numbers (local `bidrender_local_c`, read only).** Old code (worktree of
+`08205a6`) vs new, same database, `bids.get` + `bridgeForBid` +
+`materialsList.get`: **identical** on E111 bid 1728359 (pipe 3,996.04 ft)
+and Bar layout check 1164558 ($378.15, 7 lines). The only diff is a new
+`elbowFlat` fitting row at 0 per conduit type in the bridge, hidden by
+`fittingRowSpeaks`. What the new counting gives on the same drawings
+(computed, nothing written): E111 as a trench = 3,553.53 ft tape (drops not
+in it), 3,731.23 ft at 5% waste, 0 ft shared; as 700 = 380 couplings, 38
+entrance ends, 38 inside elbows, 76 flat elbows, clips not set — the same
+figures this file predicted before the wiring. Bar layout's 2" PVC run =
+80.24 ft tape (84.25 at 5%); as 700 = 1 inside elbow and the 131° corner
+named for its 45°.
+
+**Tests:** `server/runTypeExtras.test.ts` (10, DB), plus
+`runTypeFootageCore.test.ts` (+2), `takeoffBridge.test.ts` (+3),
+`surfaceRacewayFittings.test.ts` (+4); `perFootSeed.test.ts` now expects the
+tape line (40 ft); `teeBodyRole.test.ts` pins 0139's append. **Mutation-
+checked, 10 of 10 red:** no extraRuns push; shared answer ignored on read;
+live line matched by role only; 700 branch removed; preview ignoring the
+shared answer; elbowFlat speaking at 0; no lock check; materials list
+skipping extras; flat elbow mapped to `elbow45`; drops counted as flat.
+
+**Not built (next):** `qtySource` and the traced-parts JSON (0137/0138) are
+still unread — `shared/tracedParts.ts` belongs with the bid half and the
+GR2/GR5/DV34 recipe changes (plan § 9 step 3, after B's gap 11). The
+"Shared trench?" button on the bid line and the run-type editor's Extras
+block are screens nobody has built. **Not looked at on screen:** the
+RunsPanel send preview's extra sentence (the only UI change) — look at it at
+laptop and 1180x820 before calling the screen side done.
+
+## Earlier (2026-10-08, later)
 
 **Branch `c-per-foot-logic`** (from local-dev `df25451`), pushed, **NOT
 merged into local-dev — on purpose.** The owner's instruction: it merges

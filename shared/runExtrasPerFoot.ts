@@ -22,14 +22,42 @@
  * 0 is the shared-trench answer. `feetPerFootFor` is the one place that reads
  * the two together.
  *
- * ── Not wired yet ────────────────────────────────────────────────────────────
- * Pure arithmetic over a run's `RunQuantities`. Nothing calls it until
- * `takeoff_run_type_extras` (M1) exists and `groupRunFootage` sums it.
+ * ── Wired (2026-10-08) ───────────────────────────────────────────────────────
+ * `groupRunFootage` collects each run's flat and vertical feet and waste on
+ * the type's row (`extraRuns`); `runTypeRows` turns each extra of the type
+ * into a bid row with this; `withTracedFootage` re-reads an `extra` line's
+ * feet with this on every read, through the line's `extraFeetPerFoot`.
  */
 import type { RunQuantities } from "./takeoffQuantities";
 
 export const EXTRA_APPLIES_TO = ["flat", "all"] as const;
 export type ExtraAppliesTo = (typeof EXTRA_APPLIES_TO)[number];
+
+/**
+ * WHICH extra a bid line is (`bid_line_items.runExtraKey`, 0136): the shipped
+ * extra's id, carried by every fork's copy as `baselineExtraId`, so forking
+ * the type keeps its line. 0 is "not an extra", which no extra's id can be.
+ */
+export function extraKeyOf(extra: {
+  id: number;
+  baselineExtraId: number | null;
+}): number {
+  return extra.baselineExtraId ?? extra.id;
+}
+
+/**
+ * One run-type line's place on a bid: its role, and for an extra which one.
+ * A bid holds ONE line per (type, role, extra key) — the unique key 0136
+ * widened — so everything that matches a candidate to a live line (send,
+ * Send again, the preview's "on the bid") matches on this, never the role
+ * alone, or a type's second extra would be read as its first.
+ */
+export function runLineSlot(
+  role: string | null,
+  extraKey: number | null | undefined
+): string {
+  return extraKey ? `${role}:${extraKey}` : String(role);
+}
 
 /** One extra on a run type, as the arithmetic needs it. */
 export type PerFootExtra = {

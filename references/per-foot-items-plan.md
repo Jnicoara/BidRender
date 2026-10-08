@@ -1,5 +1,20 @@
 # Extra per-foot items on a traced run (PLAN, 2026-10-08)
 
+> **SERVER HALF BUILT 2026-10-08 (Track C, branch `c-per-foot-logic`, not
+> merged until A's 0139 is on local-dev).** § 9 step 2: the extras' feet
+> (`groupRunFootage` → `extraRuns`, `extraFeetForRuns`; the `feetForRole`
+> tripwire is gone), one bid row per extra keyed by `runExtraKey` through
+> bridge / send / Send again (`runLineSlot`), `bids.setExtraShared`, the
+> extras on the materials list, extras CRUD (`takeoffRunTypes.extras` /
+> `addExtra` / `updateExtra` / `removeExtra`, shipped types fork), the
+> `materialId` resolver, and the 700 family in `fittingRowsByRunType` with
+> the flat elbow on its own role **`elbowFlat`** (C's stand-in
+> `0139_elbow_flat_role.sql`; take A's 0139 at merge). **Not built:**
+> `qtySource` / traced parts (`shared/tracedParts.ts` is still unread —
+> they belong to the bid half with the starter recipe changes, § 9 step 3),
+> the "Shared trench?" button and the editor's Extras block (screens).
+> Numbers and tests: `track-c-handoff.md`.
+
 > **BUILT 2026-10-08 (Track A): § 9 step 1 and the seed content.** M1–M4 are
 > migrations **0135–0138** (`0135_run_type_extras`, `0136_bid_line_extras`,
 > `0137_assembly_material_qty_source`, `0138_traced_parts`). Seeded: the ten
@@ -396,14 +411,13 @@ need 0117 (staging has it; live does not — `next-live-release-plan.md`).
   `(bidId, takeoffRunTypeId, runMaterialRole, runExtraKey)`. It must NOT
   use a nullable column: MySQL lets NULLs repeat in a unique index, which
   would quietly allow duplicate raceway lines.
-- **OPEN (found 2026-10-08, Track C, building § 3c's counting): the flat
-  elbow has no role.** The 700 type sends an inside elbow and a flat elbow,
+- **DECIDED 2026-10-08 (owner, via the C/A job): `elbowFlat`, Track A's 0139.** Was OPEN: the flat elbow had no role. The 700 type sends an inside elbow and a flat elbow,
   two parts on one type, and the unique index allows one line per role. The
   other 700 parts fit existing roles (entrance end `connector`, clip
-  `strap`, inside elbow `elbow90`, tee `teeBox`). Suggested: append
-  `elbowFlat` here beside `extra`, append-only like 0084. Undecided — see
-  `track-c-handoff.md`. The counting is built
-  (`shared/surfaceRacewayFittings.ts`) and does not depend on the answer.
+  `strap`, inside elbow `elbow90`, tee `teeBox`). `elbowFlat` is appended
+  after `extra`, append-only like 0084; C built and wired it against that
+  name (`SURFACE_RACEWAY_PART_ROLE`), with a stand-in 0139 on its branch
+  until A's lands.
 - **New: add `extraFeetPerFoot DECIMAL(8,4) NULL`** (decision 4). NULL =
   follow the run type's extra; `0` = "shared trench" on this bid. Only read
   on a role-`extra` line. NULL with no default, so "follow the type" is a

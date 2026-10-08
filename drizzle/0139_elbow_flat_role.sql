@@ -1,0 +1,26 @@
+-- 0139 — the 700 surface raceway FLAT elbow gets a bid-line role of its own
+-- (references/per-foot-items-plan.md § 3c and § 4 M2, "OPEN … the flat elbow
+-- has no role").
+--
+--   runMaterialRole   'elbowFlat' APPENDED after 'extra', like 0084/0085/
+--                     0096/0118/0136 — every stored value keeps its index.
+--
+-- Why a role and not `elbow45`: the 700 type buys an inside elbow (`elbow90`)
+-- at a plan corner AND a flat elbow at an end drop — two parts on ONE run
+-- type — and `bid_line_items_bid_runtype_role_extra_uq` allows one line per
+-- (bid, type, role, extra key). Reusing `elbow45` would fit the database and
+-- lie on every screen that labels the role.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- No UPDATE. Old code never writes 'elbowFlat'; the MODIFY only widens the
+-- list. Re-running it is harmless (the same list again).
+--
+-- ── TRACK C'S STAND-IN ───────────────────────────────────────────────────────
+-- Written on `c-per-foot-logic` so the branch's CI can apply the role its
+-- code writes. Track A is writing the real 0139 (owner, 2026-10-08). When
+-- A's lands on local-dev, TAKE A'S FILE AND JOURNAL ENTRY and delete this
+-- one in the merge — the statement is the same enum, so a database that ran
+-- this one accepts A's unchanged.
+--
+-- Hand-written, not generated.
+ALTER TABLE `bid_line_items` MODIFY COLUMN `runMaterialRole` enum('raceway','conductor','ground','coupling','connector','strap','elbow90','elbow45','fieldBend','lb','pullBox','teeBox','teeCover','teeBody','locknut','bushing','extra','elbowFlat');
