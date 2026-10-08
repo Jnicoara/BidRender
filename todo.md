@@ -53,7 +53,7 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       2026-10-07: "matching 700-series device plate"). **Done 2026-10-08**
       with the cover family: `Surface raceway device plate, 700 series`
       ships under exactly the listed name, plus `Surface raceway device
-  box, 700 series`. **Correction:** this line said DV34 then "seeds by
+box, 700 series`. **Correction:** this line said DV34 then "seeds by
       itself on the next start". It does not — `assemblyRecipe.ts` holds a
       starter while `missingParts` is non-empty, whatever the catalog has.
 - [ ] **Track B: the cover swaps** (owner, 2026-10-08 — Track A shipped
@@ -61,10 +61,10 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       700-series plate AND 700-series box lines, `missingParts` emptied, so
       it loads. Its tests are rewritten, and the seed and plan tests now say
       nothing is held. Still to do, the rest per `references/cover-plates-audit.md` § 3: CS6/7/8 → `4"
-  square raised cover, single receptacle`; RS17, CS5 → a single-
+square raised cover, single receptacle`; RS17, CS5 → a single-
       receptacle wall plate; RS1, RS2 → `1-gang wall plate, 30A/50A power
-  receptacle, …`; RS13 → `4-11/16" square raised cover, 30A/50A power
-  receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
+receptacle, …`; RS13 → `4-11/16" square raised cover, 30A/50A power
+receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       if outdoor); generic `Wall plate` → typed duplex / toggle / decorator
       plates. Nylon or stainless per recipe is the owner's call.
 
