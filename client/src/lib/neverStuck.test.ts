@@ -61,6 +61,25 @@ describe("gap 2 — Labor rates: Needs rate / Set hours / Example rate are butto
     expect(page).toMatch(/field: "hours", why: String\(rate\.rateError\)/);
     expect(page).toMatch(/field: "rate", why: EXAMPLE_RATE_WHY/);
   });
+  it("the rate box takes focus in EVERY mode — typed rate, wage breakdown, salary", () => {
+    // Found on staging: example rates open in the wage breakdown, and only
+    // the plain hourly box had autoFocus, so the cursor landed nowhere.
+    for (const label of [
+      "Base wage per hour",
+      "Hourly rate",
+      "Annual salary",
+    ]) {
+      const at = page.indexOf(`aria-label="${label}"`);
+      expect(at, label).toBeGreaterThan(-1);
+      const tag = page.slice(
+        page.lastIndexOf("<Input", at),
+        page.indexOf("/>", at)
+      );
+      expect(tag, label).toMatch(
+        /autoFocus=\{focusOnOpen\(openedFor, "rate"\)\}/
+      );
+    }
+  });
   it("no rate warning explains itself only on hover", () => {
     expect(page).not.toMatch(/title="No rate yet/);
     expect(page).not.toMatch(/title="BidRidge's example loaded rate/);

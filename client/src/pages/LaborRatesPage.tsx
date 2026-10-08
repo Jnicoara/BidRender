@@ -333,6 +333,13 @@ function RateFields({
             onFocus={selectOnFocus}
             placeholder="0.00"
             aria-label="Base wage per hour"
+            /*
+              A rate built from a wage — every shipped example rate is — opens
+              in this breakdown, so "the rate" a warning names is the wage.
+              Without this, Example rate opened the editor with the cursor
+              nowhere (measured on staging, 2026-10-08: focus = BODY).
+            */
+            autoFocus={focusOnOpen(openedFor, "rate")}
           />
           <span className="text-xs text-muted-foreground">wage</span>
           {BURDEN_FIELDS.map(([key, label]) => (
