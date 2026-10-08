@@ -271,6 +271,16 @@ not applied anywhere) or follow it:
 - `runsAt` values: `'ceiling'` | `'boxToBox'` (varchar, like `homerunMethod`,
   so a third is code rather than a migration). Like `traceMode` it describes
   the whole run: C's code will keep it equal on the root and every leg.
+- **LANDED as 0131 and WIRED (Track C, 2026-10-08, branch
+  `c-homerun-wiring`)** — everything in the next bullet is done, plus two
+  things it did not list, both found by the forcing function of making
+  `runsAt` required: `GroupableRun` (the bid's footage path) had no `runsAt`,
+  and the drop-claim rule (`stampsClaimedByRuns`) let a box-to-box run's
+  linked marks drop on their own, handing the 17 ft straight back. Both
+  fixed and tested (`runsAtBoxToBox.test.ts`, `groupDrops.test.ts`). The
+  choice is written by its own procedure, `takeoffRuns.setRunsAt`, to every
+  row of the run (the `traceMode` rule), not through `setEnds` as the next
+  bullet planned: `setEnds` writes one row.
 - What C's code owes when they land: read `bids.homerunExtraBends` in
   `loadBidHomeruns` (now a literal NULL) and add it to `setBidSettings`;
   carry `runsAt` on the run rows (`RunEnds.runsAt` is optional ONLY until

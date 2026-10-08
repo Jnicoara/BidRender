@@ -213,6 +213,7 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       endStampId: 100, // the first mark
       startCountsVertical: false,
       endCountsVertical: true, // the run carries this drop itself
+      boxToBox: false,
     };
     const [d] = drops({ marks: marks(3), runs: [claimed] });
     expect(d.claimedCount).toBe(1);
@@ -231,6 +232,7 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       endStampId: null,
       startCountsVertical: false,
       endCountsVertical: false,
+      boxToBox: false,
     };
     const [d] = drops({ marks: marks(3), runs: [leg] });
     expect(d.claimedCount).toBe(0);
@@ -238,6 +240,31 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
     expect(
       totalQuantities([], markDropEntries([d]), []).conduitBoughtFeet
     ).toBe(25.5);
+  });
+
+  it("a BOX-TO-BOX run takes its linked marks' drops, with none to count", () => {
+    // 0131. A box-to-box run counts no vertical at its ends ON PURPOSE —
+    // the pipe stays on the wall — so the marks it feeds have no drop
+    // either. Without the claim each would drop to the ceiling on its own
+    // and the 17 ft the choice removed would come back through the count.
+    const wall: DropRunEnd = {
+      sheetId: 1,
+      points: [
+        { x: 0, y: 0 },
+        { x: 5000, y: 5000 },
+      ],
+      startStampId: 100,
+      endStampId: 101,
+      startCountsVertical: false,
+      endCountsVertical: false,
+      boxToBox: true,
+    };
+    const [d] = drops({ marks: marks(3), runs: [wall] });
+    expect(d.claimedCount).toBe(2);
+    expect(d.countedMarks.map(m => m.id)).toEqual([102]);
+    expect(
+      totalQuantities([], markDropEntries([d]), []).conduitBoughtFeet
+    ).toBe(8.5);
   });
 
   it("FLAGS a mark near an unlinked run end, and still counts it", () => {
@@ -252,6 +279,7 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       endStampId: null,
       startCountsVertical: false,
       endCountsVertical: false,
+      boxToBox: false,
     };
     const [d] = drops({ marks: marks(3), runs: [near] });
     expect(d.mayDoubleCount).toBe(1);
@@ -266,6 +294,7 @@ describe("the double-count rule: a vertical is the run's OR the mark's", () => {
       endStampId: null,
       startCountsVertical: false,
       endCountsVertical: false,
+      boxToBox: false,
     };
     const [d] = drops({ marks: marks(3), runs: [near], ratio: null });
     expect(d.mayDoubleCount).toBe(0);
@@ -374,6 +403,7 @@ describe("a box a homerun rises from carries no count drop", () => {
           endStampId: 100,
           startCountsVertical: false,
           endCountsVertical: true,
+          boxToBox: false,
         },
       ],
     });

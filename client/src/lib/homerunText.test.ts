@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  bendsWords,
   homerunBreakdown,
   homerunSummaryLine,
   methodText,
   refusalText,
+  stepExtraBends,
 } from "./homerunText";
 import {
   homerunFootage,
@@ -140,5 +142,25 @@ describe("the up-drop says when it is a default height (owner, 2026-10-07)", () 
     expect(homerunBreakdown(h, null)).toBe(
       "44 ft — 40 ft run + up not counted — device type not said + 4 ft down at the panel"
     );
+  });
+});
+
+describe("the extra-bends stepper (0131)", () => {
+  it("steps from the starter the bid already counts, never from 0", () => {
+    // Unset is counted as 1: "+" means 2 and "−" means 0, not 1 and −1.
+    expect(stepExtraBends(null, 1, 1, 4)).toBe(2);
+    expect(stepExtraBends(null, 1, -1, 4)).toBe(0);
+  });
+
+  it("writes nothing at either end of the range", () => {
+    expect(stepExtraBends(0, 1, -1, 4)).toBeNull();
+    expect(stepExtraBends(4, 1, 1, 4)).toBeNull();
+    expect(stepExtraBends(3, 1, 1, 4)).toBe(4);
+  });
+
+  it("says one bend and several", () => {
+    expect(bendsWords(1)).toBe("1 extra bend");
+    expect(bendsWords(0)).toBe("0 extra bends");
+    expect(bendsWords(3)).toBe("3 extra bends");
   });
 });

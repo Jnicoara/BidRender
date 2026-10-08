@@ -376,11 +376,12 @@ export type RunEnds = {
   sheetId: number;
   points: readonly { x: number; y: number }[] | null;
   /**
-   * Box to box at one height, or through the ceiling. OPTIONAL only
-   * because its column (`takeoff_runs.runsAt`) is asked of Track A and no
-   * run row carries it yet; make it required when the column lands.
+   * Box to box at one height, or through the ceiling (`takeoff_runs.runsAt`,
+   * 0131). NULL is through the ceiling. REQUIRED like the tee ids: a caller
+   * that could leave it out would count drops on a box-to-box run — about
+   * 17 ft of pipe on a run whose pipe never leaves the wall.
    */
-  runsAt?: RunsAt | null;
+  runsAt: RunsAt | null;
   startKind: string | null;
   endKind: string | null;
   startHeightInches: number | null;
@@ -456,8 +457,8 @@ export function verticalsForRunRow(
     BOX TO BOX, SAME HEIGHT (owner, 2026-10-07, case d): the pipe runs
     along the wall between the boxes, never up to the ceiling — so neither
     end has a drop. The ends KEEP their kinds (a receptacle box still takes
-    device makeup); each is simply level with the run. `runsAt` waits on
-    Track A's column; until it lands every run reads as through the ceiling.
+    device makeup); each is simply level with the run. Kept on every row of
+    the run (`takeoffRuns.setRunsAt`), so each leg reads it from its own row.
   */
   if (run.runsAt === "boxToBox") {
     const level = (e: typeof start) => ({

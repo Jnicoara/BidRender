@@ -818,6 +818,14 @@ export type RunVerticalClaim = {
    */
   startCountsVertical: boolean;
   endCountsVertical: boolean;
+  /**
+   * The run goes box to box at one height (`takeoff_runs.runsAt`, 0131).
+   * REQUIRED: such a run's ends count no vertical ON PURPOSE — the pipe
+   * never leaves the wall — so its linked marks are claimed with nothing
+   * to add. A caller that could leave this out would hand each of those
+   * boxes its own drop back, about 17 ft on a two-box run.
+   */
+  boxToBox: boolean;
 };
 
 /** One stamp's own vertical footage, for a device not on a traced run. */
@@ -834,18 +842,31 @@ export type StampVertical = { stampId: number; verticalFeet: number };
  * smaller number with nothing on screen pointing at it
  * (references/vertical-drops-plan.md § 1, gap 5). The rule exists so a drop
  * is counted ONCE, which means the run may only take it when it counts it.
+ *
+ * ── One exception: box to box (2026-10-07) ──────────────────────────────────
+ * A box-to-box run counts no vertical at its ends because its pipe stays on
+ * the wall, and the box it feeds has no drop either — that is what the
+ * choice SAYS. So the run takes a linked mark there with zero to count. A
+ * run with no answer at an end (the branch-leg case above) still does not.
  */
 export function stampsClaimedByRuns(
   runs: readonly Pick<
     RunVerticalClaim,
-    "startStampId" | "endStampId" | "startCountsVertical" | "endCountsVertical"
+    | "startStampId"
+    | "endStampId"
+    | "startCountsVertical"
+    | "endCountsVertical"
+    | "boxToBox"
   >[]
 ): Set<number> {
   const claimed = new Set<number>();
   for (const run of runs) {
-    if (run.startStampId !== null && run.startCountsVertical)
+    // Box to box (0131) is the run's own answer about these boxes — no drop
+    // at either — so it takes them with nothing to count, rather than
+    // leaving each box to drop to the ceiling on its own.
+    if (run.startStampId !== null && (run.startCountsVertical || run.boxToBox))
       claimed.add(run.startStampId);
-    if (run.endStampId !== null && run.endCountsVertical)
+    if (run.endStampId !== null && (run.endCountsVertical || run.boxToBox))
       claimed.add(run.endStampId);
   }
   return claimed;

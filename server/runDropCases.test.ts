@@ -61,6 +61,7 @@ function run(over: Partial<RunEnds> = {}): RunEnds {
     traceMode: null,
     startStampId: null,
     endStampId: null,
+    runsAt: null,
     ...over,
   };
 }

@@ -116,3 +116,27 @@ export function homerunSummaryLine(input: {
     input.unconfirmed > 0 ? ` + ${input.unconfirmed} unconfirmed` : "";
   return `Homeruns: ${methodText(input.method)}, ${routing}${differ} · ${input.counted} homerun${input.counted === 1 ? "" : "s"}${unconfirmed}`;
 }
+
+/** "1 extra bend", "3 extra bends" — per homerun, said the same everywhere. */
+export function bendsWords(count: number): string {
+  return `${count} extra bend${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * What one tap on the extra-bends stepper writes (0131).
+ *
+ * From UNSET it steps from the starter the bid is already counting, never
+ * from 0: a "+" on an unconfirmed 1 means 2, and a "−" means 0. Clamped to
+ * 0..max, and NULL when the tap would not change anything — so a tap at
+ * the end of the range writes nothing and flashes nothing.
+ */
+export function stepExtraBends(
+  current: number | null,
+  starter: number,
+  delta: -1 | 1,
+  max: number
+): number | null {
+  const from = current ?? starter;
+  const next = Math.min(max, Math.max(0, from + delta));
+  return next === current ? null : next;
+}

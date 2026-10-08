@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Two homerun controls now work: "Extra bends per homerun" and "Box to
+  box, same height".** Extra bends is set once per bid. It starts at 1, is
+  labelled "not confirmed" until somebody accepts or changes it, and that
+  label now shows on the folded homerun card too. Accepting the 1 changes no
+  number, because 1 was already being counted. A run can now go "Box to box,
+  same height", along the wall with no drops: a 10 ft run between two
+  receptacles under a 10 ft ceiling drops from 27.09 ft to 10.09 ft of pipe.
+  The boxes it feeds no longer drop on their own instead, which would have
+  put the 17 ft straight back. Locked bids refuse both, and nothing on an
+  existing bid moved. A run end that is level with the run no longer shows
+  an amber "no height for this type" warning that wasn't true.
+
 - **A full set of cover plates is now in the starter catalog — 103 new
   items, 1,818 in all.** Every standard flush plate from 1 to 3 gangs
   (toggle, duplex, decora, blank and every mix of them) plus the common

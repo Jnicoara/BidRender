@@ -52,6 +52,12 @@ export const ROUTING_STARTER_PCT = 0.15;
  * that counts it says it is not confirmed.
  */
 export const DEFAULT_EXTRA_BENDS = 1;
+/**
+ * The stepper's ceiling, and the server's. Four 90s is 360°, the most
+ * NEC 358.26 allows between pull points; a homerun turning more than that
+ * needs a pull box, which is its own line rather than a bigger number here.
+ */
+export const MAX_EXTRA_BENDS = 4;
 
 export type HomerunBidSettings = {
   homerunMethod: string | null;
@@ -61,9 +67,9 @@ export type HomerunBidSettings = {
   homerunRunTypeId: number | null;
   /**
    * Corners per homerun (owner, 2026-10-07). NULL = nobody set it: counted
-   * as `DEFAULT_EXTRA_BENDS` and said "not confirmed". No column holds it
-   * yet — `bids.homerunExtraBends` is asked of Track A
-   * (migrations-next-batch.md); until it lands the loader passes NULL.
+   * as `DEFAULT_EXTRA_BENDS` and said "not confirmed". Held in
+   * `bids.homerunExtraBends` (0131); accepting the 1 writes 1, so the
+   * number does not move and only the "not confirmed" goes.
    */
   homerunExtraBends: number | null;
 };

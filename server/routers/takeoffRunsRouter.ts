@@ -81,6 +81,7 @@ import {
   extrasViewForRunRow,
   verticalsForRunRow,
   endOfRun,
+  RUNS_AT,
 } from "../runVerticals";
 import {
   extraPctSchema,
@@ -436,6 +437,8 @@ export const takeoffRunsRouter = router({
           endTee: teeOf(run.endTeeId),
           /** Route or quantity (D21), with NULL already read as route. */
           traceMode: traceModeOf(run),
+          /** Box to box or through the ceiling (0131), NULL read as ceiling. */
+          runsAt: run.runsAt ?? "ceiling",
           /**
            * What this run IS, and what to call it.
            *
@@ -1909,6 +1912,34 @@ export const takeoffRunsRouter = router({
           ? { wireExtraPct: pctText(wireExtraPct) }
           : {}),
       });
+    }),
+
+  /**
+   * How the run gets between its boxes (owner, 2026-10-07, case d): through
+   * the ceiling — up and down at every box — or box to box at one height,
+   * with no drops. Written to the root and every leg (`setRunRunsAt`).
+   *
+   * "Through ceiling" is stored as NULL, the same as every run before 0131,
+   * so choosing it can never be told apart from never having chosen.
+   * Refused on a locked bid: it moves the run's drop footage.
+   */
+  setRunsAt: procedure
+    .input(
+      z.object({
+        /** Any row of the run: the root or one of its legs. */
+        runId: z.number().int().positive(),
+        runsAt: z.enum(RUNS_AT),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const run = await requireRun(input.runId, userId);
+      await refuseIfLocked(run.bidId, userId);
+      return db.setRunRunsAt(
+        rootOf(run),
+        userId,
+        input.runsAt === "ceiling" ? null : input.runsAt
+      );
     }),
 
   setTraceMode: procedure

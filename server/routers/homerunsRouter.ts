@@ -24,7 +24,11 @@ import {
   homerunTotals,
   outlineFromTaps,
 } from "../../shared/homerunFootage";
-import { DEFAULT_EXTRA_BENDS, ROUTING_STARTER_PCT } from "../homerunsCore";
+import {
+  DEFAULT_EXTRA_BENDS,
+  MAX_EXTRA_BENDS,
+  ROUTING_STARTER_PCT,
+} from "../homerunsCore";
 import { ceilingAt, NO_CEILINGS } from "../../shared/ceilingHeights";
 
 const procedure = scoped("bids.view", "bids.edit");
@@ -112,12 +116,13 @@ export const homerunsRouter = router({
               ? null
               : Number(bid.homerunRoutingPct),
           runTypeId: bid.homerunRunTypeId,
-          // No column yet (bids.homerunExtraBends, asked of Track A):
-          // NULL = not set, counted as the starter and said unconfirmed.
-          extraBends: null as number | null,
+          // 0131. NULL = not set, counted as the starter and said
+          // unconfirmed until somebody accepts or changes it.
+          extraBends: bid.homerunExtraBends,
         },
         routingStarterPct: ROUTING_STARTER_PCT,
         extraBendsDefault: DEFAULT_EXTRA_BENDS,
+        extraBendsMax: MAX_EXTRA_BENDS,
         type: computed?.type ?? null,
         noExtraSet: computed?.noExtraSet ?? false,
         locked: bid.quantitiesLockedAt !== null,
@@ -342,6 +347,18 @@ export const homerunsRouter = router({
         minimumFt: feetSchema.nullable().optional(),
         routingPct: z.number().min(0).max(5).nullable().optional(),
         runTypeId: z.number().int().nullable().optional(),
+        /**
+         * Extra bends per homerun (0131). Writing the starter 1 is how it is
+         * ACCEPTED — the count stays, the "not confirmed" goes. NULL puts
+         * the question back.
+         */
+        extraBends: z
+          .number()
+          .int()
+          .min(0)
+          .max(MAX_EXTRA_BENDS)
+          .nullable()
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -361,6 +378,7 @@ export const homerunsRouter = router({
         homerunMinimumFt: input.minimumFt,
         homerunRoutingPct: input.routingPct,
         homerunRunTypeId: input.runTypeId,
+        homerunExtraBends: input.extraBends,
       });
       return { ok: true };
     }),

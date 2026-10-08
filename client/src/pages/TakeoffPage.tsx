@@ -4429,8 +4429,34 @@ export default function TakeoffPage({
     onError: (e: { message: string }) => toast.error(e.message),
     onSettled: () => refreshFor("homerun"),
   };
-  const setHomerunSettings =
-    trpc.homeruns.setBidSettings.useMutation(homerunSaved);
+  const setHomerunSettings = trpc.homeruns.setBidSettings.useMutation({
+    // The extra-bends stepper reads the cache, so it is written at once and
+    // a second quick tap steps from the first (CLAUDE.md § Responsiveness);
+    // a refused save puts the stored value back rather than leaving ours.
+    onMutate: async input => {
+      if (input.extraBends === undefined) return { before: undefined };
+      await utils.homeruns.forBid.cancel({ bidId });
+      const before = utils.homeruns.forBid.getData({ bidId });
+      utils.homeruns.forBid.setData({ bidId }, data =>
+        data
+          ? {
+              ...data,
+              settings: {
+                ...data.settings,
+                extraBends: input.extraBends ?? null,
+              },
+            }
+          : data
+      );
+      return { before };
+    },
+    onError: (error, _input, context) => {
+      if (context?.before)
+        utils.homeruns.forBid.setData({ bidId }, context.before);
+      homerunSaved.onError(error);
+    },
+    onSettled: homerunSaved.onSettled,
+  });
   const updateHomerun = trpc.homeruns.update.useMutation(homerunSaved);
   const confirmHomeruns = trpc.homeruns.confirmMany.useMutation(homerunSaved);
   const setSheetHomerunMethod =
@@ -7394,6 +7420,34 @@ export default function TakeoffPage({
     [saveEnds]
   );
 
+  /**
+   * Through the ceiling or box to box (0131), for the whole run. Shown at
+   * once on every row of the run (the server writes them all); a refusal
+   * puts them back. It moves the drops, which can also hand a linked mark's
+   * own drop to the run or back, so it refreshes as an end change does.
+   */
+  const setRunsAt = trpc.takeoffRuns.setRunsAt.useMutation({
+    onMutate: async vars => {
+      if (!activeSheet) return undefined;
+      const key = { sheetId: activeSheet.id };
+      await utils.takeoffRuns.listForSheet.cancel(key);
+      const before = utils.takeoffRuns.listForSheet.getData(key);
+      const root = rootOfRun(vars.runId);
+      utils.takeoffRuns.listForSheet.setData(key, old =>
+        old?.map(r =>
+          (r.parentRunId ?? r.id) === root ? { ...r, runsAt: vars.runsAt } : r
+        )
+      );
+      return { key, before };
+    },
+    onError: (e, _vars, context) => {
+      if (context)
+        utils.takeoffRuns.listForSheet.setData(context.key, context.before);
+      toast.error(e.message);
+    },
+    onSettled: () => refreshFor("runEnds"),
+  });
+
   /** The end clicked on the plan, lit in the Run ends section. */
   const [endHighlight, setEndHighlight] = useState<{
     runId: number;
@@ -7470,6 +7524,7 @@ export default function TakeoffPage({
       verticals: r.quantities?.verticals ?? null,
       teeEnds: { start: Boolean(r.startTee), end: Boolean(r.endTee) },
       points: r.points,
+      runsAt: r.runsAt,
     }));
   };
 
@@ -11204,6 +11259,11 @@ export default function TakeoffPage({
                         end: Boolean(run.endTee),
                       }}
                       onSave={patch => onSetEnds(run.id, patch)}
+                      runsAt={run.runsAt}
+                      onRunsAt={runsAt =>
+                        setRunsAt.mutate({ runId: run.id, runsAt })
+                      }
+                      locked={quantitiesLocked}
                       endsElsewhere
                     />
                   </>

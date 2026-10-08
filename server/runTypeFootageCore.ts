@@ -40,6 +40,7 @@ import {
   extrasForRunRow,
   verticalsForRunRow,
   type HeightContext,
+  type RunsAt,
 } from "./runVerticals";
 import type { ExtrasRow } from "../shared/runExtras";
 import { dropsFootage, type MarkDropEntry } from "../shared/groupDrops";
@@ -235,6 +236,12 @@ export type GroupableRun = {
   endTeeId: number | null;
   /** Route or quantity (D21). */
   traceMode: TraceMode | null;
+  /**
+   * Through the ceiling (NULL) or box to box (0131). REQUIRED: this shape is
+   * restated field by field, and a box-to-box run that lost the field here
+   * would put its drops on the bid while the panel said it had none.
+   */
+  runsAt: RunsAt | null;
 } & ExtrasRow; // the run's own extra and makeup — REQUIRED, see ExtrasRow
 
 export type SheetScale = {

@@ -450,6 +450,7 @@ describe("fittings are counted over INSTALLED pipe, not bought", () => {
       startTeeId: null,
       endTeeId: null,
       traceMode: null,
+      runsAt: null,
       conduitExtraPct: "0.2000", // a big extra, so a leak would show
       wireExtraPct: null,
       makeupDeviceInches: null,
