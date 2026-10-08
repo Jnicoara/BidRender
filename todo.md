@@ -25,7 +25,8 @@ left as written rather than rewritten to match the rename.
 > **Forced:** step 9 now delays sheet 2's first mark list by 6 s after its
 > reload, so the window is there every run. The old step 10 under that hold
 > went red locally with the CI picture (Expected 0, Received 2); the fixed
-> one was 3/3 green locally.
+> one was 3/3 green locally, then on staging Gate 37845117225 green and
+> its smoke re-run 5 of 5 green (2026-10-08).
 >
 > **Two app findings left open, NOT fixed here (owner/B to decide):**
 >
