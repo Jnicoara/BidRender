@@ -52,6 +52,7 @@ import {
   LABOR_SHEET,
   PRICE_SHEET,
   brandVariants,
+  heldNote,
   hoursPer,
 } from "./starterSheetLayout";
 
@@ -307,6 +308,13 @@ if (assemblyHoursPath) {
       problems.push(`${at}: ref "${ref}", the starter is ${a.ref}`);
     const hours = num(row.getCell(cHours).value);
     if (hours === null) continue; // blank: keeps what ships
+    // A HELD starter is on the sheet so the list is complete, and its cell
+    // refuses input; this catches a value that got past that (pasted, or a
+    // sheet built before the hold). Owner, 2026-10-08.
+    if (heldNote(a)) {
+      problems.push(`${at}: HELD — not seeded yet, leave MY HOURS blank`);
+      continue;
+    }
     if (Number.isNaN(hours) || hours <= 0) {
       problems.push(`${at}: MY HOURS is not a number above 0 (blank = keep)`);
       continue;

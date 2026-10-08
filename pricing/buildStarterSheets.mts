@@ -16,9 +16,22 @@
  * pricing/loadStarterSheets.mts into the SEED (every shop), never through the
  * app (one company) — references/starter-vs-company-plan.md.
  *
- * Overwrites both files. The versions it replaced (2026-10-01 and -06) held
- * no typed value — checked before the first rebuild, 2026-10-07: 0 pack
- * prices, 0 hours. If a filled sheet is ever rebuilt, LOAD it first.
+ * Overwrites every file it builds. The versions it replaced (2026-10-01 and
+ * -06) held no typed value — checked before the first rebuild, 2026-10-07: 0
+ * pack prices, 0 hours. If a filled sheet is ever rebuilt, LOAD it first.
+ *
+ * ── Build ONE sheet: --only ─────────────────────────────────────────────────
+ *   --only assembly-hours     (or prices, labor, brands; repeatable)
+ * Added 2026-10-08, when the assembly sheet needed rebuilding while the owner
+ * had the pricing and labor sheets open and half filled. Without --only it
+ * builds all four, as before, which would have overwritten his typing.
+ *
+ * ── Mark what is new: --new-since <previous assembly-hours.xlsx> ────────────
+ * Rows whose Ref is not in that file read "NEW" in the "New" column, so the
+ * owner can find them. Give it the version he last had (e.g. from git:
+ * `git show <commit>:pricing/assembly-hours-starter.xlsx > old.xlsx`).
+ * Without it the column stays blank: a rebuild cannot tell new from old on
+ * its own, and marking everything would mark nothing.
  */
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -65,6 +78,18 @@ const GREY = {
 };
 const rows = catalogInSheetOrder();
 
+const SHEETS = ["prices", "labor", "brands", "assembly-hours"] as const;
+const only = process.argv.flatMap((a, i, all) =>
+  a === "--only" ? [all[i + 1]] : []
+);
+for (const o of only)
+  if (!(SHEETS as readonly string[]).includes(o))
+    throw new Error(`--only ${o}: not one of ${SHEETS.join(", ")}`);
+const want = (s: (typeof SHEETS)[number]) =>
+  only.length === 0 || only.includes(s);
+const newSinceIdx = process.argv.indexOf("--new-since");
+const newSincePath = newSinceIdx >= 0 ? process.argv[newSinceIdx + 1] : null;
+
 function sheetWithHeader(
   wb: any,
   name: string,
@@ -108,7 +133,7 @@ function howTo(wb: any, lines: [string, string][]) {
 }
 
 // ── Pricing sheet ───────────────────────────────────────────────────────────
-{
+if (want("prices")) {
   const wb = new ExcelJS.Workbook();
   const C = PRICE_COLUMNS;
   const ws = sheetWithHeader(
@@ -191,7 +216,7 @@ function howTo(wb: any, lines: [string, string][]) {
 }
 
 // ── Labor-units sheet ───────────────────────────────────────────────────────
-{
+if (want("labor")) {
   const wb = new ExcelJS.Workbook();
   const C = LABOR_COLUMNS;
   const ws = sheetWithHeader(
@@ -262,7 +287,7 @@ function howTo(wb: any, lines: [string, string][]) {
 }
 
 // ── Brand variants sheet ────────────────────────────────────────────────────
-{
+if (want("brands")) {
   const { kept, dropped } = brandVariants();
   const wb = new ExcelJS.Workbook();
   const C = BRAND_COLUMNS;
@@ -337,28 +362,74 @@ function howTo(wb: any, lines: [string, string][]) {
 }
 
 // ── Assembly hours sheet ────────────────────────────────────────────────────
-{
+if (want("assembly-hours")) {
   const { rows: assemblies, notShipped } = assembliesInSheetOrder();
+  // Refs on the version the owner last had, to mark what is new.
+  let previous: Set<string> | null = null;
+  if (newSincePath) {
+    const old = new ExcelJS.Workbook();
+    await old.xlsx.readFile(newSincePath);
+    const ows = old.getWorksheet(ASSEMBLY_SHEET);
+    if (!ows) throw new Error(`${newSincePath}: no "${ASSEMBLY_SHEET}" sheet`);
+    const refCol = ows.getRow(HEADER_ROW).values.indexOf("Ref");
+    if (refCol < 1) throw new Error(`${newSincePath}: no "Ref" column`);
+    previous = new Set();
+    for (let r = FIRST_DATA_ROW; r <= ows.rowCount; r++) {
+      const v = ows.getRow(r).getCell(refCol).value;
+      if (v) previous.add(String(v).trim());
+    }
+  }
+  const isNew = (ref: string) => previous !== null && !previous.has(ref);
+  const newCount = assemblies.filter(a => isNew(a.ref)).length;
+  const held = assemblies.filter(a => a.held);
   const wb = new ExcelJS.Workbook();
   const C = ASSEMBLY_COLUMNS;
   const ws = sheetWithHeader(
     wb,
     ASSEMBLY_SHEET,
     C,
-    `STARTER ASSEMBLY HOURS — every shipped starter (${assemblies.length}). Your top-30 commercial list first, then the top-30 residential, then the rest. Type YELLOW 'MY HOURS' per assembly (one installed). 'Hours now' is what ships today (blank = not set). Leave blank to keep it. Send the file back to Track A — do NOT edit hours in the app for this.`,
-    [6, 26, 18, 8, 18, 52, 10, 12, 40]
+    `STARTER ASSEMBLY HOURS — every starter (${assemblies.length}${held.length ? `, ${held.length} HELD` : ""}${previous ? `, ${newCount} NEW since the last version — filter the 'New' column` : ""}). Your top-30 commercial list first, then the top-30 residential, then the rest. Type YELLOW 'MY HOURS' per assembly (one installed). 'Hours now' is what ships today (blank = not set). Leave blank to keep it. Grey = HELD, leave blank. Send the file back to Track A — do NOT edit hours in the app for this.`,
+    [6, 8, 26, 18, 8, 18, 52, 10, 12, 60]
   );
+  const GREEN = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFC6EFCE" },
+  };
   assemblies.forEach((a, i) => {
     const row = ws.getRow(FIRST_DATA_ROW + i);
     row.getCell(col(C, "#")).value = i + 1;
+    if (isNew(a.ref)) {
+      row.getCell(col(C, "New")).value = "NEW";
+      row.getCell(col(C, "New")).fill = GREEN;
+      row.getCell(col(C, "New")).font = { bold: true };
+    }
     row.getCell(col(C, "Top-30 list")).value = a.top;
     row.getCell(col(C, KIND_COLUMN)).value = assemblyKind(a.projectType);
     row.getCell(col(C, "Ref")).value = a.ref;
     row.getCell(col(C, "Category")).value = a.category;
     row.getCell(col(C, "Assembly")).value = a.name;
     row.getCell(col(C, "Hours now")).value = a.hoursNow;
-    row.getCell(col(C, "MY HOURS")).fill = YELLOW;
-    row.getCell(col(C, "MY HOURS")).dataValidation = {
+    const my = row.getCell(col(C, "MY HOURS"));
+    if (a.held) {
+      // Refuses ANY entry: a held starter is not seeded, so hours typed
+      // here would sit in the seed for a recipe nobody has. The loader
+      // refuses them as well, in case this validation is bypassed.
+      my.fill = GREY;
+      my.dataValidation = {
+        type: "textLength",
+        operator: "equal",
+        formulae: [0],
+        allowBlank: true,
+        showErrorMessage: true,
+        error: "HELD — this starter is not seeded yet. Leave it blank.",
+      };
+      row.getCell(col(C, "Notes")).value = a.held;
+      row.getCell(col(C, "Notes")).font = { bold: true };
+      return;
+    }
+    my.fill = YELLOW;
+    my.dataValidation = {
       type: "decimal",
       operator: "greaterThan",
       formulae: [0],
@@ -381,6 +452,18 @@ function howTo(wb: any, lines: [string, string][]) {
       "Your top-30 commercial list, then the top-30 residential list (references/top-assemblies-draft.md), then every other starter by category.",
     ],
     [
+      "New",
+      previous
+        ? `${newCount} rows say NEW: starters added since the version this was compared with (${path.basename(newSincePath!)}). Filter the 'New' column to see only them.`
+        : "Not marked in this build.",
+    ],
+    [
+      "HELD",
+      held.length
+        ? `${held.map(a => `${a.ref} ${a.name}`).join("; ")} — grey, and refuses input. It is listed so the sheet is complete, but it is not seeded yet; leave it blank. See its Notes.`
+        : "None.",
+    ],
+    [
       "Not in this sheet",
       notShipped.length
         ? `On your lists but not shipped yet (drafted recipes): ${notShipped.join(", ")}.`
@@ -394,6 +477,6 @@ function howTo(wb: any, lines: [string, string][]) {
   const out = path.join(HERE, ASSEMBLY_HOURS_FILE);
   await wb.xlsx.writeFile(out);
   console.log(
-    `wrote ${path.relative(process.cwd(), out)}: ${assemblies.length} rows (${notShipped.length} listed refs not shipped: ${notShipped.join(", ")})`
+    `wrote ${path.relative(process.cwd(), out)}: ${assemblies.length} rows, ${previous ? `${newCount} NEW` : "new not marked"}, ${held.length} HELD (${held.map(a => a.ref).join(", ") || "none"}), ${notShipped.length} listed refs not shipped: ${notShipped.join(", ") || "none"}`
   );
 }
