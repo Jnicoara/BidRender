@@ -746,10 +746,98 @@ export function rankMaterialHits<R extends SearchableMaterial>(
       { name: y, category: categoryOf.get(y) }
     ) || (x < y ? -1 : x > y ? 1 : 0);
   // Keys once per row, then a sort that only compares them — see rankKey.
-  return keyed
+  const sorted = keyed
     .map(k => ({ row: k.row, key: rankKey(k.match, query) }))
     .sort((a, b) => compareRankKeys(a.key, b.key, total))
     .map(k => k.row);
+  const gang = bareGangCount(query);
+  return gang === null ? sorted : mixGangLanes(sorted, gang);
+}
+
+/**
+ * "2 gang", "2-gang", "double gang" — a gang count and NOTHING else.
+ *
+ * That names no product: a box, a mud ring and a plate are all 2-gang, and
+ * the estimator has not said which yet. Ranked like any other query, the 30
+ * wall-plate variants (their names START with "2-gang") filled the whole top
+ * five and every box sat below them (owner, 2026-10-08). With a noun typed —
+ * "2 gang box", "2 gang plate", "2 gang mud ring" — the query names the thing
+ * and the ordinary ranking stands; this does not apply.
+ */
+const GANG_WORDS: Readonly<Record<string, number>> = {
+  one: 1,
+  single: 1,
+  two: 2,
+  double: 2,
+  three: 3,
+  triple: 3,
+  four: 4,
+  quad: 4,
+};
+const GANG_COUNT =
+  "(\\d+|one|single|two|double|three|triple|four|quad) ?gangs?";
+const BARE_GANG = new RegExp(`^${GANG_COUNT}$`);
+const GANG_IN_NAME = new RegExp(`(?:^| )${GANG_COUNT}(?= |$)`, "g");
+
+const gangNumber = (word: string): number => GANG_WORDS[word] ?? Number(word);
+
+/** The gang count a bare query asks for, or null if it is not one. */
+export function bareGangCount(query: string): number | null {
+  const m = BARE_GANG.exec(norm(query));
+  return m ? gangNumber(m[1]) : null;
+}
+
+/**
+ * Which of the three things a gang count can mean a row is.
+ * 0 box, 1 mud ring (a raised cover is one), 2 plate, 3 anything else that
+ * matched — a weatherproof cover included: it is a real answer, but a plain
+ * wall plate is the commoner one and would lose its turn to it.
+ */
+function gangLane(name: string): number {
+  const n = ` ${norm(name)} `;
+  if (n.includes(" box ")) return 0;
+  if (n.includes(" mud ring ") || n.includes(" raised cover ")) return 1;
+  if (n.includes(" plate ") || n.includes(" plates ")) return 2;
+  return 3;
+}
+
+/** Does the name state a gang count, and none of them the one asked for? */
+function statesOtherGang(name: string, count: number): boolean {
+  const stated = Array.from(norm(name).matchAll(GANG_IN_NAME), m =>
+    gangNumber(m[1])
+  );
+  return stated.length > 0 && !stated.includes(count);
+}
+
+/**
+ * Take turns: the best box, the best mud ring, the best plate, and round
+ * again. Inside each lane the ranked order is kept, so "Double-gang box" is
+ * still the first box and the commonest plate the first plate; a lane that
+ * runs out drops out of the turn. Then everything else that matched, in its
+ * ranked order — a combo device or a "Double switch" is not what a gang
+ * count asks for — and last any row naming a DIFFERENT gang count, which
+ * the alias table can let in ("single gang" reached a 2-gang mud ring).
+ */
+function mixGangLanes<R extends SearchableMaterial>(
+  rows: R[],
+  count: number
+): R[] {
+  const lanes: R[][] = [[], [], []];
+  const rest: R[] = [];
+  const wrongCount: R[] = [];
+  for (const row of rows) {
+    if (statesOtherGang(row.name, count)) wrongCount.push(row);
+    else {
+      const lane = gangLane(row.name);
+      (lane < 3 ? lanes[lane] : rest).push(row);
+    }
+  }
+  const out: R[] = [];
+  const longest = Math.max(...lanes.map(l => l.length));
+  for (let i = 0; i < longest; i++) {
+    for (const lane of lanes) if (i < lane.length) out.push(lane[i]);
+  }
+  return [...out, ...rest, ...wrongCount];
 }
 
 /**
