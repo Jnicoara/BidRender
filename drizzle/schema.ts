@@ -753,6 +753,15 @@ export const materials = mysqlTable(
       precision: 10,
       scale: 4,
     }),
+    /**
+     * "Example price" / "Example hours" (0132 / 0133, owner 2026-10-07):
+     * TRUE on a SHIPPED row whose price / labor hours came from the starter
+     * sheets, re-stamped by the seed. A shop's edit of that number clears it
+     * on its copy (`clearExampleFlags`, shared/exampleTags.ts). NULL = not
+     * an example. Shown on the bid screen only — never the customer quote.
+     */
+    isExamplePrice: boolean("isExamplePrice"),
+    isExampleLaborHours: boolean("isExampleLaborHours"),
 
     unitOfSale: mysqlEnum("unitOfSale", MATERIAL_UNITS_OF_SALE)
       .default("each")
@@ -941,6 +950,24 @@ export const laborRates = mysqlTable(
      */
     annualSalary: decimal("annualSalary", { precision: 12, scale: 2 }),
     annualHours: decimal("annualHours", { precision: 8, scale: 2 }),
+    /**
+     * "Example rate" (0134, owner 2026-10-07): TRUE on a shipped role
+     * carrying the example LOADED rate; a shop's edit clears it on its copy.
+     * NULL = not an example. `needsRate` reads it — an example rate is not
+     * the shop's rate.
+     */
+    isExampleRate: boolean("isExampleRate"),
+    /**
+     * The loaded rate as its parts (0134). All NULL = not broken down —
+     * never 0. `hourlyCost` stays the number every bid uses; the editor
+     * writes it as baseWage x (1 + the four parts), nothing derives it on
+     * read (shared/loadedRate.ts).
+     */
+    baseWage: decimal("baseWage", { precision: 10, scale: 4 }),
+    payrollTaxPct: decimal("payrollTaxPct", { precision: 6, scale: 4 }),
+    workersCompPct: decimal("workersCompPct", { precision: 6, scale: 4 }),
+    insurancePct: decimal("insurancePct", { precision: 6, scale: 4 }),
+    benefitsPct: decimal("benefitsPct", { precision: 6, scale: 4 }),
 
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1081,6 +1108,12 @@ export const assemblies = mysqlTable(
      * "has no parts" (CLAUDE.md § Editing fields 6).
      */
     laborOnly: boolean("laborOnly"),
+    /**
+     * "Example hours" (0133): TRUE on a shipped starter whose baseLaborHours
+     * came from the starter assembly hours sheet; a shop's edit of the hours
+     * clears it on its copy. NULL = not an example.
+     */
+    isExampleHours: boolean("isExampleHours"),
     /**
      * Hours to take this device out / move it, every job (0110, owner Q2).
      * NULL = not set -> "not priced"; 0 is a real answer.
@@ -2178,6 +2211,11 @@ export const bids = mysqlTable(
       (): AnyMySqlColumn => takeoffRunTypes.id,
       { onDelete: "set null" }
     ),
+    /**
+     * Extra bends per homerun (0131, owner 2026-10-07). NULL = not set:
+     * counted as 1 and shown "not confirmed" (server/homerunsCore.ts).
+     */
+    homerunExtraBends: int("homerunExtraBends"),
 
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -2850,6 +2888,14 @@ export const takeoffRuns = mysqlTable(
      * becomes route.
      */
     traceMode: mysqlEnum("traceMode", TRACE_MODES),
+
+    /**
+     * Where the run travels between boxes (0131, owner 2026-10-07):
+     * 'ceiling' | 'boxToBox'. NULL = 'ceiling', through the ceiling with a
+     * drop at every box, as before 0131 (server/runVerticals.ts). varchar,
+     * like `homerunMethod`, so a third value is code, not a migration.
+     */
+    runsAt: varchar("runsAt", { length: 16 }).$type<"ceiling" | "boxToBox">(),
 
     /**
      * A length somebody TYPED for this row (0091, § 4c): the flat run along the
@@ -4456,6 +4502,16 @@ export const bidLineItems = mysqlTable(
      * A's pick). NULL = a line from before the column, read as "not said".
      */
     snapshotLaborOnly: boolean("snapshotLaborOnly"),
+    /**
+     * Which of the frozen inputs were EXAMPLES when the line was added
+     * (0132–0134, owner 2026-10-07): the material cost, the hours, the rate.
+     * Frozen like the numbers themselves, so the bid-screen tag and the
+     * warning before printing cannot change after the fact. NULL = a line
+     * from before the columns, or not an example. Never on the customer quote.
+     */
+    snapshotPriceWasExample: boolean("snapshotPriceWasExample"),
+    snapshotHoursWereExample: boolean("snapshotHoursWereExample"),
+    snapshotLaborRateWasExample: boolean("snapshotLaborRateWasExample"),
     snapshotAt: timestamp("snapshotAt").defaultNow().notNull(),
 
     /**

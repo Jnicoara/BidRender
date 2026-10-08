@@ -215,7 +215,10 @@ import {
   RETIRED_BASELINE_MATERIALS,
   type BaselineMaterial,
 } from "./seed/baselineMaterials";
-import { BASELINE_LABOR_RATES } from "./seed/baselineLaborRates";
+import {
+  BASELINE_LABOR_RATES,
+  type BaselineLaborRate,
+} from "./seed/baselineLaborRates";
 import { BASELINE_RUN_TYPES } from "./seed/baselineRunTypes";
 import { BASELINE_MODIFIERS } from "./seed/baselineModifiers";
 import {
@@ -239,7 +242,11 @@ import {
   seatRefusal,
   type SeatUsage,
 } from "../shared/seats";
-import { hourlyCostFor } from "../shared/laborRateLookup";
+import {
+  hourlyCostFor,
+  hourlyCostOf,
+  resolveLaborRate,
+} from "../shared/laborRateLookup";
 import type { ExpenseLine } from "../shared/bidExtras";
 import { unpricedPartsIn, type NotPricedTally } from "../shared/lineNotPriced";
 import { appliedModifiers } from "../shared/modifierLookup";
@@ -2172,6 +2179,8 @@ export async function seedBaselineMaterialsFrom(
       // From the starter labor sheet (starterLaborUnits.ts); NULL = not set.
       laborHours: m.laborHours ?? null,
       fieldBendLaborHours: m.fieldBendLaborHours ?? null,
+      isExamplePrice: m.isExamplePrice ?? null,
+      isExampleLaborHours: m.isExampleLaborHours ?? null,
       userId: null,
     }));
 
@@ -2277,6 +2286,8 @@ async function backfillMaterialMetadata(
       strapFromBoxFeet: materials.strapFromBoxFeet,
       laborHours: materials.laborHours,
       fieldBendLaborHours: materials.fieldBendLaborHours,
+      isExamplePrice: materials.isExamplePrice,
+      isExampleLaborHours: materials.isExampleLaborHours,
     })
     .from(materials)
     .where(isNull(materials.userId));
@@ -2334,6 +2345,11 @@ async function backfillMaterialMetadata(
       const want = intended[key] ?? null;
       const have = row[key] === null ? null : Number(row[key]);
       if (have !== (want === null ? null : Number(want))) patch[key] = want;
+    }
+    // The example tags travel with the numbers they describe (0132 / 0133).
+    for (const key of ["isExamplePrice", "isExampleLaborHours"] as const) {
+      const want = intended[key] ?? null;
+      if ((row[key] ?? null) !== want) patch[key] = want;
     }
 
     if (Object.keys(patch).length > 0) {
@@ -2511,6 +2527,15 @@ export async function setLaborRateHourlyCost(
 
   await updateLaborRate(editableId, userId, {
     hourlyCost: hourlyCost.toFixed(4),
+    // A rate the shop typed is its own: not "Example rate" (0134), and the
+    // example's wage/burden parts — copied by the fork — no longer explain
+    // it, so they go too (NULL = not broken down, never zeros).
+    isExampleRate: false,
+    baseWage: null,
+    payrollTaxPct: null,
+    workersCompPct: null,
+    insurancePct: null,
+    benefitsPct: null,
   });
   return { id: editableId, forked: isBaseline };
 }
@@ -2597,7 +2622,7 @@ export async function seedBaselineLaborRates(): Promise<void> {
 
     const missing = BASELINE_LABOR_RATES.filter(
       r => !alreadySeeded.has(r.name)
-    ).map(r => ({ ...r, userId: null }));
+    ).map(r => ({ ...laborRateSeedColumns(r), userId: null }));
 
     if (missing.length > 0) await db.insert(laborRates).values(missing);
 
@@ -2735,15 +2760,41 @@ export async function seedBaselineRunTypes(): Promise<void> {
 }
 
 /**
- * Drag shipped labor rates back to $0.
+ * A seed role as the columns it writes — named, not spread, so a field of
+ * the seed type that is not a column (`example`) can never reach an insert.
+ */
+function laborRateSeedColumns(r: BaselineLaborRate) {
+  return {
+    name: r.name,
+    rateType: r.rateType,
+    hourlyCost: r.hourlyCost,
+    annualSalary: r.annualSalary,
+    annualHours: r.annualHours,
+    // The example loaded rate's parts and flag (0134) — or NULL on an
+    // unrated role, never zeros.
+    isExampleRate: r.example ? true : null,
+    baseWage: r.example?.baseWage ?? null,
+    payrollTaxPct: r.example?.payrollTaxPct ?? null,
+    workersCompPct: r.example?.workersCompPct ?? null,
+    insurancePct: r.example?.insurancePct ?? null,
+    benefitsPct: r.example?.benefitsPct ?? null,
+  };
+}
+
+/**
+ * Re-stamp shipped labor rates from the seed: the owner-approved EXAMPLE
+ * loaded rates on the four field roles, $0 on the rest.
  *
- * The same pass materials get, for the same reason and with more at stake: the
- * catalog used to ship plausible-looking rates, and a plausible rate that
- * nobody chose is indistinguishable on screen from one they did. A material
- * priced wrong costs one line; the labor rate multiplies every line in the bid.
+ * Until 2026-10-07 this dragged every shipped rate back to $0: a plausible rate
+ * nobody chose is indistinguishable on screen from one they did, and the rate
+ * multiplies every line of a bid. It now writes the example rates — with
+ * `isExampleRate` and the wage/burden parts in the SAME update, so a shipped
+ * rate never exists without the flag that says what it is
+ * (baselineLaborRates.ts).
  *
  * Only baseline rows. A user who has set a rate has set it on their own FORK,
- * which this cannot see — same boundary as the material price pass.
+ * which this cannot see — same boundary as the material price pass. A sent
+ * bid never moves: its lines froze `snapshotLaborRate`.
  */
 async function backfillLaborRateAmounts(): Promise<void> {
   const db = await getDb();
@@ -2756,6 +2807,12 @@ async function backfillLaborRateAmounts(): Promise<void> {
       hourlyCost: laborRates.hourlyCost,
       annualSalary: laborRates.annualSalary,
       annualHours: laborRates.annualHours,
+      isExampleRate: laborRates.isExampleRate,
+      baseWage: laborRates.baseWage,
+      payrollTaxPct: laborRates.payrollTaxPct,
+      workersCompPct: laborRates.workersCompPct,
+      insurancePct: laborRates.insurancePct,
+      benefitsPct: laborRates.benefitsPct,
     })
     .from(laborRates)
     .where(isNull(laborRates.userId));
@@ -2779,6 +2836,21 @@ async function backfillLaborRateAmounts(): Promise<void> {
     // still re-stamped so a row that lost them gets a usable divisor back.
     if (Number(row.annualHours ?? 0) !== Number(want.annualHours ?? 0)) {
       patch.annualHours = want.annualHours;
+    }
+    // The flag and the parts travel WITH the rate (0134).
+    const cols = laborRateSeedColumns(want);
+    if ((row.isExampleRate ?? null) !== cols.isExampleRate)
+      patch.isExampleRate = cols.isExampleRate;
+    for (const key of [
+      "baseWage",
+      "payrollTaxPct",
+      "workersCompPct",
+      "insurancePct",
+      "benefitsPct",
+    ] as const) {
+      const have = row[key] === null ? null : Number(row[key]);
+      const wantV = cols[key] === null ? null : Number(cols[key]);
+      if (have !== wantV) patch[key] = cols[key];
     }
 
     if (Object.keys(patch).length > 0) {
@@ -3056,6 +3128,12 @@ export type AssemblyMaterialLine = {
    * since forked still finds the override.
    */
   itemKey: number;
+  /**
+   * The RESOLVED material's "Example price" flag (0132) — what a line added
+   * from this recipe freezes as `snapshotPriceWasExample`. Required, so a
+   * mapping that drops it cannot compile.
+   */
+  isExamplePrice: boolean;
 };
 
 export type AssemblyDetail = Assembly & {
@@ -3250,6 +3328,7 @@ export async function getAssemblyMaterialLines(
       laborHours: material.laborHours,
       category: material.category,
       itemKey: materialItemKey(material),
+      isExamplePrice: material.isExamplePrice === true,
     });
   }
   return resolved;
@@ -3912,12 +3991,13 @@ export async function seedBaselineAssemblies(
       if (hours === undefined || !alreadySeeded.has(spec.name)) continue;
       await db
         .update(assemblies)
-        .set({ baseLaborHours: hours })
+        // The number and its "Example hours" tag together (0133).
+        .set({ baseLaborHours: hours, isExampleHours: true })
         .where(
           and(
             isNull(assemblies.userId),
             eq(assemblies.name, spec.name),
-            sql`NOT (${assemblies.baseLaborHours} <=> ${hours})`
+            sql`(NOT (${assemblies.baseLaborHours} <=> ${hours}) OR NOT (${assemblies.isExampleHours} <=> TRUE))`
           )
         );
     }
@@ -4031,6 +4111,9 @@ export async function seedBaselineAssemblies(
         category: schemaCategory(spec),
         projectType: spec.projectType,
         baseLaborHours: starterHoursValue(spec),
+        // Hours from the owner's sheet arrive WITH their tag (0133).
+        isExampleHours:
+          STARTER_ASSEMBLY_HOURS[spec.name] !== undefined ? true : null,
         // Without this the hours above cost nothing — see DEFAULT_ASSEMBLY_ROLE.
         laborRateId: defaultRole?.id ?? null,
         // Ships ticked only when the seed says so; otherwise "not said".
@@ -6329,6 +6412,9 @@ async function snapshotForAssembly(
   snapshotMarkupSource: LineMarkupSource;
   snapshotUnpricedParts: number;
   snapshotLaborOnly: boolean;
+  snapshotPriceWasExample: boolean;
+  snapshotHoursWereExample: boolean;
+  snapshotLaborRateWasExample: boolean;
 }> {
   const [activeModifiers, rates, markupRuleSet] = await Promise.all([
     getLibraryModifiers(userId, "active"),
@@ -6353,7 +6439,10 @@ async function snapshotForAssembly(
 
   // Resolved through the shared lookup so a forked role still prices — the
   // snapshot must freeze the rate the assembly ACTUALLY means, not zero.
-  const laborRate = hourlyCostFor(rates, detail.laborRateId);
+  // The ROW, not just its cost: whether it is BidRidge's example rate is
+  // frozen beside the number (0134).
+  const rateRow = resolveLaborRate(rates, detail.laborRateId);
+  const laborRate = hourlyCostOf(rateRow);
 
   const materialCost = detail.materials.reduce(
     (sum, line) => sum + Number(line.costPerUnit) * Number(line.qty),
@@ -6403,6 +6492,16 @@ async function snapshotForAssembly(
       inferred from having no parts (lineMaterialNotPriced).
     */
     snapshotLaborOnly: detail.laborOnly === true,
+    /*
+      Which frozen numbers were BidRidge's EXAMPLES (0132–0134, owner
+      2026-10-07), from the SAME rows the numbers above came from: a part
+      priced from an example price, the starter's example hours, the role's
+      example rate. Frozen like the numbers, so the bid-screen tag and the
+      print warning cannot change after the fact.
+    */
+    snapshotPriceWasExample: detail.materials.some(line => line.isExamplePrice),
+    snapshotHoursWereExample: detail.isExampleHours === true,
+    snapshotLaborRateWasExample: rateRow?.isExampleRate === true,
   };
 }
 
@@ -6571,6 +6670,11 @@ export function pricingSnapshotOf(
     snapshotUnpricedParts: line.snapshotUnpricedParts,
     // And whether its assembly was labor only when it was frozen (0106).
     snapshotLaborOnly: line.snapshotLaborOnly,
+    // And which of its frozen numbers were examples (0132–0134): a copy
+    // priced from an example is still priced from one.
+    snapshotPriceWasExample: line.snapshotPriceWasExample,
+    snapshotHoursWereExample: line.snapshotHoursWereExample,
+    snapshotLaborRateWasExample: line.snapshotLaborRateWasExample,
     snapshotAt: line.snapshotAt,
   };
 }
@@ -6908,6 +7012,8 @@ export async function saveLineAsAssembly(input: {
   category: (typeof ASSEMBLY_CATEGORIES)[number];
   laborRateId: number | null;
   laborRate: number;
+  /** Whether that rate is BidRidge's example rate (0134) — frozen with it. */
+  laborRateWasExample: boolean;
 }): Promise<{ assemblyId: number; materialId: number | null }> {
   const { userId, bidId, line } = input;
   const cost = Number(line.snapshotMaterialCost);
@@ -6945,6 +7051,7 @@ export async function saveLineAsAssembly(input: {
   await updateBidLineItem(line.id, bidId, {
     assemblyId,
     snapshotLaborRate: input.laborRate.toFixed(4),
+    snapshotLaborRateWasExample: input.laborRateWasExample,
     // Built from this line's typed price, so no part of it is $0 — said
     // rather than left NULL, which would read the new recipe live for ever.
     snapshotUnpricedParts: 0,
@@ -13306,7 +13413,8 @@ export async function addRunTypeRowToBid(
   const material = resolveMaterial(materialRows, input.materialId);
   if (!material) throw new Error("Material not found");
 
-  const laborRate = hourlyCostFor(rates, defaults?.defaultLaborRateId ?? null);
+  const rateRow = resolveLaborRate(rates, defaults?.defaultLaborRateId ?? null);
+  const laborRate = hourlyCostOf(rateRow);
 
   await releaseArchivedPlanSlot(bidId, {
     runTypeId: input.runTypeId,
@@ -13327,6 +13435,7 @@ export async function addRunTypeRowToBid(
     // an operation, and this is a length of pipe.
     snapshotModifierPct: "0.0000",
     snapshotLaborRate: laborRate.toFixed(4),
+    snapshotLaborRateWasExample: rateRow?.isExampleRate === true,
     snapshotModifierNames: [],
     sortOrder: await nextBidSortOrder(bidId),
   });
@@ -13368,6 +13477,9 @@ function runLinePricing(
       snapshotMaterialCost: "0.0000",
       snapshotLaborHours: runLineLaborUnit(role, material),
       ...markupSnapshot([], markupRuleSet),
+      // No price on a bend; its hours are the raceway's bend hours.
+      snapshotPriceWasExample: false,
+      snapshotHoursWereExample: runLineHoursWereExample(role, material),
     };
   }
   return {
@@ -13377,7 +13489,23 @@ function runLinePricing(
       [markupPartForMaterial(material, storedId)],
       markupRuleSet
     ),
+    // Frozen with the numbers they describe (0132 / 0133).
+    snapshotPriceWasExample: material.isExamplePrice === true,
+    snapshotHoursWereExample: runLineHoursWereExample(role, material),
   };
+}
+
+/**
+ * Whether the hours `runLineLaborUnit` freezes are BidRidge's example hours.
+ * A part paid for in the run's rate freezes a ZERO that is the rule, not a
+ * shipped number, so it is never an example.
+ */
+function runLineHoursWereExample(
+  role: RunMaterialRole,
+  material: Material
+): boolean {
+  if (laborInRunRate(role)) return false;
+  return material.isExampleLaborHours === true;
 }
 
 /**
@@ -13481,10 +13609,18 @@ export async function resnapshotRunTypeLine(
               [markupPartForMaterial(material, input.materialId)],
               markupRuleSet
             ),
+            // Each refilled number brings its example flag with it (0132).
+            snapshotPriceWasExample: material.isExamplePrice === true,
           }
         : {}),
       ...(input.hours
-        ? { snapshotLaborHours: runLineLaborUnit(input.role, material) }
+        ? {
+            snapshotLaborHours: runLineLaborUnit(input.role, material),
+            snapshotHoursWereExample: runLineHoursWereExample(
+              input.role,
+              material
+            ),
+          }
         : {}),
       runMaterialId: input.materialId,
     };

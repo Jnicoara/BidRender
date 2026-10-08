@@ -1,0 +1,28 @@
+-- "Example price" — a SHIPPED price says it is an example (owner,
+-- 2026-10-07; CLAUDE.md § "Where a priced catalog lands";
+-- references/starter-vs-company-plan.md).
+--
+--   materials.isExamplePrice           TRUE on a shipped row whose price came
+--                                      from the starter sheet. A shop's edit
+--                                      of the price clears it on its copy.
+--                                      NULL = not an example (every row
+--                                      before this, and every typed price).
+--   bid_line_items.snapshotPriceWasExample
+--                                      FROZEN at add time: the line's
+--                                      material cost used an example price.
+--                                      Drives the bid-screen tag and the
+--                                      warning before printing; never shown
+--                                      on the customer quote.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Nullable, no DEFAULT, no backfill: NULL reads as "not an example", which
+-- is what every existing row is. Moves no number.
+--
+-- ── NUMBERING / PAIRING ──────────────────────────────────────────────────────
+-- After Track C's footage batch (0125–0131, branch a-batch-c-0125); applied
+-- together with it (migrations-next-batch.md). Same release as the
+-- example-tags code (branch a-example-tags) — the seed sets the flag.
+--
+-- Hand-written, not generated.
+ALTER TABLE `materials` ADD `isExamplePrice` boolean;--> statement-breakpoint
+ALTER TABLE `bid_line_items` ADD `snapshotPriceWasExample` boolean;

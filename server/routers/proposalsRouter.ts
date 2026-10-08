@@ -45,6 +45,7 @@ import { refuseIfIncomplete, reportPricingProblems } from "../pricingProblems";
 import { resolveBidClient } from "../../shared/bidClient";
 import { explainTaxStatus } from "../../shared/salesTax";
 import { notPricedLines, withDropsNotPriced } from "../../shared/lineNotPriced";
+import { exampleSummary } from "../../shared/exampleTags";
 import { storagePresignPut } from "../storage";
 import * as db from "../db";
 import { setLogoReleasingOld } from "../storedFiles";
@@ -510,6 +511,14 @@ export const proposalsRouter = router({
           }))
         ),
         lineCount: lines.length,
+        /**
+         * Lines priced from BidRidge's EXAMPLE numbers (0132–0134), from
+         * their frozen flags: the warning before printing (owner,
+         * 2026-10-07 — a warning, not a block). For the shop's screen only;
+         * nothing in the document reads it, so the customer's copy never
+         * shows a tag.
+         */
+        examples: exampleSummary(lines),
       };
     }),
 });

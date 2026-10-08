@@ -118,24 +118,37 @@ export const BASELINE_MATERIALS: BaselineMaterial[] = (
   ] as BaselineMaterial[]
 )
   .map(dropRestatedWords)
-  .map(withStarterValues);
+  .map(m => withStarterValues(m));
 
 /**
  * The starter sheets' numbers, applied by NAME on top of the modules: the
  * modules say what a row IS, the generated files say what it costs and how
  * long it takes. Both files are written only by pricing/loadStarterSheets.mts.
  */
-function withStarterValues(m: BaselineMaterial): BaselineMaterial {
-  const price = STARTER_PRICES[m.name];
-  const labor = STARTER_LABOR_UNITS[m.name];
+export function withStarterValues(
+  m: BaselineMaterial,
+  // Parameters so server/starterValues.test.ts can prove the tagging while
+  // the generated maps are still empty.
+  prices: Readonly<Record<string, string>> = STARTER_PRICES,
+  laborUnits: typeof STARTER_LABOR_UNITS = STARTER_LABOR_UNITS
+): BaselineMaterial {
+  const price = prices[m.name];
+  const labor = laborUnits[m.name];
+  const hasHours =
+    labor?.laborHours !== undefined || labor?.fieldBendLaborHours !== undefined;
   return {
     ...m,
-    ...(price !== undefined ? { costPerUnit: price } : {}),
+    // A sheet number always arrives WITH its tag — the owner's rule: never a
+    // shipped number that does not say it is an example.
+    ...(price !== undefined
+      ? { costPerUnit: price, isExamplePrice: true as const }
+      : {}),
     ...(labor?.laborHours !== undefined
       ? { laborHours: labor.laborHours }
       : {}),
     ...(labor?.fieldBendLaborHours !== undefined
       ? { fieldBendLaborHours: labor.fieldBendLaborHours }
       : {}),
+    ...(hasHours ? { isExampleLaborHours: true as const } : {}),
   };
 }

@@ -186,6 +186,12 @@ retired to first-boot. Its own plan when the time comes.
 
 ## 3b. Labor rates
 
+> **BUILT 2026-10-07 on branch `a-example-tags`**, together with the example
+> price and hours tags (§ "Shipped HOURS"): migrations 0132–0134, after C's
+> 0125–0131 (`migrations-next-batch.md` § Batch 5). The trap in "A trap to
+> close in the same change" below is closed in `needsRate`. Not merged, not
+> on staging. The "today" below describes local-dev before that branch.
+
 ### How they are stored today
 
 - **One row per worker type (role)**: `labor_rates` (`drizzle/schema.ts`

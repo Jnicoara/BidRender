@@ -918,6 +918,34 @@
       "when": 1789962000000,
       "tag": "0130_bid_height_areas",
       "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "5",
+      "when": 1789962100000,
+      "tag": "0131_homerun_bends_runs_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "5",
+      "when": 1789962200000,
+      "tag": "0132_example_price",
+      "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "5",
+      "when": 1789962300000,
+      "tag": "0133_example_hours",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "5",
+      "when": 1789962400000,
+      "tag": "0134_example_labor_rates",
+      "breakpoints": true
     }
   ]
 }

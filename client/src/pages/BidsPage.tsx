@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
+  Info,
   ArrowLeft,
   CalendarDays,
   Check,
@@ -75,6 +76,7 @@ import { BidExtrasPanel } from "@/components/BidExtrasPanel";
 import { CloseoutPanel } from "@/components/CloseoutPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
+import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import {
   countUnpricedLaborLines,
@@ -93,6 +95,8 @@ import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
+import { ExampleTags } from "@/components/ExampleTags";
+import { exampleSummary, exampleWarning } from "@shared/exampleTags";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { MostUsedRow } from "@/components/MostUsedRow";
 import { TapExplain } from "@/components/TapExplain";
@@ -540,6 +544,11 @@ export default function BidsPage({
   const notPriced = lines.filter(l =>
     lineNotPriced(l, l.breakdown?.directCost ?? null)
   );
+  /**
+   * Lines priced from BidRidge's EXAMPLE numbers (0132–0134), from their
+   * frozen flags — the same count the warning before printing gives.
+   */
+  const examples = exampleSummary(lines);
   const notPricedFromPlans = notPriced.filter(
     l => l.takeoffRunTypeId !== null
   ).length;
@@ -871,6 +880,7 @@ export default function BidsPage({
 
       <div className="shrink-0 md:shrink md:flex-1 md:overflow-y-auto px-4 md:px-6 py-5">
         {bid.isSample && <SampleBidNotice bidId={bid.id} />}
+        <ExampleRatesBanner className="mb-4" />
         {/* Above everything, full width: it changes what every quantity below
             it MEANS, so it cannot sit in a column somebody scrolls past. */}
         <QuantityLockPanel bidId={bidId} />
@@ -1307,6 +1317,15 @@ export default function BidsPage({
                                       </TapExplain>
                                     );
                                   })()}
+                                  {/* "Example hours" / "Example rate"
+                                      (0133 / 0134): beside the hours they
+                                      priced — the bid screen only, never
+                                      the customer quote. */}
+                                  <ExampleTags
+                                    line={line}
+                                    only={["hours", "rate"]}
+                                    className="justify-end font-sans"
+                                  />
                                 </span>
                               )}
                               {/*
@@ -1496,6 +1515,20 @@ export default function BidsPage({
                     {dropsNotPriced === 1 ? "it is" : "they are"} priced. Pick
                     what each drop is made of on its count, on the{" "}
                     <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
+              {/*
+                Lines priced from BidRidge's EXAMPLE numbers (owner,
+                2026-10-07): said here, on the shop's own screen, and warned
+                again before printing — never on the customer quote. Sky, not
+                amber: these are real prices, just not the shop's.
+              */}
+              {examples.lines > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-2.5 py-2 my-1">
+                  <Info className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    {exampleWarning(examples)}
                   </p>
                 </div>
               )}

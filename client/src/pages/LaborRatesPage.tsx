@@ -52,6 +52,12 @@ import {
 import { DEFAULT_ANNUAL_HOURS, effectiveHourlyRate } from "@shared/pricing";
 import { countNeedingRate, needsRate } from "@shared/laborRatePricing";
 import { money, moneyWhole } from "@/lib/money";
+import {
+  EXAMPLE_BURDEN,
+  loadedRate,
+  readParts,
+  type LoadedParts,
+} from "@shared/loadedRate";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -68,6 +74,14 @@ type LaborRate = {
   annualHours: string | null;
   effectiveHourlyRate: number;
   rateError?: string;
+  /** BidRidge's example loaded rate, not the shop's (0134). */
+  isExampleRate?: boolean | null;
+  /** The loaded rate's parts; all NULL = not broken down (0134). */
+  baseWage?: string | null;
+  payrollTaxPct?: string | null;
+  workersCompPct?: string | null;
+  insurancePct?: string | null;
+  benefitsPct?: string | null;
 };
 
 /** Mirrors the bounds the router enforces. */
@@ -78,12 +92,33 @@ const MAX_ANNUAL_HOURS = 8760;
 const hours = (value: number) =>
   value.toLocaleString("en-US", { maximumFractionDigits: 0 });
 
+/**
+ * A loaded rate typed as its parts (0134): wage, then each burden as a
+ * PERCENT the way people say it ("10"), stored as a fraction (0.10).
+ */
+type BreakdownDraft = {
+  baseWage: string;
+  payrollTaxPct: string;
+  workersCompPct: string;
+  insurancePct: string;
+  benefitsPct: string;
+};
+
+const BURDEN_FIELDS = [
+  ["payrollTaxPct", "Payroll tax"],
+  ["workersCompPct", "Workers' comp"],
+  ["insurancePct", "Insurance"],
+  ["benefitsPct", "Benefits"],
+] as const;
+
 type Draft = {
   name: string;
   rateType: RateType;
   hourlyCost: string;
   annualSalary: string;
   annualHours: string;
+  /** Null = the hourly rate is typed as one number. */
+  breakdown: BreakdownDraft | null;
 };
 
 const emptyDraft: Draft = {
@@ -92,7 +127,45 @@ const emptyDraft: Draft = {
   hourlyCost: "",
   annualSalary: "",
   annualHours: String(DEFAULT_ANNUAL_HOURS),
+  breakdown: null,
 };
+
+const pctText = (fraction: number) =>
+  String(Math.round(fraction * 10000) / 100);
+
+const breakdownDraftFrom = (rate: LaborRate): BreakdownDraft | null => {
+  const parts = readParts({
+    baseWage: rate.baseWage ?? null,
+    payrollTaxPct: rate.payrollTaxPct ?? null,
+    workersCompPct: rate.workersCompPct ?? null,
+    insurancePct: rate.insurancePct ?? null,
+    benefitsPct: rate.benefitsPct ?? null,
+  });
+  if (!parts) return null;
+  return {
+    baseWage: String(parts.baseWage),
+    payrollTaxPct: pctText(parts.payrollTaxPct),
+    workersCompPct: pctText(parts.workersCompPct),
+    insurancePct: pctText(parts.insurancePct),
+    benefitsPct: pctText(parts.benefitsPct),
+  };
+};
+
+/** The typed parts as numbers (burdens as fractions), or null if any is bad. */
+function breakdownParts(b: BreakdownDraft): LoadedParts | null {
+  const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
+  const wage = num(b.baseWage);
+  const pcts = BURDEN_FIELDS.map(([key]) => num(b[key]) / 100);
+  if (!Number.isFinite(wage) || wage < 0 || wage > MAX_HOURLY) return null;
+  if (pcts.some(p => !Number.isFinite(p) || p < 0 || p > 2)) return null;
+  return {
+    baseWage: wage,
+    payrollTaxPct: pcts[0],
+    workersCompPct: pcts[1],
+    insurancePct: pcts[2],
+    benefitsPct: pcts[3],
+  };
+}
 
 const draftFrom = (rate: LaborRate): Draft => ({
   name: rate.name,
@@ -104,12 +177,18 @@ const draftFrom = (rate: LaborRate): Draft => ({
     rate.annualHours != null
       ? String(Number(rate.annualHours))
       : String(DEFAULT_ANNUAL_HOURS),
+  breakdown: rate.rateType === "hourly" ? breakdownDraftFrom(rate) : null,
 });
 
 /** Shared validation for the add form and inline edits. */
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return "Give the role a name.";
 
+  if (draft.rateType === "hourly" && draft.breakdown) {
+    return breakdownParts(draft.breakdown)
+      ? null
+      : "Enter a wage, and each percentage from 0 to 200.";
+  }
   if (draft.rateType === "hourly") {
     const rate = Number(draft.hourlyCost);
     if (draft.hourlyCost.trim() === "" || Number.isNaN(rate))
@@ -138,6 +217,10 @@ function validateDraft(draft: Draft): string | null {
 /** What a draft would cost per hour. Same math as the server, via @shared. */
 function draftHourlyRate(draft: Draft): number | null {
   try {
+    if (draft.rateType === "hourly" && draft.breakdown) {
+      const parts = breakdownParts(draft.breakdown);
+      return parts ? loadedRate(parts) : null;
+    }
     if (draft.rateType === "hourly") {
       const rate = Number(draft.hourlyCost);
       return Number.isFinite(rate) ? rate : null;
@@ -184,12 +267,16 @@ function RateFields({
   draft,
   onChange,
   autoFocusName,
+  allowBreakdown,
 }: {
   draft: Draft;
   onChange: (next: Draft) => void;
   autoFocusName?: boolean;
+  /** Edit only — `create` takes one number; break it down after. */
+  allowBreakdown?: boolean;
 }) {
   const preview = draftHourlyRate(draft);
+  const b = draft.breakdown;
 
   return (
     <>
@@ -216,7 +303,65 @@ function RateFields({
         </SelectContent>
       </Select>
 
-      {draft.rateType === "hourly" ? (
+      {draft.rateType === "hourly" && b ? (
+        /* Wage + burden = loaded (0134). The loaded rate is what every bid
+           uses; the parts are how the shop arrives at it. */
+        <div className="basis-full flex flex-wrap items-center gap-1.5">
+          <Input
+            value={b.baseWage}
+            onChange={e =>
+              onChange({
+                ...draft,
+                breakdown: { ...b, baseWage: e.target.value },
+              })
+            }
+            className="h-8 w-20 text-sm text-right"
+            inputMode="decimal"
+            onFocus={selectOnFocus}
+            placeholder="0.00"
+            aria-label="Base wage per hour"
+          />
+          <span className="text-xs text-muted-foreground">wage</span>
+          {BURDEN_FIELDS.map(([key, label]) => (
+            <span key={key} className="flex items-center gap-1">
+              <span className="text-xs text-muted-foreground">+</span>
+              <Input
+                value={b[key]}
+                onChange={e =>
+                  onChange({
+                    ...draft,
+                    breakdown: { ...b, [key]: e.target.value },
+                  })
+                }
+                className="h-8 w-14 text-sm text-right"
+                inputMode="decimal"
+                onFocus={selectOnFocus}
+                aria-label={`${label} percent`}
+              />
+              <span className="text-xs text-muted-foreground">
+                % {label.toLowerCase()}
+              </span>
+            </span>
+          ))}
+          <span className="text-xs font-mono text-[#F5C518] whitespace-nowrap">
+            = {preview !== null ? `${money(preview)}/hr` : "—"}
+          </span>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            onClick={() =>
+              onChange({
+                ...draft,
+                breakdown: null,
+                hourlyCost:
+                  preview !== null ? String(preview) : draft.hourlyCost,
+              })
+            }
+          >
+            Type one number
+          </button>
+        </div>
+      ) : draft.rateType === "hourly" ? (
         <div className="flex items-center gap-1.5">
           <Input
             value={draft.hourlyCost}
@@ -228,6 +373,27 @@ function RateFields({
             aria-label="Hourly rate"
           />
           <span className="text-xs text-muted-foreground">/hr</span>
+          {allowBreakdown && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline-offset-2 hover:underline whitespace-nowrap"
+              title="Wage + payroll tax + workers' comp + insurance + benefits = your loaded rate"
+              onClick={() =>
+                onChange({
+                  ...draft,
+                  breakdown: {
+                    baseWage: "",
+                    payrollTaxPct: pctText(EXAMPLE_BURDEN.payrollTaxPct),
+                    workersCompPct: pctText(EXAMPLE_BURDEN.workersCompPct),
+                    insurancePct: pctText(EXAMPLE_BURDEN.insurancePct),
+                    benefitsPct: pctText(EXAMPLE_BURDEN.benefitsPct),
+                  },
+                })
+              }
+            >
+              Build from wage
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -278,6 +444,16 @@ function LaborRateRow({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const parts =
+    rate.rateType === "hourly"
+      ? readParts({
+          baseWage: rate.baseWage ?? null,
+          payrollTaxPct: rate.payrollTaxPct ?? null,
+          workersCompPct: rate.workersCompPct ?? null,
+          insurancePct: rate.insurancePct ?? null,
+          benefitsPct: rate.benefitsPct ?? null,
+        })
+      : null;
 
   const save = () => {
     const problem = validateDraft(draft);
@@ -293,7 +469,12 @@ function LaborRateRow({
   if (editing) {
     return (
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border last:border-0 bg-muted/20">
-        <RateFields draft={draft} onChange={setDraft} autoFocusName />
+        <RateFields
+          draft={draft}
+          onChange={setDraft}
+          autoFocusName
+          allowBreakdown
+        />
         <div className="flex items-center gap-1 ml-auto">
           <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={save}>
             <Check className="w-3 h-3" /> Save
@@ -329,6 +510,14 @@ function LaborRateRow({
           </span>
           <OriginBadge rate={rate} />
         </div>
+        {parts && (
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {money(parts.baseWage)} wage + {pctText(parts.payrollTaxPct)}%
+            payroll tax + {pctText(parts.workersCompPct)}% comp +{" "}
+            {pctText(parts.insurancePct)}% insurance +{" "}
+            {pctText(parts.benefitsPct)}% benefits
+          </div>
+        )}
         {rate.rateType === "salary" && (
           <div className="text-xs text-muted-foreground mt-0.5">
             {rate.annualSalary != null && moneyWhole(Number(rate.annualSalary))}
@@ -352,6 +541,22 @@ function LaborRateRow({
       <span className="text-sm font-mono md:w-28 text-right shrink-0">
         {rate.rateError ? (
           <span className="text-destructive text-xs font-sans">Set hours</span>
+        ) : rate.isExampleRate ? (
+          /* Checked BEFORE needsRate, which also says yes to an example
+             (so first run keeps asking) — but here the number is real and
+             in use on bids, so it shows, tagged as BidRidge's. */
+          <span className="inline-flex flex-col items-end">
+            <span>
+              {money(rate.effectiveHourlyRate)}
+              <span className="text-muted-foreground">/hr</span>
+            </span>
+            <span
+              title="BidRidge's example loaded rate, not your shop's. Edit it to set your own."
+              className="rounded border border-sky-500/40 px-1 text-[10px] leading-4 font-sans text-sky-400 whitespace-nowrap"
+            >
+              Example rate
+            </span>
+          </span>
         ) : needsRate(rate) ? (
           <span
             className="text-xs font-sans font-medium text-[#F5C518]"
@@ -485,10 +690,26 @@ export default function LaborRatesPage() {
             ...row,
             name: vars.name ?? row.name,
             rateType: (vars.rateType ?? row.rateType) as RateType,
-            hourlyCost:
-              vars.hourlyCost != null
+            hourlyCost: vars.breakdown
+              ? String(loadedRate(vars.breakdown))
+              : vars.hourlyCost != null
                 ? String(vars.hourlyCost)
                 : row.hourlyCost,
+            // The parts as sent; the example flag is left to the server,
+            // which knows whether anything actually changed (onSettled).
+            ...(vars.breakdown !== undefined
+              ? {
+                  baseWage: vars.breakdown && String(vars.breakdown.baseWage),
+                  payrollTaxPct:
+                    vars.breakdown && String(vars.breakdown.payrollTaxPct),
+                  workersCompPct:
+                    vars.breakdown && String(vars.breakdown.workersCompPct),
+                  insurancePct:
+                    vars.breakdown && String(vars.breakdown.insurancePct),
+                  benefitsPct:
+                    vars.breakdown && String(vars.breakdown.benefitsPct),
+                }
+              : {}),
             annualSalary:
               vars.annualSalary != null
                 ? String(vars.annualSalary)
@@ -552,16 +773,26 @@ export default function LaborRatesPage() {
 
   const handleSave = useCallback(
     (id: number, draft: Draft) => {
+      const parts =
+        draft.rateType === "hourly" && draft.breakdown
+          ? breakdownParts(draft.breakdown)
+          : null;
       updateRate.mutate({
         id,
         name: draft.name.trim(),
         rateType: draft.rateType,
-        ...(draft.rateType === "hourly"
-          ? { hourlyCost: Number(draft.hourlyCost) }
-          : {
-              annualSalary: Number(draft.annualSalary),
-              annualHours: Number(draft.annualHours),
-            }),
+        // Parts when built from a wage; otherwise null, so parts that no
+        // longer explain the number are not left beside it (the router
+        // compares, so an untouched example stays an example).
+        ...(parts
+          ? { breakdown: parts }
+          : draft.rateType === "hourly"
+            ? { hourlyCost: Number(draft.hourlyCost), breakdown: null }
+            : {
+                annualSalary: Number(draft.annualSalary),
+                annualHours: Number(draft.annualHours),
+                breakdown: null,
+              }),
       });
     },
     [updateRate]

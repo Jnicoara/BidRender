@@ -1,0 +1,34 @@
+-- "Example rate" and the LOADED-rate breakdown (owner-approved 2026-10-07;
+-- starter-vs-company-plan.md § 3b).
+--
+--   labor_rates.isExampleRate          TRUE on a shipped role carrying the
+--                                      example loaded rate; a shop's edit
+--                                      clears it on its copy.
+--   labor_rates.baseWage               the wage part of the loaded rate.
+--   labor_rates.payrollTaxPct          0.1000 = 10% of the wage.
+--   labor_rates.workersCompPct         0.0700 = 7%.
+--   labor_rates.insurancePct           0.0400 = 4%.
+--   labor_rates.benefitsPct            0.2000 = 20%.
+--                                      All five NULL = "not broken down" —
+--                                      never 0. hourlyCost stays THE number
+--                                      every bid uses; the editor writes it
+--                                      as wage x (1 + the four parts) and
+--                                      nothing derives it on read, so a
+--                                      breakdown edit can never re-price a
+--                                      sent bid.
+--   bid_line_items.snapshotLaborRateWasExample
+--                                      FROZEN at add time: the line's rate was
+--                                      an example. Bid screen and print
+--                                      warning only.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Nullable, no DEFAULT, no backfill. The example rates themselves arrive by
+-- the SEED (re-stamped on shipped roles), in the same release as these
+-- columns — never the rates without the flag (needsRate reads it).
+--
+-- ── NUMBERING / PAIRING ──────────────────────────────────────────────────────
+-- After 0133; with Track C's batch and 0132–0134 as one apply.
+--
+-- Hand-written, not generated.
+ALTER TABLE `labor_rates` ADD `isExampleRate` boolean, ADD `baseWage` decimal(10,4), ADD `payrollTaxPct` decimal(6,4), ADD `workersCompPct` decimal(6,4), ADD `insurancePct` decimal(6,4), ADD `benefitsPct` decimal(6,4);--> statement-breakpoint
+ALTER TABLE `bid_line_items` ADD `snapshotLaborRateWasExample` boolean;

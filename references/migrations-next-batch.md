@@ -326,6 +326,34 @@ don't merge." Not written as a file yet; this is the plan.
 
 ## Batch 5 — before the priced sheet (numbered from 0132 when written — 0131 is Track C's, above)
 
+**WRITTEN 2026-10-07 as 0132–0134, branch `a-example-tags` — not merged into
+local-dev, not on staging.** The example-tag part of this batch only; brand
+line and `panelId` are still unwritten.
+
+| #    | File                       | What it adds (all nullable, no DB default, no `UPDATE` — step 1, additive)                                                                              |
+| ---- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0132 | `0132_example_price`       | `materials.isExamplePrice`, `bid_line_items.snapshotPriceWasExample`                                                                                    |
+| 0133 | `0133_example_hours`       | `materials.isExampleLaborHours`, `assemblies.isExampleHours`, `bid_line_items.snapshotHoursWereExample`                                                 |
+| 0134 | `0134_example_labor_rates` | `labor_rates.isExampleRate`, `baseWage`, `payrollTaxPct`, `workersCompPct`, `insurancePct`, `benefitsPct`; `bid_line_items.snapshotLaborRateWasExample` |
+
+- **ORDER IS A HARD RULE: C's 0125–0131 are applied FIRST, then 0132–0134,
+  in one step.** The journal's `when` values rise 0124 → 0131 → 0132; the
+  migrator SKIPS a file whose `when` is older than the newest one applied,
+  so applying 0132–0134 to a database before 0125–0131 would leave C's seven
+  silently unapplied forever. Never migrate this branch alone onto staging
+  or live.
+- **The flags are set by the seed, not by a backfill**: the labor-rate seed
+  re-stamps `isExampleRate` and the parts on shipped rows on every start, so
+  the code that writes them must be running before anybody reads a tag —
+  migrate (step 1), then the code. Nothing in step 3.
+- **Bid numbers: YES, on purpose, at the first boot of this code** — shipped
+  field roles go from $0 to the example rate, so a NEW line priced from a
+  shop still on the starters gets real labor. Existing lines keep their
+  frozen `snapshotLaborRate`; nothing re-prices.
+- Rehearsed 2026-10-07 on a fresh local `bidrender_test_exampletags`
+  (0000–0124 + 0132–0134, 128 applied); `schemaDrift` and `migrationRun`
+  green.
+
 **Added 2026-10-07 — "Example hours" (owner decision):** shipped labor hours
 get the price treatment — tag on the bid screen only, never the customer
 quote; clears when the shop edits it; warning before printing. Columns:

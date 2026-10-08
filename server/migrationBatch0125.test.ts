@@ -4,7 +4,7 @@
  * fails on a database without its migration — the table or column is absent.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { bidPanelCircuits, bidPanels, bids, users } from "../drizzle/schema";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
@@ -111,4 +111,29 @@ describe.skipIf(!hasDb)("migrations 0125–0130 (homerun footage)", () => {
   // (bid_height_areas) carry no behaviour beyond their shape, which
   // server/schemaDrift.test.ts checks column by column and key by key. A
   // case here that could not fail would only look like coverage.
+
+  it("0131: both new columns are nullable with NO default, so unset stays unset", async () => {
+    // NULL is the meaning here — "1 extra bend, not confirmed" and "through
+    // the ceiling" — so a DEFAULT would turn "nobody chose" into a choice.
+    const db = (await getDb())!;
+    const [rows] = (await db.execute(
+      sql`SELECT TABLE_NAME AS t, COLUMN_NAME AS c, IS_NULLABLE AS n, COLUMN_DEFAULT AS d, DATA_TYPE AS ty
+          FROM information_schema.COLUMNS
+          WHERE TABLE_SCHEMA = DATABASE()
+            AND ((TABLE_NAME = 'bids' AND COLUMN_NAME = 'homerunExtraBends')
+              OR (TABLE_NAME = 'takeoff_runs' AND COLUMN_NAME = 'runsAt'))
+          ORDER BY TABLE_NAME`
+    )) as unknown as [
+      { t: string; c: string; n: string; d: unknown; ty: string }[],
+    ];
+    expect(rows.map(r => [r.t, r.c, r.n, r.d, r.ty])).toEqual([
+      ["bids", "homerunExtraBends", "YES", null, "int"],
+      ["takeoff_runs", "runsAt", "YES", null, "varchar"],
+    ]);
+    const [row] = await db
+      .select({ bends: bids.homerunExtraBends })
+      .from(bids)
+      .where(eq(bids.id, bidId));
+    expect(row.bends).toBeNull();
+  });
 });

@@ -21,7 +21,10 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       `pricing/buildStarterSheets.mts`. It was built from the 168 starters;
       Track B added 15 on 2026-10-07 (GC1–GC5, GR1–GR7, LT31–LT33), so they
       are not on the sheet the owner is filling in. The hours map is keyed by
-      name, so nothing breaks; they just have no row yet.
+      name, so nothing breaks; they just have no row yet. **Owner,
+      2026-10-07: rebuild it AFTER B's new starter assemblies land** (on
+      local-dev), so every starter has a row — and before the owner's filled
+      copy is loaded, carry their typed hours across rather than overwriting.
 - [ ] **Build a starter RENAME path, then rename the four can lights**
       (owner, 2026-10-07). Keep 'Recessed can new construction, 4"/6"' and
       'Recessed can retrofit, 4"/6"' (LT5, LT4, LT33, LT6) until then.

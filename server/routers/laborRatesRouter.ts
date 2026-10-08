@@ -18,6 +18,8 @@ import {
   effectiveHourlyRate,
 } from "../../shared/pricing";
 import { TRADE_ALL } from "../../shared/trades";
+import { loadedRate } from "../../shared/loadedRate";
+import { changed } from "../../shared/exampleTags";
 import * as db from "../db";
 
 /**
@@ -114,6 +116,27 @@ function normalizeForRateType(input: {
  */
 const tradeSchema = z.string().trim().toLowerCase().min(1).max(64);
 
+/** A burden part: 0.10 = 10%. A part over 200% is a typo, not a burden. */
+const pctSchema = z.number().min(0).max(2);
+const breakdownSchema = z.object({
+  baseWage: z.number().min(0).max(MAX_HOURLY),
+  payrollTaxPct: pctSchema,
+  workersCompPct: pctSchema,
+  insurancePct: pctSchema,
+  benefitsPct: pctSchema,
+});
+
+/** The breakdown as columns; null clears all five (never zeros). */
+function breakdownColumns(b: z.infer<typeof breakdownSchema> | null) {
+  return {
+    baseWage: b === null ? null : toDecimal4(b.baseWage),
+    payrollTaxPct: b === null ? null : toDecimal4(b.payrollTaxPct),
+    workersCompPct: b === null ? null : toDecimal4(b.workersCompPct),
+    insurancePct: b === null ? null : toDecimal4(b.insurancePct),
+    benefitsPct: b === null ? null : toDecimal4(b.benefitsPct),
+  };
+}
+
 const rateBodySchema = z.object({
   rateType: z.enum(LABOR_RATE_TYPES),
   hourlyCost: hourlySchema.optional(),
@@ -176,10 +199,18 @@ export const laborRatesRouter = router({
       rateBodySchema.partial().extend({
         id: z.number().int().positive(),
         name: nameSchema.optional(),
+        /**
+         * The LOADED rate as its parts (0134): wage + payroll taxes +
+         * workers' comp + insurance + benefits. Given -> the hourly rate is
+         * WRITTEN from it (shared/loadedRate.ts); null -> the breakdown is
+         * cleared and the rate stays whatever it is; omitted -> untouched.
+         * Hourly roles only.
+         */
+        breakdown: breakdownSchema.nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, ...rest } = input;
+      const { id, breakdown, ...rest } = input;
 
       const target = await db.getLaborRateById(id, ctx.scope.dataUserId);
       if (!target)
@@ -225,6 +256,65 @@ export const laborRatesRouter = router({
                 : undefined),
           })
         );
+      }
+
+      // A rate typed directly (no breakdown sent) that differs from the one
+      // stored: the stored parts no longer explain it, so they are cleared
+      // rather than left saying something false beside the number.
+      if (
+        breakdown === undefined &&
+        rest.hourlyCost !== undefined &&
+        changed(target.hourlyCost, toDecimal4(rest.hourlyCost))
+      ) {
+        Object.assign(patch, breakdownColumns(null));
+      }
+      if (breakdown !== undefined) {
+        if (nextType !== "hourly" && breakdown !== null)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "A loaded-rate breakdown is for an hourly role. A salaried role's rate comes from its salary and hours.",
+          });
+        Object.assign(patch, breakdownColumns(breakdown));
+        if (breakdown !== null) {
+          patch.rateType = "hourly";
+          patch.hourlyCost = toDecimal4(loadedRate(breakdown));
+          patch.annualSalary = null;
+          patch.annualHours = null;
+        }
+      }
+
+      /*
+        "Example rate" CLEARS when the shop edits the rate or its parts
+        (owner, 2026-10-07) — only on a real change, so opening the example
+        and saving it untouched leaves it an example.
+      */
+      if (
+        target.isExampleRate &&
+        (changed(target.hourlyCost, patch.hourlyCost as string | undefined) ||
+          changed(
+            target.annualSalary,
+            patch.annualSalary as string | null | undefined
+          ) ||
+          changed(
+            target.annualHours,
+            patch.annualHours as string | null | undefined
+          ) ||
+          (patch.rateType !== undefined &&
+            patch.rateType !== target.rateType) ||
+          (
+            [
+              "baseWage",
+              "payrollTaxPct",
+              "workersCompPct",
+              "insurancePct",
+              "benefitsPct",
+            ] as const
+          ).some(k =>
+            changed(target[k], patch[k] as string | null | undefined)
+          ))
+      ) {
+        patch.isExampleRate = false;
       }
 
       await db.updateLaborRate(editableId, ctx.scope.dataUserId, patch);

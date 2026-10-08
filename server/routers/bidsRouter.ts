@@ -1062,13 +1062,17 @@ export const bidsRouter = router({
               "This line's price comes from your library, so it is not typed here. Change the assembly in the Library and add it again to take the new price.",
           });
         }
+        // A number TYPED on the bid is the shop's own, never our example —
+        // so typing it clears the line's example flag for that number.
         if (input.materialCost !== undefined) {
           handPatch.snapshotMaterialCost =
             input.materialCost === null ? null : toDecimal4(input.materialCost);
+          handPatch.snapshotPriceWasExample = false;
         }
         if (input.laborHours !== undefined) {
           handPatch.snapshotLaborHours =
             input.laborHours === null ? null : toDecimal4(input.laborHours);
+          handPatch.snapshotHoursWereExample = false;
         }
         if (input.laborRateId !== undefined) {
           const rates = await db.getLibraryLaborRates(ctx.scope.dataUserId);
@@ -1080,6 +1084,8 @@ export const bidsRouter = router({
             });
           }
           handPatch.snapshotLaborRate = toDecimal4(hourlyCostOf(rate));
+          // The role picked may still carry BidRidge's example rate (0134).
+          handPatch.snapshotLaborRateWasExample = rate.isExampleRate === true;
         }
       }
 
@@ -1234,6 +1240,8 @@ export const bidsRouter = router({
       }
       const patch: Record<string, unknown> = {
         snapshotMaterialCost: toDecimal4(Number(material.costPerUnit)),
+        // Frozen with the price it describes (0132).
+        snapshotPriceWasExample: material.isExamplePrice === true,
         snapshotAt: new Date(),
         // The price now comes from THIS material, so its markup does too —
         // its item override or category, before the company default a typed
@@ -1245,6 +1253,7 @@ export const bidsRouter = router({
       };
       if (material.laborHours !== null) {
         patch.snapshotLaborHours = toDecimal4(Number(material.laborHours));
+        patch.snapshotHoursWereExample = material.isExampleLaborHours === true;
       }
       await db.updateBidLineItem(line.id, input.bidId, patch);
       return { from: material.name };
@@ -1283,6 +1292,7 @@ export const bidsRouter = router({
 
       const hours = Number(line.snapshotLaborHours);
       let laborRate = 0;
+      let laborRateWasExample = false;
       if (input.laborRateId !== null) {
         const rate = resolveLaborRate(
           await db.getLibraryLaborRates(ctx.scope.dataUserId),
@@ -1294,6 +1304,7 @@ export const bidsRouter = router({
             message: "That labor role is not in your library.",
           });
         laborRate = hourlyCostOf(rate);
+        laborRateWasExample = rate.isExampleRate === true;
       } else if (hours > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -1326,6 +1337,7 @@ export const bidsRouter = router({
         category: input.category,
         laborRateId: input.laborRateId,
         laborRate,
+        laborRateWasExample,
       });
     }),
 
