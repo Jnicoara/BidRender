@@ -3,6 +3,7 @@ import {
   BID_QUANTITY_QUERIES,
   QUERIES_MOVED_BY,
   type TakeoffChange,
+  sheetsAnUndoMoves,
   sheetsToRefresh,
 } from "./takeoffRefresh";
 
@@ -113,6 +114,28 @@ describe("undo and clearing a sheet (Track B, 2026-09-29)", () => {
     expect(sheetsToRefresh(4, 4)).toEqual([4]);
     expect(sheetsToRefresh(null, 2)).toEqual([2]);
     expect(sheetsToRefresh(4, undefined)).toEqual([4]);
+  });
+});
+
+describe("undoing a count deleted from several sheets (gap 4b, 2026-10-08)", () => {
+  const packet = { kind: "group", data: "", sig: "" };
+
+  it("refreshes EVERY sheet's marks, not only the open one and the step's", () => {
+    // The delete refreshed every sheet; its undo refreshed two, so a third
+    // sheet showed the count's marks still gone until its refetch landed.
+    const restore = sheetsAnUndoMoves(
+      { kind: "restoreGroup", packet, id: 7 },
+      2
+    );
+    expect(restore).toBe("every");
+    expect(sheetsToRefresh(4, restore)).toBe("every");
+    // And its redo, which deletes the count again.
+    expect(sheetsAnUndoMoves({ kind: "removeGroup", id: 7 }, 2)).toBe("every");
+  });
+
+  it("keeps a one-sheet step to its own sheet", () => {
+    expect(sheetsAnUndoMoves({ kind: "removeMarks", ids: [1, 2] }, 2)).toBe(2);
+    expect(sheetsToRefresh(4, 2)).toEqual([4, 2]);
   });
 });
 

@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **No more blank white box when an open plan reloads.** When a plan's
+  storage link was renewed, or the plan list refreshed after you came back to
+  Plans, a small blank white box sat at the sheet's top-left corner for about
+  a second, with the count pins drawn over it. Now the screen says "Opening
+  plan set…" then "Drawing sheet 1…" until the sheet is really drawn.
+
+- **A locked bid's run location can no longer be changed.** Setting where a
+  run sits (wall, ceiling, underground…) was the one run edit that ignored the
+  quantity lock. A test now checks every run edit for the lock, so a new one
+  cannot be added without it.
+
+- **Undoing a deleted count puts its marks back on every sheet at once.**
+  Before, sheets other than the one you were on kept showing the count as
+  gone until they reloaded on their own.
+
 - **A count typed with a hyphen searches the same as with a space.** "2-gang"
   now finds Double-gang box first, exactly like "2 gang" — before, it missed
   that box entirely. The same fix put "1-hole strap" on the one-hole straps

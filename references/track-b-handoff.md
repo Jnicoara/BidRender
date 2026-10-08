@@ -1,6 +1,42 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, closing for a Claude Code update (READ FIRST)
+## WHERE B STANDS — 2026-10-08, after batch 1 (READ FIRST)
+
+**Batch 1 of 3 is built**, details in todo.md (each item ticked there):
+
+- **The white box on plan open is fixed.** `planCanvasStep` in
+  `client/src/lib/planLoadState.ts` clears the drawn page and size when a
+  load starts.
+  - Locally at laptop and tablet: FLASH without the fix, "No flash" with
+    it.
+  - The local run needs `RENEW_HOLD_MS=14000 BASE=http://127.0.0.1:3002`.
+    At 5 s the renewal lands before sheet 1 is drawn, so it cannot fail.
+  - **Staging: STAGING-RESULT-PENDING**
+- **Gap 2:** `setLocation` now checks the lock.
+  `server/runMutationsCheckLock.test.ts` fails on any run mutation that does
+  not check it.
+- **Gap 4b:** undoing a count delete refreshes every sheet. It is NOT seen
+  on screen yet; look at it in batch 2.
+
+**Left for batch 2 (undo):**
+
+- Gap 4a: "can't be undone" on the undo arrow.
+- Gap 4c: undo for run type, typed length, circuits and legs.
+- The on-screen look at 4b.
+
+**Left for batch 3:**
+
+- Gap 6.1: open the viewer from the local file while it uploads.
+- Gap 3: a won bid offers "lock it?" once. Owner's call first (plan Q2).
+
+**Then (b) the cover swaps and (c) the "fix this line" panel**, as below.
+
+**Watch out:** stopping dev servers by matching `pnpm` in the command line
+also kills a `pnpm test` running in the same worktree. Its vitest then
+lives on, orphaned, and holds the test-DB lock. Stop the server set by its
+port's tree, and check for a stray `vitest` before re-running.
+
+## WHERE B STOOD — 2026-10-08, closing for a Claude Code update
 
 **State:**
 

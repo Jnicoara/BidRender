@@ -19,15 +19,60 @@ export type PlanLoadState =
 export function planLoadState(input: {
   /** The worker has not finished opening the file. */
   documentLoading: boolean;
-  /** A raster of the sheet has reached the canvas (its size is known). */
-  drawn: boolean;
+  /**
+   * The page whose raster is on the canvas now, or null before the first —
+   * the same fact `marksMayShow` reads, so one reset covers both.
+   */
+  drawnPage: number | null;
   page: number;
 }): PlanLoadState {
   if (input.documentLoading)
     return { show: "opening", message: "Opening plan set…" };
-  if (!input.drawn)
+  if (input.drawnPage === null)
     return { show: "drawing", message: `Drawing sheet ${input.page}…` };
   return { show: "sheet" };
+}
+
+/** What the viewer's canvas holds: which page, at what pixel size. */
+export type PlanCanvas = {
+  drawnPage: number | null;
+  width: number;
+  height: number;
+};
+
+export const EMPTY_PLAN_CANVAS: PlanCanvas = {
+  drawnPage: null,
+  width: 0,
+  height: 0,
+};
+
+/**
+ * The canvas's state, step by step (Track B, 2026-10-08).
+ *
+ * ── The white box on a REOPEN ───────────────────────────────────────────────
+ * The fix above covered the first open. When the document loads AGAIN — a
+ * signed link renewed, or the plan list refetched with a new link after
+ * sheet 1 was already drawn — the canvas is unmounted and a new, blank one
+ * mounts. The page and size of the OLD raster were still held, so the viewer
+ * said "sheet" at once and showed the blank canvas: the browser's default
+ * 300x150, white, scaled by the fit zoom, at the sheet's top-left, for about
+ * a second (staging, `scripts/stagingOpenFlash.mts`, "link renewed"). The
+ * pins drew over it too. So a load starting forgets what the canvas held.
+ */
+export function planCanvasStep(
+  state: PlanCanvas,
+  event:
+    | { type: "loadStarted" }
+    | { type: "drawn"; page: number; width: number; height: number }
+): PlanCanvas {
+  if (event.type === "loadStarted") return EMPTY_PLAN_CANVAS;
+  if (
+    state.drawnPage === event.page &&
+    state.width === event.width &&
+    state.height === event.height
+  )
+    return state;
+  return { drawnPage: event.page, width: event.width, height: event.height };
 }
 
 /**
