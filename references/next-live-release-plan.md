@@ -145,6 +145,38 @@ snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
 7. After the push: `curl -s https://bidridge.com/api/version` — `commit` and
    `builtAt`, not the version tag.
 
+## 5b. Rehearsal on a copy of live — DONE 2026-10-08 (nothing changed on live)
+
+Track A, 05:35–05:45 UTC. Live was only READ (one `mysqldump` through
+`scripts/backup.mts`); every write below was to a local throwaway copy.
+
+| Step                           | Result                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Backup                         | `2026-10-08T05-35-31Z` in `r2://bidsoftware/helixbid`: 65 tables, 3,479 rows, 5/5 files (324.3 MB). One warning: "ai_correction_log.cropKey is not in this database — skipped" — the backup code on `local-dev` knows 0108's table; live does not have it yet. Expected.                                                       |
+| Restore                        | `verifyBackup.mts` with `KEEP_SCRATCH=1` into local `bidrender_backup_verify`: **VERIFIED**, 65 tables / 3,479 rows, equal to the manifest. 105 migrations.                                                                                                                                                                    |
+| Live data, for scale           | 3 users, **2 bids** (23 "Decant Facility", 25 "Viewer batch check (smoke)"), **0 bid lines**, 8 shared assemblies, 1,574 materials.                                                                                                                                                                                            |
+| Recount (pre-0087 recipe-live) | **0** — `bid_line_items` with `assemblyId IS NOT NULL AND snapshotUnpricedParts IS NULL AND archivedAt IS NULL`. (0 assembly lines at all.) No freeze needed first.                                                                                                                                                            |
+| Drift before                   | 105 recorded; the missing tables/columns are exactly 0105–0134's.                                                                                                                                                                                                                                                              |
+| `bidTotals` before             | from live's code `24105ad` (worktree): 2 bids, read-only proved (MySQL refused a write).                                                                                                                                                                                                                                       |
+| Migrate 0105–0134              | **"Applied 30 migrations: 0105_assembly_labor_only to 0134_example_labor_rates … all 135." No errors. 4.5 s** wall time including `tsx` start-up (timed on a second restore of the same backup; the first run's timer failed). Re-run: "Nothing to apply".                                                                     |
+| Drift after                    | **"Database matches the schema." Foreign keys 173 present, 173 declared.**                                                                                                                                                                                                                                                     |
+| Boot `local-dev` (`3a1f3ef`)   | Started clean, no error lines. **183 shared starters, 0 "Holding" lines** (DV34 "Surface raceway receptacle (block wall)" present), 175 with hours NULL, **0 at 0 h**. Example rates seeded: Foreman 70.50, Journeyman 59.22, Apprentice 36.66, Helper 33.84; Supervisor and PM unrated. 1,820 shared materials, 1,818 active. |
+| `bidTotals` after + compare    | **"all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged."**                                                                                                                                                                                                                                                   |
+| Bids opened                    | `bids.get` through the running server as each owner: bid 23 and bid 25 both open, 0 lines, every total $0, no problems — the same as before.                                                                                                                                                                                   |
+
+**What this rehearsal cannot show, said plainly.** Live has 0 bid lines, so
+"every total unchanged" compares $0 with $0 on two bids — it proves the
+migrations and the first boot do not break a bid, not that pricing survives
+them; that was proved on staging's 511 bids (`deploying.md` § 11). Plans
+were not opened: live's files are in R2 and the copy was served from disk.
+**Expect on the day:** 30 applied, 135, matches, 173/173, 0 holds, 183
+starters. If any of these differs, stop and find out why before going on —
+either this table is stale (something merged since) or live is not in the
+state measured here.
+
+The throwaway copy `bidrender_backup_verify` and the `../bidrender-before-1008`
+worktree were removed afterwards.
+
 ## 6. What should wait (NOT in this release)
 
 - **The LT1/LT2 repair script** — moves a number on old lines; waits for the
@@ -172,3 +204,6 @@ snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
   box, live recipe-live recount = 0, backup + rehearsal with `bidTotals`.
 - Wait: LT1/LT2 repair, any shipped prices/hours, brand prices, step 3,
   C's per-foot extras plan.
+- Rehearsed on a copy of live 2026-10-08 (§ 5b): recount 0, 30 applied in
+  4.5 s, no errors, matches 173/173, 0 holds / 183 starters, both bids
+  unchanged and open. Live has 0 bid lines, so totals prove little there.
