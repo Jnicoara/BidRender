@@ -41,7 +41,12 @@ import { RUN_PATH_TYPES } from "../../drizzle/schema";
 import { resolveMaterial } from "../../shared/materialLookup";
 import { resolveRunType } from "../../shared/runTypeLookup";
 import { extraNumber } from "../../shared/runExtras";
-import { runTypeRows, runRowSendability } from "../../shared/takeoffBridge";
+import {
+  runTypeRows,
+  runRowSendability,
+  type RunTypeRow,
+} from "../../shared/takeoffBridge";
+import { EXTRA_APPLIES_TO, runLineSlot } from "../../shared/runExtrasPerFoot";
 import {
   EMT_FITTING_STYLES,
   fittingRowSendability,
@@ -153,10 +158,13 @@ async function resendPlans(
   userId: number,
   candidates: readonly {
     role: string;
+    /** Which extra, on an `extra` candidate; 0 or absent on every other. */
+    extraKey?: number;
     materialId: number | null;
   }[],
   liveLines: readonly {
     runMaterialRole: string | null;
+    runExtraKey: number;
     runMaterialId: number | null;
     snapshotMaterialCost: string | null;
     snapshotLaborHours: string | null;
@@ -176,14 +184,18 @@ async function resendPlans(
   };
   const plans = new Map<string, ResendPlan>();
   for (const candidate of candidates) {
-    const line = liveLines.find(l => l.runMaterialRole === candidate.role);
+    // By SLOT, not role: a type's two extras are two lines (0136).
+    const slot = runLineSlot(candidate.role, candidate.extraKey);
+    const line = liveLines.find(
+      l => runLineSlot(l.runMaterialRole, l.runExtraKey) === slot
+    );
     if (!line) continue;
     const current =
       candidate.materialId === null
         ? undefined
         : resolveMaterial(rows, candidate.materialId);
     plans.set(
-      candidate.role,
+      slot,
       resendPlan({
         isFitting: isFittingRole(candidate.role),
         // Couplings, connectors and straps: the run's per-foot rate pays
@@ -203,6 +215,82 @@ async function resendPlans(
     );
   }
   return plans;
+}
+
+/** A run-type row's place on the bid: role, and for an extra which one. */
+function slotOf(row: { role: string; extraKey: number }): string {
+  return runLineSlot(row.role, row.extraKey);
+}
+
+/**
+ * Each live EXTRA line's "shared trench" answer (0136 `extraFeetPerFoot`),
+ * by extra key: 0 is the answer, NULL follows the type. Fed to `runTypeRows`
+ * so the preview and a refresh say the same number the bid line does.
+ */
+function sharedTrenchAnswers(
+  lines: readonly {
+    runMaterialRole: string | null;
+    runExtraKey: number;
+    extraFeetPerFoot: string | null;
+  }[]
+): Map<number, number | null> {
+  return new Map(
+    lines
+      .filter(line => line.runMaterialRole === "extra")
+      .map(line => [
+        line.runExtraKey,
+        line.extraFeetPerFoot === null ? null : Number(line.extraFeetPerFoot),
+      ])
+  );
+}
+
+/** Feet of an extra per foot of run: more than 0 (0 is the per-BID answer). */
+const extraFeetPerFootSchema = z.number().positive().max(100);
+
+/** Refuse a material that is not this company's to use, or not sold by the foot. */
+async function requireFootSoldMaterial(materialId: number, userId: number) {
+  const material = resolveMaterial(
+    await db.getMaterialsByIds([materialId], userId),
+    materialId
+  );
+  if (!material)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Material not found." });
+  if (material.unitOfSale !== "foot")
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `${material.name} is not sold by the foot, so it cannot follow a run's length. Choose a material sold by the foot.`,
+    });
+  return material;
+}
+
+/**
+ * The company's own copy of an extra, forking its type first when the extra
+ * is shipped — so an edit never writes a shipped row. The fork's copy is
+ * found by `baselineExtraId`, which `forkRunType` sets.
+ */
+async function ownExtra(id: number, userId: number) {
+  const extra = await db.getRunTypeExtraById(id, userId);
+  if (!extra)
+    throw new TRPCError({ code: "NOT_FOUND", message: "Extra not found." });
+  if (extra.userId !== null)
+    return { id: extra.id, runTypeId: extra.runTypeId, forked: false };
+  /*
+    A shipped extra on a shipped type. If the company already forked the
+    type, edit that fork's copy; otherwise fork now.
+  */
+  const palette = await db.getRunTypesFor(userId, true);
+  const current = resolveRunType(palette, extra.runTypeId);
+  const forkId =
+    current && current.userId !== null
+      ? current.id
+      : await db.forkRunType(extra.runTypeId, userId);
+  const copy = await db.getForkedExtra(forkId, extra.id, userId);
+  if (!copy)
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Your copy of this run type no longer carries this extra.",
+    });
+  return { id: copy.id, runTypeId: forkId, forked: true };
 }
 
 async function requireOwnType(id: number, userId: number) {
@@ -561,6 +649,105 @@ export const takeoffRunTypesRouter = router({
       return { id: input.id, runsKept: counts.get(input.id) ?? 0 };
     }),
 
+  /**
+   * A type's EXTRAS (per-foot-items-plan.md § 3a) — tape and the like, each a
+   * foot-sold material that follows the traced length. Read off the RESOLVED
+   * type, so a shipped type the company forked shows the fork's extras.
+   */
+  extras: procedure
+    .input(z.object({ runTypeId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
+      const type = resolveRunType(palette, input.runTypeId);
+      if (!type)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Run type not found.",
+        });
+      const rows = await db.getRunTypeExtrasDetailed(
+        ctx.scope.dataUserId,
+        type.id
+      );
+      return { runTypeId: type.id, extras: rows };
+    }),
+
+  /**
+   * Add an extra to a type. A SHIPPED type forks first, like every other edit
+   * to one, and the fork copies its extras (`forkRunType`) — so the shop's
+   * tape stays and the new extra joins it. Foot-sold materials only: an
+   * extra is so many feet per foot of run, and a part sold by the each would
+   * price as a length.
+   */
+  addExtra: procedure
+    .input(
+      z.object({
+        runTypeId: z.number().int().positive(),
+        materialId: z.number().int().positive(),
+        feetPerFoot: extraFeetPerFootSchema,
+        appliesTo: z.enum(EXTRA_APPLIES_TO),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireOwnType(input.runTypeId, ctx.scope.dataUserId);
+      await requireFootSoldMaterial(input.materialId, ctx.scope.dataUserId);
+      // RESOLVED: a shipped type the company already forked adds to that
+      // fork, never forks a second time.
+      const target = resolveRunType(
+        await db.getRunTypesFor(ctx.scope.dataUserId, true),
+        input.runTypeId
+      );
+      if (!target)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Run type not found.",
+        });
+      const runTypeId =
+        target.userId === null
+          ? await db.forkRunType(target.id, ctx.scope.dataUserId)
+          : target.id;
+      const id = await db.createRunTypeExtra({
+        userId: ctx.scope.dataUserId,
+        runTypeId,
+        materialId: input.materialId,
+        feetPerFoot: input.feetPerFoot,
+        appliesTo: input.appliesTo,
+      });
+      return { id, runTypeId, forked: runTypeId !== target.id };
+    }),
+
+  /**
+   * Edit an extra. One on a SHIPPED type forks the type and edits the fork's
+   * copy — the shipped row is never written. Re-prices every run of the type
+   * on every bid still following it; a bid that answered "shared trench"
+   * keeps its 0, which lives on its line.
+   */
+  updateExtra: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        materialId: z.number().int().positive().optional(),
+        feetPerFoot: extraFeetPerFootSchema.optional(),
+        appliesTo: z.enum(EXTRA_APPLIES_TO).optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (input.materialId !== undefined)
+        await requireFootSoldMaterial(input.materialId, ctx.scope.dataUserId);
+      const own = await ownExtra(input.id, ctx.scope.dataUserId);
+      const { id: _id, ...patch } = input;
+      await db.updateRunTypeExtra(own.id, ctx.scope.dataUserId, patch);
+      return { id: own.id, runTypeId: own.runTypeId, forked: own.forked };
+    }),
+
+  /** Remove an extra. Shipped: forks the type and removes the fork's copy. */
+  removeExtra: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const own = await ownExtra(input.id, ctx.scope.dataUserId);
+      await db.deleteRunTypeExtra(own.id, ctx.scope.dataUserId);
+      return { runTypeId: own.runTypeId, forked: own.forked };
+    }),
+
   restore: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
@@ -606,7 +793,12 @@ export const takeoffRunTypesRouter = router({
           .filter(
             line => line.archivedAt === null && line.takeoffRunTypeId !== null
           )
-          .map(line => line.takeoffRunTypeId + ":" + line.runMaterialRole)
+          .map(
+            line =>
+              line.takeoffRunTypeId +
+              ":" +
+              runLineSlot(line.runMaterialRole, line.runExtraKey)
+          )
       );
 
       /*
@@ -646,6 +838,11 @@ export const takeoffRunTypesRouter = router({
         ctx.scope.dataUserId,
         footage
       );
+      // Each type's EXTRAS (tape), off the RESOLVED type, like its materials.
+      const extrasByType = await db.getRunTypeExtrasFor(
+        ctx.scope.dataUserId,
+        visible.map(({ type: t }) => t.id)
+      );
 
       return Promise.all(
         visible.map(async ({ storedId, type }) => {
@@ -664,6 +861,13 @@ export const takeoffRunTypesRouter = router({
             // both arrive, and a figure added to the row later cannot be left
             // behind here.
             footage: f,
+            extras: extrasByType.get(type.id) ?? [],
+            // A live line's "shared trench" answer moves its preview too.
+            lineFeetPerFootByKey: sharedTrenchAnswers(
+              lines.filter(
+                l => l.takeoffRunTypeId === storedId && l.archivedAt === null
+              )
+            ),
           });
           /*
           What Send-again would do to each line ALREADY on the bid — the same
@@ -678,6 +882,7 @@ export const takeoffRunTypesRouter = router({
                   [
                     ...rows.map(r => ({
                       role: r.role,
+                      extraKey: r.extraKey,
                       materialId: r.materialId,
                     })),
                     ...fittingRowsHere.map(r => ({
@@ -691,8 +896,8 @@ export const takeoffRunTypesRouter = router({
                   )
                 )
               : new Map<string, ResendPlan>();
-          const resendOf = (role: string, qty: number) => {
-            const plan = plans.get(role);
+          const resendOf = (slot: string, qty: number) => {
+            const plan = plans.get(slot);
             if (!plan || plan.kind === "keep") return null;
             switch (plan.kind) {
               case "swap":
@@ -725,12 +930,18 @@ export const takeoffRunTypesRouter = router({
             quantityFeet: f.quantityFeet,
             rows: rows.map(row => ({
               role: row.role,
+              /** Which extra, on an `extra` row; 0 on the others (0136). */
+              extraKey: row.extraKey,
+              /** How an extra's feet were reached; null on the others. */
+              why: row.why,
+              /** The same without "N ft of <name>:", for the panel row. */
+              how: row.how,
               materialId: row.materialId,
               materialName: row.materialName,
               feet: row.feet,
-              onBid: onBid.has(storedId + ":" + row.role),
+              onBid: onBid.has(storedId + ":" + slotOf(row)),
               sendable: runRowSendability(row),
-              resend: resendOf(row.role, row.feet),
+              resend: resendOf(slotOf(row), row.feet),
             })),
             /*
             The fittings, counted from the same runs. Every one carries `why`,
@@ -775,6 +986,11 @@ export const takeoffRunTypesRouter = router({
         runTypeId: z.number().int().positive(),
         /** Omitted sends every sendable row; given, sends just that one. */
         role: z.enum(RUN_MATERIAL_ROLES).optional(),
+        /**
+         * With `role: "extra"`, just that extra (0136). Omitted sends every
+         * extra the type carries, as before.
+         */
+        extraKey: z.number().int().nonnegative().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -837,6 +1053,14 @@ export const takeoffRunTypesRouter = router({
         groundMaterialName: nameOf(type.groundMaterialId),
         // The footage ROW — see the matching call in `bridge` above.
         footage: f,
+        extras:
+          (await db.getRunTypeExtrasFor(ctx.scope.dataUserId, [type.id])).get(
+            type.id
+          ) ?? [],
+        // A refresh keeps a line's "shared trench" answer, never resets it.
+        lineFeetPerFootByKey: sharedTrenchAnswers(
+          existing.filter(line => line.archivedAt === null)
+        ),
       });
 
       /*
@@ -860,6 +1084,7 @@ export const takeoffRunTypesRouter = router({
       const candidates = [
         ...rows.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
+          extraKey: row.extraKey,
           qty: row.feet,
           // Labour is on INSTALLED footage — extra is material only (Q5).
           laborQty: row.installedFeet as number | null,
@@ -870,6 +1095,7 @@ export const takeoffRunTypesRouter = router({
         })),
         ...fittings.map(row => ({
           role: row.role as (typeof RUN_MATERIAL_ROLES)[number],
+          extraKey: 0,
           qty: row.qty,
           // A fitting's labour is on its count; null reads as `qty`.
           laborQty: null as number | null,
@@ -891,10 +1117,17 @@ export const takeoffRunTypesRouter = router({
       const already = new Map(
         existing
           .filter(line => line.archivedAt === null)
-          .map(line => [line.runMaterialRole, line])
+          .map(line => [
+            runLineSlot(line.runMaterialRole, line.runExtraKey),
+            line,
+          ])
       );
       const wanted = input.role
-        ? candidates.filter(row => row.role === input.role)
+        ? candidates.filter(
+            row =>
+              row.role === input.role &&
+              (input.extraKey === undefined || row.extraKey === input.extraKey)
+          )
         : candidates;
       // Refill or swap, per role — the same plan the preview showed. A locked
       // bid never reaches here (refused at the top).
@@ -919,7 +1152,7 @@ export const takeoffRunTypesRouter = router({
           more homeruns with a stale line and no way to move it, which is worse
           than either. The PRICING is never re-snapshotted — only the feet.
         */
-        const live = already.get(row.role);
+        const live = already.get(slotOf(row));
         /*
           A LOCKED bid used to be handled here: an existing line was skipped
           (a re-send once rewrote a quoted quantity — the lock's open door)
@@ -938,7 +1171,7 @@ export const takeoffRunTypesRouter = router({
             owner's decisions of 2026-09-26, decided in shared/resendLine.ts.
             A price already set is never refilled over.
           */
-          const plan = plans.get(row.role) ?? { kind: "keep" as const };
+          const plan = plans.get(slotOf(row)) ?? { kind: "keep" as const };
           if (plan.kind === "swap" && row.materialId !== null) {
             await db.resnapshotRunTypeLine(live.id, ctx.scope.dataUserId, {
               mode: "swap",
@@ -988,6 +1221,8 @@ export const takeoffRunTypesRouter = router({
           // The id the RUNS use — see the note above.
           runTypeId: input.runTypeId,
           role: row.role,
+          // Which extra, on an `extra` row; 0 on every other (0136).
+          extraKey: row.extraKey,
           // Non-null past `sendable`, which refuses a row with no material
           // before this point — a line nobody can order.
           materialId: row.materialId as number,

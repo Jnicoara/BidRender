@@ -271,3 +271,68 @@ describe("a run answered branch wiring (D18)", () => {
     expect(unscaled.legs).toHaveLength(1);
   });
 });
+
+describe("the runs a type's EXTRAS are counted from (per-foot plan § 3a)", () => {
+  it("carries each counted run's flat and vertical feet and its raceway waste", () => {
+    const row = group(
+      [
+        run({ id: 600, conduitExtraPct: "0.1000" }),
+        // On a sheet with no scale: here, but unmeasured — never 0.
+        run({ id: 601, sheetId: 99 }),
+        // A suggestion is not on the bid, so not under the tape either.
+        run({ id: 602, isSuggestion: true }),
+      ],
+      []
+    ).get(7)!;
+    expect(row.extraRuns).toHaveLength(2);
+    expect(row.extraRuns[0]).toEqual({
+      quantities: { runFeet: row.conduitInstalledFeet, verticalFeet: 0 },
+      wastePct: 0.1,
+    });
+    expect(row.extraRuns[1]).toEqual({ quantities: null, wastePct: 0 });
+  });
+
+  it("adds a drop from a counted mark as VERTICAL only, with its own waste", () => {
+    const row = groupRunFootage({
+      runs: [],
+      circuitsByRun: wireCircuitsFor({
+        runs: [],
+        stored: [],
+        typeFor: () => null,
+      }),
+      scales,
+      heights: EMPTY_HEIGHT_CONTEXT,
+      pullPointAnswersByRun: new Map(),
+      teesById: new Map(),
+      markDrops: [
+        {
+          runTypeId: 7,
+          sheetId: SHEET,
+          count: 2,
+          perDrop: {
+            pathType: "conduit",
+            dropFeet: 3,
+            conduitInstalledFeet: 3,
+            conduitBoughtFeet: 3.15,
+            cableInstalledFeet: 0,
+            cableBoughtFeet: 0,
+            wireInstalledFeet: 0,
+            wireBoughtFeet: 0,
+            groundInstalledFeet: 0,
+            groundBoughtFeet: 0,
+            conduitExtraFeet: 0.15,
+            wireExtraFeet: 0,
+            makeupFeet: 0,
+          },
+        },
+      ],
+      homeruns: [],
+    }).get(7)!;
+    expect(row.extraRuns).toHaveLength(1);
+    expect(row.extraRuns[0].quantities).toEqual({
+      runFeet: 0,
+      verticalFeet: 6,
+    });
+    expect(row.extraRuns[0].wastePct).toBeCloseTo(0.05, 10);
+  });
+});

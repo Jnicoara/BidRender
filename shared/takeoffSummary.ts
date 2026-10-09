@@ -40,7 +40,16 @@ export type NotOnBidReason =
 
 export type SendTarget =
   | { kind: "count"; groupId: number }
-  | { kind: "runRow"; runTypeId: number; role: string };
+  | {
+      kind: "runRow";
+      runTypeId: number;
+      role: string;
+      /**
+       * Which EXTRA, on an `extra` row (0136) — a type may carry several,
+       * and the role alone would send all of them from each one's item.
+       */
+      extraKey?: number;
+    };
 
 export type SummaryItem = {
   /** Stable across reads — what the preview's `expect` is made of. */
@@ -63,6 +72,27 @@ export type SummaryItem = {
    * the preview shows no money at all, so it can never show $0.
    */
   notPriced: boolean;
+  /**
+   * Where to fix it, for an item no Send can fix — set on the "no wire" item
+   * only: the first such run, so the screen opens it where the wire is
+   * picked (the never-stuck rule). Absent on every other item.
+   */
+  fixAt?: RunPlace;
+  /**
+   * How the quantity was reached, where the number alone misleads — set on an
+   * extra (tape): 211 ft of tape beside 211 ft of pipe reads as a copy until
+   * it says "the flat length only, not the risers" (seen 2026-10-08).
+   */
+  note?: string;
+};
+
+/** A run and where it is drawn — what a screen needs to open it. */
+export type RunPlace = {
+  runId: number;
+  bidPdfId: number | null;
+  pageNumber: number | null;
+  x: number;
+  y: number;
 };
 
 export type TakeoffSummary = {
@@ -101,10 +131,15 @@ export type SummaryRunType = {
   unmeasurableCount: number;
   rows: {
     role: string;
+    /** Which extra, on an `extra` row; 0 on every other (0136). */
+    extraKey: number;
+    materialId: number | null;
     materialName: string | null;
     feet: number;
     onBid: boolean;
     sendable: RowSendability;
+    /** An extra's short "how" (takeoffBridge `how`); absent elsewhere. */
+    how?: string | null;
   }[];
   fittings: {
     role: string;
@@ -127,8 +162,15 @@ const TRACED_NOT_SENT = "Traced, not sent yet.";
 
 export const REASON_TEXT: Record<NotOnBidReason, string> = {
   notSent: "Counted, not sent yet.",
+  /*
+    Reworded 2026-10-08 (owner). It read "Conduit with nothing pulled through
+    it", which is a fault's voice — and on a trench, where the shipped type
+    deliberately leaves the wire unsaid (per-foot-items-plan.md § 3b), it is
+    not a fault but an unanswered question. It names both answers, because an
+    empty pipe is one of them.
+  */
   noWire:
-    "Conduit with nothing pulled through it, so no wire for it is priced. Add its wires on the run.",
+    "No wire picked, so none is priced. Pick the wire, or say it is an empty pipe.",
   locked: "The bid is locked. Unlock it to add this.",
   assemblyGone: "Counted against an assembly no longer in your library.",
   unsupported: "This kind of count cannot be priced on the bid yet.",
@@ -165,6 +207,8 @@ export function takeoffSummary(input: {
    * with no runs need not say 0.
    */
   runsWithNoWire?: number;
+  /** The first of those runs, so the item can open it. */
+  firstRunWithNoWire?: RunPlace | null;
 }): TakeoffSummary {
   const onBid: SummaryItem[] = [];
   const notOnBid: SummaryItem[] = [];
@@ -225,22 +269,39 @@ export function takeoffSummary(input: {
       unit: "ft" | "each",
       isOnBid: boolean,
       sendable: RowSendability,
-      notPriced = false
+      notPriced = false,
+      note: string | null = null,
+      extra: { key: number; materialId: number | null } | null = null
     ) => {
       const base = {
-        key: `run:${t.runTypeId}:${role}`,
+        /*
+          An EXTRA is keyed by its material and its slot, not its role: a type
+          with two extras (tape and a marker, say) has two `extra` rows, and
+          `run:<type>:extra` twice made two items one key — the preview's
+          `expect` could not tell them apart. The slot as well as the
+          material, so two extras of one material still differ.
+        */
+        key: extra
+          ? `run:${t.runTypeId}:extra:${extra.materialId ?? "none"}:${extra.key}`
+          : `run:${t.runTypeId}:${role}`,
         kind: "run" as const,
         group: t.label,
         name: materialName ?? ROLE_NAME[role] ?? role,
         qty,
         unit,
         notPriced,
+        ...(note ? { note } : {}),
       };
       if (isOnBid) {
         onBid.push({ ...base, reason: null, why: null, send: null });
       } else if (sendable.ok) {
         notOnBid.push(
-          wouldGo(base, { kind: "runRow", runTypeId: t.runTypeId, role })
+          wouldGo(base, {
+            kind: "runRow",
+            runTypeId: t.runTypeId,
+            role,
+            ...(extra ? { extraKey: extra.key } : {}),
+          })
         );
       } else {
         notOnBid.push({
@@ -255,7 +316,19 @@ export function takeoffSummary(input: {
     for (const r of t.rows) {
       // No footage means nothing to be missing; the no-scale line says why.
       if (!(r.feet > 0) && !r.onBid) continue;
-      row(r.role, r.materialName, r.feet, "ft", r.onBid, r.sendable);
+      row(
+        r.role,
+        r.materialName,
+        r.feet,
+        "ft",
+        r.onBid,
+        r.sendable,
+        false,
+        r.how ?? null,
+        r.role === "extra"
+          ? { key: r.extraKey, materialId: r.materialId }
+          : null
+      );
     }
     for (const f of t.fittings) {
       /*
@@ -313,13 +386,14 @@ export function takeoffSummary(input: {
       key: "noWire",
       kind: "run",
       group: null,
-      name: `Wire for ${noWire} conduit run${noWire === 1 ? "" : "s"}`,
+      name: `${noWire} conduit run${noWire === 1 ? "" : "s"} with no wire picked`,
       qty: noWire,
       unit: "runs",
       reason: "noWire",
       why: REASON_TEXT.noWire,
       send: null,
       notPriced: false,
+      ...(input.firstRunWithNoWire ? { fixAt: input.firstRunWithNoWire } : {}),
     });
   }
 
@@ -363,7 +437,7 @@ const FOLD_LABEL: Record<string, string> = {
   locked: "Bid is locked",
   noType: "No run type",
   noScale: "No scale",
-  noWire: "No wire in the pipe",
+  noWire: "No wire picked",
   cannotSend: "Can't go on the bid as it stands",
   assemblyGone: "Assembly no longer in your library",
   unsupported: "Can't be priced on the bid yet",

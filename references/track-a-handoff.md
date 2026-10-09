@@ -4,7 +4,27 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-08 (session 23) — START HERE
+## UPDATE 2026-10-09 (session 24) — START HERE
+
+**Live untouched (only read by `backup.mts`).** Re-rehearsed the next
+release on a fresh copy of live with `local-dev` = `8913918` (0139 + B's
+cover swaps `7fb0c80`): `next-live-release-plan.md` § 5c.
+
+- Backup `2026-10-08T23-54-07Z` VERIFIED (65 tables, 3,479 rows). Recount 0. **35 applied in 4.1 s**, 140, re-run nothing, matches, **176/176**.
+  Boot: 183 starters, 0 holds.
+- **Cover repair** (`scripts/repairStarterCovers.mts`): 5 would swap
+  (DV1–DV5, ids 1–5) + 43 already; `--apply` 5 swapped, only the Wall
+  plate line on each; second run 48 already; both bids unchanged.
+- Plan § 4b: the repair is a release step **after the new code's first
+  boot** (it needs the seeded cover rows), not right after migrations.
+- **Still missing:** owner's yes + candidate, owner's tablet look, and the
+  repair has NOT been run on staging (do it there first, with a backup).
+- **Next (waiting):** the catalog review changes (removes, adds, renames,
+  Specialty tag) once the owner's read-only check file is ready.
+- Cleaned up: worktree `../bidrender-before-1009`, DB
+  `bidrender_backup_verify`.
+
+## UPDATE 2026-10-08 (session 23)
 
 **Where things stand.** Live = `24105ad`, 0000–0104, untouched. Staging =
 `local-dev`, **migrations 0000–0139 (140)**.

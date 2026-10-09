@@ -35,6 +35,11 @@
  * only in the document". A rule that lives in a router is a rule with no test
  * that reads like the sentence it enforces; these have both.
  */
+import {
+  extraFeetForRuns,
+  type ExtraAppliesTo,
+  type ExtraRun,
+} from "./runExtrasPerFoot";
 
 /** A counted group, as the bridge needs it. */
 export type BridgeGroup = {
@@ -336,7 +341,7 @@ export function sendWarning(
  * its ground is inside the jacket where the cable's own footage already pays
  * for it.
  */
-export type RunTypeMaterialRole = "raceway" | "conductor" | "ground";
+export type RunTypeMaterialRole = "raceway" | "conductor" | "ground" | "extra";
 
 /** The footage a type's runs came to, already split by what it buys. */
 export type RunTypeFootage = {
@@ -358,11 +363,36 @@ export type RunTypeFootage = {
   /** Bare or green ground. Conduit types only. */
   groundBoughtFeet: number;
   groundInstalledFeet: number;
+  /** Each run's flat and vertical feet and waste, for the EXTRAS. */
+  extraRuns: readonly ExtraRun[];
+};
+
+/**
+ * One EXTRA on the type (per-foot-items-plan.md § 3a, 0135), as the bridge
+ * needs it — already resolved to the company's own copy of its material.
+ */
+export type RunTypeExtraInput = {
+  /** `extraKeyOf(extra)` — which extra a bid line is (0136). */
+  key: number;
+  materialId: number | null;
+  materialName: string | null;
+  feetPerFoot: number;
+  appliesTo: ExtraAppliesTo;
 };
 
 /** One line a run type wants on the bid. */
 export type RunTypeRow = {
   role: RunTypeMaterialRole;
+  /** Which extra, on an `extra` row; 0 on every other (0136). */
+  extraKey: number;
+  /** How the feet were reached — set on an `extra` row, which needs saying. */
+  why: string | null;
+  /**
+   * `why` without its "N ft of <name>:" opening, for a screen row that shows
+   * the name and the feet already (runExtrasPerFoot.ts `how`). Null where
+   * `why` is.
+   */
+  how: string | null;
   /** The material this role points at, or null when the type never said. */
   materialId: number | null;
   materialName: string | null;
@@ -393,9 +423,40 @@ export function runTypeRows(type: {
   groundMaterialId: number | null;
   groundMaterialName: string | null;
   footage: RunTypeFootage;
+  /**
+   * The type's EXTRAS (0135). REQUIRED, like every input here that adds
+   * footage: a caller that could leave it out would send a trench with no
+   * tape and say nothing. `[]` for a type with none.
+   */
+  extras: readonly RunTypeExtraInput[];
+  /**
+   * A live line's "shared trench" answer per extra key (0136
+   * `extraFeetPerFoot`): 0 is the answer, NULL or absent follows the type.
+   */
+  lineFeetPerFootByKey?: ReadonlyMap<number, number | null>;
 }): RunTypeRow[] {
+  return [...materialRows(type), ...extraRows(type)];
+}
+
+function materialRows(type: Parameters<typeof runTypeRows>[0]): RunTypeRow[] {
   const feet = (value: number) =>
     Number.isFinite(value) && value > 0 ? round2(value) : 0;
+  const row = (
+    role: RunTypeMaterialRole,
+    materialId: number | null,
+    materialName: string | null,
+    bought: number,
+    installed: number
+  ): RunTypeRow => ({
+    role,
+    extraKey: 0,
+    why: null,
+    how: null,
+    materialId,
+    materialName,
+    feet: bought,
+    installedFeet: feet(installed),
+  });
 
   /*
     A CABLE IS ONE ROW. The cable is the raceway and the conductor link holds
@@ -406,47 +467,78 @@ export function runTypeRows(type: {
   */
   if (type.pathType === "cable") {
     return [
-      {
-        role: "conductor",
-        materialId: type.conductorMaterialId,
-        materialName: type.conductorMaterialName,
-        feet: feet(type.footage.cableBoughtFeet),
-        installedFeet: feet(type.footage.cableInstalledFeet),
-      },
+      row(
+        "conductor",
+        type.conductorMaterialId,
+        type.conductorMaterialName,
+        feet(type.footage.cableBoughtFeet),
+        type.footage.cableInstalledFeet
+      ),
     ];
   }
 
   const rows: RunTypeRow[] = [
     // The pipe always exists on a conduit type — that is what makes it one.
-    {
-      role: "raceway",
-      materialId: type.racewayMaterialId,
-      materialName: type.racewayMaterialName,
-      feet: feet(type.footage.conduitBoughtFeet),
-      installedFeet: feet(type.footage.conduitInstalledFeet),
-    },
+    row(
+      "raceway",
+      type.racewayMaterialId,
+      type.racewayMaterialName,
+      feet(type.footage.conduitBoughtFeet),
+      type.footage.conduitInstalledFeet
+    ),
   ];
   const insulated = feet(type.footage.insulatedBoughtFeet);
   if (type.conductorMaterialId !== null || insulated > 0) {
-    rows.push({
-      role: "conductor",
-      materialId: type.conductorMaterialId,
-      materialName: type.conductorMaterialName,
-      feet: insulated,
-      installedFeet: feet(type.footage.insulatedInstalledFeet),
-    });
+    rows.push(
+      row(
+        "conductor",
+        type.conductorMaterialId,
+        type.conductorMaterialName,
+        insulated,
+        type.footage.insulatedInstalledFeet
+      )
+    );
   }
   const ground = feet(type.footage.groundBoughtFeet);
   if (type.groundMaterialId !== null || ground > 0) {
-    rows.push({
-      role: "ground",
-      materialId: type.groundMaterialId,
-      materialName: type.groundMaterialName,
-      feet: ground,
-      installedFeet: feet(type.footage.groundInstalledFeet),
-    });
+    rows.push(
+      row(
+        "ground",
+        type.groundMaterialId,
+        type.groundMaterialName,
+        ground,
+        type.footage.groundInstalledFeet
+      )
+    );
   }
   return rows;
+}
+
+/**
+ * One row per EXTRA (per-foot-items-plan.md § 3a): tape and the like, off
+ * the same runs as the raceway — `extraFeetForRuns`, one path. Exists
+ * whenever the type carries the extra, footage or not, for the same reason a
+ * named raceway's row does: the estimator sees it is there.
+ */
+function extraRows(type: Parameters<typeof runTypeRows>[0]): RunTypeRow[] {
+  return type.extras.map(extra => {
+    const total = extraFeetForRuns(
+      type.footage.extraRuns,
+      extra,
+      type.lineFeetPerFootByKey?.get(extra.key) ?? null,
+      extra.materialName ?? "this extra"
+    );
+    return {
+      role: "extra" as const,
+      extraKey: extra.key,
+      why: total.why,
+      how: total.how,
+      materialId: extra.materialId,
+      materialName: extra.materialName,
+      feet: total.boughtFeet,
+      installedFeet: total.installedFeet,
+    };
+  });
 }
 
 /** Whether one of those rows can become a bid line yet, and if not, why not. */

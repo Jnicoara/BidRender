@@ -24,7 +24,8 @@
  *
  * A HARD FAULT (what --check fails on):
  * - the page scrolls sideways (documentElement.scrollWidth > innerWidth);
- * - text sits below the bottom edge with no scrollable ancestor to reach it.
+ * - text sits below the bottom edge with no scrollable ancestor to reach it;
+ * - a tab is not wholly inside its tab strip and the window (`cutTabs`).
  * Small tap targets are REPORTED, not failed: a dense laptop table is allowed
  * 28 px rows, and the touch sizes list theirs for the reader to judge.
  */
@@ -185,6 +186,14 @@ export type Measure = {
   overflowRight: string[];
   /** Text below the bottom edge with no scrollable ancestor. */
   cutOffBelow: string[];
+  /**
+   * A TAB not wholly inside its strip, or the window. The sideways-strip
+   * exemption above hides a strip's text from `overflowRight`, which is how
+   * "Legend" sat 20 px off an upright tablet's edge with every check passing
+   * (2026-10-08): a tab you cannot see is a tab nobody opens, and a warning
+   * mark on it is unseen.
+   */
+  cutTabs: string[];
   /** Visible controls smaller than 44 px on either side. */
   smallTargets: { label: string; w: number; h: number }[];
   controls: number;
@@ -350,6 +359,24 @@ export function measureInPage(): Measure {
       });
   }
 
+  const cutTabs: string[] = [];
+  for (const list of Array.from(
+    document.querySelectorAll('[role="tablist"]')
+  )) {
+    if (!visible(list)) continue;
+    const lr = list.getBoundingClientRect();
+    const left = Math.max(0, lr.left);
+    const right = Math.min(iw, lr.right);
+    for (const tab of Array.from(list.querySelectorAll('[role="tab"]'))) {
+      if (!visible(tab)) continue;
+      const r = tab.getBoundingClientRect();
+      if (r.right > right + 1 || r.left < left - 1)
+        cutTabs.push(
+          `${describe(tab).slice(0, 60)} (${Math.round(r.left)}–${Math.round(r.right)} in ${Math.round(left)}–${Math.round(right)})`
+        );
+    }
+  }
+
   return {
     innerWidth: iw,
     innerHeight: ih,
@@ -360,6 +387,7 @@ export function measureInPage(): Measure {
     overlaps,
     overflowRight: overflowRight.slice(0, 12),
     cutOffBelow: cutOffBelow.slice(0, 12),
+    cutTabs,
     smallTargets,
     controls,
   };
@@ -481,7 +509,12 @@ async function main() {
           scale: "css",
         });
         (report.login ??= {})[size.name] = { ...m, shot };
-        if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length)
+        if (
+          m.sidewaysScroll ||
+          m.overflowRight.length ||
+          m.cutOffBelow.length ||
+          m.cutTabs.length
+        )
           hard++;
         await anon.close();
       }
@@ -542,11 +575,16 @@ async function main() {
           });
         }
         (report[screen.key] ??= {})[size.name] = { ...m, shot };
-        if (m.sidewaysScroll || m.overflowRight.length || m.cutOffBelow.length)
+        if (
+          m.sidewaysScroll ||
+          m.overflowRight.length ||
+          m.cutOffBelow.length ||
+          m.cutTabs.length
+        )
           hard++;
         const small = size.touch ? ` small=${m.smallTargets.length}` : "";
         console.log(
-          `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} overlap=${m.overlaps.length} cut=${m.cutOffBelow.length}${small}/${m.controls}`
+          `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} overlap=${m.overlaps.length} cut=${m.cutOffBelow.length} tabsCut=${m.cutTabs.length}${small}/${m.controls}`
         );
       }
       await page.context().close();

@@ -27,6 +27,8 @@ const runType = (over: Partial<SummaryRunType> = {}): SummaryRunType => ({
   rows: [
     {
       role: "raceway",
+      extraKey: 0,
+      materialId: 1,
       materialName: '1/2" EMT',
       feet: 100,
       onBid: false,
@@ -97,6 +99,8 @@ describe("sorting the plan set into on the bid and not yet", () => {
           rows: [
             {
               role: "conductor",
+              extraKey: 0,
+              materialId: null,
               materialName: null,
               feet: 300,
               onBid: false,
@@ -191,9 +195,112 @@ describe("wording and wire", () => {
       runsWithNoWire: 1,
     });
     expect(s.notOnBid).toMatchObject([
-      { key: "noWire", name: "Wire for 1 conduit run", send: null },
+      {
+        key: "noWire",
+        name: "1 conduit run with no wire picked",
+        send: null,
+      },
     ]);
     expect(s.sendable).toEqual([]);
+  });
+
+  it("names both answers, and says where to give them (never stuck)", () => {
+    // 2026-10-08: on an underground run the old sentence ("conduit with
+    // nothing pulled through it") read as a fault, offered nothing to press,
+    // and never mentioned that an empty pipe is a real answer.
+    const place = { runId: 5, bidPdfId: 2, pageNumber: 3, x: 10, y: 20 };
+    const s = takeoffSummary({
+      locked: false,
+      counts: [],
+      runTypes: [],
+      untypedRuns: 0,
+      runsWithNoWire: 2,
+      firstRunWithNoWire: place,
+    });
+    const item = s.notOnBid.find(i => i.key === "noWire")!;
+    expect(item.why).toMatch(/Pick the wire/);
+    expect(item.why).toMatch(/empty pipe/);
+    expect(item.fixAt).toEqual(place);
+  });
+});
+
+describe("an extra says how its feet were reached, in the preview", () => {
+  it("carries the tape's 'how' and nothing on the pipe", () => {
+    // Seen 2026-10-08: tape at 211.12 ft beside pipe at 211.12 ft, and no
+    // word in the Send dialog on why they match.
+    const s = takeoffSummary({
+      locked: false,
+      counts: [],
+      runTypes: [
+        runType({
+          rows: [
+            {
+              role: "raceway",
+              extraKey: 0,
+              materialId: 1,
+              materialName: '2" PVC Sch 40',
+              feet: 211.12,
+              onBid: false,
+              sendable: { ok: true },
+            },
+            {
+              role: "extra",
+              extraKey: 501,
+              materialId: 77,
+              materialName: "Underground warning tape",
+              feet: 211.12,
+              onBid: false,
+              sendable: { ok: true },
+              how: "211.12 ft over 2 runs, the flat length only, not the risers",
+            },
+          ],
+        }),
+      ],
+      untypedRuns: 0,
+    });
+    const byName = new Map(s.notOnBid.map(i => [i.name, i]));
+    expect(byName.get("Underground warning tape")?.note).toBe(
+      "211.12 ft over 2 runs, the flat length only, not the risers"
+    );
+    expect(byName.get('2" PVC Sch 40')?.note).toBeUndefined();
+  });
+
+  it("keys TWO extras on one type apart, by material and slot, and sends each alone", () => {
+    // A type with tape AND a second per-foot extra used to make two items
+    // with one key, `run:<type>:extra` — the preview's `expect` could not
+    // tell them apart, and each item's send sent both.
+    const extra = (extraKey: number, materialId: number, name: string) => ({
+      role: "extra",
+      extraKey,
+      materialId,
+      materialName: name,
+      feet: 100,
+      onBid: false,
+      sendable: { ok: true as const },
+    });
+    const s = takeoffSummary({
+      locked: false,
+      counts: [],
+      runTypes: [
+        runType({
+          rows: [
+            extra(501, 77, "Underground warning tape"),
+            extra(502, 78, "Tracer wire"),
+          ],
+        }),
+      ],
+      untypedRuns: 0,
+    });
+    const extras = s.notOnBid.filter(i => i.name !== '1/2" EMT');
+    expect(extras.map(i => i.key)).toEqual([
+      "run:7:extra:77:501",
+      "run:7:extra:78:502",
+    ]);
+    expect(new Set(s.sendable).size).toBe(s.sendable.length);
+    expect(extras.map(i => i.send)).toEqual([
+      { kind: "runRow", runTypeId: 7, role: "extra", extraKey: 501 },
+      { kind: "runRow", runTypeId: 7, role: "extra", extraKey: 502 },
+    ]);
   });
 });
 
@@ -239,6 +346,8 @@ describe('"Not on the bid yet", folded by reason', () => {
         rows: [
           {
             role: "raceway",
+            extraKey: 0,
+            materialId: 1,
             materialName: '1/2" EMT',
             feet: 100,
             onBid: false,
@@ -246,6 +355,8 @@ describe('"Not on the bid yet", folded by reason', () => {
           },
           {
             role: "conductor",
+            extraKey: 0,
+            materialId: 1,
             materialName: "#12 THHN",
             feet: 200,
             onBid: false,
@@ -253,6 +364,8 @@ describe('"Not on the bid yet", folded by reason', () => {
           },
           {
             role: "ground",
+            extraKey: 0,
+            materialId: null,
             materialName: null,
             feet: 100,
             onBid: false,
