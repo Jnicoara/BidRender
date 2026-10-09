@@ -1684,6 +1684,41 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0141 — a dead AI key says so (2026-10-09) — NOT on live
+
+`0141_ai_service_status`: one new table, one row, no `UPDATE` — additive,
+step 1, step 3 empty (§ 8a, `todo.md`). Migrated before the code.
+
+1. **Backup**: `staging-2026-10-09T18-23-28Z-before-0141.sql` (73 tables) in
+   `C:\dev\bidrender-backups\`.
+2. **Rehearsal** on its restore (959 bids): drift before = exactly
+   `ai_service_status`; `bidTotals` with staging's code `f058ab5`; **1
+   applied**, 142; re-run nothing; "matches", 176/176 (the table has no
+   foreign key); **959/959 unchanged** with the old code AND the new.
+3. **Staging database** (18:27 UTC): drift before the same; `bidTotals`
+   before (963 bids, old code); **1 applied**, 142; re-run nothing;
+   "matches", 176/176; site HTTP 200 on the old code; **963/963
+   unchanged**.
+4. **Code**: `679cce8` pushed to `staging` by hand at 18:47 UTC (BEFORE
+   `local-dev`, so the Gate's drizzle check finds nothing new), then
+   `local-dev`. `/api/version` = `679cce8`, built 18:48. The Gate run on
+   Track B's `8be0c18` (started 18:41) then failed its deploy-staging step
+   with "staging has commits local-dev does not" — correct: staging was
+   already ahead of it. Superseded by the run on `679cce8`.
+5. **After** (18:58, new code): `bidTotals --compare` against step 3's
+   before: **963/963 existing bids unchanged**; the 16 differences are bids
+   965–980 made by the smoke account at 18:29–18:39. Drift "matches",
+   176/176.
+6. **AI panel**: `ai_service_status` on staging is EMPTY — no AI call since
+   the deploy — so the admin panel shows no notice (no false alarm). NOT yet
+   proved: a real call through staging's key on the new code. To prove it:
+   staging → Dashboard → ask "where are labor rates" → an answer with a
+   button; then Admin → AI spend shows no amber notice, and the row reads
+   `lastWorkedAt` set, `refusedSince` NULL.
+
+**Live**: 0141 joins the next release's batch — 0105–0141, 37 files,
+expect 142 (`next-live-release-plan.md`).
+
 ### Staging: the coverage-check catalog adds (2026-10-09) — NOT on live
 
 No migration — 24 new shipped rows (`3cb5df3`, owner-approved from
