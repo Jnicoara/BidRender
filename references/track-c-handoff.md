@@ -40,6 +40,16 @@ Runs empty states show "Loading this sheet's marks/runs…" instead of
 the fix. On screen (playwright, marks response held 8 s, Bar layout check 1164558) at 1366×768 and 820×1180: loading → "3 marks · 6 items · 358 ft
 of runs", no 0 in between. Script in the session scratchpad, not committed.
 
+**Merged.** track-c `8af794d` Gate 37871005353 GREEN (test, drizzle-guard).
+Merged into local-dev as **`cd8db42`** (CHANGELOG conflict with A's catalog
+entry: both kept). local-dev Gate 37871700999: **test GREEN,
+deploy-staging REFUSED** — "this push changes drizzle/ against what staging
+runs: 0140_material_specialty.sql, \_journal.json, schema.ts". That is A's
+0140, already on local-dev with its staging code push pending (A's
+handoff); A's own `91df8ea` Gate 37870430753 failed identically. Nothing of
+C's touches `drizzle/`. **Staging will not carry this fix until Track A
+pushes staging**; not C's step.
+
 ## EARLIER (2026-10-09) — per-foot work MERGED; three leftovers fixed
 
 **Job 1 — merged.** `c-per-foot-logic` went onto local-dev as ONE squash
