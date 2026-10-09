@@ -29,7 +29,21 @@ clear it. Full history stays on `origin/c-per-foot-logic` (merge `8141b66`).
 E111 1728359 and Bar layout check 1164558: `bids.get` + `bridgeForBid` +
 `materialsList.get` + `takeoffSummary.forBid` byte-identical, 261df22 vs the
 merge, same `bidrender_local_c`. CI: track-c Gate 37863259085 — test GREEN,
-drizzle-guard GREEN. local-dev Gate: see the staging lines below.
+drizzle-guard GREEN. **local-dev Gate 37864063102 GREEN** — test,
+deploy-staging, smoke. Staging `/api/version` served `94d63fd` (built
+00:32 UTC).
+
+**On staging (2026-10-09 00:40 UTC), through staging's own HTTP API** — no
+staging JWT secret on the laptop, so no minted session: a throwaway account
+(`track-c-check-<ms>@example.com`, random password not kept; staging email
+fails closed) made bid **772**, attached a one-page PDF, traced a 700 run
+(40 ft, a square corner, 20 ft, panel → device box, run height 10 ft, ends
+5 ft / 1'6") and a 50 ft 2" underground trench, and Send all sent 9, refused
+none. Lines: 700 raceway 73.5 ft, coupling 7, entrance end 1, **inside
+elbow 1 (`elbow90`), flat elbow 2 (`elbowFlat`)**; 2" PVC 50 ft, **tape 50
+ft (`extra`)**, connector 2, strap 10. Identical to the same fixture run
+locally. Bid 772 archived (purges in 30 days); the account is left. Script:
+not committed (scratchpad) — it is ~90 lines of fetch + the gate HMAC.
 
 **Job 2 — `c-leftovers` (from `94d63fd`), one commit:**
 
