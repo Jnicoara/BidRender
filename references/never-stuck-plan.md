@@ -274,6 +274,10 @@ itself is checked on staging at laptop and tablet sizes.
     line's menu. `BidsPage.tsx` ★.
 10. **The print block's items jump to their line** on the bid, with that
     line's fix open. `ProposalPage.tsx` ★ and `BidsPage.tsx` ★.
+    > **BUILT 2026-10-08 (Track B):** `/bids/:id?fix=<lineId>`
+    > (`appRoutes.ts`); `notPricedLines` carries `lineId`. A hand-priced
+    > line is outlined instead (its boxes are on the line). todo.md
+    > § "Fix this line".
 11. **THE BIG ONE: fix an assembly or run line from the bid, in place.**
     "Not priced", "+ material not priced", "+ hours not set", "Hours not
     set", "no labor rate" and "Can't price" each become a button. It opens a
@@ -356,8 +360,10 @@ itself is checked on staging at laptop and tablet sizes.
       >   library is written, then the line.
       > - **The fix writes the line's snapshot.** This overrides todo.md's
       >   "needs `bidUnitCost`" note for bid lines, which now says so.
-      > - **Not built:** the strips' "Fix these" walk, typing a role's rate in
-      >   the panel, and "Can't price" lines.
+      > - **Not built:** typing a role's rate in the panel, and "Can't price"
+      >   lines. ~~the strips' "Fix these" walk~~ — **built 2026-10-08**
+      >   (`client/src/lib/fixWalk.ts`): Save opens the next line, Skip
+      >   passes one, Cancel ends the walk.
 
 12. **The run-end text warnings** ("no run height set for this job") open the
     heights popover. `runEnds.tsx` ★.

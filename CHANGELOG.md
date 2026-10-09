@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Fix every flagged line in one pass.** Each warning under the bid total
+  ("3 parts are not priced", "2 lines have hours not set", …) now has a
+  "Fix these" button that opens the first line's fix, then the next after
+  each save, with Skip to pass one.
+- **The proposal's "price these first" list now takes you to the fix.**
+  Clicking a line in it opens the bid on that line with its fix open,
+  instead of leaving you to find it.
 - **Fixing a line on a Won or Lost bid now asks first instead of refusing.**
   Only a locked bid refuses. On a Won or Lost bid, Save asks "Changing it
   changes a price you may have already sent. Change anyway?" and changes

@@ -80,12 +80,20 @@ export function FixLinePanel({
   line,
   onChanged,
   onClose,
+  walk,
 }: {
   bidId: number;
   line: { id: number; name: string; snapshotLaborRate: string | null };
   /** The bid screen's one invalidation helper. */
   onChanged: () => void;
-  onClose: () => void;
+  /**
+   * "fixed" after a save (or "Not now" on the offer that follows one);
+   * "cancelled" on Cancel or Escape. A "Fix these" walk moves on after the
+   * first and stops on the second (@/lib/fixWalk).
+   */
+  onClose: (how: "fixed" | "cancelled") => void;
+  /** Set while a strip's "Fix these" walk has this line open. */
+  walk?: { position: string; onSkip: () => void };
 }) {
   const utils = trpc.useUtils();
   const options = trpc.bids.fixLineOptions.useQuery(
@@ -142,7 +150,7 @@ export function FixLinePanel({
       onChanged();
       if (!result.lineChanged) {
         toast.success("Saved to your library. This bid's line is unchanged.");
-        onClose();
+        onClose("fixed");
         return;
       }
       toast.success(
@@ -153,7 +161,7 @@ export function FixLinePanel({
       if (result.otherLineIds.length > 0) {
         setOffer({ request, lineIds: result.otherLineIds });
       } else {
-        onClose();
+        onClose("fixed");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't save.");
@@ -175,7 +183,7 @@ export function FixLinePanel({
     if (failed.length === 0)
       toast.success(`${done} other line${done === 1 ? "" : "s"} updated.`);
     else toast.error(`${done} updated, ${failed.length} not: ${failed[0]}`);
-    onClose();
+    onClose("fixed");
   };
 
   const data = options.data;
@@ -205,7 +213,7 @@ export function FixLinePanel({
             variant="outline"
             className="h-8"
             autoFocus
-            onClick={onClose}
+            onClick={() => onClose("fixed")}
           >
             Not now
           </Button>
@@ -302,7 +310,7 @@ export function FixLinePanel({
       onKeyDown={e => {
         if (e.key === "Escape" && !e.defaultPrevented) {
           e.preventDefault();
-          onClose();
+          onClose("cancelled");
         }
       }}
       onSubmit={e => {
@@ -310,6 +318,23 @@ export function FixLinePanel({
         void save();
       }}
     >
+      {walk ? (
+        // Skip is a button, not Cancel: Cancel ends the walk, Skip leaves
+        // this line as it is and opens the next one.
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-medium text-foreground">{walk.position}</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={walk.onSkip}
+          >
+            Skip
+          </Button>
+        </div>
+      ) : null}
+
       {data.refusal ? <p className="text-foreground">{data.refusal}</p> : null}
 
       {gaps.parts ? (
@@ -555,7 +580,7 @@ export function FixLinePanel({
           size="sm"
           variant="ghost"
           className="h-8"
-          onClick={onClose}
+          onClick={() => onClose("cancelled")}
         >
           Cancel
         </Button>

@@ -98,7 +98,25 @@ import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { FixLinePanel } from "@/components/FixLinePanel";
 import { FixableLabel } from "@/components/FixableLabel";
-import { hasLineFixGap, lineFixGaps } from "@shared/lineFix";
+import {
+  hasLineFixGap,
+  lineFixGaps,
+  NO_GAPS,
+  type LineFixGaps,
+} from "@shared/lineFix";
+import {
+  nextInWalk,
+  startWalk,
+  walkCount,
+  walkLineId,
+  walkPosition,
+  type FixWalk,
+  type FixWalkItem,
+  type FixWalkKind,
+} from "@/lib/fixWalk";
+import { routeToPath } from "@/lib/appRoutes";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 import { ExampleTags } from "@/components/ExampleTags";
 import { exampleSummary, exampleWarning } from "@shared/exampleTags";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
@@ -245,6 +263,72 @@ function DueDateField({
 
 // ─── Bid detail ───────────────────────────────────────────────────────────────
 
+type BidLine = inferRouterOutputs<AppRouter>["bids"]["get"]["lines"][number];
+
+/**
+ * What "Fix this line" can fix on a line — NO_GAPS on one it does not open
+ * on. A hand-priced line already has its own fields; a line the engine
+ * refused says why instead. Read by the line's own button AND by the strips'
+ * "Fix these" walk, so the two cannot disagree about which lines are fixable.
+ */
+function fixGapsOf(line: BidLine): LineFixGaps {
+  return !canPriceByHand(line) && line.breakdown !== null
+    ? lineFixGaps(line)
+    : NO_GAPS;
+}
+
+/** Lines grouped by unit, with un-labelled lines last under a null key. */
+function groupLines(
+  lines: BidLine[]
+): Array<{ label: string | null; lines: BidLine[] }> {
+  const groups: Array<{ label: string | null; lines: BidLine[] }> = [];
+  for (const line of lines) {
+    const key = line.unitLabel ?? null;
+    const existing = groups.find(g => g.label === key);
+    if (existing) existing.lines.push(line);
+    else groups.push({ label: key, lines: [line] });
+  }
+  groups.sort((a, b) => (a.label === null ? 1 : b.label === null ? -1 : 0));
+  return groups;
+}
+
+/** The lines as the walk reads them, in the order they sit on the screen. */
+function fixWalkItems(lines: BidLine[]): FixWalkItem[] {
+  return groupLines(lines)
+    .flatMap(g => g.lines)
+    .map(line => ({
+      id: line.id,
+      gaps: fixGapsOf(line),
+      notPriced: lineNotPriced(line, line.breakdown?.directCost ?? null),
+    }));
+}
+
+/** "Fix these" under a strip, when the walk has a line to open. */
+function FixTheseButton({
+  count,
+  onClick,
+}: {
+  count: number;
+  onClick: () => void;
+}) {
+  if (count === 0) return null;
+  // Its own line under the sentence: inline, it read as the sentence's last
+  // word ("…type the price there. Fix these 3"; seen on screen 2026-10-08).
+  return (
+    <span className="block">
+      <Button
+        size="sm"
+        variant="outline"
+        className="mt-1.5 h-7 px-2 text-xs border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518]"
+        onClick={onClick}
+      >
+        <Wrench className="w-3.5 h-3.5 mr-1" />
+        {count === 1 ? "Fix it" : `Fix these ${count}`}
+      </Button>
+    </span>
+  );
+}
+
 /**
  * One bid. This file used to export a list-or-detail switch; the list is gone.
  *
@@ -255,9 +339,12 @@ function DueDateField({
  */
 export default function BidsPage({
   bidId,
+  fixLineId,
   onBack,
 }: {
   bidId: number;
+  /** `/bids/:id?fix=<lineId>` — open on that line's fix (gap 10). */
+  fixLineId?: number;
   onBack: () => void;
 }) {
   const [assemblyQuery, setAssemblyQuery] = useState("");
@@ -296,7 +383,92 @@ export default function BidsPage({
 
   /** The one line whose "fix this line" panel is open (gap 11). */
   const [fixingLineId, setFixingLineId] = useState<number | null>(null);
-  const closeFix = useCallback(() => setFixingLineId(null), []);
+  /**
+   * A strip's "Fix these" walk, when one is going (@/lib/fixWalk). Saving
+   * opens the next line, Skip passes this one, Cancel ends it.
+   */
+  const [walk, setWalk] = useState<FixWalk | null>(null);
+  /** Set when the panel opened somewhere the person was not looking. */
+  const scrollToFix = useRef(false);
+  const openWalkAt = useCallback((next: FixWalk | null) => {
+    setWalk(next);
+    setFixingLineId(next ? walkLineId(next) : null);
+    scrollToFix.current = next !== null;
+  }, []);
+  const startFixWalk = (kind: FixWalkKind) =>
+    openWalkAt(startWalk(kind, fixWalkItems(detailQuery.data?.lines ?? [])));
+  /**
+   * The next line, read from the bid AFTER the save's refetch: "Update 2
+   * other lines?" can fix lines further down, and opening one of those next
+   * would show a panel with nothing left to do.
+   */
+  const advanceWalk = useCallback(
+    async (current: FixWalk, refetch: boolean) => {
+      if (refetch) await utils.bids.get.invalidate({ id: bidId });
+      const fresh = utils.bids.get.getData({ id: bidId })?.lines ?? [];
+      const next = nextInWalk(current, fixWalkItems(fresh));
+      if (!next) toast.success("That was the last one.");
+      openWalkAt(next);
+    },
+    [bidId, utils, openWalkAt]
+  );
+  const closeFix = useCallback(
+    (how: "fixed" | "cancelled") => {
+      if (walk && how === "fixed") void advanceWalk(walk, true);
+      else openWalkAt(null);
+    },
+    [walk, advanceWalk, openWalkAt]
+  );
+  /**
+   * Arrived from the Proposal's print block on one line (gap 10): open its
+   * fix once the bid has loaded. A line the panel cannot open on (priced by
+   * hand: its boxes are on the line already) is scrolled to and outlined
+   * instead. Taken ONCE, and the `?fix=` is dropped from the address, so a
+   * refresh later does not reopen a panel the person has already closed.
+   */
+  const arrivedFix = useRef(fixLineId ?? null);
+  const [outlinedLineId, setOutlinedLineId] = useState<number | null>(null);
+  useEffect(() => {
+    const target = arrivedFix.current;
+    const arrivedLines = detailQuery.data?.lines;
+    if (target === null || !arrivedLines) return;
+    arrivedFix.current = null;
+    window.history.replaceState(
+      null,
+      "",
+      `#${routeToPath("bids", { id: bidId })}`
+    );
+    const line = arrivedLines.find(l => l.id === target);
+    if (!line) {
+      toast.info("That line is no longer on this bid.");
+      return;
+    }
+    if (hasLineFixGap(fixGapsOf(line))) {
+      openWalkAt(null);
+      scrollToFix.current = true;
+      setFixingLineId(line.id);
+      return;
+    }
+    setOutlinedLineId(line.id);
+    requestAnimationFrame(() =>
+      document
+        .getElementById(`bid-line-${line.id}`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" })
+    );
+  }, [detailQuery.data, bidId, openWalkAt]);
+  useEffect(() => {
+    if (outlinedLineId === null) return;
+    const t = window.setTimeout(() => setOutlinedLineId(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [outlinedLineId]);
+
+  useEffect(() => {
+    if (fixingLineId === null || !scrollToFix.current) return;
+    scrollToFix.current = false;
+    document
+      .getElementById(`bid-line-${fixingLineId}`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [fixingLineId]);
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
@@ -654,15 +826,10 @@ export default function BidsPage({
     ? markupPreview.data.changes
     : [];
 
-  /** Lines grouped by unit, with un-labelled lines last under a null key. */
-  const groups: Array<{ label: string | null; lines: typeof lines }> = [];
-  for (const line of lines) {
-    const key = line.unitLabel ?? null;
-    const existing = groups.find(g => g.label === key);
-    if (existing) existing.lines.push(line);
-    else groups.push({ label: key, lines: [line] });
-  }
-  groups.sort((a, b) => (a.label === null ? 1 : b.label === null ? -1 : 0));
+  const groups = groupLines(lines);
+  /** How many lines each strip's "Fix these" would open. */
+  const walkItems = fixWalkItems(lines);
+  const fixCount = (kind: FixWalkKind) => walkCount(kind, walkItems);
 
   return (
     /*
@@ -1070,23 +1237,31 @@ export default function BidsPage({
                         An assembly or run line with something missing gets
                         "Fix", and its amber labels open the same panel — the
                         fix is ON the line, never "go to the Library and add
-                        it again" (never-stuck-plan.md, gap 11). A hand-priced
-                        line already has its own fields; a line the engine
-                        refused says why instead.
+                        it again" (never-stuck-plan.md, gap 11). `fixGapsOf`
+                        decides which lines, for the strips' walk too.
                       */
-                      const fixable =
-                        !canPriceByHand(line) &&
-                        line.breakdown !== null &&
-                        hasLineFixGap(lineFixGaps(line));
+                      const fixable = hasLineFixGap(fixGapsOf(line));
+                      // A click on ONE line ends any walk: that is the person
+                      // choosing a line, not the next step of a strip's.
                       const openFix = fixable
-                        ? () => setFixingLineId(line.id)
+                        ? () => {
+                            setWalk(null);
+                            setFixingLineId(line.id);
+                          }
                         : undefined;
                       return (
                         <div
                           key={line.id}
+                          id={`bid-line-${line.id}`}
                           // A CARD on a phone: the name takes the first line
                           // and the numbers wrap beneath it. A row from md up.
-                          className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group"
+                          // Outlined for a moment when the print block sent
+                          // the person to a line fixed in its own boxes.
+                          className={cn(
+                            "flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group",
+                            outlinedLineId === line.id &&
+                              "ring-2 ring-inset ring-[#F5C518] bg-[#F5C518]/5"
+                          )}
                         >
                           <div className="flex-1 min-w-0 basis-full md:basis-0">
                             {/* `block`: truncate on an inline span only stops
@@ -1235,6 +1410,15 @@ export default function BidsPage({
                                 line={line}
                                 onChanged={refresh}
                                 onClose={closeFix}
+                                walk={
+                                  walk && walkLineId(walk) === line.id
+                                    ? {
+                                        position: walkPosition(walk),
+                                        onSkip: () =>
+                                          void advanceWalk(walk, false),
+                                      }
+                                    : undefined
+                                }
                               />
                             ) : null}
                           </div>
@@ -1631,7 +1815,11 @@ export default function BidsPage({
                         <PlansLink bidId={bidId} />
                         {` — it fills in the price on a line that has none, and never changes one that is set.`}
                       </>
-                    )}
+                    )}{" "}
+                    <FixTheseButton
+                      count={fixCount("notPriced")}
+                      onClick={() => startFixWalk("notPriced")}
+                    />
                   </p>
                 </div>
               )}
@@ -1663,7 +1851,11 @@ export default function BidsPage({
                     {materialMissing === 1 ? "its" : "their"} material. Press
                     &ldquo;Fix this line&rdquo; on the line to pick the material
                     there — or, if it has none on purpose, tick &ldquo;Labor
-                    only&rdquo; on the assembly.
+                    only&rdquo; on the assembly.{" "}
+                    <FixTheseButton
+                      count={fixCount("material")}
+                      onClick={() => startFixWalk("material")}
+                    />
                   </p>
                 </div>
               )}
@@ -1679,7 +1871,11 @@ export default function BidsPage({
                     Materials total above leaves{" "}
                     {partsNotPriced === 1 ? "it" : "them"} out. A line keeps the
                     price it was added with, so press &ldquo;Fix this
-                    line&rdquo; on the line and type the price there.
+                    line&rdquo; on the line and type the price there.{" "}
+                    <FixTheseButton
+                      count={fixCount("parts")}
+                      onClick={() => startFixWalk("parts")}
+                    />
                   </p>
                 </div>
               )}
@@ -1696,7 +1892,11 @@ export default function BidsPage({
                     hours when added, so the Labor total above leaves{" "}
                     {hoursNotSet === 1 ? "its" : "their"} labor out. Press
                     &ldquo;Fix this line&rdquo; on the line and type the hours
-                    there.
+                    there.{" "}
+                    <FixTheseButton
+                      count={fixCount("hours")}
+                      onClick={() => startFixWalk("hours")}
+                    />
                   </p>
                 </div>
               )}
@@ -1719,7 +1919,11 @@ export default function BidsPage({
                     screen and press Send again on the{" "}
                     <PlansLink bidId={bidId} />, which fills in labor on a line
                     that has none. Couplings, connectors and straps never need
-                    hours here: the run&apos;s hours per foot pay for them.
+                    hours here: the run&apos;s hours per foot pay for them.{" "}
+                    <FixTheseButton
+                      count={fixCount("runHours")}
+                      onClick={() => startFixWalk("runHours")}
+                    />
                   </p>
                 </div>
               )}
@@ -1764,7 +1968,11 @@ export default function BidsPage({
                     priced at $0. On a line priced by hand, pick who does the
                     hours beside them. On an assembly line, press &ldquo;Fix
                     this line&rdquo; and pick who does them. A role with no rate
-                    yet gets one in Labor Rates.
+                    yet gets one in Labor Rates.{" "}
+                    <FixTheseButton
+                      count={fixCount("rate")}
+                      onClick={() => startFixWalk("rate")}
+                    />
                   </p>
                 </div>
               )}

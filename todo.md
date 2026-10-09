@@ -129,10 +129,33 @@ left as written rather than rewritten to match the rename.
       is listed but disabled; the strip says Labor Rates); "Can't price"
       lines; a line from before markup rules (no frozen parts list) can take
       a material but not part prices; a marker saying a line was fixed on the
-      bid; the totals strips' "Fix these" walk; gap 10 (print block jumps to
-      the line). Fixing a part keeps the line's frozen markup for the parts
+      bid. ~~the totals strips' "Fix these" walk; gap 10 (print block jumps to
+      the line)~~ — both built 2026-10-08, next item. Fixing a part keeps the line's frozen markup for the parts
       already priced and adds the new part's own markup under today's rules
       (`blendedMarkup`).
+- [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
+      (not priced, labor but no material, parts, hours not set, traced labor
+      not priced, no labor rate) get "Fix these N" / "Fix it": it opens the
+      first flagged line's panel with "Line 1 of N" and Skip. Save opens the
+      next line, Skip passes it, Cancel/Escape ends the walk; a line a save
+      already fixed (e.g. by "Update other lines") is passed over, read
+      after the refetch. Each strip walks only the lines it counts, in screen
+      order (`client/src/lib/fixWalk.ts`, `fixGapsOf` in `BidsPage.tsx`,
+      shared with the line's own button). **Gap 10:** each line in the
+      Proposal's print block is a button that opens `/bids/:id?fix=<lineId>`
+      — the bid, scrolled to that line with its panel open (a hand-priced
+      line is outlined instead); the `?fix=` is dropped from the address
+      once used. `notPricedLines` now carries `lineId`. Tests:
+      `fixWalk.test.ts` (8), `appRoutes.test.ts` (3 new), the two
+      `notPricedLines` tests and the proposals end-to-end test now pin
+      `lineId` — all red on the old code, and the walk's two guards each
+      went red when removed. On screen at 1536x864 and 820x1180: strip →
+      Line 1 of 3 → Save → Line 2 of 3 → Skip → Line 3 of 3 → Cancel
+      closed it, strip 3 → 2; print block listed the 2 left, clicking the
+      second opened the bid on it with its panel, address `#/bids/<id>`.
+      **Found by looking:** the button sat inline as the sentence's last
+      word; now on its own line. Throwaway "B walk check …" bids,
+      assemblies and materials for user 1 in `bidrender_local_b_new`.
 - [x] **Gap 6.1 on staging (`fa0c697`), 2026-10-08:** sheet 1 drawn **1.51 s**
       after picking a 6.6 MB, 5-sheet set (ticket 0.17 s, opened from the
       file 0.84 s, drawn 1.51 s). The PUT ended at 2.2 s and the attach at

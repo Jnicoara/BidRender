@@ -165,6 +165,33 @@ describe("retired addresses", () => {
   });
 });
 
+describe("a bid opened on one line's fix (never-stuck gap 10)", () => {
+  it("the print block's link opens the bid with that line's panel", () => {
+    const path = routeToPath("bids", { id: 12, fixLineId: 340 });
+    expect(path).toBe("/bids/12?fix=340");
+    expect(pathToRoute(path)).toEqual({
+      route: "bids",
+      projectId: 12,
+      fixLineId: 340,
+    });
+  });
+
+  it("a fix id that is not a line id still opens the bid, with no panel", () => {
+    for (const bad of ["", "abc", "0", "-3", "1.5"])
+      expect(pathToRoute(`/bids/12?fix=${bad}`)).toEqual({
+        route: "bids",
+        projectId: 12,
+      });
+  });
+
+  it("only the bid screen takes it", () => {
+    expect(pathToRoute("/bids/12/proposal?fix=340")).toEqual({
+      route: "proposal",
+      projectId: 12,
+    });
+  });
+});
+
 describe("routeToPath", () => {
   it("round-trips every screen back to the same route", () => {
     const cases: Array<[Parameters<typeof routeToPath>[0], number?, string?]> =
