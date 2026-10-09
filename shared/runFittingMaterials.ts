@@ -421,6 +421,45 @@ export function lrName(size: string, family: string): string {
   return `${size} ${family} LR conduit body`;
 }
 
+/*
+  PVC couplings, terminal adapters and conduit bodies are ONE part for Sch 40
+  and Sch 80 (catalog reality check, batch 2, approved 2026-10-09: Carlon
+  E940 / E943 / E983–E987 and Cantex are each sold "for Schedule 40 and 80").
+  The catalog ships one row per size, named under `PVC Sch 40/80`, and a run
+  of EITHER schedule looks that row up. Elbows and sweeps are different
+  heavy-wall parts per schedule, so they keep the schedule's own name.
+
+  The same reasoning `strapFamily` already applied to the strap. Built here,
+  for the seed and the lookup alike, for the reason at the top of this file.
+
+  These rows exist only once Track A's seed renames the Sch 40 rows and
+  retires the Sch 80 ones (references/catalog-reality-check.md, batch-2
+  approval). Until then the lookup says "No catalog match" for them, which
+  is why this change and that seed ship together and never apart
+  (references/next-live-release-plan.md).
+*/
+
+/** The family name a shared PVC fitting is shipped under. */
+export const PVC_SHARED_FITTING_FAMILY = "PVC Sch 40/80";
+
+/** A PVC fitting shipped once for both schedules. */
+export type PvcSharedFittingPart =
+  | "coupling"
+  | "terminal adapter"
+  | "LB conduit body"
+  | "LL conduit body"
+  | "LR conduit body"
+  | "T conduit body"
+  | "C conduit body";
+
+/** `2" PVC Sch 40/80 terminal adapter`. */
+export function pvcSharedFittingName(
+  size: string,
+  part: PvcSharedFittingPart
+): string {
+  return `${size} ${PVC_SHARED_FITTING_FAMILY} ${part}`;
+}
+
 /** `1/2" EMT C conduit body` — the straight-through body. */
 export function cBodyName(size: string, family: string): string {
   return `${size} ${family} C conduit body`;
@@ -481,6 +520,7 @@ export function fittingMaterialName(
   if (!parsed) return null;
   const { size, family } = parsed;
   const flex = FLEX_FAMILIES.includes(family);
+  const pvc = PVC_FAMILIES.includes(family);
 
   switch (kind) {
     case "strap": {
@@ -492,7 +532,10 @@ export function fittingMaterialName(
     case "elbow45":
       return flex ? null : elbowName(size, family, 45);
     case "lb":
-      return flex ? null : lbName(size, family);
+      if (flex) return null;
+      return pvc
+        ? pvcSharedFittingName(size, "LB conduit body")
+        : lbName(size, family);
     case "pullBox":
       return pullBoxFor(racewayBaselineName, null).name;
     case "teeBox":
@@ -514,6 +557,13 @@ export function fittingMaterialName(
           ? style
           : DEFAULT_EMT_FITTING_STYLE;
         return emtStyledFittingName(size, chosen, kind);
+      }
+      if (pvc) {
+        // A PVC "connector" is a terminal adapter at the counter (E943).
+        return pvcSharedFittingName(
+          size,
+          kind === "connector" ? "terminal adapter" : "coupling"
+        );
       }
       return `${size} ${family} ${kind}`;
   }
