@@ -3,6 +3,45 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Coverage-check starters — BUILT 2026-10-09 (Track B), 224 starters
+
+41 new starters from `references/coverage-check.md` (track-c): CK1–CK26
+(every missing assembly in the first check, duplicates once) and CW1–CW15
+(the wider check's top 15). Hours not set, R/C/B tags as the document gives
+them. Plus RS12 → 4/3 NM-B, LT23 + 2 aircraft-cable kits, RS6 stays the
+hood and the microwave is CK18. Recipes and choices:
+`references/starter-assemblies-plan.md` § "CK / CW" and the comment above
+CK1 in `server/seed/starterAssemblies.ts`. Tests:
+`server/coverageCheckStarters.test.ts` (red on the old seed),
+`starterCoverRepair.test.ts` (RS12 / LT23 on an old database).
+
+- [ ] **Track A, at the next release, staging and live:** run
+      `scripts/repairStarterCovers.mts` (report, then `--apply`). RS12 and
+      LT23 now ride it, so a database that already ran it reports them
+      "would swap" and the other 48 "already has it". Bid totals must not
+      move (`scripts/bidTotals.mts --compare`). The 41 new starters need
+      nothing: the seeder inserts a missing starter by name on boot. No
+      migration.
+- [ ] **Track A: ONE rebuild of `pricing/assembly-hours-starter.xlsx`**
+      (owner, 2026-10-09: after B's assemblies), carrying typed hours
+      across. 41 rows will be NEW.
+- [ ] **Owner — catalog rows that do not exist (not invented):**
+  - an emergency-disconnect label (NEC 230.85) for CW3;
+  - an "EV-ready" / EV-capable label for CW11;
+  - a pole arm / bracket, if "second head added to an existing pole"
+    (wider check § 12 #4, not in the top 15) is wanted later.
+- [ ] **Owner — choices made in the recipes, say if wrong:**
+  - CK4 (commercial wafer) uses the 6" wafer;
+  - CK14 (wall heater) is ONE starter on 12/2 MC tagged Both, though the
+    document lists it for the office (MC) and the bath (NM);
+  - CK21 adds a switch box and plate, CK23 a receptacle in the TV box;
+  - CW9 (bollard) sits on the pole anchor kit and concrete pole base, the
+    only base rows the catalog carries — probably over-priced for a
+    bollard;
+  - CW12 (meter center) uses the 4-position row;
+  - LT23 keeps its ceiling support wire beside the new kits (the job
+    deletes the one it does not use).
+
 ## A dead AI key must SAY so — BUILT 2026-10-09 (Track A), migration 0141
 
 > **Built as planned below** (branch `a-ai-unavailable`): `AiUnavailable` +
@@ -274,6 +313,11 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
         the Gap 6.1 timing run (`fa0c697`) and the smoke-test-2 probe
         (`track-b-upload-1791518663416@example.com`). Both bids archived,
         both plan sets removed.
+  - [ ] **Added 2026-10-09 (Track B):** two `track-b-race-*@example.com`
+        accounts, one per run of the smoke-test-2 staging probe (the 12-run
+        and 24-run probes, `11f5466` / `71f9f82`). Their plan sets removed
+        and bids archived. The exact addresses were not recorded; find them
+        with `email LIKE 'track-b-race-%@example.com'`.
   - [ ] **Local, not staging — B's machine only (`bidrender_local_b_new`):**
         the "B fix-line check …" bids, assemblies and materials for user 1
         (bids 1728396–1728399 and their fixtures; 1728399 is the Won one,

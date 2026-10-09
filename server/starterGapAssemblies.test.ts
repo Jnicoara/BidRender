@@ -13,6 +13,7 @@ import { BASELINE_MATERIALS } from "./seed/materials";
 import { starterPartName } from "./seed/starterParts";
 
 const PLAIN_WAFER = /^(\d+)" canless wafer LED downlight$/;
+const COMMERCIAL_WAFERS = ["Recessed wafer downlight, commercial (MC whip)"];
 const usersOf = (name: string) =>
   BASELINE_ASSEMBLIES.filter(a =>
     a.materials.some(l => starterPartName(l.part) === name)
@@ -48,11 +49,13 @@ describe('canless wafers: a starter at 2", 4", 6", 8" only', () => {
         a.materials.some(l => starterPartName(l.part) === wafer)
       );
       // One starter per size: never a variant (CCT, gimbal, slim, wet) and
-      // never a different size standing in.
-      expect(users.map(a => a.name)).toEqual([
-        `Wafer LED downlight, ${size}" (canless)`,
-      ]);
-      const [spec] = users;
+      // never a different size standing in. The one other user allowed is
+      // CK4, the commercial MC-whip install of the 6" (coverage check,
+      // 2026-10-09): the same wafer, a different way of wiring it.
+      expect(
+        users.map(a => a.name).filter(n => !COMMERCIAL_WAFERS.includes(n))
+      ).toEqual([`Wafer LED downlight, ${size}" (canless)`]);
+      const [spec] = users.filter(a => !COMMERCIAL_WAFERS.includes(a.name));
       const line = spec.materials.find(l => starterPartName(l.part) === wafer)!;
       expect(line.fixture).toBe(true);
       expect(line.qty).toBe(1);
