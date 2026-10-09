@@ -91,6 +91,12 @@ export type RouteState = {
   projectId?: number;
   /** The active tab on a screen that has them. */
   view?: string;
+  /**
+   * `/bids/:id?fix=<lineId>`: open the bid with that line's "Fix this line"
+   * panel open — where the Proposal's print block sends each line it names
+   * (never-stuck-plan.md, gap 10). Only on the bid screen.
+   */
+  fixLineId?: number;
 };
 
 /**
@@ -191,7 +197,12 @@ export function pathToRoute(path: string): RouteState {
     // like /plans: both are ways of putting quantities on a bid, both need a
     // bid to mean anything, and neither is a destination on its own.
     if (parts[2] === "count") return { route: "count", projectId: id };
-    return { route: "bids", projectId: id };
+    // A fix id that is not a whole positive number is ignored, not an error:
+    // the bid still opens, just without a panel.
+    const fix = Number(query.get("fix"));
+    return Number.isInteger(fix) && fix > 0
+      ? { route: "bids", projectId: id, fixLineId: fix }
+      : { route: "bids", projectId: id };
   }
   if (p === "clients") return { route: "clients" };
   if (p === "team") return { route: "team" };
@@ -220,14 +231,15 @@ export function pathToRoute(path: string): RouteState {
 /** The address a given screen lives at. The inverse of pathToRoute. */
 export function routeToPath(
   route: Route,
-  options: { id?: number; view?: string } = {}
+  options: { id?: number; view?: string; fixLineId?: number } = {}
 ): string {
-  const { id, view } = options;
+  const { id, view, fixLineId } = options;
   switch (route) {
     case "dashboard":
       return "/dashboard";
     case "bids":
-      return id ? `/bids/${id}` : "/dashboard";
+      if (!id) return "/dashboard";
+      return fixLineId ? `/bids/${id}?fix=${fixLineId}` : `/bids/${id}`;
     case "takeoff":
       return id ? `/bids/${id}/plans` : "/dashboard";
     case "proposal":

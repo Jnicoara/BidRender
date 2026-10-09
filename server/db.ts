@@ -177,6 +177,8 @@ import {
   projectItems,
   bidSummary,
   aiUsageDaily,
+  aiServiceStatus,
+  type AiServiceStatus,
   pricingProblemReports,
   takeoffHeightDefaults,
   takeoffExtraDefaults,
@@ -13013,6 +13015,57 @@ export async function recordAiUsage(entry: {
         costMicros: sql`${aiUsageDaily.costMicros} + ${entry.costMicros}`,
       },
     });
+}
+
+/**
+ * An AI call was REFUSED (no key, or the key answered 401/403): note it on the
+ * one `ai_service_status` row (0141). `refusedSince` keeps the FIRST refusal
+ * of the run — COALESCE leaves an earlier time alone — so the admin screen
+ * says when it started, not when it last happened.
+ */
+export async function recordAiRefusal(
+  reason: string,
+  now: Date
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .insert(aiServiceStatus)
+    .values({
+      id: 1,
+      refusedSince: now,
+      lastRefusedAt: now,
+      lastRefusalReason: reason,
+    })
+    .onDuplicateKeyUpdate({
+      set: {
+        refusedSince: sql`COALESCE(${aiServiceStatus.refusedSince}, ${now})`,
+        lastRefusedAt: now,
+        lastRefusalReason: reason,
+      },
+    });
+}
+
+/** An AI call worked: the run of refusals, if any, is over. */
+export async function recordAiWorked(now: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .insert(aiServiceStatus)
+    .values({ id: 1, lastWorkedAt: now })
+    .onDuplicateKeyUpdate({ set: { refusedSince: null, lastWorkedAt: now } });
+}
+
+/** The one status row, or null when no AI call has ever been made here. */
+export async function getAiServiceStatus(): Promise<AiServiceStatus | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select()
+    .from(aiServiceStatus)
+    .where(eq(aiServiceStatus.id, 1))
+    .limit(1);
+  return row ?? null;
 }
 
 /**

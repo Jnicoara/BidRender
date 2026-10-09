@@ -39,6 +39,12 @@
  * warning tape has to follow the TRENCH, and a type is how a run says what it
  * is (takeoff-spec D3); a PVC type used above and below grade could not say.
  *
+ * **Twenty-four since 2026-10-09, opening on SIX** (owner;
+ * references/sch80-and-500-plan.md). The catalog review took the 3-1/2"
+ * type away (nine Sch 40 sizes), nine Sch 80 underground types joined them
+ * behind the SAME fold — "Underground (18)", Sch 40 first, then Sch 80 —
+ * and the 500 surface raceway type sits unfolded beside 700.
+ *
  * ── Materials are named, not numbered ────────────────────────────────────────
  * Each row names the catalog material it is made of, resolved to an id at seed
  * time by the same by-name lookup `seedBaselineAssemblies` uses — which is why
@@ -47,7 +53,10 @@
  * against yet, which is the honest state for a type whose material is missing.
  */
 import type { RunExtraAppliesTo, RunPathType } from "../../drizzle/schema";
-import { undergroundRunTypeLabel } from "../../shared/undergroundRunTypes";
+import {
+  UNDERGROUND_SCHEDULES,
+  undergroundRunTypeLabel,
+} from "../../shared/undergroundRunTypes";
 import { sizesFor } from "./materials/conduit";
 
 /**
@@ -182,23 +191,41 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     groundMaterialName: "#12 THHN green Copper",
   },
   /*
-    Underground PVC, one per Sch 40 size the catalog ships (owner decision 3,
-    plan § 3b), each carrying warning tape. NO WIRE: a trench may hold SER, a
-    feeder or a set of THHN, and GR2/GR5 carry their own feeder — a type that
-    shipped wire would count it twice. NULL is "not said". Sch 80 is not
-    shipped (plan § 7, Q2, open).
+    Wiremold 500, the 700 type's twin (owner, 2026-10-09;
+    references/sch80-and-500-plan.md § 2b): 2 #12 + ground ONLY, no 3-wire
+    version (plan § 5, Q3). The ground names the SAME row the 700 type does.
   */
-  ...sizesFor("PVC Sch 40").map(
-    (size): BaselineRunType => ({
-      label: undergroundRunTypeLabel(size, "PVC Sch 40"),
-      pathType: "conduit",
-      racewayMaterialName: `${size} PVC Sch 40`,
-      conductorMaterialName: null,
-      conductorCount: null,
-      groundCount: null,
-      groundMaterialName: null,
-      extras: [WARNING_TAPE],
-    })
+  {
+    label: "500 series surface raceway, 2 #12 + ground",
+    pathType: "conduit",
+    racewayMaterialName: "Surface raceway, 500 series",
+    conductorMaterialName: "#12 THHN Copper",
+    conductorCount: 2,
+    groundCount: 1,
+    groundMaterialName: "#12 THHN green Copper",
+  },
+  /*
+    Underground PVC, one per size the catalog ships, for EACH schedule —
+    Sch 40 (owner decision 3, per-foot plan § 3b) and Sch 80 (owner,
+    2026-10-09; sch80-and-500-plan.md § 1) — each carrying warning tape.
+    One map over the schedules, so a size added to one cannot miss its type.
+    NO WIRE: a trench may hold SER, a feeder or a set of THHN, and GR2/GR5
+    carry their own feeder — a type that shipped wire would count it twice.
+    NULL is "not said".
+  */
+  ...UNDERGROUND_SCHEDULES.flatMap(schedule =>
+    sizesFor(schedule).map(
+      (size): BaselineRunType => ({
+        label: undergroundRunTypeLabel(size, schedule),
+        pathType: "conduit",
+        racewayMaterialName: `${size} ${schedule}`,
+        conductorMaterialName: null,
+        conductorCount: null,
+        groundCount: null,
+        groundMaterialName: null,
+        extras: [WARNING_TAPE],
+      })
+    )
   ),
 ];
 

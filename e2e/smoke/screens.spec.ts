@@ -55,12 +55,43 @@ test.afterAll(async ({ request }) => {
   if (bidId) await discardBid(request, bidId).catch(() => {});
 });
 
+/**
+ * Requests each page has sent and not yet heard back from — so a screen
+ * whose network never goes quiet can say WHICH request is stuck.
+ */
+const pending = new WeakMap<import("@playwright/test").Page, Set<string>>();
+test.beforeEach(({ page }) => {
+  const open = new Set<string>();
+  pending.set(page, open);
+  page.on("request", r => open.add(r.url()));
+  page.on("requestfinished", r => open.delete(r.url()));
+  page.on("requestfailed", r => open.delete(r.url()));
+});
+
 async function expectNothingLost(
   page: import("@playwright/test").Page,
   where: string
 ) {
-  // Let the screen finish its first load before measuring it.
-  await page.waitForLoadState("networkidle").catch(() => {});
+  /*
+    Let the screen finish its first load before measuring it — BOUNDED.
+    This wait had no timeout of its own, so one request that never came back
+    spent the whole 180 s test budget waiting for "idle", and the test died
+    with "page has been closed" on a screen that had drawn fine (Proposal,
+    tablet-landscape, Gate 37960082974 attempt 4, 2026-10-09). It is
+    best-effort by design; the measurement below is the test.
+  */
+  const idle = await page
+    .waitForLoadState("networkidle", { timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!idle)
+    console.warn(
+      `[smoke] ${where}: network not idle after 15 s; still waiting on ${Array.from(
+        pending.get(page) ?? new Set<string>()
+      )
+        .map(u => u.replace(/\?.*$/, ""))
+        .join(", ")}`
+    );
   await page.waitForTimeout(600);
   const problems = await layoutProblems(page);
   expect(problems, `${where}: ${problems.join("; ")}`).toEqual([]);

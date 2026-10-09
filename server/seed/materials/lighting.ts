@@ -467,6 +467,20 @@ const wallPacks: BaselineMaterial[] = [
   ),
 }));
 
+/*
+  Coverage check, 2026-10-09 (owner-approved; references/coverage-check.md
+  on track-c): the swing-arm light at a loading dock door. Not a wall pack,
+  so it does not carry their search words.
+*/
+const dockLight: BaselineMaterial = {
+  ...fixture,
+  name: "Dock light, swing arm",
+  searchAliases: aliases(
+    "loading dock trailer truck bay door articulating arm warehouse led"
+  ),
+  jobKind: "commercial",
+};
+
 const vanities: BaselineMaterial[] = [
   { name: "Vanity light bar", slang: "linear led" },
   ...["1", "2", "3", "4"].map(n => ({
@@ -680,6 +694,7 @@ export const LIGHTING: BaselineMaterial[] = [
   ...cannedTrims,
   ...retrofitTrims,
   ...wallPacks,
+  dockLight,
   ...vanities,
   ...securityLights,
   ...lamps,

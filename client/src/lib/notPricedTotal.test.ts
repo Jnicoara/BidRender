@@ -234,10 +234,16 @@ describe("lines whose assembly hours were not set (D1)", () => {
 
   it("names a line whose only gap is its hours in the print's list", () => {
     const named = notPricedLines([
-      { line: { ...line({}), name: "Duplex" }, directCost: 10 },
+      { line: { ...line({}), id: 31, name: "Duplex" }, directCost: 10 },
     ]);
     expect(named).toEqual([
-      { name: "Duplex", wholeLine: false, parts: 0, hoursNotSet: true },
+      {
+        lineId: 31,
+        name: "Duplex",
+        wholeLine: false,
+        parts: 0,
+        hoursNotSet: true,
+      },
     ]);
   });
 });

@@ -31,6 +31,7 @@ import {
   Printer,
   Settings2,
   TriangleAlert,
+  Wrench,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -144,9 +145,12 @@ function BidField({
 export default function ProposalPage({
   bidId,
   onBack,
+  onFixLine,
 }: {
   bidId: number;
   onBack: () => void;
+  /** Open the bid on this line with its "Fix this line" panel (gap 10). */
+  onFixLine: (lineId: number) => void;
 }) {
   const utils = trpc.useUtils();
   /**
@@ -694,27 +698,51 @@ export default function ProposalPage({
                       ? " — lines on the bid, drops on the Plans screen (pick each count's drop material)."
                       : " on the Plans screen — pick each count's drop material."
                     : " on the bid."}
+                  {unpricedList.length > 0
+                    ? " Pick a line to go straight to its fix."
+                    : null}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {!noWork && unpricedList.length > 0 && (
-            <ul className="text-sm list-disc pl-5 space-y-0.5 max-h-48 overflow-y-auto">
-              {unpricedList.map((item, i) => (
-                <li key={i}>
-                  {item.name}
-                  <span className="text-muted-foreground">
-                    {item.wholeLine
-                      ? " — not priced"
-                      : ` — ${[
-                          item.parts > 0
-                            ? `${item.parts} part${item.parts === 1 ? "" : "s"} not priced`
-                            : "",
-                          item.hoursNotSet ? "hours not set" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}`}
-                  </span>
+            /*
+              Each line is a way out, not just a name (never-stuck-plan.md,
+              gap 10): it opens the bid on THAT line with its fix open —
+              "Fix this line" for an assembly or run line, the line's own
+              boxes for one priced by hand. By id, because two lines of one
+              assembly share a name.
+            */
+            <ul className="text-sm space-y-1 max-h-48 overflow-y-auto">
+              {unpricedList.map(item => (
+                <li key={item.lineId}>
+                  <button
+                    type="button"
+                    className="group flex w-full items-start gap-1.5 rounded px-1 py-0.5 text-left hover:bg-muted/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#F5C518]"
+                    onClick={() => {
+                      setConfirmPrint(false);
+                      onFixLine(item.lineId);
+                    }}
+                  >
+                    <Wrench className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#F5C518]" />
+                    <span className="min-w-0">
+                      <span className="underline decoration-dotted underline-offset-2 group-hover:decoration-solid">
+                        {item.name}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {item.wholeLine
+                          ? " — not priced"
+                          : ` — ${[
+                              item.parts > 0
+                                ? `${item.parts} part${item.parts === 1 ? "" : "s"} not priced`
+                                : "",
+                              item.hoursNotSet ? "hours not set" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}`}
+                      </span>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

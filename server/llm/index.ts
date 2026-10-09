@@ -25,7 +25,9 @@
  * the night nobody is watching.
  */
 import type { InvokeParams, InvokeResult } from "../_core/llm";
+import { ENV } from "../_core/env";
 import { anthropicConfigured, invokeAnthropic } from "./anthropic";
+import { AiUnavailable, keyRefusal, type AiRefusal } from "./unavailable";
 import {
   FEATURE_GROUP,
   checkDailyLimit,
@@ -36,6 +38,42 @@ import { costMicros, formatMicros, unknownModel } from "../../shared/aiPricing";
 import * as db from "../db";
 
 export type { AiFeature };
+export { AI_UNAVAILABLE, AiUnavailable } from "./unavailable";
+
+/**
+ * Note a refusal for the admin screen (`ai_service_status`, 0141). Wrapped
+ * like the usage write: failing to note it must never change what the user
+ * is told. Logged either way, without the key.
+ */
+async function noteRefusal(
+  feature: AiFeature,
+  reason: AiRefusal,
+  now: Date
+): Promise<void> {
+  console.warn(`[llm-unavailable] feature=${feature} reason=${reason}`);
+  try {
+    await db.recordAiRefusal(reason, now);
+  } catch (error) {
+    console.warn(
+      `[llm-unavailable] could not record the refusal: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
+
+/** A call worked: clear "refused since", so the admin notice goes away. */
+async function noteWorked(now: Date): Promise<void> {
+  try {
+    await db.recordAiWorked(now);
+  } catch (error) {
+    console.warn(
+      `[llm-unavailable] could not record a working call: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
+}
 
 /** Raised when a user has used up a feature's allowance for the day. */
 export class AiLimitReached extends Error {
@@ -115,13 +153,33 @@ export async function invokeLLM(
   let result: InvokeResult;
 
   if (anthropicConfigured()) {
-    result = await invokeAnthropic(request);
-  } else {
+    try {
+      result = await invokeAnthropic(request);
+    } catch (error) {
+      // A refused key fails every call until a setting changes, so it is
+      // raised as AiUnavailable — the callers say so plainly — and noted for
+      // the admin screen. Anything else (timeout, overload, a bad reply)
+      // passes, and goes up unchanged.
+      const refusal = keyRefusal(error);
+      if (refusal) {
+        await noteRefusal(feature, refusal, now);
+        throw new AiUnavailable(refusal);
+      }
+      throw error;
+    }
+  } else if (ENV.forgeApiKey) {
     // The Manus gateway, while it is still reachable. Imported lazily so a
     // deployment with only an Anthropic key never loads it.
     const { invokeLLM: viaForge } = await import("../_core/llm");
     result = await viaForge(request);
+  } else {
+    // No key at all. This used to fall through to the gateway, which threw
+    // "OPENAI_API_KEY is not configured" — the wrong layer naming the wrong
+    // variable (deploying.md § 8).
+    await noteRefusal(feature, "no-key", now);
+    throw new AiUnavailable("no-key");
   }
+  await noteWorked(now);
 
   const model = request.model ?? "unknown";
   const usage = {

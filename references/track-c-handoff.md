@@ -1,9 +1,8 @@
 # Track C — handoff, 2026-10-06
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
-section below** (per-foot work merged to local-dev as `94d63fd`; leftovers
-on `c-leftovers`; C's databases have 140 migrations — the stand-in 0139 they
-ran is the same statement and `when` as A's, so nothing more is needed).
+section below** (`c-sch80-500` merged to local-dev 2026-10-09; C's
+databases have 142 migrations, through A's 0141).
 **Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
@@ -14,9 +13,42 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-08, proof session) — tape test proven; runNoWire reds explained and fixed; still NOT MERGED
+## LATEST (2026-10-09) — `c-sch80-500` MERGED into local-dev; Q11 answered
 
-Still on `c-sch80-500`; **still no merge until A's seed lands** (below).
+**Merged.** A's seed (`8f3045c`) and A's 0141 were on local-dev, so
+`origin/local-dev` (`679cce8`) was merged into `c-sch80-500` and the result
+pushed to local-dev as a fast-forward. Conflicts: `baselineRunTypes.ts`
+and `perFootSeed.test.ts` took A's (a superset, as A's note below said);
+CHANGELOG and this file kept both. **C's databases `bidrender_local_c` and
+`bidrender_test_c` now have 142 migrations** (0141 applied this session).
+
+- **`sch80And500Runs.test.ts` now runs on the SHIPPED rows**: the shipped
+  `2" PVC Sch 80, underground` type (waste set → it forks; the fork keeps
+  the shipped tape, which the tape line proves) and the shipped 500 type,
+  raceway and parts. The stand-in company type and the shared fixture rows
+  are gone; the file seeds the catalog it reads in `beforeAll`.
+- **Tests:** the nine Sch 80/500 files (`sch80And500Runs`,
+  `sch80And500Seed`, `surfaceRacewayFittings`, `runTypeFold`,
+  `perFootSeed`, `catalogReview20261008`, `catalogReviewSeed`,
+  `runNoWire`, `runTypeExtras`) — **118 green** on `bidrender_test_c`;
+  `pnpm check` clean. Full suite: the Gate on the local-dev push.
+- **E111 1728359 and Bar layout check 1164558 unchanged:** `bids.get`,
+  `bridgeForBid`, `materialsList.get`, `takeoffSummary.forBid`, local-dev
+  tip vs the merge, same `bidrender_local_c` — identical apart from the
+  `preparedOn` clock.
+- **Not done: looking at the fold ("Underground (18)") and the 500 Send
+  dialog on screen** (plan § 6). The fold sort is A's copy of C's code and
+  already on staging; the 500 fitting lines are proven through the routers
+  only. Next session's first check.
+- **Q11 (auto branch runs) answered by the owner: YES.** A detour over 3×
+  the straight right-angle distance is a WARNING with the fix-it buttons,
+  priced, never a block. Written into `auto-branch-runs-plan.md` § 3c,
+  § 3d, § 11, § 13 on **`track-c`** (`77479ce`) — that plan lives on
+  `track-c` only, not on local-dev yet.
+
+## Earlier (2026-10-08, proof session) — tape test proven; runNoWire reds explained and fixed; still NOT MERGED
+
+Still on `c-sch80-500`; no merge until A's seed landed (it has — above).
 
 - **Sch 80 tape test proven.** `extraFeetForRun` temporarily made to follow
   every foot (risers included) → `sch80And500Runs.test.ts` red "expected
@@ -63,6 +95,37 @@ drizzle-guard and deploy-staging skipped, as expected on a branch with no
 now includes `c-*`, as it already did `a-*`.
 
 ## Earlier (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
+
+## FROM TRACK A (2026-10-09) — A's Sch 80 / 500 seed IS ON local-dev: merge `c-sch80-500` now
+
+A's seed (`sch80-and-500-plan.md` § 7c, all four items) is on
+`origin/local-dev` as **`8f3045c`** (tip `13b0dd9`), and on **staging**
+(814/814 bids unchanged; `deploying.md` § 11 "Sch 80 / 500 seed"). Gate
+37882505343 green (test, deploy-staging, smoke).
+
+What C needs to know for the merge:
+
+- **A took C's label change and fold sort FILE-IDENTICAL** from
+  `c-sch80-500` (`shared/undergroundRunTypes.ts`,
+  `client/src/lib/runTypeFold.ts` + `.test.ts`, and the call sites in
+  `catalogReview20261008.test.ts`, `catalogReviewSeed.test.ts`,
+  `runNoWire.test.ts`, `runTypeExtras.test.ts`), so those merge clean.
+  NOT taken: `surfaceRacewayFittings.ts` / its test, `server/db.ts`,
+  `sch80And500Runs.test.ts`, `gate.yml` — still C's to land.
+- **Expect conflicts** in `server/seed/baselineRunTypes.ts` and
+  `server/perFootSeed.test.ts` (A's version is a superset — take A's), in
+  `CHANGELOG.md`, this file and `sch80-and-500-plan.md` (docs; keep both).
+  `catalogReview20261008.test.ts` now expects 18 underground types and the
+  500 type in the "#12 + ground" list.
+- Seeded names exactly as § 7c: the nine 500 parts, `Surface raceway, 500
+series` (renamed in place — #1683 on staging), the 500 cover retired.
+  A's tests: `server/sch80And500Seed.test.ts` (fixture 91354).
+- Still C's per § 7c/§ 6: switch the Sch 80 case in
+  `sch80And500Runs.test.ts` to the SHIPPED type; once C's family code is in,
+  its fixture 500 rows are no longer inserted (they exist); look at the fold
+  ("Underground (18)") and the 500 Send dialog on screen.
+
+## LATEST (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
 
 **Part 1 — answers recorded, nothing built.** `sch80-and-500-plan.md` § 5
 now holds the owner's five answers (clip spacing "not set" for 500 and 700;

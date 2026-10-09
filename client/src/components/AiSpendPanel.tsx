@@ -14,8 +14,10 @@
  * not, and someone reconciling this against a real bill should know which one
  * is the bill.
  */
+import { AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { formatMicros } from "@shared/aiPricing";
+import { aiRefusalNotice } from "@shared/aiServiceNotice";
 
 /** `plan-read` → `Plan reading`. */
 function featureLabel(feature: string): string {
@@ -54,10 +56,34 @@ export function AiSpendPanel() {
   }
 
   const data = spend.data;
+  const refusal = aiRefusalNotice(data?.service ?? null);
 
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold">AI spend</h2>
+      {refusal && (
+        <div
+          role="alert"
+          className="mb-3 flex gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
+        >
+          <AlertTriangle
+            className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold">
+              AI calls are being refused since{" "}
+              {refusal.since.toLocaleString(undefined, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {refusal.message}
+            </p>
+          </div>
+        </div>
+      )}
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="grid grid-cols-2 divide-x divide-border border-b border-border">
           <div className="px-5 py-4">

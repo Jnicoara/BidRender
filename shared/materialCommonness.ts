@@ -271,6 +271,9 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // with "Raceway blank end plate" — an accessory before the raceway.
   // 700 renamed to one row on 2026-10-08 (one-piece; the cover retired).
   "Surface raceway, 700 series": "common",
+  // 500 the same way, 2026-10-09 (sch80-and-500-plan.md § 2): with nine 500
+  // parts sharing "500 v500", "wiremold 500" led with the coupling.
+  "Surface raceway, 500 series": "common",
 
   // ── Grounding: on every service ──
   'Ground rod, 5/8" x 8 ft': "common",

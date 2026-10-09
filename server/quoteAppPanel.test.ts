@@ -405,7 +405,9 @@ describe("a line with no price blocks every figure (T3)", () => {
     if (doc.state === "blocked") {
       expect(doc.gaps).toHaveLength(1);
       expect(doc.gaps[0].detail).toBe("no material price");
-      expect(doc.gaps[0].fix).toMatch(/Add the material to the assembly/);
+      // Since gap 11 the material is added ON the bid line ("Fix this line").
+      expect(doc.gaps[0].fix).toMatch(/^Add the material .*Labor only/);
+      expect(doc.gaps[0].fix).toMatch(/Fix this line/);
     }
   });
 

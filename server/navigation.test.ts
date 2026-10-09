@@ -19,6 +19,7 @@ import {
   resolveNavigationTarget,
 } from "../shared/navigationTargets";
 import { appRouter } from "./routers";
+import { AiUnavailable, invokeLLM } from "./llm";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";
 import type { TrpcContext } from "./_core/context";
 
@@ -169,7 +170,7 @@ describe("when the helper cannot reach a model", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("says nothing alarming to the user", async () => {
+  it("a failure that PASSES (bad model id, timeout) says nothing alarming", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const answer = await caller().navigation.ask({
       question: "where are labor rates",
@@ -177,8 +178,28 @@ describe("when the helper cannot reach a model", () => {
 
     // A missed navigation hint is not worth an error banner — the sidebar is
     // right there. The user gets the ordinary "not sure" and no target.
+    //
+    // NARROWED 2026-10-09. This used to cover EVERY failure, a dead key
+    // included, and pinned "not sure" for it on purpose — which told a user
+    // their question was the problem when the server's key was. A missing or
+    // refused key is the case below now.
     expect(answer.target).toBeNull();
     expect(answer.message).toMatch(/not sure/i);
+  });
+
+  it("a missing or refused KEY says AI is unavailable — never 'not sure which screen'", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(invokeLLM).mockRejectedValueOnce(
+      new AiUnavailable("key-refused")
+    );
+    const answer = await caller().navigation.ask({
+      question: "where are labor rates",
+    });
+    expect(answer.target).toBeNull();
+    expect(answer.message).toBe(
+      "AI is unavailable right now. Every screen is in the sidebar."
+    );
+    expect(answer.message).not.toMatch(/not sure/i);
   });
 
   it("logs why, and which model it tried", async () => {

@@ -80,6 +80,7 @@ import { resolveRunType } from "../../shared/runTypeLookup";
 import { extraFeetForRuns } from "../../shared/runExtrasPerFoot";
 import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
+import { fixLine, fixLineOptions } from "../lineFix";
 
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
@@ -1361,6 +1362,58 @@ export const bidsRouter = router({
       await db.updateBidLineItem(line.id, input.bidId, patch);
       return { from: material.name };
     }),
+
+  /**
+   * What the "fix this line" panel can set on an assembly or run line, and
+   * whether this bid lets the line change (references/never-stuck-plan.md,
+   * gap 11). Asked when the panel opens, never on a page load.
+   */
+  fixLineOptions: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        lineId: z.number().int().positive(),
+      })
+    )
+    .query(({ input, ctx }) => fixLineOptions(ctx, input)),
+
+  /**
+   * Fix an assembly or run line in place: the typed price, hours or role go
+   * onto THIS line's snapshot, and — with "Also save to my library", ticked
+   * by default — onto the library row too (owner, 2026-10-07). Nothing else
+   * moves. A locked bid refuses the line and still takes the library half; a
+   * Won or Lost one asks "Change anyway?" first (`changeClosedBid`). The
+   * rules: shared/lineFix.ts; the writes: server/lineFix.ts.
+   */
+  fixLine: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        lineId: z.number().int().positive(),
+        partPrices: z
+          .array(
+            z.object({
+              materialId: z.number().int().positive(),
+              price: moneySchema,
+            })
+          )
+          .max(100)
+          .optional(),
+        addMaterial: z
+          .object({
+            materialId: z.number().int().positive(),
+            qtyPerOne: z.number().positive().max(99999),
+            price: moneySchema.optional(),
+          })
+          .optional(),
+        runPrice: moneySchema.optional(),
+        hours: hoursPerUnitSchema.optional(),
+        laborRateId: z.number().int().positive().optional(),
+        saveToLibrary: z.boolean(),
+        changeClosedBid: z.boolean().optional(),
+      })
+    )
+    .mutation(({ input, ctx }) => fixLine(ctx, input)),
 
   /**
    * Save a hand-priced line to the library as an assembly — optional, never

@@ -439,6 +439,11 @@ test files (108 tests) green on shuffle seeds 1–8.
 seed ships the Sch 80 types and the 500 type; the look belongs after the
 merge.
 
+**Merged 2026-10-09** (A's seed `8f3045c` landed first). The Sch 80 case in
+`sch80And500Runs.test.ts` now uses the SHIPPED type and the 500 case the
+shipped 500 type, raceway and parts; the stand-in fixtures are gone. Nine
+files, 118 tests green. Still not looked at on screen.
+
 ### 7c. EXACT seed list for Track A
 
 All in ONE commit (exact-name matching; see § 4 for ordering):

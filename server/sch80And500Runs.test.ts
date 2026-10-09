@@ -8,26 +8,21 @@
  *   - a traced 500 run is priced from 500 rows only, and a 700 run on the
  *     same bid still from 700 rows.
  *
- * ── FIXTURES, because Track A owns the seed ──────────────────────────────────
- * Until A's seed lands (plan § 3), neither the nine Sch 80 underground types
- * nor the renamed `Surface raceway, 500 series` and its nine parts exist. So:
- *
- *   - the Sch 80 type is the COMPANY's own, built exactly as plan § 1b says
- *     the shipped one will be (label, raceway, tape flat × 1.0). Once A seeds
- *     the shipped type, `typeId(sch80('2"'))` can replace `sch80Type()` and
- *     this case then also covers the seed.
- *   - the 500 raceway and parts are SHARED rows (userId NULL — the fitting
- *     lookup reads shared rows only), inserted only when missing and deleted
- *     in afterAll, so a database that already has A's rows keeps them and
- *     the leak guard sees nothing left behind (scripts/testLeakGuard.ts).
+ * ── THE SHIPPED ROWS, since A's seed landed (2026-10-09) ─────────────────────
+ * Both cases run on what A seeded (plan § 7c): the shipped `2" PVC Sch 80,
+ * underground` type, the 500 run type, `Surface raceway, 500 series` and its
+ * parts. Until then this file built a company Sch 80 type and inserted the
+ * 500 rows as shared fixtures; those stand-ins are gone. The file seeds the
+ * shipped catalog it reads in beforeAll, as runNoWire.test.ts does, because
+ * the tests never seed on their own (server/seedShippedLibrary.ts).
  *
  * Fixture id 91353 is this file's own (runTypeExtras.test.ts is 91352).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import * as db from "./db";
-import { bidPdfs, materials, users } from "../drizzle/schema";
+import { bidPdfs, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { undergroundRunTypeLabel } from "../shared/undergroundRunTypes";
 import {
@@ -47,12 +42,10 @@ const caller = () =>
 
 const TAPE = "Underground warning tape";
 const TYPE_700 = "700 series surface raceway, 2 #12 + ground";
+const TYPE_500 = "500 series surface raceway, 2 #12 + ground";
 const RACEWAY_500 = surfaceRacewayName("500");
 /** 1/4" = 1'-0" is 18 page points a foot. */
 const FT = 18;
-
-/** Shared rows this file inserted, removed in afterAll. */
-const INSERTED: number[] = [];
 
 async function bidWithSheet() {
   const bid = (await caller().bids.create({
@@ -104,41 +97,10 @@ async function materialId(name: string) {
   return m!.id;
 }
 
-/** A shared row by exact name, inserted if this database lacks it. */
-async function sharedRow(
-  name: string,
-  unitOfSale: "each" | "foot",
-  raceway = false
-): Promise<number> {
-  const database = (await db.getDb())!;
-  const [existing] = await database
-    .select({ id: materials.id })
-    .from(materials)
-    .where(and(isNull(materials.userId), eq(materials.name, name)));
-  if (existing) return existing.id;
-  const [result] = await database.insert(materials).values({
-    userId: null,
-    name,
-    unitOfSale,
-    costPerUnit: "0.0000",
-    category: "Surface Raceway",
-    searchAliases: "",
-    ...(raceway
-      ? {
-          // Plan § 2a: as 700 — 10 ft sticks, coupled, clips not set.
-          stickLengthFeet: "10.00",
-          stickJoint: "coupling",
-          strapSpacingFeet: null,
-          strapFromBoxFeet: null,
-        }
-      : {}),
-  });
-  INSERTED.push(result.insertId);
-  return result.insertId;
-}
-
 withDb("Sch 80 underground and the 500 run", () => {
   beforeAll(async () => {
+    await db.seedBaselineMaterials();
+    await db.seedBaselineRunTypes();
     const database = (await db.getDb())!;
     const [existing] = await database
       .select()
@@ -156,31 +118,22 @@ withDb("Sch 80 underground and the 500 run", () => {
   afterAll(async () => {
     const database = await db.getDb();
     if (!database) return;
-    // The company first: its bids, lines and types point at the shared rows.
     await database.delete(users).where(eq(users.id, COMPANY));
-    if (INSERTED.length > 0)
-      await database
-        .delete(materials)
-        .where(and(isNull(materials.userId), inArray(materials.id, INSERTED)));
   });
 
   it("a Sch 80 trench: 110 ft of tape on 100 ft with two 3 ft risers and 10% waste — the pipe takes the risers", async () => {
-    // Plan § 1b, built as the company's own until A ships it.
-    const type = await caller().takeoffRunTypes.create({
-      label: undergroundRunTypeLabel('2"', "PVC Sch 80"),
-      pathType: "conduit",
-      racewayMaterialId: await materialId('2" PVC Sch 80'),
-    });
-    await caller().takeoffRunTypes.addExtra({
-      runTypeId: type.id,
-      materialId: await materialId(TAPE),
-      feetPerFoot: 1,
-      appliesTo: "flat",
-    });
-    await caller().takeoffRunTypes.update({
-      id: type.id,
+    // The SHIPPED type (A's seed, plan § 7c), so this also covers the seed:
+    // its raceway and its flat tape. Setting the waste forks it, and the
+    // fork carries the shipped extras — the tape line below is the proof.
+    const shippedSch80 = (await caller().takeoffRunTypes.list({})).find(
+      t => t.label === undergroundRunTypeLabel('2"', "PVC Sch 80")
+    );
+    expect(shippedSch80?.isShipped).toBe(true);
+    const type = await caller().takeoffRunTypes.update({
+      id: shippedSch80!.id,
       conduitExtraPct: 0.1,
     });
+    expect(type.forked).toBe(true);
 
     const at = await bidWithSheet();
     const run = await trace(at, type.id, [
@@ -217,21 +170,17 @@ withDb("Sch 80 underground and the 500 run", () => {
   });
 
   it("a 500 run is priced from 500 rows only; a 700 run on the same bid keeps 700 rows", async () => {
-    // The 500 family as A will ship it (plan § 2a), shared rows.
-    const raceway500 = await sharedRow(RACEWAY_500, "foot", true);
+    // The 500 family and type as A shipped them (plan § 7c).
     const parts500 = new Map<string, number>();
     for (const part of SURFACE_RACEWAY_PARTS) {
       const name = surfaceRacewayPartName(part, "500");
-      parts500.set(name, await sharedRow(name, "each"));
+      parts500.set(name, await materialId(name));
     }
-    const type500 = await caller().takeoffRunTypes.create({
-      label: `500 series fixture ${Date.now()}`,
-      pathType: "conduit",
-      racewayMaterialId: raceway500,
-    });
-    const t700 = (await caller().takeoffRunTypes.list({})).find(
-      t => t.label === TYPE_700
-    )!.id;
+    const types = await caller().takeoffRunTypes.list({});
+    const shipped500 = types.find(t => t.label === TYPE_500);
+    expect(shipped500?.racewayMaterialId).toBe(await materialId(RACEWAY_500));
+    const type500 = { id: shipped500!.id };
+    const t700 = types.find(t => t.label === TYPE_700)!.id;
 
     const at = await bidWithSheet();
     // The same shape for both: 40 ft, a square corner, 20 ft.

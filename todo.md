@@ -3,6 +3,63 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## A dead AI key must SAY so — BUILT 2026-10-09 (Track A), migration 0141
+
+> **Built as planned below** (branch `a-ai-unavailable`): `AiUnavailable` +
+> `keyRefusal` in `server/llm/unavailable.ts`; the door raises it for no key
+> and 401/403 and notes it on `ai_service_status` (0141); navigation and all
+> four plan-reader sites say "AI is unavailable right now." with their own
+> manual step; the admin AI spend panel shows "AI calls are being refused
+> since <time>". `navigation.test.ts`'s "says nothing alarming" is narrowed
+> to failures that pass. Tests: `server/aiUnavailable.test.ts`, plus cases in
+> `navigation.test.ts` and `planCopilot.test.ts` — 6 red without the fix.
+> One deviation: the success path WRITES the status row on every call that
+> works (one small UPDATE), so the notice clears itself; noted here in case
+> that write ever shows up in a profile. Live gets it with the next release.
+
+**Found while preparing the `bidrender-app` key rotation** (`deploying.md`
+§ 8a). Measured with a refused key: the Anthropic adapter raises
+`AuthenticationError` (401) and every caller catches it — nothing is written,
+no bid, quantity or price moves. Good. But the WORDS are not all honest:
+
+| Feature                           | Says today                                                                  | Honest?                                |
+| --------------------------------- | --------------------------------------------------------------------------- | -------------------------------------- |
+| Navigation helper                 | "I'm not sure which screen you want. Try naming what you are trying to do…" | **No** — blames the question           |
+| Plan reader, sheet question, ties | "…could not be reached. Nothing was changed — … try again later."           | Partly — "later" won't help a dead key |
+| Alias suggestions                 | "Suggestions aren't available right now"                                    | Yes                                    |
+
+Nobody is told either: the 401 is in the server log only, so the owner finds
+out when a user complains — the "only find out when you need it" shape
+CLAUDE.md § Scheduled work says to MEASURE instead.
+
+**Plan:**
+
+1. `server/llm`: classify a failure — `AiUnavailable` (no key configured, or
+   Anthropic 401/403: the key itself is refused) versus a passing failure
+   (timeout, 5xx, overloaded, bad reply). One function, unit-tested, next to
+   `AiLimitReached`; never a string match on a message.
+2. Callers use it for the WORDS only:
+   - navigation: "The helper is unavailable right now. Every screen is in
+     the sidebar." — never "not sure which screen" for a server fault. Keep
+     "not sure" for a real model answer with no target. `navigation.test.ts`
+     "says nothing alarming" changes to assert the new sentence (it pinned
+     the old wording on purpose, so say why in the test).
+   - plan reader / sheet question / ties: same sentence as today minus "try
+     again later" when unavailable ("AI reading is unavailable right now.
+     Nothing was changed — carry on marking by hand.").
+   - alias suggestions: unchanged.
+3. Tell the owner: record the last `AiUnavailable` time (one row, no prompt
+   text — same privacy rule as `ai_usage_daily`) and show it on the admin AI
+   usage screen: "AI calls are being refused since <time> — check
+   `ANTHROPIC_API_KEY` (deploying.md § 8a)". Needs a column or table → a
+   migration (step 1 of three, additive).
+4. Tests that go red without it: a mocked 401 gives the unavailable sentence
+   on each feature; a mocked timeout still gives the passing one; nothing is
+   written in either case (no stored reader run marked as anything but
+   failed, no usage row).
+
+Not urgent if keys are created with no expiration, which is now the rule.
+
 ## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08) — FIXED (A, same day)
 
 > **CAUSE FOUND, and it was neither suspect below: the TEST read a number
@@ -83,6 +140,119 @@ left as written rather than rewritten to match the rename.
       staging deploy, or give step 10 a longer poll.
     - Nothing in any of these diffs touches marks or undo.
 
+## "Fix this line" on the bid — BUILT (Track B, 2026-10-08, never-stuck gap 11)
+
+- [x] **The panel.** Every assembly or run line with something missing shows
+      "Fix this line", and its amber words ("Not priced", "Hours not set",
+      "+ 1 part not priced") open the same panel. It prices the line's $0
+      parts (recipe quantity shown beside each box), picks a material for a
+      line with none, sets hours (overhead shown), picks the role for hours
+      with no rate, and prices or sets hours on a traced run's part.
+      `shared/lineFix.ts` (rules), `server/lineFix.ts` (`bids.fixLine`,
+      `bids.fixLineOptions`), `client/src/components/FixLinePanel.tsx`,
+      `client/src/lib/fixLineDraft.ts`. No migration.
+- [x] **No guessing.** Only typed or picked numbers reach the line; a blank is
+      never sent as 0; a $0 price is refused; a picked material needs a typed
+      quantity. The library price is a hint the person taps to use.
+- [x] **"Also save to my library" ON by default**, written through
+      `materials.update` / `assemblies.update` by caller, so a starter forks
+      exactly as on the Library screen.
+- [x] **Nothing else moves.** Other lines with the same gap are OFFERED
+      ("Update 1 other line on this bid to the new figure?"), never changed.
+- [x] ~~**Locked, Won or Lost bids keep their lines**~~ **REVERSED by the
+      owner, 2026-10-08:** only a **LOCKED** bid refuses (and the library
+      half still works). A **Won or Lost** bid no longer blocks on its own:
+      Save first asks "This bid is marked Won/Lost. Changing it changes a
+      price you may have already sent. Change anyway?" with Continue and
+      Cancel (focus on Cancel; Cancel goes back to the form, typed values
+      kept, nothing saved). The server refuses the line AND the library half
+      until the request carries `changeClosedBid` (`lineFixClosedWarning` in
+      `shared/lineFix.ts`), so a screen that forgets to ask cannot change a
+      sent price. Draft and Active unchanged. Tests: 6 changed/new in
+      `server/fixLine.test.ts` (24 total), all six red against the old code.
+      On screen at 1536x864 and 820x1180 on a Won bid: asked, Cancel kept
+      "3.25", Continue fixed the line ($63.99 → $83.49, "1 part not priced"
+      gone).
+- [x] Tests: `server/fixLine.test.ts` (21; each guard removed in turn went
+      red: refusal → 2, always-save → 2, never-save/no line write → 8) and
+      `client/src/lib/fixLineDraft.test.ts` (9).
+- [x] On screen, laptop 1536x864 and tablet 820x1180: part priced ($85.32 →
+      $185.32, strip 2 → 1 parts), offer shown, other line untouched; pole
+      line given a material and 6 h; (before the 2026-10-08 reversal) a Won bid explained and offered only
+      "Save to my library". **Found by looking:** the offer vanished because
+      the saved line stopped being fixable and the panel unmounted; it is now
+      shown while open, not while fixable.
+- [ ] **Not covered yet:** typing a ROLE'S rate from the panel (a role at $0
+      is listed but disabled; the strip says Labor Rates); "Can't price"
+      lines; a line from before markup rules (no frozen parts list) can take
+      a material but not part prices; a marker saying a line was fixed on the
+      bid. ~~the totals strips' "Fix these" walk; gap 10 (print block jumps to
+      the line)~~ — both built 2026-10-08, next item. Fixing a part keeps the line's frozen markup for the parts
+      already priced and adds the new part's own markup under today's rules
+      (`blendedMarkup`).
+- [x] **Smoke test 2, the empty sheet list after a first upload — second
+      half, 2026-10-09 (Track B).** The 2026-10-08 fix (`ensureSheets`
+      refreshes by the id it SENT) passed one Gate and the first smoke
+      re-run, then re-run 2 (Gate 37883298465, attempt 3) failed test 2
+      with nothing deploying. A staging probe reproduced it 2 of 12 and the
+      network log named it: the set's FIRST sheet read went out before the
+      insert and was still in flight when `ensureSheets` answered, and its
+      invalidate sent no second read. React Query cancels a running fetch
+      on invalidate only when the query already HAS data; a new one folds
+      the invalidate into the stale read. Fix: cancel, then invalidate
+      (`client/src/lib/refetchPastInFlight.ts`; its test pins the trap
+      against a real QueryClient and goes red without the cancel). **Worth
+      knowing generally:** "invalidate after a write" is not enough for a
+      query that may be making its FIRST read at that moment.
+- [ ] **Smoke `screens.spec.ts`: a request that never came back on the
+      Proposal screen (tablet-landscape), 2026-10-09.** Gate 37960082974's
+      third smoke re-run (attempt 4) timed out at 180 s waiting for network
+      idle on a screen that had drawn fine; nothing was deploying. The wait
+      had no bound, so it spent the whole budget. Now bounded at 15 s, and a
+      miss prints the request URLs still pending (query strings stripped:
+      a signed plan link is a bearer credential). **Which request hung is
+      NOT known** (`trace: "off"`); if the warning names one, chase it.
+      No warning in the next 4 runs (Gate 37970377380 and its 3 re-runs).
+- [ ] **Smoke flow test 5: a Legend click that did not arm, 2026-10-09.**
+      Gate 37970377380, smoke attempt 2, nothing deploying. "Link CI SWITCH"
+      saved (the row shows Duplex receptacle standard), then
+      `armFromLegend("CI SWITCH")` clicked the row and the pill stayed on
+      "Counting ci duplex". The test's forced-race hook waits on the
+      `bidridge:last-count:<bid>` write and timed out at 20 s. Passed in the
+      3 runs on either side. Cause NOT found (`trace: "off"`; the screenshot
+      is the only evidence). Not from Track B's changes, which touch neither
+      the legend nor arming. Needs whoever owns the legend; a trace
+      (`trace: "retain-on-failure"`) would name it next time.
+- [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
+      (not priced, labor but no material, parts, hours not set, traced labor
+      not priced, no labor rate) get "Fix these N" / "Fix it": it opens the
+      first flagged line's panel with "Line 1 of N" and Skip. Save opens the
+      next line, Skip passes it, Cancel/Escape ends the walk; a line a save
+      already fixed (e.g. by "Update other lines") is passed over, read
+      after the refetch. Each strip walks only the lines it counts, in screen
+      order (`client/src/lib/fixWalk.ts`, `fixGapsOf` in `BidsPage.tsx`,
+      shared with the line's own button). **Gap 10:** each line in the
+      Proposal's print block is a button that opens `/bids/:id?fix=<lineId>`
+      — the bid, scrolled to that line with its panel open (a hand-priced
+      line is outlined instead); the `?fix=` is dropped from the address
+      once used. `notPricedLines` now carries `lineId`. Tests:
+      `fixWalk.test.ts` (8), `appRoutes.test.ts` (3 new), the two
+      `notPricedLines` tests and the proposals end-to-end test now pin
+      `lineId` — all red on the old code, and the walk's two guards each
+      went red when removed. On screen at 1536x864 and 820x1180: strip →
+      Line 1 of 3 → Save → Line 2 of 3 → Skip → Line 3 of 3 → Cancel
+      closed it, strip 3 → 2; print block listed the 2 left, clicking the
+      second opened the bid on it with its panel, address `#/bids/<id>`.
+      **Found by looking:** the button sat inline as the sentence's last
+      word; now on its own line. Throwaway "B walk check …" bids,
+      assemblies and materials for user 1 in `bidrender_local_b_new`.
+- [x] **Gap 6.1 on staging (`fa0c697`), 2026-10-08:** sheet 1 drawn **1.51 s**
+      after picking a 6.6 MB, 5-sheet set (ticket 0.17 s, opened from the
+      file 0.84 s, drawn 1.51 s). The PUT ended at 2.2 s and the attach at
+      2.4 s, so the sheet was up before the upload finished. 0 MB pulled back
+      before sheet 1 or in the 10 s after. One run; one more throwaway
+      `track-b-upload-*` account on staging (bid archived, file removed).
+
 ## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
 
 > **Track C HAS MERGED into local-dev** (`bea4d8f`, 2026-10-07). Every item
@@ -100,6 +270,17 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       `track-b-flash-*`, `track-b-starters-*`); their bids are archived and
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
+  - [ ] **Added 2026-10-08 (Track B):** the `track-b-upload-*` accounts from
+        the Gap 6.1 timing run (`fa0c697`) and the smoke-test-2 probe
+        (`track-b-upload-1791518663416@example.com`). Both bids archived,
+        both plan sets removed.
+  - [ ] **Local, not staging — B's machine only (`bidrender_local_b_new`):**
+        the "B fix-line check …" bids, assemblies and materials for user 1
+        (bids 1728396–1728399 and their fixtures; 1728399 is the Won one,
+        its line now fixed to $3.25 a part), the earlier "B batch 2 undo
+        check" / "B 6.1 preview check …" bids, and the local smoke account
+        `b-smoke-local@example.test` (user 15507) with its throwaway bids.
+        Disposable; delete before the local DB is used for anything real.
 - [x] **DONE 2026-10-08:** rebuilt with `--only assembly-hours --new-since
 <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
       NEW, DV34 grey with "HELD - no 700 plate yet". The old copy had 0 typed
@@ -967,6 +1148,18 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       rules refuse, and uses nothing up" in `server/passwordReset.test.ts`).
 
 ### Before beta: price an unpriced line right where it blocks you
+
+> **PARTLY SUPERSEDED 2026-10-08 (Track B) by never-stuck gap 11, "fix this
+> line", which the owner amended 2026-10-07.** On the BID PAGE an assembly or
+> run line is now fixed in place with NO migration: the typed price, hours or
+> role go onto that line's own snapshot as a deliberate hand edit (the same
+> thing `updateLine` already does for a hand-priced line), with "Also save to
+> my library" ticked by default. That overrides the "needs a MIGRATION —
+> `bidUnitCost`" reasoning below for bid lines. **Still open from this
+> item:** price boxes in the quote-app `Blocked` panel and the Proposal's
+> print block (gap 10 would jump them to the line's fix), and a "priced on
+> this bid" marker on the line. Quote items (§ 8) may still want their own
+> column — decide there.
 
 > **2026-10-05:** quote items (references/quote-items-plan.md § 8) need the
 > SAME per-bid price column as this item (`bidUnitCost`). Build it once:

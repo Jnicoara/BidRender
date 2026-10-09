@@ -4,15 +4,86 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-09]
+
+- **Fixed for good: a freshly uploaded plan set could still show no
+  sheets.** Yesterday's fix caught one way it happened; a second way, about
+  one upload in six on staging, left the sheet list empty until a reload.
+  The list is now always read again after the sheets are saved.
+
+## [2026-10-09]
+
+- **A dead AI key now says so.** If the server has no Anthropic key, or the
+  key has expired or been disabled, the help assistant and the plan reader
+  now say "AI is unavailable right now" with what to do by hand, instead of
+  "I'm not sure which screen you want" (which blamed the question) or "try
+  again later" (which would never work). The admin AI spend screen shows an
+  amber notice with the time calls started being refused and where the fix
+  is written down, and it clears itself once a call works. Nothing on a bid
+  was ever affected; this is about the words.
+- **A traced Wiremold 500 run now counts its own fittings.** Couplings,
+  entrance end, inside and flat elbows come from the 500 parts only, the
+  same way 700 already did; a 500 run never borrows a 700 part, and 1500 is
+  deliberately left out. Before this, a 500 run's fittings said "no catalog
+  match".
+
 ## [2026-10-08]
 
-- **Ready for Wiremold 500 and PVC Sch 80 underground (waiting on the
-  catalog).** A traced Wiremold 500 run will count its couplings, entrance
-  end, inside and flat elbows and tees from 500 parts only, the same way 700
-  already does; 1500 is deliberately left out. The underground fold in the
-  run-type picker will list every Sch 40 size, then every Sch 80 size,
-  rather than mixing them. Nothing changes on screen until the 500 parts and
-  the Sch 80 types are added to the starter catalog.
+- **Fix every flagged line in one pass.** Each warning under the bid total
+  ("3 parts are not priced", "2 lines have hours not set", …) now has a
+  "Fix these" button that opens the first line's fix, then the next after
+  each save, with Skip to pass one.
+- **The proposal's "price these first" list now takes you to the fix.**
+  Clicking a line in it opens the bid on that line with its fix open,
+  instead of leaving you to find it.
+- **24 catalog items real jobs were missing.** From the coverage check of
+  thirteen real jobs: 250V receptacles (6-15R, 6-20R, 6-30R, 6-50R),
+  3-phase twist-locks (L15-30, L21-30), a red emergency receptacle, a pop-up
+  countertop receptacle, fan-forced wall heater and its thermostat, a floor
+  heating mat and its GFCI thermostat, 4/3 NM-B, healthcare (HCF) MC cable,
+  4- and 6-position meter centers, 400/600/800A switchboards, a
+  polymer-concrete handhole, a swing-arm dock light, a cord reel, and a
+  plywood telecom backboard with its grounding busbar. Each is tagged
+  residential, commercial or both; the big gear and the HCF cable sort as
+  Specialty. Nothing existing was renamed or removed. (The CT cabinet the
+  check asked for was already in the catalog under its full name.)
+- **Searching "14 3" or "6 3" finds the cable again.** A spoken cable size
+  like "14 3" was matching the start of a receptacle's NEMA number (14-30R),
+  so the dryer receptacle led a search for 14/3 Romex. A finished cable size
+  now only matches that size.
+- **Fixing a line on a Won or Lost bid now asks first instead of refusing.**
+  Only a locked bid refuses. On a Won or Lost bid, Save asks "Changing it
+  changes a price you may have already sent. Change anyway?" and changes
+  nothing unless you press Continue.
+- **Fixed: a freshly uploaded plan set could show no sheets.** Right after a
+  bid's first upload, the sheet list sometimes stayed on "Sheets appear here
+  once the document opens" and the scale was never read, until the page was
+  reloaded. The sheets are now always picked up once they are saved.
+- **Schedule 80 underground pipe and Wiremold 500 are ready to trace.**
+  Nine "PVC Sch 80, underground" run types (one per size, each with its
+  warning tape) sit in the same Underground fold as the Sch 40 ones, Sch 40
+  listed first. Wiremold 500 now works like 700: one raceway row priced by
+  the foot, its own run type (2 #12 + ground) and nine of its own parts,
+  coupling to device plate. The old 500 "base" row keeps its place under the
+  new name; the separate 500 cover row is withdrawn, since 500 is one piece.
+  Nothing on an existing bid moves.
+- **Fix a line right on the bid.** A line that says "Not priced", "Hours not
+  set" or "+ 1 part not priced" now has a "Fix this line" button. Type the
+  missing price or hours (or pick the material or the role) and only that
+  line changes. "Also save to my library" is ticked by default, so the next
+  bid isn't missing it too. Before this, the only fix was editing the
+  library, removing the line and adding it again. Locked, Won and Lost bids
+  keep their numbers; the panel says so and can still save to the library.
+- **Rebuilding the starter pricing sheets can no longer lose what the owner
+  typed.** Every price and hours value is carried onto the new sheet by
+  item, so a renamed item keeps its number, a new item arrives blank, and a
+  number for an item that was removed is listed in a "dropped values"
+  report. If a number would be lost for an item that still exists, the
+  rebuild stops and writes nothing. A test fails if a typed value goes
+  missing.
+- **Beta checklist gains an admin "baseline" screen** for editing the
+  shipped starter prices and hours, reaching every company except on items
+  that company already changed.
 - **The starter catalog follows the owner's catalog review.** 138 shipped
   items were withdrawn — all IMC and all 3-1/2" conduit and fittings, #14 to
   #10 bare copper, and unsized "generic" rows whose sized versions cover

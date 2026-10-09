@@ -221,6 +221,8 @@ const AFTER_FREEZE: Record<string, string> = {
   // id, and the cover is retired (server/seed/materials/index.ts). Allowed
   // because neither row had reached live (0117 is staging-only).
   "Surface raceway base, 700 series": "Surface raceway, 700 series",
+  // 500 the same way (owner, 2026-10-09; sch80-and-500-plan.md § 2a).
+  "Surface raceway base, 500 series": "Surface raceway, 500 series",
 };
 
 /**
