@@ -4,7 +4,51 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-09 (session 24) — START HERE
+## UPDATE 2026-10-09 (session 25) — START HERE
+
+**The owner's catalog review of the STARTER catalog is built; staging's
+DATABASE has 0140, staging's CODE does not yet.** Live untouched.
+
+- Decisions: `references/catalog-review-2026-10-08.md` (the owner's check,
+  copied in, plus "What was built" with every call on a NOT SURE item).
+  Lists the seed reads: `shared/catalogReview20261008.ts`,
+  `server/seed/materials/specialty.ts`. Catalog **1,824 -> 1,793**: 138
+  retired, 107 added, 23 renamed in place, 108 Specialty.
+- **0140** `materials.isSpecialty` (additive). Specialty sorts after
+  everyday rows that answer a search the same way (`compareRankKeys`, after
+  phrase and tier); forks never copy it (`materialContentFields`).
+  Run types: #12 + ground types pull `#12 THHN green Copper` (new row;
+  `RUN_TYPE_MATERIAL_SWAPS` moves existing shipped links); the 3-1/2"
+  underground type is archived (`RETIRED_BASELINE_RUN_TYPES`).
+- Staging: backup `staging-2026-10-09T00-53-51Z-before-0140.sql`; rehearsed
+  on a copy (773/773 unchanged, old AND new code; catalog compare as
+  planned); **staging migrated 01:10 UTC, 781/781 unchanged on the old
+  code** (`deploying.md` § 11 "0140"). No staging bid line points at a
+  removed row.
+- **NOT DONE: pushing the code to `staging`.** The `git push origin
+HEAD:staging` was refused by the permission classifier this session, so
+  the owner (or a session with that permission) pushes it. Until then
+  `local-dev`'s Gate `deploy-staging` step refuses (it changes `drizzle/`
+  against what staging runs) — expected red, not a fault. After the push:
+  `/api/version`, `bidTotals` against the before file, and the catalog
+  checks in § 11 step 3 on staging itself.
+- Gate on `a-catalog-review` (`66b3961`): run 37869321465 **green** (test).
+  The first run caught British "colour", a test leaking two shared rows on
+  a fresh DB, and a rename test — all fixed.
+- Sheets rebuilt from the new catalog (0 typed values before, checked):
+  `pricing/starter-catalog-pricing.xlsx` and `labor-units-starter.xlsx`
+  (1,793 rows), `assembly-hours-starter.xlsx` (183). The loader dry-runs
+  clean. These are the new frozen list for pricing.
+- Owner lists: `C:\dev\catalog-review\size-gaps.txt` (168 proposed rows,
+  24 everyday — not added), `verify-box-depths.txt` (33 "typical" depths to
+  confirm), `catalog-after-review.tsv` (the catalog dump both came from).
+- **Next live release**: now 0105–0140 (36), expect 141; re-rehearse with
+  the catalog review's first boot (`next-live-release-plan.md` § 5d).
+- Local: `bidrender_local`, `bidrender_test_localdev` at 141. Scratch
+  `bidrender_staging_restore_0140`, `bidrender_test_fresh0140` and worktree
+  `../bidrender-before-0140` can go once the code is on staging.
+
+## UPDATE 2026-10-09 (session 24)
 
 **Live untouched (only read by `backup.mts`).** Re-rehearsed the next
 release on a fresh copy of live with `local-dev` = `8913918` (0139 + B's
