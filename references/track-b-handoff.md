@@ -27,6 +27,12 @@
   changes (my preview wrapper re-indented that block). Resolved by taking
   C's block verbatim and re-wrapping; `git diff -w origin/local-dev`
   shows only B's changes (212 lines, the same as B's own diff).
+- **local-dev Gate 37868193507 went red at SMOKE** (test and staging
+  deploy green): the smoke helper `uploadFixturePlan` waited for the sheet
+  canvas, which Gap 6.1 now draws from the file BEFORE the attach, so
+  `beforeAll` closed the page mid-upload and the phone-panel test found an
+  empty bid. Fixed in `e2e/smoke/helpers.ts` (waits for `confirmAttach`).
+  Worth knowing generally: **a drawn sheet no longer means a saved set.**
 - **Next:** (c) the "fix this line" panel. Optional: staging timing of 6.1
   with `scripts/stagingUploadTiming.mts` once it is on staging.
 - **State:** no migrations. No dev server running.
