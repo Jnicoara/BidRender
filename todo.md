@@ -30,11 +30,22 @@ left as written rather than rewritten to match the rename.
 >
 > **Two app findings left open, NOT fixed here (owner/B to decide):**
 >
-> - [ ] **"This sheet: 0 marks" while the sheet's marks are loading** —
+> - [x] **"This sheet: 0 marks" while the sheet's marks are loading** —
 >       `ThisSheetLine` is fed `stamps = []` before `listForSheet` answers,
 >       so it states a zero it does not know (CLAUDE.md: a number that is
 >       quietly wrong). Usually a fraction of a second; on a slow staging,
 >       long enough for a test — or a person — to read it.
+>       **DONE 2026-10-08 (C):** `sheetLine` takes NULL for "not loaded"
+>       and says "This sheet: loading…" (no number); TakeoffPage keeps the
+>       queries' `undefined` (`sheetLoaded` = marks AND runs arrived) and
+>       both the panel line and the phone bar pass null until then. The
+>       Counts and Runs tabs' empty states ("Nothing counted on this sheet
+>       yet" — the same false zero in words) wait too: "Loading this
+>       sheet's marks…". A refetch keeps old data, so no flicker after the
+>       first load. `client/src/lib/panelTabs.test.ts` (+2), red without the
+>       fix; a real 0 still reads "0 marks". Seen on screen at 1366×768 and
+>       820×1180 with the marks held 8 s: loading → "3 marks · 6 items ·
+>       358 ft of runs", never 0.
 > - [x] **Ctrl+Z on a mark still being saved does nothing, silently.**
 >       **DONE 2026-10-08 (B):** every undo press goes through `stepBack`,
 >       which now asks `stillSavingMessage` (`@/lib/undoStack`) first: while
@@ -131,7 +142,7 @@ box, 700 series`. **Correction:** this line said DV34 then "seeds by
       throughout (stainless is still the owner's call). Nothing was missing
       from the catalog. `server/starterCoverSwaps.test.ts` (5, all red
       before). **Existing databases need `scripts/repairStarterCovers.mts
-  --apply` at the next release — TRACK A runs it** (staging, then live;
+--apply` at the next release — TRACK A runs it** (staging, then live;
       the seeder never rewrites an existing starter): swaps a shared starter
       only if its lines are EXACTLY the old recipe, and unlike the LT1/LT2
       repair it DOES swap a forked one (the fork keeps its own lines; the
@@ -150,8 +161,8 @@ box, 700 series`. **Correction:** this line said DV34 then "seeds by
       the starter default. RS1/RS2: the BOX was the mismatch (no 2-gang
       power plate exists; RS1's 6/3 overfills any 1-gang box), so both moved
       to a 4-11/16" box + `4-11/16" square raised cover, 30A/50A power
-    receptacle` — owner chose this. RS13 is outdoor: + `Weatherproof
-    in-use cover, 30A/50A power receptacle`. Folded into the same repair
+  receptacle` — owner chose this. RS13 is outdoor: + `Weatherproof
+  in-use cover, 30A/50A power receptacle`. Folded into the same repair
       (`interim` in `starterCoverSwaps.ts` also catches a database that
       already ran the first swap). Staging copy (before-0139 + 0139): 48
       swapped, rerun 48 already, **all 732 bid totals unchanged**. Track A's

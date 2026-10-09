@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **A sheet no longer says "0 marks" while its marks are still loading.**
+  For a moment after opening a sheet, the panel read "This sheet: 0 marks"
+  and "Nothing counted on this sheet yet", which looked like lost work. It
+  now says "loading…" until the marks arrive, and shows 0 only when there
+  really are none.
+
 - **A new plan set opens straight from your computer.** The first set on a
   bid now shows sheet 1 within about two seconds of picking the file, while
   it is still uploading, instead of after the upload and a second download
