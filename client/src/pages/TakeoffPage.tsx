@@ -372,6 +372,7 @@ import {
   type LocalPlan,
   type UploadPreview,
 } from "@/lib/localPlanSource";
+import { refetchPastInFlight } from "@/lib/refetchPastInFlight";
 import { startPageTextRead, type PageTextReads } from "@/lib/pageTextRead";
 import { pageTextFor, rememberPageText } from "@/lib/pageText";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
@@ -4295,11 +4296,27 @@ export default function TakeoffPage({
     beat the insert, the screen sat on "Sheets appear here once the document
     opens" and "This sheet: loading…" for good (local-dev Gate 37879795728,
     smoke test 2; seen to pass on the next staging run, so a race).
+
+    THAT WAS HALF OF IT (2026-10-09). The right key was invalidated, and the
+    invalidate still did nothing when the set's FIRST sheet read was in
+    flight: React Query only cancels a running fetch for a query that already
+    has data, so a new query folded the invalidate into the read that started
+    before the insert and stored its empty answer. Seen on staging 2 of 12,
+    no second read ever sent. So the read in flight is cancelled first
+    (@/lib/refetchPastInFlight, where the trap is pinned against a real
+    QueryClient).
   */
   const ensureSheets = trpc.bidPdfs.ensureSheets.useMutation({
     onSuccess: (_result, { bidPdfId }) => {
-      void utils.bidPdfs.sheets.invalidate({ bidPdfId });
-      void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
+      void refetchPastInFlight({
+        cancel: () => utils.bidPdfs.sheets.cancel({ bidPdfId }),
+        invalidate: () => utils.bidPdfs.sheets.invalidate({ bidPdfId }),
+      });
+      void refetchPastInFlight({
+        cancel: () => utils.bidPdfs.sheetIdentities.cancel({ bidPdfId }),
+        invalidate: () =>
+          utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId }),
+      });
       refreshSheets();
     },
   });

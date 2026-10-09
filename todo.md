@@ -133,6 +133,20 @@ left as written rather than rewritten to match the rename.
       the line)~~ — both built 2026-10-08, next item. Fixing a part keeps the line's frozen markup for the parts
       already priced and adds the new part's own markup under today's rules
       (`blendedMarkup`).
+- [x] **Smoke test 2, the empty sheet list after a first upload — second
+      half, 2026-10-09 (Track B).** The 2026-10-08 fix (`ensureSheets`
+      refreshes by the id it SENT) passed one Gate and the first smoke
+      re-run, then re-run 2 (Gate 37883298465, attempt 3) failed test 2
+      with nothing deploying. A staging probe reproduced it 2 of 12 and the
+      network log named it: the set's FIRST sheet read went out before the
+      insert and was still in flight when `ensureSheets` answered, and its
+      invalidate sent no second read. React Query cancels a running fetch
+      on invalidate only when the query already HAS data; a new one folds
+      the invalidate into the stale read. Fix: cancel, then invalidate
+      (`client/src/lib/refetchPastInFlight.ts`; its test pins the trap
+      against a real QueryClient and goes red without the cancel). **Worth
+      knowing generally:** "invalidate after a write" is not enough for a
+      query that may be making its FIRST read at that moment.
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the

@@ -4,6 +4,13 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-09]
+
+- **Fixed for good: a freshly uploaded plan set could still show no
+  sheets.** Yesterday's fix caught one way it happened; a second way, about
+  one upload in six on staging, left the sheet list empty until a reload.
+  The list is now always read again after the sheets are saved.
+
 ## [2026-10-08]
 
 - **Fix every flagged line in one pass.** Each warning under the bid total
