@@ -527,6 +527,21 @@ const meterBases: BaselineMaterial[] = ["100", "200", "320", "400"].map(
   beside the meter bases, until that shelf exists (see
   references/track-a-handoff-starter-assemblies.md).
 */
+/*
+  Multi-position meter centers (coverage check, 2026-10-09, owner-approved:
+  "meter center, 4–6 position" for apartments and a retail strip). One row
+  per position count rather than one for the range — a 4 and a 6 are
+  different prices. Specialty (specialty.ts).
+*/
+const meterCenters: BaselineMaterial[] = ["4", "6"].map(positions => ({
+  ...gear("Panels"),
+  name: `Meter center, ${positions}-position`,
+  searchAliases: aliases(
+    `${positions} gang ${positions} position multi meter stack pack bank apartment tenant units socket service`
+  ),
+  jobKind: "both" as const,
+}));
+
 const meterHub: BaselineMaterial = {
   ...gear("Panels"),
   name: '2" meter hub',
@@ -828,6 +843,20 @@ export const DISTRIBUTION: BaselineMaterial[] = [
     unitOfSale: "foot",
     searchAliases: aliases("flat wire undercarpet office floor ffc"),
   },
+  /*
+    Coverage check, 2026-10-09 (owner-approved; references/coverage-check.md
+    on track-c): the switchboard a retail strip's service lands in. One row
+    per common size — a 400A and an 800A are different prices — and
+    Specialty (specialty.ts), since few jobs buy one.
+  */
+  ...["400", "600", "800"].map(amps => ({
+    ...gear("Distribution Equipment"),
+    name: `${amps}A switchboard`,
+    searchAliases: aliases(
+      `${amps} amp swbd switch board main service distribution section 3 phase three phase`
+    ),
+    jobKind: "commercial" as const,
+  })),
 ];
 
 export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
@@ -849,6 +878,7 @@ export const PANELS_AND_BREAKERS: BaselineMaterial[] = [
   ...outdoorPanels,
   ...panelParts,
   ...meterBases,
+  ...meterCenters,
   meterHub,
   ...disconnects,
   acDisconnect,

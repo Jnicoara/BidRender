@@ -189,6 +189,16 @@ describe("counts and cable specs keep working", () => {
   it("a cable spec typed with a space, and a conductor inside a spec", () => {
     expect(search("6 3")[0]).toBe("6/3 NM-B Copper");
     expect(search("12 2")[0]).toBe("12/2 NM-B Copper");
+    // A finished spec never runs on into a longer number: "14 3" is not the
+    // NEMA 14-30R dryer receptacle, "6 3" not the 6-30R (2026-10-09).
+    expect(search("14 3")[0]).toBe("14/3 NM-B Copper");
+    expect(search("10 3")[0]).toBe("10/3 NM-B Copper");
+    expect(search("6 3")).not.toContain("30A 250V receptacle, NEMA 6-30R");
+    // …while the receptacles are still found by their own number.
+    expect(search("6-30")[0]).toBe("30A 250V receptacle, NEMA 6-30R");
+    expect(search("14-30")).toContain(
+      "30A dryer receptacle, NEMA 14-30R (4-wire)"
+    );
     expect(search("2/0 ser")).toContain("2/0-2/0-2/0-1 SER Aluminum");
   });
 

@@ -589,6 +589,9 @@ function isInches(word: string): boolean {
 /** A size a person has finished typing — see sizeTier. */
 const COMPLETE_SIZE = /^#?\d+(?:-\d+\/\d+|\/\d+)?(?:"|a|v|w|ft|mm)?$/;
 
+/** A cable spec as SPOKEN_CABLE joins it: "6-3", "12-2", "14-3". */
+const SPOKEN_CABLE_KEY = /^(?:14|12|10|8|6|4|2)-[234]$/;
+
 /**
  * A word's size, in one spelling: trailing punctuation off, the inch mark
  * off, and a hyphenated word suffix off — so '1/2"', "1/2", "1/2," key alike,
@@ -638,6 +641,20 @@ function sizeTier(term: string, indexed: IndexedItem<SearchableItem>): number {
     return 0;
   }
   // Still being typed: the START of a size, never the middle.
+  //
+  // Except a whole spoken cable spec ("6 3" joined to "6-3"): it is finished,
+  // so it must not run on into a longer number. "6-3" started "6-30r" and put
+  // the 6-30R receptacle above 6/3 NM-B; "14 3" and "10 3" led with the dryer
+  // receptacles (NEMA 14-30R / 10-30R) since the 2026-10-08 catalog review.
+  // Found 2026-10-09 when the coverage-check receptacles shipped.
+  if (SPOKEN_CABLE_KEY.test(key)) {
+    const runsOn = (w: string) =>
+      w.startsWith(key) && /\d/.test(w.charAt(key.length));
+    if (descWords[0]?.startsWith(key) && !runsOn(descWords[0])) return 2;
+    if (descWords.some(w => w.startsWith(key) && !runsOn(w))) return 3;
+    if (text.split(" ").some(w => w.startsWith(key) && !runsOn(w))) return 6;
+    return 0;
+  }
   if (descWords[0]?.startsWith(key)) return 2;
   if (descWords.some(w => w.startsWith(key))) return 3;
   if (startsAWord(text, key)) return 6;
