@@ -168,11 +168,20 @@ Then:
 
 **Both modes flag the cases nothing can route:** a device inside a no-go
 area, a device outside the outline, or no clear path at all (an outline
-drawn with a gap that seals a room off). A detour longer than **3× the
-plain right-angle distance** is also flagged rather than priced (the factor is
-open question Q11), because a path that long usually means an outline
-mistake, not a real route — a wrong number with no warning is the failure
-this app is built against.
+drawn with a gap that seals a room off).
+
+**A long detour is a WARNING, not a block (owner, Q11, 2026-10-09).** A
+routed path longer than **3× the plain right-angle distance** between its two
+devices is still priced — its feet stay in the circuit and the bid total —
+but the link carries an amber warning in words ("Routed 96 ft where the
+straight right-angle distance is 24 ft — check the outline") and the § 3d
+fix-it buttons beside it. A path that long usually means an outline mistake,
+not a real route, and a wrong number with no warning is the failure this app
+is built against; the warning is what keeps it from being silent, and the
+fix-it button is what keeps it from being stuck. It never refuses the bid or
+the print. 3× exactly is not warned; over 3× is. This applies to
+route-around only: flag-only never prices a detour, so there is nothing to
+warn about there.
 
 **What route-around never does**, from the decision itself: draw the path,
 store the path, offer a choice of route type, or use a straight line. The
@@ -181,7 +190,8 @@ row says how the number was made in words: "routed around No-go: cooler,
 
 ### 3d. "Fix it here" — what the button offers
 
-On a flagged device, in its row, in place (CLAUDE.md never-stuck rule):
+On a flagged device, and on a link carrying the long-detour warning (§ 3c,
+Q11), in its row, in place (CLAUDE.md never-stuck rule):
 
 - **Trace it** — opens the trace tool from that device; the traced run wins.
 - **Type a length** for that one link.
@@ -460,8 +470,9 @@ branch footage on the branch run type's lines.
   the other L, then the next edge; then **route-around** returns a length
   and corner count (and nothing else — no point list leaves the function),
   while **flag-only** flags. A device inside a no-go area, outside the
-  outline, or sealed off flags in BOTH modes. A detour over 3× the plain
-  distance flags in both. Fixtures whose shapes differ: a no-go area across
+  outline, or sealed off flags in BOTH modes. A route-around detour over 3×
+  the plain distance is PRICED and carries the warning and fix buttons
+  (Q11); exactly 3× carries none; neither blocks the print. Fixtures whose shapes differ: a no-go area across
   the middle of a long thin room, one in a corner, two that leave a single
   1 ft gap between them.
 - **The switch** (§ 3f): route-around for an internal-tier company, flag-only
@@ -496,7 +507,7 @@ tablet size; mark a device, watch the number move (staleness).
 ## 13. Owner questions — ANSWERED 2026-10-09
 
 The owner took the suggested answer on Q1–Q9. Q10 is replaced by the
-route-around decision. Q11 is new, from that decision, and still open.
+route-around decision. Q11, new from that decision, answered the same day.
 
 - **Q1. Tree or chain?** **Answer: tree with a 3-per-box cap as the
   default, chain as the per-bid option; the bake-off picks the default.**
@@ -523,6 +534,9 @@ route-around decision. Q11 is new, from that decision, and still open.
   around the outline and no-go areas in the main build; the owner's company
   and test accounts only until the attorney answers § 9's four questions;
   flag-only built and tested alongside as the fallback (§ 3c, § 3f).
-- **Q11 (new, open). Flag a detour longer than how many times the plain
-  right-angle distance?** _Suggest: 3×_ (§ 3c) — longer usually means an
-  outline mistake, not a real route.
+- **Q11. Flag a detour longer than how many times the plain right-angle
+  distance?** **Answer (owner, 2026-10-09): yes, 3× — and as a WARNING with
+  a fix-it button, not a block.** The detour stays priced; the link says in
+  words how much longer it is than the straight right-angle distance, with
+  the § 3d buttons beside it (§ 3c). This replaces the earlier draft
+  wording, "flagged rather than priced".
