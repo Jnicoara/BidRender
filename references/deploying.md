@@ -1197,6 +1197,85 @@ is absent. So the message means "no Anthropic key", worded by the wrong layer.
 It has sent one investigation down the wrong path already. Removing the shim is
 tracked in `todo.md`.
 
+### 8a. API key rotation — the Anthropic key
+
+**Written 2026-10-09**, when the live key `bidrender-app` was 7 days from
+expiring. **Create every replacement key with NO EXPIRATION** (Anthropic
+console → API keys → Create key → expiration "Never"). An expiring key is a
+scheduled outage nobody is watching for: AI goes quiet on the day, and the
+only signal is a log line (below). Spend is capped on the WORKSPACE (monthly
+limit and email alert, `todo.md`), not on the key, so a non-expiring key
+loses no protection.
+
+**Where the key lives — every place, by setting name** (checked 2026-10-09;
+values never written down here):
+
+| Place                              | Setting name                             | Key                                                                                                          |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Live app (DigitalOcean)            | `ANTHROPIC_API_KEY`, encrypted, Run Time | `bidrender-app` (the one expiring)                                                                           |
+| Staging app (DigitalOcean)         | `ANTHROPIC_API_KEY`, encrypted, Run Time | its OWN key, `bidridge-staging` (§ 11) — check its expiry too                                                |
+| Laptop, `.env.production.local`    | `ANTHROPIC_API_KEY`                      | a copy of live's; only `scripts/aiSmokeTest.mts`, `readerAccuracy.mts` and `scanMatchingCheck.mts` borrow it |
+| Laptop, `.env`                     | none — `DISABLE_AI_FEATURES` instead     | —                                                                                                            |
+| GitHub Actions                     | **none.** Secrets are `SMOKE_*` only     | the Gate's deploy-staging step only pushes a branch; it never carries a key                                  |
+| Tests                              | none — `vitest.setup.ts` blanks it       | —                                                                                                            |
+| Cloudflare Worker (`workers/cron`) | none                                     | —                                                                                                            |
+
+The code reads exactly one name, `ANTHROPIC_API_KEY` (`server/llm/anthropic.ts`).
+`BUILT_IN_FORGE_API_*` are the dead Manus fallback and are not set on either
+app; do not put the key there.
+
+**Keep staging and live on separate keys.** Staging's own key keeps its
+spend apart and means a leaked staging setting cannot spend live's money.
+Do not paste live's new key into staging to "keep it simple".
+
+**The swap — staging first, then live:**
+
+1. Anthropic console: create the new key, **no expiration**, named for where
+   it goes (`bidridge-staging-2`, `bidrender-app-2`). Put it straight into
+   the password manager. Leave the old key ENABLED until step 6.
+2. DigitalOcean → Apps → the **staging** app → Settings → find
+   `ANTHROPIC_API_KEY` (App-Level Environment Variables, or the web
+   component's own list — wherever it is shown today; change it there, do not
+   add a second copy at the other level) → Edit → paste the new key, keep
+   **Encrypt** ticked → Save. Saving REDEPLOYS the app; nothing in GitHub
+   needs changing. Wait for Activity to show the deploy live (3–6 min).
+3. Confirm the restart happened: `curl -s https://staging.bidridge.com/api/version`
+   — `builtAt` must be AFTER you pressed Save. (The key is read once per
+   process, so a server that did not restart is still on the old key.)
+4. **Confirm AI works on staging** (password page first):
+   - Dashboard → "Ask where to find something" → type `where are labor
+rates`. **Pass:** an answer WITH a button that opens the labor rates
+     screen. **Fail:** "I'm not sure which screen you want…" — today that is
+     also what a refused key looks like (see "When the key is missing or
+     refused" below), so treat it as a fail and go to the logs.
+   - DigitalOcean → staging app → Runtime Logs, search `llm-`: a line
+     `[llm-cost] feature=navigation … cost=…` is the pass. A line
+     `[navigation] helper call failed: request rejected … 401
+authentication_error` means the key was refused — re-paste it.
+   - Anthropic console → API keys: the new key shows a recent "last used".
+5. Repeat steps 2–4 on the **live** app, at `https://bidridge.com`. Do it
+   when nobody is mid-read in the plan viewer: the redeploy restarts the
+   server (requests in flight fail once; nothing is lost).
+6. Only now, in the Anthropic console, **disable** the old keys. Delete them
+   a day later, once nothing in the logs has asked for them.
+7. Laptop: replace `ANTHROPIC_API_KEY` in `.env.production.local` with live's
+   new key. Optional check, costs a few cents: `pnpm tsx scripts/aiSmokeTest.mts`
+   (one real call per feature).
+
+**When the key is missing or refused — what users see** (measured
+2026-10-09 with a refused key: the adapter raises `AuthenticationError`, 401,
+and every caller catches it). Nothing is written and no bid, quantity or
+price moves, so no $0 and no broken bid. The words:
+
+- Plan reader / sheet question / tie-break: "The plan reader could not be
+  reached. Nothing was changed — carry on marking by hand and try again
+  later." (true, but "later" does not help when the key is dead).
+- Alias suggestions: "Suggestions aren't available right now" (honest).
+- **Navigation helper: "I'm not sure which screen you want. Try naming what
+  you are trying to do…" — NOT honest**: it blames the question for a dead
+  key. Pinned on purpose by `server/navigation.test.ts` ("says nothing
+  alarming"). The fix is planned in `todo.md` (top), not built.
+
 ## 9. Storage needs a CORS rule, and without it no plan uploads — or views
 
 > **Configured — this is no longer an outstanding issue.** The rule is on the
@@ -1586,6 +1665,35 @@ link were refused.
   cause. Read the log line before changing settings.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
+
+### Staging: the coverage-check catalog adds (2026-10-09) — NOT on live
+
+No migration — 24 new shipped rows (`3cb5df3`, owner-approved from
+`coverage-check.md` on track-c), plus a search fix (a spoken cable spec no
+longer matches a longer NEMA number). Additive: renamed 0, retired 0.
+
+1. **Backups**: `staging-2026-10-09T05-13-27Z-before-coverage-rows.sql`
+   (rehearsal) and `staging-2026-10-09T16-13-17Z-before-coverage-push.sql`
+   (right before the push; staging had gained 8 bids in between), both 73
+   tables, in `C:\dev\bidrender-backups\`.
+2. **Rehearsal** on the first, restored locally (847 bids): staging's code
+   booted as a control, 847/847 unchanged; the new seed twice: **added 24,
+   renamed 0, retired 0, DELETED 0**, 1,825 active, 114 Specialty,
+   `VERDICT: CLEAN`; second boot nothing; **847/847 unchanged**
+   (`next-live-release-plan.md` § 5f).
+3. **Before** on staging (code `94471cc`): `bidTotals` 855 bids; catalog
+   1,941 rows / 1,801 active.
+4. **Code**: `2221948` pushed to `local-dev`; Gate 37957706459 test,
+   deploy-staging and smoke **all green**. By the time it was read, staging
+   served **`71f9f82`** — `2221948` plus two Track B commits (the "Fix
+   these" walk, a sheet-read fix; one touches `shared/lineNotPriced.ts`) —
+   so the after-read below covers both.
+5. **After** (16:53): `bidTotals --compare`: **855/855 existing bids
+   unchanged**; the 27 differences are bids 857–883 created between the
+   reads (12 by account 49162 at 16:19–16:21, 15 by the smoke account).
+   `catalogRehearsal compare`: **added 24, renamed 0, retired 0, DELETED 0,
+   1,825 active**, old spellings 0, duplicates 0, every reference
+   identical — `VERDICT: CLEAN`.
 
 ### Staging: the Sch 80 / 500 seed (2026-10-09, 04:17 UTC) — NOT on live
 

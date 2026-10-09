@@ -3,6 +3,51 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## A dead AI key must SAY so — PLAN, not built (Track A, 2026-10-09)
+
+**Found while preparing the `bidrender-app` key rotation** (`deploying.md`
+§ 8a). Measured with a refused key: the Anthropic adapter raises
+`AuthenticationError` (401) and every caller catches it — nothing is written,
+no bid, quantity or price moves. Good. But the WORDS are not all honest:
+
+| Feature                           | Says today                                                                  | Honest?                                |
+| --------------------------------- | --------------------------------------------------------------------------- | -------------------------------------- |
+| Navigation helper                 | "I'm not sure which screen you want. Try naming what you are trying to do…" | **No** — blames the question           |
+| Plan reader, sheet question, ties | "…could not be reached. Nothing was changed — … try again later."           | Partly — "later" won't help a dead key |
+| Alias suggestions                 | "Suggestions aren't available right now"                                    | Yes                                    |
+
+Nobody is told either: the 401 is in the server log only, so the owner finds
+out when a user complains — the "only find out when you need it" shape
+CLAUDE.md § Scheduled work says to MEASURE instead.
+
+**Plan:**
+
+1. `server/llm`: classify a failure — `AiUnavailable` (no key configured, or
+   Anthropic 401/403: the key itself is refused) versus a passing failure
+   (timeout, 5xx, overloaded, bad reply). One function, unit-tested, next to
+   `AiLimitReached`; never a string match on a message.
+2. Callers use it for the WORDS only:
+   - navigation: "The helper is unavailable right now. Every screen is in
+     the sidebar." — never "not sure which screen" for a server fault. Keep
+     "not sure" for a real model answer with no target. `navigation.test.ts`
+     "says nothing alarming" changes to assert the new sentence (it pinned
+     the old wording on purpose, so say why in the test).
+   - plan reader / sheet question / ties: same sentence as today minus "try
+     again later" when unavailable ("AI reading is unavailable right now.
+     Nothing was changed — carry on marking by hand.").
+   - alias suggestions: unchanged.
+3. Tell the owner: record the last `AiUnavailable` time (one row, no prompt
+   text — same privacy rule as `ai_usage_daily`) and show it on the admin AI
+   usage screen: "AI calls are being refused since <time> — check
+   `ANTHROPIC_API_KEY` (deploying.md § 8a)". Needs a column or table → a
+   migration (step 1 of three, additive).
+4. Tests that go red without it: a mocked 401 gives the unavailable sentence
+   on each feature; a mocked timeout still gives the passing one; nothing is
+   written in either case (no stored reader run marked as anything but
+   failed, no usage row).
+
+Not urgent if keys are created with no expiration, which is now the rule.
+
 ## Smoke step 10 is FLAKY — undo a mark (Track B, 2026-10-08) — FIXED (A, same day)
 
 > **CAUSE FOUND, and it was neither suspect below: the TEST read a number
