@@ -1381,8 +1381,9 @@ export const bidsRouter = router({
    * Fix an assembly or run line in place: the typed price, hours or role go
    * onto THIS line's snapshot, and — with "Also save to my library", ticked
    * by default — onto the library row too (owner, 2026-10-07). Nothing else
-   * moves. A locked, Won or Lost bid refuses the line and still takes the
-   * library half. The rules: shared/lineFix.ts; the writes: server/lineFix.ts.
+   * moves. A locked bid refuses the line and still takes the library half; a
+   * Won or Lost one asks "Change anyway?" first (`changeClosedBid`). The
+   * rules: shared/lineFix.ts; the writes: server/lineFix.ts.
    */
   fixLine: procedure
     .input(
@@ -1409,6 +1410,7 @@ export const bidsRouter = router({
         hours: hoursPerUnitSchema.optional(),
         laborRateId: z.number().int().positive().optional(),
         saveToLibrary: z.boolean(),
+        changeClosedBid: z.boolean().optional(),
       })
     )
     .mutation(({ input, ctx }) => fixLine(ctx, input)),

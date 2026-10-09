@@ -102,16 +102,26 @@ left as written rather than rewritten to match the rename.
       exactly as on the Library screen.
 - [x] **Nothing else moves.** Other lines with the same gap are OFFERED
       ("Update 1 other line on this bid to the new figure?"), never changed.
-- [x] **Locked, Won or Lost bids keep their lines** and say so; the library
-      half still works. There is no "Sent" status in the schema, so "gone to
-      the customer" is read as Won or Lost (the rule `bids.get` already uses
-      for stale rates). Owner may want Active included — ask.
+- [x] ~~**Locked, Won or Lost bids keep their lines**~~ **REVERSED by the
+      owner, 2026-10-08:** only a **LOCKED** bid refuses (and the library
+      half still works). A **Won or Lost** bid no longer blocks on its own:
+      Save first asks "This bid is marked Won/Lost. Changing it changes a
+      price you may have already sent. Change anyway?" with Continue and
+      Cancel (focus on Cancel; Cancel goes back to the form, typed values
+      kept, nothing saved). The server refuses the line AND the library half
+      until the request carries `changeClosedBid` (`lineFixClosedWarning` in
+      `shared/lineFix.ts`), so a screen that forgets to ask cannot change a
+      sent price. Draft and Active unchanged. Tests: 6 changed/new in
+      `server/fixLine.test.ts` (24 total), all six red against the old code.
+      On screen at 1536x864 and 820x1180 on a Won bid: asked, Cancel kept
+      "3.25", Continue fixed the line ($63.99 → $83.49, "1 part not priced"
+      gone).
 - [x] Tests: `server/fixLine.test.ts` (21; each guard removed in turn went
       red: refusal → 2, always-save → 2, never-save/no line write → 8) and
       `client/src/lib/fixLineDraft.test.ts` (9).
 - [x] On screen, laptop 1536x864 and tablet 820x1180: part priced ($85.32 →
       $185.32, strip 2 → 1 parts), offer shown, other line untouched; pole
-      line given a material and 6 h; a Won bid explains and offers only
+      line given a material and 6 h; (before the 2026-10-08 reversal) a Won bid explained and offered only
       "Save to my library". **Found by looking:** the offer vanished because
       the saved line stopped being fixable and the panel unmounted; it is now
       shown while open, not while fixable.
@@ -147,6 +157,17 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       `track-b-flash-*`, `track-b-starters-*`); their bids are archived and
       their plan sets removed, but the app cannot delete an account, so
       they need removing on the staging database itself, by whoever owns it.
+  - [ ] **Added 2026-10-08 (Track B):** the `track-b-upload-*` accounts from
+        the Gap 6.1 timing run (`fa0c697`) and the smoke-test-2 probe
+        (`track-b-upload-1791518663416@example.com`). Both bids archived,
+        both plan sets removed.
+  - [ ] **Local, not staging — B's machine only (`bidrender_local_b_new`):**
+        the "B fix-line check …" bids, assemblies and materials for user 1
+        (bids 1728396–1728399 and their fixtures; 1728399 is the Won one,
+        its line now fixed to $3.25 a part), the earlier "B batch 2 undo
+        check" / "B 6.1 preview check …" bids, and the local smoke account
+        `b-smoke-local@example.test` (user 15507) with its throwaway bids.
+        Disposable; delete before the local DB is used for anything real.
 - [x] **DONE 2026-10-08:** rebuilt with `--only assembly-hours --new-since
 <the a019453 copy>`. 183 rows (182 starters + DV34 held), 15 marked
       NEW, DV34 grey with "HELD - no 700 plate yet". The old copy had 0 typed

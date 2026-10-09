@@ -31,6 +31,7 @@ import {
   addMaterialToLine,
   hasLineFixGap,
   lineFixGaps,
+  lineFixClosedWarning,
   lineFixRefusal,
   pricePartsOnLine,
   type FrozenPart,
@@ -107,6 +108,8 @@ function runHoursField(role: string | null) {
 
 export type FixLineOptions = {
   refusal: string | null;
+  /** Won or Lost: the question asked before Save changes the line. */
+  closedWarning: string | null;
   gaps: LineFixGaps;
   assembly: {
     /** The row the library half writes: the company's own copy if it has one. */
@@ -149,6 +152,7 @@ export async function fixLineOptions(
   const gaps = lineFixGaps(line);
   const out: FixLineOptions = {
     refusal: lineFixRefusal(bid),
+    closedWarning: lineFixClosedWarning(bid),
     gaps,
     assembly: null,
     parts: [],
@@ -239,10 +243,15 @@ export type FixLineInput = {
   /** Assembly line: the role doing the hours. */
   laborRateId?: number;
   saveToLibrary: boolean;
+  /**
+   * The person answered Continue to "Change anyway?" on a Won or Lost bid.
+   * Without it such a bid refuses the line change (`lineFixClosedWarning`).
+   */
+  changeClosedBid?: boolean;
 };
 
 export type FixLineResult = {
-  /** False when the bid refused the line change (locked, Won, Lost). */
+  /** False when the bid refused the line change (locked). */
   lineChanged: boolean;
   refusal: string | null;
   /** What went into the library, in words, for the confirmation. */
@@ -266,6 +275,11 @@ export async function fixLine(
   const refusal = lineFixRefusal(bid);
   // Nothing at all would happen: say why rather than appear to succeed.
   if (refusal && !input.saveToLibrary) throw bad(refusal);
+  // Won or Lost: the line changes only once the person has said Continue.
+  // Refused before anything is written, the library half included, so a
+  // Cancel leaves everything as it was.
+  const closedWarning = lineFixClosedWarning(bid);
+  if (closedWarning && !input.changeClosedBid) throw bad(closedWarning);
 
   const gaps = lineFixGaps(line);
   const patch: Partial<BidLineItem> = {};

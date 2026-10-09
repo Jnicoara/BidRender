@@ -4282,8 +4282,26 @@ export default function TakeoffPage({
       )
     : null;
 
+  /*
+    The set's sheet rows are refreshed by the id SENT, never the open `doc`.
+
+    `refreshSheets` reads `doc?.id` from the render it was made in, and
+    useMutation takes new options in an EFFECT, which React runs for a parent
+    after its children's. The viewer re-announces a just-attached upload to
+    its row from its own effect (Gap 6.1, "THE SAME FILE, A NEW ROW"), in the
+    very commit the row first appears — so this mutation ran with the
+    previous render's onSuccess, whose `doc` was still null, and the sheet
+    list was never told its rows now existed. When the list's first read
+    beat the insert, the screen sat on "Sheets appear here once the document
+    opens" and "This sheet: loading…" for good (local-dev Gate 37879795728,
+    smoke test 2; seen to pass on the next staging run, so a race).
+  */
   const ensureSheets = trpc.bidPdfs.ensureSheets.useMutation({
-    onSuccess: refreshSheets,
+    onSuccess: (_result, { bidPdfId }) => {
+      void utils.bidPdfs.sheets.invalidate({ bidPdfId });
+      void utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId });
+      refreshSheets();
+    },
   });
 
   const detectScale = trpc.bidPdfs.detectSheetScale.useMutation({

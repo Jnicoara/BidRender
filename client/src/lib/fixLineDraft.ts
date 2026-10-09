@@ -53,6 +53,8 @@ export type FixLineRequest = {
   hours?: number;
   laborRateId?: number;
   saveToLibrary: boolean;
+  /** Continue was answered to "Change anyway?" on a Won or Lost bid. */
+  changeClosedBid?: boolean;
 };
 
 /** A typed number, or null for a blank box, or NaN for something unreadable. */

@@ -8,8 +8,10 @@
  *     untouched); unticked, the library does NOT change;
  *   • another bid using the same assembly does NOT move, ticked or not;
  *   • another line on this bid does NOT move until the person says so;
- *   • a Won bid and a locked bid refuse the line change, and allow the
- *     library change.
+ *   • a locked bid refuses the line change, and allows the library change;
+ *   • a Won bid changes the line only when the request carries the
+ *     "Change anyway?" answer, and changes NOTHING without it (owner,
+ *     2026-10-08).
  *
  * Fixture prices only, never shipped ones. The "starter" part is a fixture
  * BASELINE row (userId NULL) made and removed here, so the fork is real.
@@ -33,6 +35,7 @@ import { countNotPriced } from "../shared/lineNotPriced";
 import {
   addMaterialToLine,
   blendedMarkup,
+  lineFixClosedWarning,
   lineFixGaps,
   lineFixRefusal,
   pricePartsOnLine,
@@ -50,30 +53,39 @@ const caller = () =>
 
 // ─── The rules, without a database ────────────────────────────────────────────
 
-describe("which bids refuse a line fix", () => {
-  it("lets a Draft or Active bid change", () => {
-    expect(lineFixRefusal({ status: "Draft", quantitiesLockedAt: null })).toBe(
-      null
-    );
-    expect(lineFixRefusal({ status: "Active", quantitiesLockedAt: null })).toBe(
-      null
-    );
+describe("which bids refuse a line fix, and which ask first", () => {
+  const bidAt = (status: string, locked = false) => ({
+    status,
+    quantitiesLockedAt: locked ? new Date() : null,
+  });
+
+  it("lets a Draft or Active bid change, without asking", () => {
+    for (const status of ["Draft", "Active"]) {
+      expect(lineFixRefusal(bidAt(status))).toBe(null);
+      expect(lineFixClosedWarning(bidAt(status))).toBe(null);
+    }
   });
   it("refuses a locked bid, and says the library still works", () => {
-    const why = lineFixRefusal({
-      status: "Draft",
-      quantitiesLockedAt: new Date(),
-    });
+    const why = lineFixRefusal(bidAt("Draft", true));
     expect(why).toMatch(/locked/);
     expect(why).toMatch(/library/);
   });
-  it("refuses a Won or Lost bid", () => {
-    expect(lineFixRefusal({ status: "Won", quantitiesLockedAt: null })).toMatch(
-      /Won.*library/
+  // Owner, 2026-10-08: only a LOCKED bid refuses. Won and Lost ask instead.
+  it("does NOT refuse a Won or Lost bid on its own", () => {
+    expect(lineFixRefusal(bidAt("Won"))).toBe(null);
+    expect(lineFixRefusal(bidAt("Lost"))).toBe(null);
+  });
+  it("asks before a Won or Lost bid's line changes, naming the status", () => {
+    expect(lineFixClosedWarning(bidAt("Won"))).toBe(
+      "This bid is marked Won. Changing it changes a price you may have already sent. Change anyway?"
     );
-    expect(
-      lineFixRefusal({ status: "Lost", quantitiesLockedAt: null })
-    ).toMatch(/Lost/);
+    expect(lineFixClosedWarning(bidAt("Lost"))).toMatch(
+      /^This bid is marked Lost\. .*Change anyway\?$/
+    );
+  });
+  it("a locked Won bid refuses rather than asks", () => {
+    expect(lineFixRefusal(bidAt("Won", true))).toMatch(/locked/);
+    expect(lineFixClosedWarning(bidAt("Won", true))).toBe(null);
   });
 });
 
@@ -399,33 +411,69 @@ describe.skipIf(!hasDb)("fixing a line on the bid, end to end", () => {
     await expect(fix()).rejects.toThrow(/no unpriced parts/);
   });
 
-  it("a Won bid refuses the line change and still takes the library change", async () => {
+  it("a Won bid asks first: without the answer NOTHING changes, with it the line does", async () => {
     await caller().bids.update({ id: bidId, status: "Won" });
     const [line] = await linesOf(bidId);
+    const options = await caller().bids.fixLineOptions({
+      bidId,
+      lineId: line.id,
+    });
+    expect(options.refusal).toBe(null);
+    expect(options.closedWarning).toMatch(/marked Won.*Change anyway\?/);
+
+    // Not answered: refused before anything is written, library included.
     await expect(
       caller().bids.fixLine({
         bidId,
         lineId: line.id,
         partPrices: [{ materialId: starterLugId, price: 12.5 }],
-        saveToLibrary: false,
+        saveToLibrary: true,
       })
-    ).rejects.toThrow(/marked Won/);
+    ).rejects.toThrow(/marked Won.*Change anyway\?/);
+    const [untouched] = await linesOf(bidId);
+    expect(untouched.snapshotMaterialCost).toBe(line.snapshotMaterialCost);
+    expect((await libraryLug()).find(r => r.userId === USER)).toBeUndefined();
 
+    // Continue: the line changes, and the library too when ticked.
     const result = await caller().bids.fixLine({
       bidId,
       lineId: line.id,
       partPrices: [{ materialId: starterLugId, price: 12.5 }],
       saveToLibrary: true,
+      changeClosedBid: true,
     });
     expect(result).toEqual(
-      expect.objectContaining({ lineChanged: false, otherLineIds: [] })
+      expect.objectContaining({ lineChanged: true, refusal: null })
     );
-    expect(result.refusal).toMatch(/marked Won/);
     const [after] = await linesOf(bidId);
-    expect(after.snapshotMaterialCost).toBe(line.snapshotMaterialCost);
+    expect(Number(after.snapshotMaterialCost)).toBeGreaterThan(
+      Number(line.snapshotMaterialCost)
+    );
     expect((await libraryLug()).find(r => r.userId === USER)?.costPerUnit).toBe(
       "12.5000"
     );
+  });
+
+  it("a Lost bid asks too, and Continue changes only the line", async () => {
+    await caller().bids.update({ id: bidId, status: "Lost" });
+    const [line] = await linesOf(bidId);
+    const fix = (changeClosedBid?: boolean) =>
+      caller().bids.fixLine({
+        bidId,
+        lineId: line.id,
+        partPrices: [{ materialId: starterLugId, price: 7 }],
+        saveToLibrary: false,
+        changeClosedBid,
+      });
+    await expect(fix()).rejects.toThrow(/marked Lost.*Change anyway\?/);
+    const result = await fix(true);
+    expect(result.lineChanged).toBe(true);
+    expect(result.savedToLibrary).toEqual([]);
+    const [after] = await linesOf(bidId);
+    expect(Number(after.snapshotMaterialCost)).toBeGreaterThan(
+      Number(line.snapshotMaterialCost)
+    );
+    expect((await libraryLug()).find(r => r.userId === USER)).toBeUndefined();
   });
 
   it("a locked bid refuses the line change and still takes the library change", async () => {

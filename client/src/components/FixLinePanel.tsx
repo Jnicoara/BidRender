@@ -10,8 +10,10 @@
  * on the same missing number. Nothing else moves; other lines on this bid
  * are offered afterwards, never changed on their own.
  *
- * A locked, Won or Lost bid keeps its line: the panel says why, and the
- * library half still works (shared/lineFix.ts, `lineFixRefusal`).
+ * A locked bid keeps its line: the panel says why, and the library half still
+ * works (`lineFixRefusal`). A Won or Lost bid asks "Change anyway?" with
+ * Continue and Cancel before Save goes out (`lineFixClosedWarning`; owner,
+ * 2026-10-08). Both in shared/lineFix.ts.
  *
  * The rules are in @shared/lineFix and @/lib/fixLineDraft, where the suite can
  * reach them; this file only draws them.
@@ -98,6 +100,8 @@ export function FixLinePanel({
     request: FixLineRequest;
     lineIds: number[];
   } | null>(null);
+  /** Won or Lost: the save waiting on "Change anyway?". */
+  const [asking, setAsking] = useState<FixLineRequest | null>(null);
 
   const fix = trpc.bids.fixLine.useMutation();
   const set = (patch: Partial<FixDraft>) => {
@@ -123,8 +127,17 @@ export function FixLinePanel({
       setError(built.message);
       return;
     }
+    // Won or Lost: ask first. The server refuses without the answer too.
+    if (data.closedWarning) {
+      setAsking(built.request);
+      return;
+    }
+    await send(built.request);
+  };
+
+  const send = async (request: FixLineRequest) => {
     try {
-      const result = await fix.mutateAsync(built.request);
+      const result = await fix.mutateAsync(request);
       afterLibraryWrite(result.savedToLibrary);
       onChanged();
       if (!result.lineChanged) {
@@ -138,7 +151,7 @@ export function FixLinePanel({
           : "Line fixed."
       );
       if (result.otherLineIds.length > 0) {
-        setOffer({ request: built.request, lineIds: result.otherLineIds });
+        setOffer({ request, lineIds: result.otherLineIds });
       } else {
         onClose();
       }
@@ -195,6 +208,62 @@ export function FixLinePanel({
             onClick={onClose}
           >
             Not now
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (asking && data?.closedWarning) {
+    // Owner, 2026-10-08: a Won or Lost bid may already be with the customer,
+    // so its line changes only on Continue. Cancel goes back to the form with
+    // what was typed, and nothing is saved. Focus starts on Cancel: Enter
+    // twice must not change a sent price.
+    return (
+      <div
+        className={shell}
+        role="alertdialog"
+        aria-label={`Fix ${line.name}`}
+        onKeyDown={e => {
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setAsking(null);
+          }
+        }}
+      >
+        <p className="text-foreground">{data.closedWarning}</p>
+        {error ? (
+          <p role="alert" className="text-red-500">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            className="h-8"
+            disabled={fix.isPending}
+            onClick={() => {
+              const request = { ...asking, changeClosedBid: true };
+              void send(request).then(() => setAsking(null));
+            }}
+          >
+            {fix.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : null}
+            Continue
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            autoFocus
+            disabled={fix.isPending}
+            onClick={() => {
+              setError(null);
+              setAsking(null);
+            }}
+          >
+            Cancel
           </Button>
         </div>
       </div>
