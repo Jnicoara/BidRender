@@ -528,8 +528,14 @@ materialId, feet | notOnJob | clear })`, refused on a locked or sent bid
    raceway row.
 2. **Sch 80 underground types?** Not shipped; Sch 40 is the trench pipe.
    Say if risers or a spec need Sch 80 types too.
+   **ANSWERED (owner, 2026-10-09): yes** — nine Sch 80 underground types,
+   tape only. Planned in `sch80-and-500-plan.md` § 1; overrides § 3b's
+   "Sch 80 is not shipped".
 3. **The 500-series base/cover pair** has the same one-piece problem as 700
    (§ 3c). Merge it the same way? Not done here.
+   **ANSWERED (owner, 2026-10-09): yes** — 500 becomes a run type like 700,
+   base renamed, cover retired. Planned in `sch80-and-500-plan.md` § 2;
+   overrides § 3c's "Not touched here".
 4. **DV34's wire nuts** are kept (§ 3c). Say if "only device + box + plate"
    meant them too.
 5. **GR2's elbow and connectors, and GR5's connectors, follow the traced
