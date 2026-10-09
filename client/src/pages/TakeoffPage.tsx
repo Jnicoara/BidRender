@@ -364,6 +364,14 @@ import {
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
 import { plansPane } from "@/lib/plansPane";
+import {
+  UPLOAD_PREVIEW_NOTE,
+  localPlanKey,
+  paneSource,
+  previewsUpload,
+  type LocalPlan,
+  type UploadPreview,
+} from "@/lib/localPlanSource";
 import { startPageTextRead, type PageTextReads } from "@/lib/pageTextRead";
 import { pageTextFor, rememberPageText } from "@/lib/pageText";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
@@ -734,6 +742,18 @@ function usePdfWorker() {
     []
   );
 
+  // A set still on this machine, read a range at a time from the file
+  // (@/lib/localPlanSource). A File crosses to the worker as a handle to the
+  // file on disk, not a copy of its bytes.
+  const loadFile = useCallback((file: Blob, hash: string) => {
+    return new Promise<number>((resolve, reject) => {
+      const worker = workerRef.current;
+      if (!worker) return reject(new Error("Viewer not ready"));
+      loadWaiters.current.push({ resolve, reject });
+      worker.postMessage({ type: "loadFile", file, hash });
+    });
+  }, []);
+
   // Memoised as a whole. These go into effect dependency arrays, and a fresh
   // function identity per render restarts the document load on every render —
   // which cancels the one in flight, so the viewer spins forever and never
@@ -742,6 +762,7 @@ function usePdfWorker() {
     () => ({
       load,
       loadUrl,
+      loadFile,
       /**
        * Draw part of a page — or all of it, if no rect is given.
        *
@@ -863,7 +884,7 @@ function usePdfWorker() {
           input,
         }),
     }),
-    [load, loadUrl, ask]
+    [load, loadUrl, loadFile, ask]
   );
 }
 
@@ -953,6 +974,8 @@ class PlanUrlExpired extends Error {
 
 function PlanPane({
   doc,
+  localFile = null,
+  sourceKey,
   page,
   onPageCount,
   onPage,
@@ -973,6 +996,18 @@ function PlanPane({
   focusRequest,
 }: {
   doc: Document;
+  /**
+   * The set's file, when it is on this machine — read from here instead of
+   * `doc.url` (Gap 6.1, @/lib/localPlanSource).
+   */
+  localFile?: Blob | null;
+  /**
+   * The document's key: it reloads when this changes and not otherwise. An
+   * uploaded set keeps its preview's key when it attaches, so `doc.id` can
+   * change from the preview's to the row's under an open sheet. Defaults to
+   * the id.
+   */
+  sourceKey?: string;
   page: number;
   /**
    * A spot to bring to the middle of the view, in PAGE POINTS (the space
@@ -1197,6 +1232,7 @@ function PlanPane({
   const {
     load,
     loadUrl,
+    loadFile,
     render,
     outline,
     pageText,
@@ -1910,6 +1946,48 @@ function PlanPane({
    */
   const onUrlExpiredRef = useRef(onUrlExpired);
   onUrlExpiredRef.current = onUrlExpired;
+  // The same, for the two calls a file-backed open makes and the re-announce
+  // below repeats.
+  const onDocumentReadyRef = useRef(onDocumentReady);
+  onDocumentReadyRef.current = onDocumentReady;
+  const onPageCountRef = useRef(onPageCount);
+  onPageCountRef.current = onPageCount;
+  const onPageRenderedRef = useRef(onPageRendered);
+  onPageRenderedRef.current = onPageRendered;
+  /** What the open document turned out to hold, for the re-announce. */
+  const openedPages = useRef(0);
+  const openedOutline = useRef<{ pageNumber: number; title: string }[]>([]);
+
+  /*
+    THE SAME FILE, A NEW ROW (Gap 6.1). An upload shown from this machine
+    attaches under the SAME source key, so nothing reloads — and so nothing
+    that a load announces is announced again for the row that now exists:
+    its sheet rows (`onDocumentReady` → ensureSheets), its page count, the
+    drawn page's size, and the page text scale detection reads. Each was
+    sent while the id was the preview's, and the page ignored it.
+
+    So when the id changes under an open document, all four go again, to the
+    row. A stored set never gets here with a loaded document: its key IS its
+    id, so a new id is a new load, which announces them itself.
+  */
+  const announcedFor = useRef(doc.id);
+  useEffect(() => {
+    if (announcedFor.current === doc.id) return;
+    announcedFor.current = doc.id;
+    detected.current.delivered.clear();
+    const pages = openedPages.current;
+    if (pages === 0) return; // still opening: the load announces to this id
+    if (doc.pageCount !== pages) onPageCountRef.current(pages);
+    onDocumentReadyRef.current({
+      pageCount: pages,
+      outline: openedOutline.current,
+    });
+    const canvas = canvasRef.current;
+    if (canvas && drawnPage !== null)
+      onPageRenderedRef.current?.(drawnPage, canvas, drawnScale);
+    // Only the id: the rest is read as it is at that moment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc.id]);
 
   /**
    * The URL that has already been refreshed once.
@@ -1920,7 +1998,10 @@ function PlanPane({
    */
   const refreshedFor = useRef<string | null>(null);
 
-  const hash = String(doc.id);
+  const hash = sourceKey ?? String(doc.id);
+  // What the document is read FROM. For a set on this machine the stored
+  // link is not it, so a refetched link is not a reason to reload.
+  const source = localFile ?? doc.url;
 
   useEffect(() => {
     let cancelled = false;
@@ -1943,6 +2024,23 @@ function PlanPane({
         // because range loading was failing on every open (see
         // shared/pdfRangeLoading.ts). A fallback that nobody can see being
         // taken is how that stayed hidden, so it warns now.
+        //
+        // A set on this machine has no network to fall back from: its ranges
+        // come off the disk, and a failure there is reported as it is.
+        if (localFile) {
+          const pages = await loadFile(localFile, hash);
+          if (cancelled) return;
+          markUpload("viewer opened the file (from this machine)");
+          openedPages.current = pages;
+          setPageCount(pages);
+          setLoading(false);
+          if (doc.pageCount !== pages) onPageCountRef.current(pages);
+          const entries = await outline(hash).catch(() => []);
+          if (cancelled) return;
+          openedOutline.current = entries;
+          onDocumentReadyRef.current({ pageCount: pages, outline: entries });
+          return;
+        }
         const pages = await loadUrl(doc.url, hash, doc.byteSize ?? null).catch(
           async rangeError => {
             console.warn(
@@ -1984,6 +2082,7 @@ function PlanPane({
         );
         if (cancelled) return;
         markUpload("viewer opened the file");
+        openedPages.current = pages;
         setPageCount(pages);
         setLoading(false);
         if (doc.pageCount !== pages) onPageCount(pages);
@@ -1991,6 +2090,7 @@ function PlanPane({
         // Best-effort: no outline is normal, and must not fail the open.
         const entries = await outline(hash).catch(() => []);
         if (cancelled) return;
+        openedOutline.current = entries;
         onDocumentReady({ pageCount: pages, outline: entries });
       } catch (err) {
         if (cancelled) return;
@@ -2027,7 +2127,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [doc.id, doc.url, hash, load, loadUrl, outline]);
+  }, [source, hash, load, loadUrl, loadFile, outline]);
 
   // Paint the backdrop: the whole sheet, once per page, at RENDER_SCALE.
   useEffect(() => {
@@ -2340,7 +2440,9 @@ function PlanPane({
       () => pageText(page, hash),
       (p, text) => onSheetVisibleRef.current(p, text)
     );
-  }, [page, pageCount, loading, error, pageText, hash]);
+    // doc.id: a set shown from this machine gets its row under the same
+    // hash, and the page's text goes again to the row (the re-announce).
+  }, [page, pageCount, loading, error, pageText, hash, doc.id]);
 
   /*
     THE SCALE CHECK. Once a page with a set scale is on screen, its arcs and
@@ -2850,10 +2952,22 @@ export default function TakeoffPage({
     the upload box for it, and nothing may settle the address or judge a link
     against it (@/lib/plansPane).
   */
+  /*
+    Gap 6.1 (@/lib/localPlanSource): the sets uploaded on this visit, read
+    from the file, and a FIRST set shown from its file while it uploads.
+  */
+  const [localPlans, setLocalPlans] = useState<ReadonlyMap<number, LocalPlan>>(
+    () => new Map()
+  );
+  const [uploadPreview, setUploadPreview] = useState<UploadPreview | null>(
+    null
+  );
+  const uploadSeq = useRef(0);
   const pane = plansPane({
     isLoading,
     isError: docsFailed,
     count: docs.length,
+    previewing: uploadPreview !== null,
   });
   const docsKnown = pane === "plans" || pane === "empty";
 
@@ -3413,6 +3527,21 @@ export default function TakeoffPage({
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const doc = docs.find(d => d.id === selectedDocId) ?? docs[0] ?? null;
+  /** What the viewer opens, and from where (Gap 6.1, @/lib/localPlanSource). */
+  const planSource = paneSource(doc, localPlans, uploadPreview);
+  /** Read by an upload as it starts, without making it a dependency. */
+  const openDocId = useRef<number | null>(null);
+  openDocId.current = doc?.id ?? null;
+  // The preview has done its job once its row is the open set: same key, so
+  // the viewer carried straight on.
+  useEffect(() => {
+    if (
+      uploadPreview &&
+      doc &&
+      localPlans.get(doc.id)?.key === uploadPreview.key
+    )
+      setUploadPreview(null);
+  }, [uploadPreview, doc, localPlans]);
 
   /*
     THE TOOLS IN HAND, AS THIS SHEET SEES THEM. Every way of changing sheet
@@ -8872,9 +9001,24 @@ export default function TakeoffPage({
         );
       }
 
+      // Gap 6.1: one key for this upload, which the preview and the attached
+      // set both open under, so the viewer never reloads between them.
+      const localKey = localPlanKey(`${job.id}:${++uploadSeq.current}`);
+      const keepLocal = (attachedId: number) =>
+        setLocalPlans(prev =>
+          new Map(prev).set(attachedId, { file, key: localKey })
+        );
+
       try {
         setState({ state: "uploading", sent: 0 });
         startUploadTiming(file.name, file.size);
+        // Previewed: somebody may be on sheet 4 of it by the time it attaches,
+        // so attaching does not send them back to sheet 1.
+        const previewed = previewsUpload(openDocId.current);
+        if (previewed) {
+          setUploadPreview({ file, key: localKey, filename: file.name });
+          setPage(1);
+        }
 
         const handle = {
           onProgress: (sent: number) => setState({ sent }),
@@ -8911,9 +9055,10 @@ export default function TakeoffPage({
               byteSize: file.size,
             });
             markUpload("attach");
+            keepLocal(attached.id);
             setState({ state: "done" });
             setSelectedDocId(attached.id);
-            setPage(1);
+            if (!previewed) setPage(1);
             void utils.bidPdfs.list.invalidate({ bidId });
             toast.success(`${attached.filename} attached.`);
             // Sheet numbers, read once from the copy on this machine.
@@ -8963,10 +9108,11 @@ export default function TakeoffPage({
           byteSize: file.size,
         });
         markUpload("attach");
+        keepLocal(attached.id);
 
         setState({ state: "done" });
         setSelectedDocId(attached.id);
-        setPage(1);
+        if (!previewed) setPage(1);
         void utils.bidPdfs.list.invalidate({ bidId });
         toast.success(`${attached.filename} attached.`);
         // Sheet numbers, read once from the copy on this machine — the whole
@@ -8981,6 +9127,8 @@ export default function TakeoffPage({
           err instanceof Error
             ? ((err as Error & { detail?: string | null }).detail ?? null)
             : null;
+        // Nothing attached, so nothing may go on looking as if it had.
+        setUploadPreview(prev => (prev?.key === localKey ? null : prev));
         fail(message, { detail });
       }
     },
@@ -10413,6 +10561,9 @@ export default function TakeoffPage({
               <SheetIndex
                 sheets={sheets}
                 identities={identities}
+                emptyNote={
+                  planSource?.preview ? UPLOAD_PREVIEW_NOTE : undefined
+                }
                 readStatus={{
                   progress: doc ? sheetReads[doc.id] : undefined,
                   pagesRead: identityData?.pagesRead ?? 0,
@@ -10446,10 +10597,15 @@ export default function TakeoffPage({
             </div>
           </SidePanel>
 
-          {doc && (
+          {planSource && (
             <PlanPane
-              key={doc.id}
-              doc={doc}
+              // The SOURCE key, not the id: a set uploaded on this visit
+              // keeps its preview's key when it attaches, so the viewer
+              // carries on rather than reloading (@/lib/localPlanSource).
+              key={planSource.sourceKey}
+              doc={planSource.doc}
+              localFile={planSource.localFile}
+              sourceKey={planSource.sourceKey}
               page={page}
               focusRequest={focusRequest}
               onPage={setPage}
@@ -10457,9 +10613,10 @@ export default function TakeoffPage({
               fitOnly={phone}
               thumbnailWants={wantedThumbnails}
               onThumbnail={rememberThumbnail}
-              onPageCount={pageCount =>
-                setPageCount.mutate({ id: doc.id, pageCount })
-              }
+              onPageCount={pageCount => {
+                // None on a preview: it has no row yet. Re-sent when it has.
+                if (doc) setPageCount.mutate({ id: doc.id, pageCount });
+              }}
               onDocumentReady={handleDocumentReady}
               onSheetVisible={handleSheetVisible}
               scaleSet={
@@ -10485,7 +10642,7 @@ export default function TakeoffPage({
               onUrlExpired={async () => {
                 await utils.bidPdfs.list.invalidate({ bidId });
                 const fresh = utils.bidPdfs.list.getData({ bidId });
-                return fresh?.find(d => d.id === doc.id)?.url ?? null;
+                return fresh?.find(d => d.id === doc?.id)?.url ?? null;
               }}
               overlay={size =>
                 /*
@@ -10505,7 +10662,9 @@ export default function TakeoffPage({
                   repeated here rather than dropped so the block below keeps
                   its shape.
                 */
-                size.width > 0 ? (
+                // No layer at all on a preview: it has no row, so nothing on it
+                // can be marked, traced or measured yet (Gap 6.1).
+                size.width > 0 && !planSource?.preview ? (
                   <>
                     {/* Calibration takes the drawing while it is on: two
                               clicks that mean something different from every
@@ -11325,508 +11484,527 @@ export default function TakeoffPage({
               updatePanels(current => setPanelWidth(current, "work", width))
             }
           >
-            <RunsPanel
-              runColors={runColors}
-              pins={pinStyles}
-              lookEditor={(groupId, name, swatch) => {
-                const style = pinStyles.get(groupId);
-                const row = bidCounts.data?.groups.find(g => g.id === groupId);
-                if (!style || !row) return swatch;
-                return (
-                  <PinLookEditor
-                    name={name}
-                    style={style}
-                    own={row.look}
-                    everyJob={everyJobTarget(row)}
-                    busy={setLook.isPending}
-                    onSave={look => setLook.mutate({ id: groupId, ...look })}
-                  >
-                    {swatch}
-                  </PinLookEditor>
-                );
-              }}
-              hideOtherRuns={hideOtherRuns}
-              onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
-              onAddLeg={run => {
-                // A leg on a sheet with no scale is drawn and then typed, like
-                // any run there (§ 4c) — each leg has its own length.
-                addLegTo({ ...run, parentRunId: run.parentRunId ?? null });
-              }}
-              runs={visibleRuns.map(r => ({
-                ...r,
-                firstPoint: r.points[0] ?? null,
-                spec:
-                  r.runTypeId === null
-                    ? null
-                    : (specByRunType.get(r.runTypeId) ?? null),
-                typeDefaults:
-                  r.runTypeId === null
-                    ? null
-                    : (circuitDefaultsByRunType.get(r.runTypeId) ?? null),
-              }))}
-              stampGroups={stampGroups}
-              groupDrops={groupDropsById}
-              onSetGroupDrop={(groupId, patch) =>
-                setGroupDrop.mutate({ id: groupId, ...patch })
-              }
-              dropHeightTypes={(heightsForBid?.types ?? []).filter(
-                t => t.isActive
-              )}
-              dropRunTypes={runTypes.data ?? []}
-              bridge={bridgeByGroup}
-              quantitiesLocked={quantitiesLocked}
-              waitingToSend={bidCounts.data?.waitingToSend}
-              countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
-              onSendToBid={id => sendToBid.mutate({ id })}
-              linkAssemblies={allAssemblies.map(a => ({
-                id: a.id,
-                name: a.name,
-                category: a.category ?? null,
-              }))}
-              onLinkAssembly={(id, assemblyId) =>
-                setGroupSource.mutate({ id, assemblyId })
-              }
-              sendingGroupId={
-                sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
-              }
-              onJumpTo={jumpTo}
-              onRemoveStamp={id => removeStamp.mutate({ id })}
-              summary={
-                <TakeoffSummaryPanel
-                  summary={bidSummary.data}
-                  sending={sendAll.isPending}
-                  onSendAll={expect => sendAll.mutate({ bidId, expect })}
-                  onPickWire={to => {
-                    openRunAt(to);
-                    setPickWireFor(to.runId);
-                  }}
-                />
-              }
-              onAnswerBranchWiring={(runId, answer) =>
-                setBranchWiring.mutate({ id: runId, branchWiring: answer })
-              }
-              onSetTypedLength={(runId, inches) =>
-                setTypedLength.mutate({ id: runId, typedLengthInches: inches })
-              }
-              onSetRunExtras={(runId, patch) =>
-                setRunExtras.mutate({ runId, ...patch })
-              }
-              customHeightTypes={customHeightTypes}
-              onAnswerPullPoint={answer => answerPullPoint.mutate(answer)}
-              onUndoPullPoint={id => undoPullPoint.mutate({ id })}
-              pullPointBusy={
-                answerPullPoint.isPending || undoPullPoint.isPending
-              }
-              runTypeBridge={runTypeBridge.data}
-              sendingRunTypeId={sendingRunTypeId}
-              onSendRunType={runTypeId => {
-                setSendingRunTypeId(runTypeId);
-                sendRunType.mutate({ bidId, runTypeId });
-              }}
-              renderRunType={run => {
-                const armed = (runTypes.data ?? []).find(
-                  t => t.id === run.runTypeId
-                );
-                return (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[0.7rem] text-muted-foreground shrink-0">
-                        This run is
-                      </span>
-                      <RunTypePicker
-                        pathType={run.pathType}
-                        runColors={runColors}
-                        customHeightTypes={customHeightTypes}
-                        types={runTypes.data ?? []}
-                        armedId={run.runTypeId}
-                        onPick={type =>
-                          setRunTypeFor.mutate({
-                            id: run.id,
-                            runTypeId: type.id,
-                          })
-                        }
-                        catalog={allMaterials}
-                        onCreate={spec =>
-                          createRunType
-                            .mutateAsync({ ...spec, pathType: run.pathType })
-                            .then(type =>
-                              setRunTypeFor.mutate({
-                                id: run.id,
-                                runTypeId: type.id,
-                              })
-                            )
-                            .catch(() => {
-                              /* the mutation's onError has already said so */
+            {planSource?.preview ? (
+              // A preview has no row, so nothing can be counted on it yet —
+              // and "pick something from Count in the toolbar" would point
+              // at a toolbar that is not there (Gap 6.1).
+              <p className="px-4 py-6 text-center text-xs leading-snug text-muted-foreground">
+                Counting starts once this set is saved.
+              </p>
+            ) : (
+              <RunsPanel
+                runColors={runColors}
+                pins={pinStyles}
+                lookEditor={(groupId, name, swatch) => {
+                  const style = pinStyles.get(groupId);
+                  const row = bidCounts.data?.groups.find(
+                    g => g.id === groupId
+                  );
+                  if (!style || !row) return swatch;
+                  return (
+                    <PinLookEditor
+                      name={name}
+                      style={style}
+                      own={row.look}
+                      everyJob={everyJobTarget(row)}
+                      busy={setLook.isPending}
+                      onSave={look => setLook.mutate({ id: groupId, ...look })}
+                    >
+                      {swatch}
+                    </PinLookEditor>
+                  );
+                }}
+                hideOtherRuns={hideOtherRuns}
+                onToggleHideOtherRuns={() => setHideOtherRuns(on => !on)}
+                onAddLeg={run => {
+                  // A leg on a sheet with no scale is drawn and then typed, like
+                  // any run there (§ 4c) — each leg has its own length.
+                  addLegTo({ ...run, parentRunId: run.parentRunId ?? null });
+                }}
+                runs={visibleRuns.map(r => ({
+                  ...r,
+                  firstPoint: r.points[0] ?? null,
+                  spec:
+                    r.runTypeId === null
+                      ? null
+                      : (specByRunType.get(r.runTypeId) ?? null),
+                  typeDefaults:
+                    r.runTypeId === null
+                      ? null
+                      : (circuitDefaultsByRunType.get(r.runTypeId) ?? null),
+                }))}
+                stampGroups={stampGroups}
+                groupDrops={groupDropsById}
+                onSetGroupDrop={(groupId, patch) =>
+                  setGroupDrop.mutate({ id: groupId, ...patch })
+                }
+                dropHeightTypes={(heightsForBid?.types ?? []).filter(
+                  t => t.isActive
+                )}
+                dropRunTypes={runTypes.data ?? []}
+                bridge={bridgeByGroup}
+                quantitiesLocked={quantitiesLocked}
+                waitingToSend={bidCounts.data?.waitingToSend}
+                countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
+                onSendToBid={id => sendToBid.mutate({ id })}
+                linkAssemblies={allAssemblies.map(a => ({
+                  id: a.id,
+                  name: a.name,
+                  category: a.category ?? null,
+                }))}
+                onLinkAssembly={(id, assemblyId) =>
+                  setGroupSource.mutate({ id, assemblyId })
+                }
+                sendingGroupId={
+                  sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
+                }
+                onJumpTo={jumpTo}
+                onRemoveStamp={id => removeStamp.mutate({ id })}
+                summary={
+                  <TakeoffSummaryPanel
+                    summary={bidSummary.data}
+                    sending={sendAll.isPending}
+                    onSendAll={expect => sendAll.mutate({ bidId, expect })}
+                    onPickWire={to => {
+                      openRunAt(to);
+                      setPickWireFor(to.runId);
+                    }}
+                  />
+                }
+                onAnswerBranchWiring={(runId, answer) =>
+                  setBranchWiring.mutate({ id: runId, branchWiring: answer })
+                }
+                onSetTypedLength={(runId, inches) =>
+                  setTypedLength.mutate({
+                    id: runId,
+                    typedLengthInches: inches,
+                  })
+                }
+                onSetRunExtras={(runId, patch) =>
+                  setRunExtras.mutate({ runId, ...patch })
+                }
+                customHeightTypes={customHeightTypes}
+                onAnswerPullPoint={answer => answerPullPoint.mutate(answer)}
+                onUndoPullPoint={id => undoPullPoint.mutate({ id })}
+                pullPointBusy={
+                  answerPullPoint.isPending || undoPullPoint.isPending
+                }
+                runTypeBridge={runTypeBridge.data}
+                sendingRunTypeId={sendingRunTypeId}
+                onSendRunType={runTypeId => {
+                  setSendingRunTypeId(runTypeId);
+                  sendRunType.mutate({ bidId, runTypeId });
+                }}
+                renderRunType={run => {
+                  const armed = (runTypes.data ?? []).find(
+                    t => t.id === run.runTypeId
+                  );
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[0.7rem] text-muted-foreground shrink-0">
+                          This run is
+                        </span>
+                        <RunTypePicker
+                          pathType={run.pathType}
+                          runColors={runColors}
+                          customHeightTypes={customHeightTypes}
+                          types={runTypes.data ?? []}
+                          armedId={run.runTypeId}
+                          onPick={type =>
+                            setRunTypeFor.mutate({
+                              id: run.id,
+                              runTypeId: type.id,
                             })
-                        }
-                        onSave={saveRunType}
-                        disabled={quantitiesLocked}
-                      >
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-6 gap-1 px-2 text-[0.7rem] min-w-0"
-                          aria-label={`Change what this run is`}
+                          }
+                          catalog={allMaterials}
+                          onCreate={spec =>
+                            createRunType
+                              .mutateAsync({ ...spec, pathType: run.pathType })
+                              .then(type =>
+                                setRunTypeFor.mutate({
+                                  id: run.id,
+                                  runTypeId: type.id,
+                                })
+                              )
+                              .catch(() => {
+                                /* the mutation's onError has already said so */
+                              })
+                          }
+                          onSave={saveRunType}
                           disabled={quantitiesLocked}
                         >
-                          <span className="truncate">
-                            {armed?.label ?? run.typeName ?? "Not said"}
-                          </span>
-                          <ChevronDown className="w-3 h-3 shrink-0" />
-                        </Button>
-                      </RunTypePicker>
-                    </div>
-                    <RunSpecEditor
-                      pathType={run.pathType}
-                      current={resolveRunType(
-                        runTypes.data ?? [],
-                        run.runTypeId
-                      )}
-                      /*
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 gap-1 px-2 text-[0.7rem] min-w-0"
+                            aria-label={`Change what this run is`}
+                            disabled={quantitiesLocked}
+                          >
+                            <span className="truncate">
+                              {armed?.label ?? run.typeName ?? "Not said"}
+                            </span>
+                            <ChevronDown className="w-3 h-3 shrink-0" />
+                          </Button>
+                        </RunTypePicker>
+                      </div>
+                      <RunSpecEditor
+                        pathType={run.pathType}
+                        current={resolveRunType(
+                          runTypes.data ?? [],
+                          run.runTypeId
+                        )}
+                        /*
                         What the ARITHMETIC reads, not what is stored. A
                         quantity trace pulls one circuit of its type (D21) and
                         has no rows — handed its stored ones, this said "none
                         pulled yet" beside 230 ft of wire on the row above.
                         Seen on screen 2026-09-26.
                       */
-                      circuits={
-                        run.traceMode === "quantity"
-                          ? run.typeDefaults?.conductorCount
-                            ? [
-                                {
-                                  conductorCount:
-                                    run.typeDefaults.conductorCount,
-                                },
-                              ]
-                            : []
-                          : run.circuits
-                      }
-                      locked={quantitiesLocked}
-                      onSave={patch =>
-                        respecifyRun.mutateAsync({ id: run.id, ...patch })
-                      }
-                      openRequested={pickWireFor === run.id}
-                      onOpened={() => setPickWireFor(null)}
-                    />
-                  </div>
-                );
-              }}
-              renderRunEnds={run =>
-                run.traceMode === "quantity" ? (
-                  // A quantity trace has no ends to set — it has drops to
-                  // review, for the whole trace, under whichever leg is open.
-                  <QuantityDropsReview
-                    bidId={bidId}
-                    legs={
-                      quantityLegsByRoot.get(run.parentRunId ?? run.id) ?? []
-                    }
-                    toKind={traceEnds.endKind}
-                    onToKind={endKind =>
-                      updateTraceEnds({ ...traceEnds, endKind })
-                    }
-                    types={heightsForBid?.types ?? []}
-                    distributionInches={
-                      heightsForBid?.distributionHeight.inches ?? null
-                    }
-                    selected={selectedDrop}
-                    onSelect={setSelectedDrop}
-                    onJumpTo={jumpTo}
-                    onAnswer={answers =>
-                      answerDrops.mutate({
-                        rootRunId: run.parentRunId ?? run.id,
-                        answers,
-                      })
-                    }
-                    busy={answerDrops.isPending}
-                  />
-                ) : (
-                  <>
-                    {/* Every end of every leg of this run (owner, 2026-09-29). */}
-                    <RunEndsSection
+                        circuits={
+                          run.traceMode === "quantity"
+                            ? run.typeDefaults?.conductorCount
+                              ? [
+                                  {
+                                    conductorCount:
+                                      run.typeDefaults.conductorCount,
+                                  },
+                                ]
+                              : []
+                            : run.circuits
+                        }
+                        locked={quantitiesLocked}
+                        onSave={patch =>
+                          respecifyRun.mutateAsync({ id: run.id, ...patch })
+                        }
+                        openRequested={pickWireFor === run.id}
+                        onOpened={() => setPickWireFor(null)}
+                      />
+                    </div>
+                  );
+                }}
+                renderRunEnds={run =>
+                  run.traceMode === "quantity" ? (
+                    // A quantity trace has no ends to set — it has drops to
+                    // review, for the whole trace, under whichever leg is open.
+                    <QuantityDropsReview
                       bidId={bidId}
-                      legs={runEndsLegs(run.parentRunId ?? run.id)}
-                      onSave={onSetEnds}
+                      legs={
+                        quantityLegsByRoot.get(run.parentRunId ?? run.id) ?? []
+                      }
+                      toKind={traceEnds.endKind}
+                      onToKind={endKind =>
+                        updateTraceEnds({ ...traceEnds, endKind })
+                      }
+                      types={heightsForBid?.types ?? []}
+                      distributionInches={
+                        heightsForBid?.distributionHeight.inches ?? null
+                      }
+                      selected={selectedDrop}
+                      onSelect={setSelectedDrop}
                       onJumpTo={jumpTo}
-                      highlight={endHighlight}
-                      locked={quantitiesLocked}
-                    />
-                    <RunEndsEditor
-                      bidId={bidId}
-                      ends={run.ends ?? NO_ENDS}
-                      verticals={run.quantities?.verticals ?? null}
-                      suggestion={suggestionForRun(run.id)}
-                      teeEnds={{
-                        start: Boolean(run.startTee),
-                        end: Boolean(run.endTee),
-                      }}
-                      onSave={patch => onSetEnds(run.id, patch)}
-                      runsAt={run.runsAt}
-                      onRunsAt={runsAt =>
-                        setRunsAt.mutate({ runId: run.id, runsAt })
+                      onAnswer={answers =>
+                        answerDrops.mutate({
+                          rootRunId: run.parentRunId ?? run.id,
+                          answers,
+                        })
                       }
-                      locked={quantitiesLocked}
-                      endsElsewhere
+                      busy={answerDrops.isPending}
                     />
-                  </>
-                )
-              }
-              /*
+                  ) : (
+                    <>
+                      {/* Every end of every leg of this run (owner, 2026-09-29). */}
+                      <RunEndsSection
+                        bidId={bidId}
+                        legs={runEndsLegs(run.parentRunId ?? run.id)}
+                        onSave={onSetEnds}
+                        onJumpTo={jumpTo}
+                        highlight={endHighlight}
+                        locked={quantitiesLocked}
+                      />
+                      <RunEndsEditor
+                        bidId={bidId}
+                        ends={run.ends ?? NO_ENDS}
+                        verticals={run.quantities?.verticals ?? null}
+                        suggestion={suggestionForRun(run.id)}
+                        teeEnds={{
+                          start: Boolean(run.startTee),
+                          end: Boolean(run.endTee),
+                        }}
+                        onSave={patch => onSetEnds(run.id, patch)}
+                        runsAt={run.runsAt}
+                        onRunsAt={runsAt =>
+                          setRunsAt.mutate({ runId: run.id, runsAt })
+                        }
+                        locked={quantitiesLocked}
+                        endsElsewhere
+                      />
+                    </>
+                  )
+                }
+                /*
                 THE READER has its own tab since 2026-09-30 (§ 1 of the
                 panel plan). It used to sit above the layers and legend in
                 one long column. Opening the tab starts nothing: a read is
                 a button, never an effect (CLAUDE.md § AI features).
               */
-              reader={
-                readerAvailable ? (
-                  <CoPilotPanel
-                    state={copilot}
-                    reading={readSheet.isPending}
-                    canRead={canRead}
-                    onRead={runReader}
-                    onConfirm={findingIds => {
-                      if (!copilot?.runId) return;
-                      confirmFindings.mutate({
-                        runId: copilot.runId,
-                        findingIds,
-                        confirmed: true,
-                      });
-                    }}
-                    onDismiss={findingIds =>
-                      dismissFindings.mutate({ findingIds })
-                    }
-                    onCorrect={(findingId, symbolLinkId) =>
-                      correctFinding.mutate({
-                        findingId,
-                        symbolLinkId,
-                        confirmed: true,
-                      })
-                    }
-                    onJumpTo={jumpTo}
-                    symbols={symbols}
-                    onAsk={question => {
-                      if (!activeSheet) return;
-                      const snapshot = snapshotPage(
-                        pageCanvas.current,
-                        pageCanvasScale.current,
-                        copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
-                      );
-                      if (!snapshot) return;
-                      askCopilot.mutate({
-                        sheetId: activeSheet.id,
-                        question,
-                        pageImage: snapshot.image,
-                        pageText: pageTextFor(
-                          pageTextByPage.current,
-                          doc?.id,
-                          page
-                        ),
-                      });
-                    }}
-                    asking={askCopilot.isPending}
-                    answer={copilotAnswer}
-                    onClearAnswer={() => setCopilotAnswer(null)}
-                  />
-                ) : undefined
-              }
-              tab={panelTab}
-              tabs={panelTabs}
-              onTab={choosePanelTab}
-              warnedTabs={warnedTabs}
-              phone={compact}
-              onSheetsSlot={setSheetsSlot}
-              focusGroupId={
-                selectedStampIds.size === 0
-                  ? null
-                  : (stamps.find(s => selectedStampIds.has(s.id))?.groupId ??
-                    null)
-              }
-              layers={
-                <LayersPanel
-                  present={present}
-                  state={effectiveLayers}
-                  onChange={update =>
-                    setLayerState(previous =>
-                      update(
-                        previous ??
-                          allLayersOn([...layeredStamps, ...layeredRuns])
+                reader={
+                  readerAvailable ? (
+                    <CoPilotPanel
+                      state={copilot}
+                      reading={readSheet.isPending}
+                      canRead={canRead}
+                      onRead={runReader}
+                      onConfirm={findingIds => {
+                        if (!copilot?.runId) return;
+                        confirmFindings.mutate({
+                          runId: copilot.runId,
+                          findingIds,
+                          confirmed: true,
+                        });
+                      }}
+                      onDismiss={findingIds =>
+                        dismissFindings.mutate({ findingIds })
+                      }
+                      onCorrect={(findingId, symbolLinkId) =>
+                        correctFinding.mutate({
+                          findingId,
+                          symbolLinkId,
+                          confirmed: true,
+                        })
+                      }
+                      onJumpTo={jumpTo}
+                      symbols={symbols}
+                      onAsk={question => {
+                        if (!activeSheet) return;
+                        const snapshot = snapshotPage(
+                          pageCanvas.current,
+                          pageCanvasScale.current,
+                          copilot?.readerModel ?? PLAN_READER_FALLBACK_MODEL
+                        );
+                        if (!snapshot) return;
+                        askCopilot.mutate({
+                          sheetId: activeSheet.id,
+                          question,
+                          pageImage: snapshot.image,
+                          pageText: pageTextFor(
+                            pageTextByPage.current,
+                            doc?.id,
+                            page
+                          ),
+                        });
+                      }}
+                      asking={askCopilot.isPending}
+                      answer={copilotAnswer}
+                      onClearAnswer={() => setCopilotAnswer(null)}
+                    />
+                  ) : undefined
+                }
+                tab={panelTab}
+                tabs={panelTabs}
+                onTab={choosePanelTab}
+                warnedTabs={warnedTabs}
+                phone={compact}
+                onSheetsSlot={setSheetsSlot}
+                focusGroupId={
+                  selectedStampIds.size === 0
+                    ? null
+                    : (stamps.find(s => selectedStampIds.has(s.id))?.groupId ??
+                      null)
+                }
+                layers={
+                  <LayersPanel
+                    present={present}
+                    state={effectiveLayers}
+                    onChange={update =>
+                      setLayerState(previous =>
+                        update(
+                          previous ??
+                            allLayersOn([...layeredStamps, ...layeredRuns])
+                        )
                       )
-                    )
-                  }
-                  filtered={hiddenCount > 0}
-                  hiddenCount={hiddenCount}
-                />
-              }
-              legend={
-                <>
-                  <LegendPanel
-                    symbols={symbols}
-                    assemblies={allAssemblies.map(a => ({
-                      id: a.id,
-                      name: a.name,
-                      category: a.category,
-                    }))}
-                    activeAssemblyId={armedGroup?.assemblyId ?? null}
-                    activeSymbolId={armedGroup?.symbolId ?? null}
-                    capturing={capturingSymbol}
-                    onStartCapture={() => {
-                      // The box is a drag on the drawing; a count still in
-                      // hand would take the same press as a mark.
-                      setArmedGroup(null);
-                      setSelectingText(false);
-                      setCapturingLegend(false);
-                      setCapturingSymbol(true);
-                    }}
-                    onCancelCapture={() => setCapturingSymbol(false)}
-                    capturingLegend={capturingLegend}
-                    onStartLegend={() => {
-                      setSelectingText(false);
-                      setCapturingSymbol(false);
-                      setPendingCapture(null);
-                      setCapturingLegend(true);
-                    }}
-                    onCancelLegend={() => setCapturingLegend(false)}
-                    onLink={(symbolId, assemblyId) =>
-                      linkSymbol.mutate({ id: symbolId, assemblyId })
                     }
-                    onUnlink={id => unlinkSymbol.mutate({ id })}
-                    renameRefusal={
-                      quantitiesLocked
-                        ? lockedEditRefusal(
-                            "its legend names cannot be changed"
-                          )
-                        : null
-                    }
-                    onRename={(id, label) =>
-                      renameSymbol.mutate({ id, bidId, label })
-                    }
-                    onResetName={id => resetSymbolName.mutate({ id, bidId })}
-                    onRemove={id => setSymbolDeleteId(id)}
-                    onLookRemoved={lookId => {
-                      // An open find that look made is dropped unless the
-                      // box found it too — never re-pointed
-                      // (multiple-looks-plan.md § 7).
-                      const dropped =
-                        findSession?.panel.phase === "results"
-                          ? dropLookMatches(findSession.panel.items, lookId)
-                              .dropped
-                          : 0;
-                      setFindSession(s =>
-                        s
-                          ? {
-                              ...s,
-                              looks: s.looks.filter(l => l.id !== lookId),
-                              panel:
-                                s.panel.phase === "results"
-                                  ? {
-                                      ...s.panel,
-                                      items: dropLookMatches(
-                                        s.panel.items,
-                                        lookId
-                                      ).items,
-                                      selectedId: null,
-                                    }
-                                  : s.panel,
-                            }
-                          : s
-                      );
-                      return dropped > 0
-                        ? `${dropped} unconfirmed find${dropped === 1 ? "" : "s"} that look made ${dropped === 1 ? "was" : "were"} dropped from this search.`
-                        : null;
-                    }}
-                    onUseSymbol={symbol => {
-                      const assembly = allAssemblies.find(
-                        a => a.id === symbol.assemblyId
-                      );
-                      if (!assembly) return;
-                      // The symbol goes too: several symbols sharing one
-                      // assembly each count into their own count (§ 11.2).
-                      // Armed at once; clicks before the count exists are
-                      // kept (armWhileCreating).
-                      armWhileCreating(
-                        symbol.label,
-                        assembly.id,
-                        symbol.id,
-                        () =>
-                          groupForAssembly.mutateAsync({
-                            bidId,
-                            assemblyId: assembly.id,
-                            symbolId: symbol.id,
-                          }),
-                        // It may have made a count, or linked a plain one.
-                        () =>
-                          void utils.takeoffGroups.list.invalidate({ bidId })
-                      );
-                    }}
-                    onCountSymbol={symbol => {
-                      /*
+                    filtered={hiddenCount > 0}
+                    hiddenCount={hiddenCount}
+                  />
+                }
+                legend={
+                  <>
+                    <LegendPanel
+                      symbols={symbols}
+                      assemblies={allAssemblies.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        category: a.category,
+                      }))}
+                      activeAssemblyId={armedGroup?.assemblyId ?? null}
+                      activeSymbolId={armedGroup?.symbolId ?? null}
+                      capturing={capturingSymbol}
+                      onStartCapture={() => {
+                        // The box is a drag on the drawing; a count still in
+                        // hand would take the same press as a mark.
+                        setArmedGroup(null);
+                        setSelectingText(false);
+                        setCapturingLegend(false);
+                        setCapturingSymbol(true);
+                      }}
+                      onCancelCapture={() => setCapturingSymbol(false)}
+                      capturingLegend={capturingLegend}
+                      onStartLegend={() => {
+                        setSelectingText(false);
+                        setCapturingSymbol(false);
+                        setPendingCapture(null);
+                        setCapturingLegend(true);
+                      }}
+                      onCancelLegend={() => setCapturingLegend(false)}
+                      onLink={(symbolId, assemblyId) =>
+                        linkSymbol.mutate({ id: symbolId, assemblyId })
+                      }
+                      onUnlink={id => unlinkSymbol.mutate({ id })}
+                      renameRefusal={
+                        quantitiesLocked
+                          ? lockedEditRefusal(
+                              "its legend names cannot be changed"
+                            )
+                          : null
+                      }
+                      onRename={(id, label) =>
+                        renameSymbol.mutate({ id, bidId, label })
+                      }
+                      onResetName={id => resetSymbolName.mutate({ id, bidId })}
+                      onRemove={id => setSymbolDeleteId(id)}
+                      onLookRemoved={lookId => {
+                        // An open find that look made is dropped unless the
+                        // box found it too — never re-pointed
+                        // (multiple-looks-plan.md § 7).
+                        const dropped =
+                          findSession?.panel.phase === "results"
+                            ? dropLookMatches(findSession.panel.items, lookId)
+                                .dropped
+                            : 0;
+                        setFindSession(s =>
+                          s
+                            ? {
+                                ...s,
+                                looks: s.looks.filter(l => l.id !== lookId),
+                                panel:
+                                  s.panel.phase === "results"
+                                    ? {
+                                        ...s.panel,
+                                        items: dropLookMatches(
+                                          s.panel.items,
+                                          lookId
+                                        ).items,
+                                        selectedId: null,
+                                      }
+                                    : s.panel,
+                              }
+                            : s
+                        );
+                        return dropped > 0
+                          ? `${dropped} unconfirmed find${dropped === 1 ? "" : "s"} that look made ${dropped === 1 ? "was" : "were"} dropped from this search.`
+                          : null;
+                      }}
+                      onUseSymbol={symbol => {
+                        const assembly = allAssemblies.find(
+                          a => a.id === symbol.assemblyId
+                        );
+                        if (!assembly) return;
+                        // The symbol goes too: several symbols sharing one
+                        // assembly each count into their own count (§ 11.2).
+                        // Armed at once; clicks before the count exists are
+                        // kept (armWhileCreating).
+                        armWhileCreating(
+                          symbol.label,
+                          assembly.id,
+                          symbol.id,
+                          () =>
+                            groupForAssembly.mutateAsync({
+                              bidId,
+                              assemblyId: assembly.id,
+                              symbolId: symbol.id,
+                            }),
+                          // It may have made a count, or linked a plain one.
+                          () =>
+                            void utils.takeoffGroups.list.invalidate({ bidId })
+                        );
+                      }}
+                      onCountSymbol={symbol => {
+                        /*
                         A plain count under the symbol's name (§ 8a). Reused,
                         not refused, when the bid already has it: clicking
                         the same symbol again means "keep counting that".
                       */
-                      // Armed at once; clicks before the count exists are
-                      // kept (armWhileCreating, which also refuses on a
-                      // locked bid).
-                      armWhileCreating(
-                        symbol.label,
-                        null,
-                        symbol.id,
-                        () =>
-                          createGroup.mutateAsync({
-                            bidId,
-                            label: symbol.label,
-                            reuseExisting: true,
-                            // A renamed symbol still owns the count made
-                            // under its original name on this bid.
-                            symbolId: symbol.id,
-                          }),
-                        () =>
-                          void utils.takeoffGroups.list.invalidate({ bidId })
-                      );
-                    }}
+                        // Armed at once; clicks before the count exists are
+                        // kept (armWhileCreating, which also refuses on a
+                        // locked bid).
+                        armWhileCreating(
+                          symbol.label,
+                          null,
+                          symbol.id,
+                          () =>
+                            createGroup.mutateAsync({
+                              bidId,
+                              label: symbol.label,
+                              reuseExisting: true,
+                              // A renamed symbol still owns the count made
+                              // under its original name on this bid.
+                              symbolId: symbol.id,
+                            }),
+                          () =>
+                            void utils.takeoffGroups.list.invalidate({ bidId })
+                        );
+                      }}
+                    />
+                  </>
+                }
+                totals={totals}
+                selectedRunId={selectedRunId}
+                onSelectRun={setSelectedRunId}
+                onRemoveRun={askRemoveRun}
+                onDeleteCountMarks={deleteMarks}
+                onDeleteCount={askDeleteCount}
+                onOpenPartialEnds={openPartialEnds}
+                cardUndo={subject => undoForSubject(undoState, subject)}
+                emptiedCount={emptiedCountCard(
+                  undoState,
+                  activeSheet?.id ?? null,
+                  stampGroups.map(g => g.groupId)
+                )}
+                // Only ever enabled for the NEWEST step, so it is the ordinary
+                // undo — never an out-of-order one (@/lib/undoStack).
+                onCardUndo={() => void stepBack("undo")}
+                onCommitRun={id => commitRun.mutate({ id })}
+                onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
+                onPickWire={runId => {
+                  setSelectedRunId(runId);
+                  setPickWireFor(runId);
+                }}
+                onEmptyPipe={makeEmptyPipe}
+                onAddCircuit={(runId, name, conductorCount, groundCount) =>
+                  addCircuit.mutate({
+                    runId,
+                    name,
+                    conductorCount,
+                    groundCount,
+                  })
+                }
+                onUpdateCircuit={(id, patch) =>
+                  updateCircuit.mutate({ id, ...patch })
+                }
+                onRemoveCircuit={id => removeCircuit.mutate({ id })}
+                onSetTraceMode={(runId, mode) =>
+                  setRunTraceMode.mutate({ runId, mode })
+                }
+                dropsReadout={
+                  <BidDropsReadout
+                    bidId={bidId}
+                    runColors={runColors}
+                    onJump={openRunAt}
                   />
-                </>
-              }
-              totals={totals}
-              selectedRunId={selectedRunId}
-              onSelectRun={setSelectedRunId}
-              onRemoveRun={askRemoveRun}
-              onDeleteCountMarks={deleteMarks}
-              onDeleteCount={askDeleteCount}
-              onOpenPartialEnds={openPartialEnds}
-              cardUndo={subject => undoForSubject(undoState, subject)}
-              emptiedCount={emptiedCountCard(
-                undoState,
-                activeSheet?.id ?? null,
-                stampGroups.map(g => g.groupId)
-              )}
-              // Only ever enabled for the NEWEST step, so it is the ordinary
-              // undo — never an out-of-order one (@/lib/undoStack).
-              onCardUndo={() => void stepBack("undo")}
-              onCommitRun={id => commitRun.mutate({ id })}
-              onAcceptSuggestion={id => acceptSuggestion.mutate({ id })}
-              onPickWire={runId => {
-                setSelectedRunId(runId);
-                setPickWireFor(runId);
-              }}
-              onEmptyPipe={makeEmptyPipe}
-              onAddCircuit={(runId, name, conductorCount, groundCount) =>
-                addCircuit.mutate({ runId, name, conductorCount, groundCount })
-              }
-              onUpdateCircuit={(id, patch) =>
-                updateCircuit.mutate({ id, ...patch })
-              }
-              onRemoveCircuit={id => removeCircuit.mutate({ id })}
-              onSetTraceMode={(runId, mode) =>
-                setRunTraceMode.mutate({ runId, mode })
-              }
-              dropsReadout={
-                <BidDropsReadout
-                  bidId={bidId}
-                  runColors={runColors}
-                  onJump={openRunAt}
-                />
-              }
-            />
+                }
+              />
+            )}
           </SidePanel>
         </div>
       )}

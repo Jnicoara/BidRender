@@ -131,7 +131,7 @@ box, 700 series`. **Correction:** this line said DV34 then "seeds by
       throughout (stainless is still the owner's call). Nothing was missing
       from the catalog. `server/starterCoverSwaps.test.ts` (5, all red
       before). **Existing databases need `scripts/repairStarterCovers.mts
-    --apply` at the next release — TRACK A runs it** (staging, then live;
+  --apply` at the next release — TRACK A runs it** (staging, then live;
       the seeder never rewrites an existing starter): swaps a shared starter
       only if its lines are EXACTLY the old recipe, and unlike the LT1/LT2
       repair it DOES swap a forked one (the fork keeps its own lines; the
@@ -146,6 +146,16 @@ box, 700 series`. **Correction:** this line said DV34 then "seeds by
       double-gang box (as the audit said); RS13 got no in-use cover (the
       starter does not say outdoor); DV33's generic floor box cover was not
       in scope.
+      **ANSWERED 2026-10-08 (owner) and DONE (B, `efe06c6`):** nylon stays
+      the starter default. RS1/RS2: the BOX was the mismatch (no 2-gang
+      power plate exists; RS1's 6/3 overfills any 1-gang box), so both moved
+      to a 4-11/16" box + `4-11/16" square raised cover, 30A/50A power
+    receptacle` — owner chose this. RS13 is outdoor: + `Weatherproof
+    in-use cover, 30A/50A power receptacle`. Folded into the same repair
+      (`interim` in `starterCoverSwaps.ts` also catches a database that
+      already ran the first swap). Staging copy (before-0139 + 0139): 48
+      swapped, rerun 48 already, **all 732 bid totals unchanged**. Track A's
+      release step is unchanged: report, then `--apply`.
 - [x] **The original entry, superseded by the one above** (owner,
       2026-10-08 — Track A shipped the parts and changed no recipe). **DV34 DONE 2026-10-08 by B:** the
       700-series plate AND 700-series box lines, `missingParts` emptied, so
@@ -244,10 +254,21 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       `server/runMutationsCheckLock.test.ts` reads the router and fails on
       ANY run mutation without `refuseIfLocked`/`refuseIfRunLocked` (it was
       the only one). Both red without the check.
-- [ ] **Gap 3: a won bid offers "lock its quantities?" once** on its Plans
-      screen (`TakeoffPage.tsx`). No status gate. **Owner DECIDED
-      2026-10-08:** when a bid is marked Won, OFFER "Lock this bid?" —
-      never auto-lock, and "Not now" exactly as easy as "Lock". Batch 3.
+- [x] **DONE 2026-10-08 (batch 3): Gap 3, a won bid offers "Lock this
+      bid?"** Built on the bid screen, where the status is changed (not the
+      Plans screen this line first named). `offersLockOnStatusChange` and
+      `lockOfferCopy` in `shared/quantityLock.ts`; dialog in
+      `QuantityLockPanel`. Offered only on the CHANGE to Won, only when
+      unlocked with lines following the plans; never locks itself. "Not now"
+      and "Lock quantities" same size and weight, "Not now" has the default
+      focus, Escape/outside = Not now. Tests in `server/quantityLock.test.ts`.
+      On screen at laptop and tablet: offer, Escape left it unlocked, re-pick
+      Won and Lost offered nothing, Lock locked (bid restored after). Found
+      on screen: the Lock button's text was invisible (outline variant sets
+      no text colour) and "1 line … and change" — both fixed.
+      **Original entry:** a won bid offers "lock its quantities?" once on its
+      Plans screen. Owner decided 2026-10-08: OFFER "Lock this bid?" — never
+      auto-lock, and "Not now" exactly as easy as "Lock".
 - [x] **DONE 2026-10-08 (batch 2): Gap 4a, "can't be undone" on the undo
       arrow.** `NOT_UNDOABLE` in `client/src/lib/undoStack.ts` names 19
       changes undo does not cover; the screen notes each on success
@@ -286,8 +307,25 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       **Still not covered, by choice:** branch wiring, run extras, trace
       mode, runs-at — each says "can't be undone". Branch wiring would be
       cheap (it is `setEnds`, which already returns a packet).
-- [ ] **Gap 6.1: open the viewer from the file on this machine while it
-      uploads** (`TakeoffPage.tsx`, `planUpload.ts`). Measured on staging
+- [x] **DONE 2026-10-08 (batch 3): Gap 6.1.** `@/lib/localPlanSource`
+      decides; the worker reads the File through pdf.js's range transport
+      (`loadFile`, nothing downloaded, nothing held whole, autofetch off
+      above 50 MB as for a link). The FIRST set on a bid previews from the
+      file while it uploads (a bid with a set already open is not pulled
+      away); every set uploaded on the visit keeps reading from the file.
+      Preview and row share one source key, so attach does NOT reload; the
+      pane re-sends page count, sheet rows, page text (scale detection) and
+      drawn size to the row. On screen locally, upload held 9 s, 52.6 MB:
+      sheet 1 at 1.5–1.9 s (laptop and tablet), no "Opening plan set" at
+      attach, 15 sheet rows, detectSheetScale fired, 0 GETs of the stored
+      copy; a second set opened from disk too. Preview copy says counting
+      waits for the save. **Not yet:** staging timing
+      (`scripts/stagingUploadTiming.mts` — note its timing now ends at
+      sheet 1, before the PUT finishes). **Seen, not fixed:** in the
+      preview the zoom strip's "Fit" is clipped by the panel chevron at
+      tablet width (the strip shows only until the toolbar exists).
+      **Original entry:** open the viewer from the file on this machine
+      while it uploads (`TakeoffPage.tsx`, `planUpload.ts`). Measured on staging
       2026-10-07 (52.6 MB, 15 pages): the PUT is 11.5–16.4 s of a 16–22 s
       wait to sheet 1, and the viewer re-reads the file from R2 afterwards.
       Opening from disk would show sheet 1 in about 2 s.

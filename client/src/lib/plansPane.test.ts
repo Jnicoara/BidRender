@@ -26,4 +26,15 @@ describe("the Plans pane", () => {
       "plans"
     );
   });
+
+  it("shows the plans, not the upload box, while a first set previews from this machine", () => {
+    expect(
+      plansPane({
+        isLoading: false,
+        isError: false,
+        count: 0,
+        previewing: true,
+      })
+    ).toBe("plans");
+  });
 });

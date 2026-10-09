@@ -47,7 +47,12 @@
  */
 
 import * as pdfjs from "pdfjs-dist";
-import { pdfRangeLoadOptions } from "@shared/pdfRangeLoading";
+import {
+  PDF_RANGE_CHUNK_BYTES,
+  pdfRangeLoadOptions,
+  shouldDisableAutoFetch,
+} from "@shared/pdfRangeLoading";
+import { readFileRange } from "@/lib/localPlanSource";
 import { connectPointFor, type ConnectMark } from "@shared/connectPoint";
 import {
   isScan,
@@ -581,14 +586,34 @@ async function findOnScanPage(
   };
 }
 
+/** pdf.js's range transport, answered from a file on this machine. */
+class FileRangeTransport extends pdfjs.PDFDataRangeTransport {
+  constructor(private readonly file: Blob) {
+    super(file.size, null);
+  }
+  override requestDataRange(begin: number, end: number) {
+    void readFileRange(this.file, begin, end).then(chunk =>
+      this.onDataRange(begin, chunk)
+    );
+  }
+}
+
 self.onmessage = async (e: MessageEvent) => {
   const msg = e.data;
 
-  if (msg.type === "load" || msg.type === "loadUrl") {
+  if (
+    msg.type === "load" ||
+    msg.type === "loadUrl" ||
+    msg.type === "loadFile"
+  ) {
     // Prefer pdf.js's URL transport. It uses HTTP Range requests when the
     // storage response supports them, so a 500MB set does not need to be held
     // in tab memory before the first sheet can render. ArrayBuffer remains the
     // deliberate fallback for storage endpoints that do not support ranges.
+    //
+    // `loadFile` is a set still on this machine (Gap 6.1, @/lib/localPlanSource):
+    // the same range loading, with the ranges read from the file instead of
+    // the network — nothing downloaded and nothing held whole.
     try {
       const t0 = performance.now();
       const loadingTask =
@@ -601,10 +626,17 @@ self.onmessage = async (e: MessageEvent) => {
               ),
               ...WORKER_SAFE_OPTIONS,
             })
-          : pdfjs.getDocument({
-              data: new Uint8Array(msg.pdfData),
-              ...WORKER_SAFE_OPTIONS,
-            });
+          : msg.type === "loadFile"
+            ? pdfjs.getDocument({
+                range: new FileRangeTransport(msg.file as Blob),
+                rangeChunkSize: PDF_RANGE_CHUNK_BYTES,
+                disableAutoFetch: shouldDisableAutoFetch(msg.file.size),
+                ...WORKER_SAFE_OPTIONS,
+              })
+            : pdfjs.getDocument({
+                data: new Uint8Array(msg.pdfData),
+                ...WORKER_SAFE_OPTIONS,
+              });
       pdfDoc = await loadingTask.promise;
       loadedHash = msg.hash;
       matchPages = []; // another document's line work is no use now

@@ -572,9 +572,9 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "Equipment Connections",
     "residential",
     [
-      p("double-gang-box", 1),
+      p("4-11-16in-square-box", 1),
       p("50a-range-receptacle", 1),
-      p("1-gang-wall-plate-30a-50a-power-receptacle-nylon", 1),
+      p("4-11-16in-square-raised-cover-30a-50a-power-receptacle", 1),
       p("6-3-nm-b", 40),
       p("50a-2-pole-breaker", 1),
       p("3-4in-cable-connector", 1),
@@ -587,9 +587,9 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "Equipment Connections",
     "residential",
     [
-      p("double-gang-box", 1),
+      p("4-11-16in-square-box", 1),
       p("30a-dryer-receptacle", 1),
-      p("1-gang-wall-plate-30a-50a-power-receptacle-nylon", 1),
+      p("4-11-16in-square-raised-cover-30a-50a-power-receptacle", 1),
       p("10-3-nm-b", 40),
       p("30a-2-pole-breaker", 1),
       p("1-2in-cable-connector", 1),
@@ -723,6 +723,9 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
       p("4-11-16in-square-box", 1),
       p("50a-rv-receptacle", 1),
       p("4-11-16in-square-raised-cover-30a-50a-power-receptacle", 1),
+      // Owner, 2026-10-08: this is an OUTDOOR EV/RV outlet, so it gets the
+      // in-use (bubble) cover that fits its 2.15" receptacle.
+      p("weatherproof-in-use-cover-30a-50a-power-receptacle", 1),
       p("6-3-nm-b", 40),
       p("50a-2-pole-gfci-breaker", 1),
       p("1in-cable-connector", 1),

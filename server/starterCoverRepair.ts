@@ -9,7 +9,8 @@
  * ── Which rows, exactly ──────────────────────────────────────────────────────
  * Only the SHARED starter row (`userId IS NULL`), and only when its lines are
  * EXACTLY the old shipped recipe — same parts, quantities, whip flags, no
- * per-line hour overrides. Anything else is skipped and reported, never
+ * per-line hour overrides — or, for RS1 / RS2 / RS13, exactly what the first
+ * swap of 2026-10-08 left (`interim` in the swap table). Anything else is skipped and reported, never
  * guessed at. A row already on the new recipe is "already has it", which is
  * what makes a second run harmless.
  *
@@ -38,7 +39,11 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { assemblies, assemblyMaterials, materials } from "../drizzle/schema";
 import { getDb } from "./db";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
-import { STARTER_COVER_SWAPS, wasRecipe } from "./seed/starterCoverSwaps";
+import {
+  STARTER_COVER_SWAPS,
+  interimRecipe,
+  wasRecipe,
+} from "./seed/starterCoverSwaps";
 import { starterPartName } from "./seed/starterParts";
 import type { BaselineAssemblyMaterial } from "./seed/assemblyRecipe";
 
@@ -74,7 +79,20 @@ export async function repairStarterCovers(options: {
   const results: CoverRepairResult[] = [];
   for (const swap of STARTER_COVER_SWAPS) {
     const spec = BASELINE_ASSEMBLIES.find(a => a.ref === swap.ref)!;
-    const oldRecipe = wasRecipe(spec.ref, spec.materials);
+    // What this row may hold now: the recipe as shipped, or — for a starter
+    // a later decision changed again — as the first swap left it. Each
+    // carries the cover lines it swaps FROM.
+    const starts = [
+      { from: swap.was, recipe: wasRecipe(spec.ref, spec.materials) },
+      ...(swap.interim
+        ? [
+            {
+              from: swap.interim,
+              recipe: interimRecipe(spec.ref, spec.materials)!,
+            },
+          ]
+        : []),
+    ];
     const result = (
       outcome: CoverRepairOutcome,
       detail: string,
@@ -90,7 +108,9 @@ export async function repairStarterCovers(options: {
 
     const names = Array.from(
       new Set(
-        [...spec.materials, ...oldRecipe].map(l => starterPartName(l.part))
+        [...spec.materials, ...starts.flatMap(s => s.recipe)].map(l =>
+          starterPartName(l.part)
+        )
       )
     );
     const catalog = await db
@@ -139,10 +159,13 @@ export async function repairStarterCovers(options: {
       result("already has it", "the recipe is the new one", row.id);
       continue;
     }
-    if (overridden || !sameSet(have, asKeys(oldRecipe))) {
+    const start = overridden
+      ? undefined
+      : starts.find(s => sameSet(have, asKeys(s.recipe)));
+    if (!start) {
       result(
         "skipped: edited",
-        "its lines are not the old shipped recipe, so it was changed by hand — left as it is",
+        "its lines are not a recipe this repair knows, so it was changed by hand — left as it is",
         row.id
       );
       continue;
@@ -152,10 +175,14 @@ export async function repairStarterCovers(options: {
       .select({ forks: sql<number>`COUNT(*)` })
       .from(assemblies)
       .where(eq(assemblies.baselineId, row.id));
+    const which =
+      start.from === swap.was
+        ? "old recipe exactly"
+        : "first cover swap's recipe exactly";
     const forkNote =
       Number(forks) === 0
-        ? "old recipe exactly"
-        : `old recipe exactly; ${forks} compan${Number(forks) === 1 ? "y's copy is left as it is" : "ies' copies are left as they are"}`;
+        ? which
+        : `${which}; ${forks} compan${Number(forks) === 1 ? "y's copy is left as it is" : "ies' copies are left as they are"}`;
 
     if (!options.apply) {
       result("would swap", forkNote, row.id);
@@ -163,10 +190,10 @@ export async function repairStarterCovers(options: {
     }
 
     await db.transaction(async tx => {
-      // was[i] becomes now[i] ON THE SAME LINE, so the cover keeps its place
-      // in the recipe; a `now` line with no `was` is appended after the rest.
-      for (let i = 0; i < swap.was.length; i++) {
-        const was = swap.was[i];
+      // from[i] becomes now[i] ON THE SAME LINE, so the cover keeps its place
+      // in the recipe; a `now` line past the end of `from` is appended.
+      for (let i = 0; i < start.from.length; i++) {
+        const was = start.from[i];
         const target = lines.find(
           l =>
             l.materialId === resolve(was) &&
@@ -181,7 +208,7 @@ export async function repairStarterCovers(options: {
           .where(eq(assemblyMaterials.id, target.id));
       }
       const after = Math.max(-1, ...lines.map(l => l.sortOrder ?? 0));
-      const added = swap.now.slice(swap.was.length);
+      const added = swap.now.slice(start.from.length);
       if (added.length > 0)
         await tx.insert(assemblyMaterials).values(
           added.map((l, i) => ({

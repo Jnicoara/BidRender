@@ -430,6 +430,7 @@ export function SheetIndex({
   onSetNumber,
   onReadNumbers,
   loading,
+  emptyNote,
 }: {
   sheets: IndexSheet[];
   /** Numbers and titles read off the plan, by page. */
@@ -449,6 +450,8 @@ export function SheetIndex({
   /** Read (or re-read) this plan's numbers from storage. */
   onReadNumbers: () => void;
   loading?: boolean;
+  /** What an empty list says, when the default would be untrue. */
+  emptyNote?: string;
 }) {
   const scaled = sheets.filter(s => s.scaleRatio !== null).length;
   const [mode, setMode] = useState<ListMode>(readListMode);
@@ -580,7 +583,7 @@ export function SheetIndex({
         </div>
       ) : sheets.length === 0 ? (
         <p className="flex-1 min-h-0 px-3 py-4 text-xs text-muted-foreground">
-          Sheets appear here once the document opens.
+          {emptyNote ?? "Sheets appear here once the document opens."}
         </p>
       ) : (
         <SheetRows

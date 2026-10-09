@@ -24,6 +24,25 @@ This is the human-readable companion to the git history — read this to see wha
   after the everyday ones in every material search. The three "#12 +
   ground" run types now pull green #12 THHN as the ground. Bid totals do
   not move.
+- **A new plan set opens straight from your computer.** The first set on a
+  bid now shows sheet 1 within about two seconds of picking the file, while
+  it is still uploading, instead of after the upload and a second download
+  (about 16–22 seconds for a 50 MB set on staging). Every set you upload
+  keeps reading from your own copy for the rest of the visit, so nothing is
+  downloaded back. Counting starts once the set is saved, and the screen
+  says so.
+- **Marking a bid Won now asks "Lock this bid?"** with "Not now" right
+  beside it, just as easy. Locking keeps the quantities you sent from moving
+  when somebody opens the plans later. It never locks on its own, and it
+  asks only when the status changes to Won.
+- **The range and dryer starters now use a box their cover fits, and the
+  outdoor 14-50 gets an in-use cover.** The range and dryer had been given
+  a one-gang plate on a two-gang box; they now use a 4-11/16" box with the
+  raised cover made for a 30A/50A receptacle (a 50A range circuit is too
+  much wire for a one-gang box anyway). The EV/RV 14-50 starter adds the
+  weatherproof in-use ("bubble") cover. Existing databases get this from the
+  same repair script at the next release; all 732 bids on a copy of staging
+  kept their totals.
 - **An underground run can no longer be given wire with nothing to price
   it.** The open run's "Add wires to this run" now offers "Pick the wire" or
   "No wire (empty pipe)" on an underground trench or an empty pipe, the same

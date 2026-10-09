@@ -126,8 +126,12 @@ slang in `searchAliases` and never aliased to the device it covers
 
 - CS6, CS7, CS8 → swap the duplex raised cover for #3 (Comm).
 - RS17, CS5 → swap `Wall plate` for #2 (Res / Comm).
-- RS1, RS2 → add #4 (Res).
-- RS13 → add #5, plus an in-use cover if outdoor (Res).
+- RS1, RS2 → add #4 (Res). **Superseded 2026-10-08 (owner):** a 1-gang
+  plate on their double-gang box does not fit, and RS1's 6/3 overfills any
+  single-gang box, so both moved to a 4-11/16" box with #5, like RS13.
+- RS13 → add #5, plus an in-use cover if outdoor (Res). **Owner,
+  2026-10-08: it is outdoor** — `Weatherproof in-use cover, 30A/50A power
+receptacle` added. Both in `server/seed/starterCoverSwaps.ts`.
 - DV34 → add a wall plate (Comm).
 - MS12 → add a plate (Res, minor).
 - Once #1 exists: GFCI / AFCI / USB / dimmer / sensor / timer / fan-control

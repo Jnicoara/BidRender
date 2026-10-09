@@ -63,12 +63,20 @@ describe("starter cover plates", () => {
   });
 
   it("gives the range, dryer, 14-50 and structured media a cover", () => {
-    for (const ref of ["RS1", "RS2"])
+    // One power receptacle: a 4-11/16" box and the raised cover made for it,
+    // never a 1-gang plate on a double-gang box (owner, 2026-10-08).
+    for (const ref of ["RS1", "RS2"]) {
+      const names = recipe(ref).map(l => starterPartName(l.part));
+      expect(names, ref).toContain('4-11/16" square box, 2-1/8" deep');
+      expect(names, ref).not.toContain("Double-gang box");
       expect(covers(ref), ref).toEqual([
-        "1-gang wall plate, 30A/50A power receptacle, nylon",
+        '4-11/16" square raised cover, 30A/50A power receptacle',
       ]);
+    }
+    // Outdoors, so the in-use cover that takes a 30A/50A receptacle too.
     expect(covers("RS13")).toEqual([
       '4-11/16" square raised cover, 30A/50A power receptacle',
+      "Weatherproof in-use cover, 30A/50A power receptacle",
     ]);
     expect(covers("MS12")).toEqual(["1-gang wall plate, duplex, nylon"]);
   });
@@ -81,7 +89,7 @@ describe("starter cover plates", () => {
       for (const now of swap.now)
         expect(lines, swap.ref).toContain(`${now.part}|${now.qty}`);
       // The old cover is gone unless the new one is the same part.
-      for (const was of swap.was)
+      for (const was of [...swap.was, ...(swap.interim ?? [])])
         if (!swap.now.some(n => n.part === was.part))
           expect(
             lines.some(l => l.startsWith(`${was.part}|`)),
