@@ -157,6 +157,9 @@ export const takeoffSummaryRouter = router({
               bidId: input.bidId,
               runTypeId: target.runTypeId,
               role,
+              ...(target.extraKey !== undefined
+                ? { extraKey: target.extraKey }
+                : {}),
             });
             if (result.sent.length > 0 || result.updated.length > 0)
               sent.push({ key: item.key, name: describe(item) });

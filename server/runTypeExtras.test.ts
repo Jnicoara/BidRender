@@ -284,6 +284,49 @@ withDb("a run type's extras on a bid", () => {
     expect(new Set(extras.map(l => l.runExtraKey)).size).toBe(2);
   });
 
+  it("Send all sends EACH of two extras once, under keys that tell them apart", async () => {
+    // The preview keyed an extra by its role alone, so two extras on one type
+    // were one key twice — and each item's send sent both, so the second
+    // reported "Nothing was added" for a line that was on the bid.
+    const shippedId = await typeId(undergroundRunTypeLabel('1"'));
+    const at = await bidWithSheet();
+    await trace(at, shippedId, straight(40));
+    const tracer = (await caller().materials.list()).find(
+      m => m.name === "Tracer wire"
+    )!;
+    await caller().takeoffRunTypes.addExtra({
+      runTypeId: shippedId,
+      materialId: tracer.id,
+      feetPerFoot: 1,
+      appliesTo: "flat",
+    });
+
+    const summary = await caller().takeoffSummary.forBid({ bidId: at.bidId });
+    const extraKeys = summary.notOnBid
+      .filter(i => i.key.startsWith(`run:${shippedId}:extra`))
+      .map(i => i.key);
+    expect(extraKeys).toHaveLength(2);
+    expect(new Set(extraKeys).size).toBe(2);
+    expect(extraKeys).toContain(
+      `run:${shippedId}:extra:${tracer.id}:${
+        (
+          await caller().takeoffRunTypes.extras({ runTypeId: shippedId })
+        ).extras.find(e => e.materialId === tracer.id)!.key
+      }`
+    );
+
+    const result = await caller().takeoffSummary.sendAll({
+      bidId: at.bidId,
+      expect: summary.sendable,
+    });
+    expect(result.notSent).toEqual([]);
+    const extras = (await linesOf(at.bidId)).filter(
+      l => l.runMaterialRole === "extra"
+    );
+    expect(extras).toHaveLength(2);
+    expect(extras.map(l => Number(l.qty))).toEqual([40, 40]);
+  });
+
   it("a company's own price for the tape is the one on the line", async () => {
     const tape = (await caller().materials.list()).find(m => m.name === TAPE)!;
     await caller().materials.update({ id: tape.id, costPerUnit: 0.25 });

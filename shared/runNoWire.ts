@@ -88,3 +88,31 @@ export function countRunsWithNoWire(
 ): number {
   return runsWithNoWire(rows, wire, typeSaysEmpty).length;
 }
+
+/**
+ * Would a circuit added to a run of this type be WIRE WITH NO MATERIAL — so
+ * the wire has to be picked instead (`takeoffRuns.respecify`, "Pick the
+ * wire")? 2026-10-08, owner: never wire with no material.
+ *
+ * A circuit has no material of its own; its wire is the type's conductor.
+ * True when the type names none AND has said why on purpose:
+ *
+ * - an UNDERGROUND trench — it carries a per-foot extra (the tape), and the
+ *   shipped ones leave the wire unsaid by design (per-foot-items-plan § 3b);
+ * - an EMPTY PIPE — its conductor count is 0, so a circuit contradicts it.
+ *
+ * A plain raceway-only type the shop made is NOT this case: a circuit there
+ * is the manual way to measure wire footage (the materials list's "Wire,
+ * insulated"), and stays allowed. Read by the server's refusal and by the
+ * panel's circuit editor, so the two cannot disagree.
+ */
+export function circuitNeedsPickedWire(
+  type: {
+    conductorMaterialId: number | null;
+    conductorCount: number | null;
+  } | null,
+  extraCount: number
+): boolean {
+  if (!type || type.conductorMaterialId !== null) return false;
+  return type.conductorCount === 0 || extraCount > 0;
+}

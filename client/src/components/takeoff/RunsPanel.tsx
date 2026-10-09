@@ -465,6 +465,13 @@ export type PanelRun = {
    * server, through shared/runNoWire.ts, so the row and the bid agree.
    */
   noWire?: boolean;
+  /**
+   * A circuit here would be wire with no material (an underground trench or
+   * an empty pipe whose type names no wire), so the circuit editor offers
+   * "Pick the wire" instead — the server refuses the circuit. From the
+   * server, shared/runNoWire.ts `circuitNeedsPickedWire`.
+   */
+  pickWireToAdd?: boolean;
   /** Ends that may be double-click stubs, to check (shared/runBends.ts). */
   stubsToReview?: {
     end: "start" | "end";
@@ -1602,8 +1609,15 @@ export function RunsPanel({
                 // minimum, or Totals — the tab most likely to carry the
                 // warning mark — is the one scrolled out of sight. A
                 // finger's 44px on the phone (takeoff-spec ground rule 2).
+                //
+                // `phone` is every touch layout, the upright tablet included
+                // — a 312px panel with touch-sized text. There px-2.5 made
+                // the five tabs 331px, and Legend sat 20px off the screen's
+                // edge (measured 2026-10-08; `pnpm device:audit` now fails on
+                // it as `cutTabs`). Padding is only the MINIMUM — flex-1
+                // spreads the tabs over the strip anyway — so px-1 there.
                 "flex-1 min-w-fit flex items-center justify-center gap-1 px-1.5 text-xs border-b-2 whitespace-nowrap",
-                phone ? "h-11 text-sm px-2.5" : "h-9",
+                phone ? "h-11 text-sm px-1" : "h-9",
                 active
                   ? "border-[#F5C518] text-foreground font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -3330,6 +3344,37 @@ export function RunsPanel({
                             >
                               Add
                             </Button>
+                          </div>
+                        ) : run.pickWireToAdd ? (
+                          /*
+                            The same answer as the run's no-wire line: a type
+                            that names no wire on purpose (a trench, an empty
+                            pipe) has nothing for a circuit to price, and the
+                            server refuses one (takeoffRuns.addCircuit). So
+                            the wire is picked instead — or the pipe is said
+                            to be empty.
+                          */
+                          <div className="text-xs space-y-0.5 [&_button]:whitespace-nowrap">
+                            <p className="text-muted-foreground">
+                              {run.typeDefaults?.conductorCount === 0
+                                ? "Empty pipe."
+                                : "This run's type names no wire."}
+                            </p>
+                            <div className="flex flex-wrap gap-x-3">
+                              {run.typeDefaults?.conductorCount === 0 ? (
+                                <button
+                                  className="underline text-muted-foreground hover:text-foreground"
+                                  onClick={() => onPickWire(run.id)}
+                                >
+                                  Pick the wire
+                                </button>
+                              ) : (
+                                <NoWireAnswers
+                                  onPickWire={() => onPickWire(run.id)}
+                                  onEmptyPipe={() => onEmptyPipe(run.id)}
+                                />
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <Button

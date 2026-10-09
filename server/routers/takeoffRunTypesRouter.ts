@@ -986,6 +986,11 @@ export const takeoffRunTypesRouter = router({
         runTypeId: z.number().int().positive(),
         /** Omitted sends every sendable row; given, sends just that one. */
         role: z.enum(RUN_MATERIAL_ROLES).optional(),
+        /**
+         * With `role: "extra"`, just that extra (0136). Omitted sends every
+         * extra the type carries, as before.
+         */
+        extraKey: z.number().int().nonnegative().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1118,7 +1123,11 @@ export const takeoffRunTypesRouter = router({
           ])
       );
       const wanted = input.role
-        ? candidates.filter(row => row.role === input.role)
+        ? candidates.filter(
+            row =>
+              row.role === input.role &&
+              (input.extraKey === undefined || row.extraKey === input.extraKey)
+          )
         : candidates;
       // Refill or swap, per role — the same plan the preview showed. A locked
       // bid never reaches here (refused at the top).

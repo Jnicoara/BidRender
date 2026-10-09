@@ -18,11 +18,12 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { getDb } from "./db";
+import { createRunCircuit, getDb } from "./db";
 import { bidPdfs, bids, takeoffRunTypes, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { undergroundRunTypeLabel } from "../shared/undergroundRunTypes";
 import {
+  circuitNeedsPickedWire,
   countRunsWithNoWire,
   emptyPipeLookup,
   runCarriesNoWire,
@@ -102,6 +103,26 @@ describe("which runs carry no wire", () => {
     expect(runCarriesNoWire(row({ runTypeId: 6 }), none, lookup)).toBe(true);
     // A run stored against the shipped id follows the fork's answer.
     expect(runCarriesNoWire(row({ runTypeId: 8 }), none, lookup)).toBe(false);
+  });
+
+  it("asks for the wire to be PICKED only where a circuit would have no material on purpose", () => {
+    const noWire = { conductorMaterialId: null, conductorCount: null };
+    // An underground trench: no wire said, a per-foot extra (the tape).
+    expect(circuitNeedsPickedWire(noWire, 1)).toBe(true);
+    // An empty pipe: the type says 0.
+    expect(
+      circuitNeedsPickedWire(
+        { conductorMaterialId: null, conductorCount: 0 },
+        0
+      )
+    ).toBe(true);
+    // A plain raceway-only type: a circuit is the manual way to measure wire.
+    expect(circuitNeedsPickedWire(noWire, 0)).toBe(false);
+    // A type that names its wire, with tape or without.
+    expect(
+      circuitNeedsPickedWire({ conductorMaterialId: 9, conductorCount: 2 }, 1)
+    ).toBe(false);
+    expect(circuitNeedsPickedWire(null, 0)).toBe(false);
   });
 
   it("counts a branched run once, however many legs are empty (D20)", () => {
@@ -372,10 +393,69 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
     expect(ground.sendable).toEqual({ ok: true });
   });
 
+  it("refuses a circuit on a type that names no wire, and writes none (never wire with no material)", async () => {
+    const t = await trench();
+    await expect(
+      caller().takeoffRuns.addCircuit({
+        runId: t.run.id,
+        name: "Circuit 1",
+        conductorCount: 2,
+        groundCount: 1,
+      })
+    ).rejects.toThrow(/Pick the wire/);
+    const row = await t.rowOf(t.run.id);
+    expect(row.circuits).toHaveLength(0);
+    expect(row.noWire).toBe(true);
+    // The panel's circuit editor reads this to offer "Pick the wire".
+    expect(row.pickWireToAdd).toBe(true);
+  });
+
+  it("refuses a circuit on an EMPTY PIPE too, which the type says on purpose", async () => {
+    const t = await trench();
+    await caller().takeoffRuns.respecify({
+      id: t.run.id,
+      racewayMaterialId: t.ug.racewayMaterialId,
+      conductorMaterialId: null,
+      conductorCount: null,
+      emptyPipe: true,
+    });
+    expect((await t.rowOf(t.run.id)).pickWireToAdd).toBe(true);
+    await expect(
+      caller().takeoffRuns.addCircuit({
+        runId: t.run.id,
+        name: "Circuit 1",
+        conductorCount: 2,
+        groundCount: 1,
+      })
+    ).rejects.toThrow(/Pick the wire/);
+  });
+
+  it("still lets a plain raceway-only type take a circuit by hand", async () => {
+    const s = await scenario();
+    const catalog = await caller().materials.list();
+    const plain = await caller().takeoffRunTypes.create({
+      label: `Raceway only ${Date.now()}${Math.random()}`,
+      pathType: "conduit",
+      racewayMaterialId: catalog.find(m => m.name === '1/2" EMT')!.id,
+    });
+    const run = await s.traceAs(plain.id);
+    expect((await s.rowOf(run.id)).pickWireToAdd).toBe(false);
+    await caller().takeoffRuns.addCircuit({
+      runId: run.id,
+      name: "Ckt 1",
+      conductorCount: 2,
+      groundCount: 1,
+    });
+    expect((await s.rowOf(run.id)).circuits).toHaveLength(1);
+  });
+
   it("refuses an empty pipe on a run that already has wire, and says why", async () => {
     const t = await trench();
-    await caller().takeoffRuns.addCircuit({
+    // A circuit written before addCircuit refused one here (2026-10-08) —
+    // such rows exist, so respecify still has to say what to do with them.
+    await createRunCircuit({
       runId: t.run.id,
+      userId: USER,
       name: "Circuit 1",
       conductorCount: 2,
       groundCount: 1,

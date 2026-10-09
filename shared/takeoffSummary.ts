@@ -40,7 +40,16 @@ export type NotOnBidReason =
 
 export type SendTarget =
   | { kind: "count"; groupId: number }
-  | { kind: "runRow"; runTypeId: number; role: string };
+  | {
+      kind: "runRow";
+      runTypeId: number;
+      role: string;
+      /**
+       * Which EXTRA, on an `extra` row (0136) — a type may carry several,
+       * and the role alone would send all of them from each one's item.
+       */
+      extraKey?: number;
+    };
 
 export type SummaryItem = {
   /** Stable across reads — what the preview's `expect` is made of. */
@@ -122,6 +131,9 @@ export type SummaryRunType = {
   unmeasurableCount: number;
   rows: {
     role: string;
+    /** Which extra, on an `extra` row; 0 on every other (0136). */
+    extraKey: number;
+    materialId: number | null;
     materialName: string | null;
     feet: number;
     onBid: boolean;
@@ -258,10 +270,20 @@ export function takeoffSummary(input: {
       isOnBid: boolean,
       sendable: RowSendability,
       notPriced = false,
-      note: string | null = null
+      note: string | null = null,
+      extra: { key: number; materialId: number | null } | null = null
     ) => {
       const base = {
-        key: `run:${t.runTypeId}:${role}`,
+        /*
+          An EXTRA is keyed by its material and its slot, not its role: a type
+          with two extras (tape and a marker, say) has two `extra` rows, and
+          `run:<type>:extra` twice made two items one key — the preview's
+          `expect` could not tell them apart. The slot as well as the
+          material, so two extras of one material still differ.
+        */
+        key: extra
+          ? `run:${t.runTypeId}:extra:${extra.materialId ?? "none"}:${extra.key}`
+          : `run:${t.runTypeId}:${role}`,
         kind: "run" as const,
         group: t.label,
         name: materialName ?? ROLE_NAME[role] ?? role,
@@ -274,7 +296,12 @@ export function takeoffSummary(input: {
         onBid.push({ ...base, reason: null, why: null, send: null });
       } else if (sendable.ok) {
         notOnBid.push(
-          wouldGo(base, { kind: "runRow", runTypeId: t.runTypeId, role })
+          wouldGo(base, {
+            kind: "runRow",
+            runTypeId: t.runTypeId,
+            role,
+            ...(extra ? { extraKey: extra.key } : {}),
+          })
         );
       } else {
         notOnBid.push({
@@ -297,7 +324,10 @@ export function takeoffSummary(input: {
         r.onBid,
         r.sendable,
         false,
-        r.how ?? null
+        r.how ?? null,
+        r.role === "extra"
+          ? { key: r.extraKey, materialId: r.materialId }
+          : null
       );
     }
     for (const f of t.fittings) {

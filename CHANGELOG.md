@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **An underground run can no longer be given wire with nothing to price
+  it.** The open run's "Add wires to this run" now offers "Pick the wire" or
+  "No wire (empty pipe)" on an underground trench or an empty pipe, the same
+  as the run's warning, and the server refuses a circuit there. A plain
+  conduit type with no wire named still takes circuits by hand, as before.
+- **A run type with two per-foot extras now sends both to the bid.** The
+  Send dialog told two extras on one type apart by their part kind only, so
+  the second came back "Nothing was added". Each is now its own item.
+- **The Legend tab fits on an upright tablet.** At 820 wide it sat 20 px off
+  the screen's edge; the tabs' minimum spacing was too wide for the panel.
+  The layout check now fails if any tab is cut off.
 - **An underground run can now be given its wire, or called an empty pipe,
   right where the warning is.** The shipped underground types leave the wire
   unsaid on purpose, so a traced trench sat at "no wire" with nothing that

@@ -1,8 +1,10 @@
 # Track C — handoff, 2026-10-06
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
-section below** (per-foot server half on `c-per-foot-logic`; C's databases
-have 140 migrations, including a stand-in 0139). **Earlier, 2026-10-08:**
+section below** (per-foot work merged to local-dev as `94d63fd`; leftovers
+on `c-leftovers`; C's databases have 140 migrations — the stand-in 0139 they
+ran is the same statement and `when` as A's, so nothing more is needed).
+**Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
 `c-homerun-wiring` (from local-dev), merged into local-dev by C once CI is
@@ -12,7 +14,63 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-08, late) — wire on underground runs; tape line checked on screen
+## LATEST (2026-10-09) — per-foot work MERGED; three leftovers fixed
+
+**Job 1 — merged.** `c-per-foot-logic` went onto local-dev as ONE squash
+commit, **`94d63fd`** (fast-forward of `ee7576c`). Took A's 0139 file and
+journal entry, dropped C's stand-in, deleted A's `elbowFlat` tripwire in
+`feetForRole` (`elbowFlat` was already in `FITTING_KINDS` from C's 700
+code; `pnpm check` clean). **Why squashed:** `drizzle-guard` lists every
+non-merge branch commit touching `drizzle/` (`git log --no-merges
+origin/local-dev..HEAD -- drizzle/`), so the stand-in commit `92a7ef4` kept
+it red even after the merge's tree equalled local-dev's — a merge does not
+clear it. Full history stays on `origin/c-per-foot-logic` (merge `8141b66`).
+`origin/track-c` was force-pushed (with lease) from that merge to the squash.
+E111 1728359 and Bar layout check 1164558: `bids.get` + `bridgeForBid` +
+`materialsList.get` + `takeoffSummary.forBid` byte-identical, 261df22 vs the
+merge, same `bidrender_local_c`. CI: track-c Gate 37863259085 — test GREEN,
+drizzle-guard GREEN. local-dev Gate: see the staging lines below.
+
+**Job 2 — `c-leftovers` (from `94d63fd`), one commit:**
+
+- **a. No wire with no material.** `circuitNeedsPickedWire` in
+  `shared/runNoWire.ts` (type, extra count): true when the type names no
+  conductor AND says so on purpose — an underground trench (it carries an
+  extra) or an empty pipe (count 0). `takeoffRuns.addCircuit` refuses with
+  "Use "Pick the wire"…"; `listForSheet` rows carry `pickWireToAdd` from the
+  same function, and the open run's circuit editor shows "This run's type
+  names no wire." + Pick the wire / No wire (empty pipe) instead of "Add
+  wires to this run" (empty pipe: Pick the wire only). **Deliberately NOT
+  every no-wire type:** a raceway-only shop type with hand-added circuits is
+  the manual way to measure wire (materials list "Wire, insulated"); 19
+  existing tests rely on it. Looked at on screen at laptop and 820×1180
+  (throwaway bid on the Old Blueridge set, deleted).
+- **b. Send-dialog extras keyed by type + material + slot:**
+  `run:<type>:extra:<materialId|none>:<extraKey>` (slot too, so two extras
+  of one material still differ). `SendTarget` carries `extraKey`;
+  `takeoffRunTypes.sendToBid` takes optional `extraKey` and sends that one
+  extra. Before: one key twice, and Send all's second item reported "Nothing
+  was added" because the first sent both.
+- **c. Legend tab at 820×1180.** `phone` in RunsPanel is every touch layout,
+  tablet included; its `px-2.5` made the tabs 331 px in a 312 px panel, so
+  Legend ended at x=840. Now `px-1` (flex-1 still spreads them; measured
+  62–64 px each, strip 311/311). **`pnpm device:audit` gained a hard fault,
+  `cutTabs`**: a tab not wholly inside its strip and the window — the
+  sideways-strip exemption had hidden it. Red before (3 faults, all
+  tablet-portrait), 0 after, plans/plans-totals/capture at all four sizes.
+
+**Tests** (`bidrender_test_c`): `runNoWire.test.ts` (+4: pure rule,
+trench refused + `pickWireToAdd`, empty pipe refused, raceway-only still
+allowed; the old "refuses an empty pipe on a run that already has wire"
+now seeds its circuit with `createRunCircuit`, since addCircuit refuses
+one there), `takeoffSummary.test.ts` (+1, two extras), `runTypeExtras.test.ts`
+(+1 DB, Send all sends both). Mutation-checked: rule → 3 red; key → 2 red;
+send filter → 1 red. 13 touched files, 205 passed. Full suite: CI.
+
+**Not done:** "Pick the wire then a ground" `(2)` twin names (below) still
+open.
+
+## EARLIER (2026-10-08, late) — wire on underground runs; tape line checked on screen
 
 Same branch, `c-per-foot-logic`, **still NOT merged into local-dev** (waits
 for A's 0139 — the section below still applies word for word). **No new

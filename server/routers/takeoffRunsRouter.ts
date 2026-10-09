@@ -57,7 +57,11 @@ import {
 import { runWireOwnership } from "../../shared/branchWire";
 import { runOnBid, type RunTotalsLeftOut } from "../../shared/runOnBid";
 import { lockedEditRefusal } from "../../shared/quantityLock";
-import { emptyPipeLookup, runCarriesNoWire } from "../../shared/runNoWire";
+import {
+  circuitNeedsPickedWire,
+  emptyPipeLookup,
+  runCarriesNoWire,
+} from "../../shared/runNoWire";
 import {
   runDisplayName,
   runName,
@@ -349,6 +353,21 @@ export const takeoffRunsRouter = router({
         db.getRunTypesFor(ctx.scope.dataUserId, true),
       ]);
       const typeSaysEmpty = emptyPipeLookup(palette);
+      // "Add wires" or "Pick the wire" — circuitNeedsPickedWire, per type,
+      // the same rule addCircuit refuses by. Extras off the RESOLVED type.
+      const extrasByType = await db.getRunTypeExtrasFor(
+        ctx.scope.dataUserId,
+        runs
+          .map(r => resolveRunType(palette, r.runTypeId)?.id)
+          .filter((id): id is number => id !== undefined)
+      );
+      const pickWireToAdd = (runTypeId: number | null) => {
+        const type = resolveRunType(palette, runTypeId) ?? null;
+        return circuitNeedsPickedWire(
+          type,
+          type ? (extrasByType.get(type.id)?.length ?? 0) : 0
+        );
+      };
 
       // The heights, loaded ONCE for the whole sheet rather than per run. The
       // bid comes from the runs rather than the sheet: a sheet belongs to a
@@ -491,6 +510,12 @@ export const takeoffRunsRouter = router({
            * same function the bid's warning counts with (shared/runNoWire.ts).
            */
           noWire: runCarriesNoWire(run, wire, typeSaysEmpty),
+          /**
+           * A circuit here would be wire with no material, so the circuit
+           * editor offers "Pick the wire" instead of "Add wires" — and
+           * addCircuit refuses one (shared/runNoWire.ts).
+           */
+          pickWireToAdd: pickWireToAdd(run.runTypeId),
           /**
            * An end that may be a double-click stub which bought an elbow —
            * listed for the estimator to check, never changed (owner,
@@ -1635,6 +1660,35 @@ export const takeoffRunsRouter = router({
           message:
             "A cable run carries its own conductors — circuits are only assigned to conduit runs.",
         });
+      }
+      /*
+        NEVER WIRE WITH NO MATERIAL (2026-10-08). A circuit has no material of
+        its own — its wire is the run type's conductor. On a type that names
+        none (the shipped underground types, by design, or an empty pipe) a
+        circuit is footage nothing can price: it read "can't go on the bid as
+        it stands" and the feeder was left off. The way to wire such a run is
+        `respecify` ("Pick the wire"), which points it at a type that says.
+        Which types: `circuitNeedsPickedWire` (shared/runNoWire.ts), the same
+        rule the panel's circuit editor reads. A run with no type, and a plain
+        raceway-only type, are not this case and are left as they were.
+      */
+      if (run.runTypeId !== null) {
+        const type = resolveRunType(
+          await db.getRunTypesFor(ctx.scope.dataUserId, true),
+          run.runTypeId
+        );
+        const extras = type
+          ? ((
+              await db.getRunTypeExtrasFor(ctx.scope.dataUserId, [type.id])
+            ).get(type.id) ?? [])
+          : [];
+        if (circuitNeedsPickedWire(type ?? null, extras.length)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              'This run\'s type names no wire, so a circuit on it could not be priced. Use "Pick the wire" to say what it carries.',
+          });
+        }
       }
       const { result: id, undo } = await asUndoStep(
         run,
