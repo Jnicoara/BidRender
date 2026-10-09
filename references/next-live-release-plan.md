@@ -18,8 +18,9 @@ in the state it describes, and those want opposite responses.
 | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Live      | `24105ad` (`origin/main`), database 0000–0104 (105 migrations)                                                                |
 | Staging   | follows `local-dev`; database 0000–0139 (140) since 2026-10-08 22:44 UTC, all applied before their code (`deploying.md` § 11) |
-| Gap       | `git rev-list --count origin/main..origin/local-dev` = 178 commits before this file (merges and docs included)                |
+| Gap       | `git log --oneline origin/main..origin/local-dev \| wc -l` = 207 at `8913918` (merges and docs included)                      |
 | Candidate | not chosen. Must be a commit with a green Gate (test, deploy-staging, smoke) — `live-release-plan.md` § 0 if not the tip      |
+| Last Gate | `8913918` (B's cover swaps merged): Gate 37858600880 green, 2026-10-08                                                        |
 
 ## 2. What is on staging and not live — by theme
 
@@ -78,9 +79,10 @@ left out. One line per theme; the commits say the rest.
 > **Grew 2026-10-08 (sessions 21 and 23):** 0135–0138 (per-foot items
 > M1–M4) and **0139** (`0139_elbow_flat_role`, the `elbowFlat` role)
 > joined the batch, both on staging (`deploying.md` § 11). The
-> rehearsal in § 5b was of the thirty only — **re-rehearse before the
-> day, expecting 35 applied, 140, matches, 176/176.** The "30 / 135 /
-> 173" figures below are the thirty's, kept as the record of that run.
+> rehearsal in § 5b was of the thirty only. **Re-rehearsed with all 35 on
+> 2026-10-08 (§ 5c): 35 applied in 4.1 s, 140, matches, 176/176, no
+> errors.** The "30 / 135 / 173" figures in § 5b are the thirty's, kept as
+> the record of that run.
 
 All thirty-five are **step 1, additive** — no `UPDATE` to an older column —
 per `migrations-next-batch.md` and the staging records in `deploying.md`
@@ -136,6 +138,39 @@ rate; only NEW lines on a shop still using starter rates get real labor.
 FAIL. (B's labor rule may raise "not priced" counts on labor-with-$0-material
 lines: expected, and labelled as such in § 1b of the checklist.)
 
+## 4b. A release step after the push: the starter cover repair
+
+Track B's cover swaps (`7fb0c80`, `cover-plates-audit.md` § 3) change the
+seed recipes, but the seeder never edits a starter that already exists. So
+on live the starters seeded before the swap keep the generic "Wall plate"
+until `scripts/repairStarterCovers.mts` runs. It is a hand step, run by
+Track A, never a boot step (`server/starterCoverRepair.ts`).
+
+**When: AFTER the new code's first boot on live**, not straight after the
+migrations. The typed cover rows ("1-gang wall plate, duplex, nylon" etc.)
+are catalog rows the new code SEEDS when it starts; before that boot the
+script answers "skipped: part not in catalog" for every starter, and the
+175 starters live does not have yet are not there either. So, in the
+`live-release-plan.md` § 4 sequence: migrate → push → watch the deploy and
+`/api/version` → **cover repair** → `bidTotals` after.
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterCovers.mts           # report only
+ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterCovers.mts --apply
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterCovers.mts           # again: expect 48 already has it
+```
+
+**Expect (from § 5c, on the 2026-10-08 copy of live): report only says
+`5 would swap, 43 already has it`** — DV1–DV5, live's original starters
+ids 1–5, each "old recipe exactly" with no company copies; the other 43
+were seeded on the new recipe by the boot. `--apply` says `5 swapped`; a
+second run says `48 already has it`. Any `skipped: edited`, `skipped: not
+found` or `skipped: part not in catalog`, or a different split, is a stop:
+either live changed since the copy (a company edited a starter, or the
+boot did not finish seeding) or this line is stale — find out which first.
+It writes only shared starter lines, so `bidTotals` after must still show
+every bid unchanged.
+
 ## 5. Check first — before the window
 
 1. **Owner's yes** to release, and to which candidate commit.
@@ -147,17 +182,18 @@ lines: expected, and labelled as such in § 1b of the checklist.)
    every run); Gate 37845117225 green, then its smoke re-run against staging
    5 of 5 green. **A red step 10 is now a real failure — do NOT re-run past
    it**; find out why first.
-3. **The white box on plan open** (`todo.md` "FIRST: the white box…") is
-   reproduced on staging and **not fixed**. Owner decides: fix first, or ship
-   with it (it is not a wrong number, but pins can draw over the blank and
-   taps land on it).
+3. ~~The white box on plan open~~ — **FIXED by Track B (`14fead9`, batch 1)**: `stagingOpenFlash.mts` prints "No flash" on staging at laptop and
+   tablet (`todo.md` § White box). ~~Track B's cover swaps~~ — **on
+   local-dev (`7fb0c80`)**, with the repair script in § 4b.
 4. **Read-only recount on live**: lines with `assemblyId IS NOT NULL AND
 snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
    (it was 0 on 2026-10-07). Otherwise freeze first (`todo.md`
    "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE").
 5. **Backup of live**, restored locally, table counts equal; rehearse the
-   thirty on that copy (apply, re-run, drift, `bidTotals` before/after with
-   the candidate's code booted, the starter count with zero holds).
+   thirty-five on that copy (apply, re-run, drift, `bidTotals` before/after
+   with the candidate's code booted, the starter count with zero holds, the
+   cover repair). **Done on `8913918` 2026-10-08 (§ 5c)** — repeat only if
+   the candidate's `drizzle/` or seed differs from that.
 6. `git status --porcelain` empty, `pnpm check` clean, read
    `git log main..<candidate> --oneline` in full.
 7. After the push: `curl -s https://bidridge.com/api/version` — `commit` and
@@ -195,6 +231,50 @@ state measured here.
 The throwaway copy `bidrender_backup_verify` and the `../bidrender-before-1008`
 worktree were removed afterwards.
 
+## 5c. Re-rehearsal with all 35 + the cover repair — DONE 2026-10-08 (nothing changed on live)
+
+Track A, 23:54–00:10 UTC, code `local-dev` = `8913918` (0139 and B's cover
+swaps in). Live was only READ, through `scripts/backup.mts`; every write
+was to the local throwaway copy `bidrender_backup_verify`, dropped after.
+
+| Step                           | Result                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backup                         | `2026-10-08T23-54-07Z` in `r2://bidsoftware/helixbid`: 65 tables, 3,479 rows, 5/5 files (324.3 MB). Same one warning as § 5b (0108's `ai_correction_log` is not on live yet). Live's data is the same size as in § 5b.                            |
+| Restore                        | `verifyBackup.mts`, `KEEP_SCRATCH=1`: **VERIFIED**, 65 tables / 3,479 rows. 105 migrations. 3 users, 2 bids, **0 bid lines**, 8 shared assemblies (38 lines), 1,574 materials, 0 company assemblies, 0 forks.                                     |
+| Recount (pre-0087 recipe-live) | **0** before the migration and **0** after the repair.                                                                                                                                                                                            |
+| `bidTotals` before             | from live's code `24105ad` (worktree, today's `bidTotals.mts` copied in): read only proved, 2 bids for 2 owners.                                                                                                                                  |
+| Migrate 0105–0139              | **"Applied 35 migrations: 0105_assembly_labor_only to 0139_elbow_flat_role … all 140."** No errors. **4.1 s** wall time incl. `tsx` start-up (timed on a second restore of the same backup). Re-run: "Nothing to apply … all 140".                |
+| Drift after                    | **"Database matches the schema." Foreign keys 176 present, 176 declared.**                                                                                                                                                                        |
+| Boot `8913918`                 | Started clean, no error or "Holding" lines. **183 shared starters**, 940 starter lines, 1,826 shared materials (1,844 rows in all).                                                                                                               |
+| Cover repair, report only      | **`5 would swap, 43 already has it`** — DV1 Duplex receptacle standard (1), DV2 GFCI (2), DV3 Dedicated 20A (3), DV4 Single-pole switch (4), DV5 Dimmer (5), all "old recipe exactly". Nothing skipped.                                           |
+| Cover repair, `--apply`        | `5 swapped`. Measured both sides: in each of ids 1–5 ONLY the "Wall plate" line changed, on the same line id and place (duplex/decorator/toggle nylon plates per B's table). The other 914 starter lines hash identical; assembly rows identical. |
+| Cover repair, second run       | **`48 already has it`** — changes nothing. Dry run takes ~1.7 s.                                                                                                                                                                                  |
+| `bidTotals` after + compare    | **"all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged."**                                                                                                                                                                      |
+
+**Same honest limit as § 5b:** live has 0 bid lines and 0 company
+assemblies, so "totals unchanged" is $0 against $0 and "only exact old
+recipes" was never put to the test by an edited starter here. Both were
+proved where the data exists: B rehearsed the repair on staging's copy (48
+swapped, 732 totals unchanged, `7fb0c80`), and `server/starterCoverRepair.test.ts`
+covers the edited and forked cases.
+
+**Expect on the day:** 35 applied, 140, matches, 176/176, 0 holds, 183
+starters; repair 5 / 43, then 48. If any differs, stop and find out why.
+
+### Still missing before the release (2026-10-08)
+
+- **Owner's yes** and the candidate commit; then a green Gate on exactly
+  that commit (`8913918` is green; anything newer needs its own).
+- **Owner's tablet look at staging** (the third of the owner's three
+  waits; the white box and the cover swaps are done).
+- **The cover repair has NOT been run on staging.** Staging's starters
+  still have the old covers (B rehearsed on a copy only). Run it there
+  first, with a backup, the same way — it is what the live step will do.
+- The recount (§ 5 item 4) on LIVE itself on the day — the 0 here is the
+  copy's.
+- Not blockers, logged by session 22 in `todo.md`: the tally saying
+  "0 marks" while loading.
+
 ## 6. What should wait (NOT in this release)
 
 - **The LT1/LT2 repair script** — moves a number on old lines; waits for the
@@ -213,14 +293,17 @@ worktree were removed afterwards.
 
 ## SHORT SUMMARY
 
-- Live `24105ad` / 0104; staging = `local-dev` / 0134; 178 commits apart.
+- Live `24105ad` / 0104; staging = `local-dev` / 0139; 207 commits apart.
 - A release runs 0105–0139 (35, all additive) before the push, in one
-  ordered run; expect 140, matches, 176/176 FKs (0135–0139 added since the
-  rehearsal — re-rehearse).
+  ordered run; expect 140, matches, 176/176 FKs. Re-rehearsed 2026-10-08
+  (§ 5c): 4.1 s, no errors, both bids unchanged.
+- NEW release step after the push and first boot: `repairStarterCovers.mts`
+  (§ 4b) — expect 5 swapped (DV1–DV5), 43 already, then 48 already.
 - Pairing rules 1–5 all met on `local-dev`; rule 2 now expects ZERO holds
   (DV34 loads).
-- Check first: owner's yes, green Gate on the candidate, the unfixed white
-  box, live recipe-live recount = 0, backup + rehearsal with `bidTotals`.
+- Check first: owner's yes, green Gate on the candidate, owner's tablet
+  look, the cover repair run on STAGING, live recipe-live recount = 0.
+  White box and cover swaps are done.
 - Wait: LT1/LT2 repair, any shipped prices/hours, brand prices, step 3,
   C's per-foot extras plan.
 - Rehearsed on a copy of live 2026-10-08 (§ 5b): recount 0, 30 applied in
