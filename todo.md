@@ -200,6 +200,17 @@ Not urgent if keys are created with no expiration, which is now the rule.
       miss prints the request URLs still pending (query strings stripped:
       a signed plan link is a bearer credential). **Which request hung is
       NOT known** (`trace: "off"`); if the warning names one, chase it.
+      No warning in the next 4 runs (Gate 37970377380 and its 3 re-runs).
+- [ ] **Smoke flow test 5: a Legend click that did not arm, 2026-10-09.**
+      Gate 37970377380, smoke attempt 2, nothing deploying. "Link CI SWITCH"
+      saved (the row shows Duplex receptacle standard), then
+      `armFromLegend("CI SWITCH")` clicked the row and the pill stayed on
+      "Counting ci duplex". The test's forced-race hook waits on the
+      `bidridge:last-count:<bid>` write and timed out at 20 s. Passed in the
+      3 runs on either side. Cause NOT found (`trace: "off"`; the screenshot
+      is the only evidence). Not from Track B's changes, which touch neither
+      the legend nor arming. Needs whoever owns the legend; a trace
+      (`trace: "retain-on-failure"`) would name it next time.
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the

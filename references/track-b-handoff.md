@@ -1,6 +1,50 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, Won/Lost ask first + smoke race fixed (READ FIRST)
+## WHERE B STANDS — 2026-10-09, smoke test 2 PROVEN + "Fix these" walk + gap 10 (READ FIRST)
+
+- **Smoke test 2 (empty sheet list after a first upload): release blocker
+  CLEARED.** The 2026-10-08 fix was only half: a re-run on Gate
+  37883298465 (attempt 3) failed test 2 with nothing deploying. A staging
+  probe reproduced it 2 of 12, and its network log showed the cause. The
+  set's FIRST sheet read was in flight when `ensureSheets` answered, and
+  React Query folds an invalidate into a running fetch when the query has
+  no data yet, so no second read was sent. Fix `11f5466`: cancel, then
+  invalidate (`client/src/lib/refetchPastInFlight.ts`; its test pins the
+  trap against a real QueryClient and goes red without the cancel).
+- **Proof after the fix:**
+  - Staging probe on `71f9f82`: **0 of 24 failed**. All 24 had the first
+    read racing the insert, and every one re-read afterwards.
+  - **Test 2 passed in all 10 smoke runs since:**
+    - Gate 37960082974 (`71f9f82`): first run + re-runs 2–4;
+    - A's Gates 37962455841 and 37967963402;
+    - Gate 37970377380 (`f058ab5`): first run + re-runs 2–4.
+  - 8 of those 10 smoke JOBS were fully green. The other 2 failed on
+    DIFFERENT tests, with no deploy running:
+    - **screens / Proposal, tablet-landscape** (37960082974 attempt 4): the
+      network-idle wait had no bound and one request never came back.
+      Bounded at 15 s and made to name what is pending (`739eae6`). No
+      warnings in the 4 runs since. Which request hung is not known.
+    - **flow test 5** (37970377380 attempt 2): clicking CI SWITCH in the
+      Legend did not arm its count, so the forced-race hook never fired.
+      Not caused by B's changes (nothing touches the legend or arming).
+      Cause NOT found (`trace: "off"`). In todo.md for whoever owns the
+      legend.
+- **Built: the "Fix these" walk and gap 10** (`88feaf9`). Six bid warning
+  boxes have "Fix these N", which walks the "Fix this line" panel one line
+  at a time ("Line 2 of 5", Skip; Save goes to the next, Cancel ends it).
+  Each line in the Proposal's print block opens
+  `/bids/:id?fix=<lineId>` with that line's fix open. Tests red on the old
+  code. Seen on screen at 1536x864 and 820x1180. todo.md § "Fix this line".
+- **State:** `track-b` = `local-dev` at `f058ab5` + this docs commit. B's
+  databases are at 141 and `schemaDrift` matches (176/176); A's new rows
+  are seed, not migrations. No migrations by B. No dev server running.
+  Leftovers:
+  - staging: one more `track-b-race-*@example.com` per probe run (2 runs),
+    their plan sets removed and bids archived;
+  - local only: throwaway "B walk check …" and "B race probe …" data in
+    `bidrender_local_b_new`.
+
+## WHERE B STOOD — 2026-10-08, Won/Lost ask first + smoke race fixed
 
 - **Smoke (local-dev Gate 37879795728) FAILED at test 2**: after a first
   upload the sheet list stayed on "Sheets appear here once the document

@@ -197,6 +197,25 @@ every bid unchanged.
    every run); Gate 37845117225 green, then its smoke re-run against staging
    5 of 5 green. **A red step 10 is now a real failure — do NOT re-run past
    it**; find out why first.
+   ~~Smoke test 2 (empty sheet list after a first upload)~~ — **CLEARED
+   2026-10-09 by Track B**:
+   - Fixes: `526d295`, then `11f5466`, the half that mattered (cancel the
+     first sheet read in flight before re-reading).
+   - Before the fix: 2 of 12 failed on a staging probe. After: **0 of 24**.
+   - Test 2 green in all 10 smoke runs since (Gates 37960082974 and
+     37970377380 with 3 re-runs each, plus A's two Gates).
+   - **The candidate must contain `11f5466`.** A red test 2 is now a real
+     failure, so do not re-run past it.
+
+   **Two OTHER smoke tests each failed once in those 10 runs**, with no
+   deploy running (`track-b-handoff.md`, todo.md):
+   - screens / Proposal: an unbounded network-idle wait. Bounded in
+     `739eae6`.
+   - flow test 5: a Legend click that did not arm. Cause NOT found.
+
+   Either can turn the candidate's Gate red. If one does, read the failure
+   before re-running.
+
 3. ~~The white box on plan open~~ — **FIXED by Track B (`14fead9`, batch 1)**: `stagingOpenFlash.mts` prints "No flash" on staging at laptop and
    tablet (`todo.md` § White box). ~~Track B's cover swaps~~ — **on
    local-dev (`7fb0c80`)**, with the repair script in § 4b.
@@ -374,7 +393,9 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
 
 - **Owner's yes** and the candidate commit; then a green Gate on exactly
   that commit (test, deploy-staging, smoke). The candidate must include the
-  Sch 80 / 500 seed if it is to match § 5e.
+  Sch 80 / 500 seed if it is to match § 5e, and Track B's `11f5466` (smoke
+  test 2's fix, § 5 item 2).
+- ~~Smoke test 2 proven fixed~~ — **done 2026-10-09** (§ 5 item 2).
 - **Owner's tablet look at staging** (the third of the owner's three
   waits; the white box and the cover swaps are done).
 - **A fresh backup of live on the day** — this session could not take one
