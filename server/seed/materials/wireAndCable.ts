@@ -225,6 +225,7 @@ const NM_COLOURS: Record<string, string> = {
   "10": "orange",
   "8": "black",
   "6": "black",
+  "4": "black",
 };
 
 const NM_SIZES = [
@@ -239,6 +240,9 @@ const NM_SIZES = [
   // 6/2 added in the owner's catalog review, 2026-10-08.
   "6-2",
   "6-3",
+  // 4/3 added from the coverage check, 2026-10-09 (owner-approved): a 60A
+  // EV or sub-panel feed in a house.
+  "4-3",
 ];
 
 const nmb: BaselineMaterial[] = NM_SIZES.map(size => {
@@ -256,7 +260,9 @@ const nmb: BaselineMaterial[] = NM_SIZES.map(size => {
       "nm nonmetallic sheathed house wire with ground",
       NM_COLOURS[gauge]
     ),
-    ...(size === "6-2" ? { jobKind: "residential" as const } : {}),
+    ...(size === "6-2" || size === "4-3"
+      ? { jobKind: "residential" as const }
+      : {}),
   };
 });
 
@@ -350,6 +356,25 @@ const mcCable: BaselineMaterial[] = [
     ),
     description:
       "Two conductors, an insulated ground for the IG receptacle, and the bond.",
+  },
+  /*
+    Healthcare-facility armored cable (coverage check, 2026-10-09,
+    owner-approved): what feeds an exam or operatory receptacle, where the
+    armour must be a listed ground path. "MC cable" in the name on purpose,
+    so `mcFittingNames` buys MC connectors and straps for it, as for the IG
+    cable above. Specialty (specialty.ts).
+  */
+  {
+    name: "12/2 MC cable healthcare (HCF) Copper",
+    unitOfSale: "foot",
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable",
+    searchAliases: aliases(
+      "12-2 hcf mc-hcf ac-hcf hospital medical dental exam patient care green insulated ground metal clad armored armoured bx"
+    ),
+    description:
+      "Two conductors, an insulated ground, and armour listed as a ground path.",
+    jobKind: "commercial",
   },
 ];
 

@@ -151,7 +151,9 @@ describe("the shipped run types after the review", () => {
 
 describe("SPECIALTY (0140)", () => {
   it("tags exactly the check's 108 rows, every one shipped", () => {
-    expect(SPECIALTY_MATERIALS).toHaveLength(108);
+    // 114 since 2026-10-09: the coverage check's meter centers, switchboards
+    // and HCF cable (server/coverageCheckRows.test.ts).
+    expect(SPECIALTY_MATERIALS).toHaveLength(114);
     expect(SPECIALTY_MATERIALS.filter(n => !shipped.has(n))).toEqual([]);
     expect(
       BASELINE_MATERIALS.filter(m => m.isSpecialty)

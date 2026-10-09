@@ -344,6 +344,32 @@ bids (`deploying.md` § 11).
 holds, 183 starters, 1,801 active shipped, 24 shipped run types; repair 5 /
 43, then 48. If any differs, stop and find out why.
 
+> **Changed 2026-10-09, later — the coverage-check catalog adds (§ 5f).**
+> A candidate that includes `3cb5df3` ships **24 more rows: expect 1,825
+> active shipped and 114 Specialty** on live's first boot, not 1,801 / 108.
+> Seed only, no migration, additive (renamed 0, retired 0), so § 5e's
+> migration and repair figures are unchanged. § 5e itself was NOT re-run
+> with them; they were rehearsed on a copy of STAGING (§ 5f), which holds
+> the same catalog live will reach after this release's first boot.
+
+## 5f. The coverage-check catalog adds (24 rows) — rehearsed on staging's copy, 2026-10-09
+
+Owner-approved rows from `coverage-check.md` (track-c), `3cb5df3`:
+receptacles (6-15R, 6-20R, 6-30R, 6-50R, L15-30, L21-30, red emergency,
+pop-up countertop), wall and floor heat (4), 4/3 NM-B, HCF MC cable,
+meter centers (4, 6), switchboards (400/600/800A), handhole, dock light,
+cord reel, telecom backboard and busbar. CT cabinet already shipped. No
+migration; the seed adds them on the first boot.
+
+| Step                         | Result                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backup                       | `staging-2026-10-09T05-13-27Z-before-coverage-rows.sql` (73 tables), restored locally: 847 bids, 438 lines, 1,801 active, 141 migrations       |
+| Before (staging's `94471cc`) | `bidTotals` 847; catalog 1,941 rows / 1,801 active. Control: booting that same code changed no total (847/847)                                 |
+| New code's boot ×2           | **added 24, renamed 0, retired 0, DELETED 0**, 1,825 active, 114 Specialty, every reference identical — `VERDICT: CLEAN`; second boot: nothing |
+| Totals                       | **847/847 unchanged**                                                                                                                          |
+
+Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
+
 ### Still missing before the release (2026-10-09)
 
 - **Owner's yes** and the candidate commit; then a green Gate on exactly
@@ -391,6 +417,9 @@ holds, 183 starters, 1,801 active shipped, 24 shipped run types; repair 5 /
     starters, 0 holds, only the intended ground swap moved, repair 5 / 43 →
     48, both bids unchanged. The copy was the 2026-10-08 23:54 backup (a fresh
     read of live was refused this session).
+- Coverage-check catalog adds (`3cb5df3`, § 5f): +24 rows, seed only —
+  expect **1,825 active / 114 Specialty** on the first boot if the
+  candidate includes them. Rehearsed on staging's copy: CLEAN, 847/847.
 - NEW release step after the push and first boot: `repairStarterCovers.mts`
   (§ 4b) — expect 5 swapped (DV1–DV5), 43 already, then 48 already.
 - Pairing rules 1–5 all met on `local-dev`; rule 2 now expects ZERO holds

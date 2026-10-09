@@ -202,6 +202,17 @@ const ug = (unit: "each" | "foot", name: string, slang: string, d?: string) =>
   row("Underground", unit, name, `${slang} ${UG}`, d);
 
 export const UNDERGROUND: BaselineMaterial[] = [
+  // Coverage check, 2026-10-09 (owner-approved): the in-grade pull point for
+  // site lighting and underground runs. Not the light pole's own handhole
+  // cover (lighting.ts), nor the small landscape splice box.
+  {
+    ...ug(
+      "each",
+      "Handhole with lid, polymer concrete",
+      "in-grade ingrade pull box vault quazite tier 15 traffic site lighting parking lot"
+    ),
+    jobKind: "commercial",
+  },
   ug(
     "each",
     'Conduit spacer, 2"',

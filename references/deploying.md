@@ -1587,6 +1587,30 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: the Sch 80 / 500 seed (2026-10-09, 04:17 UTC) — NOT on live
+
+No migration — seed content only (`sch80-and-500-plan.md`, Track A's half):
+nine `N" PVC Sch 80, underground` run types with tape, the 500 base
+renamed in place, the 500 cover retired, nine 500 parts, the 500 run type.
+
+1. **Backup**: `staging-2026-10-09T03-57-40Z-before-sch80-500.sql` (73
+   tables, `--single-transaction`, `VERIFY_IDENTITY` TLS) in
+   `C:\dev\bidrender-backups\`. Not restored (no migration to rehearse).
+2. **Before** (staging's code `c1e7b35`, worktree): `bidTotals` 814 bids;
+   `catalogRehearsal snapshot` 1,932 baseline rows, 1,793 active.
+3. **Code**: `8f3045c` + docs `13b0dd9` merged to `local-dev`; Gate
+   37882505343 test, deploy-staging, smoke (on staging) **all green**;
+   `/api/version` = `13b0dd9`, built 04:17.
+4. **After**: `bidTotals --compare`: **814/814 existing bids unchanged**;
+   the 9 "differences" are bids 816–824 created between the reads (817–824
+   the Gate's smoke account, 04:21–04:25; 816 another account, 04:04).
+   `catalogRehearsal compare`: **added 9, renamed 1** (`Surface raceway
+base, 500 series` → `Surface raceway, 500 series`, same id #1683),
+   **retired 1** (the 500 cover), DELETED 0, **1,801 active**, old
+   spellings 0, duplicates 0; every pre-existing reference identical,
+   checked row by row (its verdict line says "NOT CLEAN" only because the
+   10 new run types add references).
+
 ### Staging: migration 0140 + the catalog review (2026-10-09, 01:10 UTC) — NOT on live
 
 `0140_material_specialty`: `materials.isSpecialty`, nullable, no default,

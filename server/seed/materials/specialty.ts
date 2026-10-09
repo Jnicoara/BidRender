@@ -106,6 +106,14 @@ export const SPECIALTY_MATERIALS: readonly string[] = [
   "600A fused disconnect",
   "400A cartridge fuse",
   "600A cartridge fuse",
+  // Coverage check adds, 2026-10-09 (owner: Specialty on meter center,
+  // switchboard, CT cabinet — already above — and HCF cable).
+  "Meter center, 4-position",
+  "Meter center, 6-position",
+  "400A switchboard",
+  "600A switchboard",
+  "800A switchboard",
+  "12/2 MC cable healthcare (HCF) Copper",
   // 2", 3", 5", 8" canless, every variant
   ...CANLESS_SIZES.flatMap(size =>
     CANLESS_VARIANTS.map(v => `${size} canless wafer LED downlight${v}`)

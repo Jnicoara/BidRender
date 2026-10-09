@@ -19,7 +19,73 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-09 (session 26) — START HERE
+## UPDATE 2026-10-09 (session 27, second job) — START HERE
+
+**Coverage-check catalog adds: 24 rows, on local-dev and staging. Live
+untouched. Sheets NOT rebuilt** (owner: Track B adds assemblies next; ONE
+rebuild after that — the carry-over rule above applies to it).
+
+- Rows (`3cb5df3`), owner-approved from `coverage-check.md` (track-c, both
+  lists): 6-15R/6-20R/6-30R/6-50R (`NN A 250V receptacle, NEMA 6-NNR`),
+  L15-30, L21-30, `20A red emergency receptacle`, `Pop-up countertop
+receptacle`, `Fan-forced wall heater`, `Wall heater thermostat`, `Floor
+heating mat`, `Floor heating thermostat, GFCI`, `4/3 NM-B Copper`, `12/2
+MC cable healthcare (HCF) Copper` (MC fittings apply), `Meter center,
+4-position` / `6-position`, `400A`/`600A`/`800A switchboard`, `Handhole
+with lid, polymer concrete`, `Dock light, swing arm`, `Cord reel`,
+  `Telecom backboard, plywood 4x8`, `Telecom grounding busbar`. Every row
+  has a `jobKind`. Record: `shared/coverageCheck20261009.ts` (wire adds).
+- **CT cabinet NOT added** — it ships as `Current transformer cabinet`,
+  already Specialty. The check searched by a different name.
+- Choices made without the owner (say if wrong): meter center as TWO rows
+  (4- and 6-position) and switchboard as THREE (400/600/800A) — one row
+  cannot carry a price for a range.
+- Specialty 108 → 114 (meter centers ×2, switchboards ×3, HCF). Catalog
+  **1,801 → 1,825**, renamed 0, retired 0.
+- **Search fix that came with it**: a spoken cable spec ("6 3" → "6-3") no
+  longer prefix-matches a word whose number runs on ("6-30r", "14-30r").
+  "14 3" and "10 3" had led with the DRYER receptacles since 2026-10-08
+  (nobody's test asked). Pinned in `materialSearchSizes.test.ts`. And the
+  6-20R carries no "20 amp" word — it pushed the 20A breaker out of "sp 20"
+  (`materialsCatalog.test.ts`; that breaker sits at exactly 8th of 8 in the
+  raw search, so any new "20A" device can do it again).
+- Safety: staging backup `staging-2026-10-09T05-13-27Z-before-coverage-rows.sql`,
+  rehearsed on its restore (CLEAN, 847/847 — `next-live-release-plan.md`
+  § 5f); staging itself: `deploying.md` § 11.
+
+## UPDATE 2026-10-09 (session 27)
+
+**Sch 80 / 500 seed on local-dev and staging; live re-rehearsed. Live
+untouched.**
+
+- **Seed** (`8f3045c`, Track A's half of `sch80-and-500-plan.md` § 7c):
+  9 `N" PVC Sch 80, underground` types (tape, no wire; one map over
+  `UNDERGROUND_SCHEDULES`), 500 base renamed in place, 500 cover retired,
+  nine 500 parts, `500 series surface raceway, 2 #12 + ground` on
+  `#12 THHN green Copper`. 500 raceway "common" (so "wiremold 500" leads with
+  it). **Took C's label signature + fold sort from `c-sch80-500`
+  file-identical** (`shared/undergroundRunTypes.ts`, `runTypeFold.ts` + test,
+  5 test call sites) — the plan allows A doing both. C's 500 fitting family
+  is NOT in; until C merges, a 500 run's fittings say "no catalog match".
+- Tests: `server/sch80And500Seed.test.ts` (11 red without the seed, incl. a
+  DB case that the rename keeps the id); counts moved in `perFootSeed`,
+  `catalogReview20261008`, `frozenMaterialNames` (123 shipped / 20
+  retired). Touched set 18 files / 312 green locally; branch Gate
+  37881649096 test green; local-dev Gate 37882505343 all green.
+- **Staging**: backup `staging-2026-10-09T03-57-40Z-before-sch80-500.sql`;
+  814/814 bids unchanged; catalog +9 / 1 renamed (#1683) / 1 retired,
+  1,801 active (`deploying.md` § 11 "Sch 80 / 500 seed").
+- **Live re-rehearsal** (`next-live-release-plan.md` § 5e): clean. **But on
+  the 2026-10-08 23:54 backup, not a fresh one** — `backup.mts` against live
+  was refused by the permission classifier ("Production Reads").
+- Two test call-site edits were made with `sed` (C's exact text), read back
+  and green — CLAUDE.md asks for Edit; noted, not repeated.
+- Cleaned up: DBs `bidrender_backup_verify`, `bidrender_staging_restore_0140`,
+  `bidrender_test_fresh0140`; worktrees `../bidrender-before-0140`,
+  `../bidrender-before-sch80`, `../bidrender-live-24105ad`. Branch
+  `a-sch80-500` pushed (merged).
+
+## UPDATE 2026-10-09 (session 26)
 
 **Staging now runs the catalog review's code; live untouched.**
 

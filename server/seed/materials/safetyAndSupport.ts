@@ -496,4 +496,42 @@ export const EQUIPMENT: BaselineMaterial[] = [
     name,
     searchAliases: aliases(slang),
   })),
+  /*
+    Coverage check, 2026-10-09 (owner-approved; references/coverage-check.md
+    on track-c): electric wall and floor heat, and the warehouse cord reel.
+  */
+  ...(
+    [
+      [
+        "Fan-forced wall heater",
+        "in-wall electric heat 240v bathroom office cadet recessed blower",
+        "both",
+      ],
+      [
+        "Wall heater thermostat",
+        "line voltage tstat in-wall fan forced control",
+        "both",
+      ],
+      [
+        "Floor heating mat",
+        "radiant heated bathroom tile warming cable underfloor",
+        "residential",
+      ],
+      [
+        "Floor heating thermostat, GFCI",
+        "gfi radiant heated floor tile warming programmable sensor",
+        "residential",
+      ],
+      [
+        "Cord reel",
+        "retractable drop cord ceiling mount warehouse shop extension",
+        "commercial",
+      ],
+    ] as const
+  ).map(([name, slang, jobKind]) => ({
+    ...item("Equipment & Appliances"),
+    name,
+    searchAliases: aliases(slang),
+    jobKind,
+  })),
 ];

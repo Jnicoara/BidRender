@@ -20,6 +20,21 @@ This is the human-readable companion to the git history — read this to see wha
 - **The proposal's "price these first" list now takes you to the fix.**
   Clicking a line in it opens the bid on that line with its fix open,
   instead of leaving you to find it.
+- **24 catalog items real jobs were missing.** From the coverage check of
+  thirteen real jobs: 250V receptacles (6-15R, 6-20R, 6-30R, 6-50R),
+  3-phase twist-locks (L15-30, L21-30), a red emergency receptacle, a pop-up
+  countertop receptacle, fan-forced wall heater and its thermostat, a floor
+  heating mat and its GFCI thermostat, 4/3 NM-B, healthcare (HCF) MC cable,
+  4- and 6-position meter centers, 400/600/800A switchboards, a
+  polymer-concrete handhole, a swing-arm dock light, a cord reel, and a
+  plywood telecom backboard with its grounding busbar. Each is tagged
+  residential, commercial or both; the big gear and the HCF cable sort as
+  Specialty. Nothing existing was renamed or removed. (The CT cabinet the
+  check asked for was already in the catalog under its full name.)
+- **Searching "14 3" or "6 3" finds the cable again.** A spoken cable size
+  like "14 3" was matching the start of a receptacle's NEMA number (14-30R),
+  so the dryer receptacle led a search for 14/3 Romex. A finished cable size
+  now only matches that size.
 - **Fixing a line on a Won or Lost bid now asks first instead of refusing.**
   Only a locked bid refuses. On a Won or Lost bid, Save asks "Changing it
   changes a price you may have already sent. Change anyway?" and changes
