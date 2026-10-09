@@ -398,13 +398,15 @@ describe("dimensions and trailing sizes", () => {
       sortMaterialsForDisplay(
         BASELINE_MATERIALS.filter(m => pattern.test(m.name))
       ).map(m => m.name);
-    expect(shelf(/^\d+x\d+ pull box$/)).toEqual([
-      "4x4 pull box",
-      "6x6 pull box",
-      "8x8 pull box",
-      "12x12 pull box",
-      "16x16 pull box",
-      "24x24 pull box",
+    // Named with their depth since 2026-10-09 (box-depth check): the face
+    // size still orders them, and 12x12x4 never sorts before 4x4x4.
+    expect(shelf(/^\d+x\d+x\d+ pull box$/)).toEqual([
+      "4x4x4 pull box",
+      "6x6x4 pull box",
+      "8x8x4 pull box",
+      "12x12x4 pull box",
+      "16x16x6 pull box",
+      "24x24x6 pull box",
     ]);
     expect(shelf(/^Bath exhaust fan, \d+ CFM$/)).toEqual([
       "Bath exhaust fan, 50 CFM",
@@ -450,11 +452,16 @@ describe("the real catalog", () => {
     // unlike the strut straps which are sized per trade size. It sorts to the
     // end of its category by name, which is right. "Reducing washer set"
     // (2026-09-25) is a mixed set of step-downs, not one size. "Roof flashing
-    // boot" (2026-09-29) is a cone cut to fit the conduit it seals.
+    // boot" (2026-09-29) is a cone cut to fit the conduit it seals — renamed
+    // "Pipe roof flashing boot, adjustable split" on 2026-10-09. The set
+    // became three step-down PAIRS that day ("Reducing washer, 3/4" to
+    // 1/2""): a pair names two sizes and is none of them.
     const GENUINELY_UNSIZED = new Set([
       "EMT strap",
-      "Reducing washer set",
-      "Roof flashing boot",
+      "Pipe roof flashing boot, adjustable split",
+      'Reducing washer, 3/4" to 1/2"',
+      'Reducing washer, 1" to 1/2"',
+      'Reducing washer, 1" to 3/4"',
     ]);
 
     const sizeNamed = BASELINE_MATERIALS.filter(
@@ -474,13 +481,16 @@ describe("the real catalog", () => {
   it("orders the real THHN family thinnest to thickest", () => {
     // The solid rows and the stranded sizes (no "stranded" in the name),
     // named "… THHN Copper" since 2026-10-07, aughts without the "#".
+    // The small solid rows say "solid" since 2026-10-09 (catalog reality
+    // check): "#14 THHN solid Copper".
     const thhn = BASELINE_MATERIALS.filter(
       m =>
-        /^#?\d.* THHN Copper$/.test(m.name) || /kcmil THHN Copper$/.test(m.name)
+        /^#?\d.* THHN (solid )?Copper$/.test(m.name) ||
+        /kcmil THHN Copper$/.test(m.name)
     )
       .map(m => m.name)
       .sort(compareBySize);
-    expect(thhn[0]).toBe("#14 THHN Copper");
+    expect(thhn[0]).toBe("#14 THHN solid Copper");
     expect(thhn[thhn.length - 1]).toBe("500 kcmil THHN Copper");
     expect(thhn.indexOf("#1 THHN Copper")).toBeLessThan(
       thhn.indexOf("1/0 THHN Copper")

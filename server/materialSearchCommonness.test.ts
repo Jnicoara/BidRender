@@ -82,8 +82,10 @@ describe("a generic query puts the common part first", () => {
     // Both rows of each pair are "core"; the starter list's ORDER decides.
     // Without it these fell to alphabetical type order: 3-way over
     // single-pole, double-gang over single-gang, MC over NM-B.
-    expect(search("switch")[0]).toBe("Single-pole switch");
-    expect(search("box")[0]).toBe("Single-gang box");
+    expect(search("switch")[0]).toBe("15A single-pole switch");
+    expect(search("box")[0]).toBe(
+      "Single-gang new work box, plastic, 18 cu in"
+    );
     expect(search("12-2")[0]).toBe("12/2 NM-B Copper");
     expect(search("12/2")[0]).toBe("12/2 NM-B Copper");
   });
@@ -97,7 +99,9 @@ describe("a generic query puts the common part first", () => {
 
   it("keeps a single word from promoting a row that merely starts with it", () => {
     // "Panel filler plate" starts with "panel"; a panel is what was meant.
-    expect(search("panel")[0]).toMatch(/main panel$/);
+    // A main panel says "main-breaker panel" since the panel table
+    // (2026-10-09).
+    expect(search("panel")[0]).toMatch(/main-breaker panel, /);
   });
 });
 
@@ -171,13 +175,15 @@ describe("a bare amp size leads with the two-pole, not the 3-pole", () => {
       expect(three, `${amps}A 3-Pole found`).toBeGreaterThanOrEqual(0);
       expect(two, amps).toBeLessThan(three);
     }
+    // From 125A the branch breaker says so (2026-10-09), beside the
+    // back-fed main breaker kit of the same size.
+    const twoPole = (amps: string) =>
+      amps === "125"
+        ? `${amps}A 2-Pole branch breaker`
+        : `${amps}A 2-Pole breaker`;
     for (const amps of ["70", "80", "90", "100", "125"]) {
-      expect(search(`${amps}a breaker`)[0], amps).toBe(
-        `${amps}A 2-Pole breaker`
-      );
-      expect(search(`${amps} amp breaker`)[0], amps).toBe(
-        `${amps}A 2-Pole breaker`
-      );
+      expect(search(`${amps}a breaker`)[0], amps).toBe(twoPole(amps));
+      expect(search(`${amps} amp breaker`)[0], amps).toBe(twoPole(amps));
     }
   });
 
@@ -187,7 +193,7 @@ describe("a bare amp size leads with the two-pole, not the 3-pole", () => {
   });
 
   it("finds the new large two-poles by the spoken forms", () => {
-    expect(search("125a 2 pole")[0]).toBe("125A 2-Pole breaker");
+    expect(search("125a 2 pole")[0]).toBe("125A 2-Pole branch breaker");
     expect(search("110a 2-pole")[0]).toBe("110A 2-Pole breaker");
     expect(search("90/2")[0]).toBe("90A 2-Pole breaker");
   });
@@ -246,8 +252,16 @@ describe("commonness points", () => {
   });
 
   it("lets list order separate two core rows, by less than one point", () => {
-    const first = commonnessPoints("Single-gang box", undefined, NOW);
-    const second = commonnessPoints("Double-gang box", undefined, NOW);
+    const first = commonnessPoints(
+      "Single-gang new work box, plastic, 18 cu in",
+      undefined,
+      NOW
+    );
+    const second = commonnessPoints(
+      "Double-gang new work box, plastic, 32 cu in",
+      undefined,
+      NOW
+    );
     expect(first).toBeGreaterThan(second);
     expect(first - second).toBeLessThan(1);
     // So it can never lift a "common" row over a "core" one.

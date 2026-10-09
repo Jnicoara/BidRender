@@ -783,9 +783,9 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
       label: `Priced EMT ${uniq()}`,
       pathType: "conduit",
       racewayMaterialId: await priced('1/2" EMT', 1.25),
-      conductorMaterialId: await priced("#12 THHN Copper", 0.18),
+      conductorMaterialId: await priced("#12 THHN solid Copper", 0.18),
       conductorCount: 2,
-      groundMaterialId: await priced("#12 THHN green Copper", 0.12),
+      groundMaterialId: await priced("#12 THHN green solid Copper", 0.12),
       groundCount: 1,
     });
     await caller().takeoffRuns.save({

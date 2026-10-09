@@ -56,6 +56,7 @@ const TYPE_500 = "500 series surface raceway, 2 #12 + ground";
 const TYPE_700 = "700 series surface raceway, 2 #12 + ground";
 
 /** The nine 500 parts, as plan § 7c lists them — the first six counted. */
+const SHARED_WITH_700 = ["support clip", "tee", "device box"];
 const PARTS_500 = [
   "coupling",
   "entrance end fitting",
@@ -66,7 +67,13 @@ const PARTS_500 = [
   "outside elbow",
   "device box",
   "device plate",
-].map(part => `Surface raceway ${part}, 500 series`);
+].map(part =>
+  // ONE row for 500 and 700 since 2026-10-09 (catalog reality check): the
+  // device box (V5747/V5748), support clip (V5703) and tee (V5715).
+  SHARED_WITH_700.includes(part)
+    ? `Surface raceway ${part}, 500/700 series`
+    : `Surface raceway ${part}, 500 series`
+);
 
 const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
 const typeByLabel = new Map(BASELINE_RUN_TYPES.map(t => [t.label, t]));
@@ -118,12 +125,12 @@ describe("the 500 surface raceway", () => {
     expect(t500).toMatchObject({
       pathType: "conduit",
       racewayMaterialName: RACEWAY_500,
-      conductorMaterialName: "#12 THHN Copper",
+      conductorMaterialName: "#12 THHN solid Copper",
       conductorCount: 2,
       groundCount: 1,
     });
     expect(t500?.groundMaterialName).toBe(t700?.groundMaterialName);
-    expect(t500?.groundMaterialName).toBe("#12 THHN green Copper");
+    expect(t500?.groundMaterialName).toBe("#12 THHN green solid Copper");
     expect(t500?.extras ?? []).toEqual([]);
     // 2 #12 + ground ONLY (plan § 5, Q3): no other 500 type ships.
     expect(
@@ -163,8 +170,10 @@ describe("the 500 surface raceway", () => {
       expect(Number(row!.costPerUnit), name).toBe(0);
       expect(row!.searchAliases, name).toMatch(/\bv500\b/);
       expect(row!.searchAliases, name).toMatch(/\bwiremold\b/);
-      // Never a 700 word on a 500 part: "700 elbow" must not find it.
-      expect(row!.searchAliases, name).not.toMatch(/\b(v?700)\b/);
+      // Never a 700 word on a 500-ONLY part: "700 elbow" must not find it.
+      // A shared part answers to both, on purpose.
+      if (!name.includes("500/700"))
+        expect(row!.searchAliases, name).not.toMatch(/\b(v?700)\b/);
     }
   });
 });
@@ -280,8 +289,8 @@ withDb("the 500 rename on a database that holds the OLD rows", () => {
         and(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes.label, TYPE_500))
       );
     expect(t?.racewayMaterialId).toBe(baseId);
-    const [green] = await sharedRows("#12 THHN green Copper");
-    const [conductor] = await sharedRows("#12 THHN Copper");
+    const [green] = await sharedRows("#12 THHN green solid Copper");
+    const [conductor] = await sharedRows("#12 THHN solid Copper");
     expect([t?.conductorMaterialId, t?.conductorCount]).toEqual([
       conductor.id,
       2,

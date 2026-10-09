@@ -217,7 +217,7 @@ describe.skipIf(!hasDb)("material categories", () => {
   it("backfills a fork that predates the column from the baseline it came from", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "3-way switch"
+      r => r.userId === null && r.name === "15A 3-way switch"
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
 
@@ -237,7 +237,7 @@ describe.skipIf(!hasDb)("material categories", () => {
   it("does not overwrite a category the user chose for their own copy", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "Fan-rated ceiling box"
+      r => r.userId === null && r.name === 'Fan-rated ceiling box, 2-1/4" deep'
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
 
@@ -251,7 +251,7 @@ describe.skipIf(!hasDb)("material categories", () => {
   it("carries the category onto a fresh fork without any category-specific code", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "GFCI receptacle"
+      r => r.userId === null && r.name === "15A GFCI receptacle"
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
     const fork = await getMaterialById(forkId, USER);
@@ -261,7 +261,7 @@ describe.skipIf(!hasDb)("material categories", () => {
   it("restores the starter category on revert", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "6 ft MC whip"
+      r => r.userId === null && r.name === '6 ft fixture whip, 3/8" MC, 14/3'
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
 
@@ -304,6 +304,9 @@ describe.skipIf(!hasDb)("material search aliases", () => {
       const nameWords = new Set(
         seeded.name
           .toLowerCase()
+          // "500/700" is one word to search, so "500" and "700" are not
+          // restated by it — the seed's own rule (dropRestatedWords, types.ts).
+          .replace(/\d{3,}\/\d{3,}/g, " ")
           .replace(/[^a-z0-9 ]/g, " ")
           .split(/\s+/)
           .filter(w => w.length > 2)
@@ -389,7 +392,7 @@ describe.skipIf(!hasDb)("fork and revert", () => {
     await seedBaselineMaterials();
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "Duplex receptacle"
+      r => r.userId === null && r.name === "15A duplex receptacle"
     );
     baselineId = baseline!.id;
   });
@@ -399,7 +402,7 @@ describe.skipIf(!hasDb)("fork and revert", () => {
     const fork = await getMaterialById(forkId, USER);
     expect(fork?.userId).toBe(USER);
     expect(fork?.baselineId).toBe(baselineId);
-    expect(fork?.name).toBe("Duplex receptacle");
+    expect(fork?.name).toBe("15A duplex receptacle");
   });
 
   it("forking twice returns the same copy rather than duplicating", async () => {
@@ -432,7 +435,7 @@ describe.skipIf(!hasDb)("fork and revert", () => {
     await revertMaterialToBaseline(forkId, USER);
     const reverted = await getMaterialById(forkId, USER);
     expect(reverted?.id).toBe(forkId);
-    expect(reverted?.name).toBe("Duplex receptacle");
+    expect(reverted?.name).toBe("15A duplex receptacle");
     expect(reverted?.costPerUnit).toBe(original?.costPerUnit);
   });
 

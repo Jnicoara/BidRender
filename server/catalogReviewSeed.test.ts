@@ -39,7 +39,8 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const withDb = describe.skipIf(!hasDb);
 
 const BARE = "#12 bare solid Copper";
-const GREEN = "#12 THHN green Copper";
+// "solid" in the name since 2026-10-09 (catalog reality check).
+const GREEN = "#12 THHN green solid Copper";
 const EMT_TYPE = '1/2" EMT, 2 #12 + ground';
 const UNDERGROUND_3_5 = undergroundRunTypeLabel('3-1/2"', "PVC Sch 40");
 

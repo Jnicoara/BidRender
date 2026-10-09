@@ -370,7 +370,8 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
     });
     expect(rows.find(r => r.role === "teeBox")!.pick).toEqual({
       ok: false,
-      why: "No catalog match for Surface raceway tee, 700 series",
+      // One tee for 500 and 700 since 2026-10-09 (V5715).
+      why: "No catalog match for Surface raceway tee, 500/700 series",
     });
   });
 
@@ -411,8 +412,11 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
       qty: 1,
       pick: { ok: true, name: "Surface raceway flat elbow, 500 series" },
     });
+    // The clip and tee are ONE part for 500 and 700 since 2026-10-09
+    // (V5703, V5715): "500/700" is a 500 part too. Never a 700-only one.
     for (const row of rows)
-      if (row.pick.ok) expect(row.pick.name, row.role).toMatch(/, 500 series$/);
+      if (row.pick.ok)
+        expect(row.pick.name, row.role).toMatch(/, (500|500\/700) series$/);
     // And the sentences say 500 where they name a part.
     expect(counts500.entranceEnd).toMatchObject({
       why: expect.stringContaining("goes into the 500 box"),
@@ -426,7 +430,9 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
     for (const row of rows)
       expect(row.pick, row.role).toEqual({
         ok: false,
-        why: expect.stringMatching(/^No catalog match for .*, 500 series$/),
+        why: expect.stringMatching(
+          /^No catalog match for .*, (500|500\/700) series$/
+        ),
       });
   });
 
@@ -436,7 +442,10 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
       why: "1 entrance end: one at the start of each run — the far end goes into the 700 box",
     });
     expect(surfaceRacewayPartName("tee", series)).toBe(
-      "Surface raceway tee, 700 series"
+      "Surface raceway tee, 500/700 series"
+    );
+    expect(surfaceRacewayPartName("coupling", series)).toBe(
+      "Surface raceway coupling, 700 series"
     );
   });
 

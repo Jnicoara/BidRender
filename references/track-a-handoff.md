@@ -19,7 +19,37 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-09 (session 27, second job) — START HERE
+## UPDATE 2026-10-09 (session 28) — START HERE
+
+**Catalog reality check BUILT on branch `a-catalog-reality` (pushed, NOT
+merged to local-dev — a green local-dev push deploys staging, so the merge IS
+the staging step, after the backup). READY FOR STAGING, not on it.
+Live untouched. Pricing sheets NOT rebuilt (owner).**
+
+- Branch `a-catalog-reality` (from local-dev `aaed2a8`): batch 1 + 2, the panel
+  table, the box decisions (`box-depth-check.md` § Owner's decisions), two
+  labels (CW3, CW11). C's PVC code half (`c-pvc-4080`) merged in the SAME
+  branch, so the pair cannot arrive apart. Decisions:
+  `shared/catalogRealityCheck20261009.ts` (applied to the seed BY NAME,
+  `applyRealityCheck`); adds: `server/seed/materials/realityCheck.ts`;
+  every call made: `references/catalog-reality-check-build.md`.
+- Rehearsed on `staging-2026-10-09T18-23-28Z-before-0141.sql`'s restore:
+  **CLEAN — added 50, renamed 296, retired 158, deleted 0, references
+  identical, 959/959 bids unchanged**, second boot nothing. Fresh DB: 1,717
+  active, 224 starters. Full suite 6,519 passed / 0 failed.
+- **HELD for the owner:** the 5" wafer retirement and the 5"/6" disc/trim
+  merge (they contradict the 2026-10-07 "never folded" decision).
+- Search fixes that came with it (depth and space count are not sizes;
+  leading rating; "500/700"): build doc § Search fixes. The spot-check
+  sweep before/after is the way to re-check.
+- **Next (Track A, owner's go):** staging backup → rehearse on its restore →
+  merge `a-catalog-reality` into local-dev (the green Gate pushes staging) →
+  `repairStarterCovers` on staging → bidTotals before/after.
+- Scratch left: DBs `bidrender_test_reality` (fresh test DB, keep for the
+  next full run) and `bidrender_rehearse_reality`; worktree
+  `../bidrender-spot` (search sweep baseline) — remove when done.
+
+## UPDATE 2026-10-09 (session 27, second job)
 
 **Coverage-check catalog adds: 24 rows, on local-dev and staging. Live
 untouched. Sheets NOT rebuilt** (owner: Track B adds assemblies next; ONE

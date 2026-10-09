@@ -939,6 +939,14 @@ const FAMILY_WEATHERPROOF: BaselineMaterial[] = [
   },
 ];
 
+/*
+  103 -> 96 on 2026-10-09: the catalog reality check (batch 2, owner-
+  approved) retired the three mixed 3-gang plates nobody stocks — D/Dec/Dec,
+  D/D/Dec, T/D/Dec, nylon and stainless — and the stainless oversized
+  duplex/decorator. They are generated here still and withdrawn by name in
+  shared/catalogRealityCheck20261009.ts, so a bid priced from one keeps
+  resolving it (server/coverPlateFamily.test.ts counts the family).
+*/
 export const COVER_PLATE_FAMILY: BaselineMaterial[] = [
   ...STANDARD_PLATES,
   ...BIG_PLATES,

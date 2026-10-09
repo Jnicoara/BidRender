@@ -73,7 +73,7 @@ async function mine(baselineId: number) {
 describe.skipIf(!hasDb)("importing the labor-unit sheet", () => {
   it("previews without writing, then writes only hours, on a fork", async () => {
     const emt = await shipped('1/2" EMT');
-    const thhn = await shipped("#12 THHN Copper");
+    const thhn = await shipped("#12 THHN solid Copper");
     expect(emt && thhn).toBeTruthy();
     const text = sheet([
       [String(emt.id), emt.name, "per 100 ft", "4.5", "yes", "", ""],

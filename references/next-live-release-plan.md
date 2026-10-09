@@ -184,6 +184,19 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
      ids as before (164, 165 locally: renamed in place, so only the names
      differ) and nothing else to move, and only then merges. The release
      candidate carries both halves or neither.
+   - **DONE TOGETHER, 2026-10-09 (Track A, `a-catalog-reality`):** C's
+     `460bd83` was merged INTO the branch that carries A's seed, so the two
+     halves reach local-dev in one merge and cannot arrive apart. On a
+     fresh database `pvcSharedFittings.test.ts` finds the shipped rows and
+     inserts nothing. The routerSnapshot compare on Bar is still Track C's
+     to run (it needs `bidrender_local_c`).
+7. **The catalog reality check (`a-catalog-reality`, 2026-10-09)** — 296
+   renames in place, 158 retirements, 50 adds; rehearsed on staging's copy
+   CLEAN, 959/959 bids unchanged
+   (`references/catalog-reality-check-build.md` § Rehearsal). Same release
+   steps as the catalog review: staging backup, rehearse on its restore,
+   push staging, then `repairStarterCovers` on staging. Two batch-2 lighting
+   lines are HELD for the owner (build doc § TWO LINES HELD).
 
 **One bid number moves on purpose:** at the first boot the shipped field
 roles go from $0 to the example rates. Existing lines keep their frozen
@@ -273,7 +286,7 @@ every bid unchanged.
 snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
    (it was 0 on 2026-10-07). Otherwise freeze first (`todo.md`
    "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE").
-4b. **Read-only check for the Legend-link race on live** (`44ede4f`):
+   4b. **Read-only check for the Legend-link race on live** (`44ede4f`):
    `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/legendLinkRaceCandidates.mts`.
    It prints CANDIDATES (a mark does not record which symbol placed it):
    "no candidates" ends it; any row means opening that bid's sheets and

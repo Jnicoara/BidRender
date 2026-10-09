@@ -210,8 +210,22 @@ const TRADE_SIZE_INCHES: Readonly<Record<string, number>> = {
 /** The pull boxes the catalog ships (`boxes.ts`), smallest first. */
 const PULL_BOX_SIDES = [4, 6, 8, 12, 16, 24] as const;
 
+/**
+ * Each shipped pull box's depth (box-depth check #31–#32, owner 2026-10-09):
+ * 4" up to 12x12, 6" for 16x16 and 24x24. The names say it, and the seed's
+ * renames (shared/catalogRealityCheck20261009.ts) read this same table.
+ */
+export const PULL_BOX_DEPTH: Readonly<Record<number, number>> = {
+  4: 4,
+  6: 4,
+  8: 4,
+  12: 4,
+  16: 6,
+  24: 6,
+};
+
 export function pullBoxName(side: number): string {
-  return `${side}x${side} pull box`;
+  return `${side}x${side}x${PULL_BOX_DEPTH[side]} pull box`;
 }
 
 /**
@@ -439,6 +453,13 @@ export function lrName(size: string, family: string): string {
   (references/next-live-release-plan.md).
 */
 
+/** PVC sizes whose strap is the two-hole one (batch 2, PVC). */
+export const PVC_TWO_HOLE_STRAP_SIZES: readonly string[] = [
+  '2-1/2"',
+  '3"',
+  '4"',
+];
+
 /** The family name a shared PVC fitting is shipped under. */
 export const PVC_SHARED_FITTING_FAMILY = "PVC Sch 40/80";
 
@@ -525,7 +546,12 @@ export function fittingMaterialName(
   switch (kind) {
     case "strap": {
       const label = strapFamily(family);
-      return label === null ? null : oneHoleStrapName(size, label);
+      if (label === null) return null;
+      // From 2-1/2" up the PVC strap is the two-hole one (catalog reality
+      // check, batch 2, PVC — the row was renamed in place).
+      return label === "PVC" && PVC_TWO_HOLE_STRAP_SIZES.includes(size)
+        ? `${size} PVC two-hole strap`
+        : oneHoleStrapName(size, label);
     }
     case "elbow90":
       return flex ? null : elbowName(size, family, 90);
@@ -556,7 +582,17 @@ export function fittingMaterialName(
         const chosen = isEmtFittingStyle(style)
           ? style
           : DEFAULT_EMT_FITTING_STYLE;
-        return emtStyledFittingName(size, chosen, kind);
+        // The raintight rows say what they are: compression fittings with a
+        // gland (catalog reality check, batch 2, metal fittings — renamed in
+        // place, so the stored style "raintight" still means them).
+        return chosen === "raintight"
+          ? `${size} EMT raintight compression ${kind}`
+          : emtStyledFittingName(size, chosen, kind);
+      }
+      if (family === "rigid conduit" && kind === "connector") {
+        // A rigid "connector" is a threadless compression connector (batch
+        // 2, metal fittings; renamed in place).
+        return `${size} rigid conduit threadless compression connector`;
       }
       if (pvc) {
         // A PVC "connector" is a terminal adapter at the counter (E943).

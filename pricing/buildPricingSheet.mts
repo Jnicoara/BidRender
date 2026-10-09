@@ -27,6 +27,7 @@ import type { BaselineMaterial } from "../server/seed/materials/types";
 import { compareBySize, materialTypeName } from "../shared/materialSizeOrder";
 import { compareMaterials } from "../shared/materialOrder";
 import { RENAMED_BASELINE_MATERIALS } from "../shared/renamedMaterials";
+import { REALITY_RETIRED_INTO } from "../shared/catalogRealityCheck20261009";
 import {
   DROPPED_FROM_SHEET,
   MOVED_FROM_SHEET,
@@ -116,6 +117,20 @@ Object.assign(SAME_AS, MOVED_FROM_SHEET);
 */
 for (const [from, to] of Object.entries(RENAMED_BASELINE_MATERIALS)) {
   // Only into a row this catalog has: the scale test reads a synthetic one.
+  if (
+    !(from in SAME_AS) &&
+    !BASELINE_MATERIALS.some(m => m.name === from) &&
+    BASELINE_MATERIALS.some(m => m.name === to)
+  ) {
+    SAME_AS[from] = to;
+  }
+}
+/*
+  And a row the catalog reality check RETIRED (2026-10-09) folds into the
+  row that took its job, for the same reason: a name this script still
+  generates the old way must not come back as a NEW row.
+*/
+for (const [from, to] of Object.entries(REALITY_RETIRED_INTO)) {
   if (
     !(from in SAME_AS) &&
     !BASELINE_MATERIALS.some(m => m.name === from) &&

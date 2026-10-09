@@ -20,6 +20,8 @@ import {
 } from "./seed/materials";
 import { SPECIALTY_MATERIALS } from "./seed/materials/specialty";
 import { smartSearch } from "../client/src/lib/smartSearch";
+import { latestCatalogName } from "../shared/renamedMaterials";
+import { REALITY_RENAMES } from "../shared/catalogRealityCheck20261009";
 
 type Kind = "residential" | "commercial" | "both";
 
@@ -83,7 +85,16 @@ const ADDED: Record<string, [string, "each" | "foot", Kind, boolean]> = {
   "4/3 NM-B Copper": ["Wire & Cable", "foot", "residential", false],
 };
 
-const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
+/*
+  Read under TODAY's name: the catalog reality check (2026-10-09, later the
+  same day) renamed one of the 24 in place — "Fan-forced wall heater" is
+  "Fan-forced wall heater, 2000W 240V", same row.
+*/
+const byLatest = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
+const byName = {
+  get: (name: string) => byLatest.get(latestCatalogName(name)),
+  has: (name: string) => byLatest.has(latestCatalogName(name)),
+};
 
 describe("the coverage check's catalog rows", () => {
   it("ships all 24, each with its shelf, unit, job tag, $0 and search words", () => {
@@ -103,19 +114,29 @@ describe("the coverage check's catalog rows", () => {
 
   it("tags Specialty on exactly the meter centers, switchboards and HCF cable — and the CT cabinet is already there", () => {
     for (const [name, [, , , specialty]] of Object.entries(ADDED))
-      expect(SPECIALTY_MATERIALS.includes(name), name).toBe(specialty);
+      expect(SPECIALTY_MATERIALS.includes(latestCatalogName(name)), name).toBe(
+        specialty
+      );
     expect(SPECIALTY_MATERIALS).toContain("Current transformer cabinet");
     expect(byName.has("Current transformer cabinet")).toBe(true);
   });
 
   it("is additive: no new row is a rename target, a retired name, or an old spelling", () => {
-    const renamedFrom = new Set(Object.keys(RENAMED_BASELINE_MATERIALS));
+    // A rename decided LATER (the catalog reality check) is not one the
+    // coverage rows collided with when they were added.
+    const renamedFrom = new Set(
+      Object.keys(RENAMED_BASELINE_MATERIALS).filter(
+        n => !(n in REALITY_RENAMES)
+      )
+    );
     for (const name of Object.keys(ADDED)) {
       expect(renamedFrom.has(name), name).toBe(false);
       expect(RETIRED_BASELINE_MATERIALS, name).not.toContain(name);
     }
-    // Nothing shipped before was removed: the catalog grew by exactly 24.
-    expect(BASELINE_MATERIALS).toHaveLength(1801 + 24);
+    // The catalog grew by exactly 24 that day (1,801 -> 1,825). The
+    // catalog reality check later the same day moved the total on purpose
+    // (1,825 -> 1,717): references/catalog-reality-check-build.md has the
+    // count and what to do if a recount differs.
   });
 
   it("is found by the words a counter would use — within the top three", () => {
@@ -149,7 +170,7 @@ describe("the coverage check's catalog rows", () => {
       ["telecom backboard", "Telecom backboard, plywood 4x8"],
       ["4/3 romex", "4/3 NM-B Copper"],
       ["pop up countertop", "Pop-up countertop receptacle"],
-      ["cadet heater", "Fan-forced wall heater"],
+      ["cadet heater", "Fan-forced wall heater, 2000W 240V"],
       ["wall heater thermostat", "Wall heater thermostat"],
       ["floor heat mat", "Floor heating mat"],
       ["floor heat thermostat", "Floor heating thermostat, GFCI"],

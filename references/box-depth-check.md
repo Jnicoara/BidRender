@@ -1,9 +1,70 @@
 # Box depth check — 2026-10-09 (Track A)
 
 The 33 boxes in `C:\dev\catalog-review\verify-box-depths.txt` (catalog review
-RENAME 7) checked against real products. **Nothing was renamed.** This is the
-evidence for the owner's yes/no; the rename (in place, through
-`RENAMED_BASELINE_MATERIALS`, every starter keeps its row) waits for that.
+RENAME 7) checked against real products. The owner decided on 2026-10-09
+(below); the renames are built in `shared/catalogRealityCheck20261009.ts`
+(in place, same ids, every starter keeps its row).
+
+## Owner's decisions — 2026-10-09 (APPROVED)
+
+Numbers refer to "Proposed changes" at the end of this file.
+
+- **#1 and #3–#11: apply as proposed** — but see #14, which names the
+  plastic ones by cubic inches instead of depth.
+- **#2, 5-gang box:** keep it, depth 3-9/16", tagged **Specialty**.
+- **#12, 2- and 3-gang metal:** one-piece **welded** gang box rows, with
+  "gangable" as a search word.
+- **#13: keep 3"** for the triple- and 4-gang plastic boxes.
+- **#14: plastic boxes are named by CUBIC INCHES** (e.g. "Single-gang new
+  work box, plastic, 18 cu in"); the old names and the depths stay as search
+  words. The owner approved these as changes to the frozen names.
+
+**As built** (every old name is a search word on its row):
+
+| Was                                | Now                                                |
+| ---------------------------------- | -------------------------------------------------- |
+| Single-gang box                    | Single-gang new work box, plastic, 18 cu in        |
+| Double-gang box                    | Double-gang new work box, plastic, 32 cu in        |
+| Triple-gang box                    | Triple-gang new work box, plastic, 46 cu in        |
+| Single-gang box, deep              | Single-gang new work box, plastic, 22.5 cu in      |
+| Double-gang box, deep              | Double-gang new work box, plastic, 35 cu in        |
+| 4-gang box                         | 4-gang new work box, plastic, 60 cu in             |
+| 5-gang box                         | 5-gang new work box, plastic, 94 cu in (Specialty) |
+| Single-gang old-work box           | Single-gang old work box, plastic, 20 cu in        |
+| Double-gang old-work box           | Double-gang old work box, plastic, 34 cu in        |
+| Triple-gang old-work box           | Triple-gang old work box, plastic, 55 cu in        |
+| Octagon box, plastic               | Round ceiling box, plastic, 20 cu in               |
+| Old-work ceiling box               | Old work ceiling box, plastic, 18 cu in            |
+| Single-gang metal box              | Single-gang metal box, 2-1/2" deep                 |
+| Double-gang metal box              | Double-gang welded metal box, 2-1/2" deep          |
+| Triple-gang metal box              | Triple-gang welded metal box, 2-1/2" deep          |
+| Masonry box, single/double/triple  | …, 3-1/2" deep                                     |
+| Fan-rated ceiling box              | Fan-rated ceiling box, 2-1/4" deep                 |
+| Ceiling fan brace box              | Ceiling fan brace box, 1-1/2" deep                 |
+| Handy box                          | Handy box, 1-7/8" deep                             |
+| 1/2" and 3/4" WP single/double     | …, 2" deep                                         |
+| 1/2" weatherproof box, triple-gang | 3/4" weatherproof box, triple-gang, 2-5/8" deep    |
+| 1/2" and 3/4" WP round             | …, 1-1/2" deep                                     |
+| 1/2" and 3/4" WP single, PVC       | …, PVC, 2-3/8" deep                                |
+| NxN pull box (steel, 3R, PVC)      | NxNx4 up to 12x12; 16x16x6, 24x24x6                |
+
+**Calls made in building it (say if wrong):**
+
+- **Which cubic inches.** Each is the commonly stocked size the research
+  found at that depth: 18 (2-7/8"), 32 (3"), 22.5 (deep single; Carlon's is
+  22), 35 (deep double), 20 / 34 / 55 (old work), 20 (round ceiling), 18
+  (old-work ceiling).
+- **#13 with #14.** "Keep 3"" and "name by cubic inches" meet on the 3"-deep
+  product: the triple-gang is 46 cu in (Allied 3300-NK, 3") rather than
+  Carlon's 44 cu in at 2-11/16", and the 4-gang is 60 cu in (3"). "3 inch
+  deep" stays a search word on both.
+- **#11 (PVC weatherproof) stays on depth**, not cubic inches: it is a
+  weatherproof FS box, and the two stocked parts disagree on capacity (18 vs
+  22.5 cu in) while agreeing on depth.
+- **"new work" / "old work" unhyphenated**, as in the owner's example; the
+  hyphenated old names are search words.
+- **The fan-rated box is not a plastic-by-cubic-inch row:** batch 1 of the
+  reality check redefines it as the new-work fan box, metal or plastic.
 
 ## How it was checked, and how far to trust it
 

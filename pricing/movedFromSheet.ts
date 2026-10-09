@@ -29,8 +29,9 @@
  * same so it is checked on every test run rather than only when somebody
  * regenerates the sheet.
  */
+import { currentShippedName } from "../shared/renamedMaterials";
 
-export const MERGED_FROM_SHEET: Record<string, string> = {
+const MERGED_AS_WRITTEN: Record<string, string> = {
   // ── Batch 1: wire, conduit fittings, connectors, consumables, fasteners, strut
   // Values follow the catalog names frozen 2026-10-07 (metal spelled out,
   // slash sizes, aughts without "#") — pricingSheetMoves.test.ts fails on a
@@ -204,7 +205,7 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "Wall plate extender": "Single-gang box extender",
 };
 
-export const RENAMED_FROM_SHEET: Record<string, string> = {
+const RENAMED_AS_WRITTEN: Record<string, string> = {
   // ── Batch 1
   "14/2 UF-B": "14/2 UF-B Copper",
   "Fire alarm cable, 14/2": "14/2 fire alarm cable Copper",
@@ -357,6 +358,26 @@ export const RENAMED_FROM_SHEET: Record<string, string> = {
   "Meter socket hub": '2" meter hub',
   "Mast roof flashing": '2" mast roof flashing',
 };
+
+/*
+  Read under TODAY's names. The maps above keep the names of their day; the
+  catalog has renamed and retired rows since (the frozen names 2026-10-07,
+  the review 2026-10-08, the reality check 2026-10-09), so each target goes
+  through currentShippedName. An entry that then points a name at ITSELF —
+  the sheet's old wording is now the shipped name ("15A duplex receptacle")
+  — has nothing left to move, and is dropped.
+*/
+const current = (map: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(map)
+      .map(([from, to]) => [from, currentShippedName(to)])
+      .filter(([from, to]) => from !== to)
+  );
+
+export const MERGED_FROM_SHEET: Record<string, string> =
+  current(MERGED_AS_WRITTEN);
+export const RENAMED_FROM_SHEET: Record<string, string> =
+  current(RENAMED_AS_WRITTEN);
 
 /** Every sheet name that moved under a different name, whichever kind. */
 export const MOVED_FROM_SHEET: Record<string, string> = {

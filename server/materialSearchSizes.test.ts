@@ -182,8 +182,10 @@ describe("never fuzz numbers: a size matches itself, whole", () => {
 
 describe("counts and cable specs keep working", () => {
   it('"2 gang box" still finds the double-gang box (a count, not a size)', () => {
-    expect(search("2 gang box")).toContain("Double-gang box");
-    expect(search("3 way switch")[0]).toBe("3-way switch");
+    expect(search("2 gang box")).toContain(
+      "Double-gang new work box, plastic, 32 cu in"
+    );
+    expect(search("3 way switch")[0]).toBe("15A 3-way switch");
   });
 
   it("a cable spec typed with a space, and a conductor inside a spec", () => {
@@ -203,7 +205,7 @@ describe("counts and cable specs keep working", () => {
   });
 
   it('"12" still finds #12 wire, and "#12" is only the gauge', () => {
-    expect(search("12 thhn")[0]).toBe("#12 THHN Copper");
+    expect(search("12 thhn")[0]).toBe("#12 THHN solid Copper");
     expect(search("#12").some(n => /under-cabinet/.test(n))).toBe(false);
   });
 
@@ -215,8 +217,16 @@ describe("counts and cable specs keep working", () => {
     // and led the plain row; the owner had them renamed "6" canless wafer LED
     // downlight, slim" (third answers) so the plain one leads. This goes red
     // if it stops.
+    //
+    // As many hits as that size SHIPS rows (four variants until 2026-10-09,
+    // when slim and wet rated went into the plain wafer): the 6" row keeps
+    // the old '5"/6"' spelling as a search word on purpose, and below the
+    // 5" rows' own it is allowed to answer.
     for (const s of ["2", "3", "4", "5", "6", "8"]) {
-      const hits = search(`${s} wafer`).slice(0, 5);
+      const own = BASELINE_MATERIALS.filter(m =>
+        m.name.startsWith(`${s}" canless wafer`)
+      ).length;
+      const hits = search(`${s} wafer`).slice(0, own);
       onlySize(hits, s);
       expect(hits[0], `${s} wafer`).toBe(`${s}" canless wafer LED downlight`);
     }

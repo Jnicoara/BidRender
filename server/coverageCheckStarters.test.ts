@@ -104,7 +104,7 @@ describe("the coverage-check starters", () => {
       "30A 250V receptacle, NEMA 6-30R",
       "50A 250V receptacle, NEMA 6-50R",
       "Pop-up countertop receptacle",
-      "Fan-forced wall heater",
+      "Fan-forced wall heater, 2000W 240V",
       "Wall heater thermostat",
       "Floor heating mat",
       "Floor heating thermostat, GFCI",
@@ -137,7 +137,7 @@ describe("the changes to starters that already ship", () => {
       name: "Fixture hanging kit, aircraft cable",
       qty: 2,
     });
-    expect(namesOf("LT23")).toContain("Ceiling support wire");
+    expect(namesOf("LT23")).toContain("12 ga ceiling hanger wire");
   });
 
   it("RS6 stays the range hood; the over-range microwave is CK18", () => {

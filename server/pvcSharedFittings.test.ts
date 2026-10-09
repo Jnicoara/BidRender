@@ -64,8 +64,15 @@ describe("PVC fittings shared by Sch 40 and Sch 80 (names)", () => {
     expect(fittingMaterialName('2" PVC Sch 80', "strap", null)).toBe(
       '2" PVC one-hole strap'
     );
+    // From 2-1/2" up the PVC strap is the two-hole one, and a rigid
+    // connector is the threadless compression connector — both renamed in
+    // place by the same batch-2 approval (Track A, 2026-10-09). Not this
+    // file's change, so pinned here only as what the lookup now asks for.
+    expect(fittingMaterialName('3" PVC Sch 80', "strap", null)).toBe(
+      '3" PVC two-hole strap'
+    );
     expect(fittingMaterialName('1" rigid conduit', "connector", null)).toBe(
-      '1" rigid conduit connector'
+      '1" rigid conduit threadless compression connector'
     );
     expect(fittingMaterialName('1/2" EMT', "lb", null)).toBe(
       '1/2" EMT LB conduit body'

@@ -3,6 +3,31 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Catalog reality check — BUILT 2026-10-09 (Track A), NOT on staging
+
+Batch 1 + batch 2 (owner's calls), the panel table (56 rows), the box
+decisions and two labels: 296 renames in place, 158 retired, 50 added,
+1,825 → 1,717 active. Rehearsed on staging's copy CLEAN, 959/959 bids
+unchanged. Full record: `references/catalog-reality-check-build.md`.
+
+- [ ] **Owner: two batch-2 lighting lines are HELD** — retiring the 5"
+      wafers and folding 5"/6" disc lights and LED retrofit trims. Both
+      contradict the 2026-10-07 decision "every wafer, canless and CCT-disc
+      size its own item, never folded together". Yes or no.
+- [ ] **Owner: panels say "main-breaker"** (the table's names) where
+      `power.ts` had avoided "breaker" in panel names. Search is fixed for
+      it; say if the older "main panel" wording should come back (35 rows).
+- [ ] **Owner, optional lines not done** (build doc § "Lines NOT done"):
+      temp pole length, poke-through contents, floor heating mat size,
+      busway rating, the "confirm or retire" rows, filler-plate brands.
+- [ ] **Track A, at the release:** staging backup → rehearse on its restore
+      → push staging → `repairStarterCovers` on staging. Existing databases
+      keep the 10 starter lines that point at retired rows (they still
+      price); repointing them is a repair pass not built (build doc §
+      "Existing databases").
+- [ ] Pricing sheets NOT rebuilt (owner). The next rebuild carries typed
+      values over by key, renamed items included.
+
 ## Coverage-check starters — BUILT 2026-10-09 (Track B), 224 starters
 
 41 new starters from `references/coverage-check.md` (track-c): CK1–CK26
@@ -259,37 +284,7 @@ Not urgent if keys are created with no expiration, which is now the rule.
       `armFromLegend("CI SWITCH")` clicked the row and the pill stayed on
       "Counting ci duplex". The test's forced-race hook waits on the
       `bidridge:last-count:<bid>` write and timed out at 20 s. Passed in the
-      3 runs on either side.
-      > **Cause:** the click DID arm — and the server handed back the DUPLEX
-      > count. The Legend shows a link the moment it is picked, so the click
-      > after "Link" can reach `takeoffGroups.forAssembly` before
-      > `linkSymbol` has written. `forAssembly` then dropped the symbol as
-      > unlinked, and with no symbol the assembly's ONE count (ci duplex,
-      > linked in step 4) was taken: the pill relabelled to "ci duplex" and
-      > the switch's marks would have gone into the duplex count, under its
-      > name, with nothing said. The screenshot hid it: the mouse's hover
-      > tint covers the armed row's yellow. **Fix:** a symbol linked to
-      > NOTHING yet is still the click's own (`clickedFrom` in
-      > `takeoffGroupsRouter.ts`); one linked to a different assembly is
-      > still ignored. `server/sharedAssemblyCounts.test.ts` (2 new) — red
-      > without it (the duplex count's id came back). **Forced in flow 5**:
-      > `linkSymbol` is held until `forAssembly` has answered, so this order
-      > happens every run; red without the fix locally with "the toolbar
-      > says Counting ci duplex" — the CI picture exactly. With the fix,
-      > local: flow 6 of 6, flow with +150 ms per request 2 of 2, touch on
-      > both tablet sizes 2 of 2. (At +400 ms and 200 KB/s the dev server's
-      > unbundled modules did not load test 1 inside 60 s, 3 of 3 — never
-      > reached the Legend; a throttle too heavy for dev mode, not this.)
-      > **LIVE (`24105ad`) has the race** (same line, same optimistic
-      > link). Gate 37983875286 on `705e1c9` all green; a must-include for
-      > the next release (`next-live-release-plan.md` § 5 items 2 and 4b).
-      > Which bids it could have touched: `scripts/legendLinkRaceCandidates.mts`
-      > (read only; candidates, since a mark does not record its symbol —
-      > proved on a planted case). Not run against live.
-      > **Also:** the Legend's one silent no-op (a linked symbol whose
-      > assembly is not loaded) now says so in a toast. And a failed smoke
-      > test keeps a Playwright trace, sealed before upload (`gate.yml`,
-      > `deploying.md` § 12 says how to open one).
+      3 runs on either side. > **Cause:** the click DID arm — and the server handed back the DUPLEX > count. The Legend shows a link the moment it is picked, so the click > after "Link" can reach `takeoffGroups.forAssembly` before > `linkSymbol` has written. `forAssembly` then dropped the symbol as > unlinked, and with no symbol the assembly's ONE count (ci duplex, > linked in step 4) was taken: the pill relabelled to "ci duplex" and > the switch's marks would have gone into the duplex count, under its > name, with nothing said. The screenshot hid it: the mouse's hover > tint covers the armed row's yellow. **Fix:** a symbol linked to > NOTHING yet is still the click's own (`clickedFrom` in > `takeoffGroupsRouter.ts`); one linked to a different assembly is > still ignored. `server/sharedAssemblyCounts.test.ts` (2 new) — red > without it (the duplex count's id came back). **Forced in flow 5**: > `linkSymbol` is held until `forAssembly` has answered, so this order > happens every run; red without the fix locally with "the toolbar > says Counting ci duplex" — the CI picture exactly. With the fix, > local: flow 6 of 6, flow with +150 ms per request 2 of 2, touch on > both tablet sizes 2 of 2. (At +400 ms and 200 KB/s the dev server's > unbundled modules did not load test 1 inside 60 s, 3 of 3 — never > reached the Legend; a throttle too heavy for dev mode, not this.) > **LIVE (`24105ad`) has the race** (same line, same optimistic > link). Gate 37983875286 on `705e1c9` all green; a must-include for > the next release (`next-live-release-plan.md` § 5 items 2 and 4b). > Which bids it could have touched: `scripts/legendLinkRaceCandidates.mts` > (read only; candidates, since a mark does not record its symbol — > proved on a planted case). Not run against live. > **Also:** the Legend's one silent no-op (a linked symbol whose > assembly is not loaded) now says so in a toast. And a failed smoke > test keeps a Playwright trace, sealed before upload (`gate.yml`, > `deploying.md` § 12 says how to open one).
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the

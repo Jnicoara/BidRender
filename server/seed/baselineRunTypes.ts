@@ -139,19 +139,19 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     label: '1/2" EMT, 2 #12 + ground',
     pathType: "conduit",
     racewayMaterialName: '1/2" EMT',
-    conductorMaterialName: "#12 THHN Copper",
+    conductorMaterialName: "#12 THHN solid Copper",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 THHN green Copper",
+    groundMaterialName: "#12 THHN green solid Copper",
   },
   {
     label: '3/4" EMT, 3 #12 + ground',
     pathType: "conduit",
     racewayMaterialName: '3/4" EMT',
-    conductorMaterialName: "#12 THHN Copper",
+    conductorMaterialName: "#12 THHN solid Copper",
     conductorCount: 3,
     groundCount: 1,
-    groundMaterialName: "#12 THHN green Copper",
+    groundMaterialName: "#12 THHN green solid Copper",
   },
   {
     label: "12-2 MC cable",
@@ -185,10 +185,10 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     label: "700 series surface raceway, 2 #12 + ground",
     pathType: "conduit",
     racewayMaterialName: "Surface raceway, 700 series",
-    conductorMaterialName: "#12 THHN Copper",
+    conductorMaterialName: "#12 THHN solid Copper",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 THHN green Copper",
+    groundMaterialName: "#12 THHN green solid Copper",
   },
   /*
     Wiremold 500, the 700 type's twin (owner, 2026-10-09;
@@ -199,10 +199,10 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     label: "500 series surface raceway, 2 #12 + ground",
     pathType: "conduit",
     racewayMaterialName: "Surface raceway, 500 series",
-    conductorMaterialName: "#12 THHN Copper",
+    conductorMaterialName: "#12 THHN solid Copper",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 THHN green Copper",
+    groundMaterialName: "#12 THHN green solid Copper",
   },
   /*
     Underground PVC, one per size the catalog ships, for EACH schedule —
@@ -264,4 +264,4 @@ export const RETIRED_BASELINE_RUN_TYPES: readonly {
  * three "#12 + ground" types now pull a green #12 THHN as their ground.
  */
 export const RUN_TYPE_MATERIAL_SWAPS: readonly { from: string; to: string }[] =
-  [{ from: "#12 bare solid Copper", to: "#12 THHN green Copper" }];
+  [{ from: "#12 bare solid Copper", to: "#12 THHN green solid Copper" }];

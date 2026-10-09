@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **The starter catalog now names real, stocked parts (catalog reality
+  check).** About 300 items were renamed to what a supply house actually
+  sells: plastic boxes by cubic inches ("Single-gang new work box, plastic,
+  18 cu in"), box depths that match real products, panels as the 56
+  single-phase load centers that are really stocked (main-lug or main-breaker,
+  spaces, indoor/outdoor), single-size crimp lugs, fuses and disconnects with
+  their voltage, and "15A" on the plain devices. 158 items nobody stocks were
+  retired into the row that does the same job. Old names still find their
+  rows, starters point at the kept rows, and no existing bid changes (959
+  bids rehearsed, all unchanged). Two labels were added for the outdoor
+  emergency disconnect and EV-ready starters.
+- **Search got smarter about sizes.** A box's depth ("2" deep") and a
+  panel's space count ("20-space") no longer count as its size, so "2 emt"
+  and "20 amp breaker" stop listing boxes and panels.
+
 - **PVC runs, either schedule, will buy one coupling, terminal adapter and
   LB per size (not live yet; waits for the matching catalog change).**
   Suppliers sell these as one part for Sch 40 and Sch 80, so a traced Sch
