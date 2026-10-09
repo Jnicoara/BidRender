@@ -42,6 +42,10 @@
   "Coverage-check starters".
 - **Staging cleanup:** the two `track-b-race-*` accounts are now on the
   delete-before-stress-test list.
+- **Merged into local-dev as `09b0294`** after track-b Gate 37983660993
+  went green (merged tree: 375 files, 6,235 passed). The local-dev merge
+  had one conflict, CHANGELOG.md (both entries kept). The local-dev Gate
+  (staging deploy and smoke) was not watched to the end; check it.
 - **State:** merged local-dev (A's 0141). B's databases are at 142 and
   `schemaDrift` matches (176/176). No migrations by B. No dev server running.
 
