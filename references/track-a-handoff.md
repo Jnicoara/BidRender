@@ -19,7 +19,39 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-09 (session 26) — START HERE
+## UPDATE 2026-10-09 (session 27) — START HERE
+
+**Sch 80 / 500 seed on local-dev and staging; live re-rehearsed. Live
+untouched.**
+
+- **Seed** (`8f3045c`, Track A's half of `sch80-and-500-plan.md` § 7c):
+  9 `N" PVC Sch 80, underground` types (tape, no wire; one map over
+  `UNDERGROUND_SCHEDULES`), 500 base renamed in place, 500 cover retired,
+  nine 500 parts, `500 series surface raceway, 2 #12 + ground` on
+  `#12 THHN green Copper`. 500 raceway "common" (so "wiremold 500" leads with
+  it). **Took C's label signature + fold sort from `c-sch80-500`
+  file-identical** (`shared/undergroundRunTypes.ts`, `runTypeFold.ts` + test,
+  5 test call sites) — the plan allows A doing both. C's 500 fitting family
+  is NOT in; until C merges, a 500 run's fittings say "no catalog match".
+- Tests: `server/sch80And500Seed.test.ts` (11 red without the seed, incl. a
+  DB case that the rename keeps the id); counts moved in `perFootSeed`,
+  `catalogReview20261008`, `frozenMaterialNames` (123 shipped / 20
+  retired). Touched set 18 files / 312 green locally; branch Gate
+  37881649096 test green; local-dev Gate 37882505343 all green.
+- **Staging**: backup `staging-2026-10-09T03-57-40Z-before-sch80-500.sql`;
+  814/814 bids unchanged; catalog +9 / 1 renamed (#1683) / 1 retired,
+  1,801 active (`deploying.md` § 11 "Sch 80 / 500 seed").
+- **Live re-rehearsal** (`next-live-release-plan.md` § 5e): clean. **But on
+  the 2026-10-08 23:54 backup, not a fresh one** — `backup.mts` against live
+  was refused by the permission classifier ("Production Reads").
+- Two test call-site edits were made with `sed` (C's exact text), read back
+  and green — CLAUDE.md asks for Edit; noted, not repeated.
+- Cleaned up: DBs `bidrender_backup_verify`, `bidrender_staging_restore_0140`,
+  `bidrender_test_fresh0140`; worktrees `../bidrender-before-0140`,
+  `../bidrender-before-sch80`, `../bidrender-live-24105ad`. Branch
+  `a-sch80-500` pushed (merged).
+
+## UPDATE 2026-10-09 (session 26)
 
 **Staging now runs the catalog review's code; live untouched.**
 

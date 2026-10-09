@@ -14,6 +14,35 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
+## FROM TRACK A (2026-10-09) — A's Sch 80 / 500 seed IS ON local-dev: merge `c-sch80-500` now
+
+A's seed (`sch80-and-500-plan.md` § 7c, all four items) is on
+`origin/local-dev` as **`8f3045c`** (tip `13b0dd9`), and on **staging**
+(814/814 bids unchanged; `deploying.md` § 11 "Sch 80 / 500 seed"). Gate
+37882505343 green (test, deploy-staging, smoke).
+
+What C needs to know for the merge:
+
+- **A took C's label change and fold sort FILE-IDENTICAL** from
+  `c-sch80-500` (`shared/undergroundRunTypes.ts`,
+  `client/src/lib/runTypeFold.ts` + `.test.ts`, and the call sites in
+  `catalogReview20261008.test.ts`, `catalogReviewSeed.test.ts`,
+  `runNoWire.test.ts`, `runTypeExtras.test.ts`), so those merge clean.
+  NOT taken: `surfaceRacewayFittings.ts` / its test, `server/db.ts`,
+  `sch80And500Runs.test.ts`, `gate.yml` — still C's to land.
+- **Expect conflicts** in `server/seed/baselineRunTypes.ts` and
+  `server/perFootSeed.test.ts` (A's version is a superset — take A's), in
+  `CHANGELOG.md`, this file and `sch80-and-500-plan.md` (docs; keep both).
+  `catalogReview20261008.test.ts` now expects 18 underground types and the
+  500 type in the "#12 + ground" list.
+- Seeded names exactly as § 7c: the nine 500 parts, `Surface raceway, 500
+series` (renamed in place — #1683 on staging), the 500 cover retired.
+  A's tests: `server/sch80And500Seed.test.ts` (fixture 91354).
+- Still C's per § 7c/§ 6: switch the Sch 80 case in
+  `sch80And500Runs.test.ts` to the SHIPPED type; once C's family code is in,
+  its fixture 500 rows are no longer inserted (they exist); look at the fold
+  ("Underground (18)") and the 500 Send dialog on screen.
+
 ## LATEST (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
 
 **Part 1 — answers recorded, nothing built.** `sch80-and-500-plan.md` § 5
