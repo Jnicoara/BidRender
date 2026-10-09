@@ -34,6 +34,11 @@ This is the human-readable companion to the git history — read this to see wha
   amber notice with the time calls started being refused and where the fix
   is written down, and it clears itself once a call works. Nothing on a bid
   was ever affected; this is about the words.
+- **A traced Wiremold 500 run now counts its own fittings.** Couplings,
+  entrance end, inside and flat elbows come from the 500 parts only, the
+  same way 700 already did; a 500 run never borrows a 700 part, and 1500 is
+  deliberately left out. Before this, a 500 run's fittings said "no catalog
+  match".
 
 ## [2026-10-08]
 
