@@ -124,7 +124,11 @@ describe("the frozen ADDS (2026-10-07)", () => {
     }
   });
 
-  it("measured 2026-10-08: 153 adds = 124 shipped + 8 duplicates + 2 declined + 19 retired", () => {
+  it("measured 2026-10-09: 153 adds = 123 shipped + 8 duplicates + 2 declined + 20 retired", () => {
+    // 124 -> 123 on 2026-10-09: the 500 cover was retired the same way as
+    // 700's (owner; sch80-and-500-plan.md § 2a). The 500 base still counts
+    // as shipped, renamed to "Surface raceway, 500 series".
+    //
     // 142 -> 124 later on 2026-10-08: the owner's catalog review withdrew
     // every 3-1/2" row, 18 of them frozen adds (now `retired`).
     // 86 shipped on the first pass and 59 were held; the owner's second
@@ -139,10 +143,10 @@ describe("the frozen ADDS (2026-10-07)", () => {
     expect(adds).toHaveLength(153);
     expect(held.filter(h => h.kind === "duplicate")).toHaveLength(8);
     expect(held.filter(h => h.kind === "declined")).toHaveLength(2);
-    expect(held.filter(h => h.kind === "retired")).toHaveLength(19);
+    expect(held.filter(h => h.kind === "retired")).toHaveLength(20);
     expect(
       adds.filter(a => shipped.has(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name))
-    ).toHaveLength(124);
+    ).toHaveLength(123);
   });
 });
 

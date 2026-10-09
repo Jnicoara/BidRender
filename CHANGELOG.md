@@ -14,6 +14,14 @@ This is the human-readable companion to the git history — read this to see wha
   bid's first upload, the sheet list sometimes stayed on "Sheets appear here
   once the document opens" and the scale was never read, until the page was
   reloaded. The sheets are now always picked up once they are saved.
+- **Schedule 80 underground pipe and Wiremold 500 are ready to trace.**
+  Nine "PVC Sch 80, underground" run types (one per size, each with its
+  warning tape) sit in the same Underground fold as the Sch 40 ones, Sch 40
+  listed first. Wiremold 500 now works like 700: one raceway row priced by
+  the foot, its own run type (2 #12 + ground) and nine of its own parts,
+  coupling to device plate. The old 500 "base" row keeps its place under the
+  new name; the separate 500 cover row is withdrawn, since 500 is one piece.
+  Nothing on an existing bid moves.
 - **Fix a line right on the bid.** A line that says "Not priced", "Hours not
   set" or "+ 1 part not priced" now has a "Fix this line" button. Type the
   missing price or hours (or pick the material or the role) and only that
