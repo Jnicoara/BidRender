@@ -24,6 +24,37 @@ This is the human-readable companion to the git history — read this to see wha
   after the everyday ones in every material search. The three "#12 +
   ground" run types now pull green #12 THHN as the ground. Bid totals do
   not move.
+- **An underground run can no longer be given wire with nothing to price
+  it.** The open run's "Add wires to this run" now offers "Pick the wire" or
+  "No wire (empty pipe)" on an underground trench or an empty pipe, the same
+  as the run's warning, and the server refuses a circuit there. A plain
+  conduit type with no wire named still takes circuits by hand, as before.
+- **A run type with two per-foot extras now sends both to the bid.** The
+  Send dialog told two extras on one type apart by their part kind only, so
+  the second came back "Nothing was added". Each is now its own item.
+- **The Legend tab fits on an upright tablet.** At 820 wide it sat 20 px off
+  the screen's edge; the tabs' minimum spacing was too wide for the panel.
+  The layout check now fails if any tab is cut off.
+- **An underground run can now be given its wire, or called an empty pipe,
+  right where the warning is.** The shipped underground types leave the wire
+  unsaid on purpose, so a traced trench sat at "no wire" with nothing that
+  fitted: the bid came in without the feeder and the only button added wire
+  with no material to price. Now the run's warning offers "Pick the wire"
+  (the wire, how many, and the ground) and "No wire (empty pipe)" for a spare
+  conduit; the Send dialog's warning has a button that opens the run.
+  Either way the trench keeps its warning tape. A spare conduit no longer
+  shows a warning forever. The tape's explanation stops repeating its own
+  name and number, and says why the tape matches the pipe in the Send dialog
+  too. No existing bid number moved.
+- **Underground warning tape now follows the trench, and a traced 700 run
+  buys 700 parts.** Sending an underground run type to a bid adds a tape line
+  sized to the flat trench length (not the risers), with the run's conduit
+  waste on the material only; it moves when the trench is redrawn. A bid can
+  set one tape line to 0 for a shared trench without touching any other bid.
+  A traced Wiremold 700 run now buys 700 couplings, one entrance end per run,
+  an inside elbow at each corner and a flat elbow at each drop, instead of
+  "no catalog match". The tape is on the materials list too. No existing bid
+  number moved.
 - **Starter assemblies now carry the right cover plate.** Receptacles get a
   duplex plate, switches a toggle plate, and GFCI, AFCI, USB, dimmer,
   sensor, timer and fan-control devices a decorator plate, in place of the

@@ -503,6 +503,10 @@ export function fittingMaterialName(
       // Not a part: a field bend's "material" is the raceway itself, picked
       // in `pickFittingMaterial` before any name is built.
       return null;
+    case "elbowFlat":
+      // Surface raceway only, and its raceway does not parse as a pipe —
+      // the 700 family names its own parts (`surfaceRacewayPartName`).
+      return null;
     case "coupling":
     case "connector":
       if (family === "EMT") {
@@ -689,7 +693,10 @@ export function fittingRowSpeaks(row: {
 }): boolean {
   // A tee box speaks by the same rule as a bend: most runs have no tee, and
   // "No branch tees" listed as "not sent" would read as a failure.
-  if (!isBendRole(row.role) && !isTeeRole(row.role)) return true;
+  // A flat elbow is surface raceway's alone: on every pipe it is a 0 that
+  // would read as a failure, so it speaks by the bend rule too.
+  if (!isBendRole(row.role) && !isTeeRole(row.role) && row.role !== "elbowFlat")
+    return true;
   if (row.onBid || row.status === "unknown") return true;
   return row.status === "counted" && row.qty > 0;
 }

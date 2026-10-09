@@ -68,6 +68,7 @@ import { unmatchedKindWords } from "../../shared/runFittings";
 import { isBendRole } from "../../shared/runBends";
 import { isTeeRole, rootOf } from "../../shared/runNetwork";
 import { runOnBid } from "../../shared/runOnBid";
+import { extraFeetForRuns } from "../../shared/runExtrasPerFoot";
 import { quantityTraceSummary } from "../../shared/quantityDrops";
 
 /**
@@ -300,8 +301,9 @@ export const materialsListRouter = router({
         ctx.scope.dataUserId,
         footage
       );
+      const extraPalette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
       if (fittingsByType.size > 0) {
-        const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
+        const palette = extraPalette;
         const minimums: string[] = [];
         const bendMinimums: string[] = [];
         const teeMinimums: string[] = [];
@@ -383,6 +385,61 @@ export const materialsListRouter = router({
           fittingShortfalls.push(`Not counted: ${uncounted.join("; ")}.`);
         }
       }
+
+      /*
+        EXTRAS — underground warning tape and the like (per-foot-items-plan.md
+        § 3a): off the same runs as the pipe, by the same arithmetic as the
+        bid line (`extraFeetForRuns`), and through the bid line's "shared
+        trench" answer where one is on the bid. Every traced type, sent or
+        not, like the fittings above. A run on an unscaled sheet is said, not
+        counted as 0.
+      */
+      const extraLines = liveLines.filter(l => l.runMaterialRole === "extra");
+      const extrasByType = await db.getRunTypeExtrasFor(
+        ctx.scope.dataUserId,
+        Array.from(footage.keys())
+          .map(id => resolveRunType(extraPalette, id)?.id ?? null)
+          .filter((id): id is number => id !== null)
+      );
+      footage.forEach((f, storedId) => {
+        const type = resolveRunType(extraPalette, storedId);
+        if (!type) return;
+        for (const extra of extrasByType.get(type.id) ?? []) {
+          const line = extraLines.find(
+            l => l.takeoffRunTypeId === storedId && l.runExtraKey === extra.key
+          );
+          const total = extraFeetForRuns(
+            f.extraRuns,
+            extra,
+            line?.extraFeetPerFoot == null
+              ? null
+              : Number(line.extraFeetPerFoot),
+            extra.materialName ?? "an extra"
+          );
+          if (total.unmeasurableCount > 0)
+            fittingShortfalls.push(`${type.label}: ${total.why}.`);
+          if (total.boughtFeet <= 0) continue;
+          if (extra.materialName === null) {
+            fittingShortfalls.push(
+              `${type.label}: ${total.boughtFeet} ft of an extra whose material was deleted — not listed.`
+            );
+            continue;
+          }
+          sources.push({
+            name: `${type.label} (from traced runs)`,
+            count: total.boughtFeet,
+            materials: [
+              {
+                name: extra.materialName,
+                unit: extra.unitOfSale ?? "foot",
+                category: extra.category,
+                qty: 1,
+                isBranchWhip: false,
+              },
+            ],
+          });
+        }
+      });
 
       const entries = aggregateMaterials(sources, Number(bid.whipAdjustPct));
 

@@ -465,6 +465,13 @@ export type PanelRun = {
    * server, through shared/runNoWire.ts, so the row and the bid agree.
    */
   noWire?: boolean;
+  /**
+   * A circuit here would be wire with no material (an underground trench or
+   * an empty pipe whose type names no wire), so the circuit editor offers
+   * "Pick the wire" instead — the server refuses the circuit. From the
+   * server, shared/runNoWire.ts `circuitNeedsPickedWire`.
+   */
+  pickWireToAdd?: boolean;
   /** Ends that may be double-click stubs, to check (shared/runBends.ts). */
   stubsToReview?: {
     end: "start" | "end";
@@ -584,6 +591,54 @@ function noTypeSentence(noType: RunTotalsLeftOut["noType"]): string {
       ? `${parts.join(" and ")} ${parts.length === 1 ? "is" : "are"} not on the bid`
       : `${noType.count === 1 ? "it is" : "they are"} not on the bid`;
   return `${runs} — ${what}. Give each run a type to price it.`;
+}
+
+/**
+ * "No wire (empty pipe)" — a spare, a sleeve, a trench for a future pull.
+ * An answer, so it is said as plainly as picking a wire, never hidden as the
+ * lesser choice (2026-10-08).
+ */
+function EmptyPipeButton({ onEmptyPipe }: { onEmptyPipe: () => void }) {
+  return (
+    <button
+      className="underline text-muted-foreground hover:text-foreground"
+      onClick={e => {
+        e.stopPropagation();
+        onEmptyPipe();
+      }}
+    >
+      No wire (empty pipe)
+    </button>
+  );
+}
+
+/**
+ * The two answers to a run whose TYPE does not say its wire — the shipped
+ * underground types, by design (per-foot-items-plan.md § 3b). Picking opens
+ * the run's "Made of" editor on its wire; either way the run moves to a type
+ * that says so and keeps its tape (`takeoffRuns.respecify`).
+ */
+function NoWireAnswers({
+  onPickWire,
+  onEmptyPipe,
+}: {
+  onPickWire: () => void;
+  onEmptyPipe: () => void;
+}) {
+  return (
+    <>
+      <button
+        className="underline text-warning hover:text-foreground"
+        onClick={e => {
+          e.stopPropagation();
+          onPickWire();
+        }}
+      >
+        Pick the wire
+      </button>
+      <EmptyPipeButton onEmptyPipe={onEmptyPipe} />
+    </>
+  );
 }
 
 /**
@@ -1027,7 +1082,14 @@ export type PanelStampGroup = {
  * for future use has one too, and that is a real thing to bid.
  */
 export type RunTypeBridgeRow = {
-  role: "raceway" | "conductor" | "ground";
+  /** `extra` is a per-foot extra on the type, like underground tape (0135). */
+  role: "raceway" | "conductor" | "ground" | "extra";
+  /** Which extra, on an `extra` row; 0 on the others. */
+  extraKey: number;
+  /** How an extra's feet were reached; null on the others. */
+  why: string | null;
+  /** `why` without "N ft of <name>:" — what this row shows under itself. */
+  how: string | null;
   materialName: string | null;
   feet: number;
   onBid: boolean;
@@ -1165,6 +1227,8 @@ export function RunsPanel({
   emptiedCount = null,
   onCommitRun,
   onAcceptSuggestion,
+  onPickWire,
+  onEmptyPipe,
   onAddCircuit,
   onUpdateCircuit,
   onRemoveCircuit,
@@ -1430,6 +1494,14 @@ export function RunsPanel({
   emptiedCount?: EmptiedCountCard | null;
   onCommitRun: (id: number) => void;
   onAcceptSuggestion: (id: number) => void;
+  /**
+   * The two answers to "no wire" when the run's TYPE does not say its wire
+   * (an underground trench, 2026-10-08): open the run's "Made of" editor on
+   * its wire, or make it an empty pipe. Both go through
+   * `takeoffRuns.respecify` — one run, its type's tape kept.
+   */
+  onPickWire: (runId: number) => void;
+  onEmptyPipe: (runId: number) => void;
   onAddCircuit: (
     runId: number,
     name: string,
@@ -1537,8 +1609,15 @@ export function RunsPanel({
                 // minimum, or Totals — the tab most likely to carry the
                 // warning mark — is the one scrolled out of sight. A
                 // finger's 44px on the phone (takeoff-spec ground rule 2).
+                //
+                // `phone` is every touch layout, the upright tablet included
+                // — a 312px panel with touch-sized text. There px-2.5 made
+                // the five tabs 331px, and Legend sat 20px off the screen's
+                // edge (measured 2026-10-08; `pnpm device:audit` now fails on
+                // it as `cutTabs`). Padding is only the MINIMUM — flex-1
+                // spreads the tabs over the strip anyway — so px-1 there.
                 "flex-1 min-w-fit flex items-center justify-center gap-1 px-1.5 text-xs border-b-2 whitespace-nowrap",
-                phone ? "h-11 text-sm px-2.5" : "h-9",
+                phone ? "h-11 text-sm px-1" : "h-9",
                 active
                   ? "border-[#F5C518] text-foreground font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -1986,7 +2065,7 @@ export function RunsPanel({
                   </p>
                   <div className="mt-1 space-y-0.5">
                     {entry.rows.map(row => (
-                      <div key={row.role}>
+                      <div key={`${row.role}:${row.extraKey}`}>
                         <div className="flex items-baseline justify-between gap-2">
                           <span
                             className={cn(
@@ -2000,6 +2079,16 @@ export function RunsPanel({
                             {row.feet} ft
                           </span>
                         </div>
+                        {/* An extra says how its feet were reached — tape
+                            follows the flat length, not the risers — the
+                            way every fitting below carries its sentence. */}
+                        {/* The short form: the row above already says
+                            what and how many (2026-10-08). */}
+                        {(row.how ?? row.why) && (
+                          <p className="text-xs text-muted-foreground leading-snug">
+                            {row.how ?? row.why}
+                          </p>
+                        )}
                         {row.resend && (
                           <p className="text-xs text-warning leading-snug">
                             {resendSentence(row.resend)}
@@ -2707,15 +2796,22 @@ export function RunsPanel({
                             typed={run.quantities.lengthSource === "typed"}
                           />
                         ) : (
-                          <div className="flex items-baseline justify-between text-xs gap-2">
+                          <div
+                            className={cn(
+                              "flex items-baseline justify-between text-xs gap-2",
+                              run.noWire && "flex-wrap justify-start gap-y-1"
+                            )}
+                          >
                             {/* Amber for the same reason as the route row
-                                below; no one-tap here, because the type is
-                                what says "no wire" and has none to offer. */}
+                                below. No "use the type's wire" — the type has
+                                none to offer — so the answers are the two
+                                that fit: pick the wire, or say it is an empty
+                                pipe (2026-10-08; it used to offer nothing). */}
                             <span
                               className={cn(
                                 "shrink-0",
                                 run.noWire
-                                  ? "text-warning flex items-center gap-1"
+                                  ? "text-warning flex items-center gap-1 basis-full"
                                   : "text-muted-foreground"
                               )}
                             >
@@ -2723,19 +2819,23 @@ export function RunsPanel({
                                 <TriangleAlert className="w-3 h-3" />
                               )}
                               {run.noWire
-                                ? "No wire on the bid for this pipe"
+                                ? "Pick the wire for this run"
                                 : "Wires in this pipe"}
                             </span>
-                            <span
-                              className={cn(
-                                "font-mono",
-                                run.noWire
-                                  ? "text-warning"
-                                  : "text-muted-foreground/70"
-                              )}
-                            >
-                              the type says no wire
-                            </span>
+                            {run.noWire ? (
+                              <span className="flex items-baseline gap-2">
+                                <NoWireAnswers
+                                  onPickWire={() => onPickWire(run.id)}
+                                  onEmptyPipe={() => onEmptyPipe(run.id)}
+                                />
+                              </span>
+                            ) : (
+                              <span className="font-mono text-muted-foreground/70">
+                                {run.typeDefaults?.conductorCount === 0
+                                  ? "empty pipe"
+                                  : "the type says no wire"}
+                              </span>
+                            )}
                           </div>
                         ))}
                       {run.pathType === "conduit" &&
@@ -2770,7 +2870,9 @@ export function RunsPanel({
                               {run.noWire ? (
                                 <>
                                   <TriangleAlert className="w-3 h-3" />
-                                  No wire on the bid for this pipe
+                                  {typeCarriesWire(run.typeDefaults ?? null)
+                                    ? "No wire on the bid for this pipe"
+                                    : "Pick the wire for this run"}
                                 </>
                               ) : (
                                 "Wires in this pipe"
@@ -2779,7 +2881,9 @@ export function RunsPanel({
                             <span className="flex items-baseline gap-2">
                               {!run.noWire && (
                                 <span className="font-mono text-muted-foreground/70">
-                                  none
+                                  {run.typeDefaults?.conductorCount === 0
+                                    ? "empty pipe"
+                                    : "none"}
                                 </span>
                               )}
                               {/*
@@ -2803,19 +2907,44 @@ export function RunsPanel({
                                     Use the run type's wire
                                   </button>
                                 )}
-                              <button
-                                className="underline text-muted-foreground hover:text-foreground"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  // Opens the run, because the circuit rows this
-                                  // is about only exist on an open one.
-                                  onSelectRun(run.id);
-                                  setAddingTo(run.id);
-                                  setCircuitName(nextCircuitName(run.circuits));
-                                }}
-                              >
-                                Add wires
-                              </button>
+                              {/*
+                                A type that does not say its wire (an
+                                underground trench, by design) has nothing for
+                                "Add wires" to price: the circuit it added
+                                carried no material and stopped at "cannot go
+                                on the bid". So that type is answered by
+                                picking the wire instead (2026-10-08).
+                              */}
+                              {run.noWire &&
+                              !typeCarriesWire(run.typeDefaults ?? null) ? (
+                                <NoWireAnswers
+                                  onPickWire={() => onPickWire(run.id)}
+                                  onEmptyPipe={() => onEmptyPipe(run.id)}
+                                />
+                              ) : (
+                                <>
+                                  <button
+                                    className="underline text-muted-foreground hover:text-foreground"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      // Opens the run, because the circuit rows
+                                      // this is about only exist on an open one.
+                                      onSelectRun(run.id);
+                                      setAddingTo(run.id);
+                                      setCircuitName(
+                                        nextCircuitName(run.circuits)
+                                      );
+                                    }}
+                                  >
+                                    Add wires
+                                  </button>
+                                  {run.noWire && (
+                                    <EmptyPipeButton
+                                      onEmptyPipe={() => onEmptyPipe(run.id)}
+                                    />
+                                  )}
+                                </>
+                              )}
                             </span>
                           </div>
                         ) : (
@@ -3215,6 +3344,37 @@ export function RunsPanel({
                             >
                               Add
                             </Button>
+                          </div>
+                        ) : run.pickWireToAdd ? (
+                          /*
+                            The same answer as the run's no-wire line: a type
+                            that names no wire on purpose (a trench, an empty
+                            pipe) has nothing for a circuit to price, and the
+                            server refuses one (takeoffRuns.addCircuit). So
+                            the wire is picked instead — or the pipe is said
+                            to be empty.
+                          */
+                          <div className="text-xs space-y-0.5 [&_button]:whitespace-nowrap">
+                            <p className="text-muted-foreground">
+                              {run.typeDefaults?.conductorCount === 0
+                                ? "Empty pipe."
+                                : "This run's type names no wire."}
+                            </p>
+                            <div className="flex flex-wrap gap-x-3">
+                              {run.typeDefaults?.conductorCount === 0 ? (
+                                <button
+                                  className="underline text-muted-foreground hover:text-foreground"
+                                  onClick={() => onPickWire(run.id)}
+                                >
+                                  Pick the wire
+                                </button>
+                              ) : (
+                                <NoWireAnswers
+                                  onPickWire={() => onPickWire(run.id)}
+                                  onEmptyPipe={() => onEmptyPipe(run.id)}
+                                />
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <Button

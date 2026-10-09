@@ -1,6 +1,10 @@
 # Track C — handoff, 2026-10-06
 
-Written for a restart. Worktree `C:\dev\BidPhase-C`. **Updated 2026-10-08:**
+Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
+section below** (per-foot work merged to local-dev as `94d63fd`; leftovers
+on `c-leftovers`; C's databases have 140 migrations — the stand-in 0139 they
+ran is the same statement and `when` as A's, so nothing more is needed).
+**Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
 `c-homerun-wiring` (from local-dev), merged into local-dev by C once CI is
@@ -10,7 +14,303 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## WHERE THINGS STAND (2026-10-08, end of session — read this first)
+## LATEST (2026-10-09) — per-foot work MERGED; three leftovers fixed
+
+**Job 1 — merged.** `c-per-foot-logic` went onto local-dev as ONE squash
+commit, **`94d63fd`** (fast-forward of `ee7576c`). Took A's 0139 file and
+journal entry, dropped C's stand-in, deleted A's `elbowFlat` tripwire in
+`feetForRole` (`elbowFlat` was already in `FITTING_KINDS` from C's 700
+code; `pnpm check` clean). **Why squashed:** `drizzle-guard` lists every
+non-merge branch commit touching `drizzle/` (`git log --no-merges
+origin/local-dev..HEAD -- drizzle/`), so the stand-in commit `92a7ef4` kept
+it red even after the merge's tree equalled local-dev's — a merge does not
+clear it. Full history stays on `origin/c-per-foot-logic` (merge `8141b66`).
+`origin/track-c` was force-pushed (with lease) from that merge to the squash.
+E111 1728359 and Bar layout check 1164558: `bids.get` + `bridgeForBid` +
+`materialsList.get` + `takeoffSummary.forBid` byte-identical, 261df22 vs the
+merge, same `bidrender_local_c`. CI: track-c Gate 37863259085 — test GREEN,
+drizzle-guard GREEN. **local-dev Gate 37864063102 GREEN** — test,
+deploy-staging, smoke. Staging `/api/version` served `94d63fd` (built
+00:32 UTC).
+
+**On staging (2026-10-09 00:40 UTC), through staging's own HTTP API** — no
+staging JWT secret on the laptop, so no minted session: a throwaway account
+(`track-c-check-<ms>@example.com`, random password not kept; staging email
+fails closed) made bid **772**, attached a one-page PDF, traced a 700 run
+(40 ft, a square corner, 20 ft, panel → device box, run height 10 ft, ends
+5 ft / 1'6") and a 50 ft 2" underground trench, and Send all sent 9, refused
+none. Lines: 700 raceway 73.5 ft, coupling 7, entrance end 1, **inside
+elbow 1 (`elbow90`), flat elbow 2 (`elbowFlat`)**; 2" PVC 50 ft, **tape 50
+ft (`extra`)**, connector 2, strap 10. Identical to the same fixture run
+locally. Bid 772 archived (purges in 30 days); the account is left. Script:
+not committed (scratchpad) — it is ~90 lines of fetch + the gate HMAC.
+
+**Job 2 — `c-leftovers` (from `94d63fd`), one commit:**
+
+- **a. No wire with no material.** `circuitNeedsPickedWire` in
+  `shared/runNoWire.ts` (type, extra count): true when the type names no
+  conductor AND says so on purpose — an underground trench (it carries an
+  extra) or an empty pipe (count 0). `takeoffRuns.addCircuit` refuses with
+  "Use "Pick the wire"…"; `listForSheet` rows carry `pickWireToAdd` from the
+  same function, and the open run's circuit editor shows "This run's type
+  names no wire." + Pick the wire / No wire (empty pipe) instead of "Add
+  wires to this run" (empty pipe: Pick the wire only). **Deliberately NOT
+  every no-wire type:** a raceway-only shop type with hand-added circuits is
+  the manual way to measure wire (materials list "Wire, insulated"); 19
+  existing tests rely on it. Looked at on screen at laptop and 820×1180
+  (throwaway bid on the Old Blueridge set, deleted).
+- **b. Send-dialog extras keyed by type + material + slot:**
+  `run:<type>:extra:<materialId|none>:<extraKey>` (slot too, so two extras
+  of one material still differ). `SendTarget` carries `extraKey`;
+  `takeoffRunTypes.sendToBid` takes optional `extraKey` and sends that one
+  extra. Before: one key twice, and Send all's second item reported "Nothing
+  was added" because the first sent both.
+- **c. Legend tab at 820×1180.** `phone` in RunsPanel is every touch layout,
+  tablet included; its `px-2.5` made the tabs 331 px in a 312 px panel, so
+  Legend ended at x=840. Now `px-1` (flex-1 still spreads them; measured
+  62–64 px each, strip 311/311). **`pnpm device:audit` gained a hard fault,
+  `cutTabs`**: a tab not wholly inside its strip and the window — the
+  sideways-strip exemption had hidden it. Red before (3 faults, all
+  tablet-portrait), 0 after, plans/plans-totals/capture at all four sizes.
+
+**Tests** (`bidrender_test_c`): `runNoWire.test.ts` (+4: pure rule,
+trench refused + `pickWireToAdd`, empty pipe refused, raceway-only still
+allowed; the old "refuses an empty pipe on a run that already has wire"
+now seeds its circuit with `createRunCircuit`, since addCircuit refuses
+one there), `takeoffSummary.test.ts` (+1, two extras), `runTypeExtras.test.ts`
+(+1 DB, Send all sends both). Mutation-checked: rule → 3 red; key → 2 red;
+send filter → 1 red. 13 touched files, 205 passed. Full suite: CI.
+
+**Not done:** "Pick the wire then a ground" `(2)` twin names (below) still
+open.
+
+## EARLIER (2026-10-08, late) — wire on underground runs; tape line checked on screen
+
+Same branch, `c-per-foot-logic`, **still NOT merged into local-dev** (waits
+for A's 0139 — the section below still applies word for word). **No new
+column was needed**, so nothing here is for Track A.
+
+**How a user put wire on an underground run before this (the owner's
+question 1).** Only by editing the TYPE in the picker (pencil → Conductor,
+count, ground), which forks it for the whole shop and moves every run of it.
+From the warning itself there was no way: a route run's "Add wires" added a
+circuit the type named no material for, so the wire row read "can't go on
+the bid as it stands"; a quantity trace said "the type says no wire" and
+offered nothing. Ignored, **the bid came in without the feeder** — said in
+amber, never priced. "Empty pipe" did not exist as an answer at all: a
+spare conduit stayed flagged forever.
+
+**What is built (no column — D3(b), the existing per-run "Made of" path):**
+
+- **"Pick the wire"** on the run's no-wire line (route and quantity) opens
+  the run's `RunSpecEditor` with its wire, count — and a **ground** slot,
+  shown only when the type names no ground (otherwise picking the wire left
+  the circuit's ground counted with nothing named: seen on screen). Saving
+  goes through `takeoffRuns.respecify`, which points the run at a type
+  saying exactly that, found or made.
+- **"No wire (empty pipe)"** on the same line and inside the editor:
+  `respecify({ emptyPipe: true })` → a type with conductor count **0**
+  (already "says no wire" in `typeCarriesWire`; NULL stays "not said").
+  `runCarriesNoWire` now takes the type's answer (REQUIRED third argument,
+  `emptyPipeLookup(palette)`), so a 0-type run is not flagged; all three
+  callers (runs list, summary, plan attention) pass it. Refused, with the
+  way out named, on a route run whose circuits already carry wire.
+- **The trench keeps its tape.** `respecify` now carries the current
+  type's EXTRAS (rule 7 — the editor does not show them): a match must have
+  the same extras (`extrasSignature`), and a made type copies them. Before,
+  picking a wire for an underground run would have landed it on a tape-less
+  type and **dropped the tape off the bid** — the wrong number this job was
+  for, from the fix itself. Made types are named
+  `2" PVC Sch 40, 2 #6 THHN Copper, underground` /
+  `2" PVC Sch 40, empty pipe, underground` (`saysUnderground`); a type with
+  other extras gets `+ <extra>`.
+- **Send dialog, never stuck:** the "no wire" item reads "N conduit runs
+  with no wire picked — No wire picked, so none is priced. Pick the wire, or
+  say it is an empty pipe." with a button ("Go to the run and pick its
+  wire") that opens the first such run on its sheet with the editor open and
+  scrolled into view (`fixAt` on the item, `openRunAt` in TakeoffPage —
+  the drops readout uses the same function now).
+
+**Job 2 — the tape line on screen** (playwright, real viewports 1366×768,
+820×1180, 1180×820; a throwaway bid on the Old Blueridge set, deleted
+after, with its made types). No sideways scroll anywhere; the Send dialog
+scrolls its list inside with Cancel/Send on screen at 1366×768. Fixed:
+the Runs panel's tape explanation restated the row ("211.12 ft of
+Underground warning tape: 211.12 ft over 2 runs…" under "Underground
+warning tape 211.12 ft") — now `how`, the sentence without its opening;
+the bid note keeps the full `why`. The Send dialog showed tape = pipe feet
+with no word on why — it now carries the `how` under extra lines (`note`).
+Picker opened below the fold after the jump — now scrolls into view.
+
+**Seen, not changed:** at 820 wide the panel's tab strip runs "Legend" past
+the right edge (pre-existing; not checked whether it scrolls). The open
+run's own "Add wires to this run" (circuit editor) still adds a circuit on
+a type with no wire named — it then reads "can't go", visible, not silent.
+`takeoffSummary` keys a run row `run:<type>:<role>`, so a type with TWO
+extras would collide on `run:<type>:extra` — one shipped extra today, but
+it needs the extra key before a second ships. Picking wire without a ground
+and later with one makes a `(2)` twin name (labels do not name the ground).
+
+**Numbers:** HEAD `4147269` vs this tree, same `bidrender_local_c`, read
+only — `bids.get` + `bridgeForBid` + `materialsList.get` +
+`takeoffSummary.forBid`: identical on E111 1728359 (pipe 3,996.04 ft) and
+Bar layout check 1164558 ($378.15, 7 lines) except the reworded no-wire item
+and its new `fixAt` (and the list's timestamp). Note E111 1728359 is owned
+by local user 22173517 — run it as that user.
+
+**Tests** (`bidrender_test_c`): `runNoWire.test.ts` (+6, incl. 5 DB: asks,
+empty pipe keeps tape and reuses its type, picked wire priced with tape,
+ground named and sendable, refusal), `runRespecify.test.ts` (+8),
+`takeoffSummary.test.ts` (+2), `runExtrasPerFoot.test.ts` (`how`).
+**Mutation-checked, 13 of 13 red.** CI: Gate 37857115190 (`8277522`, pushed to `track-c`) — `test` GREEN, `drizzle-guard` red by rule until A's 0139. The local full-suite rerun was stopped for low memory; the earlier full run was 5978 passed with one failure, in a test edited while it ran, which passes now.
+
+## WHERE THINGS STAND (2026-10-08, before the section above — still true)
+
+**Branch `c-per-foot-logic` now holds the per-foot SERVER HALF, wired**, on
+top of local-dev `08205a6` (A's 0135–0138 + seed). Pushed; **NOT merged
+into local-dev, on purpose: it waits for A's 0139 (`elbowFlat`) to be on
+local-dev.** The branch carries a STAND-IN `drizzle/0139_elbow_flat_role.sql`
+(+ journal entry) only so its CI can apply the role. **At merge: take A's
+0139 file and journal entry, delete the stand-in**, re-point
+`server/teeBodyRole.test.ts` (it names `0139_elbow_flat_role.sql` as the
+newest list) at A's file name, and run that test. Same enum statement, so a
+database that ran the stand-in accepts A's unchanged. C's databases
+(`bidrender_local_c`, `bidrender_test_c`) have 140 recorded (the stand-in).
+
+What is built (plan § 9 step 2):
+
+- **Extras' feet.** `groupRunFootage` keeps every counted run's flat and
+  vertical feet + resolved raceway waste on the type row (`extraRuns`;
+  traced runs, mark drops as vertical only, homeruns), and
+  `extraFeetForRuns` sums them. `feetForRole`'s `extra` tripwire is gone —
+  the role is excluded from its switch and read in `withTracedFootage`
+  through the line's `extraFeetPerFoot`.
+- **One bid line per extra.** `runTypeRows` takes the type's extras
+  (required) and emits role `extra` + `extraKey`. Bridge, send, Send again
+  and `releaseArchivedPlanSlot` match lines by `runLineSlot(role,
+runExtraKey)`, never the role alone. RunsPanel's send preview shows the
+  extra's sentence (the one screen change — see "not looked at" below).
+- **`bids.setExtraShared({ bidId, lineId, shared })`** — 0 / NULL on one
+  extra line; refused on a locked bid and on any non-extra line. There is
+  no "sent" marker in the schema; the lock is the only freeze.
+  `bids.get` lines carry `extraNote` (how the feet were reached) and
+  `extraShared`.
+- **Materials list** lists each extra off the same runs, through the bid
+  line's shared answer; unscaled runs go in the notes.
+- **Extras CRUD**: `takeoffRunTypes.extras / addExtra / updateExtra /
+removeExtra`; foot-sold materials only; a shipped type forks first (and a
+  type already forked is resolved, not forked twice). No editor UI yet.
+- **`takeoff_run_type_extras.materialId`** is now a resolver in
+  `server/forkableReferences.test.ts` (`getRunTypeExtrasFor`).
+- **700 family wired**: `fittingRowsByRunType` sends a type whose SHIPPED
+  raceway is `Surface raceway, 700 series` to `countSurfaceRacewayFittings`;
+  parts go out as coupling / connector (entrance end) / strap (clip, not set)
+  / elbow90 (inside) / **elbowFlat** / teeBox (`SURFACE_RACEWAY_PART_ROLE`).
+  `elbowFlat` is in `FITTING_KINDS`; a pipe answers 0 and the row stays
+  quiet (`fittingRowSpeaks`).
+
+**Numbers (local `bidrender_local_c`, read only).** Old code (worktree of
+`08205a6`) vs new, same database, `bids.get` + `bridgeForBid` +
+`materialsList.get`: **identical** on E111 bid 1728359 (pipe 3,996.04 ft)
+and Bar layout check 1164558 ($378.15, 7 lines). The only diff is a new
+`elbowFlat` fitting row at 0 per conduit type in the bridge, hidden by
+`fittingRowSpeaks`. What the new counting gives on the same drawings
+(computed, nothing written): E111 as a trench = 3,553.53 ft tape (drops not
+in it), 3,731.23 ft at 5% waste, 0 ft shared; as 700 = 380 couplings, 38
+entrance ends, 38 inside elbows, 76 flat elbows, clips not set — the same
+figures this file predicted before the wiring. Bar layout's 2" PVC run =
+80.24 ft tape (84.25 at 5%); as 700 = 1 inside elbow and the 131° corner
+named for its 45°.
+
+**Tests:** `server/runTypeExtras.test.ts` (10, DB), plus
+`runTypeFootageCore.test.ts` (+2), `takeoffBridge.test.ts` (+3),
+`surfaceRacewayFittings.test.ts` (+4); `perFootSeed.test.ts` now expects the
+tape line (40 ft); `teeBodyRole.test.ts` pins 0139's append. **Mutation-
+checked, 10 of 10 red:** no extraRuns push; shared answer ignored on read;
+live line matched by role only; 700 branch removed; preview ignoring the
+shared answer; elbowFlat speaking at 0; no lock check; materials list
+skipping extras; flat elbow mapped to `elbow45`; drops counted as flat.
+
+**Not built (next):** `qtySource` and the traced-parts JSON (0137/0138) are
+still unread — `shared/tracedParts.ts` belongs with the bid half and the
+GR2/GR5/DV34 recipe changes (plan § 9 step 3, after B's gap 11). The
+"Shared trench?" button on the bid line and the run-type editor's Extras
+block are screens nobody has built.
+
+**CI (Gate 37847472206, pushed to `track-c`):** `test` GREEN — the full
+suite. `drizzle-guard` RED, and that is the rule working: a track branch
+may not touch `drizzle/`, and this one carries the stand-in 0139 and the
+`schema.ts` enum line. It clears when A's 0139 is on local-dev and the merge
+takes A's files (the branch's own `drizzle/` diff is then empty). Do not
+"fix" it any other way.
+
+**On screen (local, 2026-10-08):** a throwaway bid with a 52 ft 1"
+underground run (deleted after). The Runs panel reads "Underground warning
+tape 52 ft" with "52 ft of Underground warning tape: 52 ft over 1 run, the
+flat length only, not the risers" under it; the Send dialog lists the tape
+as its own 52 ft new line. Read from the DOM — **the driven tab was hidden,
+so no screenshot: the LAYOUT is still unlooked-at**, at laptop or 1180x820.
+Seen in passing, not changed: an underground type's send says "Cannot go on
+the bid: Wire for 1 conduit run — conduit with nothing pulled through it",
+which is true (no wire, by design § 3b) but reads as a fault on a trench.
+
+## Earlier (2026-10-08, later)
+
+**Branch `c-per-foot-logic`** (from local-dev `df25451`), pushed, **NOT
+merged into local-dev — on purpose.** The owner's instruction: it merges
+when A's M1–M4 have landed and C wires it up. It holds the per-foot plan's
+counting that needs NO new column, as pure functions with tests:
+
+- `shared/surfaceRacewayFittings.ts` — the 700 family (plan § 3c): couplings
+  off 10 ft lengths; ONE entrance end per run at its start (none on a branch
+  leg, none at an open quantity-trace start); corner = inside elbow, end drop
+  = flat elbow (read by `legBends`, the same as a pipe's elbows); tee = a 700
+  tee fitting (none on a tee standing on a counted box); clips "not set"
+  while spacing is NULL; a corner that is not square buys its 90s and NAMES
+  the 45° part it cannot buy. No field bend, 45, LB or pull box.
+- `shared/runExtrasPerFoot.ts` — tape and any extra (§ 3a): `flat` or `all`
+  feet × feet per foot, the run's raceway waste on top (bought, not
+  installed), the line's shared-trench 0 vs NULL, unmeasurable runs counted
+  apart and never added as 0.
+- `shared/tracedParts.ts` — a part "from the traced run" (§ 3d): traced
+  beats typed beats default; GR2's pipe falls back to its own 10 ft
+  "default length" (read from the GR2 recipe in the test, not restated);
+  tape with nothing traced is NOT PRICED; covered = priced on the run line,
+  0 on the assembly line; coverage by material lineage.
+- Tests: `surfaceRacewayFittings.test.ts` (18), `runExtrasPerFoot.test.ts`
+  (10), `tracedParts.test.ts` (16). **Mutation-checked:** removing the
+  branch-leg skip, counting drops as inside elbows, buying a tee on a mark,
+  tape following risers, dropping waste and ignoring coverage each turn a
+  named test red.
+
+**Real numbers (local `bidrender_local_c`, read only, nothing written):**
+
+- **E111 bid 1728359** — its footage is all 38 computed homeruns (no
+  hand-traced runs left): pipe 3,996.04 ft (matches the earlier figure) =
+  3,553.53 ft flat + 442.51 ft drops. As 700: 380 couplings, 38 entrance
+  ends, 38 inside elbows (homerun corners), 76 flat elbows (2 drops each),
+  clips not set. As a trench at 5% waste: 3,553.53 ft tape + 177.70 waste =
+  3,731.23 ft — the drops are NOT in the tape.
+- **Bar layout check 1164558** (real traced runs): the 2" PVC run's one
+  corner is past 90°, so it buys 1 inside elbow and says the 45° part needs
+  adding by hand. That case is why the sentence names the angle, and is now
+  a test.
+
+**FOR TRACK A, before M2 is final — a role the plan missed.** The 700 type
+counts an inside elbow AND a flat elbow, two different parts on ONE run
+type. `bid_line_items_bid_runtype_role_uq` allows one line per (bid, type,
+role), so both cannot go out as `elbow90`. Entrance end → `connector`, clip
+→ `strap`, tee → `teeBox` and inside elbow → `elbow90` can reuse existing
+roles; **the flat elbow needs its own** (e.g. append `elbowFlat` to
+`runMaterialRole` in M2, beside `extra`). Reusing `elbow45` would work in
+the database and lie on every screen that labels the role. Not decided —
+A's and the owner's call. Plan § 4 M2 says the same.
+
+**Not done, and still waiting:** everything that reads a new column (extras
+CRUD, the bridge, `setExtraShared`, freezing traced parts), and the seed
+content (A's). The five owner questions below are still unanswered.
+
+## Before that (2026-10-08, end of session)
 
 **No job is in progress.** Working tree clean; `c-homerun-wiring` and
 `local-dev` both at `11dbd02` (or later, if this commit). No WIP anywhere.

@@ -467,11 +467,16 @@ describe.skipIf(!hasDb)("default quantities", () => {
   it("marks the consumables that are never used one at a time", async () => {
     const materials = await caller().materials.list();
     expect(
-      Number(materials.find(m => m.name === "Wire nuts")?.defaultQty)
+      Number(
+        materials.find(m => m.name === "Wire nut, 22-8 AWG (tan/red)")
+          ?.defaultQty
+      )
     ).toBe(3);
+    // "EMT strap" (3) was retired in the catalog review, 2026-10-08; the
+    // cable staple is the other consumable bought by the handful.
     expect(
-      Number(materials.find(m => m.name === "EMT strap")?.defaultQty)
-    ).toBe(3);
+      Number(materials.find(m => m.name === "Cable staple")?.defaultQty)
+    ).toBe(10);
   });
 
   it("leaves ordinary materials without a default", async () => {
@@ -494,7 +499,9 @@ describe.skipIf(!hasDb)("recently used materials", () => {
   it("lists the most recently used first, without repeats", async () => {
     const materials = await caller().materials.list();
     const box = materials.find(m => m.name === "Single-gang box")!;
-    const nuts = materials.find(m => m.name === "Wire nuts")!;
+    const nuts = materials.find(
+      m => m.name === "Wire nut, 22-8 AWG (tan/red)"
+    )!;
 
     await caller().assemblies.create({
       name: `Recent A ${Date.now()}${Math.random()}`,

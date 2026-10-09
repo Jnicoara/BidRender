@@ -1,5 +1,20 @@
 # Extra per-foot items on a traced run (PLAN, 2026-10-08)
 
+> **SERVER HALF BUILT 2026-10-08 (Track C, branch `c-per-foot-logic`, not
+> merged until A's 0139 is on local-dev).** § 9 step 2: the extras' feet
+> (`groupRunFootage` → `extraRuns`, `extraFeetForRuns`; the `feetForRole`
+> tripwire is gone), one bid row per extra keyed by `runExtraKey` through
+> bridge / send / Send again (`runLineSlot`), `bids.setExtraShared`, the
+> extras on the materials list, extras CRUD (`takeoffRunTypes.extras` /
+> `addExtra` / `updateExtra` / `removeExtra`, shipped types fork), the
+> `materialId` resolver, and the 700 family in `fittingRowsByRunType` with
+> the flat elbow on its own role **`elbowFlat`** (C's stand-in
+> `0139_elbow_flat_role.sql`; take A's 0139 at merge). **Not built:**
+> `qtySource` / traced parts (`shared/tracedParts.ts` is still unread —
+> they belong to the bid half with the starter recipe changes, § 9 step 3),
+> the "Shared trench?" button and the editor's Extras block (screens).
+> Numbers and tests: `track-c-handoff.md`.
+
 > **BUILT 2026-10-08 (Track A): § 9 step 1 and the seed content.** M1–M4 are
 > migrations **0135–0138** (`0135_run_type_extras`, `0136_bid_line_extras`,
 > `0137_assembly_material_qty_source`, `0138_traced_parts`). Seeded: the ten
@@ -17,7 +32,10 @@
 > every part. Clip spacing ships NULL; no Sch 80 types; 500 series not
 > merged (§ 7, Q1–Q3 still open). Record: `deploying.md` § 11.
 
-**Status: plan only. Nothing is built.** Written by Track C, on
+**Status: plan, plus the column-free counting** — the 700 rules, the
+extras' feet and the traced-part fallback, as pure functions with tests on
+branch `c-per-foot-logic` (2026-10-08, not merged; `track-c-handoff.md`).
+Nothing reads them yet. Written by Track C, on
 `c-homerun-wiring`, for the owner's ask of 2026-10-07. The first sketch is in
 `todo.md` § "Track A: ONE feature — extra per-foot items on a traced run".
 
@@ -407,6 +425,9 @@ need 0117 (staging has it; live does not — `next-live-release-plan.md`).
   it: `feetForRole` (`server/db.ts`) has an `elbowFlat` tripwire case that
   stops compiling when C adds the role to `FITTING_KINDS` — delete it then.
   Test: `server/migration0139.test.ts` (red without the migration).
+  **Wired 2026-10-08 (Track C merge):** `elbowFlat` is in `FITTING_KINDS`
+  (`shared/runFittings.ts`), the tripwire case is deleted, and the 700
+  family sends its flat elbows on it (`SURFACE_RACEWAY_PART_ROLE`).
 - **New: add `extraFeetPerFoot DECIMAL(8,4) NULL`** (decision 4). NULL =
   follow the run type's extra; `0` = "shared trench" on this bid. Only read
   on a role-`extra` line. NULL with no default, so "follow the type" is a

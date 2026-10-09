@@ -206,7 +206,7 @@ withDb("a tee on a cable run", () => {
     expect(byRole.get("teeBox")).toMatchObject({
       status: "counted",
       qty: 1,
-      materialName: '4" square box',
+      materialName: '4" square box, 1-1/2" deep',
     });
     expect(byRole.get("teeCover")).toMatchObject({
       qty: 1,
@@ -220,7 +220,9 @@ withDb("a tee on a cable run", () => {
     expect(result.sent).toEqual(expect.arrayContaining(["teeBox", "teeCover"]));
     const lines = (await caller().bids.get({ id: bidId })).lines;
     const box = lines.find(l => l.runMaterialRole === "teeBox")!;
-    expect(box.runMaterialId).toBe((await shipped('4" square box')).id);
+    expect(box.runMaterialId).toBe(
+      (await shipped('4" square box, 1-1/2" deep')).id
+    );
     expect(Number(box.qty)).toBe(1);
     expect(box.fittingNote).toBe("1 tee box: one at each branch tee");
     expect(lines.find(l => l.runMaterialRole === "teeCover")).toBeDefined();

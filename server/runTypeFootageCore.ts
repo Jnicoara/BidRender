@@ -43,6 +43,7 @@ import {
   type RunsAt,
 } from "./runVerticals";
 import type { ExtrasRow } from "../shared/runExtras";
+import type { ExtraRun } from "../shared/runExtrasPerFoot";
 import { dropsFootage, type MarkDropEntry } from "../shared/groupDrops";
 import type { HomerunEntry } from "./homerunsCore";
 import type { TraceMode, WireCircuits } from "../shared/traceMode";
@@ -156,6 +157,15 @@ export type RunTypeFootageRow = {
    * box is decided across all of them by `teeBoxOwners`.
    */
   tees: TeeRef[];
+  /**
+   * Every counted run of this type as its FLAT and VERTICAL feet and its
+   * resolved raceway waste — what the type's EXTRAS are counted from
+   * (per-foot-items-plan.md § 3a, `extraFeetForRuns`). Per run, not summed,
+   * because a run can carry its own waste %, and an unmeasurable run is here
+   * with `quantities` NULL so the extra says so instead of counting it as 0.
+   * Traced runs, drops from marks (vertical only) and computed homeruns.
+   */
+  extraRuns: ExtraRun[];
 };
 
 /** Node key prefix for a homerun's two ends — its own, never a mark's. */
@@ -341,13 +351,27 @@ export function groupRunFootage(input: {
         : null;
 
     const verticals = verticalsForRunRow(run, input.heights);
+    const runExtras = extrasForRunRow(run, input.heights);
     const quantities = quantitiesForRun(
       tracedRunOf(run),
       (input.circuitsByRun.get(run.id) ?? []).map(circuitWire),
       ratio,
       verticals,
-      extrasForRunRow(run, input.heights)
+      runExtras
     );
+    /*
+      The run for the type's EXTRAS (tape and the like), before the
+      unmeasurable `continue` so a run with no scale is counted apart and
+      never as 0. Waste is the run's resolved RACEWAY extra (owner decision
+      5): conduit extra on pipe, the cable's own extra on a cable type.
+    */
+    row.extraRuns.push({
+      quantities: quantities
+        ? { runFeet: quantities.runFeet, verticalFeet: quantities.verticalFeet }
+        : null,
+      wastePct:
+        run.pathType === "conduit" ? runExtras.conduitPct : runExtras.wirePct,
+    });
 
     /*
       The same run as a LEG for the fitting count, from the same numbers the
@@ -503,6 +527,15 @@ export function groupRunFootage(input: {
     const row = rowFor(byType, entry.runTypeId, f.pathType);
     row.markDropFeet += f.dropFeet;
     row.markDropCount += entry.count;
+    // A drop is all vertical: a `flat` extra (tape) takes none of it, an
+    // `all` one (pull rope) takes every foot. Its waste, as a fraction.
+    row.extraRuns.push({
+      quantities: { runFeet: 0, verticalFeet: f.dropFeet },
+      wastePct: wasteFraction(
+        f.pathType === "cable" ? f.wireExtraFeet : f.conduitExtraFeet,
+        f.dropFeet
+      ),
+    });
     row.verticalFeet += f.dropFeet;
     row.conduitBoughtFeet += f.conduitBoughtFeet;
     row.conduitInstalledFeet += f.conduitInstalledFeet;
@@ -537,6 +570,25 @@ export function groupRunFootage(input: {
     if (f.pathType === "cable") row.cableLegs.push(homerunFittingLeg(entry));
     else row.legs.push(homerunFittingLeg(entry));
     if (!entry.confirmed) row.homerunUnconfirmedCount += 1;
+    /*
+      For the EXTRAS: its counted drops are vertical, the rest of what is
+      installed (run + routing, the leg's own feet) is flat. Waste is the
+      homerun's own raceway extra, which it applies to its base feet.
+    */
+    const homerunVertical =
+      (entry.upDrop.counted ? entry.upDrop.feet : 0) +
+      (entry.downAtPanel.counted ? entry.downAtPanel.feet : 0);
+    const homerunInstalled = f.homerunFeet + f.routingFeet;
+    row.extraRuns.push({
+      quantities: {
+        runFeet: round2(Math.max(0, homerunInstalled - homerunVertical)),
+        verticalFeet: round2(Math.min(homerunVertical, homerunInstalled)),
+      },
+      wastePct: wasteFraction(
+        f.pathType === "cable" ? f.wireExtraFeet : f.conduitExtraFeet,
+        f.homerunFeet
+      ),
+    });
     row.conduitBoughtFeet += f.conduitBoughtFeet;
     row.conduitInstalledFeet += f.conduitInstalledFeet;
     row.cableBoughtFeet += f.cableBoughtFeet;
@@ -584,6 +636,11 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** Waste feet over the feet they were taken on, as a fraction; 0 on none. */
+function wasteFraction(wasteFeet: number, onFeet: number): number {
+  return onFeet > 0 && wasteFeet > 0 ? wasteFeet / onFeet : 0;
+}
+
 /** The row for a run type, created empty the first time — runs and drops alike. */
 function rowFor(
   byType: Map<number, RunTypeFootageRow>,
@@ -622,6 +679,7 @@ function rowFor(
       legs: [],
       cableLegs: [],
       tees: [],
+      extraRuns: [],
     };
     byType.set(runTypeId, row);
   }
