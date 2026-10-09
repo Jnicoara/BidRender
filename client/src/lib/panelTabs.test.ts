@@ -66,6 +66,29 @@ describe("the pinned 'This sheet' line (answer 6)", () => {
       })
     ).toBe("This sheet: 1 mark · 1 item");
   });
+
+  /*
+    The sheet's marks (or runs) have not arrived yet. The page used to feed
+    `[]` here, so the line read "0 marks" — a zero nobody had counted, which
+    looks exactly like marks that were lost (todo.md, smoke step 10).
+  */
+  it("says it is loading — never '0 marks' — until the sheet's lists arrive", () => {
+    for (const input of [
+      { counts: null, runs: null },
+      { counts: null, runs: [] },
+      { counts: [], runs: null },
+    ]) {
+      const line = sheetLine(input);
+      expect(line).toBe("This sheet: loading…");
+      expect(line).not.toMatch(/\d/);
+    }
+  });
+
+  it("still says 0 marks when the sheet really has none", () => {
+    expect(sheetLine({ counts: [], runs: [] })).toBe(
+      "This sheet: 0 marks · 0 items"
+    );
+  });
 });
 
 describe("a tab with a warning in it shows a mark (rule 5)", () => {

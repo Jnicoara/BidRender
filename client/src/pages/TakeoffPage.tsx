@@ -4503,10 +4503,11 @@ export default function TakeoffPage({
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) }
   );
-  const { data: runs = [] } = trpc.takeoffRuns.listForSheet.useQuery(
+  const { data: runsData } = trpc.takeoffRuns.listForSheet.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) }
   );
+  const runs = runsData ?? [];
   /** The root of the run a row belongs to — what a run card is keyed by. */
   const rootOfRun = (id: number) =>
     runs.find(r => r.id === id)?.parentRunId ?? id;
@@ -4580,10 +4581,19 @@ export default function TakeoffPage({
   */
   const refreshRuns = useCallback(() => refreshFor("run"), [refreshFor]);
 
-  const { data: stamps = [] } = trpc.takeoffStamps.listForSheet.useQuery(
+  const { data: stampsData } = trpc.takeoffStamps.listForSheet.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) }
   );
+  const stamps = stampsData ?? [];
+  /*
+    Whether this sheet's marks AND runs have arrived. Until both have, the
+    lists above are empty stand-ins, and the pinned "This sheet" line says
+    "loading…" rather than "0 marks" — a zero nobody counted reads exactly
+    like marks that were lost (todo.md, smoke step 10). A refetch keeps the
+    old data, so this goes false only for a sheet not yet fetched.
+  */
+  const sheetLoaded = runsData !== undefined && stampsData !== undefined;
   /*
     CIRCUITS ON THIS SHEET (@/lib/circuitGroups): its marks grouped by the
     circuit tag beside each, read-only. Derived from `stamps` here, so a mark
@@ -11534,6 +11544,7 @@ export default function TakeoffPage({
                       : (circuitDefaultsByRunType.get(r.runTypeId) ?? null),
                 }))}
                 stampGroups={stampGroups}
+                sheetLoaded={sheetLoaded}
                 groupDrops={groupDropsById}
                 onSetGroupDrop={(groupId, patch) =>
                   setGroupDrop.mutate({ id: groupId, ...patch })
@@ -12023,8 +12034,8 @@ export default function TakeoffPage({
           aria-label="Open the panel: counts, runs, sheets and totals"
         >
           <ThisSheetLine
-            stampGroups={stampGroups}
-            runs={visibleRuns}
+            stampGroups={sheetLoaded ? stampGroups : null}
+            runs={sheetLoaded ? visibleRuns : null}
             className="min-w-0 flex-1 truncate text-sm"
           />
           {warnedTabs.size > 0 && (

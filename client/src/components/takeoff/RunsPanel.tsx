@@ -1183,30 +1183,49 @@ export type RunTypeBridgeEntry = {
  * and on the phone the bar under the drawing too. ONE component for both, so
  * the two can never count differently (CLAUDE.md § Copying a layout does not
  * copy the behaviour).
+ *
+ * NULL for either list means the sheet's marks or runs have not arrived, and
+ * the line says "loading…" instead of a zero nobody counted (`sheetLine`).
  */
 export function ThisSheetLine({
   stampGroups,
   runs,
   className,
 }: {
-  stampGroups: readonly { placed: number }[];
-  runs: readonly {
-    runTypeId: number | null;
-    isSuggestion: boolean;
-    quantities: { runFeet: number } | null;
-  }[];
+  stampGroups: readonly { placed: number }[] | null;
+  runs:
+    | readonly {
+        runTypeId: number | null;
+        isSuggestion: boolean;
+        quantities: { runFeet: number } | null;
+      }[]
+    | null;
   className?: string;
 }) {
+  const loading = stampGroups === null || runs === null;
   return (
-    <p className={className}>
+    <p className={className} aria-busy={loading || undefined}>
       {sheetLine({
         counts: stampGroups,
-        runs: runs.map(r => ({
-          runTypeId: r.runTypeId,
-          isSuggestion: r.isSuggestion,
-          feet: r.quantities?.runFeet ?? null,
-        })),
+        runs:
+          runs?.map(r => ({
+            runTypeId: r.runTypeId,
+            isSuggestion: r.isSuggestion,
+            feet: r.quantities?.runFeet ?? null,
+          })) ?? null,
       })}
+    </p>
+  );
+}
+
+/** Where an empty state would go, while the sheet's lists are on their way. */
+function SheetListLoading({ what }: { what: "marks" | "runs" }) {
+  return (
+    <p
+      className="p-6 text-center text-sm text-muted-foreground"
+      aria-busy="true"
+    >
+      Loading this sheet's {what}…
     </p>
   );
 }
@@ -1233,6 +1252,7 @@ export function RunsPanel({
   onUpdateCircuit,
   onRemoveCircuit,
   stampGroups,
+  sheetLoaded,
   bridge,
   waitingToSend,
   countedWithNoPrice,
@@ -1352,6 +1372,12 @@ export function RunsPanel({
   sendingRunTypeId?: number | null;
   /** Counted stamps, grouped by assembly. Quantities are derived, not typed. */
   stampGroups: PanelStampGroup[];
+  /**
+   * False until this sheet's marks AND runs have both arrived. The pinned
+   * line says "loading…" meanwhile; `stampGroups` and `runs` are `[]` then,
+   * and a line built from them would state "0 marks" nobody counted.
+   */
+  sheetLoaded: boolean;
   /** Each count's relationship to the bid, by group id. */
   bridge?: ReadonlyMap<number, GroupBridgeState>;
   /**
@@ -1642,8 +1668,8 @@ export function RunsPanel({
       */}
       <div className="px-3 py-1.5 border-b border-border shrink-0 text-xs">
         <ThisSheetLine
-          stampGroups={stampGroups}
-          runs={runs}
+          stampGroups={sheetLoaded ? stampGroups : null}
+          runs={sheetLoaded ? runs : null}
           className="text-foreground"
         />
         {quantitiesLocked && (
@@ -1690,7 +1716,11 @@ export function RunsPanel({
         {/* Stamped assemblies first: an estimator drops dozens per sheet and
             traces a handful of runs, so the thing they are actively adding to
             stays where they can watch it climb. */}
+        {/* Not loaded is not empty: "Nothing counted" while the marks are
+            still on their way reads exactly like marks that were lost. */}
+        {tab === "counts" && !sheetLoaded && <SheetListLoading what="marks" />}
         {tab === "counts" &&
+          sheetLoaded &&
           stampGroups.length === 0 &&
           !(emptiedAt === 0 && emptiedCount) && (
             <div className="p-6 text-center">
@@ -2317,7 +2347,9 @@ export function RunsPanel({
 
         {tab === "totals" && dropsReadout}
 
-        {tab !== "runs" ? null : runs.length === 0 ? (
+        {tab !== "runs" ? null : !sheetLoaded ? (
+          <SheetListLoading what="runs" />
+        ) : runs.length === 0 ? (
           <div className="p-6 text-center">
             <Zap className="w-7 h-7 mx-auto mb-3 text-muted-foreground/50" />
             <p className="text-sm font-medium text-muted-foreground">

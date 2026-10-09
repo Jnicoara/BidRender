@@ -14,7 +14,33 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-09) — per-foot work MERGED; three leftovers fixed
+## LATEST (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
+
+**Part 1 — answers recorded, nothing built.** `sch80-and-500-plan.md` § 5
+now holds the owner's five answers (clip spacing "not set" for 500 and 700;
+separate 500/700 fitting rows; 500 type 2 #12 + ground only; Sch 80 NOT
+Specialty; GR2 follows whatever pipe is traced, Sch 80 included), with
+`per-foot-items-plan.md` § 7 Q1 and Q5 pointing there. **Wiremold check
+(legrand.us, the maker's own pages):** flat elbow (V511 / V711) and inside
+elbow (V517 / 717) are series-specific; the parts Wiremold sells as
+"500/700" — 5711 twist elbow, V5783/V5784 elbow box connectors, 615 wire
+pulley — are none of the nine planned rows, so nothing merges. Coupling,
+tee, entrance end, clip, box, plate were not checked part by part; they stay
+separate by the owner's rule. **A's 0140 (`a-catalog-review`) IS now on
+local-dev** (ancestor of `91df8ea`), so the build may start — re-check the
+plan's § 4 against local-dev first.
+
+**Part 2 — the "0 marks" flash (todo.md, smoke step 10 finding).**
+`sheetLine` (`client/src/lib/panelTabs.ts`) takes NULL for "not loaded"
+and says "This sheet: loading…"; TakeoffPage computes `sheetLoaded` (marks
+AND runs answered) and passes null to `ThisSheetLine` in the panel and on
+the phone bar; RunsPanel takes a required `sheetLoaded` and its Counts /
+Runs empty states show "Loading this sheet's marks/runs…" instead of
+"Nothing counted…" until then. Test: `panelTabs.test.ts` +2, red without
+the fix. On screen (playwright, marks response held 8 s, Bar layout check 1164558) at 1366×768 and 820×1180: loading → "3 marks · 6 items · 358 ft
+of runs", no 0 in between. Script in the session scratchpad, not committed.
+
+## EARLIER (2026-10-09) — per-foot work MERGED; three leftovers fixed
 
 **Job 1 — merged.** `c-per-foot-logic` went onto local-dev as ONE squash
 commit, **`94d63fd`** (fast-forward of `ee7576c`). Took A's 0139 file and

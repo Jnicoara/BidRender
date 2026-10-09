@@ -128,20 +128,34 @@ export function tabForSelection(kind: "run" | "mark"): PanelTab {
  * Runs with no type count once together, as one "not yet typed" thing.
  * Feet are the flat run lengths that could be measured; when some could not,
  * the line says how many, rather than presenting a short total as whole.
+ *
+ * NULL means NOT LOADED YET, and the line then says "loading…" with no
+ * number at all. The page used to default the sheet's lists to `[]`, so the
+ * line read "0 marks" for as long as the marks took to arrive — a zero
+ * nobody counted, which looks exactly like marks that were lost (todo.md,
+ * smoke step 10). The type takes null rather than an optional flag so a
+ * caller has to say which it is holding.
  */
 export function sheetLine(input: {
   /**
    * Marks on this sheet, per count — every mark PLACED, whatever its status:
    * this line says what is on the paper. What is priced is the card's number.
+   * Null while the sheet's marks are still loading.
    */
-  counts: readonly { placed: number }[];
-  runs: readonly {
-    runTypeId: number | null;
-    isSuggestion: boolean;
-    /** Null when the sheet has no usable scale and nothing was typed. */
-    feet: number | null;
-  }[];
+  counts: readonly { placed: number }[] | null;
+  /** Null while the sheet's runs are still loading. */
+  runs:
+    | readonly {
+        runTypeId: number | null;
+        isSuggestion: boolean;
+        /** Null when the sheet has no usable scale and nothing was typed. */
+        feet: number | null;
+      }[]
+    | null;
 }): string {
+  if (input.counts === null || input.runs === null) {
+    return "This sheet: loading…";
+  }
   const marks = input.counts.reduce((n, c) => n + c.placed, 0);
   const real = input.runs.filter(r => !r.isSuggestion);
   const types = new Set(real.map(r => r.runTypeId ?? "untyped"));
