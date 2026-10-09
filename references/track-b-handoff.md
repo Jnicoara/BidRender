@@ -19,10 +19,10 @@
   screen in todo.md. Throwaway local bids "B 6.1 preview check …" (user 1,
   `bidrender_local_b_new`) were left; the lock check restored its bid.
 - **Track A, re the live rehearsal in `ee7576c`** (cover repair "5 swapped
-  + 43 already"): with this change, RS1/RS2/RS13 will now report as
-  "would swap" there too — from the old recipe, or "first cover swap's
-  recipe" where the first swap already landed. Expected; still report,
-  then `--apply`, then bid totals.
+  - 43 already"): with this change, RS1/RS2/RS13 will now report as
+    "would swap" there too — from the old recipe, or "first cover swap's
+    recipe" where the first swap already landed. Expected; still report,
+    then `--apply`, then bid totals.
 - **Merge note:** local-dev's TakeoffPage conflicted with C's RunsPanel
   changes (my preview wrapper re-indented that block). Resolved by taking
   C's block verbatim and re-wrapping; `git diff -w origin/local-dev`
