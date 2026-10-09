@@ -1,4 +1,4 @@
-# Automatic branch runs between devices (PLAN, 2026-10-08)
+# Automatic branch runs between devices (PLAN, 2026-10-08; owner answers 2026-10-09)
 
 **PLAN ONLY. Nothing is built.** Track C, on `track-c`. Owner's brief,
 2026-10-08: work out the branch wiring between devices automatically
@@ -18,9 +18,19 @@ It stays **off** until a bake-off against hand-traced runs lands within
 
 **Read § 9 before building anything.** Two things in the brief — routing
 around "no-go areas" and staying inside a building outline — are close to
-the wording of the McCormick patent's dependent claims 4–6. The plan ships
-them in a safe form first (flag, never route around) and holds the
-route-around version for the attorney.
+the wording of the McCormick patent's dependent claims 4–6.
+
+> **Owner decision, 2026-10-09: ROUTE AROUND, in the main build.** Auto
+> branch runs route around the building outline and no-go areas (§ 3c),
+> instead of only flagging the device. This replaces the earlier "Stage B,
+> held for the attorney". Still kept: **no drawn route line, no route-type
+> choice, right-angle distance by arithmetic.** Route-around sits behind an
+> **outside-users switch** (§ 3f): it works only for the owner's company
+> and test accounts until the patent attorney answers § 9's four
+> questions. **Flag-only is built and tested alongside** as the fallback
+> every outside user gets, and the one everybody gets if the attorney says
+> no. `before-beta-checklist.md` carries "Attorney answer on route-around
+> before any outside user sees it." Owner answers to the questions: § 13.
 
 ---
 
@@ -71,7 +81,7 @@ Two shapes, chosen per bid (owner question Q1):
 
 | Shape                        | What it is                                                                                                                                                                   | Looks like                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Tree (suggested default)** | Minimum spanning tree on right-angle distance, **at most 3 connections per box** (a box rarely takes more than 3 cables: in, out, one tee). Prim's, from the leaving device. | Receptacles daisy-chained along a wall, with a tee where a row splits. How a circuit is actually pulled. |
+| **Tree (default, owner Q1)** | Minimum spanning tree on right-angle distance, **at most 3 connections per box** (a box rarely takes more than 3 cables: in, out, one tee). Prim's, from the leaving device. | Receptacles daisy-chained along a wall, with a tee where a row splits. How a circuit is actually pulled. |
 | **Chain**                    | One unbranched string from the leaving device: nearest neighbour, then a 2-opt pass to remove crossings.                                                                     | Strict daisy chain. Longer than the tree on spread-out circuits.                                         |
 
 The tree is never longer than the chain, and the box cap stops the star a
@@ -134,15 +144,40 @@ an atrium, an open-to-structure area, a cooler box, a rated shaft. **Interior
 walls do NOT block** (a ceiling run goes over them), so nobody has to draw
 walls.
 
-### 3c. What happens when a link would cross one — TWO stages
+### 3c. What happens when a link would cross one — ROUTE AROUND (owner, 2026-10-09)
 
-| Stage                                                    | A link whose right-angle path leaves the outline or crosses a no-go area…                                                                                                                                                                         | Patent (§ 9)                                                                                                 |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Stage A — flag (after the attorney's claim-4 answer)** | First the engine tries the OTHER one-corner L (horizontal-first vs vertical-first) and the next-best tree edge. If none stays clear, **the device is flagged**: "No clean path from Light 7 — fix it here", never guessed (§ 3d).                 | Safe: nothing routes around anything.                                                                        |
-| **Stage B — detour (attorney first)**                    | A grid search (A\* on cells about 1 ft at the sheet's scale, right-angle moves only, a cost per turn so it prefers fewer bends — the way an electrician runs it) finds the shortest clear right-angle path; its LENGTH and corner count are used. | **High risk**: claims 5–6 ("a multi-line path around the non-wiring area"). Held until the attorney answers. |
+> **Changed 2026-10-09 by the owner.** This section first held the detour
+> back as "Stage B, attorney first" and shipped flag-only. The owner moved
+> the detour into the main build. Flag-only stays, built and tested beside
+> it, as the fallback (§ 3f).
 
-Stage B is the brief as written. **It is held, not dropped**: the engine is
-built so the detour drops in where Stage A flags, and nothing else changes.
+Both modes start the same way, so they share one code path up to the point
+where they differ:
+
+1. Try the link's two one-corner Ls (horizontal-first, vertical-first). If
+   either stays inside the outline and clear of every no-go area, use it.
+2. Try the circuit's next-best network edge for that device (§ 2a), in
+   case another device gives it a clear L.
+
+Then:
+
+| Mode                                      | When neither step gives a clear path                                                                                                                                                                                                                                                                                                                                                                                                                                               | Who gets it                                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Route around (main build)**             | A grid search finds the shortest clear right-angle path: A\* on cells about 1 ft square at the sheet's scale, right-angle moves only, a cost per turn so it prefers fewer bends (the way an electrician runs it), cells inside a no-go area or outside the outline blocked. **Only its LENGTH and its CORNER COUNT are kept** — the length is the link's horizontal feet, the corners feed the bend rule (§ 4). The cells it passed through are thrown away the moment it returns. | The owner's company and test accounts, until the attorney answers (§ 3f).          |
+| **Flag only (fallback, built alongside)** | **The device is flagged**: "No clean path from Light 7 — fix it here", never guessed (§ 3d). It keeps its whip until fixed.                                                                                                                                                                                                                                                                                                                                                        | Every outside user until the attorney answers; everybody, if the attorney says no. |
+
+**Both modes flag the cases nothing can route:** a device inside a no-go
+area, a device outside the outline, or no clear path at all (an outline
+drawn with a gap that seals a room off). A detour longer than **3× the
+plain right-angle distance** is also flagged rather than priced (the factor is
+open question Q11), because a path that long usually means an outline
+mistake, not a real route — a wrong number with no warning is the failure
+this app is built against.
+
+**What route-around never does**, from the decision itself: draw the path,
+store the path, offer a choice of route type, or use a straight line. The
+row says how the number was made in words: "routed around No-go: cooler,
++18 ft".
 
 ### 3d. "Fix it here" — what the button offers
 
@@ -152,6 +187,41 @@ On a flagged device, in its row, in place (CLAUDE.md never-stuck rule):
 - **Type a length** for that one link.
 - **Connect to…** — tap the device it should hang from.
 - **Leave it on its whip** — that one device keeps its assembly whip.
+
+### 3f. The outside-users switch (owner, 2026-10-09)
+
+**Route-around works only for the owner's company and test accounts until
+the patent attorney answers § 9's four questions.** Everyone else gets
+flag-only (§ 3c).
+
+- **The mechanism already exists: an access-tier feature, not a new flag
+  table.** A `FEATURES` entry in `shared/permissions.ts`,
+  `branchRouteAround`, with `availability: "internal"`. The owner's account
+  and the test accounts are `internal` tier (the owner's was set by hand,
+  because the 0039 backfill missed it — check it still is before relying
+  on this); every outside account is `standard`.
+- **Decided per COMPANY, never per viewer.** The tier is read from the
+  bid's company owner (`ctx.scope.dataUserId`), not from whoever is looking.
+  Otherwise an employee and the owner would see two different totals on
+  the same bid, and a number that depends on who opened the screen is a
+  wrong number for one of them.
+- **Decided on the server.** The pricing code asks the switch; the client
+  only shows which mode priced the circuit. No client-side toggle can turn
+  route-around on.
+- **The full auto-branch feature is ALSO internal** until the bake-off
+  passes (§ 8). So the switch matters in the window AFTER the bake-off and
+  BEFORE the attorney: auto branches are released, route-around is not.
+- **If the attorney says no:** route-around is switched off for everybody
+  (delete the internal availability, or set it to nobody), flag-only is
+  what remains, and nothing else changes — which is why flag-only is built
+  and tested now, not written later.
+- **If the attorney says yes:** the entry moves to `availability:
+"standard"` (or is deleted), in one commit, with the attorney's answer
+  recorded in § 9 and in `before-beta-checklist.md`.
+- **Switching modes re-prices the bid.** Footage is computed when asked,
+  never stored (§ 10a), so a bid priced with detours shows flags instead the
+  moment the switch is off for it. The totals line says which mode priced
+  it.
 
 ### 3e. Later, optional: walls from vector PDFs
 
@@ -171,7 +241,7 @@ in this plan's build stages beyond a note.
 | **Makeup**        | Per conductor, per box end: `makeupDeviceInches`, or `makeupByKindInches` for that device's kind — the run type's own columns.                                                                                                                  |
 | **Waste**         | The run type's `wireExtraPct` and `conduitExtraPct`. Material only.                                                                                                                                                                             |
 | **Routing %**     | The bid's routing percentage, added (not multiplied), on labor and material — exactly as a homerun. Owner question Q5: share the homerun's number or have its own.                                                                              |
-| **Wire and pipe** | The **circuit's run type**. Which one is owner question Q3; suggested: the bid's **branch run type** (new, per bid), defaulting to the homerun run type, so "EMT homeruns, MC branches" is one setting.                                         |
+| **Wire and pipe** | The **circuit's run type**. Owner's answer to Q3: the bid's **branch run type** (new, per bid), defaulting to the homerun run type, so "EMT homeruns, MC branches" is one setting.                                                              |
 | **Labor feet**    | installed × (1 + routing), no waste, no makeup — the homerun's rule.                                                                                                                                                                            |
 
 The arithmetic is one new pure function, `branchFootage` in
@@ -259,8 +329,12 @@ by owner decision, not by code.
    and a routing rule cannot hide each other).
 3. **Also compare the whips** on the same devices. The engine has to beat
    the whip, or it adds machinery for nothing.
+4. **Run it twice: route-around and flag-only** (§ 3c). Both modes are
+   scored, so whichever one outside users end up with has been proven, not
+   assumed. Flag-only scores the circuits it priced and reports how many
+   devices it left on whips.
 
-**Pass (suggested; owner question Q8):**
+**Pass (owner, 2026-10-09, Q8):**
 
 - per-sheet installed feet within **±10%** of hand-traced, on every sheet;
 - at least **80% of circuits within ±20%**;
@@ -289,28 +363,34 @@ Branch links run device to device and device to switch; **none ends at a
 panel**. The panel end stays with the homerun, which keeps Option A (one
 number, no path). That is a real difference, not a guaranteed one.
 
-| Idea                                                                                       | Nearest claim language                                                  | Risk     | Plan                                                                                                                                    |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Right-angle LENGTH per link, from two device spots                                         | Claim 13, "multi-line path … orthogonal" (a one-corner L's length)      | Low–med  | Same flag as homeruns (§ 4 of the notes). Not to a panel. No route type choice. Keep.                                                   |
-| **A drawn line along a link or circuit**                                                   | Claims 1/13 "generate wire routes" (displayed)                          | **High** | **Not drawn.** A guard test like `noHomerunPath.test.ts` on the branch layer: no line, polyline, polygon or path element.               |
-| Rings on a circuit's devices; the leaving device larger; the switch ringed with its letter | None found                                                              | Low      | **The display.** Same as homerun's Option A.                                                                                            |
-| Order numbers (1, 2, 3…) on the devices                                                    | Suggests a route order without drawing one                              | Medium   | **Not in the first build.** Ask the attorney.                                                                                           |
-| A text list of links in the side panel ("Light 3 – Light 4, 12.5 ft")                      | Shows the network, not a path on the floorplan                          | Low–med  | Build; feet only.                                                                                                                       |
-| **A cost per link, per circuit or per route**                                              | Claims 1/13 "generate a cost for each of the wire routes"               | **High** | **Never.** Feet per circuit; cost only on the bid's run-type lines, all together, as homeruns.                                          |
-| A "branch takeoff window" with costs for SELECTED circuits                                 | Claim 13 "estimated material takeoff window … for selected wire routes" | High     | **Not built.** Totals are per run type, all circuits together.                                                                          |
-| A route-type choice (direct / orthogonal)                                                  | Claims 1 and 13 ("when a direct / orthogonal route is selected")        | **High** | **Never offered.** Tree vs chain is a per-bid estimating method, not a route type; ask the attorney to confirm that reading.            |
-| Straight-line distance anywhere                                                            | Claim 1                                                                 | High     | **None.** Right-angle only.                                                                                                             |
-| **No-go areas** drawn by the user                                                          | Claim 4 "mark at least one non-wiring area"                             | **High** | Stage A: the area only FLAGS links that cross it. Ask the attorney before building even this, since marking is claim 4's whole element. |
-| **Routing around** a no-go area (grid detour)                                              | Claims 5–6 "a multi-line path around the at least one non-wiring area"  | **High** | **Stage B, held for the attorney.** Length only, never drawn, never to a panel.                                                         |
-| Building outline, runs never leave it                                                      | Same family as non-wiring areas (outside = no wiring)                   | Med–high | Stage A flag only; Stage B with the no-go answer.                                                                                       |
-| Following a cable tray or marked route                                                     | Claims 7–9                                                              | High     | **Not in this plan.** Not proposed.                                                                                                     |
-| Walls read from a vector PDF                                                               | None directly; feeds the no-go question                                 | Medium   | Later, optional, proposes only; after the no-go answer.                                                                                 |
+| Idea                                                                                       | Nearest claim language                                                  | Risk     | Plan                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Right-angle LENGTH per link, from two device spots                                         | Claim 13, "multi-line path … orthogonal" (a one-corner L's length)      | Low–med  | Same flag as homeruns (§ 4 of the notes). Not to a panel. No route type choice. Keep.                                                                                                                                                      |
+| **A drawn line along a link or circuit**                                                   | Claims 1/13 "generate wire routes" (displayed)                          | **High** | **Not drawn.** A guard test like `noHomerunPath.test.ts` on the branch layer: no line, polyline, polygon or path element.                                                                                                                  |
+| Rings on a circuit's devices; the leaving device larger; the switch ringed with its letter | None found                                                              | Low      | **The display.** Same as homerun's Option A.                                                                                                                                                                                               |
+| Order numbers (1, 2, 3…) on the devices                                                    | Suggests a route order without drawing one                              | Medium   | **Not in the first build.** Ask the attorney.                                                                                                                                                                                              |
+| A text list of links in the side panel ("Light 3 – Light 4, 12.5 ft")                      | Shows the network, not a path on the floorplan                          | Low–med  | Build; feet only.                                                                                                                                                                                                                          |
+| **A cost per link, per circuit or per route**                                              | Claims 1/13 "generate a cost for each of the wire routes"               | **High** | **Never.** Feet per circuit; cost only on the bid's run-type lines, all together, as homeruns.                                                                                                                                             |
+| A "branch takeoff window" with costs for SELECTED circuits                                 | Claim 13 "estimated material takeoff window … for selected wire routes" | High     | **Not built.** Totals are per run type, all circuits together.                                                                                                                                                                             |
+| A route-type choice (direct / orthogonal)                                                  | Claims 1 and 13 ("when a direct / orthogonal route is selected")        | **High** | **Never offered.** Tree vs chain is a per-bid estimating method, not a route type; ask the attorney to confirm that reading.                                                                                                               |
+| Straight-line distance anywhere                                                            | Claim 1                                                                 | High     | **None.** Right-angle only.                                                                                                                                                                                                                |
+| **No-go areas** drawn by the user                                                          | Claim 4 "mark at least one non-wiring area"                             | **High** | **Built (owner, 2026-10-09).** Outside users get them in flag-only mode until the attorney answers (§ 3f).                                                                                                                                 |
+| **Routing around** a no-go area (grid detour)                                              | Claims 5–6 "a multi-line path around the at least one non-wiring area"  | **High** | **Built in the main build (owner, 2026-10-09)**: length and corner count only, never drawn, never stored, never to a panel. **Owner's company and test accounts only** until the attorney answers; flag-only is the fallback (§ 3c, § 3f). |
+| Building outline, runs never leave it                                                      | Same family as non-wiring areas (outside = no wiring)                   | Med–high | Same as the two rows above: route-around behind the switch, flag-only for outside users.                                                                                                                                                   |
+| Following a cable tray or marked route                                                     | Claims 7–9                                                              | High     | **Not in this plan.** Not proposed.                                                                                                                                                                                                        |
+| Walls read from a vector PDF                                                               | None directly; feeds the no-go question                                 | Medium   | Later, optional, proposes only; after the no-go answer.                                                                                                                                                                                    |
 
 **Put to the attorney, in one page:** (1) does device-to-device (never to a
 panel) take branch links outside claims 1 and 13; (2) is flagging a crossing
 of a user-drawn area "marking a non-wiring area" (claim 4); (3) is a detour
 LENGTH, never generated as a displayed path, "generating a path around" it
 (claims 5–6); (4) are order numbers on devices a displayed route.
+
+**Until the answer comes back** (owner, 2026-10-09): route-around runs for
+the owner's company and test accounts only (§ 3f), and "Attorney answer on
+route-around before any outside user sees it" is on
+`before-beta-checklist.md`. The answer is recorded here, with its date, in
+the same commit that moves the switch.
 
 ## 10. What each track builds
 
@@ -347,7 +427,10 @@ branch footage on the branch run type's lines.
   state; open a row → its links as text, each with feet; the § 3d fix
   buttons on any flagged device; a confirm button.
 - **Drawing tools:** "Building outline" and "No-go area" next to height
-  areas (Stage A). "Use my height areas" for the outline.
+  areas. "Use my height areas" for the outline.
+- **Which mode priced it, in words:** a routed link says "routed around
+  No-go: cooler, +18 ft"; under flag-only the same device shows the § 3d
+  fix buttons. No setting on screen turns route-around on (§ 3f).
 - **The sheet:** rings only (§ 9). No line.
 - **Untagged groups:** the § 7 question, one group at a time.
 
@@ -373,7 +456,18 @@ branch footage on the branch run type's lines.
   circuit has no whip; an untagged unconfirmed device keeps its whip;
   **sum of owned feet with everything on = auto + traced + remaining whips,
   each device once.**
-- Stage A: a link crossing a no-go area tries the other L, then flags.
+- **Both modes, every fixture** (§ 3c): a link crossing a no-go area tries
+  the other L, then the next edge; then **route-around** returns a length
+  and corner count (and nothing else — no point list leaves the function),
+  while **flag-only** flags. A device inside a no-go area, outside the
+  outline, or sealed off flags in BOTH modes. A detour over 3× the plain
+  distance flags in both. Fixtures whose shapes differ: a no-go area across
+  the middle of a long thin room, one in a corner, two that leave a single
+  1 ft gap between them.
+- **The switch** (§ 3f): route-around for an internal-tier company, flag-only
+  for a standard-tier one, on the same bid data; an employee of an internal
+  company gets the company's mode, not their own tier's; no client input
+  can turn it on.
 
 **Server:** router tests through `createCaller`, scoped by
 `ctx.scope.dataUserId`; a confirm/override round trip; a mark moved →
@@ -386,41 +480,49 @@ tablet size; mark a device, watch the number move (staleness).
 
 ## 12. Build stages (each one a gate on the next)
 
-| Stage | What                                                                                                                            | Who       |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| **0** | Attorney reads § 9's one page. Owner answers § 13.                                                                              | Owner     |
-| **1** | Pure engine (§ 2, § 4, § 5) and a bake-off script that prints per-circuit feet from a bid's marks. No UI, no columns.           | C         |
-| **2** | **Bake-off** on the four sheets (§ 8). Fail = stop and report. Pass = owner decides Measured becomes eligible.                  | Owner + C |
-| **3** | Track A's additive columns (§ 10a), step 1 of three.                                                                            | A         |
-| **4** | Server: ownership in `branchWire.ts`, pricing, router, internal tier only.                                                      | C         |
-| **5** | Bid and Plans screens (§ 10c), rings only.                                                                                      | B         |
-| **6** | Switch legs and 3-ways, if not already in stage 1's pass.                                                                       | C         |
-| **7** | Building outline and no-go areas, **Stage A (flag)**, and untagged grouping — only if the attorney clears claim 4 for flagging. | C + B     |
-| **8** | **Stage B (detour)**, only on the attorney's clear answer to § 9 (3).                                                           | C         |
-| **9** | Optional: walls from vector PDFs, proposing outlines.                                                                           | later     |
+| Stage | What                                                                                                                                                       | Who       |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| **0** | Owner answers § 13 — **done 2026-10-09**. Attorney gets § 9's one page (in parallel; it gates outside users only, § 3f).                                   | Owner     |
+| **1** | Pure engine (§ 2, § 3c both modes, § 4, § 5) and a bake-off script that prints per-circuit feet from a bid's marks. No UI, no columns.                     | C         |
+| **2** | **Bake-off** on the four sheets (§ 8). Fail = stop and report. Pass = owner decides Measured becomes eligible.                                             | Owner + C |
+| **3** | Track A's additive columns (§ 10a), step 1 of three.                                                                                                       | A         |
+| **4** | Server: ownership in `branchWire.ts`, pricing, router, internal tier only.                                                                                 | C         |
+| **5** | Bid and Plans screens (§ 10c), rings only.                                                                                                                 | B         |
+| **6** | Switch legs and 3-ways, if not already in stage 1's pass.                                                                                                  | C         |
+| **7** | Building outline and no-go areas with **route-around and flag-only together**, the outside-users switch (§ 3f), and untagged grouping.                     | C + B     |
+| **8** | **The attorney's answer moves the switch**: yes → route-around for everybody; no → flag-only for everybody. One commit, recorded in § 9 and the checklist. | Owner + C |
+| **9** | Optional: walls from vector PDFs, proposing outlines.                                                                                                      | later     |
 
-## 13. Owner questions (suggested answer first)
+## 13. Owner questions — ANSWERED 2026-10-09
 
-- **Q1. Tree or chain?** _Suggest: tree with a 3-per-box cap as the default,
-  chain as the per-bid option; the bake-off picks the default._
-- **Q2. Is the leaving device the same for homerun and branch?** _Suggest:
-  yes, always the homerun's saved one._
-- **Q3. Which run type prices branch wiring?** _Suggest: a per-bid branch
-  run type, defaulting to the homerun run type._
-- **Q4. Neutral at every switch (NEC 404.2(C))?** _Suggest: the switch leg
+The owner took the suggested answer on Q1–Q9. Q10 is replaced by the
+route-around decision. Q11 is new, from that decision, and still open.
+
+- **Q1. Tree or chain?** **Answer: tree with a 3-per-box cap as the
+  default, chain as the per-bid option; the bake-off picks the default.**
+- **Q2. Is the leaving device the same for homerun and branch?** **Answer:
+  yes, always the homerun's saved one.**
+- **Q3. Which run type prices branch wiring?** **Answer: a per-bid branch
+  run type, defaulting to the homerun run type.**
+- **Q4. Neutral at every switch (NEC 404.2(C))?** **Answer: the switch leg
   uses the run type's conductor count, and a per-bid "neutral at switches"
-  tick adds one; travelers always +1._
-- **Q5. Routing % for branch: the homerun's number or its own?** _Suggest:
-  its own, starting unapplied, because branch links are short and a
-  homerun's corridor factor overstates them._
-- **Q6. Keep both "Whips" and "Allowance per device"?** _Suggest: yes —
-  Whips is the assembly's own cable, Allowance is the bid's run type._
+  tick adds one; travelers always +1.**
+- **Q5. Routing % for branch: the homerun's number or its own?** **Answer:
+  its own, starting unapplied**, because branch links are short and a
+  homerun's corridor factor overstates them.
+- **Q6. Keep both "Whips" and "Allowance per device"?** **Answer: yes** —
+  Whips is the assembly's own cable, Allowance is the bid's run type.
 - **Q7. Untagged devices: propose groups by height area and distance, and
-  ask?** _Suggest: yes; nothing priced until confirmed._
+  ask?** **Answer: yes; nothing priced until confirmed.**
 - **Q8. Pass mark ±10% per sheet, 80% of circuits within ±20%, no unflagged
-  circuit off by 50%?** _Suggest: yes._
-- **Q9. Order numbers on devices?** _Suggest: no, until the attorney says
-  they are not a displayed route._
-- **Q10. Build Stage A (flag on no-go crossings) before the attorney
-  answers?** _Suggest: no — wait, since drawing the area at all is claim 4's
-  element._
+  circuit off by 50%?** **Answer: yes.**
+- **Q9. Order numbers on devices?** **Answer: no, until the attorney says
+  they are not a displayed route.**
+- **Q10. REPLACED by the owner's route-around decision (2026-10-09).** It
+  asked whether to build flag-only before the attorney answered. Now: route
+  around the outline and no-go areas in the main build; the owner's company
+  and test accounts only until the attorney answers § 9's four questions;
+  flag-only built and tested alongside as the fallback (§ 3c, § 3f).
+- **Q11 (new, open). Flag a detour longer than how many times the plain
+  right-angle distance?** _Suggest: 3×_ (§ 3c) — longer usually means an
+  outline mistake, not a real route.
