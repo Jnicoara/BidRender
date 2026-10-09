@@ -8,6 +8,8 @@
 >   no longer wait on C.
 > - **Gap 11 is amended by the owner:** an "Also save to my library" tick box,
 >   ON by default. See gap 11.
+> - **Gap 11 is BUILT (Track B, 2026-10-08)** — see the note under it, and
+>   todo.md § "Fix this line" for what it does not cover yet.
 > - **The Example price, hours and rate tags now exist** (Track A's
 >   0132–0134). They open on a tap. On a labor rate, the tag also opens the
 >   rate (gap 2).
@@ -266,75 +268,89 @@ itself is checked on staging at laptop and tablet sizes.
 
 ### Next — Track C has merged, so these no longer wait (★ kept as history)
 
-8. **"hours not set" on the assembly list opens the editor ON the hours
-   field.** `AssembliesLibraryPage.tsx` ★.
-9. **Rename a bid line.** The server already takes `name`; add it to the
-   line's menu. `BidsPage.tsx` ★.
+8.  **"hours not set" on the assembly list opens the editor ON the hours
+    field.** `AssembliesLibraryPage.tsx` ★.
+9.  **Rename a bid line.** The server already takes `name`; add it to the
+    line's menu. `BidsPage.tsx` ★.
 10. **The print block's items jump to their line** on the bid, with that
     line's fix open. `ProposalPage.tsx` ★ and `BidsPage.tsx` ★.
 11. **THE BIG ONE: fix an assembly or run line from the bid, in place.**
     "Not priced", "+ material not priced", "+ hours not set", "Hours not
     set", "no labor rate" and "Can't price" each become a button. It opens a
-    small panel on the line with the missing number:
-    - the material's price, for a part not priced;
-    - the assembly's hours, for hours not set;
-    - the role's rate, for no labor rate.
+    small panel on the line with the missing number: - the material's price, for a part not priced; - the assembly's hours, for hours not set; - the role's rate, for no labor rate.
 
-    > **Amended by the owner, 2026-10-07:** the panel saves the number onto
-    > THIS line, and offers a tick box **"Also save to my library", ON by
-    > default**, so the next bid is not stuck on the same missing number.
-    > **Sent and frozen bids never change.** This replaces the two-button
-    > design that stood here ("Save and update this line" / "Update all N
-    > lines").
+        > **Amended by the owner, 2026-10-07:** the panel saves the number onto
+        > THIS line, and offers a tick box **"Also save to my library", ON by
+        > default**, so the next bid is not stuck on the same missing number.
+        > **Sent and frozen bids never change.** This replaces the two-button
+        > design that stood here ("Save and update this line" / "Update all N
+        > lines").
 
-    **How it works:**
-    1. **Save always writes THIS line.** The typed price, hours or rate goes
-       into this line's own snapshot fields, as a hand edit, and the line
-       re-prices. That is the person deliberately changing their own line,
-       which the snapshot rule allows. What it forbids is a line moving
-       because something ELSE changed.
-    2. **"Also save to my library" (ticked by default)** also writes the
-       source: the material's price, the assembly's hours, or the role's
-       rate. A starter forks, as every library edit does. That is the
-       default because the owner's aim is that the next bid is not stuck
-       too.
-    3. **Nothing else moves.** Other lines on this bid using the same
-       assembly, and every other bid, keep their frozen numbers. That is the
-       snapshot freeze (CLAUDE.md § Architecture). A small note under the
-       tick box says so: "Other bids keep their prices. New lines use this."
-       Bringing other lines on THIS bid up to date stays its own deliberate
-       action, offered afterwards only if there are some: "Update N other
-       lines on this bid to the new figure?"
-    4. **Sent and frozen bids never change.** The panel does not open on a
-       bid whose quantities are locked, or that has gone to the customer
-       (Sent, Won, Lost). It still EXPLAINS, so the person is not stuck
-       wondering: "This bid was sent, so its prices are fixed. Fix it in
-       your library for next time." The library half is still offered.
-       That needs the same rule the bid screen already applies to editing a
-       line; reuse it rather than writing a second one.
+        **How it works:**
+        1. **Save always writes THIS line.** The typed price, hours or rate goes
+           into this line's own snapshot fields, as a hand edit, and the line
+           re-prices. That is the person deliberately changing their own line,
+           which the snapshot rule allows. What it forbids is a line moving
+           because something ELSE changed.
+        2. **"Also save to my library" (ticked by default)** also writes the
+           source: the material's price, the assembly's hours, or the role's
+           rate. A starter forks, as every library edit does. That is the
+           default because the owner's aim is that the next bid is not stuck
+           too.
+        3. **Nothing else moves.** Other lines on this bid using the same
+           assembly, and every other bid, keep their frozen numbers. That is the
+           snapshot freeze (CLAUDE.md § Architecture). A small note under the
+           tick box says so: "Other bids keep their prices. New lines use this."
+           Bringing other lines on THIS bid up to date stays its own deliberate
+           action, offered afterwards only if there are some: "Update N other
+           lines on this bid to the new figure?"
+        4. **Sent and frozen bids never change.** The panel does not open on a
+           bid whose quantities are locked, or that has gone to the customer
+           (Sent, Won, Lost). It still EXPLAINS, so the person is not stuck
+           wondering: "This bid was sent, so its prices are fixed. Fix it in
+           your library for next time." The library half is still offered.
+           That needs the same rule the bid screen already applies to editing a
+           line; reuse it rather than writing a second one.
 
-    **Needs:**
-    - **One server procedure**, `bids.fixLine({ lineId, price?, hours?,
-laborRateId?, saveToLibrary })`, that writes the line and, if asked,
-      the library row, in one transaction. It refuses on a locked or sent
-      bid, and that refusal is tested.
+        **Needs:**
+        - **One server procedure**, `bids.fixLine({ lineId, price?, hours?,
+
+    laborRateId?, saveToLibrary })`, that writes the line and, if asked,
+    the library row, in one transaction. It refuses on a locked or sent
+    bid, and that refusal is tested.
     - **Files:** `bidsRouter.ts`, `server/db.ts`, `BidsPage.tsx`,
       `LineCost.tsx`, `shared/lineNotPriced.ts`,
-      `client/src/lib/notPricedTotal.ts`.
-    - **No migration.**
+      `client/src/lib/notPricedTotal.ts`. - **No migration.**
 
-    **Tests that must fail without it:**
-    - the line's numbers move and the "not priced" count drops;
-    - with the box ticked, the library row changes (a starter forks, the
-      shipped row untouched);
-    - with it unticked, the library does NOT change;
-    - another bid using the same assembly does NOT move, ticked or not;
-    - another line on this bid does NOT move until the person says so;
-    - a sent bid and a locked bid refuse the line change, and allow the
-      library change.
+      **Tests that must fail without it:**
+      - the line's numbers move and the "not priced" count drops;
+      - with the box ticked, the library row changes (a starter forks, the
+        shipped row untouched);
+      - with it unticked, the library does NOT change;
+      - another bid using the same assembly does NOT move, ticked or not;
+      - another line on this bid does NOT move until the person says so;
+      - a sent bid and a locked bid refuse the line change, and allow the
+        library change.
 
-    The totals strips then get "Fix these" buttons that walk the same panel
-    line by line.
+      The totals strips then get "Fix these" buttons that walk the same panel
+      line by line.
+
+      > **BUILT 2026-10-08 (Track B).** `bids.fixLine` and
+      > `bids.fixLineOptions` (`server/lineFix.ts`, rules in
+      > `shared/lineFix.ts`), panel `FixLinePanel.tsx`. Every test listed above
+      > exists in `server/fixLine.test.ts` and was seen to go red with its
+      > guard removed. Decisions made while building, for the owner to check:
+      >
+      > - **"Sent" = Won or Lost**, plus the quantity lock. The schema has no
+      >   Sent status; Active is treated as still being priced.
+      > - **Not one transaction.** The library half goes through
+      >   `materials.update` / `assemblies.update` by caller (same fork, same
+      >   capability check), so everything is validated first, then the
+      >   library is written, then the line.
+      > - **The fix writes the line's snapshot.** This overrides todo.md's
+      >   "needs `bidUnitCost`" note for bid lines, which now says so.
+      > - **Not built:** the strips' "Fix these" walk, typing a role's rate in
+      >   the panel, and "Can't price" lines.
 
 12. **The run-end text warnings** ("no run height set for this job") open the
     heights popover. `runEnds.tsx` ★.

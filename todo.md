@@ -83,6 +83,53 @@ left as written rather than rewritten to match the rename.
       staging deploy, or give step 10 a longer poll.
     - Nothing in any of these diffs touches marks or undo.
 
+## "Fix this line" on the bid — BUILT (Track B, 2026-10-08, never-stuck gap 11)
+
+- [x] **The panel.** Every assembly or run line with something missing shows
+      "Fix this line", and its amber words ("Not priced", "Hours not set",
+      "+ 1 part not priced") open the same panel. It prices the line's $0
+      parts (recipe quantity shown beside each box), picks a material for a
+      line with none, sets hours (overhead shown), picks the role for hours
+      with no rate, and prices or sets hours on a traced run's part.
+      `shared/lineFix.ts` (rules), `server/lineFix.ts` (`bids.fixLine`,
+      `bids.fixLineOptions`), `client/src/components/FixLinePanel.tsx`,
+      `client/src/lib/fixLineDraft.ts`. No migration.
+- [x] **No guessing.** Only typed or picked numbers reach the line; a blank is
+      never sent as 0; a $0 price is refused; a picked material needs a typed
+      quantity. The library price is a hint the person taps to use.
+- [x] **"Also save to my library" ON by default**, written through
+      `materials.update` / `assemblies.update` by caller, so a starter forks
+      exactly as on the Library screen.
+- [x] **Nothing else moves.** Other lines with the same gap are OFFERED
+      ("Update 1 other line on this bid to the new figure?"), never changed.
+- [x] **Locked, Won or Lost bids keep their lines** and say so; the library
+      half still works. There is no "Sent" status in the schema, so "gone to
+      the customer" is read as Won or Lost (the rule `bids.get` already uses
+      for stale rates). Owner may want Active included — ask.
+- [x] Tests: `server/fixLine.test.ts` (21; each guard removed in turn went
+      red: refusal → 2, always-save → 2, never-save/no line write → 8) and
+      `client/src/lib/fixLineDraft.test.ts` (9).
+- [x] On screen, laptop 1536x864 and tablet 820x1180: part priced ($85.32 →
+      $185.32, strip 2 → 1 parts), offer shown, other line untouched; pole
+      line given a material and 6 h; a Won bid explains and offers only
+      "Save to my library". **Found by looking:** the offer vanished because
+      the saved line stopped being fixable and the panel unmounted; it is now
+      shown while open, not while fixable.
+- [ ] **Not covered yet:** typing a ROLE'S rate from the panel (a role at $0
+      is listed but disabled; the strip says Labor Rates); "Can't price"
+      lines; a line from before markup rules (no frozen parts list) can take
+      a material but not part prices; a marker saying a line was fixed on the
+      bid; the totals strips' "Fix these" walk; gap 10 (print block jumps to
+      the line). Fixing a part keeps the line's frozen markup for the parts
+      already priced and adds the new part's own markup under today's rules
+      (`blendedMarkup`).
+- [x] **Gap 6.1 on staging (`fa0c697`), 2026-10-08:** sheet 1 drawn **1.51 s**
+      after picking a 6.6 MB, 5-sheet set (ticket 0.17 s, opened from the
+      file 0.84 s, drawn 1.51 s). The PUT ended at 2.2 s and the attach at
+      2.4 s, so the sheet was up before the upload finished. 0 MB pulled back
+      before sheet 1 or in the 10 s after. One run; one more throwaway
+      `track-b-upload-*` account on staging (bid archived, file removed).
+
 ## Plans screen gaps — AFTER TRACK C MERGES (Track B, 2026-10-07)
 
 > **Track C HAS MERGED into local-dev** (`bea4d8f`, 2026-10-07). Every item
@@ -967,6 +1014,18 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       rules refuse, and uses nothing up" in `server/passwordReset.test.ts`).
 
 ### Before beta: price an unpriced line right where it blocks you
+
+> **PARTLY SUPERSEDED 2026-10-08 (Track B) by never-stuck gap 11, "fix this
+> line", which the owner amended 2026-10-07.** On the BID PAGE an assembly or
+> run line is now fixed in place with NO migration: the typed price, hours or
+> role go onto that line's own snapshot as a deliberate hand edit (the same
+> thing `updateLine` already does for a hand-priced line), with "Also save to
+> my library" ticked by default. That overrides the "needs a MIGRATION —
+> `bidUnitCost`" reasoning below for bid lines. **Still open from this
+> item:** price boxes in the quote-app `Blocked` panel and the Proposal's
+> print block (gap 10 would jump them to the line's fix), and a "priced on
+> this bid" marker on the line. Quote items (§ 8) may still want their own
+> column — decide there.
 
 > **2026-10-05:** quote items (references/quote-items-plan.md § 8) need the
 > SAME per-bid price column as this item (`bidUnitCost`). Build it once:

@@ -42,6 +42,7 @@ import {
   ChevronDown,
   X,
   Zap,
+  Wrench,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -95,6 +96,9 @@ import { describeLineMarkup } from "@shared/materialMarkup";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
+import { FixLinePanel } from "@/components/FixLinePanel";
+import { FixableLabel } from "@/components/FixableLabel";
+import { hasLineFixGap, lineFixGaps } from "@shared/lineFix";
 import { ExampleTags } from "@/components/ExampleTags";
 import { exampleSummary, exampleWarning } from "@shared/exampleTags";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
@@ -289,6 +293,10 @@ export default function BidsPage({
     (label: string) => unitStates.find(s => s.label === label),
     [unitStates]
   );
+
+  /** The one line whose "fix this line" panel is open (gap 11). */
+  const [fixingLineId, setFixingLineId] = useState<number | null>(null);
+  const closeFix = useCallback(() => setFixingLineId(null), []);
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
@@ -1058,6 +1066,21 @@ export default function BidsPage({
                         line,
                         bid.quantitiesLockedAt
                       );
+                      /*
+                        An assembly or run line with something missing gets
+                        "Fix", and its amber labels open the same panel — the
+                        fix is ON the line, never "go to the Library and add
+                        it again" (never-stuck-plan.md, gap 11). A hand-priced
+                        line already has its own fields; a line the engine
+                        refused says why instead.
+                      */
+                      const fixable =
+                        !canPriceByHand(line) &&
+                        line.breakdown !== null &&
+                        hasLineFixGap(lineFixGaps(line));
+                      const openFix = fixable
+                        ? () => setFixingLineId(line.id)
+                        : undefined;
                       return (
                         <div
                           key={line.id}
@@ -1189,6 +1212,31 @@ export default function BidsPage({
                                 })}
                               </div>
                             ) : null}
+                            {fixable && fixingLineId !== line.id ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-1 h-7 px-2 text-xs border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518]"
+                                onClick={openFix}
+                              >
+                                <Wrench className="w-3.5 h-3.5 mr-1" />
+                                Fix this line
+                              </Button>
+                            ) : null}
+                            {/* Open decides, not `fixable`: the save that
+                                fixes the line makes it unfixable, and the
+                                panel still has "Update N other lines?" to
+                                ask (seen on screen 2026-10-08 — the offer
+                                vanished with the panel). */}
+                            {fixingLineId === line.id &&
+                            !canPriceByHand(line) ? (
+                              <FixLinePanel
+                                bidId={bidId}
+                                line={line}
+                                onChanged={refresh}
+                                onClose={closeFix}
+                              />
+                            ) : null}
                           </div>
                           {/*
                           A from-plans line's quantity is not typeable, because
@@ -1266,15 +1314,21 @@ export default function BidsPage({
                                   priced", never "0 h" (owner, 2026-09-26) —
                                   the same words and colour as the cost cell. */}
                               {lineHoursUnset(line) ? (
-                                <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
+                                <FixableLabel
+                                  onFix={openFix}
+                                  className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
+                                >
                                   Not priced
-                                </span>
+                                </FixableLabel>
                               ) : lineHoursNotSet(line) ? (
                                 /* An assembly whose hours were not set when
                                    this line was added (D1): never "0 h". */
-                                <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
+                                <FixableLabel
+                                  onFix={openFix}
+                                  className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
+                                >
                                   Hours not set
-                                </span>
+                                </FixableLabel>
                               ) : line.takeoffRunTypeId !== null &&
                                 laborInRunRate(line.runMaterialRole) ? (
                                 /* A coupling, connector or strap: its labor is
@@ -1351,6 +1405,7 @@ export default function BidsPage({
                               */}
                               <LineCost
                                 line={line}
+                                onFix={openFix}
                                 className="md:w-24 text-right shrink-0"
                               />
                             </>
@@ -1605,10 +1660,10 @@ export default function BidsPage({
                     </span>{" "}
                     — the total above has{" "}
                     {materialMissing === 1 ? "its" : "their"} labor and none of{" "}
-                    {materialMissing === 1 ? "its" : "their"} material. Add the
-                    material to the assembly — or, if it has none on purpose,
-                    tick "Labor only" on the assembly — then remove the line and
-                    add the assembly again.
+                    {materialMissing === 1 ? "its" : "their"} material. Press
+                    &ldquo;Fix this line&rdquo; on the line to pick the material
+                    there — or, if it has none on purpose, tick &ldquo;Labor
+                    only&rdquo; on the assembly.
                   </p>
                 </div>
               )}
@@ -1623,8 +1678,8 @@ export default function BidsPage({
                     inside assembly lines that are otherwise priced — the
                     Materials total above leaves{" "}
                     {partsNotPriced === 1 ? "it" : "them"} out. A line keeps the
-                    price it was added with, so price the part on the Materials
-                    screen, then remove the line and add the assembly again.
+                    price it was added with, so press &ldquo;Fix this
+                    line&rdquo; on the line and type the price there.
                   </p>
                 </div>
               )}
@@ -1639,9 +1694,9 @@ export default function BidsPage({
                     </span>{" "}
                     — {hoursNotSet === 1 ? "its" : "their"} assembly had no
                     hours when added, so the Labor total above leaves{" "}
-                    {hoursNotSet === 1 ? "its" : "their"} labor out. Set the
-                    hours on the assembly, then remove the line and add the
-                    assembly again.
+                    {hoursNotSet === 1 ? "its" : "their"} labor out. Press
+                    &ldquo;Fix this line&rdquo; on the line and type the hours
+                    there.
                   </p>
                 </div>
               )}
@@ -1659,11 +1714,12 @@ export default function BidsPage({
                     from traced runs, and the part had no labor hours when sent,
                     so no labor for{" "}
                     {laborNotPricedFromPlans === 1 ? "it" : "them"} is in the
-                    total above. Set the hours on the Materials screen, then
-                    press Send again on the <PlansLink bidId={bidId} /> — it
-                    fills in labor on a line that has none, and never changes
-                    hours that are set. Couplings, connectors and straps never
-                    need hours here: the run&apos;s hours per foot pay for them.
+                    total above. Press &ldquo;Fix this line&rdquo; on the line
+                    and type the hours there — or set them on the Materials
+                    screen and press Send again on the{" "}
+                    <PlansLink bidId={bidId} />, which fills in labor on a line
+                    that has none. Couplings, connectors and straps never need
+                    hours here: the run&apos;s hours per foot pay for them.
                   </p>
                 </div>
               )}
@@ -1706,10 +1762,9 @@ export default function BidsPage({
                     </span>{" "}
                     — their hours are in the total above and their labor is
                     priced at $0. On a line priced by hand, pick who does the
-                    hours beside them. On an assembly line, give its role a rate
-                    in Labor Rates — or, if the assembly has no role, give it
-                    one in the Library — then re-add the line to pick the rate
-                    up.
+                    hours beside them. On an assembly line, press &ldquo;Fix
+                    this line&rdquo; and pick who does them. A role with no rate
+                    yet gets one in Labor Rates.
                   </p>
                 </div>
               )}

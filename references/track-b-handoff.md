@@ -1,6 +1,30 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, owner cover decisions + batch 3 (READ FIRST)
+## WHERE B STANDS — 2026-10-08, "fix this line" (gap 11) BUILT (READ FIRST)
+
+- **Built (c), the "fix this line" panel.** Assembly and run lines with a
+  gap show "Fix this line", and their amber words open it too. It prices $0
+  parts, picks a material for a line with none, sets hours, picks the role,
+  and prices or sets hours on a traced part. "Also save to my library" is ON
+  by default. Other lines are only offered. Locked, Won and Lost bids refuse
+  the line and still take the library half. No migration. Details, decisions
+  and gaps: todo.md § "Fix this line"; the plan's gap 11 note.
+- **Owner to confirm:** "sent" is read as Won or Lost, since the schema has
+  no Sent status (Active is still editable).
+- **Tests:** `server/fixLine.test.ts` (21) and
+  `client/src/lib/fixLineDraft.test.ts` (9), each guard seen red when
+  removed. On screen at 1536x864 and 820x1180, all pass; looking found one
+  fault (the "update other lines" offer vanished) and it is fixed.
+- **Gap 6.1 on staging (`fa0c697`):** sheet 1 drawn 1.51 s after picking a
+  6.6 MB set; the upload finished at 2.2 s. 0 MB pulled back.
+- **Local leftovers:** throwaway "B fix-line check …" bids, assemblies and
+  materials for user 1 in `bidrender_local_b_new` (local only). One more
+  `track-b-upload-*` account on staging.
+- **Next:** gap 10 (print block jumps to the line's fix) and the strips'
+  "Fix these" walk.
+- **State:** no migrations. No dev server running.
+
+## WHERE B STOOD — 2026-10-08, owner cover decisions + batch 3
 
 - **Cover decisions DONE (`efe06c6`).** Nylon stays. RS1/RS2: the BOX was
   wrong (no 2-gang power plate; RS1's 6/3 overfills a 1-gang box) → owner

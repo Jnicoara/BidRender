@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Fix a line right on the bid.** A line that says "Not priced", "Hours not
+  set" or "+ 1 part not priced" now has a "Fix this line" button. Type the
+  missing price or hours (or pick the material or the role) and only that
+  line changes. "Also save to my library" is ticked by default, so the next
+  bid isn't missing it too. Before this, the only fix was editing the
+  library, removing the line and adding it again. Locked, Won and Lost bids
+  keep their numbers; the panel says so and can still save to the library.
+
 - **The starter catalog follows the owner's catalog review.** 138 shipped
   items were withdrawn — all IMC and all 3-1/2" conduit and fittings, #14 to
   #10 bare copper, and unsized "generic" rows whose sized versions cover
