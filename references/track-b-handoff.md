@@ -33,6 +33,11 @@
   `beforeAll` closed the page mid-upload and the phone-panel test found an
   empty bid. Fixed in `e2e/smoke/helpers.ts` (waits for `confirmAttach`).
   Worth knowing generally: **a drawn sheet no longer means a saved set.**
+  **The smoke fix is NOT yet proven on staging:** the last local-dev run
+  (37873032008, `a748e96`) passed TEST, but deploy-staging was refused
+  ("staging has commits local-dev does not" — A's hand push for 0140), so
+  smoke did not run. First local-dev run after A reconciles staging must
+  show smoke green, the phone-panel test included.
 - **Next:** (c) the "fix this line" panel. Optional: staging timing of 6.1
   with `scripts/stagingUploadTiming.mts` once it is on staging.
 - **State:** no migrations. No dev server running.
