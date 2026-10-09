@@ -3,7 +3,8 @@
 **Status: plan only. Nothing here is built.** Written by Track C on
 `track-c` for two owner-approved additions. Same pattern as
 `per-foot-items-plan.md` (the per-foot plan), and it builds on that plan
-rather than re-deciding anything in it.
+rather than re-deciding anything in it. **The owner's answers to § 5 are
+recorded there (2026-10-09)**; build only once A's 0140 is on local-dev.
 
 **Read against:** local-dev `dda8e42` and Track A's in-progress branch
 `origin/a-catalog-review` (`87066f4`, migration 0140 + the owner's catalog
@@ -291,30 +292,57 @@ no migration.**
    are not tagged on A's branch — **owner call**: tag them Specialty too?
    That would sort them after Sch 40 in a search (good: "2 pvc" should lead
    with Sch 40) and changes no number. Not assumed here.
+   **ANSWERED (owner, 2026-10-09): no** — Sch 80 pipe and fittings are not
+   Specialty (§ 5, Q4).
 5. **Catalog row count.** A's branch: 1,824 → 1,793. This plan adds 9 and
    retires 1 → **1,801 active** if both land. A count is intent, not
    outcome: read it from the seed after building, and if it differs, stop
    and find out why.
 
-## 5. Open questions for the owner (none blocks the seed)
+## 5. Owner's answers (2026-10-09) — formerly "open questions"
 
-1. **500 clip spacing** — ships NULL ("not set"), as 700 (per-foot § 7 Q1
-   still open). One figure answers both if they share it.
-2. **Does 500 share fittings with 700 in your supply house?** Some Wiremold
-   fittings are sold for both series. This plan ships separate `, 500
-series` rows (simplest, mirrors 700). If they are the same part, say so
-   and they become one row per part named for both — a rename, not a
-   rebuild.
-3. **500 wire fill.** The type ships 2 #12 + ground (3 conductors), the
-   same as 700. 500 is the smaller channel — confirm 3 #12 is a fill you
-   would actually pull.
-4. **Tag Sch 80 pipe/fittings Specialty?** (§ 4 item 4.)
-5. **GR2 with a Sch 80 trench.** When the bid half lands (per-foot § 3d,
-   B's step 3), a traced Sch 80 trench covers GR2's TAPE (same tape row)
-   but NOT GR2's 2" Sch 40 pipe — different material, so GR2's 10 ft
-   "default length" pipe would stay on top. Either GR2 is Sch 40 by
-   definition (fine), or coverage should treat Sch 40/80 of one size as
-   the same pipe. Decide before B builds § 3d.
+All five answered by the owner on 2026-10-09. The original question is kept
+in one line under each answer so the next reader can see what was decided.
+
+1. **500 clip spacing: "not set", same as 700.** Ships NULL; the count
+   shows "not set" for both series. Also answers per-foot § 7 Q1 (700).
+   _Was: give a figure, or say "not set"._
+2. **500/700 fittings: separate rows, unless Wiremold's own catalog says a
+   fitting fits both.** Checked against legrand.us (Wiremold's maker) on
+   2026-10-08:
+   - **Series-specific, so separate rows (as § 2a plans):** flat elbow —
+     V511 is "500 Series", V711 is "700 Series"; inside (internal) elbow —
+     V517 is "500 Series", 717 is "700 Series".
+   - **Sold by Wiremold as "500/700" (fit both):** the 5711 internal TWIST
+     elbow, the V5783 / V5784 elbow box connectors, the 615 wire pulley.
+     **None of these is one of the nine rows § 2a adds**, so nothing merges.
+   - **Not checked part by part:** coupling, tee, entrance end fitting,
+     support clip, device box, device plate. They stay separate per the
+     owner's rule ("separate unless the catalog says both"). A distributor
+     listing calling a part "500/700" is NOT the catalog — one did for V517,
+     which Legrand's own page lists as 500 only.
+     _Was: does 500 share fittings with 700 in your supply house?_
+3. **500 run type: 2 #12 + ground only. No 3-wire version.** § 2b stands as
+   written; nothing else is seeded for 500.
+   _Was: confirm 3 #12 is a fill you would pull._
+4. **Sch 80 underground run types are NOT Specialty.** Their pipe and
+   fittings stay untagged (A's 0140 tags only the 2-1/2"–4" Sch 80 sweeps,
+   which the types do not count). § 4 item 4 is closed: tag nothing.
+   _Was: tag Sch 80 pipe/fittings Specialty?_
+5. **GR2 follows whatever pipe is traced, including Sch 80.** So a traced
+   Sch 80 trench covers GR2's pipe as well as its tape: when B builds
+   per-foot § 3d, coverage must treat a traced trench's pipe as GR2's pipe
+   whatever its schedule — matching on GR2's own 2" Sch 40 row would leave
+   GR2's 10 ft default pipe counted on top of a Sch 80 trench. Same answer
+   recorded at per-foot § 7 Q5.
+   _Was: is GR2 Sch 40 by definition, or does coverage treat Sch 40/80 as
+   one pipe?_
+
+**Still: build nothing from this plan until Track A's catalog job
+(`a-catalog-review`, 0140) is merged into local-dev** (owner, 2026-10-09).
+As of 2026-10-08 it IS merged (`origin/a-catalog-review` is an ancestor of
+`origin/local-dev` `91df8ea`, with `drizzle/0140_material_specialty.sql`),
+but nothing has been built; re-check § 4 against local-dev before starting.
 
 ## 6. Look at it (CLAUDE.md: not verified until somebody has looked)
 

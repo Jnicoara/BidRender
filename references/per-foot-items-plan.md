@@ -526,6 +526,8 @@ materialId, feet | notOnJob | clear })`, refused on a locked or sent bid
 1. **700 support clip spacing.** Ships NULL, which the count shows as "not
    set". Give a figure (or "per the manufacturer, N ft") and it goes on the
    raceway row.
+   **ANSWERED (owner, 2026-10-09): "not set"** — 700 stays NULL, and 500
+   ships NULL the same way (`sch80-and-500-plan.md` § 5, Q1).
 2. **Sch 80 underground types?** Not shipped; Sch 40 is the trench pipe.
    Say if risers or a spec need Sch 80 types too.
    **ANSWERED (owner, 2026-10-09): yes** — nine Sch 80 underground types,
@@ -541,6 +543,10 @@ materialId, feet | notOnJob | clear })`, refused on a locked or sent bid
 5. **GR2's elbow and connectors, and GR5's connectors, follow the traced
    pipe** (§ 3d). Assumed yes, because otherwise a traced trench counts them
    twice.
+   **ANSWERED (owner, 2026-10-09): yes, and GR2 follows WHATEVER pipe is
+   traced, Sch 80 included** — a traced Sch 80 trench covers GR2's pipe as
+   well as its tape. Recorded in `sch80-and-500-plan.md` § 5, Q5, which
+   says what that means for § 3d's coverage match.
 
 ## 8. Tests that must fail without it
 
