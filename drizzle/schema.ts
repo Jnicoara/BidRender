@@ -5433,6 +5433,32 @@ export type AiUsageDaily = typeof aiUsageDaily.$inferSelect;
 export type InsertAiUsageDaily = typeof aiUsageDaily.$inferInsert;
 
 /**
+ * Whether AI calls are being REFUSED on this server, for the admin AI screen
+ * (0141, 2026-10-09). ONE row, id 1 — a fact about the server's key, not
+ * about any company, so it carries no `userId` and is never scoped.
+ *
+ * Written by server/llm only: `refusedSince` is set by the first refusal
+ * (missing key, or a key Anthropic answers 401/403) and kept through later
+ * ones; the next call that works clears it. So "refused since <time>" is
+ * when the run of refusals STARTED, which is what the owner needs to know.
+ *
+ * Holds no key, no prompt and no user: the same privacy line as
+ * `ai_usage_daily`.
+ */
+export const aiServiceStatus = mysqlTable("ai_service_status", {
+  /** Always 1. */
+  id: int("id").primaryKey(),
+  /** NULL = calls are not being refused now. */
+  refusedSince: timestamp("refusedSince"),
+  lastRefusedAt: timestamp("lastRefusedAt"),
+  /** `no-key` | `key-refused` (server/llm/unavailable.ts). */
+  lastRefusalReason: varchar("lastRefusalReason", { length: 20 }),
+  lastWorkedAt: timestamp("lastWorkedAt"),
+});
+
+export type AiServiceStatus = typeof aiServiceStatus.$inferSelect;
+
+/**
  * Things on a bid the pricing engine could not price, one row per problem.
  *
  * Written by the rollup's callers (`recordPricingProblems`) whenever a bid is

@@ -988,6 +988,13 @@
       "when": 1789963000000,
       "tag": "0140_material_specialty",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "5",
+      "when": 1789963100000,
+      "tag": "0141_ai_service_status",
+      "breakpoints": true
     }
   ]
 }

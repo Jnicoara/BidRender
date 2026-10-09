@@ -1243,15 +1243,19 @@ Do not paste live's new key into staging to "keep it simple".
    — `builtAt` must be AFTER you pressed Save. (The key is read once per
    process, so a server that did not restart is still on the old key.)
 4. **Confirm AI works on staging** (password page first):
-   - Dashboard → "Ask where to find something" → type `where are labor
-rates`. **Pass:** an answer WITH a button that opens the labor rates
-     screen. **Fail:** "I'm not sure which screen you want…" — today that is
-     also what a refused key looks like (see "When the key is missing or
-     refused" below), so treat it as a fail and go to the logs.
-   - DigitalOcean → staging app → Runtime Logs, search `llm-`: a line
-     `[llm-cost] feature=navigation … cost=…` is the pass. A line
-     `[navigation] helper call failed: request rejected … 401
-authentication_error` means the key was refused — re-paste it.
+   - Dashboard → "Ask where to find something" → ask "where are labor
+     rates". **Pass:** an answer WITH a button that opens the labor rates
+     screen. **Fail:** "AI is unavailable right now. Every screen is in the
+     sidebar." — the key is missing or refused. (On code older than 0141,
+     which is LIVE until the next release, a refused key shows "I'm not sure
+     which screen you want…" instead; treat that as a fail too.)
+   - DigitalOcean → Runtime Logs, search `llm-`: `[llm-cost]
+feature=navigation … cost=…` is the pass. `[llm-unavailable]
+feature=navigation reason=key-refused` (or, on older code, `helper call
+failed … 401 authentication_error`) means the key was refused —
+     re-paste it.
+   - Admin → AI spend (from 0141): no amber "AI calls are being refused
+     since …" notice. It clears itself on the first call that works.
    - Anthropic console → API keys: the new key shows a recent "last used".
 5. Repeat steps 2–4 on the **live** app, at `https://bidridge.com`. Do it
    when nobody is mid-read in the plan viewer: the redeploy restarts the
@@ -1265,16 +1269,30 @@ authentication_error` means the key was refused — re-paste it.
 **When the key is missing or refused — what users see** (measured
 2026-10-09 with a refused key: the adapter raises `AuthenticationError`, 401,
 and every caller catches it). Nothing is written and no bid, quantity or
-price moves, so no $0 and no broken bid. The words:
+price moves, so no $0 and no broken bid.
 
-- Plan reader / sheet question / tie-break: "The plan reader could not be
-  reached. Nothing was changed — carry on marking by hand and try again
-  later." (true, but "later" does not help when the key is dead).
-- Alias suggestions: "Suggestions aren't available right now" (honest).
-- **Navigation helper: "I'm not sure which screen you want. Try naming what
-  you are trying to do…" — NOT honest**: it blames the question for a dead
-  key. Pinned on purpose by `server/navigation.test.ts` ("says nothing
-  alarming"). The fix is planned in `todo.md` (top), not built.
+**Since 0141 (2026-10-09; on staging, LIVE from the next release)** a
+missing key or a 401/403 is told apart from a failure that passes
+(`server/llm/unavailable.ts`, by the SDK's error type and status — never by
+the words), and every feature says so:
+
+- Navigation helper: "AI is unavailable right now. Every screen is in the
+  sidebar."
+- Plan reader: "AI is unavailable right now. Nothing was changed — carry on
+  marking by hand." Sheet question, tie-break and scan finds: the same
+  sentence with their own manual step. No "try again later".
+- Alias suggestions: "Suggestions aren't available right now" (unchanged).
+- Admin → AI spend: an amber "AI calls are being refused since <time>"
+  notice naming the fault (no key / key refused) and this section. Kept on
+  `ai_service_status` (0141, one row, no key text); the first call that
+  works clears it.
+
+A timeout, an overload or a bad reply still gets the old words ("could not
+be reached … try again later", "not sure which screen") — those pass.
+
+**Before 0141 (live today)** a dead key read "could not be reached … try
+again later" in the plan reader and, in the navigation helper, "I'm not sure
+which screen you want…" — which blamed the question (`todo.md`, done).
 
 ## 9. Storage needs a CORS rule, and without it no plan uploads — or views
 

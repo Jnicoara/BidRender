@@ -78,7 +78,14 @@ left out. One line per theme; the commits say the rest.
 - Reset page says a dead link is dead on open (`6518fc5`); reset logs why
   nothing was sent (`4a76181`); slow-request logging (`c0f7fbe`).
 
-## 3. Migrations a live release would run: 0105–0140 (36 files)
+## 3. Migrations a live release would run: 0105–0141 (37 files)
+
+> **Grew 2026-10-09 (later): 0141** (`0141_ai_service_status`, one new
+> table for "a dead AI key says so" — additive, on staging, `deploying.md`
+> § 11 "0141"). **Expect 37 applied, 142, matches, 176/176** (the table has
+> no foreign key). § 5e rehearsed 36; 0141 was rehearsed on staging's copy
+> only. The counts below that say 36 / 141 are the 0140 figures — read them
+> as 37 / 142. If what prints differs, stop and find out why.
 
 > **Grew again 2026-10-09 (session 25): 0140** (`0140_material_specialty`,
 > `materials.isSpecialty`, the owner's catalog review — additive, on
@@ -112,6 +119,7 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 | 0135–0138 | per-foot items M1–M4: `takeoff_run_type_extras`, `extra` role + `runExtraKey` key swap, `qtySource`, traced-part JSON           |
 | 0139      | `elbowFlat` appended to `bid_line_items.runMaterialRole` (the 700 flat elbow)                                                   |
 | 0140      | `materials.isSpecialty` — the catalog review's Specialty tag (sorts lower in search; no total reads it)                         |
+| 0141      | `ai_service_status` — one row: whether AI calls are being refused (dead key), for the admin AI screen                           |
 
 - **Expect: "Applied 36 migrations", then 141; a second run applies nothing;
   `schemaDrift` "matches"; foreign keys 176/176** (staging's number,

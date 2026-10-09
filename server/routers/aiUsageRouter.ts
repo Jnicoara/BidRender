@@ -59,9 +59,10 @@ export const aiUsageRouter = router({
     const now = new Date();
     const today = usageDay(now);
 
-    const [todayRows, monthRows] = await Promise.all([
+    const [todayRows, monthRows, status] = await Promise.all([
       db.getAiSpend(today, today),
       db.getAiSpend(monthStart(now), today),
+      db.getAiServiceStatus(),
     ]);
 
     const todayTotal = total(todayRows);
@@ -76,6 +77,19 @@ export const aiUsageRouter = router({
       monthFormatted: formatMicros(monthTotal.costMicros),
       /** Newest-first by spend, so the expensive feature is at the top. */
       monthByFeature: monthRows.sort((a, b) => b.costMicros - a.costMicros),
+      /**
+       * Whether calls are being REFUSED (0141): `refusedSince` set means a
+       * missing or refused key since then. Fields listed, not spread — a
+       * screen shows what it chose (CLAUDE.md).
+       */
+      service: status
+        ? {
+            refusedSince: status.refusedSince,
+            lastRefusedAt: status.lastRefusedAt,
+            lastRefusalReason: status.lastRefusalReason,
+            lastWorkedAt: status.lastWorkedAt,
+          }
+        : null,
     };
   }),
 });
