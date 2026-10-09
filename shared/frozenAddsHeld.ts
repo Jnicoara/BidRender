@@ -36,6 +36,8 @@ export const FROZEN_ADDS_SHIPPED_AS: Readonly<Record<string, string>> = {
   // Owner, 2026-10-08: 700 is one-piece raceway and its own run type; the
   // base row was renamed in place (per-foot-items-plan.md § 3c).
   "Surface raceway base, 700 series": "Surface raceway, 700 series",
+  // 500 the same way (owner, 2026-10-09; sch80-and-500-plan.md § 2a).
+  "Surface raceway base, 500 series": "Surface raceway, 500 series",
   // Owner's third answers, 2026-10-07: the variants carry "canless" so the
   // plain canless wafer leads a typed "6 wafer" (lighting.ts).
   ...Object.fromEntries(
@@ -110,6 +112,10 @@ export const FROZEN_ADDS_NOT_SEEDED: Readonly<Record<string, HeldAdd>> = {
   "Surface raceway cover, 700 series": {
     kind: "retired",
     why: "Owner, 2026-10-08: 700 is one-piece raceway and a run type of its own, so a separate cover row describes a part nobody buys. Shipped 2026-10-07 on staging only, retired 2026-10-08 (per-foot-items-plan.md § 3c).",
+  },
+  "Surface raceway cover, 500 series": {
+    kind: "retired",
+    why: "Owner, 2026-10-09: 500 is set up the same way as 700 — one-piece raceway and a run type of its own — so a separate cover row describes a part nobody buys. Shipped 2026-10-07 on staging only (sch80-and-500-plan.md § 2a).",
   },
   // The 18 frozen 3-1/2" adds (under their frozen names): shipped
   // 2026-10-07, retired with every 3-1/2" row in the catalog review.

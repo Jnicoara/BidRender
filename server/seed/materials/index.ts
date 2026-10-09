@@ -97,6 +97,9 @@ export const RETIRED_BASELINE_MATERIALS: string[] = [
   // describes a part nobody buys on its own. Retired, not deleted, so
   // anything already pointing at it still resolves. Staging-only row.
   "Surface raceway cover, 700 series",
+  // 500 the same way (owner, 2026-10-09; sch80-and-500-plan.md § 2a): its
+  // base row became "Surface raceway, 500 series". Staging-only row.
+  "Surface raceway cover, 500 series",
   // The owner's catalog review, 2026-10-08: #14/#12/#10 bare copper, the
   // generic EMT strap and three other generics, all 3-1/2" and all IMC,
   // six unused generic connectors and the unsized grounding bushing — 138

@@ -120,6 +120,8 @@ describe("the shipped run types after the review", () => {
       ['1/2" EMT, 2 #12 + ground', "#12 THHN green Copper"],
       ['3/4" EMT, 3 #12 + ground', "#12 THHN green Copper"],
       ["700 series surface raceway, 2 #12 + ground", "#12 THHN green Copper"],
+      // The 500 type, 2026-10-09 (sch80-and-500-plan.md § 2b): the same row.
+      ["500 series surface raceway, 2 #12 + ground", "#12 THHN green Copper"],
     ]);
     expect(shipped.has("#12 THHN green Copper")).toBe(true);
   });
@@ -131,15 +133,19 @@ describe("the shipped run types after the review", () => {
   });
 
   it('no longer ship the 3-1/2" underground type, and archive it where it exists', () => {
-    const label = undergroundRunTypeLabel('3-1/2"');
+    const label = undergroundRunTypeLabel('3-1/2"', "PVC Sch 40");
     expect(BASELINE_RUN_TYPES.map(t => t.label)).not.toContain(label);
     expect(RETIRED_BASELINE_RUN_TYPES).toEqual([
       { pathType: "conduit", label },
     ]);
-    // The other nine underground types stay.
+    // The other nine Sch 40 underground types stay (nine Sch 80 beside
+    // them since 2026-10-09, sch80-and-500-plan.md § 1 — never a 3-1/2").
     expect(
       BASELINE_RUN_TYPES.filter(t => t.label.endsWith(", underground"))
-    ).toHaveLength(9);
+    ).toHaveLength(18);
+    expect(BASELINE_RUN_TYPES.map(t => t.label)).not.toContain(
+      undergroundRunTypeLabel('3-1/2"', "PVC Sch 80")
+    );
   });
 });
 

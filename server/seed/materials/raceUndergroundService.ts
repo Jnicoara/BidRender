@@ -45,18 +45,28 @@ const sr = (unit: "each" | "foot", name: string, slang: string, d?: string) =>
   row("Surface Raceway", unit, name, `${slang} ${SR}`, d);
 
 export const SURFACE_RACEWAY: BaselineMaterial[] = [
-  sr(
-    "foot",
-    "Surface raceway base, 500 series",
-    "500 v500 small single channel base",
-    "The base half of two-piece raceway; the cover is its own row."
-  ),
-  sr(
-    "foot",
-    "Surface raceway cover, 500 series",
-    "500 v500 small snap on cover",
-    "The cover half of two-piece raceway; the base is its own row."
-  ),
+  /*
+    500 is set up the same way as 700 (owner, 2026-10-09;
+    references/sch80-and-500-plan.md § 2): one-piece raceway, ONE per-foot
+    row priced by its own run type. It was "Surface raceway base, 500 series"
+    (renamed in place, shared/renamedMaterials.ts AFTER_FREEZE) and the cover
+    row is retired (index.ts) — both staging-only, never live (0117).
+    Clip spacing ships NOT SET, as for 700 (plan § 5, Q1).
+  */
+  {
+    // "base" kept as a search word: the row's old name.
+    ...sr(
+      "foot",
+      "Surface raceway, 500 series",
+      "500 v500 small single channel base"
+    ),
+    raceway: {
+      stickLengthFeet: 10,
+      stickJoint: "coupling",
+      strapSpacingFeet: null,
+      strapFromBoxFeet: null,
+    },
+  },
   /*
     ONE per-foot row for 700, not base + cover (owner, 2026-10-08;
     references/per-foot-items-plan.md § 3c). 700 is one-piece raceway in the
@@ -157,6 +167,30 @@ export const SURFACE_RACEWAY: BaselineMaterial[] = [
     ] as const
   ).map(([part, slang]) => ({
     ...sr("each", `Surface raceway ${part}, 700 series`, `700 v700 ${slang}`),
+    jobKind: "commercial" as const,
+  })),
+  /*
+    The 500 run type's own parts (sch80-and-500-plan.md § 2a / § 7c): the
+    same seven fittings as 700 plus its device box and plate. SEPARATE rows
+    from 700's — Wiremold sells the flat and inside elbows per series, and
+    the owner's rule is separate unless the maker's catalog says a part fits
+    both (plan § 5, Q2). The names are what the fitting family builds for
+    "500", character for character.
+  */
+  ...(
+    [
+      ["coupling", "joiner splice connection"],
+      ["flat elbow", "90 ell flat turn"],
+      ["inside elbow", "90 ell internal corner"],
+      ["outside elbow", "90 ell external corner"],
+      ["tee", "t branch split"],
+      ["entrance end fitting", "entry feed start from wall box"],
+      ["support clip", "strap clamp mounting"],
+      ["device box", "shallow switch receptacle single gang one gang 1g"],
+      ["device plate", "faceplate cover outlet duplex single gang one gang 1g"],
+    ] as const
+  ).map(([part, slang]) => ({
+    ...sr("each", `Surface raceway ${part}, 500 series`, `500 v500 ${slang}`),
     jobKind: "commercial" as const,
   })),
 ];
