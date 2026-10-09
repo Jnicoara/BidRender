@@ -1,6 +1,35 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, "fix this line" (gap 11) BUILT (READ FIRST)
+## WHERE B STANDS — 2026-10-08, Won/Lost ask first + smoke race fixed (READ FIRST)
+
+- **Smoke (local-dev Gate 37879795728) FAILED at test 2**: after a first
+  upload the sheet list stayed on "Sheets appear here once the document
+  opens", so no "1/2 scaled". A real race from Gap 6.1, not the test:
+  `useMutation` takes new options in an effect, a parent's effects run after
+  its children's, and the viewer re-announces a just-attached set from its
+  own effect in the commit the row first appears — so `ensureSheets` ran
+  with the previous render's `onSuccess` (`doc` null) and the sheet-list
+  refresh was skipped. When the list's first read beat the insert, nothing
+  ever refetched it. A staging probe passed (the read lost the race that
+  time). Fix: `ensureSheets` refreshes by the id it SENT
+  (`TakeoffPage.tsx`). No vitest can reach this (component); **proof is the
+  next local-dev smoke run**: test 2 must be green.
+- **Owner decision, "Fix this line":** only a LOCKED bid refuses. Won/Lost
+  ask "This bid is marked Won/Lost. Changing it changes a price you may
+  have already sent. Change anyway?" (Continue / Cancel, focus on Cancel).
+  Server refuses until `changeClosedBid` is sent, so a forgotten question
+  cannot change a sent price. Tests: 6 changed/new in
+  `server/fixLine.test.ts`, all red on the old code (run in a HEAD worktree
+  with the new tests). On screen at 1536x864 and 820x1180: asked, Cancel kept
+  the typed value, Continue fixed the line ($63.99 → $83.49). Recorded in
+  todo.md and `references/never-stuck-plan.md`.
+- **Leftovers** listed in todo.md's staging-cleanup item: one more
+  `track-b-upload-*` account (the probe), and local-only "B fix-line
+  check" data plus local smoke account `b-smoke-local@example.test`
+  (`.env.test.local` in B's worktree, git-ignored, points at it).
+- **State:** no migrations. No dev server running.
+
+## WHERE B STOOD — 2026-10-08, "fix this line" (gap 11) BUILT
 
 - **Built (c), the "fix this line" panel.** Assembly and run lines with a
   gap show "Fix this line", and their amber words open it too. It prices $0

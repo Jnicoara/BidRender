@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Fixing a line on a Won or Lost bid now asks first instead of refusing.**
+  Only a locked bid refuses. On a Won or Lost bid, Save asks "Changing it
+  changes a price you may have already sent. Change anyway?" and changes
+  nothing unless you press Continue.
+- **Fixed: a freshly uploaded plan set could show no sheets.** Right after a
+  bid's first upload, the sheet list sometimes stayed on "Sheets appear here
+  once the document opens" and the scale was never read, until the page was
+  reloaded. The sheets are now always picked up once they are saved.
 - **Schedule 80 underground pipe and Wiremold 500 are ready to trace.**
   Nine "PVC Sch 80, underground" run types (one per size, each with its
   warning tape) sit in the same Underground fold as the Sch 40 ones, Sch 40

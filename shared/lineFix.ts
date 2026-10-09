@@ -17,9 +17,11 @@
  *   • MOVE ANYTHING ELSE. Other lines on this bid, and every other bid, keep
  *     their frozen numbers (the snapshot rule, CLAUDE.md § Architecture).
  *     Bringing other lines here up to date is its own, offered, action.
- *   • CHANGE A FIXED BID. A bid whose quantities are locked, or that is Won
- *     or Lost, refuses the line change and still takes the library change
- *     (`lineFixRefusal`).
+ *   • CHANGE A LOCKED BID. A bid whose quantities are locked refuses the
+ *     line change and still takes the library change (`lineFixRefusal`).
+ *   • CHANGE A WON OR LOST BID WITHOUT ASKING. It may already have gone to
+ *     the customer, so its line changes only after "Change anyway?"
+ *     (`lineFixClosedWarning`; owner, 2026-10-08).
  *
  * Pure, so the screen and the suite read one rule.
  */
@@ -33,25 +35,39 @@ import { laborInRunRate } from "./runFittings";
 /**
  * Why this bid's lines cannot be fixed in place, or null when they can.
  *
- * TWO reasons, and they are the two the app already treats as "this bid is
- * history": the QUANTITY LOCK (the estimator's own "this is what I sent",
- * `shared/quantityLock.ts`) and a Won or Lost status (the same test
- * `bids.get` uses to stop flagging older labor rates — "on a Won or Lost bid
- * an older rate is history, not a mistake"). There is no separate "sent"
- * status in the schema; Draft and Active are both still being priced.
+ * ONE reason: the QUANTITY LOCK, the estimator's own "this is what I sent"
+ * (`shared/quantityLock.ts`). The sentence says what still works, so the
+ * person is not stuck: the library half is still offered.
  *
- * Each sentence says what still works, so the person is not stuck: the
- * library half is still offered.
+ * Won and Lost refused here too in the first build (2026-10-08). The owner
+ * reversed that the same day: only a LOCKED bid refuses, and a Won or Lost
+ * one ASKS first — `lineFixClosedWarning` below. Draft and Active change
+ * without a question, as before.
  */
 export function lineFixRefusal(bid: {
-  status: string;
   quantitiesLockedAt: Date | string | null;
 }): string | null {
   if (bid.quantitiesLockedAt !== null) {
     return "This bid is locked, so its lines don't change. Fix it in your library for next time — or unlock the bid first.";
   }
+  return null;
+}
+
+/**
+ * The question a Won or Lost bid asks before a line changes, or null when it
+ * need not ask (owner, 2026-10-08). The server refuses the line change until
+ * the request says the person answered Continue (`changeClosedBid`), so a
+ * screen that forgets to ask cannot change a sent price quietly.
+ *
+ * A locked bid never asks: it refuses (`lineFixRefusal`), and that wins.
+ */
+export function lineFixClosedWarning(bid: {
+  status: string;
+  quantitiesLockedAt: Date | string | null;
+}): string | null {
+  if (bid.quantitiesLockedAt !== null) return null;
   if (bid.status === "Won" || bid.status === "Lost") {
-    return `This bid is marked ${bid.status}, so its prices are fixed. Fix it in your library for next time.`;
+    return `This bid is marked ${bid.status}. Changing it changes a price you may have already sent. Change anyway?`;
   }
   return null;
 }

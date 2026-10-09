@@ -341,8 +341,15 @@ itself is checked on staging at laptop and tablet sizes.
       > exists in `server/fixLine.test.ts` and was seen to go red with its
       > guard removed. Decisions made while building, for the owner to check:
       >
-      > - **"Sent" = Won or Lost**, plus the quantity lock. The schema has no
-      >   Sent status; Active is treated as still being priced.
+      > - ~~**"Sent" = Won or Lost**, plus the quantity lock.~~ **Overridden
+      >   by the owner, 2026-10-08:** only a LOCKED bid refuses a line
+      >   change. Won and Lost do NOT block on their own; Save first asks
+      >   "This bid is marked Won/Lost. Changing it changes a price you may
+      >   have already sent. Change anyway?" (Continue / Cancel), and the
+      >   server refuses until the request carries that answer
+      >   (`lineFixClosedWarning`, `changeClosedBid`). Active unchanged.
+      >   This also overrides item 4 above ("Sent and frozen bids never
+      >   change") for Won and Lost. todo.md § "Fix this line" says the same.
       > - **Not one transaction.** The library half goes through
       >   `materials.update` / `assemblies.update` by caller (same fork, same
       >   capability check), so everything is validated first, then the
