@@ -131,7 +131,7 @@ box, 700 series`. **Correction:** this line said DV34 then "seeds by
       throughout (stainless is still the owner's call). Nothing was missing
       from the catalog. `server/starterCoverSwaps.test.ts` (5, all red
       before). **Existing databases need `scripts/repairStarterCovers.mts
-    --apply` at the next release — TRACK A runs it** (staging, then live;
+  --apply` at the next release — TRACK A runs it** (staging, then live;
       the seeder never rewrites an existing starter): swaps a shared starter
       only if its lines are EXACTLY the old recipe, and unlike the LT1/LT2
       repair it DOES swap a forked one (the fork keeps its own lines; the
@@ -150,8 +150,8 @@ box, 700 series`. **Correction:** this line said DV34 then "seeds by
       the starter default. RS1/RS2: the BOX was the mismatch (no 2-gang
       power plate exists; RS1's 6/3 overfills any 1-gang box), so both moved
       to a 4-11/16" box + `4-11/16" square raised cover, 30A/50A power
-      receptacle` — owner chose this. RS13 is outdoor: + `Weatherproof
-      in-use cover, 30A/50A power receptacle`. Folded into the same repair
+    receptacle` — owner chose this. RS13 is outdoor: + `Weatherproof
+    in-use cover, 30A/50A power receptacle`. Folded into the same repair
       (`interim` in `starterCoverSwaps.ts` also catches a database that
       already ran the first swap). Staging copy (before-0139 + 0139): 48
       swapped, rerun 48 already, **all 732 bid totals unchanged**. Track A's
