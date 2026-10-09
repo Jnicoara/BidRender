@@ -2,7 +2,8 @@
  * THE PER-FOOT ITEMS PLAN'S SEED CONTENT (references/per-foot-items-plan.md
  * § 3b, 3c, 3e; owner 2026-10-08), built by Track A with M1–M4:
  *
- *   - ten underground PVC Sch 40 types, one per shipped size, no wire,
+ *   - nine underground PVC Sch 40 types (ten until the 2026-10-08 catalog
+ *     review withdrew 3-1/2"), one per shipped size, no wire,
  *     each carrying underground warning tape (flat, 1.0) — the ONLY shipped
  *     extra;
  *   - one 700 surface raceway type, priced from ONE per-foot row;
@@ -52,10 +53,10 @@ const underground = BASELINE_RUN_TYPES.filter(t =>
 );
 
 describe("the shipped underground run types", () => {
-  it("are one per PVC Sch 40 size the catalog ships — ten today", () => {
+  it("are one per PVC Sch 40 size the catalog ships — nine since the 2026-10-08 catalog review withdrew 3-1/2 inch", () => {
     // Built from sizesFor, so an eleventh PVC size ships its type with it.
     const sizes = sizesFor("PVC Sch 40");
-    expect(sizes).toHaveLength(10);
+    expect(sizes).toHaveLength(9);
     expect(underground.map(t => t.label)).toEqual(
       sizes.map(undergroundRunTypeLabel)
     );
@@ -93,11 +94,11 @@ describe("the shipped underground run types", () => {
     expect(others.filter(t => (t.extras ?? []).length > 0)).toEqual([]);
   });
 
-  it("the fold's test finds exactly the ten, and never a shop's own type", () => {
+  it("the fold's test finds exactly the nine, and never a shop's own type", () => {
     const folded = BASELINE_RUN_TYPES.filter(t =>
       isShippedUndergroundType({ isShipped: true, label: t.label })
     );
-    expect(folded).toHaveLength(10);
+    expect(folded).toHaveLength(9);
     expect(
       isShippedUndergroundType({
         isShipped: false,
@@ -116,7 +117,7 @@ describe("the 700 surface raceway", () => {
       conductorMaterialName: "#12 THHN Copper",
       conductorCount: 2,
       groundCount: 1,
-      groundMaterialName: "#12 bare solid Copper",
+      groundMaterialName: "#12 THHN green Copper",
     });
     expect(t?.extras ?? []).toEqual([]);
     expect(byName.get(RACEWAY_700)?.unitOfSale).toBe("foot");
@@ -147,7 +148,7 @@ describe("the 700 surface raceway", () => {
   it("every frozen add held as 'retired' really is on the retired list", () => {
     const retired = Object.entries(FROZEN_ADDS_NOT_SEEDED)
       .filter(([, held]) => held.kind === "retired")
-      .map(([name]) => name);
+      .map(([name, held]) => held.retiredAs ?? name);
     expect(retired.length).toBeGreaterThan(0);
     for (const name of retired)
       expect(RETIRED_BASELINE_MATERIALS, name).toContain(name);
@@ -207,7 +208,14 @@ async function shippedExtras() {
     )
     .leftJoin(materials, eq(materials.id, takeoffRunTypeExtras.materialId))
     .where(
-      and(isNull(takeoffRunTypeExtras.userId), isNull(takeoffRunTypes.userId))
+      and(
+        isNull(takeoffRunTypeExtras.userId),
+        isNull(takeoffRunTypes.userId),
+        // ACTIVE types: the 3-1/2" underground type is archived since the
+        // catalog review (2026-10-08) and keeps its tape row, so a run
+        // already traced under it still prices its tape.
+        eq(takeoffRunTypes.status, "active")
+      )
     );
 }
 

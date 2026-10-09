@@ -358,7 +358,7 @@ withDb("a run type's extras on a bid", () => {
   });
 
   it("the materials list orders the tape, through the bid's shared-trench answer", async () => {
-    const ug = await typeId(undergroundRunTypeLabel('3-1/2"'));
+    const ug = await typeId(undergroundRunTypeLabel('3"'));
     const at = await bidWithSheet();
     await trace(at, ug, straight(35));
     // Listed whether or not it was sent, like the fittings.

@@ -21,12 +21,11 @@ export const FROZEN_ADDS_SHIPPED_AS: Readonly<Record<string, string>> = {
   // The shipped riser strap's pattern, '2" riser strap' (duplicate pair the
   // owner settled "keep A").
   'Riser strap, 3"': '3" riser strap',
-  // 3-1/2" ships as a whole family, named by the family's own pattern
-  // (conduit.ts) — EMT connectors and couplings state their style, and every
-  // body is "<size> <raceway> <shape> conduit body".
-  '3-1/2" EMT connector': '3-1/2" EMT set-screw connector',
-  '3-1/2" EMT coupling': '3-1/2" EMT set-screw coupling',
-  'Conduit body, 3-1/2" LB': '3-1/2" EMT LB conduit body',
+  // (3-1/2" shipped as a whole family on 2026-10-07 and was withdrawn in the
+  // catalog review, 2026-10-08 — every 3-1/2" add is `retired` below.)
+  // The owner's catalog review, 2026-10-08: "pair (0-10V)" in the name.
+  "12/2 MC cable with 16/2 dimming Copper":
+    "12/2 MC cable with 16/2 dimming pair (0-10V) Copper",
   // Canless wafers are one family, every size named alike (lighting.ts):
   // the 4" and 6" are "… canless wafer LED downlight".
   '2" canless LED downlight': '2" canless wafer LED downlight',
@@ -57,6 +56,13 @@ export type HeldAdd = {
    */
   kind: "duplicate" | "declined" | "retired";
   why: string;
+  /**
+   * `retired` only: the name the add SHIPPED under before it was retired,
+   * where that differs from its frozen name — the name the retired list
+   * holds ('3-1/2" EMT connector' shipped as '3-1/2" EMT set-screw
+   * connector').
+   */
+  retiredAs?: string;
 };
 
 const DUP_WEATHERHEAD: HeldAdd = {
@@ -70,6 +76,18 @@ const DUP_SWEEP: HeldAdd = {
 const QO_ONLY: HeldAdd = {
   kind: "declined",
   why: 'Owner, 2026-10-07: "NO: the QO-only 60A/70A single-pole (keep off)". A one-maker part is a brand variant (CLAUDE.md § Brands); power.ts keeps them on the pricing sheet.',
+};
+
+const RETIRED_3_5: HeldAdd = {
+  kind: "retired",
+  why: "Owner's catalog review, 2026-10-08: every 3-1/2\" conduit row and fitting withdrawn (shared/catalogReview20261008.ts). Shipped 2026-10-07; retired, so anything pointing at it still resolves.",
+};
+
+/** The three 3-1/2" adds that shipped under their family's own pattern. */
+const RETIRED_3_5_AS: Readonly<Record<string, string>> = {
+  '3-1/2" EMT connector': '3-1/2" EMT set-screw connector',
+  '3-1/2" EMT coupling': '3-1/2" EMT set-screw coupling',
+  'Conduit body, 3-1/2" LB': '3-1/2" EMT LB conduit body',
 };
 
 export const FROZEN_ADDS_NOT_SEEDED: Readonly<Record<string, HeldAdd>> = {
@@ -93,4 +111,33 @@ export const FROZEN_ADDS_NOT_SEEDED: Readonly<Record<string, HeldAdd>> = {
     kind: "retired",
     why: "Owner, 2026-10-08: 700 is one-piece raceway and a run type of its own, so a separate cover row describes a part nobody buys. Shipped 2026-10-07 on staging only, retired 2026-10-08 (per-foot-items-plan.md § 3c).",
   },
+  // The 18 frozen 3-1/2" adds (under their frozen names): shipped
+  // 2026-10-07, retired with every 3-1/2" row in the catalog review.
+  ...Object.fromEntries(
+    [
+      '3-1/2" EMT',
+      '3-1/2" PVC Sch 40',
+      '3-1/2" EMT connector',
+      '3-1/2" EMT coupling',
+      'Conduit body, 3-1/2" LB',
+      '3-1/2" EMT 90-degree elbow',
+      '3-1/2" EMT 45-degree elbow',
+      '3-1/2" PVC Sch 40 connector',
+      '3-1/2" PVC Sch 40 coupling',
+      '3-1/2" PVC Sch 40 90-degree elbow',
+      '3-1/2" PVC Sch 40 45-degree elbow',
+      '3-1/2" PVC Sch 40 90-degree sweep, 24" radius',
+      '3-1/2" PVC Sch 40 90-degree sweep, 36" radius',
+      '3-1/2" EMT one-hole strap',
+      '3-1/2" PVC one-hole strap',
+      '3-1/2" conduit bushing',
+      '3-1/2" conduit locknut',
+      '3-1/2" strut conduit strap',
+    ].map(name => [
+      name,
+      RETIRED_3_5_AS[name]
+        ? { ...RETIRED_3_5, retiredAs: RETIRED_3_5_AS[name] }
+        : RETIRED_3_5,
+    ])
+  ),
 };

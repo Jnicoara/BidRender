@@ -12,6 +12,7 @@
 import { TRADE_SIZES } from "./tradeSizes";
 import { emtStyledFittingName } from "./runFittingMaterials";
 import { FROZEN_RENAMES_2026_10_07 } from "./frozenMaterialNames";
+import { CATALOG_REVIEW_RENAMES } from "./catalogReview20261008";
 
 /**
  * Baseline rows to rename in place, old name -> new name.
@@ -222,8 +223,17 @@ const AFTER_FREEZE: Record<string, string> = {
   "Surface raceway base, 700 series": "Surface raceway, 700 series",
 };
 
-/** Today's name for a name some rename above produced. */
-const latest = (name: string): string => AFTER_FREEZE[name] ?? name;
+/**
+ * Today's name for a name some rename above produced: the after-freeze
+ * renames, then the owner's catalog review of 2026-10-08
+ * (shared/catalogReview20261008.ts) — so "3-4 MC cable" goes STRAIGHT to
+ * "#3 4-conductor MC cable Copper", never via "#3/4".
+ */
+export const latestCatalogName = (name: string): string => {
+  const afterFreeze = AFTER_FREEZE[name] ?? name;
+  return CATALOG_REVIEW_RENAMES[afterFreeze] ?? afterFreeze;
+};
+const latest = latestCatalogName;
 
 export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   ...Object.fromEntries(
@@ -235,7 +245,10 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
   ...Object.fromEntries(
     Object.entries(FROZEN_FINAL).map(([from, to]) => [from, latest(to)])
   ),
-  ...AFTER_FREEZE,
+  ...Object.fromEntries(
+    Object.entries(AFTER_FREEZE).map(([from, to]) => [from, latest(to)])
+  ),
+  ...CATALOG_REVIEW_RENAMES,
 };
 
 /** An old spelling, normalised the way search ranking compares names. */

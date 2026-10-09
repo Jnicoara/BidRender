@@ -697,13 +697,8 @@ export const LIGHTING: BaselineMaterial[] = [
     name: "Surface-mount ceiling fixture",
     searchAliases: aliases("flush mount drum dome closet utility round led"),
   },
-  {
-    ...fixture,
-    name: "Wall pack",
-    searchAliases: aliases(
-      "wallpack exterior building mounted security dusk dawn led outdoor"
-    ),
-  },
+  // The unsized "Wall pack" stood here until the owner's catalog review,
+  // 2026-10-08: retired in favour of the mini, large and full-cutoff rows.
   {
     ...fixture,
     name: "Flood light",

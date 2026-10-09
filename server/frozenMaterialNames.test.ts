@@ -28,18 +28,33 @@ import {
   FROZEN_ADDS_SHIPPED_AS,
 } from "../shared/frozenAddsHeld";
 import frozenJson from "../pricing/frozen-names.json";
+import { latestCatalogName } from "../shared/renamedMaterials";
+import {
+  CATALOG_REVIEW_RENAMES,
+  CATALOG_REVIEW_RETIRED,
+} from "../shared/catalogReview20261008";
 
 const shippedNames = BASELINE_MATERIALS.map(m => m.name);
 const shipped = new Set(shippedNames);
+
+/*
+  The owner's catalog review (2026-10-08) came AFTER the freeze: it renamed
+  some frozen final names again ("#3/4 MC cable Copper" -> "#3 4-conductor
+  MC cable Copper") and retired others (#14/#12/#10 bare copper). So a frozen
+  final name is checked as what it became — never silently dropped: a
+  retired one must be on the review's retired list by name.
+*/
+const reviewRetired = new Set(CATALOG_REVIEW_RETIRED);
 
 describe("the frozen names (2026-10-07)", () => {
   it("are generated from pricing/frozen-names.json, unchanged", () => {
     expect(FROZEN_RENAMES_2026_10_07).toEqual(frozenJson.renames);
   });
 
-  it("are what the seed files ship", () => {
+  it("are what the seed files ship — as the catalog review left them", () => {
     const missing = FROZEN_RENAMES_2026_10_07.filter(
-      r => !shipped.has(r.final)
+      r =>
+        !shipped.has(latestCatalogName(r.final)) && !reviewRetired.has(r.final)
     );
     const stillOld = FROZEN_RENAMES_2026_10_07.filter(r =>
       shipped.has(r.current)
@@ -56,8 +71,30 @@ describe("the frozen names (2026-10-07)", () => {
 
   it("are applied by the seeder straight from the old name", () => {
     for (const { current, final } of FROZEN_RENAMES_2026_10_07) {
-      expect(RENAMED_BASELINE_MATERIALS[current], current).toBe(final);
+      expect(RENAMED_BASELINE_MATERIALS[current], current).toBe(
+        latestCatalogName(final)
+      );
     }
+  });
+
+  it("measured 2026-10-08: the catalog review renamed 2 frozen names again and retired 4", () => {
+    // If either count moves, a later decision touched a frozen name — find
+    // out which before trusting the pricing sheets built from these names.
+    expect(
+      FROZEN_RENAMES_2026_10_07.filter(r => r.final in CATALOG_REVIEW_RENAMES)
+        .map(r => r.final)
+        .sort()
+    ).toEqual(["#3/4 MC cable Copper", "3/3 MC cable Copper"]);
+    expect(
+      FROZEN_RENAMES_2026_10_07.filter(r => reviewRetired.has(r.final))
+        .map(r => r.final)
+        .sort()
+    ).toEqual([
+      "#10 bare solid Copper",
+      "#10 bare stranded Copper",
+      "#12 bare solid Copper",
+      "#14 bare solid Copper",
+    ]);
   });
 });
 
@@ -87,7 +124,9 @@ describe("the frozen ADDS (2026-10-07)", () => {
     }
   });
 
-  it("measured 2026-10-08: 153 adds = 142 shipped + 8 duplicates + 2 declined + 1 retired", () => {
+  it("measured 2026-10-08: 153 adds = 124 shipped + 8 duplicates + 2 declined + 19 retired", () => {
+    // 142 -> 124 later on 2026-10-08: the owner's catalog review withdrew
+    // every 3-1/2" row, 18 of them frozen adds (now `retired`).
     // 86 shipped on the first pass and 59 were held; the owner's second
     // answers shipped 57 of them and declined 2. If this count moves, a row
     // was seeded, held or dropped since — find out which before trusting the
@@ -100,10 +139,10 @@ describe("the frozen ADDS (2026-10-07)", () => {
     expect(adds).toHaveLength(153);
     expect(held.filter(h => h.kind === "duplicate")).toHaveLength(8);
     expect(held.filter(h => h.kind === "declined")).toHaveLength(2);
-    expect(held.filter(h => h.kind === "retired")).toHaveLength(1);
+    expect(held.filter(h => h.kind === "retired")).toHaveLength(19);
     expect(
       adds.filter(a => shipped.has(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name))
-    ).toHaveLength(142);
+    ).toHaveLength(124);
   });
 });
 
@@ -124,9 +163,15 @@ describe("the shipped run types", () => {
 });
 
 describe("the rename map", () => {
-  it("has no chains: every target is a name the catalog ships", () => {
+  it("has no chains: every target is a name the catalog ships, or one it retired", () => {
+    // A RETIRED target is allowed and needed: a database that missed the
+    // 2026-10-07 rename still holds "#14 bare CU, solid", which must rename
+    // into "#14 bare solid Copper" so the retire pass finds it by that name.
+    const retired = new Set(RETIRED_BASELINE_MATERIALS);
     const chained = Object.entries(RENAMED_BASELINE_MATERIALS).filter(
-      ([, to]) => to in RENAMED_BASELINE_MATERIALS || !shipped.has(to)
+      ([, to]) =>
+        to in RENAMED_BASELINE_MATERIALS ||
+        (!shipped.has(to) && !retired.has(to))
     );
     expect(chained).toEqual([]);
   });

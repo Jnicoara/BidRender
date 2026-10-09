@@ -133,7 +133,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     conductorMaterialName: "#12 THHN Copper",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 bare solid Copper",
+    groundMaterialName: "#12 THHN green Copper",
   },
   {
     label: '3/4" EMT, 3 #12 + ground',
@@ -142,7 +142,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     conductorMaterialName: "#12 THHN Copper",
     conductorCount: 3,
     groundCount: 1,
-    groundMaterialName: "#12 bare solid Copper",
+    groundMaterialName: "#12 THHN green Copper",
   },
   {
     label: "12-2 MC cable",
@@ -179,7 +179,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     conductorMaterialName: "#12 THHN Copper",
     conductorCount: 2,
     groundCount: 1,
-    groundMaterialName: "#12 bare solid Copper",
+    groundMaterialName: "#12 THHN green Copper",
   },
   /*
     Underground PVC, one per Sch 40 size the catalog ships (owner decision 3,
@@ -201,3 +201,35 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
     })
   ),
 ];
+
+/**
+ * Shipped run types withdrawn from the palette — ARCHIVED on the shipped row,
+ * never deleted, so a run already traced under one still resolves its type
+ * (getRunTypesFor reads archived rows for exactly that). Matched by
+ * `pathType:label`, the key the seed inserts under.
+ *
+ * Owner's catalog review, 2026-10-08: the 3-1/2" underground type went with
+ * its pipe (every 3-1/2" row was retired). It is no longer in
+ * BASELINE_RUN_TYPES, so a fresh database never gets it; this archives it on
+ * every database that already has it. A company's own copy is untouched.
+ */
+export const RETIRED_BASELINE_RUN_TYPES: readonly {
+  pathType: RunPathType;
+  label: string;
+}[] = [{ pathType: "conduit", label: undergroundRunTypeLabel('3-1/2"') }];
+
+/**
+ * Material links on SHIPPED run types to move from one shipped row to
+ * another, by exact name. The seed's other pass only fills a NULL link, so a
+ * changed `*MaterialName` above reaches a fresh database and nothing else —
+ * this is what moves an existing one.
+ *
+ * Only a link that still points at the `from` row is moved: a shipped type
+ * somebody re-pointed is left alone, and a company's own copy of a type is
+ * never in the pass (`userId` NULL only).
+ *
+ * Owner's catalog review, 2026-10-08: #12 bare copper was retired, and the
+ * three "#12 + ground" types now pull a green #12 THHN as their ground.
+ */
+export const RUN_TYPE_MATERIAL_SWAPS: readonly { from: string; to: string }[] =
+  [{ from: "#12 bare solid Copper", to: "#12 THHN green Copper" }];

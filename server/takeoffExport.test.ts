@@ -785,7 +785,7 @@ describe.skipIf(!hasDb)("the export against a real bid", () => {
       racewayMaterialId: await priced('1/2" EMT', 1.25),
       conductorMaterialId: await priced("#12 THHN Copper", 0.18),
       conductorCount: 2,
-      groundMaterialId: await priced("#12 bare solid Copper", 0.12),
+      groundMaterialId: await priced("#12 THHN green Copper", 0.12),
       groundCount: 1,
     });
     await caller().takeoffRuns.save({

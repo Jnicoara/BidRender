@@ -182,7 +182,7 @@ async function scenario() {
     racewayMaterialId: id('1/2" EMT'),
     conductorMaterialId: id("#12 THHN Copper"),
     conductorCount: 2,
-    groundMaterialId: id("#12 bare solid Copper"),
+    groundMaterialId: id("#12 THHN green Copper"),
     groundCount: 1,
   });
   const trace = (traceMode?: "quantity", runTypeId: number = type.id) =>
@@ -383,12 +383,12 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
       conductorMaterialId: id("#6 THHN Copper"),
       conductorCount: 2,
       emptyPipe: false,
-      groundMaterialId: id("#10 bare solid Copper"),
+      groundMaterialId: id("#8 bare solid Copper"),
     });
     const ground = (await t.bridgeFor(t.run.id)).rows.find(
       r => r.role === "ground"
     )!;
-    expect(ground.materialName).toBe("#10 bare solid Copper");
+    expect(ground.materialName).toBe("#8 bare solid Copper");
     expect(ground.feet).toBeGreaterThan(0);
     expect(ground.sendable).toEqual({ ok: true });
   });

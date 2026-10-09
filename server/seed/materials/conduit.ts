@@ -104,16 +104,13 @@ const FAMILIES: Family[] = [
       strapFromBoxFeet: 3,
     }),
   },
-  {
-    label: "IMC",
-    slang: "intermediate metal threaded galvanized galvanised",
-    raceway: () => ({
-      stickLengthFeet: 10,
-      stickJoint: "coupling_on_stick",
-      strapSpacingFeet: 10,
-      strapFromBoxFeet: 3,
-    }),
-  },
+  /*
+    IMC shipped here as a fifth family until the owner's catalog review,
+    2026-10-08, which withdrew all 90 rows — retired, not deleted, so
+    anything already pointing at one still resolves
+    (shared/catalogReview20261008.ts). The fitting lookup still knows IMC
+    (shared/runFittingMaterials.ts), for a company that adds its own.
+  */
 ];
 
 /**
@@ -189,7 +186,6 @@ const FITTINGS: { suffix: string; slang: string; description?: string }[] = [
  */
 const T_BODY_BRANDS: Record<string, string> = {
   "rigid conduit": "crouse hinds",
-  IMC: "crouse hinds",
   "PVC Sch 40": "carlon",
   "PVC Sch 80": "carlon",
 };
@@ -254,25 +250,20 @@ function fittingSlang(
 const PVC_LABELS = new Set(["PVC Sch 40", "PVC Sch 80"]);
 
 /*
-  3-1/2" is a full trade size for EMT and PVC Sch 40 since 2026-10-07 (owner:
-  "ship 3-1/2" as a full conduit size for EMT and PVC — elbows, bodies,
-  everything the tests require"). Not in TRADE_SIZES, because that list is
-  every family's, and rigid, IMC and Sch 80 do not ship it. Everything that
-  follows a raceway — its fittings, every body shape, straps, bushings,
-  locknuts, strut straps, Sch 40 sweeps — takes it from here.
+  3-1/2" was a full trade size for EMT and PVC Sch 40 from 2026-10-07 until
+  the owner's catalog review, 2026-10-08, which withdrew every 3-1/2" row —
+  33 of them, retired not deleted (shared/catalogReview20261008.ts) — and
+  the 3-1/2" underground run type with its pipe (baselineRunTypes.ts).
+  `sizesFor` stays the one place a family's sizes come from, so a size
+  that returns later comes back for every fitting at once.
 */
-const THREE_AND_A_HALF = '3-1/2"';
-const WITH_3_5 = new Set(["EMT", "PVC Sch 40", "PVC"]);
 /**
  * The sizes one family (or strap family) ships, in trade-size order.
  * Exported for the shipped underground run types (baselineRunTypes.ts): one
  * per PVC Sch 40 size, so a size added here ships its type too.
  */
-export function sizesFor(label: string): string[] {
-  const sizes: string[] = [...TRADE_SIZES];
-  if (WITH_3_5.has(label))
-    sizes.splice(sizes.indexOf('4"'), 0, THREE_AND_A_HALF);
-  return sizes;
+export function sizesFor(_label: string): string[] {
+  return [...TRADE_SIZES];
 }
 
 /**
@@ -299,10 +290,7 @@ const SWEEP_RADII = [24, 36] as const;
 const pvcSweeps: BaselineMaterial[] = FAMILIES.filter(f =>
   PVC_LABELS.has(f.label)
 ).flatMap(family =>
-  (family.label === "PVC Sch 40"
-    ? [...SWEEP_SIZES.slice(0, -1), THREE_AND_A_HALF, '4"']
-    : SWEEP_SIZES
-  ).flatMap(size =>
+  SWEEP_SIZES.flatMap(size =>
     SWEEP_ANGLES.flatMap(angle =>
       SWEEP_RADII.map(radius => ({
         name: sweepName(size, family.label, angle, radius),
@@ -414,7 +402,10 @@ const FLEX_FAMILIES = [
   },
   {
     label: "liquidtight flexible conduit",
-    slang: "lfmc sealtite seal tite liquid tight carflex whip wet",
+    // No "carflex" since 2026-10-08: Carflex is the NONMETALLIC liquidtight
+    // (LFNC), which ships as its own rows below, and this metal flex
+    // answered a Carflex search first (catalog review, § ADD 9).
+    slang: "lfmc sealtite seal tite liquid tight whip wet",
   },
 ];
 
@@ -455,17 +446,35 @@ const flex: BaselineMaterial[] = FLEX_FAMILIES.flatMap(family => [
  * raceway on the other side of them is, and shipping five identical locknuts
  * under five family names would be five rows for one part.
  */
-// Every size any raceway ships at — 3-1/2" included, for EMT and Sch 40.
+// Every size any raceway ships at.
+//
+// Bushings split into INSULATING and GROUNDING at every size (owner's
+// catalog review, 2026-10-08). The insulating row is the shipped
+// "conduit bushing" renamed in place — its search words already said
+// plastic and insulating — so PG2's 2" keeps its line; the grounding rows
+// are new, and replace the one unsized "Grounding bushing" (retired).
 const terminations: BaselineMaterial[] = [
   ...sizesFor("EMT").map(size => ({
-    name: `${size} conduit bushing`,
+    name: `${size} insulating bushing`,
     unitOfSale: "each" as const,
     costPerUnit: UNPRICED,
     category: "Conduit Fittings" as const,
     searchAliases: aliases(
       sizeAliases(size),
-      "plastic insulating insulated throat bushing"
+      "conduit plastic insulated throat"
     ),
+  })),
+  ...sizesFor("EMT").map(size => ({
+    name: `${size} grounding bushing`,
+    unitOfSale: "each" as const,
+    costPerUnit: UNPRICED,
+    category: "Conduit Fittings" as const,
+    searchAliases: aliases(
+      sizeAliases(size),
+      "conduit bonding insulated throat lug myers set screw"
+    ),
+    description: "Insulated throat with a bonding lug.",
+    jobKind: "both" as const,
   })),
   ...sizesFor("EMT").map(size => ({
     name: `${size} conduit locknut`,
@@ -530,6 +539,88 @@ const fit = (name: string, slang: string): BaselineMaterial => ({
   category: "Conduit Fittings",
   searchAliases: aliases("1/2 half inch", slang),
 });
+/**
+ * The sized fittings the owner's catalog review added, 2026-10-08 (§ ADD
+ * 5–9), each family carried up from the single 1/2" row the typical-job
+ * pass shipped. Names follow that row's pattern exactly, so the 1/2" and
+ * the new sizes read as one family: '3/4" PVC expansion fitting' beside
+ * '1/2" PVC expansion fitting' (the trade also says "expansion coupling",
+ * which is a search word on all six).
+ */
+function reviewFittings(): BaselineMaterial[] {
+  const sized = (
+    sizes: string[],
+    name: (size: string) => string,
+    slang: string,
+    jobKind: "residential" | "commercial" | "both",
+    unitOfSale: "each" | "foot" = "each",
+    category: "Conduit Fittings" | "Conduit" = "Conduit Fittings"
+  ): BaselineMaterial[] =>
+    sizes.map(size => ({
+      name: name(size),
+      unitOfSale,
+      costPerUnit: UNPRICED,
+      category,
+      searchAliases: aliases(sizeAliases(size), slang),
+      jobKind,
+    }));
+  const UP_TO_2 = ['3/4"', '1"', '1-1/4"', '1-1/2"', '2"'];
+  const LFNC = ['1/2"', '3/4"'];
+  const LFNC_SLANG =
+    "lfnc lfnc-b carflex nonmetallic non-metallic plastic liquid tight sealtite whip wet";
+  return [
+    ...sized(
+      UP_TO_2,
+      size => `${size} PVC expansion fitting`,
+      "expansion coupling joint thermal outdoor exposed schedule sch40 plastic",
+      "both"
+    ),
+    ...sized(
+      UP_TO_2,
+      size => `${size} PVC female adapter`,
+      "fa threaded schedule sch40 plastic transition",
+      "both"
+    ),
+    // Two-hole straps, the sizes a wall run is strapped in by hand. The
+    // "two-hole" words the retired generic "EMT strap" carried live here.
+    ...sized(
+      ['1/2"', '3/4"', '1"'],
+      size => `${size} EMT two-hole strap`,
+      "thinwall clamp conduit pipe hanger support minerallac",
+      "both"
+    ),
+    ...sized(
+      ['3/4"', '1"'],
+      size => `${size} liquidtight 90-degree connector`,
+      "lfmc sealtite seal tite 90 ell elbow angle rooftop unit condenser",
+      "commercial"
+    ),
+    // LFNC — nonmetallic liquidtight, "Carflex" at the counter. Its own
+    // rows, NOT a size of the metal "liquidtight flexible conduit" family,
+    // so the fitting lookup never buys metal flex fittings for it.
+    ...sized(
+      LFNC,
+      size => `${size} nonmetallic liquidtight conduit (LFNC)`,
+      LFNC_SLANG + " flex raceway",
+      "both",
+      "foot",
+      "Conduit"
+    ),
+    ...sized(
+      LFNC,
+      size => `${size} nonmetallic liquidtight connector`,
+      LFNC_SLANG + " straight fitting box",
+      "both"
+    ),
+    ...sized(
+      LFNC,
+      size => `${size} nonmetallic liquidtight 90-degree connector`,
+      LFNC_SLANG + " 90 ell elbow angle fitting box",
+      "both"
+    ),
+  ];
+}
+
 const typicalJobFittings: BaselineMaterial[] = [
   fit(
     '1/2" EMT insulated set-screw connector',
@@ -549,12 +640,13 @@ const typicalJobFittings: BaselineMaterial[] = [
   ),
   fit(
     '1/2" PVC expansion fitting',
-    "expansion joint thermal outdoor exposed schedule sch40 plastic"
+    "expansion coupling joint thermal outdoor exposed schedule sch40 plastic"
   ),
   fit(
     '1/2" EMT offset connector',
     "offset box connector surface mount thinwall"
   ),
+  ...reviewFittings(),
   {
     name: '3/8" FMC (reduced wall)',
     unitOfSale: "foot",
@@ -574,21 +666,8 @@ export const CONDUIT: BaselineMaterial[] = [
   ...terminations,
   ...weatherheads,
   ...typicalJobFittings,
-  {
-    // The plain wall strap, as distinct from the strut-mounted straps in
-    // strut.ts: this one screws to a surface, that one bolts to channel.
-    name: "EMT strap",
-    unitOfSale: "each",
-    costPerUnit: UNPRICED,
-    category: "Conduit Fittings",
-    // Hyphenated, one word each: aliases() drops a repeated word, so the
-    // spaced "one hole 1 hole two hole 2 hole" was stored as "one hole 1 two
-    // 2" and "2 hole strap" could not find it (count sweep, 2026-09-29).
-    searchAliases: aliases(
-      "one-hole 1-hole two-hole 2-hole hole conduit pipe clamp minerallac hanger"
-    ),
-    defaultQty: 3,
-  },
+  // The unsized "EMT strap" shipped here until the owner's catalog review,
+  // 2026-10-08: retired in favour of the sized one-hole and two-hole straps.
   {
     // Moved from the pricing sheet, 2026-09-25. Steps a knockout down to a
     // smaller fitting; sold as a pair in a set.

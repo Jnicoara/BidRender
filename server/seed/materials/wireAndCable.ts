@@ -65,7 +65,11 @@ function gaugeAliases(gauge: string): string {
   const bare = gauge.replace(/[#/]/g, "");
   return aliases(
     "awg gauge",
-    `${bare}ga`,
+    // "12ga" for a #12, but NOTHING for an aught: stripping "1/0" gave
+    // "10ga", so every 1/0, 2/0, 3/0 and 4/0 row answered "10ga" … "40ga"
+    // and a search for #10 could surface 1/0 wire (owner's catalog review,
+    // 2026-10-08, § 7). Nobody writes an aught in "ga".
+    gauge.includes("/0") ? "" : `${bare}ga`,
     // "1/0" is read aloud as "one aught" and typed both ways.
     gauge.includes("/0") ? "aught ought" : ""
   );
@@ -110,6 +114,28 @@ const copperThhn: BaselineMaterial[] = [
     searchAliases: aliases(gaugeAliases(gauge), BUILDING_WIRE),
     description: "Stranded. The solid version is a separate item.",
   })),
+  /*
+    The GREEN #12 — the equipment ground pulled in a conduit run. Added in
+    the owner's catalog review (2026-10-08) when #12 bare copper was
+    withdrawn: it is the ground the shipped "#12 + ground" run types name
+    now (baselineRunTypes.ts). Solid, like the #12 those types pull. Only
+    the green ships as its own row because it is the one a run type names;
+    other colors are bought on the plain row.
+  */
+  {
+    name: "#12 THHN green Copper",
+    unitOfSale: "foot" as const,
+    costPerUnit: UNPRICED,
+    category: "Wire & Cable" as const,
+    searchAliases: aliases(
+      gaugeAliases("#12"),
+      BUILDING_WIRE,
+      "solid ground grounding egc equipment bond"
+    ),
+    description:
+      "Solid, green insulation — the equipment ground in a conduit run.",
+    jobKind: "commercial" as const,
+  },
   ...COPPER_STRANDED.map(gauge => ({
     // Only 10 AWG needs the suffix — it is the single size stocked both ways.
     name:
@@ -189,8 +215,8 @@ const aluminumFeeder: BaselineMaterial[] = ALUMINUM_SIZES.map(size => {
 // ─── NM-B (Romex) ─────────────────────────────────────────────────────────────
 
 /**
- * Jacket colour is how NM-B gets called out on a job — "grab a roll of yellow"
- * — so every size carries its colour as slang. The colours are the NEC-era
+ * Jacket color is how NM-B gets called out on a job — "grab a roll of yellow"
+ * — so every size carries its color as slang. The colors are the NEC-era
  * industry convention: 14 white, 12 yellow, 10 orange, 8 and 6 black.
  */
 const NM_COLOURS: Record<string, string> = {
@@ -210,6 +236,8 @@ const NM_SIZES = [
   "10-3",
   "8-2",
   "8-3",
+  // 6/2 added in the owner's catalog review, 2026-10-08.
+  "6-2",
   "6-3",
 ];
 
@@ -228,6 +256,7 @@ const nmb: BaselineMaterial[] = NM_SIZES.map(size => {
       "nm nonmetallic sheathed house wire with ground",
       NM_COLOURS[gauge]
     ),
+    ...(size === "6-2" ? { jobKind: "residential" as const } : {}),
   };
 });
 
@@ -282,11 +311,12 @@ const MC_DESCRIPTIONS: Record<string, string> = {
 const mcCable: BaselineMaterial[] = [
   ...MC_SIZES.map(
     (size): BaselineMaterial => ({
-      // "#3/4", never "3/4": a #3 four-wire must not read as 3/4 inch (Q2d).
-      name:
-        size === "3-4"
-          ? "#3/4 MC cable Copper"
-          : `${slashed(size)} MC cable Copper`,
+      // A #3 says its conductor count in words — "#3 4-conductor", never
+      // "#3/4" or "3/3", which read as fractions (owner's catalog review,
+      // 2026-10-08; "#3/4" itself replaced "3-4" on Q2d, 2026-10-07).
+      name: size.startsWith("3-")
+        ? `#3 ${size.slice(2)}-conductor MC cable Copper`
+        : `${slashed(size)} MC cable Copper`,
       unitOfSale: "foot",
       costPerUnit: UNPRICED,
       category: "Wire & Cable",
@@ -295,6 +325,10 @@ const mcCable: BaselineMaterial[] = [
       // #3/4 row, which would answer a 3/4" conduit search.
       searchAliases: aliases(
         size,
+        // The #3 rows keep their 2026-10-07 spelling as a search word, so
+        // the old name still finds them — no more exposed to a 3/4" conduit
+        // search than that name itself was.
+        size === "3-4" ? "#3/4" : size === "3-3" ? "3/3" : "",
         "metal clad armored armoured bx flexible feeder"
       ),
       ...(MC_DESCRIPTIONS[size] ? { description: MC_DESCRIPTIONS[size] } : {}),
@@ -321,7 +355,15 @@ const mcCable: BaselineMaterial[] = [
 
 // ─── UF-B and fixture wire ────────────────────────────────────────────────────
 
-const ufb: BaselineMaterial[] = ["14-2", "12-2", "10-2", "8-2"].map(size => ({
+// 12/3 and 10/3 added in the owner's catalog review, 2026-10-08.
+const ufb: BaselineMaterial[] = [
+  "14-2",
+  "12-2",
+  "10-2",
+  "8-2",
+  "12-3",
+  "10-3",
+].map(size => ({
   name: `${slashed(size)} UF-B Copper`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
@@ -330,6 +372,7 @@ const ufb: BaselineMaterial[] = ["14-2", "12-2", "10-2", "8-2"].map(size => ({
     size,
     "underground feeder direct burial grey gray outdoor wet buried"
   ),
+  ...(size.endsWith("-3") ? { jobKind: "residential" as const } : {}),
 }));
 
 const fixtureWire: BaselineMaterial[] = ["#16", "#18"].map(gauge => ({
@@ -403,7 +446,9 @@ const typicalJobCable: BaselineMaterial[] = [
   {
     ...cable(
       "12-2",
-      "MC cable with 16/2 dimming",
+      // "pair (0-10V)" in the name since the owner's catalog review,
+      // 2026-10-08: the 16/2 is the dimming pair, not a second cable.
+      "MC cable with 16/2 dimming pair (0-10V)",
       "0-10v 0-10 dimming pair lighting retrofit mc lumi metal clad armored bx"
     ),
     description:
@@ -448,8 +493,13 @@ const equipmentCable: BaselineMaterial[] = [
 
 // ─── Bare copper ground ───────────────────────────────────────────────────────
 
+/*
+  #14, #12 and #10 bare (solid, and #10 stranded) were withdrawn in the
+  owner's catalog review, 2026-10-08 — retired, not deleted
+  (shared/catalogReview20261008.ts) — and #6 solid was added.
+*/
 const bareCopper: BaselineMaterial[] = [
-  ...["#14", "#12", "#10", "#8"].map(gauge => ({
+  ...["#8", "#6"].map(gauge => ({
     name: `${gauge} bare solid Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,
@@ -459,10 +509,13 @@ const bareCopper: BaselineMaterial[] = [
       gaugeAliases(gauge),
       "ground grounding earth bond bonding gec egc green",
       // #8 solid is what a pool or spa's equipotential bonding grid is run in.
-      gauge === "#8" ? "pool spa equipotential wire" : ""
+      gauge === "#8" ? "pool spa equipotential wire" : "",
+      // #6 solid is the electrode conductor to a ground rod.
+      gauge === "#6" ? "gec rod electrode" : ""
     ),
+    ...(gauge === "#6" ? { jobKind: "both" as const } : {}),
   })),
-  ...["#10", "#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(gauge => ({
+  ...["#8", "#6", "#4", "#2", "#1/0", "#2/0"].map(gauge => ({
     name: `${gaugeLabel(gauge)} bare stranded Copper`,
     unitOfSale: "foot" as const,
     costPerUnit: UNPRICED,

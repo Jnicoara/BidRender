@@ -191,6 +191,13 @@ function readSize(name: string): SizeKey | null {
     const key = conductor(hashedCable[1]);
     if (key) return { ...key, count: Number(hashedCable[2]) };
   }
+  // The same cable with its count in words — "#3 4-conductor MC cable
+  // Copper" (owner's catalog review, 2026-10-08), which replaced "#3/4".
+  const wordedCable = name.match(/^#(\d{1,2}) ([1-9])-conductor\s/);
+  if (wordedCable) {
+    const key = conductor(wordedCable[1]);
+    if (key) return { ...key, count: Number(wordedCable[2]) };
+  }
 
   // A hashed gauge — "#12 THHN", "#4/0 XHHW AL". Unambiguous.
   const hashed = name.match(/^#(\d{1,4}\/0|\d{1,4})(?![\d/])/);
@@ -398,6 +405,9 @@ const SIZE_PREFIXES: RegExp[] = [
   // MC cable Copper" (2026-10-07). Count 1–9 so "1/0" is not taken; the
   // lookahead keeps `1/2"` and tandem "15/20" out.
   /^#?\d{1,2}\/[1-9](?![\d/"])\s*/,
+  // A worded cable spec — "#3 4-conductor MC cable Copper" (2026-10-08).
+  // Before the hashed gauge, which would take only "#3".
+  /^#\d{1,2} [1-9]-conductor\s+/,
   // A hashed gauge — "#12 THHN".
   /^#\d{1,4}\s+/,
   // Raceway trade size or a plain measurement — "1-1/4\" EMT", "4\" square box".

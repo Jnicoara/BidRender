@@ -202,7 +202,12 @@ describe("rolling assemblies into one list", () => {
         count: 12,
         materials: [
           { name: "Duplex receptacle", unit: "each", category: null, qty: 1 },
-          { name: '4" square box', unit: "each", category: null, qty: 1 },
+          {
+            name: '4" square box, 1-1/2" deep',
+            unit: "each",
+            category: null,
+            qty: 1,
+          },
           { name: "#12 THHN", unit: "foot", category: null, qty: 25 },
         ],
       },
@@ -213,7 +218,7 @@ describe("rolling assemblies into one list", () => {
 
   it("sums the same material arriving from two different assemblies", () => {
     const box = {
-      name: '4" square box',
+      name: '4" square box, 1-1/2" deep',
       unit: "each" as const,
       category: null,
       qty: 1,

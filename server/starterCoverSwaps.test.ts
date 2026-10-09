@@ -67,7 +67,7 @@ describe("starter cover plates", () => {
     // never a 1-gang plate on a double-gang box (owner, 2026-10-08).
     for (const ref of ["RS1", "RS2"]) {
       const names = recipe(ref).map(l => starterPartName(l.part));
-      expect(names, ref).toContain('4-11/16" square box');
+      expect(names, ref).toContain('4-11/16" square box, 2-1/8" deep');
       expect(names, ref).not.toContain("Double-gang box");
       expect(covers(ref), ref).toEqual([
         '4-11/16" square raised cover, 30A/50A power receptacle',

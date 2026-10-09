@@ -153,9 +153,14 @@ describe("the cover family ships whole", () => {
   });
 
   it("is one row per plate: colors are search words, never rows", () => {
+    // Phase tape is the one shipped thing bought BY color — a red roll and
+    // a blue roll are two purchases — so its colors are rows on purpose
+    // (owner's catalog review, 2026-10-08). The rule is about plates.
     expect(
-      BASELINE_MATERIALS.filter(m =>
-        /\b(white|ivory|almond|black)\b/i.test(m.name)
+      BASELINE_MATERIALS.filter(
+        m =>
+          /\b(white|ivory|almond|black)\b/i.test(m.name) &&
+          !m.name.startsWith("Phase tape, ")
       ).map(m => m.name)
     ).toEqual([]);
     for (const name of FAMILY.filter(n => n.includes(", nylon"))) {

@@ -231,7 +231,8 @@ describe("against the real catalog", () => {
   it.each([
     ["3/4 rigid", "Conduit"],
     ["1 1/4 emt", "Conduit"],
-    ["2 inch imc", "Conduit"],
+    // IMC was retired 2026-10-08 (catalog review); rigid stands in.
+    ["2 inch rigid", "Conduit"],
     ["3 inch pvc", "Conduit"],
   ])("%s finds something on the %s shelf", (query, category) => {
     expect(hits(query, category).length).toBeGreaterThan(0);

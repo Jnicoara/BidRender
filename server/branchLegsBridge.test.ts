@@ -186,7 +186,7 @@ withDb("the preview counts a branched run as one network", () => {
     expect(byRole.get("teeBox")).toMatchObject({
       status: "counted",
       qty: 1,
-      materialName: '4" square box',
+      materialName: '4" square box, 1-1/2" deep',
     });
     expect(byRole.get("teeCover")).toMatchObject({
       qty: 1,
@@ -228,7 +228,7 @@ withDb("the preview counts a branched run as one network", () => {
 
 withDb("sent, marked up, locked and listed", () => {
   it("sends the tee box as an ordinary priced, marked-up line", async () => {
-    const box = await shipped('4" square box');
+    const box = await shipped('4" square box, 1-1/2" deep');
     await caller().materials.update({ id: box.id, costPerUnit: 3.2 });
     await caller().bids.setPricingDefaults({ materialMarkupPct: 0.3 });
 
@@ -300,7 +300,7 @@ withDb("sent, marked up, locked and listed", () => {
     const { bidId, sheetId } = await aBid();
     await branchedRun(bidId, sheetId, type.id);
     const doc = await caller().materialsList.get({ bidId });
-    const box = doc.entries.find(e => e.name === '4" square box');
+    const box = doc.entries.find(e => e.name === '4" square box, 1-1/2" deep');
     expect(box).toMatchObject({ qty: 1, unit: "each", category: "Boxes" });
     expect(
       doc.entries.find(e => e.name === '4" square blank cover')

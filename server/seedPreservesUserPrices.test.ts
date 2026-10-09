@@ -52,7 +52,7 @@ const caller = () =>
   } as unknown as TrpcContext);
 
 /** A shipped row every database has, whichever way the catalog grows. */
-const SHIPPED = "Wire nuts";
+const SHIPPED = "Wire nut, 22-8 AWG (tan/red)";
 
 beforeAll(async () => {
   if (!hasDb) return;
