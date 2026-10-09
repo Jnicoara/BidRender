@@ -15,8 +15,11 @@
  *   (stainless per recipe is the owner's call, todo.md).
  * - Single receptacles (RS17, CS5) get a single-receptacle plate; the
  *   twist-locks (CS6–8) a single-receptacle raised cover, not a duplex one.
- * - RS1 / RS2 / RS13 / MS12 had no cover and get one. RS13's in-use cover
- *   "if outdoor" is NOT added: the starter does not say it is outdoors.
+ * - RS1 / RS2 / RS13 / MS12 had no cover and get one. RS1 / RS2 also move
+ *   to a 4-11/16" box, and RS13 gets an in-use cover as well (both owner,
+ *   2026-10-08, after the first swap — see `interim`). This line used to say
+ *   RS13's in-use cover was not added because the starter did not say
+ *   outdoors; the owner says it is.
  * - DV34 was done earlier, as its own change; it is not here.
  *
  * A pair is matched by position: `was[i]` becomes `now[i]` on the same line,
@@ -33,9 +36,19 @@ export type StarterCoverSwap = {
   was: BaselineAssemblyMaterial[];
   /** The cover lines the seed recipe holds now. */
   now: BaselineAssemblyMaterial[];
+  /**
+   * The cover lines from the FIRST swap (7fb0c80, 2026-10-08) where a later
+   * owner decision changed them again — what a database seeded or repaired
+   * in between holds. Matched by position exactly like `was`.
+   */
+  interim?: BaselineAssemblyMaterial[];
 };
 
 const plate = p("wall-plate", 1);
+const powerCover = p(
+  "4-11-16in-square-raised-cover-30a-50a-power-receptacle",
+  1
+);
 const duplex = p("1-gang-wall-plate-duplex-nylon", 1);
 const toggle = p("1-gang-wall-plate-toggle-nylon", 1);
 const decorator = p("1-gang-wall-plate-decorator-nylon", 1);
@@ -125,17 +138,30 @@ export const STARTER_COVER_SWAPS: StarterCoverSwap[] = [
     [p("4in-square-raised-cover-duplex", 1)],
     [p("4in-square-raised-cover-single-receptacle", 1)]
   ),
-  // No cover at all.
-  ...swap(
-    ["RS1", "RS2"],
-    [],
-    [p("1-gang-wall-plate-30a-50a-power-receptacle-nylon", 1)]
-  ),
-  ...swap(
-    ["RS13"],
-    [],
-    [p("4-11-16in-square-raised-cover-30a-50a-power-receptacle", 1)]
-  ),
+  // No cover at all. RS1 / RS2 change their BOX too (owner, 2026-10-08):
+  // one power receptacle in a double-gang box had no plate that fits, and a
+  // 6/3 range circuit overfills any single-gang box — so the 4-11/16" box
+  // and raised cover RS13 already used. The first swap gave them a 1-gang
+  // plate on the double-gang box; that is the `interim` below.
+  ...["RS1", "RS2"].map(ref => ({
+    ref,
+    was: [p("double-gang-box", 1)],
+    interim: [
+      p("double-gang-box", 1),
+      p("1-gang-wall-plate-30a-50a-power-receptacle-nylon", 1),
+    ],
+    now: [p("4-11-16in-square-box", 1), powerCover],
+  })),
+  // Outdoor, so the in-use cover as well (owner, 2026-10-08).
+  {
+    ref: "RS13",
+    was: [],
+    interim: [powerCover],
+    now: [
+      powerCover,
+      p("weatherproof-in-use-cover-30a-50a-power-receptacle", 1),
+    ],
+  },
   ...swap(["MS12"], [], [duplex]),
 ];
 
@@ -150,14 +176,31 @@ export function wasRecipe(
   materials: readonly BaselineAssemblyMaterial[]
 ): BaselineAssemblyMaterial[] {
   const swap = STARTER_COVER_SWAPS.find(s => s.ref === ref);
-  if (!swap) return [...materials];
+  return swap ? undoSwap(swap.now, swap.was, materials) : [...materials];
+}
+
+/**
+ * The recipe as the FIRST swap left it, for a starter with an `interim`;
+ * null for the rest (their first swap is their current one).
+ */
+export function interimRecipe(
+  ref: string,
+  materials: readonly BaselineAssemblyMaterial[]
+): BaselineAssemblyMaterial[] | null {
+  const swap = STARTER_COVER_SWAPS.find(s => s.ref === ref);
+  return swap?.interim ? undoSwap(swap.now, swap.interim, materials) : null;
+}
+
+function undoSwap(
+  now: readonly BaselineAssemblyMaterial[],
+  from: readonly BaselineAssemblyMaterial[],
+  materials: readonly BaselineAssemblyMaterial[]
+): BaselineAssemblyMaterial[] {
   const out: BaselineAssemblyMaterial[] = [];
   for (const line of materials) {
-    const i = swap.now.findIndex(
-      n => n.part === line.part && n.qty === line.qty
-    );
+    const i = now.findIndex(n => n.part === line.part && n.qty === line.qty);
     if (i === -1) out.push(line);
-    else if (i < swap.was.length) out.push(swap.was[i]);
+    else if (i < from.length) out.push(from[i]);
   }
   return out;
 }

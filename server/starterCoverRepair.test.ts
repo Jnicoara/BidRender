@@ -23,7 +23,11 @@ import {
   users,
 } from "../drizzle/schema";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
-import { STARTER_COVER_SWAPS, wasRecipe } from "./seed/starterCoverSwaps";
+import {
+  STARTER_COVER_SWAPS,
+  interimRecipe,
+  wasRecipe,
+} from "./seed/starterCoverSwaps";
 import { starterPartName } from "./seed/starterParts";
 import type { BaselineAssemblyMaterial } from "./seed/assemblyRecipe";
 import { repairStarterCovers } from "./starterCoverRepair";
@@ -224,6 +228,34 @@ describe.skipIf(!hasDb)("the starter cover repair", () => {
     const results = await repairStarterCovers({ apply: true });
     expect(outcomes(results)).toEqual(new Set(["already has it"]));
     expect(await linesOf(ids.get("RS1")!)).toEqual(before);
+  });
+
+  it("moves a starter on the FIRST swap's recipe to the new box and covers", async () => {
+    // A database seeded or repaired between the two owner decisions holds
+    // RS1/RS2 with a 1-gang plate on a double-gang box, and RS13 with no
+    // in-use cover.
+    for (const ref of ["RS1", "RS2", "RS13"])
+      await setRecipe(ref, interimRecipe(ref, spec(ref).materials)!);
+    const boxLine = (await linesOf(ids.get("RS1")!))[0];
+    const results = await repairStarterCovers({ apply: true });
+    for (const ref of ["RS1", "RS2", "RS13"]) {
+      const r = results.find(x => x.ref === ref)!;
+      expect(r.outcome, ref).toBe("swapped");
+      expect(r.detail, ref).toMatch(/first cover swap/);
+      expect(await recipeOf(ids.get(ref)!), ref).toEqual(
+        asRecipe(spec(ref).materials)
+      );
+    }
+    expect(await recipeOf(ids.get("RS1")!)).not.toContain(
+      "Double-gang box|1.0000|false"
+    );
+    expect(await recipeOf(ids.get("RS13")!)).toContain(
+      "Weatherproof in-use cover, 30A/50A power receptacle|1.0000|false"
+    );
+    // The box changed on its own line rather than being dropped and added.
+    const after = await linesOf(ids.get("RS1")!);
+    expect(after[0].id).toBe(boxLine.id);
+    expect(after[0].materialId).not.toBe(boxLine.materialId);
   });
 
   it("skips a shared row somebody edited", async () => {

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **The range and dryer starters now use a box their cover fits, and the
+  outdoor 14-50 gets an in-use cover.** The range and dryer had been given
+  a one-gang plate on a two-gang box; they now use a 4-11/16" box with the
+  raised cover made for a 30A/50A receptacle (a 50A range circuit is too
+  much wire for a one-gang box anyway). The EV/RV 14-50 starter adds the
+  weatherproof in-use ("bubble") cover. Existing databases get this from the
+  same repair script at the next release; all 732 bids on a copy of staging
+  kept their totals.
 - **Starter assemblies now carry the right cover plate.** Receptacles get a
   duplex plate, switches a toggle plate, and GFCI, AFCI, USB, dimmer,
   sensor, timer and fan-control devices a decorator plate, in place of the

@@ -353,6 +353,8 @@ export const STARTER_PARTS = {
   "water-pipe-bonding-clamp": "Water pipe bonding clamp",
   "weatherproof-in-use-cover": "Weatherproof in-use cover",
   "weatherproof-in-use-cover-2-gang": "Weatherproof in-use cover, 2-gang",
+  "weatherproof-in-use-cover-30a-50a-power-receptacle":
+    "Weatherproof in-use cover, 30A/50A power receptacle",
   "well-pump-control-box": "Well pump control box",
   "well-pump-pressure-switch": "Well pump pressure switch",
   "whole-house-surge-protector": "Whole-house surge protector",
