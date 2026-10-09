@@ -407,4 +407,62 @@ withDb("two legend symbols on one assembly", () => {
     });
     expect(again.id).toBe(count.id);
   });
+
+  /*
+    Smoke flow 5, Gate 37970377380 (2026-10-09). The Legend shows a link the
+    moment it is picked, so the click that follows can reach forAssembly
+    before linkSymbol has written. The symbol was then dropped as unlinked,
+    and the assembly's ONE count — another item's — was handed back: the
+    pill stayed on "ci duplex" and the switch's marks would have gone into
+    the duplex count. Red without the `clickedFrom` rule in forAssembly.
+  */
+  it("a click that beats its symbol's link still reaches that symbol's own count", async () => {
+    const { bidId } = await aBid();
+    const assemblyId = await ownAssembly("Duplex receptacle");
+    // The flow's step 4: a plain count by the first symbol's name, linked
+    // to the assembly afterwards from the Counts tab.
+    await caller().takeoffStamps.captureSymbol({ label: "CI DUPLEX" });
+    const duplex = await caller().takeoffGroups.create({
+      bidId,
+      label: "CI DUPLEX",
+    });
+    await caller().takeoffGroups.setSource({ id: duplex.id, assemblyId });
+    // Step 5: the second symbol, its link still on the way.
+    const sw = await caller().takeoffStamps.captureSymbol({
+      label: "CI SWITCH",
+    });
+
+    const armed = await caller().takeoffGroups.forAssembly({
+      bidId,
+      assemblyId,
+      symbolId: sw.id,
+    });
+    expect(armed.id).not.toBe(duplex.id);
+    expect(armed.label).toBe("CI SWITCH");
+
+    // And once the link lands, the next click finds that same count.
+    await caller().takeoffStamps.linkSymbol({ id: sw.id, assemblyId });
+    const again = await caller().takeoffGroups.forAssembly({
+      bidId,
+      assemblyId,
+      symbolId: sw.id,
+    });
+    expect(again.id).toBe(armed.id);
+  });
+
+  it("a symbol linked to a DIFFERENT assembly still says nothing about this one", async () => {
+    const { bidId } = await aBid();
+    const assemblyId = await ownAssembly("Duplex receptacle");
+    const other = await ownAssembly("Switch");
+    const sw = await caller().takeoffStamps.captureSymbol({
+      label: "CI SWITCH",
+      assemblyId: other,
+    });
+    const armed = await caller().takeoffGroups.forAssembly({
+      bidId,
+      assemblyId,
+      symbolId: sw.id,
+    });
+    expect(armed.label).toBe("Duplex receptacle");
+  });
 });

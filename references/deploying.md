@@ -1715,6 +1715,9 @@ step 1, step 3 empty (§ 8a, `todo.md`). Migrated before the code.
    staging → Dashboard → ask "where are labor rates" → an answer with a
    button; then Admin → AI spend shows no amber notice, and the row reads
    `lastWorkedAt` set, `refusedSince` NULL.
+7. **PROVED by the owner (2026-10-09), on `679cce8`**: staging's Dashboard
+   helper answered, and Admin showed no amber notice. A real call through
+   staging's key works on the new code.
 
 **Live**: 0141 joins the next release's batch — 0105–0141, 37 files,
 expect 142 (`next-live-release-plan.md`).
@@ -2306,8 +2309,31 @@ start a server on that port, then `pnpm smoke`. A production build
 (`pnpm build && pnpm start`) is the closer match to staging — the new-version
 bar only exists in a build.
 
-**Artifacts stay credential-free on purpose.** The repo is public, so anyone
-can download a run's artifacts. Playwright TRACES record every request with
-headers and bodies — the passwords and the session — so traces and video are
-off (`e2e/playwright.config.ts`), and only failure screenshots are uploaded.
-Do not turn traces on in CI.
+**Artifacts never carry a credential in the clear.** The repo is public, so
+anyone can download a run's artifacts. Playwright TRACES record every request
+with headers and bodies — the passwords and the session.
+
+> **Changed 2026-10-09.** This said "traces off, do not turn them on in CI".
+> Flow test 5 then failed once with a screenshot as the only evidence, and the
+> cause (the click armed the WRONG count — a server answer, invisible in a
+> picture) took a session to find. So a FAILED test now keeps a trace
+> (`trace: "retain-on-failure"`), and the Gate SEALS it before upload:
+> `openssl` AES-256 with the passphrase **`SMOKE_STAGING_PASSWORD` followed
+> directly by `SMOKE_PASSWORD`** (no space). Anyone able to open it already
+> holds every credential inside it. The upload matches `*.png` and
+> `*.trace.enc` only, so a trace the seal step missed is never uploaded.
+> Video stays off.
+
+**Opening a sealed trace** — download the run's `smoke-failures` artifact,
+then, with both passwords from your password manager:
+
+```bash
+read -rs -p "staging password then smoke password, no space: " TRACE_KEY; export TRACE_KEY; echo
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:TRACE_KEY \
+  -in trace.trace.enc -out trace.zip
+unset TRACE_KEY
+npx playwright show-trace trace.zip
+```
+
+The decrypted `trace.zip` holds the session and both passwords: open it, then
+delete it. Never attach it to an issue or commit it.

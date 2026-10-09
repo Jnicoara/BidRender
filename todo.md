@@ -213,16 +213,38 @@ Not urgent if keys are created with no expiration, which is now the rule.
       a signed plan link is a bearer credential). **Which request hung is
       NOT known** (`trace: "off"`); if the warning names one, chase it.
       No warning in the next 4 runs (Gate 37970377380 and its 3 re-runs).
-- [ ] **Smoke flow test 5: a Legend click that did not arm, 2026-10-09.**
+- [x] **Smoke flow test 5: a Legend click that did not arm, 2026-10-09 —
+      FOUND AND FIXED (A, same day). A real wrong count, not a flaky test.**
       Gate 37970377380, smoke attempt 2, nothing deploying. "Link CI SWITCH"
       saved (the row shows Duplex receptacle standard), then
       `armFromLegend("CI SWITCH")` clicked the row and the pill stayed on
       "Counting ci duplex". The test's forced-race hook waits on the
       `bidridge:last-count:<bid>` write and timed out at 20 s. Passed in the
-      3 runs on either side. Cause NOT found (`trace: "off"`; the screenshot
-      is the only evidence). Not from Track B's changes, which touch neither
-      the legend nor arming. Needs whoever owns the legend; a trace
-      (`trace: "retain-on-failure"`) would name it next time.
+      3 runs on either side.
+      > **Cause:** the click DID arm — and the server handed back the DUPLEX
+      > count. The Legend shows a link the moment it is picked, so the click
+      > after "Link" can reach `takeoffGroups.forAssembly` before
+      > `linkSymbol` has written. `forAssembly` then dropped the symbol as
+      > unlinked, and with no symbol the assembly's ONE count (ci duplex,
+      > linked in step 4) was taken: the pill relabelled to "ci duplex" and
+      > the switch's marks would have gone into the duplex count, under its
+      > name, with nothing said. The screenshot hid it: the mouse's hover
+      > tint covers the armed row's yellow. **Fix:** a symbol linked to
+      > NOTHING yet is still the click's own (`clickedFrom` in
+      > `takeoffGroupsRouter.ts`); one linked to a different assembly is
+      > still ignored. `server/sharedAssemblyCounts.test.ts` (2 new) — red
+      > without it (the duplex count's id came back). **Forced in flow 5**:
+      > `linkSymbol` is held until `forAssembly` has answered, so this order
+      > happens every run; red without the fix locally with "the toolbar
+      > says Counting ci duplex" — the CI picture exactly. With the fix,
+      > local: flow 6 of 6, flow with +150 ms per request 2 of 2, touch on
+      > both tablet sizes 2 of 2. (At +400 ms and 200 KB/s the dev server's
+      > unbundled modules did not load test 1 inside 60 s, 3 of 3 — never
+      > reached the Legend; a throttle too heavy for dev mode, not this.)
+      > **Also:** the Legend's one silent no-op (a linked symbol whose
+      > assembly is not loaded) now says so in a toast. And a failed smoke
+      > test keeps a Playwright trace, sealed before upload (`gate.yml`,
+      > `deploying.md` § 12 says how to open one).
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the

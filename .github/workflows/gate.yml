@@ -236,17 +236,36 @@ jobs:
         if: steps.configured.outputs.ready == 'true'
         run: pnpm smoke
 
-      # Failure SCREENSHOTS only. The repo is public, so an artifact is
-      # readable by anyone: traces and videos are off in the config because
-      # they would carry the passwords and the session, and the session file
+      # A failed test keeps a Playwright TRACE (e2e/playwright.config.ts),
+      # and a trace carries the passwords and the session cookie. The repo is
+      # public, so an artifact is readable by anyone: each trace.zip is sealed
+      # here, with the smoke secrets as the passphrase — whoever can open it
+      # already holds everything inside it — and the plain file is deleted.
+      # The upload below matches *.png and *.trace.enc only, so a trace this
+      # step failed to seal is left behind, never uploaded. To open one:
+      # references/deploying.md § 12.
+      - name: Seal the failure traces
+        if: failure() && steps.configured.outputs.ready == 'true'
+        env:
+          TRACE_KEY: ${{ secrets.SMOKE_STAGING_PASSWORD }}${{ secrets.SMOKE_PASSWORD }}
+        run: |
+          find e2e/.results -name trace.zip -print0 2>/dev/null |
+            while IFS= read -r -d '' trace; do
+              openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+                -pass env:TRACE_KEY -in "$trace" -out "${trace%.zip}.trace.enc"
+              rm -f "$trace"
+            done
+
+      # Failure screenshots, and the SEALED traces only. The session file
       # (e2e/.auth/) is excluded here by name.
-      - name: Keep the failure screenshots
+      - name: Keep the failure screenshots and sealed traces
         if: failure() && steps.configured.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: smoke-failures
           path: |
             e2e/.results/**/*.png
+            e2e/.results/**/*.trace.enc
             !e2e/.auth/**
           retention-days: 7
           if-no-files-found: ignore
@@ -254,5 +273,6 @@ jobs:
           # and upload-artifact@v4 skips hidden paths by default — so until
           # 2026-10-06 this step never uploaded a single screenshot ("No files
           # were found"), and the one failure that needed a picture had none.
-          # The pattern is still .png only and e2e/.auth stays excluded.
+          # The patterns are .png and SEALED traces only (never a plain
+          # trace.zip), and e2e/.auth stays excluded.
           include-hidden-files: true

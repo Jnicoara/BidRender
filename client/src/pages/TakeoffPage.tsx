@@ -11955,7 +11955,14 @@ export default function TakeoffPage({
                         const assembly = allAssemblies.find(
                           a => a.id === symbol.assemblyId
                         );
-                        if (!assembly) return;
+                        // Never a click that silently does nothing: the
+                        // tool would stay on whatever was in hand before.
+                        if (!assembly) {
+                          toast.error(
+                            `Couldn't start counting ${symbol.label}: its assembly isn't loaded yet. Try again in a moment.`
+                          );
+                          return;
+                        }
                         // The symbol goes too: several symbols sharing one
                         // assembly each count into their own count (§ 11.2).
                         // Armed at once; clicks before the count exists are

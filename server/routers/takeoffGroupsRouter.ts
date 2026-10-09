@@ -437,14 +437,29 @@ export const takeoffGroupsRouter = router({
           message: "Assembly not found.",
         });
 
-      // A symbol linked to some OTHER assembly says nothing about this one.
       const symbol = input.symbolId
         ? await db.getSymbolLinkById(input.symbolId, ctx.scope.dataUserId)
         : undefined;
+      /*
+        A symbol linked to some OTHER assembly says nothing about this one.
+        A symbol linked to NOTHING yet is still the click's own, and must be
+        kept. The Legend links optimistically, so a click straight after
+        "Link" can arrive here before `linkSymbol` has written. Until
+        2026-10-09 that symbol was dropped as unlinked, and with no symbol
+        the assembly's one existing count was taken: the second item's marks
+        went into the FIRST item's count, under its name, with nothing said
+        (smoke flow 5, Gate 37970377380 — the pill stayed on "ci duplex").
+        `server/sharedAssemblyCounts.test.ts` goes red without this.
+      */
+      const clickedFrom =
+        symbol &&
+        (symbol.assemblyId === assembly.id || symbol.assemblyId === null)
+          ? symbol
+          : null;
 
       // Shared with the plan reader's Place, so both reach the same count.
       return groupForAssembly(input.bidId, ctx.scope.dataUserId, assembly, {
-        symbol: symbol?.assemblyId === assembly.id ? symbol : null,
+        symbol: clickedFrom,
         ifSeveral: input.ifSeveral,
       });
     }),

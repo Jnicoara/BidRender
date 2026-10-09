@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **Fixed: clicking a legend symbol right after linking it could count into
+  the WRONG item.** When two symbols share one assembly (say a duplex and a
+  switch both priced as one receptacle), a click straight after "Link" could
+  arrive before the link had saved, and the app then kept counting the first
+  symbol instead — its marks under the other item's name, with nothing said.
+  Each symbol now always gets its own count. A legend click that cannot start
+  counting now says so instead of doing nothing.
+
 - **Fixed for good: a freshly uploaded plan set could still show no
   sheets.** Yesterday's fix caught one way it happened; a second way, about
   one upload in six on staging, left the sheet list empty until a reload.

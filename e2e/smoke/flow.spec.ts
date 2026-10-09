@@ -220,6 +220,29 @@ test("4. 8a: a legend click counts with no assembly; Link assembly keeps every m
 });
 
 test("5. a second symbol on the SAME assembly keeps its own count", async () => {
+  /*
+    FORCED: the click that arms CI SWITCH reaches the server BEFORE its link
+    has been written. The Legend shows a link the moment it is picked, so
+    that order is a real one, and until 2026-10-09 it armed the DUPLEX count
+    instead — the switch was dropped as unlinked and the assembly's one count
+    taken. Pill stuck on "ci duplex", the race hook below never firing: Gate
+    37970377380, smoke attempt 2. Holding the link until `forAssembly` has
+    answered makes that order happen every run (server/routers/
+    takeoffGroupsRouter.ts, `clickedFrom`). The hold gives up after 15 s so
+    a run that never sends `forAssembly` fails on the assertion, not here.
+  */
+  const linkHeld = async (route: Route) => {
+    await page
+      .waitForResponse(r => r.url().includes("takeoffGroups.forAssembly"), {
+        timeout: 15_000,
+      })
+      .catch(() => {});
+    await route.continue();
+  };
+  const isLink = (url: URL) =>
+    url.pathname.includes("takeoffStamps.linkSymbol");
+  await page.route(isLink, linkHeld);
+
   await page.getByRole("tab", { name: "Legend" }).click();
   await page
     .getByRole("button", { name: "Link CI SWITCH to an assembly" })
@@ -276,7 +299,20 @@ test("5. a second symbol on the SAME assembly keeps its own count", async () => 
         () => (window as unknown as { __raceFired?: boolean }).__raceFired
       )
     )
-    .toBe(true);
+    .toBe(true)
+    .catch(async (error: Error) => {
+      // Say which way it failed: the toolbar names the count that IS armed.
+      const pill = await page
+        .getByText(/^Counting /)
+        .first()
+        .textContent({ timeout: 1_000 })
+        .catch(() => null);
+      throw new Error(
+        `CI SWITCH never armed under its own name; the toolbar says ` +
+          `${pill ? `"${pill}"` : "nothing is armed"}.\n${error.message}`
+      );
+    });
+  await page.unroute(isLink, linkHeld);
   for (const at of SYMBOLS.switch.slice(1)) await placeAt(page, at);
   await expect.poll(marksOnSheet).toBe(6);
   await expect(thisSheetLine(page)).toContainText("2 items");
