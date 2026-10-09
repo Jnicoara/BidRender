@@ -1622,7 +1622,24 @@ types moved to #12 THHN green, the 3-1/2" underground type archived.
    before (781 bids, old code); **1 applied**, 141; re-run nothing;
    "matches", 176/176; site HTTP 200 on the old code; **781/781
    unchanged**.
-5. **Code**: see the line below this record (filled in when pushed).
+5. **Code** (2026-10-09, 02:53 UTC): `d36bfc9` pushed to `staging` by hand
+   (owner's yes); `/api/version` = `d36bfc9`. `bidTotals` before (old code,
+   789 bids) vs after (new code): **789/789 unchanged**; the only two
+   differences were bids 791–792, "CI smoke …", created between the reads.
+   `catalogRehearsal compare` on staging itself: **added 107, renamed 23,
+   retired 138, DELETED 0**, 1,793 active, 108 Specialty, old spellings 0,
+   duplicates 0, company rows unchanged, every reference identical except
+   `takeoff_run_types.groundMaterialId` — the intended swap, run types 1, 2
+   and 5 now on `#12 THHN green Copper`. Gate 37874094992 re-run on
+   `d36bfc9`: deploy-staging and smoke (96 passed) **green**.
+6. **Starter cover repair** (Track B's `scripts/repairStarterCovers.mts`,
+   right after the new code's first boot, as `next-live-release-plan.md`
+   § 4b orders it for live): backup
+   `staging-2026-10-09T02-58-38Z-before-cover-repair.sql` (73 tables); dry
+   run **48 would swap** (staging's starters were all still on the old
+   recipe — live's copy had 43 already); `--apply` **48 swapped**; re-run
+   **48 already has it**; `bidTotals` **794/794 unchanged** (bids 796–797,
+   "CI smoke …", created between the reads).
 
 **Live**: 0140 joins the batch — 0105–0140, 36 files, expect 141 and
 176/176 — and the live rehearsal must be re-run with the catalog review's

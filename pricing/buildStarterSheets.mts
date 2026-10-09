@@ -18,7 +18,8 @@
  *
  * Overwrites every file it builds. The versions it replaced (2026-10-01 and
  * -06) held no typed value — checked before the first rebuild, 2026-10-07: 0
- * pack prices, 0 hours. If a filled sheet is ever rebuilt, LOAD it first.
+ * pack prices, 0 hours. Since 2026-10-08 a filled sheet's values are carried
+ * over (below), so a rebuild no longer needs the sheet loaded first.
  *
  * ── Build ONE sheet: --only ─────────────────────────────────────────────────
  *   --only assembly-hours     (or prices, labor, brands; repeatable)
@@ -32,10 +33,41 @@
  * `git show <commit>:pricing/assembly-hours-starter.xlsx > old.xlsx`).
  * Without it the column stays blank: a rebuild cannot tell new from old on
  * its own, and marking everything would mark nothing.
+ *
+ * ── Every typed value is CARRIED OVER (owner's standing rule, 2026-10-08) ───
+ * Before writing anything it reads each file it is about to replace and
+ * carries every typed price and hours onto the rebuilt sheet BY ITEM KEY —
+ * the catalog name followed through the rename map, or the assembly Ref;
+ * never the row number or the old name (pricing/sheetCarryOver.ts). A
+ * renamed item keeps its value, a new item comes in blank, and a value for
+ * an item that no longer ships goes in pricing/dropped-values-<date>.tsv.
+ * It STOPS, writing nothing, if a value would be lost for an item that still
+ * exists (or that it cannot place). Each sheet is written to a temporary
+ * file, read back and checked value by value before it replaces the old
+ * one. `server/sheetCarryOver.test.ts` goes red if a typed value is lost.
  */
 import { createRequire } from "node:module";
+import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  RENAMED_BASELINE_MATERIALS,
+  RETIRED_BASELINE_MATERIALS,
+} from "../server/seed/materials";
+import {
+  type CarryPlan,
+  type SheetKind,
+  type TypedValues,
+  SHEET_SPECS,
+  assemblyResolver,
+  brandResolver,
+  droppedReport,
+  keyed,
+  lostValues,
+  materialResolver,
+  planCarryOver,
+  readTypedRows,
+} from "./sheetCarryOver";
 import {
   ASSEMBLY_COLUMNS,
   ASSEMBLY_HOURS_FILE,
@@ -90,6 +122,85 @@ const want = (s: (typeof SHEETS)[number]) =>
 const newSinceIdx = process.argv.indexOf("--new-since");
 const newSincePath = newSinceIdx >= 0 ? process.argv[newSinceIdx + 1] : null;
 
+// ── Carry-over: plan every sheet BEFORE writing any ─────────────────────────
+const SHEET_FILES: Record<SheetKind, [file: string, tab: string]> = {
+  prices: [PRICES_FILE, PRICE_SHEET],
+  labor: [LABOR_FILE, LABOR_SHEET],
+  brands: [BRANDS_FILE, BRAND_SHEET],
+  "assembly-hours": [ASSEMBLY_HOURS_FILE, ASSEMBLY_SHEET],
+};
+async function readTyped(file: string, kind: SheetKind) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(file);
+  const ws = wb.getWorksheet(SHEET_FILES[kind][1]);
+  if (!ws) throw new Error(`${file}: no "${SHEET_FILES[kind][1]}" tab`);
+  return readTypedRows(ws, SHEET_SPECS[kind], HEADER_ROW, FIRST_DATA_ROW);
+}
+const plans = new Map<SheetKind, CarryPlan>();
+for (const kind of SHEETS) {
+  if (!want(kind)) continue;
+  const file = path.join(HERE, SHEET_FILES[kind][0]);
+  if (!existsSync(file)) continue;
+  const { rows: old, extra } = await readTyped(file, kind);
+  const resolve =
+    kind === "assembly-hours"
+      ? assemblyResolver({
+          current: assembliesInSheetOrder().rows.map(a => ({
+            ref: a.ref,
+            name: a.name,
+            ...(a.held ? { refuses: `HELD now: ${a.held}` } : {}),
+          })),
+          oldNames: new Map(
+            [...extra].map(([ref, { Assembly }]) => [ref, Assembly])
+          ),
+        })
+      : kind === "brands"
+        ? brandResolver(
+            new Map(
+              brandVariants().kept.map(v => [
+                v.name,
+                { unit: v.parent.unitOfSale },
+              ])
+            )
+          )
+        : materialResolver({
+            current: new Map(
+              rows.map(m => [
+                m.name,
+                { unit: kind === "labor" ? hoursPer(m) : m.unitOfSale },
+              ])
+            ),
+            renamed: RENAMED_BASELINE_MATERIALS,
+            retired: RETIRED_BASELINE_MATERIALS,
+          });
+  plans.set(kind, planCarryOver(kind, old, resolve));
+}
+const stops = [...plans.values()].flatMap(p => p.stops);
+if (stops.length) {
+  console.error(
+    `STOPPED — ${stops.length} typed value(s) would be lost for an item that still exists, or one that cannot be placed. Nothing written:`
+  );
+  for (const s of stops)
+    console.error(
+      `  - ${s.sheet} row ${s.row} (${s.label}) ${JSON.stringify(s.values)}: ${s.why}`
+    );
+  process.exit(1);
+}
+for (const p of plans.values())
+  console.log(
+    `carry-over ${p.sheet}: ${p.carried.size} row(s) carried (${p.renamed.length} onto a renamed row), ${p.dropped.length} dropped (item no longer ships)`
+  );
+const carriedFor = (kind: SheetKind, key: string): TypedValues =>
+  plans.get(kind)?.carried.get(key) ?? {};
+/** Written to a temporary name; checked and moved into place at the end. */
+const pending: { kind: SheetKind; temp: string; out: string }[] = [];
+const tempFor = (out: string) => out.replace(/\.xlsx$/, ".rebuild-tmp.xlsx");
+async function stage(kind: SheetKind, wb: any, out: string) {
+  const temp = tempFor(out);
+  await wb.xlsx.writeFile(temp);
+  pending.push({ kind, temp, out });
+}
+
 function sheetWithHeader(
   wb: any,
   name: string,
@@ -119,6 +230,15 @@ function sheetWithHeader(
 }
 
 const col = (cols: readonly string[], name: string) => cols.indexOf(name) + 1;
+
+/** Write the carried typed values onto a rebuilt row, over any default. */
+function applyCarried(row: any, cols: readonly string[], v: TypedValues) {
+  for (const [field, value] of Object.entries(v)) {
+    const c = col(cols, field);
+    if (c < 1) throw new Error(`carried "${field}" has no column here`);
+    row.getCell(c).value = value;
+  }
+}
 const letter = (n: number) => String.fromCharCode(64 + n);
 
 function howTo(wb: any, lines: [string, string][]) {
@@ -163,6 +283,7 @@ if (want("prices")) {
     row.getCell(col(C, "Price per unit")).numFmt = "$#,##0.0000";
     row.getCell(col(C, "Pack price")).numFmt = "$#,##0.00";
     row.getCell(col(C, "Notes")).value = m.description ?? "";
+    applyCarried(row, C, carriedFor("prices", m.name));
     for (const k of ["Pack price", "Pack size", "Pack qty"])
       row.getCell(col(C, k)).fill = YELLOW;
     row.getCell(col(C, "Pack price")).dataValidation = {
@@ -209,7 +330,7 @@ if (want("prices")) {
     ],
   ]);
   const out = path.join(HERE, PRICES_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("prices", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${rows.length} rows`
   );
@@ -238,6 +359,7 @@ if (want("labor")) {
     row.getCell(col(C, "Hours per")).value = hoursPer(m);
     row.getCell(col(C, "MY HOURS")).fill = YELLOW;
     row.getCell(col(C, "Notes")).value = m.description ?? "";
+    applyCarried(row, C, carriedFor("labor", m.name));
     const bend = row.getCell(col(C, "Bend hours (raceway only)"));
     if (m.raceway) {
       raceways++;
@@ -280,7 +402,7 @@ if (want("labor")) {
     ],
   ]);
   const out = path.join(HERE, LABOR_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("labor", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${rows.length} rows (${raceways} raceways take bend hours)`
   );
@@ -319,6 +441,7 @@ if (want("brands")) {
     };
     row.getCell(col(C, "Price per unit")).numFmt = "$#,##0.0000";
     row.getCell(col(C, "Pack price")).numFmt = "$#,##0.00";
+    applyCarried(row, C, carriedFor("brands", v.name));
     for (const k of ["Pack price", "Pack size", "Pack qty"])
       row.getCell(col(C, k)).fill = YELLOW;
     row.getCell(col(C, "Pack price")).dataValidation = {
@@ -355,7 +478,7 @@ if (want("brands")) {
     ],
   ]);
   const out = path.join(HERE, BRANDS_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("brands", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${kept.length} rows (${dropped.length} left off — parent not shipped)`
   );
@@ -429,6 +552,7 @@ if (want("assembly-hours")) {
       return;
     }
     my.fill = YELLOW;
+    applyCarried(row, C, carriedFor("assembly-hours", a.ref));
     my.dataValidation = {
       type: "decimal",
       operator: "greaterThan",
@@ -475,8 +599,39 @@ if (want("assembly-hours")) {
     ],
   ]);
   const out = path.join(HERE, ASSEMBLY_HOURS_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("assembly-hours", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${assemblies.length} rows, ${previous ? `${newCount} NEW` : "new not marked"}, ${held.length} HELD (${held.map(a => a.ref).join(", ") || "none"}), ${notShipped.length} listed refs not shipped: ${notShipped.join(", ") || "none"}`
   );
 }
+
+// ── Check every carried value is IN the written file, then replace ──────────
+// Read back from the temporary file, not taken from the plan: a value the
+// plan carried and the workbook did not hold is exactly the loss this exists
+// to catch. Nothing is replaced unless every sheet passes.
+const lost: string[] = [];
+for (const p of pending) {
+  const plan = plans.get(p.kind);
+  if (!plan) continue;
+  lost.push(...lostValues(plan, keyed((await readTyped(p.temp, p.kind)).rows)));
+}
+if (lost.length) {
+  for (const p of pending) rmSync(p.temp, { force: true });
+  console.error(
+    `STOPPED — ${lost.length} typed value(s) missing from the rebuilt sheets. Nothing replaced:`
+  );
+  for (const l of lost) console.error(`  - ${l}`);
+  process.exit(1);
+}
+for (const p of pending) renameSync(p.temp, p.out);
+const report = droppedReport([...plans.values()]);
+if (report) {
+  const f = path.join(
+    HERE,
+    `dropped-values-${new Date().toISOString().slice(0, 10)}.tsv`
+  );
+  writeFileSync(f, report);
+  console.log(
+    `DROPPED VALUES (items no longer shipped) — read them: ${path.relative(process.cwd(), f)}`
+  );
+} else console.log("dropped values: none");
