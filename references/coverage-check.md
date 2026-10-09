@@ -166,3 +166,184 @@ panel and battery, recessed TV receptacle box, HDMI wall plate, keystone
 fan heater combo, emergency light, EMT compression connectors, tandem
 breakers. Search was by name in the seed dump; a row named some other way
 would have been missed.
+
+---
+
+# Wider coverage check — ten more jobs (2026-10-08, later)
+
+**List only, same rules as above.** Checked against `origin/local-dev` at
+`94471cc` (A's Sch 80/500 seed included): **183** starters, **1,801**
+catalog rows, counted from the seed. If either count reads differently when
+you use this, the seed has moved; re-check a row before building it. Nothing
+already on the first list is repeated here. Type: **R** residential, **C**
+commercial, **B** both.
+
+## Top 15 new missing assemblies (all ten jobs together)
+
+| #   | Assembly                                               | Type | Parts exist?                          | Y/N |
+| --- | ------------------------------------------------------ | ---- | ------------------------------------- | --- |
+| 1   | Equipment connection, hardwired (flex whip), 208/240V  | C    | Yes                                   |     |
+| 2   | Commercial Level 2 EV charger, 208V (pedestal or wall) | C    | Yes                                   |     |
+| 3   | Outdoor emergency service disconnect (NEC 230.85)      | R    | Yes                                   |     |
+| 4   | Apartment unit panel, 125A main-lug                    | R    | Yes                                   |     |
+| 5   | Overhead door operator connection                      | C    | Yes                                   |     |
+| 6   | Air compressor connection, 240V                        | B    | Yes                                   |     |
+| 7   | Welder / shop receptacle, 50A (NEMA 6-50)              | B    | **No: 6-50R**                         |     |
+| 8   | Wireless access point drop (ceiling)                   | C    | Yes                                   |     |
+| 9   | Bollard light                                          | C    | Yes                                   |     |
+| 10  | Manual transfer switch, 6–10 circuit                   | R    | Yes                                   |     |
+| 11  | EV-ready conduit stub (EV-capable space)               | B    | Yes                                   |     |
+| 12  | Multi-unit meter center                                | B    | **No: meter center rows**             |     |
+| 13  | Hospital-grade receptacle (exam / operatory)           | C    | **Partly: no healthcare (HCF) cable** |     |
+| 14  | 208V kitchen equipment receptacle, 30A (NEMA 6-30)     | C    | **No: 6-30R**                         |     |
+| 15  | Recessed clock receptacle (classroom)                  | C    | Yes                                   |     |
+
+The per-job tables below hold the full list, with each assembly's parts.
+
+## 4. Restaurant / coffee shop TI
+
+**Covered:** DV20–23 in MC, CS5 cooler, MH7/MH8 walk-in, CS15 hood shunt,
+MH9/MH10 exhaust and make-up air, MH5 RTU, CS3, CS4, CS7 L6-30, DV24 POS, CS1
+sign, LT19–25, LT27/LT28, CS11–14, MS6.
+
+| #   | Missing                                                 | Type | Parts it needs                                                                                           | Parts exist?                | Y/N |
+| --- | ------------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------- | --------------------------- | --- |
+| 1   | Equipment connection, hardwired (flex whip), 208/240V   | C    | 4" square box + blank cover, 1/2" FMC or liquidtight 6, connectors 2, #10 or #12 THHN 18, 2-Pole breaker | Yes                         |     |
+| 2   | 208V kitchen equipment receptacle, 30A (espresso, oven) | C    | 4" square box, raised cover single, **6-30R**, 10/2 MC 40, 30A 2-Pole breaker, MC connectors             | **No: 6-30R**               |     |
+| 3   | 50A equipment receptacle (NEMA 6-50)                    | C    | 4-11/16" box, raised cover, **6-50R**, 6/2 MC, 50A 2-Pole breaker                                        | **No: 6-50R**               |     |
+| 4   | Kitchen GFCI receptacle, stainless plate                | C    | 4" box, mud ring, 20A GFCI, stainless decorator plate, 12/2 MC 25                                        | Yes (DV21 uses nylon plate) |     |
+
+## 5. Warehouse / shop building
+
+**Covered:** LT26 high bay, LT22/LT23 strips, LT29 wall pack, MH11 (HVLS fan
+on VFD), MH12 unit heater, MH9, MS5 trapeze, CS6–8 twist-locks, PG12–17.
+
+| #   | Missing                                         | Type | Parts it needs                                                                         | Parts exist?                                  | Y/N |
+| --- | ----------------------------------------------- | ---- | -------------------------------------------------------------------------------------- | --------------------------------------------- | --- |
+| 1   | Overhead door operator connection               | C    | 30A non-fused disconnect NEMA 1, 1/2" FMC 6, connectors 2, #12 THHN 18, 4" box + cover | Yes (push-button station comes with the door) |     |
+| 2   | Air compressor connection, 240V                 | B    | 30A or 60A disconnect, 3/4" liquidtight 6, connectors 2, #10 THHN 18, 2-Pole breaker   | Yes                                           |     |
+| 3   | Welder receptacle, 50A (NEMA 6-50)              | B    | 4-11/16" box, raised cover, **6-50R**, 6/2 MC or #6 THHN, 50A 2-Pole breaker           | **No: 6-50R**                                 |     |
+| 4   | High bay with occupancy sensor                  | C    | LT26's parts + Occupancy sensor, high bay                                              | Yes                                           |     |
+| 5   | Dock light (swing arm)                          | C    | **Dock light**, 4" box, raised cover, 12/2 MC                                          | **No: dock light**                            |     |
+| 6   | 3-phase twist-lock receptacle (L15-30 / L21-30) | C    | 4" box, raised cover, **L15-30 or L21-30**, 10/4 MC, 30A 3-Pole breaker                | **No: L15-30, L21-30**                        |     |
+| 7   | Cord reel / cord drop                           | C    | **Cord reel**, 12/3 SOOW, cord grip, 4" box                                            | **No: cord reel** (SOOW exists)               |     |
+
+## 6. Medical / dental office
+
+**Covered:** DV20–25, DV24 isolated ground, DV33 floor box, MS6, CS11–13,
+GC5, LT19–21, LT27/LT28.
+
+| #   | Missing                                      | Type | Parts it needs                                                                                     | Parts exist?                      | Y/N |
+| --- | -------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------- | --------------------------------- | --- |
+| 1   | Hospital-grade receptacle (exam / operatory) | C    | 4" box, mud ring, Hospital-grade receptacle, plate, **12/2 healthcare (HCF) cable** 25, connectors | **Partly: no HCF cable**          |     |
+| 2   | Dental chair connection (floor box + j-box)  | C    | Floor box, blank floor box cover, 4" box, 12/2 MC, Cat6, connectors                                | Yes                               |     |
+| 3   | Dental compressor / vacuum pump              | C    | same as Warehouse #2                                                                               | Yes                               |     |
+| 4   | Emergency-branch receptacle (red)            | C    | 4" box, mud ring, **red 20A receptacle**, plate, HCF cable                                         | **No: red receptacle, HCF cable** |     |
+| 5   | Imaging / X-ray dedicated circuit, 208V      | C    | same as Restaurant #1                                                                              | Yes                               |     |
+
+## 7. School classroom remodel
+
+**Covered:** LT19–21, DV29–31, DV20–23, CS11–13, LT27/LT28, MS6, DR rows.
+
+| #   | Missing                              | Type | Parts it needs                                                                       | Parts exist?                     | Y/N |
+| --- | ------------------------------------ | ---- | ------------------------------------------------------------------------------------ | -------------------------------- | --- |
+| 1   | Wireless access point drop (ceiling) | C    | 4" box or low-voltage mud ring, Cat6 150, Cat6 jack, keystone plate 1-port, J-hook 3 | Yes                              |     |
+| 2   | Recessed clock receptacle            | C    | 4" box, mud ring, Recessed clock receptacle, 12/2 MC 25, connectors                  | Yes                              |     |
+| 3   | PA / paging ceiling speaker          | C    | In-ceiling speaker, 16/2 speaker wire 50, J-hook 2                                   | Yes (MS10 is tagged residential) |     |
+
+## 8. Apartment unit (new construction)
+
+**Covered:** the residential device, lighting, kitchen, bath and low-voltage
+rows on the first list, plus RS9 and RS19.
+
+| #   | Missing                             | Type | Parts it needs                                                                      | Parts exist?              | Y/N |
+| --- | ----------------------------------- | ---- | ----------------------------------------------------------------------------------- | ------------------------- | --- |
+| 1   | Apartment unit panel, 125A main-lug | R    | 125A main-lug sub-panel 24-space, ground bar kit, cable connectors, directory label | Yes                       |     |
+| 2   | Multi-unit meter center             | B    | **Meter center (4–6 position)**, ground rods 2, clamps, #4 bare                     | **No: meter center rows** |     |
+| 3   | PTAC / through-wall unit receptacle | R    | single-gang box, **6-20R or 6-30R**, 12/2 or 10/2 NM-B, 2-Pole breaker              | **No: 6-20R / 6-30R**     |     |
+
+## 9. 200A residential service upgrade
+
+**Covered:** PG2, PG3, GR2, GR3, PG4, PG9, PG10 surge, PG11.
+
+| #   | Missing                                       | Type | Parts it needs                                                                 | Parts exist? | Y/N |
+| --- | --------------------------------------------- | ---- | ------------------------------------------------------------------------------ | ------------ | --- |
+| 1   | Outdoor emergency service disconnect (230.85) | R    | 200A fused or non-fused disconnect NEMA 3R, 4-0 SER 10, SE connectors 2, label | Yes          |     |
+| 2   | Service mast / riser replacement only         | R    | 2" rigid 10, metal weatherhead, mast flashing, 2" meter hub, riser straps 2    | Yes          |     |
+
+## 10. EV charger install (home and commercial)
+
+**Covered:** RS12 48A hardwired (home), RS13 14-50 receptacle (home).
+
+| #   | Missing                                                | Type | Parts it needs                                                                                                          | Parts exist? | Y/N |
+| --- | ------------------------------------------------------ | ---- | ----------------------------------------------------------------------------------------------------------------------- | ------------ | --- |
+| 1   | Commercial Level 2 EV charger, 208V (pedestal or wall) | C    | EVSE pedestal (or wall charger), 40A 2-Pole breaker, pole anchor bolt kit, concrete base, 3/4" liquidtight + connectors | Yes          |     |
+| 2   | EV-ready conduit stub (EV-capable space)               | B    | 4-11/16" box + blank cover, 1" EMT or PVC stub, connectors, label                                                       | Yes          |     |
+| 3   | Home charger, 40A / 32A hardwired                      | R    | 40A or 32A EV charger, 6/3 NM-B (40A) or 8/3 NM-B (32A), 50A or 40A 2-Pole breaker                                      | Yes          |     |
+
+**There, but check a part — RS12 (48A hardwired):** it uses 6/3 NM-B on a 60A
+breaker. NM is held to its 60°C rating, which is 55A for #6 copper, and a 48A
+charger needs 60A of wire (125% of 48A). If that holds, RS12 needs 4/3 NM-B,
+which **the catalog does not carry**, or #6 THHN in conduit. Owner to
+confirm.
+
+## 11. Standby generator hookup
+
+**Covered:** PG19 (ATS, pad, charger, control wire, ground rod), RS18/GR4
+inlets.
+
+| #   | Missing                                    | Type | Parts it needs                                                             | Parts exist? | Y/N |
+| --- | ------------------------------------------ | ---- | -------------------------------------------------------------------------- | ------------ | --- |
+| 1   | Manual transfer switch, 6–10 circuit       | R    | Manual transfer switch, inlet box, generator cord, 10/3 NM-B, connectors   | Yes          |     |
+| 2   | Essential-loads subpanel (moving circuits) | R    | 100A main-lug sub-panel, breakers, #12 THHN 40, wire nuts, directory label | Yes          |     |
+
+## 12. Parking lot / site lighting
+
+**Covered:** GC3 pole light, CS2 photocell + contactor, LT16 flood, LT29 wall
+pack.
+
+| #   | Missing                            | Type | Parts it needs                                        | Parts exist?              | Y/N |
+| --- | ---------------------------------- | ---- | ----------------------------------------------------- | ------------------------- | --- |
+| 1   | Bollard light                      | C    | Bollard light, anchor bolts, concrete base, wire nuts | Yes                       |     |
+| 2   | In-grade handhole / pull box       | C    | **Polymer-concrete handhole with lid**                | **No: handhole rows**     |     |
+| 3   | Replace head on existing pole      | C    | LED area light, wire nuts                             | Yes                       |     |
+| 4   | Second head added to existing pole | C    | LED area light, pole arm / bracket, wire nuts         | **Not checked: pole arm** |     |
+
+## 13. Small retail strip (new build)
+
+**Covered:** PG12–14 tenant and house panels, PG16 transformer, CS1 signs,
+MH5/MH6 RTUs, LT29, GC3, PG11, CS11–14, CS16.
+
+| #   | Missing                                      | Type | Parts it needs                                                          | Parts exist?                                             | Y/N |
+| --- | -------------------------------------------- | ---- | ----------------------------------------------------------------------- | -------------------------------------------------------- | --- |
+| 1   | Multi-tenant meter center                    | C    | same as Apartment #2                                                    | **No: meter center rows**                                |     |
+| 2   | Main switchboard / main disconnect, 400–800A | C    | **Switchboard** (or 600A fused disconnect + fuses), anchors, labels     | **Partly: 600A fused disconnect exists; no switchboard** |     |
+| 3   | CT cabinet and meter                         | C    | **CT cabinet**, meter base, conduit nipple                              | **No: CT cabinet**                                       |     |
+| 4   | Telecom backboard with ground bar            | C    | **Plywood backboard**, **telecom ground busbar**, #6 green, ground lugs | **No: backboard, telecom busbar**                        |     |
+| 5   | Storefront / canopy downlight, wet-rated     | C    | Wet-rated wafer downlight, 4" box, 12/2 MC, connectors                  | Yes                                                      |     |
+
+## New missing catalog items (not on the first list)
+
+| Item                                      | Needed by                                 | Y/N |
+| ----------------------------------------- | ----------------------------------------- | --- |
+| 6-30R receptacle                          | restaurant equipment, PTAC                |     |
+| 6-50R receptacle                          | welder, commercial oven                   |     |
+| L15-30 and L21-30 receptacles             | 3-phase shop equipment                    |     |
+| Healthcare (HCF) armored cable, 12/2      | medical / dental receptacles              |     |
+| Red (emergency branch) 20A receptacle     | medical                                   |     |
+| Meter center, 4–6 position                | apartments, retail strip                  |     |
+| CT cabinet                                | retail strip                              |     |
+| Switchboard, 400–800A                     | retail strip                              |     |
+| Polymer-concrete handhole with lid        | site lighting                             |     |
+| Dock light (swing arm)                    | warehouse                                 |     |
+| Cord reel                                 | warehouse                                 |     |
+| Plywood telecom backboard; telecom busbar | retail strip, office                      |     |
+| 4/3 NM-B                                  | only if RS12 is corrected (EV note above) |     |
+
+Searched for and **found**: hospital-grade receptacle, recessed clock
+receptacle, bollard light, LED area light, EVSE pedestal, 32A/40A/48A
+chargers, manual and automatic transfer switches, 200A disconnects (fused and
+non-fused, NEMA 1 and 3R), 125A main-lug sub-panels, 400A meter base, high-bay
+occupancy sensor, wet-rated wafers, stainless plates, 12/3 and 10/3 SOOW,
+600A fused disconnect. Search was by name; a row named some other way would
+have been missed.
