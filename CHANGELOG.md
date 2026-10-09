@@ -11,6 +11,17 @@ This is the human-readable companion to the git history — read this to see wha
   one upload in six on staging, left the sheet list empty until a reload.
   The list is now always read again after the sheets are saved.
 
+## [2026-10-09]
+
+- **A dead AI key now says so.** If the server has no Anthropic key, or the
+  key has expired or been disabled, the help assistant and the plan reader
+  now say "AI is unavailable right now" with what to do by hand, instead of
+  "I'm not sure which screen you want" (which blamed the question) or "try
+  again later" (which would never work). The admin AI spend screen shows an
+  amber notice with the time calls started being refused and where the fix
+  is written down, and it clears itself once a call works. Nothing on a bid
+  was ever affected; this is about the words.
+
 ## [2026-10-08]
 
 - **Fix every flagged line in one pass.** Each warning under the bid total

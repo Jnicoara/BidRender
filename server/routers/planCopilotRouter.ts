@@ -40,7 +40,12 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
-import { AiLimitReached, invokeLLM } from "../llm";
+import {
+  AI_UNAVAILABLE,
+  AiLimitReached,
+  AiUnavailable,
+  invokeLLM,
+} from "../llm";
 import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   TIE_BREAK_MAX_CROPS,
@@ -430,9 +435,19 @@ export const planCopilotRouter = router({
         if (error instanceof AiLimitReached) {
           return record("failed", null, error.message, []);
         }
-        // No key, a bad model id, a timeout and a refusal all land here and are
-        // indistinguishable on screen. The run is still stored so the panel can
-        // say what happened instead of looking like it never ran.
+        // No key, or the key was refused: "try again later" would not help,
+        // so do not say it (2026-10-09).
+        if (error instanceof AiUnavailable) {
+          return record(
+            "failed",
+            null,
+            `${AI_UNAVAILABLE} Nothing was changed — carry on marking by hand.`,
+            []
+          );
+        }
+        // A bad model id, a timeout and an overloaded model land here. The run
+        // is still stored so the panel can say what happened instead of
+        // looking like it never ran.
         noteFailure(
           "request rejected",
           error instanceof Error ? error.message : error
@@ -611,6 +626,10 @@ export const planCopilotRouter = router({
         // The allowance has its own sentence. Everything else gets the generic
         // one, because the difference is not the user's to act on.
         if (error instanceof AiLimitReached) return { answer: error.message };
+        if (error instanceof AiUnavailable)
+          return {
+            answer: `${AI_UNAVAILABLE} Nothing was changed — zoom in and check that spot yourself.`,
+          };
         noteFailure(
           "ask request rejected",
           error instanceof Error ? error.message : error
@@ -689,6 +708,10 @@ export const planCopilotRouter = router({
           };
         } catch (error) {
           if (error instanceof AiLimitReached) return none(error.message);
+          if (error instanceof AiUnavailable)
+            return none(
+              `${AI_UNAVAILABLE} Nothing was changed — pick these by eye.`
+            );
           noteFailure(
             "tie-break request rejected",
             error instanceof Error ? error.message : error
@@ -754,6 +777,10 @@ export const planCopilotRouter = router({
           };
         } catch (error) {
           if (error instanceof AiLimitReached) return none(error.message);
+          if (error instanceof AiUnavailable)
+            return none(
+              `${AI_UNAVAILABLE} Nothing was changed — check these by eye.`
+            );
           noteFailure(
             "scan finds request rejected",
             error instanceof Error ? error.message : error

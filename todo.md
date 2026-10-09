@@ -3,7 +3,19 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
-## A dead AI key must SAY so — PLAN, not built (Track A, 2026-10-09)
+## A dead AI key must SAY so — BUILT 2026-10-09 (Track A), migration 0141
+
+> **Built as planned below** (branch `a-ai-unavailable`): `AiUnavailable` +
+> `keyRefusal` in `server/llm/unavailable.ts`; the door raises it for no key
+> and 401/403 and notes it on `ai_service_status` (0141); navigation and all
+> four plan-reader sites say "AI is unavailable right now." with their own
+> manual step; the admin AI spend panel shows "AI calls are being refused
+> since <time>". `navigation.test.ts`'s "says nothing alarming" is narrowed
+> to failures that pass. Tests: `server/aiUnavailable.test.ts`, plus cases in
+> `navigation.test.ts` and `planCopilot.test.ts` — 6 red without the fix.
+> One deviation: the success path WRITES the status row on every call that
+> works (one small UPDATE), so the notice clears itself; noted here in case
+> that write ever shows up in a profile. Live gets it with the next release.
 
 **Found while preparing the `bidrender-app` key rotation** (`deploying.md`
 § 8a). Measured with a refused key: the Anthropic adapter raises
