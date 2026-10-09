@@ -14,7 +14,29 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
+## LATEST (2026-10-08, build session) — Sch 80/500: C's half BUILT on `c-sch80-500`, NOT MERGED
+
+**DO NOT MERGE `c-sch80-500` INTO local-dev UNTIL TRACK A'S SEED LANDS**
+(owner, 2026-10-08). The exact list A must add is
+`sch80-and-500-plan.md` § 7c — nine Sch 80 underground types, the 500
+rename/retire/nine adds, the 500 run type, and A's seed tests. When it is on
+local-dev: merge local-dev into `c-sch80-500`, switch the Sch 80 case in
+`server/sch80And500Runs.test.ts` to the shipped type (§ 7b), run the touched
+files, Gate, then merge — and look at the fold and the 500 Send dialog on
+screen (plan § 6).
+
+Branch from `origin/local-dev` `d36bfc9` (A's 0140 included). Built:
+`undergroundRunTypeLabel(size, schedule)` (schedule required), the fold
+sorting Sch 40 then Sch 80 by size, and the 500/700 fitting family as a
+closed list (`surfaceRacewaySeries`; 1500 off; `isSurfaceRaceway700`
+deleted) with `fittingRowsByRunType` branching on it. The seed file was
+touched only to pass `"PVC Sch 40"` to the two existing label calls. Tests
+and their red-without-it checks: plan § 7b. Full suite NOT run on the
+laptop. `bidrender_local_c` and `bidrender_test_c` now have **141**
+migrations (0140 applied this session). One unexplained first-run red in
+`runNoWire.test.ts` straight after applying 0140, not repeated — § 7b.
+
+## Earlier (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
 
 **Part 1 — answers recorded, nothing built.** `sch80-and-500-plan.md` § 5
 now holds the owner's five answers (clip spacing "not set" for 500 and 700;

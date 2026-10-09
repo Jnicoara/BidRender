@@ -285,7 +285,8 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
   async function trench() {
     const s = await scenario();
     const ug = (await caller().takeoffRunTypes.list({})).find(
-      t => t.isShipped && t.label === undergroundRunTypeLabel('2"')
+      t =>
+        t.isShipped && t.label === undergroundRunTypeLabel('2"', "PVC Sch 40")
     )!;
     expect(ug).toBeDefined();
     const run = await s.traceAs(ug.id);

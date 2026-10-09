@@ -58,7 +58,7 @@ describe("the shipped underground run types", () => {
     const sizes = sizesFor("PVC Sch 40");
     expect(sizes).toHaveLength(9);
     expect(underground.map(t => t.label)).toEqual(
-      sizes.map(undergroundRunTypeLabel)
+      sizes.map(size => undergroundRunTypeLabel(size, "PVC Sch 40"))
     );
     for (const t of underground) {
       expect(t.pathType).toBe("conduit");
@@ -102,7 +102,7 @@ describe("the shipped underground run types", () => {
     expect(
       isShippedUndergroundType({
         isShipped: false,
-        label: undergroundRunTypeLabel('2"'),
+        label: undergroundRunTypeLabel('2"', "PVC Sch 40"),
       })
     ).toBe(false);
   });
@@ -266,7 +266,8 @@ withDb("the shipped run types on a database", () => {
 
   it("a FORK of an underground type keeps its tape, pointing back at the shipped extra", async () => {
     const shipped = (await caller().takeoffRunTypes.list({})).find(
-      t => t.isShipped && t.label === undergroundRunTypeLabel('2"')
+      t =>
+        t.isShipped && t.label === undergroundRunTypeLabel('2"', "PVC Sch 40")
     );
     expect(shipped).toBeDefined();
     const [shippedExtra] = (await shippedExtras()).filter(
@@ -306,7 +307,7 @@ withDb("the shipped run types on a database", () => {
 
   it("a traced underground run sends its pipe and its tape — no wire is invented", async () => {
     const shipped = (await caller().takeoffRunTypes.list({})).find(
-      t => t.label === undergroundRunTypeLabel('1"')
+      t => t.label === undergroundRunTypeLabel('1"', "PVC Sch 40")
     );
     expect(shipped).toBeDefined();
     const bid = (await caller().bids.create({

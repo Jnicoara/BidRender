@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **Ready for Wiremold 500 and PVC Sch 80 underground (waiting on the
+  catalog).** A traced Wiremold 500 run will count its couplings, entrance
+  end, inside and flat elbows and tees from 500 parts only, the same way 700
+  already does; 1500 is deliberately left out. The underground fold in the
+  run-type picker will list every Sch 40 size, then every Sch 80 size,
+  rather than mixing them. Nothing changes on screen until the 500 parts and
+  the Sch 80 types are added to the starter catalog.
 - **The starter catalog follows the owner's catalog review.** 138 shipped
   items were withdrawn — all IMC and all 3-1/2" conduit and fittings, #14 to
   #10 bare copper, and unsized "generic" rows whose sized versions cover

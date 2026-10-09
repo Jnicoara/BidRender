@@ -312,9 +312,9 @@ import {
 import {
   SURFACE_RACEWAY_PARTS,
   countSurfaceRacewayFittings,
-  isSurfaceRaceway700,
   surfaceRacewayFittingRows,
   surfaceRacewayPartName,
+  surfaceRacewaySeries,
 } from "../shared/surfaceRacewayFittings";
 import {
   canRejoin,
@@ -13714,9 +13714,13 @@ export async function fittingRowsByRunType(
         }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
-        // The 700 family names its own parts (per-foot plan § 3c).
-        if (isSurfaceRaceway700(name))
-          return SURFACE_RACEWAY_PARTS.map(surfaceRacewayPartName);
+        // The 500 and 700 families name their own parts (per-foot plan § 3c,
+        // sch80-and-500 plan § 2c) — each series its own rows.
+        const series = surfaceRacewaySeries(name);
+        if (series !== null)
+          return SURFACE_RACEWAY_PARTS.map(part =>
+            surfaceRacewayPartName(part, series)
+          );
         return FITTING_KINDS.map(kind =>
           fittingMaterialName(name, kind, type!.fittingStyle)
         ).filter((n): n is string => n !== null);
@@ -13815,17 +13819,23 @@ export async function fittingRowsByRunType(
       tee => teeOwners.get(tee.id) === storedId
     );
     /*
-      THE 700 FAMILY (per-foot plan § 3c): one entrance end per run, corner =
-      inside elbow, end drop = flat elbow, a tee is a fitting, factory parts
-      only. Its own counter so a pipe cannot pick up a 700 rule — see
-      shared/surfaceRacewayFittings.ts. The type's own coupling, connector,
-      strap and 90 choices still win, as on any type.
+      THE 500 AND 700 FAMILIES (per-foot plan § 3c; sch80-and-500 plan
+      § 2c): one entrance end per run, corner = inside elbow, end drop = flat
+      elbow, a tee is a fitting, factory parts only. Its own counter so a pipe
+      cannot pick up a surface-raceway rule — see
+      shared/surfaceRacewayFittings.ts. Each series is priced from its own
+      rows. The type's own coupling, connector, strap and 90 choices still
+      win, as on any type.
     */
-    if (raceway && isSurfaceRaceway700(racewayBaselineName(raceway))) {
+    const series = raceway
+      ? surfaceRacewaySeries(racewayBaselineName(raceway))
+      : null;
+    if (raceway && series !== null) {
       const counts = countSurfaceRacewayFittings(
         row.legs,
         {
           name: raceway.name,
+          series,
           stickLengthFeet:
             raceway.stickLengthFeet === null
               ? null
@@ -13844,6 +13854,7 @@ export async function fittingRowsByRunType(
       out.set(
         storedId,
         surfaceRacewayFittingRows(
+          series,
           counts,
           {
             coupling: resolved(t.couplingMaterialId) ?? null,

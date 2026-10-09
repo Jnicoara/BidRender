@@ -131,7 +131,7 @@ describe("the shipped run types after the review", () => {
   });
 
   it('no longer ship the 3-1/2" underground type, and archive it where it exists', () => {
-    const label = undergroundRunTypeLabel('3-1/2"');
+    const label = undergroundRunTypeLabel('3-1/2"', "PVC Sch 40");
     expect(BASELINE_RUN_TYPES.map(t => t.label)).not.toContain(label);
     expect(RETIRED_BASELINE_RUN_TYPES).toEqual([
       { pathType: "conduit", label },

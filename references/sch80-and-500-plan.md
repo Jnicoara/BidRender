@@ -1,6 +1,9 @@
 # PVC Sch 80 underground types and the Wiremold 500 run type (PLAN, 2026-10-09)
 
-**Status: plan only. Nothing here is built.** Written by Track C on
+**Status (2026-10-08): Track C's half is BUILT on branch `c-sch80-500`**
+(from local-dev with A's 0140) and **NOT merged** — it waits for A's seed
+(§ 7 is the exact list A must add). Track A's half is not started.
+Originally written by Track C on
 `track-c` for two owner-approved additions. Same pattern as
 `per-foot-items-plan.md` (the per-foot plan), and it builds on that plan
 rather than re-deciding anything in it. **The owner's answers to § 5 are
@@ -350,3 +353,130 @@ At laptop and 1180×820 touch: the picker's "Underground (18)" fold, closed,
 Sch 40 then Sch 80 by size; the 500 type beside 700 and armable; a traced
 500 run's Send dialog lines naming 500 parts; a traced Sch 80 trench's tape
 line with its "flat length only" sentence.
+
+## 7. Built by Track C (2026-10-08, branch `c-sch80-500`) — and what A must seed
+
+**Not merged into local-dev. It merges only after A's seed below lands**
+(owner instruction, 2026-10-08). Nothing in C's branch is wrong without the
+seed — a 500 run still says "no catalog match", exactly as today, because
+the 500 raceway is still named `…base, 500 series` — but its tests use
+fixtures for rows A ships, and the seed test half (§ 1d first bullet) is A's.
+
+### 7a. What C built
+
+| Part                     | File                                  | What changed                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Label takes the schedule | `shared/undergroundRunTypes.ts`       | `undergroundRunTypeLabel(size, schedule)`, schedule REQUIRED (`UNDERGROUND_SCHEDULES = ["PVC Sch 40", "PVC Sch 80"]`); `undergroundSchedule(label)` reads it back for the sort                                                                                                                                                                                  |
+| Fold sort                | `client/src/lib/runTypeFold.ts`       | Sch 40 first, then Sch 80, each by size, under the one "Underground" fold                                                                                                                                                                                                                                                                                       |
+| 500 + 700 family         | `shared/surfaceRacewayFittings.ts`    | `SURFACE_RACEWAY_SERIES = ["500", "700"]` (closed; 1500 stays off), `surfaceRacewaySeries(name)`, `surfaceRacewayName(series)`; `surfaceRacewayPartName(part, series)` and `surfaceRacewayFittingRows(series, …)` take the series; the spec carries it for the sentences ("goes into the 500 box"). `isSurfaceRaceway700` and `SURFACE_RACEWAY_700` are DELETED |
+| Branch                   | `server/db.ts` `fittingRowsByRunType` | `surfaceRacewaySeries(...) !== null` instead of the 700-only check; each series looks up its own part names                                                                                                                                                                                                                                                     |
+| Signature follow ONLY    | `server/seed/baselineRunTypes.ts`     | the two existing calls gained `"PVC Sch 40"` so the file compiles. **No seed content changed** — no type added, none renamed                                                                                                                                                                                                                                    |
+
+Respecify naming (§ 1c item 3): unchanged, as expected — made types are
+named from the raceway.
+
+### 7b. Tests (each was run red without its part, then green)
+
+- `client/src/lib/runTypeFold.test.ts` — mixed Sch 80/Sch 40 palette folds
+  as all Sch 40 by size, then all Sch 80. **Red** with the schedule rank
+  zeroed (size-only sort). Plus the label/`undergroundSchedule` case.
+- `server/surfaceRacewayFittings.test.ts` — 500 → `"500"`, 700 → `"700"`,
+  1500 / 2400 / the pre-rename `…base, 500 series` / a shop's raceway →
+  null; a 500 run with a corner and an end drop names the 500 inside and
+  flat elbows with BOTH series' rows in the lookup; a 500 run whose rows are
+  missing says "No catalog match for …, 500 series" and never borrows 700;
+  the 700 sentence is unchanged.
+- `server/sch80And500Runs.test.ts` (new, fixture company 91353):
+  - **Sch 80 tape**: a 100 ft `2" PVC Sch 80, underground` trench, two 3 ft
+    risers (run height 0, ends at 36"), 10% waste → pipe 106 ft installed
+    (116.6 with waste), **tape 110 ft** (100 flat × 1.1, labor 100).
+  - **500 vs 700 on one bid**: the same 40 + 20 ft shape traced on a 500 type
+    and the shipped 700 type → 500 lines point at the 500 rows by id, 700
+    lines at 700 rows; both 5 couplings, 1 entrance end, 1 inside elbow; no
+    700/pipe part on the 500 type. **Red** with the db.ts branch restricted
+    to 700.
+  - **FIXTURES standing in for A's seed:** the Sch 80 type is the company's
+    own (built as § 1b says); the 500 raceway and its six counted parts are
+    SHARED rows inserted only when missing and deleted in afterAll. Once A's
+    seed lands, the shared rows already exist and are not inserted or
+    deleted; A should then switch the Sch 80 case to the SHIPPED type
+    (`typeId(undergroundRunTypeLabel('2"', "PVC Sch 80"))`) so it also covers
+    the seed (tape present, `flat`).
+- 700 unchanged: the existing 700 unit and DB cases pass unedited apart
+  from the series argument.
+
+**Not run on the laptop: the full suite** (owner instruction). Run: the
+nine touched files, 120 tests, green three times in a row on
+`bidrender_test_c`. The FIRST run of that set, straight after applying
+0140 to `bidrender_test_c`, had 9 `runNoWire.test.ts` failures; the file
+passed alone, in every pair, and in the same set three times after. Read as
+a one-off first-seed-after-0140 transition, NOT proven; the Gate run on the
+branch is the full-suite answer.
+
+**Not looked at on screen yet** (§ 6). Nothing on screen changes until A's
+seed ships the Sch 80 types and the 500 type; the look belongs after the
+merge.
+
+### 7c. EXACT seed list for Track A
+
+All in ONE commit (exact-name matching; see § 4 for ordering):
+
+**1. Nine Sch 80 underground run types** — `server/seed/baselineRunTypes.ts`,
+generated by mapping over the schedules, not a copy-paste block:
+
+```ts
+...UNDERGROUND_SCHEDULES.flatMap(schedule =>
+  sizesFor(schedule).map((size): BaselineRunType => ({
+    label: undergroundRunTypeLabel(size, schedule),
+    pathType: "conduit",
+    racewayMaterialName: `${size} ${schedule}`,
+    conductorMaterialName: null,
+    conductorCount: null,
+    groundCount: null,
+    groundMaterialName: null,
+    extras: [WARNING_TAPE],
+  }))
+),
+```
+
+Labels: `1/2" PVC Sch 80, underground`, `3/4"…`, `1"…`, `1-1/4"…`,
+`1-1/2"…`, `2"…`, `2-1/2"…`, `3"…`, `4" PVC Sch 80, underground`. Raceways
+`N" PVC Sch 80` (all exist). Update the comment that says "Sch 80 is not
+shipped (plan § 7, Q2, open)".
+
+**2. Materials** — `server/seed/materials/raceUndergroundService.ts`:
+
+- RENAME `Surface raceway base, 500 series` → `Surface raceway, 500 series`
+  (same id) via `RENAMED_BASELINE_MATERIALS` / `shared/renamedMaterials.ts`
+  `AFTER_FREEZE` and `shared/frozenAddsHeld.ts` `SHIPPED_AS`; add
+  `raceway: { stickLengthFeet: 10, stickJoint: "coupling",
+strapSpacingFeet: null, strapFromBoxFeet: null }`; keep "base" in its
+  search words.
+- RETIRE `Surface raceway cover, 500 series` (`RETIRED_BASELINE_MATERIALS`
+  - `FROZEN_ADDS_NOT_SEEDED` `retired` entry).
+- ADD nine rows, `each`, $0, example-tagged, `Surface Raceway`, commercial,
+  slang `500 v500` + the same part words the 700 rows carry. These names are
+  what `surfaceRacewayPartName(part, "500")` produces, character for
+  character — the first six are counted, the rest hand-added:
+  1. `Surface raceway coupling, 500 series`
+  2. `Surface raceway entrance end fitting, 500 series`
+  3. `Surface raceway support clip, 500 series`
+  4. `Surface raceway inside elbow, 500 series`
+  5. `Surface raceway flat elbow, 500 series`
+  6. `Surface raceway tee, 500 series`
+  7. `Surface raceway outside elbow, 500 series`
+  8. `Surface raceway device box, 500 series`
+  9. `Surface raceway device plate, 500 series`
+
+**3. The 500 run type** — `baselineRunTypes.ts`:
+`500 series surface raceway, 2 #12 + ground`, `conduit`, raceway
+`Surface raceway, 500 series`, conductor `#12 THHN Copper` × 2, ground
+`#12 THHN green Copper` × 1, no extras. 2 #12 + ground ONLY (§ 5, Q3).
+
+**4. A's tests** (§ 1d / § 2d seed bullets): `perFootSeed.test.ts` expects
+BOTH schedules' labels (`UNDERGROUND_SCHEDULES.flatMap(s => sizesFor(s).map(
+size => undergroundRunTypeLabel(size, s)))`, 18) and the fold test's "exactly
+the nine" becomes 18; a rename test like 700's; `materialsCatalog` and
+`searchSpotCheck` ("500 elbow", "wiremold 500 tee", "500 coupling",
+"500 box"). Catalog count: read it from the seed after building (§ 4 item 5
+says 1,801 active if both land — intent, not outcome).

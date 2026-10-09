@@ -190,7 +190,7 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
   */
   ...sizesFor("PVC Sch 40").map(
     (size): BaselineRunType => ({
-      label: undergroundRunTypeLabel(size),
+      label: undergroundRunTypeLabel(size, "PVC Sch 40"),
       pathType: "conduit",
       racewayMaterialName: `${size} PVC Sch 40`,
       conductorMaterialName: null,
@@ -216,7 +216,12 @@ export const BASELINE_RUN_TYPES: BaselineRunType[] = [
 export const RETIRED_BASELINE_RUN_TYPES: readonly {
   pathType: RunPathType;
   label: string;
-}[] = [{ pathType: "conduit", label: undergroundRunTypeLabel('3-1/2"') }];
+}[] = [
+  {
+    pathType: "conduit",
+    label: undergroundRunTypeLabel('3-1/2"', "PVC Sch 40"),
+  },
+];
 
 /**
  * Material links on SHIPPED run types to move from one shipped row to
