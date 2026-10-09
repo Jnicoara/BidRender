@@ -147,6 +147,14 @@ left as written rather than rewritten to match the rename.
       against a real QueryClient and goes red without the cancel). **Worth
       knowing generally:** "invalidate after a write" is not enough for a
       query that may be making its FIRST read at that moment.
+- [ ] **Smoke `screens.spec.ts`: a request that never came back on the
+      Proposal screen (tablet-landscape), 2026-10-09.** Gate 37960082974's
+      third smoke re-run (attempt 4) timed out at 180 s waiting for network
+      idle on a screen that had drawn fine; nothing was deploying. The wait
+      had no bound, so it spent the whole budget. Now bounded at 15 s, and a
+      miss prints the request URLs still pending (query strings stripped:
+      a signed plan link is a bearer credential). **Which request hung is
+      NOT known** (`trace: "off"`); if the warning names one, chase it.
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the
