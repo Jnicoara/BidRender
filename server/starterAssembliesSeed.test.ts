@@ -104,10 +104,13 @@ describe("the starter seed file", () => {
 
   it("uses every part in the table — no orphan keys to go stale", () => {
     // A swapped-out cover is still used: the cover repair needs its key to
-    // recognise the old recipe on a database seeded before the swap.
+    // recognise the old recipe on a database seeded before the swap — and
+    // the first swap's recipe (`interim`) on one that ran it.
     const used = new Set([
       ...BASELINE_ASSEMBLIES.flatMap(a => a.materials.map(l => l.part)),
-      ...STARTER_COVER_SWAPS.flatMap(s => s.was.map(l => l.part)),
+      ...STARTER_COVER_SWAPS.flatMap(s =>
+        [...s.was, ...(s.interim ?? [])].map(l => l.part)
+      ),
     ]);
     expect(
       Object.keys(STARTER_PARTS).filter(k => !used.has(k as never))
