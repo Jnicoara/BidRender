@@ -26,6 +26,11 @@ This is the human-readable companion to the git history — read this to see wha
   same way 700 already did; a 500 run never borrows a 700 part, and 1500 is
   deliberately left out. Before this, a 500 run's fittings said "no catalog
   match".
+- **The plan viewer no longer says "Nothing traced" beside traced pipe.**
+  When conduit was traced but no wires had been added on its runs, the
+  wire rows said "Nothing traced under this type yet." right next to the
+  pipe's footage — and so did the message after Send. They now say "No
+  wire on these runs yet — open a run to add its wires."
 
 ## [2026-10-08]
 

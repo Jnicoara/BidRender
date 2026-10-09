@@ -24,6 +24,7 @@ import {
   type BridgeLine,
   runTypeRows,
   runRowSendability,
+  runTypeTraced,
 } from "../shared/takeoffBridge";
 
 /** No assembly on these bids has been forked. */
@@ -387,7 +388,9 @@ describe("a run type becomes one line per material", () => {
       ["conductor", 250],
       ["ground", 125],
     ]);
-    expect(rows.every(r => runRowSendability(r).ok)).toBe(true);
+    expect(rows.every(r => runRowSendability(r, runTypeTraced(rows)).ok)).toBe(
+      true
+    );
   });
 
   it("EMPTY CONDUIT FOR FUTURE USE IS JUST THE PIPE ROW", () => {
@@ -417,7 +420,42 @@ describe("a run type becomes one line per material", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].role).toBe("raceway");
     expect(rows[0].feet).toBe(80);
-    expect(runRowSendability(rows[0]).ok).toBe(true);
+    expect(runRowSendability(rows[0], runTypeTraced(rows)).ok).toBe(true);
+  });
+
+  it("wire rows at 0 ft under TRACED pipe say no wire was added — not 'nothing traced'", () => {
+    /*
+      Seen on screen 2026-10-09: a 500 run, 80 ft of raceway traced, no wires
+      added on the run. Its #12 and ground rows said "Nothing traced under
+      this type yet." beside the 80 ft — false, in the panel and in the Send
+      toast. Wire comes from the run's circuits, so the true sentence is
+      that none were added.
+    */
+    const rows = runTypeRows({
+      ...conduit,
+      footage: {
+        conduitBoughtFeet: 80,
+        conduitInstalledFeet: 80,
+        cableBoughtFeet: 0,
+        cableInstalledFeet: 0,
+        insulatedBoughtFeet: 0,
+        insulatedInstalledFeet: 0,
+        groundBoughtFeet: 0,
+        groundInstalledFeet: 0,
+        extraRuns: [],
+      },
+      extras: [],
+    });
+    expect(runTypeTraced(rows)).toBe(true);
+    const wire = rows.filter(r => r.role !== "raceway");
+    expect(wire.map(r => r.role)).toEqual(["conductor", "ground"]);
+    for (const row of wire) {
+      const said = runRowSendability(row, runTypeTraced(rows));
+      expect(said).toMatchObject({ ok: false, reason: "no-footage" });
+      expect(said.ok ? "" : said.message).toBe(
+        "No wire on these runs yet — open a run to add its wires."
+      );
+    }
   });
 
   it("a CABLE type is one row, and its ground is not a second one", () => {
@@ -470,10 +508,14 @@ describe("a run type becomes one line per material", () => {
       extras: [],
     });
     expect(rows).toHaveLength(3);
-    expect(runRowSendability(rows[0])).toMatchObject({
-      ok: false,
-      reason: "no-footage",
-    });
+    expect(runTypeTraced(rows)).toBe(false);
+    // Every row, wire included, says the type is untraced.
+    for (const row of rows)
+      expect(runRowSendability(row, runTypeTraced(rows))).toMatchObject({
+        ok: false,
+        reason: "no-footage",
+        message: "Nothing traced under this type yet.",
+      });
   });
 
   it("SHOWS footage the type cannot name, but refuses to send it", () => {
@@ -504,7 +546,7 @@ describe("a run type becomes one line per material", () => {
       extras: [],
     });
     expect(rows.map(r => r.feet)).toEqual([125, 250]);
-    expect(runRowSendability(rows[0])).toMatchObject({
+    expect(runRowSendability(rows[0], runTypeTraced(rows))).toMatchObject({
       ok: false,
       reason: "no-material",
     });

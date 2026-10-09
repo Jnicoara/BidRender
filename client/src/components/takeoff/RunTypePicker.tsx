@@ -1455,7 +1455,8 @@ export function RunTypePicker({
               ))}
 
               {/*
-                ONE fold for the ten shipped underground types (plan § 3b;
+                ONE fold for the shipped underground types — 18 since Sch 80
+                joined (2026-10-09), Sch 40 by size then Sch 80 (plan § 3b;
                 CLAUDE.md § Customization, rules 1–3). Below the rows it
                 hides, so opening it puts them where the eye already is. A
                 shop's fork of one is its own and never sits behind this.

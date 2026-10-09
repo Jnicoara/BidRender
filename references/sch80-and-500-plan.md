@@ -442,7 +442,11 @@ merge.
 **Merged 2026-10-09** (A's seed `8f3045c` landed first). The Sch 80 case in
 `sch80And500Runs.test.ts` now uses the SHIPPED type and the 500 case the
 shipped 500 type, raceway and parts; the stand-in fixtures are gone. Nine
-files, 118 tests green. Still not looked at on screen.
+files, 118 tests green. **Looked at on screen the same day** (§ 6, laptop
+and 820×1180): fold, order, 500 type, 500 Send block, Sch 80 tape all as
+specified; the wire rows' false "Nothing traced" sentence fixed
+(`track-c-handoff.md`). The 1180×820 size § 6 names was not shot; 820×1180
+was, as asked.
 
 ### 7c. EXACT seed list for Track A
 

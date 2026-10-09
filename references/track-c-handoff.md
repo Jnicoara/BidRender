@@ -1,8 +1,8 @@
 # Track C — handoff, 2026-10-06
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
-section below** (`c-sch80-500` merged to local-dev 2026-10-09; C's
-databases have 142 migrations, through A's 0141).
+section below** (`c-sch80-500` merged to local-dev 2026-10-09 and looked
+at on screen; C's databases have 142 migrations, through A's 0141).
 **Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
@@ -13,7 +13,37 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-09) — `c-sch80-500` MERGED into local-dev; Q11 answered
+## LATEST (2026-10-09, later) — Gate green; looked at on screen; one false sentence fixed
+
+- **Gate 37977597726 on `47e4bd8` (the merge): ALL GREEN** — test,
+  deploy-staging, smoke; drizzle-guard skipped (no `drizzle/` change).
+- **On screen, laptop 1536×864 and tablet 820×1180** (playwright via
+  `scripts/deviceAudit.mts` helpers, Bar layout check 1164558, user 1).
+  Two runs added by API (a 500 run, a 2" Sch 80 trench) and one 500 run
+  traced through the UI, all three removed afterwards; nothing sent, the
+  bid's lines untouched. Seen right: the conduit picker's
+  **"Underground (18)"** fold, closed by default, below the six saved
+  types; opened, **Sch 40 ½"…4" then Sch 80 ½"…4"**; the 500 type beside
+  700 and armable (the UI trace armed it). The 500 Traced-footage block
+  names only 500 parts (coupling, entrance end, support clip "not set",
+  inside elbow), "Send 4 lines"; the Sch 80 block's tape says "the flat
+  length only, not the risers". No horizontal overflow at either size.
+- **Found and fixed: "Nothing traced under this type yet." beside 80 ft of
+  traced raceway.** Wire comes from a run's circuits, and a run traced
+  through the UI has none until somebody adds wires — so the wire rows were
+  0 ft, and `runRowSendability` said every 0 ft row was "nothing traced"
+  (panel AND the post-Send toast; every conduit type, 700 and EMT too).
+  It now takes a REQUIRED `typeTraced` (`runTypeTraced(rows)`, shared) and
+  says "No wire on these runs yet — open a run to add its wires." when the
+  pipe has feet. Test in `server/takeoffBridge.test.ts`, **red without the
+  fix** ("expected 'No wire…', received 'Nothing traced…'"), green with it;
+  five related files 96 green; `pnpm check` clean. Looked at again on
+  screen at both sizes after the fix.
+- Stale comment in `RunTypePicker.tsx` ("ten shipped underground types")
+  now says 18.
+- Dev server stopped, whole tree; port 3004 free. Temp scripts deleted.
+
+## Earlier (2026-10-09) — `c-sch80-500` MERGED into local-dev; Q11 answered
 
 **Merged.** A's seed (`8f3045c`) and A's 0141 were on local-dev, so
 `origin/local-dev` (`679cce8`) was merged into `c-sch80-500` and the result
@@ -36,10 +66,8 @@ CHANGELOG and this file kept both. **C's databases `bidrender_local_c` and
   `bridgeForBid`, `materialsList.get`, `takeoffSummary.forBid`, local-dev
   tip vs the merge, same `bidrender_local_c` — identical apart from the
   `preparedOn` clock.
-- **Not done: looking at the fold ("Underground (18)") and the 500 Send
-  dialog on screen** (plan § 6). The fold sort is A's copy of C's code and
-  already on staging; the 500 fitting lines are proven through the routers
-  only. Next session's first check.
+- ~~Not done: looking at the fold and the 500 Send block on screen~~ —
+  done the same day, see above.
 - **Q11 (auto branch runs) answered by the owner: YES.** A detour over 3×
   the straight right-angle distance is a WARNING with the fix-it buttons,
   priced, never a block. Written into `auto-branch-runs-plan.md` § 3c,
