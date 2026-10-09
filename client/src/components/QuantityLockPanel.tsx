@@ -28,11 +28,12 @@
  * This file is the wiring — the same split as ArchiveBidDialog and
  * @/lib/archiveBid.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +45,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  lockOfferCopy,
   lockedBannerCopy,
+  offersLockOnStatusChange,
   unlockConfirmCopy,
   unlockedNoticeCopy,
 } from "@shared/quantityLock";
@@ -59,7 +62,20 @@ import {
  */
 const MAX_LISTED = 8;
 
-export function QuantityLockPanel({ bidId }: { bidId: number }) {
+export function QuantityLockPanel({
+  bidId,
+  statusChange = null,
+  onStatusChangeSeen,
+}: {
+  bidId: number;
+  /**
+   * The status change the user just made on this bid, if any — marking it
+   * Won OFFERS the lock (Gap 3, owner 2026-10-08; `offersLockOnStatusChange`).
+   */
+  statusChange?: { from: string; to: string } | null;
+  /** Called once the offer is answered, or when there is nothing to offer. */
+  onStatusChangeSeen?: () => void;
+}) {
   const utils = trpc.useUtils();
   const state = trpc.bids.quantityLock.useQuery({ bidId });
   const [confirming, setConfirming] = useState(false);
@@ -100,6 +116,21 @@ export function QuantityLockPanel({ bidId }: { bidId: number }) {
     },
     onSettled: refresh,
   });
+
+  const offering =
+    statusChange !== null &&
+    state.data !== undefined &&
+    offersLockOnStatusChange({
+      ...statusChange,
+      lockedAt: state.data.lockedAt,
+      followingLines: state.data.followingLines,
+    });
+  // A change that offers nothing is done with as soon as the answer is known,
+  // so a later Won is a fresh change rather than this one held over.
+  useEffect(() => {
+    if (statusChange !== null && state.data !== undefined && !offering)
+      onStatusChangeSeen?.();
+  }, [statusChange, state.data, offering, onStatusChangeSeen]);
 
   // Nothing is drawn until the answer is known: a panel that guesses at "not
   // locked" and then corrects itself has told somebody their bid is live when it
@@ -189,21 +220,63 @@ export function QuantityLockPanel({ bidId }: { bidId: number }) {
 
   if (followingLines === 0) return null;
 
+  const offer = lockOfferCopy(followingLines);
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
-      <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">
-        {unlockedNoticeCopy(followingLines)}
-      </p>
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-8 shrink-0 gap-1.5 text-xs"
-        onClick={() => lock.mutate({ bidId })}
-        disabled={lock.isPending}
+    <>
+      <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
+        <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">
+          {unlockedNoticeCopy(followingLines)}
+        </p>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 shrink-0 gap-1.5 text-xs"
+          onClick={() => lock.mutate({ bidId })}
+          disabled={lock.isPending}
+        >
+          <Lock className="h-3.5 w-3.5" />
+          {lock.isPending ? "Locking…" : "Lock quantities"}
+        </Button>
+      </div>
+
+      {/* Gap 3: marking the bid Won ASKS. Both answers are the same size and
+          weight, "Not now" takes the default focus, and Escape or a click
+          outside is "Not now" too — the lock is never the easy path by
+          accident. */}
+      <AlertDialog
+        open={offering}
+        onOpenChange={open => {
+          if (!open) onStatusChangeSeen?.();
+        }}
       >
-        <Lock className="h-3.5 w-3.5" />
-        {lock.isPending ? "Locking…" : "Lock quantities"}
-      </Button>
-    </div>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{offer.title}</AlertDialogTitle>
+            <AlertDialogDescription>{offer.body}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => onStatusChangeSeen?.()}>
+              {offer.notNow}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              // Outline sets no text colour, so the Action's own
+              // primary-foreground would survive — dark text on a dark
+              // dialog, seen on screen. Named here.
+              className={cn(
+                buttonVariants({ variant: "outline" }),
+                "text-foreground"
+              )}
+              onClick={() => {
+                onStatusChangeSeen?.();
+                lock.mutate({ bidId });
+              }}
+            >
+              <Lock className="h-3.5 w-3.5" />
+              {offer.lock}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

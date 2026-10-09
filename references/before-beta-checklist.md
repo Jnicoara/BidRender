@@ -220,7 +220,7 @@ prices ship without them.
 - [ ] **Unpriced lines follow two policies:** the quote panel blocks, the
       proposal asks, and the block advice is wrong for a labor-rate gap ·
       B · small · no · audit #17, #25. **Advice part done 2026-10-06 (Track B):** each gap now says where to fix it (labor rate → Labor rates; traced part → Materials, then Send again). The two policies (#25) are still open.
-- [ ] **Open a just-uploaded plan from the file on this machine** instead of
+- [x] **DONE 2026-10-08 (B, Gap 6.1, todo.md).** **Open a just-uploaded plan from the file on this machine** instead of
       downloading it again. This is the biggest time-to-first-sheet win · B
       · medium · no · `origin/track-b:references/track-b-plans-screen-edits-plan.md`
       Part 4 § 2

@@ -19,8 +19,13 @@ export function plansPane(list: {
   isLoading: boolean;
   isError: boolean;
   count: number;
+  /**
+   * A first set uploading, shown from the file on this machine before it has
+   * a row (Gap 6.1, @/lib/localPlanSource). The plans, not the upload box.
+   */
+  previewing?: boolean;
 }): PlansPane {
-  if (list.count > 0) return "plans";
+  if (list.count > 0 || list.previewing) return "plans";
   if (list.isError) return "failed";
   if (list.isLoading) return "loading";
   return "empty";

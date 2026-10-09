@@ -385,6 +385,13 @@ export default function BidsPage({
     onSettled: refresh,
   });
 
+  /** The status change just saved — marking Won offers the lock (Gap 3). */
+  const [statusChange, setStatusChange] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
+  const clearStatusChange = useCallback(() => setStatusChange(null), []);
+
   /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
   const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
 
@@ -860,9 +867,14 @@ export default function BidsPage({
 
           <Select
             value={bid.status}
-            onValueChange={status =>
-              updateBid.mutate({ id: bid.id, status: status as Status })
-            }
+            onValueChange={status => {
+              const from = bid.status;
+              updateBid.mutate(
+                { id: bid.id, status: status as Status },
+                // Once it has saved, so a refused change offers nothing.
+                { onSuccess: () => setStatusChange({ from, to: status }) }
+              );
+            }}
           >
             <SelectTrigger className="h-8 w-28 text-sm" aria-label="Bid status">
               <SelectValue />
@@ -883,7 +895,11 @@ export default function BidsPage({
         <ExampleRatesBanner className="mb-4" />
         {/* Above everything, full width: it changes what every quantity below
             it MEANS, so it cannot sit in a column somebody scrolls past. */}
-        <QuantityLockPanel bidId={bidId} />
+        <QuantityLockPanel
+          bidId={bidId}
+          statusChange={statusChange}
+          onStatusChangeSeen={clearStatusChange}
+        />
         {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
             track is as wide as its widest child's longest unbreakable line,
             which made the whole bid 445 px wide on a 390 px phone. */}

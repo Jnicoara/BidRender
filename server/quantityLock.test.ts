@@ -44,6 +44,8 @@ import { behindTheLock } from "./behindTheLock.testHelper";
 import {
   followsDrawing,
   lockedBannerCopy,
+  lockOfferCopy,
+  offersLockOnStatusChange,
   quantitySource,
   quantityText,
   typedQuantityRefusal,
@@ -144,6 +146,44 @@ describe("the words, which are the feature as much as the column is", () => {
     expect(
       unlockConfirmCopy([{ lineId: 1, name: "x", from: 1, to: 2 }]).body
     ).toMatch(/prices on every line stay/i);
+    expect(lockOfferCopy(3).body).toMatch(/already frozen/);
+  });
+
+  /*
+    Gap 3 (owner, 2026-10-08): marking a bid Won OFFERS the lock, once, and
+    never takes it. The offer is the only part with a decision in it.
+  */
+  it("offers the lock on the change to Won, once, and only with something to hold", () => {
+    const won = {
+      from: "Active",
+      to: "Won",
+      lockedAt: null,
+      followingLines: 4,
+    };
+    expect(offersLockOnStatusChange(won)).toBe(true);
+    expect(offersLockOnStatusChange({ ...won, from: "Draft" })).toBe(true);
+    // Already Won (re-picking it), or not Won at all.
+    expect(offersLockOnStatusChange({ ...won, from: "Won" })).toBe(false);
+    expect(offersLockOnStatusChange({ ...won, to: "Lost" })).toBe(false);
+    expect(offersLockOnStatusChange({ ...won, to: "Active" })).toBe(false);
+    // Already locked, or nothing from the plans for a lock to hold.
+    expect(offersLockOnStatusChange({ ...won, lockedAt: LOCKED_AT })).toBe(
+      false
+    );
+    expect(offersLockOnStatusChange({ ...won, followingLines: 0 })).toBe(false);
+  });
+
+  it("asks 'Lock this bid?' with 'Not now' beside it, and counts the lines", () => {
+    const copy = lockOfferCopy(4);
+    expect(copy.title).toBe("Lock this bid?");
+    expect(copy.notNow).toBe("Not now");
+    expect(copy.body).toMatch(/4 lines still follow your plans/);
+    expect(lockOfferCopy(1).body).toMatch(
+      /1 line still follows your plans and changes when/
+    );
+    expect(copy.body).toMatch(
+      /4 lines still follow your plans and change when/
+    );
   });
 
   it("dates the banner and counts what it is holding", () => {

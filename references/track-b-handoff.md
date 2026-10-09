@@ -1,6 +1,28 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, cover swaps + "still saving" (READ FIRST)
+## WHERE B STANDS — 2026-10-08, owner cover decisions + batch 3 (READ FIRST)
+
+- **Cover decisions DONE (`efe06c6`).** Nylon stays. RS1/RS2: the BOX was
+  wrong (no 2-gang power plate; RS1's 6/3 overfills a 1-gang box) → owner
+  chose a 4-11/16" box + 4-11/16" raised cover, 30A/50A. RS13 (outdoor) +
+  `Weatherproof in-use cover, 30A/50A power receptacle`. In the SAME repair
+  script; it now also recognises a database that already ran the first
+  swap (`interim`). **Track A: still report, then `--apply`, on staging and
+  live at the release** — nothing else changed for A. Staging copy
+  (before-0139 + 0139): 48 swapped, rerun 48 "already has it", all 732 bid
+  totals unchanged; scratch DB dropped. B's local DB took the interim path
+  (3 swapped). Tests red without the fix.
+- **Batch 3 DONE.** Gap 3: marking a bid Won offers "Lock this bid?" (bid
+  screen; never locks itself; "Not now" equal and focused). Gap 6.1: a
+  first upload previews from the file in ~1.5–1.9 s; uploaded sets keep
+  reading from disk; attach does not reload. Details and what was seen on
+  screen in todo.md. Throwaway local bids "B 6.1 preview check …" (user 1,
+  `bidrender_local_b_new`) were left; the lock check restored its bid.
+- **Next:** (c) the "fix this line" panel. Optional: staging timing of 6.1
+  with `scripts/stagingUploadTiming.mts` once it is on staging.
+- **State:** no migrations. No dev server running.
+
+## WHERE B STOOD — 2026-10-08, cover swaps + "still saving"
 
 - **Cover swaps DONE (release blocker).** 48 starters, old → new cover
   lines in `server/seed/starterCoverSwaps.ts`, recipes changed to match.

@@ -30,6 +30,9 @@
  * sending a count to the bid is a button rather than a side effect (§ 5f.0
  * OVERRIDE 2). One person, one deliberate act, reversible.
  *
+ * Marking a bid Won does now ASK (owner, 2026-10-08 — `offersLockOnStatusChange`
+ * below). It asks; it never locks.
+ *
  * ── What the lock does NOT touch, and the sentence every screen must carry ───
  * **Prices were already frozen, separately, when each line was added.** The
  * four snapshot columns are R4 and have nothing to do with this. An estimator
@@ -186,6 +189,49 @@ export function unlockedNoticeCopy(followingLines: number): string {
   } your plans and ${
     followingLines === 1 ? "changes" : "change"
   } when you mark or trace. Lock the quantities when this bid is what you sent.`;
+}
+
+/**
+ * Whether marking a bid Won OFFERS the lock (owner, 2026-10-08, Gap 3).
+ *
+ * An offer, never the lock itself — § "Why it is never automatic" above still
+ * holds word for word: a Won bid is often still being adjusted, so the answer
+ * is the estimator's, and "Not now" is exactly as easy as "Lock". Offered on
+ * the CHANGE to Won only, so it asks once rather than every time the bid
+ * opens; not at all when there is nothing a lock would hold, or the bid is
+ * already locked.
+ */
+export function offersLockOnStatusChange(change: {
+  from: string;
+  to: string;
+  lockedAt: Date | null;
+  followingLines: number;
+}): boolean {
+  return (
+    change.to === "Won" &&
+    change.from !== "Won" &&
+    change.lockedAt === null &&
+    change.followingLines > 0
+  );
+}
+
+/** The offer itself — two answers of equal weight, and the price sentence. */
+export function lockOfferCopy(followingLines: number): {
+  title: string;
+  body: string;
+  lock: string;
+  notNow: string;
+} {
+  return {
+    title: "Lock this bid?",
+    body: `You marked it Won. ${plural(followingLines, "line", "lines")} still follow${
+      followingLines === 1 ? "s" : ""
+    } your plans and ${
+      followingLines === 1 ? "changes" : "change"
+    } when you mark or trace. Locking keeps the quantities you sent; you can unlock any time. Prices are a separate thing and were already frozen on each line the day it was added.`,
+    lock: "Lock quantities",
+    notNow: "Not now",
+  };
 }
 
 /**
