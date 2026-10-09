@@ -36,13 +36,8 @@ export const GROUNDING: BaselineMaterial[] = [
     name: "Ground rod clamp",
     searchAliases: aliases("acorn direct burial bronze rod attachment gec"),
   },
-  {
-    ...item("Grounding & Bonding"),
-    name: "Grounding bushing",
-    searchAliases: aliases(
-      "insulated throat lug conduit bond myers hub set screw"
-    ),
-  },
+  // The unsized "Grounding bushing" stood here until the owner's catalog
+  // review, 2026-10-08: every size now ships its own (conduit.ts).
   {
     ...item("Grounding & Bonding"),
     name: "Bonding jumper",
@@ -73,8 +68,15 @@ export const GROUNDING: BaselineMaterial[] = [
       slang: "plate copper buried earth grounding",
     },
     {
+      // No "gas" since 2026-10-08: the gas clamp ships as its own row.
       name: "Water pipe bonding clamp",
-      slang: "cold water gas pipe bond bronze gec",
+      slang: "cold water pipe bond bronze gec",
+    },
+    {
+      // Owner's catalog review, 2026-10-08 (§ ADD 22): CSST and gas piping
+      // bond to their own listed clamp.
+      name: "Gas pipe bonding clamp",
+      slang: "csst gas line piping bond bronze fitting",
     },
     {
       name: "Rebar ground clamp",
@@ -341,13 +343,8 @@ export const FASTENERS: BaselineMaterial[] = [
  * and the connection materials do not get forgotten alongside it.
  */
 export const EQUIPMENT: BaselineMaterial[] = [
-  {
-    ...item("Equipment & Appliances"),
-    name: "Bath exhaust fan",
-    searchAliases: aliases(
-      "vent fan bathroom ceiling exhaust cfm humidity light combo"
-    ),
-  },
+  // The unsized "Bath exhaust fan" stood here until the owner's catalog
+  // review, 2026-10-08: retired in favour of the sized and combo rows.
   {
     ...item("Equipment & Appliances"),
     name: "Range hood fan",
@@ -360,15 +357,8 @@ export const EQUIPMENT: BaselineMaterial[] = [
       "gable roof ventilator whole house thermostat exhaust"
     ),
   },
-  {
-    ...item("Equipment & Appliances"),
-    name: "EV charger",
-    searchAliases: aliases(
-      // "40 amp" came off on 2026-09-25, when the 32A, 40A and 48A chargers
-      // joined as their own rows.
-      "evse electric vehicle car level 2 charging station tesla j1772"
-    ),
-  },
+  // The unsized "EV charger" stood here until the owner's catalog review,
+  // 2026-10-08: retired in favour of the 32A, 40A and 48A rows.
   {
     ...item("Equipment & Appliances"),
     name: "Whole-house surge protector",
@@ -407,7 +397,7 @@ export const EQUIPMENT: BaselineMaterial[] = [
   ...[
     ...["50", "80", "110", "150"].map(cfm => ({
       name: `Bath exhaust fan, ${cfm} CFM`,
-      slang: `${cfm}cfm vent bathroom ceiling`,
+      slang: `${cfm}cfm vent bathroom ceiling humidity`,
     })),
     {
       name: "Bath exhaust fan, light combo",
@@ -451,7 +441,7 @@ export const EQUIPMENT: BaselineMaterial[] = [
     { name: "Snow melt controller", slang: "heat trace de-icing sensor" },
     ...["32", "40", "48"].map(amps => ({
       name: `${amps}A EV charger`,
-      slang: `${amps} amp evse electric vehicle car level 2 j1772`,
+      slang: `${amps} amp evse electric vehicle car level 2 j1772 charging station tesla`,
     })),
     // Not "EV charger pedestal": it led "ev charger" above the chargers.
     { name: "EVSE pedestal", slang: "ev charging mount post stand" },

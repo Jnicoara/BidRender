@@ -93,6 +93,12 @@ const FITTING_NOUNS = [
   // A crimp sleeve splices two conductors. Added 2026-09-25 with the sleeves
   // themselves, when "#4/0 crimp sleeve" ranked above 4/0 SER for "4/0".
   "sleeve",
+  // A wire nut joins conductors: a fitting, not the fastener "nut" below
+  // (longest match wins). Added 2026-10-08, when the catalog review named
+  // them "Wire nut, 22-8 AWG (tan/red)" beside "Wing nut wire connector":
+  // read as a support, the wire nut on 114 starters fell behind the wing
+  // nut for "marrette".
+  "wire nut",
   "expansion fitting",
   "service entrance cap",
   "weatherhead",
@@ -568,6 +574,11 @@ export type RankableMatch = RankableRow & {
    * to the caller's tiebreak, as before.
    */
   commonness?: number;
+  /**
+   * The owner's Specialty tag (0140): a shipped row kept in the catalog but
+   * shown after everyday items. Optional; absent = everyday.
+   */
+  specialty?: boolean;
 };
 
 export const PHRASE = {
@@ -669,6 +680,21 @@ export function compareRankKeys(
 ): number {
   if (ka.phrase !== kb.phrase) return ka.phrase - kb.phrase;
   if (ka.tier !== kb.tier) return ka.tier - kb.tier;
+  /*
+    SPECIALTY SORTS AFTER EVERYDAY (0140, owner's catalog review 2026-10-08)
+    — among rows that answered the query the SAME way, and ahead of every
+    other tiebreak. So a bare "wafer" lists the 4" and 6" canless before
+    the 2", 3", 5" and 8", and "pole" the everyday parts before the light
+    poles; but a query that names a specialty row — its whole name, the
+    start of it, or its own noun ("4 pvc 80 sweep") — still finds it
+    first, because phrase and tier come before this. Placed before the tier
+    at first, it put the 4" Sch 80 elbow above the sweep that was asked
+    for (materialSearchRank.test.ts). Never a filter: every specialty row
+    still shows, below.
+  */
+  const sa = ka.match.specialty === true ? 1 : 0;
+  const sb = kb.match.specialty === true ? 1 : 0;
+  if (sa !== sb) return sa - sb;
   if (ka.role !== kb.role) return ka.role - kb.role;
 
   const a = ka.match;
@@ -702,6 +728,8 @@ export type SearchableMaterial = {
   name: string;
   category?: string | null;
   searchAliases?: string | null;
+  /** 0140 — see RankableMatch.specialty. */
+  isSpecialty?: boolean | null;
 };
 
 /**
@@ -737,6 +765,7 @@ export function rankMaterialHits<R extends SearchableMaterial>(
       score,
       family: options.families.get(familyKey(row.name)),
       commonness: options.commonness?.(row) ?? 0,
+      specialty: row.isSpecialty === true,
     } satisfies RankableMatch,
   }));
   const categoryOf = new Map(keyed.map(k => [k.row.name, k.row.category]));

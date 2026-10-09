@@ -75,7 +75,8 @@ function rigidRacewaysAndTheirNineties(): Record<string, StarterCommonness> {
     '3"',
     '4"',
   ];
-  const families = ["EMT", "PVC Sch 40", "PVC Sch 80", "rigid conduit", "IMC"];
+  // No IMC since the owner's catalog review, 2026-10-08 (all IMC retired).
+  const families = ["EMT", "PVC Sch 40", "PVC Sch 80", "rigid conduit"];
   const out: Record<string, StarterCommonness> = {};
   for (const family of families) {
     for (const size of sizes) {
@@ -180,18 +181,17 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   '3" EMT set-screw coupling': "common",
   '4" EMT set-screw connector': "common",
   '4" EMT set-screw coupling': "common",
-  "EMT strap": "common",
 
   // ── Boxes ──
   "Single-gang box": "core",
   "Double-gang box": "core",
-  '4" square box': "core",
+  '4" square box, 1-1/2" deep': "core",
   "Single-gang metal box": "common",
   "Double-gang metal box": "common",
   "Triple-gang box": "common",
   "Fan-rated ceiling box": "common",
   "Octagon box, plastic": "common",
-  "Octagon box, metal": "common",
+  'Octagon box, metal, 1-1/2" deep': "common",
   '4" square mud ring': "common",
   // Added 2026-09-27 with the rows (boxes audit): the everyday part of each
   // new family. A raised cover was marked too and dropped the same hour — it
@@ -224,8 +224,8 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   "20A GFCI receptacle": "common",
   "GFCI receptacle, weather-resistant": "common",
   "USB combo receptacle": "common",
-  "30A dryer receptacle": "common",
-  "50A range receptacle": "common",
+  "30A dryer receptacle, NEMA 14-30R (4-wire)": "common",
+  "50A range receptacle, NEMA 14-50R": "common",
   "4-way switch": "common",
   // So "20a switch" leads with the single-pole, as "switch" does (2026-09-25).
   "20A single-pole switch": "common",
@@ -274,6 +274,11 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
 
   // ── Grounding: on every service ──
   'Ground rod, 5/8" x 8 ft': "common",
+
+  // ── Connectors: the wire nut on 114 starters ──
+  // Added 2026-10-08, when the catalog review named wire nuts by range:
+  // with three rows sharing the slang, "marrette" led with the wing nut.
+  "Wire nut, 22-8 AWG (tan/red)": "common",
 };
 
 /**

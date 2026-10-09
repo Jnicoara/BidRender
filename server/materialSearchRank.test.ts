@@ -33,7 +33,10 @@ import {
   RENAMED_BASELINE_MATERIALS,
   renamedTo,
 } from "../shared/renamedMaterials";
-import { BASELINE_MATERIALS } from "../server/seed/baselineMaterials";
+import {
+  BASELINE_MATERIALS,
+  RETIRED_BASELINE_MATERIALS,
+} from "../server/seed/baselineMaterials";
 import {
   smartSearch,
   smartSearchCorrected,
@@ -394,15 +397,16 @@ describe("the searches that must not regress, against the shipped catalog", () =
   });
 
   it("still answers slang with the material that carries it", () => {
-    expect(top("marrette")[0]).toBe("Wire nuts");
+    expect(top("marrette")[0]).toBe("Wire nut, 22-8 AWG (tan/red)");
     expect(top("romex")[0]).toContain("NM-B");
-    expect(top("1900")[0]).toBe('4" square box');
+    expect(top("1900")[0]).toBe('4" square box, 1-1/2" deep');
   });
 
   it("still answers a named part with that part, not its family", () => {
     expect(top("pvc connector")[0]).toContain("connector");
     expect(top("emt coupling")[0]).toContain("coupling");
-    expect(top("emt strap")[0]).toBe("EMT strap");
+    // The unsized "EMT strap" was retired 2026-10-08; a sized one leads.
+    expect(top("emt strap")[0]).toMatch(/^1\/2" EMT (one|two)-hole strap$/);
   });
 });
 
@@ -452,8 +456,13 @@ describe("an old name finds the row it was renamed to, first", () => {
   };
 
   const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
+  // A rename into a row the owner's catalog review RETIRED (2026-10-08 —
+  // #14/#12/#10 bare copper) has nothing to rank: the row is withdrawn from
+  // every list. It stays in the map so an old database converges onto the
+  // retired name (frozenMaterialNames.test.ts).
+  const retired = new Set(RETIRED_BASELINE_MATERIALS);
   const entries = Object.entries(RENAMED_BASELINE_MATERIALS).filter(
-    ([from]) => !(from in NOT_A_RANKING_PROBLEM)
+    ([from, to]) => !(from in NOT_A_RANKING_PROBLEM) && !retired.has(to)
   );
 
   it("covers the whole map, and every target is a shipped row", () => {
@@ -661,7 +670,7 @@ describe("a count before its noun matches that count, never a size", () => {
     ["3 hole", '1/2" weatherproof box, single-gang'],
     ["2 pole 20", "20A 2-Pole breaker"],
     ["2 pole", "20A 2-Pole breaker"],
-    ["2 hole strap", "EMT strap"],
+    ["2 hole strap", '1/2" EMT two-hole strap'],
     // Right before, and must stay right.
     ["3 way", "3-way switch"],
     ["4 gang", "4-gang box"],

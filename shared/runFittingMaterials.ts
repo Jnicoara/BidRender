@@ -252,7 +252,7 @@ export function pullBoxFor(
  * different parts.
  */
 export const SMALL_TEE_BOX = {
-  box: '4" square box',
+  box: '4" square box, 1-1/2" deep',
   cover: '4" square blank cover',
 } as const;
 
@@ -286,7 +286,7 @@ export function teeBoxFor(
   }
   if (inches <= 1.25) {
     return {
-      box: '4-11/16" square box',
+      box: '4-11/16" square box, 2-1/8" deep',
       cover: '4-11/16" square blank cover',
       why: `a 4-11/16" square box at each tee on ${parsed.size}`,
     };
@@ -758,10 +758,17 @@ export function mcFittingNames(
   // the slash form would have lost its connectors and straps without a word
   // (naming plan § 1.3). MC-AP (aluminum armor, 2026-10-07) is MC too and
   // takes the same connector and strap.
-  const match = /^#?(\d+)[-/](\d) MC(?:-AP)? cable\b/.exec(cableName);
+  //
+  // "#3 4-conductor MC cable Copper" too (owner's catalog review,
+  // 2026-10-08): the #3 cables say their count in words, and without this
+  // a #3 MC run would lose its connectors and straps without a word.
+  const match =
+    /^#?(\d+)(?:[-/](\d)| ([1-9])-conductor) MC(?:-AP)? cable\b/.exec(
+      cableName
+    );
   if (!match) return null;
   const gauge = Number(match[1]);
-  const conductors = Number(match[2]);
+  const conductors = Number(match[2] ?? match[3]);
   const small = gauge >= 12 || (gauge === 10 && conductors <= 3);
   const connector = small
     ? '3/8"'

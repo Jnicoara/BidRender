@@ -357,7 +357,12 @@ describe.skipIf(!hasDb)("seeding a database", () => {
     const [wireNuts] = await db
       .select({ id: materials.id })
       .from(materials)
-      .where(and(isNull(materials.userId), eq(materials.name, "Wire nuts")))
+      .where(
+        and(
+          isNull(materials.userId),
+          eq(materials.name, "Wire nut, 22-8 AWG (tan/red)")
+        )
+      )
       .limit(1);
 
     // The company's fork of a shipped starter, edited…

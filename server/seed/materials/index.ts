@@ -36,6 +36,8 @@ import {
 import { STRUT } from "./strut";
 import { STARTER_PRICES } from "./starterPrices";
 import { STARTER_LABOR_UNITS } from "./starterLaborUnits";
+import { SPECIALTY_MATERIALS } from "./specialty";
+import { CATALOG_REVIEW_RETIRED } from "../../../shared/catalogReview20261008";
 import {
   SERVICE_ENTRANCE,
   SURFACE_RACEWAY,
@@ -95,6 +97,12 @@ export const RETIRED_BASELINE_MATERIALS: string[] = [
   // describes a part nobody buys on its own. Retired, not deleted, so
   // anything already pointing at it still resolves. Staging-only row.
   "Surface raceway cover, 700 series",
+  // The owner's catalog review, 2026-10-08: #14/#12/#10 bare copper, the
+  // generic EMT strap and three other generics, all 3-1/2" and all IMC,
+  // six unused generic connectors and the unsized grounding bushing — 138
+  // rows, listed with the reason for each group in
+  // shared/catalogReview20261008.ts.
+  ...CATALOG_REVIEW_RETIRED,
 ];
 
 /**
@@ -132,7 +140,19 @@ export const BASELINE_MATERIALS: BaselineMaterial[] = (
   ] as BaselineMaterial[]
 )
   .map(dropRestatedWords)
-  .map(m => withStarterValues(m));
+  .map(m => withStarterValues(m))
+  .map(m => withSpecialty(m));
+
+/**
+ * The owner's Specialty tag (0140), applied by NAME from specialty.ts — the
+ * modules say what a row IS; the list says which rows sort lower.
+ */
+export function withSpecialty(
+  m: BaselineMaterial,
+  specialty: readonly string[] = SPECIALTY_MATERIALS
+): BaselineMaterial {
+  return specialty.includes(m.name) ? { ...m, isSpecialty: true } : m;
+}
 
 /**
  * The starter sheets' numbers, applied by NAME on top of the modules: the

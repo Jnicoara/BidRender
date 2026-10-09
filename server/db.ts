@@ -221,7 +221,11 @@ import {
   BASELINE_LABOR_RATES,
   type BaselineLaborRate,
 } from "./seed/baselineLaborRates";
-import { BASELINE_RUN_TYPES } from "./seed/baselineRunTypes";
+import {
+  BASELINE_RUN_TYPES,
+  RETIRED_BASELINE_RUN_TYPES,
+  RUN_TYPE_MATERIAL_SWAPS,
+} from "./seed/baselineRunTypes";
 import { BASELINE_MODIFIERS } from "./seed/baselineModifiers";
 import {
   BASELINE_ASSEMBLIES,
@@ -1505,9 +1509,19 @@ function contentFields<TRow extends object, TInsert>(
   return copy as Partial<TInsert>;
 }
 
-/** Back-compat alias — materials read better with the specific name. */
-const materialContentFields = (row: Material) =>
-  contentFields<Material, InsertMaterial>(row);
+/**
+ * Back-compat alias — materials read better with the specific name.
+ *
+ * Never copies the Specialty tag (0140): it is the catalog's opinion of a
+ * SHIPPED row, written only by the seed. A company that forks a row — to
+ * price it, rename it, re-shelve it — has made it its own, and its copy is
+ * an everyday item from then on, whether forked before 0140 or after.
+ */
+const materialContentFields = (row: Material): Partial<InsertMaterial> => {
+  const copy = contentFields<Material, InsertMaterial>(row);
+  delete copy.isSpecialty;
+  return copy;
+};
 
 /**
  * Collapse baseline + user rows into the one list a user should see.
@@ -2184,6 +2198,7 @@ export async function seedBaselineMaterialsFrom(
       fieldBendLaborHours: m.fieldBendLaborHours ?? null,
       isExamplePrice: m.isExamplePrice ?? null,
       isExampleLaborHours: m.isExampleLaborHours ?? null,
+      isSpecialty: m.isSpecialty ?? null,
       userId: null,
     }));
 
@@ -2291,6 +2306,7 @@ async function backfillMaterialMetadata(
       fieldBendLaborHours: materials.fieldBendLaborHours,
       isExamplePrice: materials.isExamplePrice,
       isExampleLaborHours: materials.isExampleLaborHours,
+      isSpecialty: materials.isSpecialty,
     })
     .from(materials)
     .where(isNull(materials.userId));
@@ -2350,7 +2366,14 @@ async function backfillMaterialMetadata(
       if (have !== (want === null ? null : Number(want))) patch[key] = want;
     }
     // The example tags travel with the numbers they describe (0132 / 0133).
-    for (const key of ["isExamplePrice", "isExampleLaborHours"] as const) {
+    // So does the Specialty tag (0140) — SHIPPED rows only, as everything in
+    // this pass: a company's copy is never tagged (catalog review
+    // 2026-10-08).
+    for (const key of [
+      "isExamplePrice",
+      "isExampleLaborHours",
+      "isSpecialty",
+    ] as const) {
       const want = intended[key] ?? null;
       if ((row[key] ?? null) !== want) patch[key] = want;
     }
@@ -2762,7 +2785,86 @@ export async function seedBaselineRunTypes(): Promise<void> {
     }
 
     await seedBaselineRunTypeExtras(db, materialId);
+    await swapBaselineRunTypeMaterials(db);
+    await retireBaselineRunTypes(db);
   });
+}
+
+/**
+ * Move a SHIPPED run type's material link from one shipped row to another
+ * (RUN_TYPE_MATERIAL_SWAPS, baselineRunTypes.ts). Only links that still name
+ * the `from` row move — a re-pointed shipped type, and every company's own
+ * type, are left as they are. Idempotent: once moved, nothing matches.
+ *
+ * A bid line already made from a moved link keeps its FROZEN material and
+ * price (bid_line_items snapshots); only what the type buys from now on
+ * changes.
+ */
+async function swapBaselineRunTypeMaterials(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<void> {
+  if (RUN_TYPE_MATERIAL_SWAPS.length === 0) return;
+  const names = RUN_TYPE_MATERIAL_SWAPS.flatMap(s => [s.from, s.to]);
+  const rows = await db
+    .select({ id: materials.id, name: materials.name })
+    .from(materials)
+    .where(and(isNull(materials.userId), inArray(materials.name, names)));
+  // Exact, in JS: the column ignores case (see dedupeBaselineRows).
+  const idOf = (name: string) => rows.find(r => r.name === name)?.id;
+  const LINKS = [
+    "racewayMaterialId",
+    "conductorMaterialId",
+    "groundMaterialId",
+  ] as const;
+  for (const { from, to } of RUN_TYPE_MATERIAL_SWAPS) {
+    const fromId = idOf(from);
+    const toId = idOf(to);
+    if (fromId === undefined || toId === undefined) continue;
+    for (const link of LINKS) {
+      await db
+        .update(takeoffRunTypes)
+        .set({ [link]: toId })
+        .where(
+          and(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes[link], fromId))
+        );
+    }
+  }
+}
+
+/**
+ * Archive the SHIPPED run types the catalog no longer ships
+ * (RETIRED_BASELINE_RUN_TYPES). Archived, not deleted: a run traced under one
+ * resolves it still, and the palette stops offering it. Only an ACTIVE
+ * shipped row is touched, so a second start changes nothing.
+ */
+async function retireBaselineRunTypes(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
+): Promise<void> {
+  for (const { pathType, label } of RETIRED_BASELINE_RUN_TYPES) {
+    const due = (
+      await db
+        .select({ id: takeoffRunTypes.id, label: takeoffRunTypes.label })
+        .from(takeoffRunTypes)
+        .where(
+          and(
+            isNull(takeoffRunTypes.userId),
+            eq(takeoffRunTypes.pathType, pathType),
+            eq(takeoffRunTypes.label, label),
+            eq(takeoffRunTypes.status, "active")
+          )
+        )
+    ).filter(row => row.label === label);
+    if (due.length === 0) continue;
+    await db
+      .update(takeoffRunTypes)
+      .set({ status: "archived", archivedAt: new Date() })
+      .where(
+        inArray(
+          takeoffRunTypes.id,
+          due.map(row => row.id)
+        )
+      );
+  }
 }
 
 /**

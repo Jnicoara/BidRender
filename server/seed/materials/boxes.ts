@@ -155,13 +155,15 @@ const masonryBoxes: BaselineMaterial[] = [
 }));
 
 /*
-  ── Depth and gang are written into the name only on the ADDED row ──────────
-  `4" square box`, `4-11/16" square box` and both blank covers are named by
-  shared/runFittingMaterials.ts as the tee box and cover, and `4" square box`
-  by a starter assembly, so the boxes audit (2026-09-27) left every existing
-  name alone and said what it is in a description instead. The existing box is
-  the 1-1/2" deep one and the existing mud ring is single-gang; the rows added
-  beside them carry the difference in their names.
+  ── Depth and gang were written into the name only on the ADDED row ─────────
+  — until the owner's catalog review, 2026-10-08, which put the depth into
+  the 4" square and 4-11/16" square box names too (renamed in place; see
+  below). Before that, `4" square box`, `4-11/16" square box` and both blank
+  covers were named by shared/runFittingMaterials.ts as the tee box and
+  cover, and `4" square box` by a starter assembly, so the boxes audit
+  (2026-09-27) left every existing name alone and said what it is in a
+  description instead. The tee box constants now carry the new names; the
+  mud ring is still single-gang by default, and the 2-gang one says so.
 
   Mud ring DEPTHS stay merged — "Plaster ring, 1/2 in" and "5/8 in" were folded
   into the one ring on 2026-09-25 (pricing/movedFromSheet.ts). Gang count is
@@ -171,12 +173,24 @@ const SQUARE_BOX = "junction jbox j box metal steel";
 /** Surface covers for exposed work — a device mounts straight to the cover. */
 const RAISED_COVER = "industrial exposed surface work shop garage steel";
 const squareBoxes: BaselineMaterial[] = [
+  /*
+    The depth went INTO the name in the owner's catalog review, 2026-10-08,
+    for the four boxes whose depth the catalog's own data stated (this one,
+    the 4-11/16", the metal octagon and the shallow round). Renamed in place,
+    same ids; shared/runFittingMaterials.ts names the tee box by the new
+    name. Boxes whose depth would only be "typical" were NOT renamed — they
+    wait for the owner to verify (catalog review § 6).
+  */
   {
     ...each,
-    name: '4" square box',
+    name: '4" square box, 1-1/2" deep',
     // Universally "a 1900" — the one alias nobody's catalog can do without.
-    searchAliases: aliases("1900 four square 4in", SQUARE_BOX, STEEL_BRANDS),
-    description: '1-1/2" deep. The 2-1/8" deep box is a separate item.',
+    searchAliases: aliases(
+      "1900 four square 4in 11/2",
+      SQUARE_BOX,
+      STEEL_BRANDS
+    ),
+    description: 'The 2-1/8" deep box is a separate item.',
   },
   {
     ...each,
@@ -189,15 +203,14 @@ const squareBoxes: BaselineMaterial[] = [
   },
   {
     ...each,
-    name: '4-11/16" square box',
+    // Depth in the name since 2026-10-08 (above); its description had said
+    // 2-1/8" deep since 2026-09-27, how it is normally bought.
+    name: '4-11/16" square box, 2-1/8" deep',
     searchAliases: aliases(
-      "4 11/16 five square 5 square jumbo",
+      "4 11/16 five square 5 square jumbo 21/8",
       SQUARE_BOX,
       STEEL_BRANDS
     ),
-    // How it is normally bought; said so the 4" pair's depth note is not the
-    // only one on the shelf (plan § 6, 2026-09-27).
-    description: '2-1/8" deep.',
   },
   {
     ...each,
@@ -416,13 +429,14 @@ const ceilingBoxes: BaselineMaterial[] = [
   },
   {
     ...each,
-    name: "Octagon box, metal",
+    // Depth in the name since 2026-10-08 (see the square boxes).
+    name: 'Octagon box, metal, 1-1/2" deep',
     searchAliases: aliases(
-      "oct round ceiling light fixture steel",
+      "oct round ceiling light fixture steel 11/2",
       STEEL_BRANDS
     ),
     description:
-      'Steel, 1-1/2" deep. The plastic and the 2-1/8" deep boxes are separate items.',
+      'Steel. The plastic and the 2-1/8" deep boxes are separate items.',
   },
   // Boxes audit, 2026-09-27 — same depth split as the 4" square box.
   {
@@ -452,8 +466,9 @@ const ceilingBoxes: BaselineMaterial[] = [
   // Moved from the pricing sheet, 2026-09-25.
   {
     ...each,
-    name: "Shallow round box",
-    searchAliases: aliases("pancake 1/2 inch half deep ceiling light steel"),
+    // Depth in the name since 2026-10-08 (see the square boxes).
+    name: 'Shallow round box, 1/2" deep',
+    searchAliases: aliases("pancake inch half ceiling light steel"),
   },
   {
     ...each,
@@ -774,6 +789,17 @@ const roughIn: BaselineMaterial[] = [
       "plate extender"
     ),
   },
+  // Owner's catalog review, 2026-10-08 (§ ADD 11).
+  {
+    ...each,
+    name: "Double-gang box extender",
+    searchAliases: aliases(
+      // No "ring": "2 gang mud ring" must list mud rings, and this answered
+      // it through "goof ring" (materialSearchRank.test.ts).
+      "2-gang 2 gang two gang extension goof tile backsplash recessed deep device plate extender"
+    ),
+    jobKind: "both",
+  },
   {
     ...each,
     name: "Drywall repair ring",
@@ -782,9 +808,30 @@ const roughIn: BaselineMaterial[] = [
   {
     ...each,
     name: "Low-voltage mud ring",
+    // The single-gang "LV1" (lv1 since 2026-10-08, when the 2-gang LV2 was
+    // added beside it — catalog review § ADD 14). Name unchanged.
     searchAliases: aliases(
-      "lv bracket old work data cat6 tv low voltage mounting open back"
+      "lv lv1 bracket old work data cat6 tv low voltage mounting open back single gang 1-gang"
     ),
+  },
+  {
+    ...each,
+    name: "Low-voltage mud ring, 2-gang",
+    searchAliases: aliases(
+      "lv lv2 bracket old work data cat6 tv low voltage mounting open back double two gang"
+    ),
+    jobKind: "both",
+  },
+  {
+    ...each,
+    name: "Old-work box F-clip",
+    searchAliases: aliases(
+      "f clip fclip box support clip remodel cut in caddy"
+    ),
+    description:
+      'Holds an old-work box to the wall board. The "Device wing bracket" (Madison strap) is a separate item.',
+    defaultQty: 2,
+    jobKind: "both",
   },
   {
     ...each,

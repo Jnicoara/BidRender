@@ -981,6 +981,13 @@
       "when": 1789962900000,
       "tag": "0139_elbow_flat_role",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "5",
+      "when": 1789963000000,
+      "tag": "0140_material_specialty",
+      "breakpoints": true
     }
   ]
 }

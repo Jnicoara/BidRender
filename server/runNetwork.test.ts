@@ -325,13 +325,13 @@ describe("tee box and cover lines", () => {
 describe("the tee box's size (D20, answer 3)", () => {
   it("is a 4-inch square box and cover up to 3/4 inch", () => {
     expect(teeBoxFor('3/4" EMT', null)).toMatchObject({
-      box: '4" square box',
+      box: '4" square box, 1-1/2" deep',
       cover: '4" square blank cover',
     });
   });
   it("is 4-11/16 inch from 1 to 1-1/4 inch", () => {
     expect(teeBoxFor('1-1/4" EMT', null)).toMatchObject({
-      box: '4-11/16" square box',
+      box: '4-11/16" square box, 2-1/8" deep',
       cover: '4-11/16" square blank cover',
     });
   });

@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-08]
 
+- **The starter catalog follows the owner's catalog review.** 138 shipped
+  items were withdrawn — all IMC and all 3-1/2" conduit and fittings, #14 to
+  #10 bare copper, and unsized "generic" rows whose sized versions cover
+  them (EMT strap, wall pack, bath fan, EV charger, the generic split bolt,
+  H-tap, crimp terminals and multi-tap). Withdrawn means hidden from lists,
+  never deleted, so a bid already priced from one still opens as it was.
+  107 everyday items were added: sized set-screw splices, mechanical lugs,
+  split bolts, Polaris-style multi-taps, crimp terminals by colour, cord
+  grips, more crimp sleeves, grounding bushings for every size, phase tape
+  in nine colours, Carflex (nonmetallic liquidtight) and its connectors,
+  6/2 NM-B, 12/3 and 10/3 UF-B and more. Wire nuts are now named by the
+  wire they take ("Wire nut, 22-8 AWG (tan/red)" — the same item the
+  starters use), receptacles state their NEMA type, and four boxes say
+  their depth. A new "Specialty" tag keeps 108 rarely used items (busway,
+  light poles, VFDs, the odd canless sizes…) in the catalog but lists them
+  after the everyday ones in every material search. The three "#12 +
+  ground" run types now pull green #12 THHN as the ground. Bid totals do
+  not move.
 - **Starter assemblies now carry the right cover plate.** Receptacles get a
   duplex plate, switches a toggle plate, and GFCI, AFCI, USB, dimmer,
   sensor, timer and fan-control devices a decorator plate, in place of the

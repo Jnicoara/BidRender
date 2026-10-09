@@ -42,6 +42,18 @@ export const RECEPTACLES: BaselineMaterial[] = [
     ),
     description: "20A, T-slot. The 15A version is a separate item.",
   },
+  // Spec grade as its own item (owner's catalog review, 2026-10-08): the
+  // heavier commercial device a spec calls for, priced apart.
+  {
+    ...device("Receptacles"),
+    name: "20A duplex receptacle, spec grade",
+    searchAliases: aliases(
+      RECEP_SLANG,
+      "5-20r specification commercial heavy duty industrial t-slot tr"
+    ),
+    description: "Commercial specification grade, 20A, T-slot.",
+    jobKind: "commercial",
+  },
   {
     ...device("Receptacles"),
     name: "GFCI receptacle",
@@ -71,21 +83,34 @@ export const RECEPTACLES: BaselineMaterial[] = [
   },
   {
     ...device("Receptacles"),
-    name: "50A range receptacle",
+    // NEMA in the name, and no "6-50" (a welder receptacle, not a range),
+    // since the owner's catalog review, 2026-10-08.
+    name: "50A range receptacle, NEMA 14-50R",
     searchAliases: aliases(
       "stove oven cooktop",
       RECEP_SLANG,
-      "14-50r 6-50 four prong surface"
+      "14-50 four prong surface"
     ),
+  },
+  /*
+    The dryer receptacle split by wiring (catalog review, 2026-10-08): the
+    shipped row is the 4-wire 14-30R, renamed in place — RS2 buys it with a
+    4-wire cord — and the 3-wire 10-30R, for an older dryer circuit, is new.
+  */
+  {
+    ...device("Receptacles"),
+    name: "30A dryer receptacle, NEMA 14-30R (4-wire)",
+    searchAliases: aliases("laundry", RECEP_SLANG, "14-30 four prong"),
   },
   {
     ...device("Receptacles"),
-    name: "30A dryer receptacle",
+    name: "30A dryer receptacle, NEMA 10-30R (3-wire)",
     searchAliases: aliases(
       "laundry",
       RECEP_SLANG,
-      "14-30r 10-30 four prong three prong"
+      "10-30 three prong old existing"
     ),
+    jobKind: "residential",
   },
   {
     ...device("Receptacles"),
@@ -213,7 +238,8 @@ export const RECEPTACLES: BaselineMaterial[] = [
   })),
   {
     ...device("Receptacles"),
-    name: "30A RV receptacle",
+    // NEMA in the name since the owner's catalog review, 2026-10-08.
+    name: "30A RV receptacle, NEMA TT-30R",
     searchAliases: aliases(
       "tt-30 tt30 camper travel trailer 125v",
       RECEP_SLANG

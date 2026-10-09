@@ -92,6 +92,12 @@ export type BaselineMaterial = {
    */
   isExamplePrice?: true;
   isExampleLaborHours?: true;
+  /**
+   * "Specialty" (0140): set ONLY by `withSpecialty` (index.ts) from the
+   * owner's list in specialty.ts — never typed on a row, so the list is the
+   * one place to read what is tagged.
+   */
+  isSpecialty?: true;
 };
 
 export type RacewayFacts = {

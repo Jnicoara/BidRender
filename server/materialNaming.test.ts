@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { BASELINE_MATERIALS } from "./seed/materials/index";
 import { WIRE_AND_CABLE_PROPOSALS } from "../shared/materialRenameProposals";
 import frozenJson from "../pricing/frozen-names.json";
+import { latestCatalogName } from "../shared/renamedMaterials";
+import { FROZEN_ADDS_SHIPPED_AS } from "../shared/frozenAddsHeld";
+import {
+  CATALOG_REVIEW_RETIRED,
+  CATALOG_REVIEW_WIRE_ADDS,
+} from "../shared/catalogReview20261008";
 import {
   normaliseNewName,
   proposeMaterialName,
@@ -22,18 +28,23 @@ describe("the decided wire and cable names", () => {
     const wire = BASELINE_MATERIALS.filter(m => m.category === "Wire & Cable");
     // What the rules produce from each old name — the table's own proposal
     // with the aught rule applied on top ("#1/0 THHN Copper" -> "1/0 …").
-    const finals = WIRE_AND_CABLE_PROPOSALS.map(
-      r =>
+    // As the owner's catalog review (2026-10-08) left them: two #3 MC names
+    // renamed again, four bare-copper rows retired, five rows added.
+    const retired = new Set(CATALOG_REVIEW_RETIRED);
+    const finals = WIRE_AND_CABLE_PROPOSALS.map(r =>
+      latestCatalogName(
         proposeMaterialName({ name: r.current, category: "Wire & Cable" })
           .proposed
-    );
+      )
+    ).filter(name => !retired.has(name));
     // The new rows frozen with them (#3 XHHW Aluminum and three cables) are
     // decided names too, by the same sheet — just not renames.
-    const frozenWireAdds = (
-      frozenJson.adds as { name: string; category: string }[]
-    )
-      .filter(a => a.category === "Wire & Cable")
-      .map(a => a.name);
+    const frozenWireAdds = [
+      ...(frozenJson.adds as { name: string; category: string }[])
+        .filter(a => a.category === "Wire & Cable")
+        .map(a => latestCatalogName(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name)),
+      ...CATALOG_REVIEW_WIRE_ADDS,
+    ];
     expect(
       wire
         .filter(

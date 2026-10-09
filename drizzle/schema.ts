@@ -762,6 +762,15 @@ export const materials = mysqlTable(
      */
     isExamplePrice: boolean("isExamplePrice"),
     isExampleLaborHours: boolean("isExampleLaborHours"),
+    /**
+     * "Specialty" (0140, owner's catalog review 2026-10-08): TRUE on a
+     * SHIPPED row that stays in the catalog but sorts after everyday items
+     * in the picker and every material search (rankMaterialHits). Set only
+     * by the seed (server/seed/materials/specialty.ts); a company's own copy
+     * is never tagged. NULL = everyday. Orders search results only — no
+     * total reads it.
+     */
+    isSpecialty: boolean("isSpecialty"),
 
     unitOfSale: mysqlEnum("unitOfSale", MATERIAL_UNITS_OF_SALE)
       .default("each")

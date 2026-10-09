@@ -251,7 +251,11 @@ describe("commonness points", () => {
     expect(first).toBeGreaterThan(second);
     expect(first - second).toBeLessThan(1);
     // So it can never lift a "common" row over a "core" one.
-    const lastCore = commonnessPoints('4" square box', undefined, NOW);
+    const lastCore = commonnessPoints(
+      '4" square box, 1-1/2" deep',
+      undefined,
+      NOW
+    );
     const firstCommon = commonnessPoints(
       "30A Single-Pole breaker",
       undefined,

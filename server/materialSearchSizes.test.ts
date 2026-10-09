@@ -86,7 +86,7 @@ describe('"inch" spelled out is the " mark', () => {
 
   it('"4 inch box" leads with the 4" square box, not connectors', () => {
     const hits = search("4 inch box");
-    expect(hits[0]).toBe('4" square box');
+    expect(hits[0]).toBe('4" square box, 1-1/2" deep');
     onlySize(hits, "4");
   });
 

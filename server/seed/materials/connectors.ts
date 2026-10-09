@@ -1,12 +1,15 @@
 /**
  * Connectors, terminations and the consumables that go in every van.
  *
- * ── Wire nuts keep their generic name ────────────────────────────────────────
- * "Wire nuts" is what the shipped catalog calls them and what several starter
- * assemblies reference, so it stays — and it means the orange/medium size,
- * which is the one that goes on most splices. The small and large sizes say so
- * in their names and all three carry the colour, because nobody at a counter
- * asks for a "medium wire nut": they ask for a red one.
+ * ── Wire nuts are named by WIRE RANGE (owner's catalog review, 2026-10-08) ──
+ * Until then they were "Wire nuts", "Wire nuts, small" and "Wire nuts,
+ * large", with colour notes that were backwards for the common brand (it
+ * called orange the medium; orange is the smallest of orange/yellow/red).
+ * Now each says the range it takes and its colours: the general-purpose
+ * 22-8 (tan/red) — the SAME row the 114 starters use, renamed in place — the
+ * small 22-12 (blue/orange) and the large blue wing nut, 14-6. The small and
+ * large rows became those two by rename (shared/catalogReview20261008.ts).
+ * Ranges are the common published ones and vary a little by maker.
  */
 import { aliases, UNPRICED, type BaselineMaterial } from "./types";
 
@@ -18,32 +21,33 @@ const part = (category: "Connectors & Terminations" | "Consumables") => ({
 
 const CONN = part("Connectors & Terminations");
 
+const WIRE_NUT_SLANG =
+  "wirenut wire nuts connector marrette marette twist on twister splice cap 3m ideal";
+
 const wireNuts: BaselineMaterial[] = [
   {
     ...CONN,
-    name: "Wire nuts",
-    searchAliases: aliases(
-      "nut connector marrette marette twist on twister splice cap winged orange medium"
-    ),
-    description: "Medium/orange — the general-purpose size.",
+    name: "Wire nut, 22-8 AWG (tan/red)",
+    searchAliases: aliases(WIRE_NUT_SLANG, "general purpose medium"),
+    description:
+      "The general-purpose size: #14 and #12 device and fixture splices.",
     defaultQty: 3,
   },
   {
     ...CONN,
-    name: "Wire nuts, small",
-    searchAliases: aliases(
-      "nut connector marrette marette twist on splice cap red yellow low voltage"
-    ),
-    description: "Red/yellow, for small conductor counts.",
+    name: "Wire nut, 22-12 AWG (blue/orange)",
+    searchAliases: aliases(WIRE_NUT_SLANG, "small low voltage fixture"),
+    description: "For a few small conductors — fixture leads, low voltage.",
     defaultQty: 3,
   },
   {
     ...CONN,
-    name: "Wire nuts, large",
+    name: "Wing nut wire connector, 14-6 AWG (blue)",
     searchAliases: aliases(
-      "nut connector marrette marette twist on splice cap grey gray blue big"
+      WIRE_NUT_SLANG,
+      "wingnut winged large big wire connector"
     ),
-    description: "Gray/blue, for large conductor counts.",
+    description: "For many conductors, or #10 to #6.",
     defaultQty: 3,
   },
 ];
@@ -60,14 +64,34 @@ const cableConnectors: BaselineMaterial[] = ['3/8"', '1/2"', '3/4"', '1"'].map(
     name: `${size} cable connector`,
     // No "mc" since 2026-09-29: MC has connectors of its own below, and this
     // row answering "mc connector" first sent MC runs to the NM clamp.
+    // No "snap in" since 2026-10-08: snap-in connectors are their own rows
+    // (below), and these are the screw clamps.
     searchAliases: aliases(
       size.replace('"', ""),
-      "romex nm ser se clamp box fitting snap in duplex saddle two screw"
+      "romex nm ser se clamp box fitting duplex saddle two screw"
     ),
     description: "Sized by cable outside diameter, not by conductor gauge.",
     defaultQty: 2,
   })
 );
+
+/**
+ * Snap-in (push-in) NM connectors, their own items since the owner's
+ * catalog review, 2026-10-08 (§ ADD 23). Sold by the KNOCKOUT they snap
+ * into, which is how they are named; until then one row per size stood for
+ * both the screw clamp and the snap-in.
+ */
+const snapInConnectors: BaselineMaterial[] = ['1/2"', '3/4"'].map(size => ({
+  ...CONN,
+  name: `${size} snap-in NM connector`,
+  searchAliases: aliases(
+    size.replace('"', ""),
+    "snap in push in romex nm cable connector clamp box fitting knockout ko"
+  ),
+  description: "Snaps into a knockout of this size. For NM-B cable.",
+  defaultQty: 2,
+  jobKind: "residential",
+}));
 
 /**
  * MC cable connectors, by knockout size (retail catalog plan § R1,
@@ -192,6 +216,150 @@ const lugs: BaselineMaterial[] = LUG_RANGES.map(
   })
 );
 
+/**
+ * The sized connectors and terminations the owner's catalog review added,
+ * 2026-10-08 (§ 5), everyday sizes only. Ranges are the standard published
+ * ones; FOUR differ from the owner's list, because no maker found sells the
+ * listed one (checked 2026-10-08, Ilsco / NSi Polaris / Burndy listings):
+ *   set-screw splice #8-#2   -> #14-#2  (Ilsco SPA-2 is 14-2)
+ *   set-screw splice 4/0-500 -> #4-500  (SPA-500 is 4 AWG-500 kcmil)
+ *   multi-tap 4/0-#6         -> 3/0-#6  (Polaris IPL3/0)
+ *   multi-tap 500-4/0        -> 500-#4  (Polaris IPLD500)
+ * The H-tap sizes and the cord-grip cord ranges are typical, not a maker's,
+ * and say so in their descriptions.
+ */
+function sizedConnectors(): BaselineMaterial[] {
+  const DUAL = "dual rated al cu aluminum copper";
+  const each = (
+    name: string,
+    slang: string,
+    description: string,
+    jobKind: "residential" | "commercial" | "both",
+    defaultQty?: number
+  ): BaselineMaterial => ({
+    ...CONN,
+    name,
+    searchAliases: aliases(slang),
+    description,
+    jobKind,
+    ...(defaultQty ? { defaultQty } : {}),
+  });
+  const kcmil = (range: string) =>
+    /\d{3}$/.test(range) ? `${range} kcmil` : range;
+
+  return [
+    // Set-screw splices ("barrels").
+    ...[
+      "#14-#6",
+      "#14-#2",
+      "#14-1/0",
+      "#14-2/0",
+      "#6-4/0",
+      "#6-250",
+      "#6-350",
+      "#4-500",
+    ].map(range =>
+      each(
+        `Set-screw splice, ${kcmil(range)}`,
+        `barrel set screw setscrew mechanical splicer reducer inline ilsco ${DUAL}`,
+        "Dual-rated (Al/Cu) mechanical splice, by the conductor range it takes.",
+        "both"
+      )
+    ),
+    // Mechanical set-screw lugs.
+    ...["#14-#4", "#14-1/0", "#6-250", "1/0-500"].map(range =>
+      each(
+        `Mechanical lug, 1-hole, ${kcmil(range)}`,
+        `set screw setscrew terminal one hole 1 hole ilsco burndy ${DUAL}`,
+        "Dual-rated (Al/Cu) set-screw lug, by the conductor range it takes.",
+        "both"
+      )
+    ),
+    ...["#6-250", "1/0-500"].map(range =>
+      each(
+        `Mechanical lug, 2-hole, ${kcmil(range)}`,
+        `set screw setscrew terminal two hole 2 hole nema pad ilsco burndy ${DUAL}`,
+        "Dual-rated (Al/Cu) set-screw lug with a two-hole tongue.",
+        "commercial"
+      )
+    ),
+    // Split bolts, by the largest conductor they take.
+    ...["#8", "#6", "#4", "#2", "1/0", "2/0", "4/0"].map(size =>
+      each(
+        `Split bolt, ${size}`,
+        "splitbolt kearney bug nut tap bolt splice mechanical service copper",
+        "Sized by the largest conductor it takes.",
+        "both"
+      )
+    ),
+    // Insulated multi-tap connectors (main range, then tap range).
+    ...["1/0-#14", "3/0-#6", "250-#6", "500-#4"].flatMap(range =>
+      [3, 4, 6].map(ports =>
+        each(
+          `Insulated multi-tap, ${range.replace(/^(\d{3})-/, "$1 kcmil-")}, ${ports}-port`,
+          "polaris multitap multi tap connector insulated tap splice service lug block nsi",
+          "Main conductor range first, then the smallest tap it takes.",
+          ports === 6 ? "commercial" : "both"
+        )
+      )
+    ),
+    // Insulated crimp terminals, by the colour code.
+    ...(
+      [
+        ["red", "22-18 AWG"],
+        ["blue", "16-14 AWG"],
+        ["yellow", "12-10 AWG"],
+      ] as const
+    ).flatMap(([colour, range]) => [
+      each(
+        `Butt splice, ${colour} (${range})`,
+        "crimp inline connector insulated barrel joiner splice",
+        "Insulated crimp splice, colour-coded by wire range.",
+        "both",
+        4
+      ),
+      each(
+        `Ring terminal, ${colour} (${range})`,
+        "crimp lug eye connector insulated stud screw",
+        "Insulated crimp ring, colour-coded by wire range.",
+        "both",
+        4
+      ),
+      each(
+        `Spade terminal, ${colour} (${range})`,
+        "crimp fork connector insulated screw",
+        "Insulated crimp spade, colour-coded by wire range.",
+        "both",
+        4
+      ),
+    ]),
+    // H-taps for grounding: run range, then tap range.
+    ...["#2-#6", "2/0-#2", "4/0-2/0"].map(range =>
+      each(
+        `H-tap, ${range}`,
+        "htap compression tap c crimp irreversible grounding ground splice",
+        "Run size, then tap size. Typical grounding sizes — the crimp die must match.",
+        "commercial"
+      )
+    ),
+    // Cord grips, by thread size, with a typical cord range in the name.
+    ...(
+      [
+        ['1/2"', '0.25"-0.50"'],
+        ['3/4"', '0.40"-0.70"'],
+        ['1"', '0.50"-0.90"'],
+      ] as const
+    ).map(([size, cord]) =>
+      each(
+        `${size} cord grip (${cord} cord)`,
+        `${size.replace('"', "")} strain relief connector liquid tight whip flexible gland cord connector so cord`,
+        "Typical cord range for this thread size — check it against the cord's diameter.",
+        "both"
+      )
+    ),
+  ];
+}
+
 const terminations: BaselineMaterial[] = [
   {
     ...CONN,
@@ -238,70 +406,44 @@ const terminations: BaselineMaterial[] = [
       "wire end sleeve crimp stranded bootlace assortment"
     ),
   },
-  {
-    ...CONN,
-    name: "Insulated multi-tap block",
-    searchAliases: aliases(
-      "polaris multitap connector insulated tap splice service lug"
-    ),
-  },
+  /*
+    The generic "Insulated multi-tap block", "Ring terminal", "Spade
+    terminal", "Butt splice", "H-tap" and "Split-bolt connector" stood here
+    until the owner's catalog review, 2026-10-08: none was on a starter, so
+    each was retired in favour of the sized rows below
+    (shared/catalogReview20261008.ts). "Cord grip" was on two (LT25, MH8)
+    and became the 1/2" cord grip in place.
+  */
   /*
     Compression splice sleeves, by the conductor they join. Moved from the
     pricing sheet, 2026-09-25, with #2 and 4/0; #1 to 3/0 added 2026-10-07
-    (owner-approved review sheet: service and feeder splices).
+    (owner-approved review sheet: service and feeder splices); #8, #6, #4
+    and 250/350/500 kcmil added in the catalog review, 2026-10-08.
   */
-  ...["#2", "#1", "#1/0", "#2/0", "#3/0", "#4/0"].map(gauge => ({
+  ...["#8", "#6", "#4", "#2", "#1", "#1/0", "#2/0", "#3/0", "#4/0"].map(
+    gauge => ({
+      ...CONN,
+      // Aughts without the "#" (owner, 2026-10-07): "4/0 crimp sleeve".
+      name: `${gauge.replace(/^#(\d\/0)$/, "$1")} crimp sleeve`,
+      searchAliases: aliases(
+        gauge.includes("/0") ? "aught ought" : "",
+        "compression splice butt barrel inline service copper"
+      ),
+      ...(["#8", "#6", "#4"].includes(gauge)
+        ? { jobKind: "both" as const }
+        : {}),
+    })
+  ),
+  ...["250", "350", "500"].map(kcmil => ({
     ...CONN,
-    // Aughts without the "#" (owner, 2026-10-07): "4/0 crimp sleeve".
-    name: `${gauge.replace(/^#(\d\/0)$/, "$1")} crimp sleeve`,
+    name: `${kcmil} kcmil crimp sleeve`,
     searchAliases: aliases(
-      gauge.includes("/0") ? "aught ought" : "",
-      "compression splice butt barrel inline service copper"
+      `mcm ${kcmil}mcm`,
+      "compression splice butt barrel inline service feeder copper"
     ),
+    jobKind: "commercial" as const,
   })),
-  {
-    ...CONN,
-    name: "Ring terminal",
-    searchAliases: aliases("crimp lug eye connector insulated stud screw"),
-    defaultQty: 4,
-  },
-  {
-    ...CONN,
-    name: "Spade terminal",
-    searchAliases: aliases(
-      "crimp fork connector insulated screw quick disconnect"
-    ),
-    defaultQty: 4,
-  },
-  {
-    ...CONN,
-    name: "Butt splice",
-    searchAliases: aliases(
-      "crimp inline connector insulated heat shrink barrel joiner"
-    ),
-    defaultQty: 4,
-  },
-  {
-    ...CONN,
-    name: "H-tap",
-    searchAliases: aliases(
-      "htap compression tap c crimp irreversible service splice"
-    ),
-  },
-  {
-    ...CONN,
-    name: "Split-bolt connector",
-    searchAliases: aliases(
-      "splitbolt bug tap bolt splice copper mechanical service"
-    ),
-  },
-  {
-    ...CONN,
-    name: "Cord grip",
-    searchAliases: aliases(
-      "strain relief connector liquid tight romex whip flexible gland"
-    ),
-  },
+  ...sizedConnectors(),
   {
     ...CONN,
     name: "MC anti-short bushing",
@@ -357,15 +499,52 @@ export const CONSUMABLES: BaselineMaterial[] = [
   {
     ...CONS,
     name: "Underground splice kit",
+    // "uf" since 2026-10-08: this IS the UF splice kit the catalog review
+    // asked for, so it is found by that name rather than shipped twice.
     searchAliases: aliases(
-      "waterproof direct burial resin gel epoxy wet location repair"
+      "uf uf-b cable waterproof direct burial resin gel epoxy wet location repair"
     ),
   },
   {
     ...CONS,
     name: "Electrical tape",
-    searchAliases: aliases("vinyl 33 super 88 roll colored phase black scotch"),
+    // No "colored phase" since 2026-10-08: the phase tapes are their own
+    // rows (below), and this black roll answered a phase-tape search first.
+    searchAliases: aliases("vinyl 33 super 88 roll black scotch"),
     defaultQty: 2,
+  },
+  // Phase-colour tape, one row per colour (owner's catalog review,
+  // 2026-10-08): bought by colour, for marking phases and conductors.
+  ...[
+    "red",
+    "blue",
+    "white",
+    "green",
+    "black",
+    "brown",
+    "orange",
+    "yellow",
+    "gray",
+  ].map(colour => ({
+    ...CONS,
+    name: `Phase tape, ${colour}`,
+    searchAliases: aliases(
+      "phasing marking colored coloured electrical vinyl tape 35 scotch",
+      colour === "gray" ? "grey" : ""
+    ),
+    jobKind: "both" as const,
+  })),
+  {
+    ...CONS,
+    name: "Rubber splicing tape",
+    searchAliases: aliases("self fusing amalgamating 23 scotch high voltage"),
+    jobKind: "commercial",
+  },
+  {
+    ...CONS,
+    name: "Mastic tape",
+    searchAliases: aliases("2228 moisture seal pad rubber scotch splice"),
+    jobKind: "commercial",
   },
   {
     ...CONS,
@@ -453,6 +632,7 @@ const seConnector: BaselineMaterial = {
 export const CONNECTORS: BaselineMaterial[] = [
   ...wireNuts,
   ...cableConnectors,
+  ...snapInConnectors,
   ...mcConnectors,
   seConnector,
   ...lugs,

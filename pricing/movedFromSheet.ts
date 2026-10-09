@@ -55,25 +55,30 @@ export const MERGED_FROM_SHEET: Record<string, string> = {
   "XHHW-2, 1/0": "1/0 XHHW Aluminum",
   "XHHW-2, 4/0": "4/0 XHHW Aluminum",
   '4" rigid coupling': '4" rigid conduit coupling',
-  // The four cable connectors are sized by jacket diameter and already stand
-  // for every style — snap-in, two-screw, duplex — see connectors.ts.
+  // The four cable connectors are sized by jacket diameter and stand for the
+  // screw styles — two-screw, duplex — see connectors.ts. Snap-in stood
+  // here too until the catalog review (2026-10-08) gave it its own rows.
   "AC/MC snap connector": '3/8" cable connector',
   "Duplex NM connector": '3/8" cable connector',
-  "Snap-in NM connector": '3/8" cable connector',
+  // Its own row since the catalog review, 2026-10-08.
+  "Snap-in NM connector": '1/2" snap-in NM connector',
   "Two-screw NM connector": '3/8" cable connector',
   "MC cable connector, 3/8 in": '3/8" cable connector',
   "MC cable connector, 1/2 in": '1/2" cable connector',
   "Romex connector, 1/2 in": '1/2" cable connector',
   "Romex connector, 3/4 in": '3/4" cable connector',
   "Compression lug, 4/0": "2/0-4/0 AWG crimp lug",
-  "Mechanical lug, 4/0": "2/0-4/0 AWG crimp lug",
+  // A real mechanical lug since the catalog review, 2026-10-08.
+  "Mechanical lug, 4/0": "Mechanical lug, 1-hole, #6-250 kcmil",
   // Polaris is a brand of insulated multi-tap connector.
-  "Polaris connector, 4/0": "Insulated multi-tap block",
+  // 4/0 lands in the 250-#6 main range (catalog review, 2026-10-08).
+  "Polaris connector, 4/0": "Insulated multi-tap, 250 kcmil-#6, 4-port",
   "Cable lubricant gel": "Pulling lube",
   "Wire pulling soap": "Pulling lube",
   "Push-in connectors": "Push-in wire connector",
-  "Split bolt connector": "Split-bolt connector",
-  "Wire nuts, assorted": "Wire nuts",
+  // The generic split bolt was retired 2026-10-08; #6 is the everyday one.
+  "Split bolt connector": "Split bolt, #6",
+  "Wire nuts, assorted": "Wire nut, 22-8 AWG (tan/red)",
   "All-thread rod, 3/8 in": '3/8" all-thread rod, 10 ft',
   "All-thread rod, 1/2 in": '1/2" all-thread rod, 10 ft',
   // Unsized duplicates of the four sized rod-hardware families; folded into

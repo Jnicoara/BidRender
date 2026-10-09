@@ -201,7 +201,7 @@ describe.skipIf(!hasDb)("material categories", () => {
     const db = await getDb();
     const before = await getLibraryMaterials(USER);
     const target = before.find(
-      r => r.userId === null && r.name === "EMT strap"
+      r => r.userId === null && r.name === '1/2" EMT two-hole strap'
     )!;
 
     await db!
@@ -321,7 +321,7 @@ describe.skipIf(!hasDb)("material search aliases", () => {
     const db = await getDb();
     const before = await getLibraryMaterials(USER);
     const target = before.find(
-      r => r.userId === null && r.name === '4" square box'
+      r => r.userId === null && r.name === '4" square box, 1-1/2" deep'
     )!;
 
     await db!
@@ -337,7 +337,7 @@ describe.skipIf(!hasDb)("material search aliases", () => {
   it("backfills a fork that predates the column from its baseline", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "Wire nuts"
+      r => r.userId === null && r.name === "Wire nut, 22-8 AWG (tan/red)"
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
 
@@ -355,7 +355,7 @@ describe.skipIf(!hasDb)("material search aliases", () => {
   it("does not overwrite aliases the user wrote themselves", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
-      r => r.userId === null && r.name === "EMT strap"
+      r => r.userId === null && r.name === '1/2" EMT two-hole strap'
     )!;
     const forkId = await forkMaterial(baseline.id, USER);
 

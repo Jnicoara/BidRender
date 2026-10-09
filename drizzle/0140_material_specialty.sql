@@ -1,0 +1,24 @@
+-- 0140 — "Specialty": a shipped material that stays in the catalog but sits
+-- LOWER in the material picker and every material search, after everyday
+-- items (owner's catalog review, 2026-10-08;
+-- references/catalog-review-2026-10-08.md § SPECIALTY).
+--
+--   materials.isSpecialty   TRUE on a SHIPPED row the review tagged
+--                           specialty (busway, cable tray, VFDs, light poles,
+--                           2"/3"/5"/8" canless, …). Set ONLY by the seed
+--                           (server/seed/materials/specialty.ts), re-stamped
+--                           on every start like the category. NULL = an
+--                           everyday item, which is every row before this and
+--                           every company's own copy — the seed never reaches
+--                           a company's row.
+--
+-- Nothing is deleted or hidden: it only orders search results.
+--
+-- ── ADDITIVE. STEP 1. MIGRATE BEFORE THE CODE ───────────────────────────────
+-- Nullable, no DEFAULT, no UPDATE: NULL reads as "everyday", which is what
+-- every existing row is until the new seed tags it. Moves no number — a bid
+-- total never reads this column. Re-running it fails on "Duplicate column",
+-- which the migrator never does (it goes by `when`).
+--
+-- Hand-written, not generated.
+ALTER TABLE `materials` ADD `isSpecialty` boolean;
