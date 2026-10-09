@@ -4,7 +4,51 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `24105ad`".
 
-## UPDATE 2026-10-09 (session 25) — START HERE
+## STANDING RULE — a starter-sheet rebuild never loses a typed value
+
+**Owner, 2026-10-08.** Any rebuild of `starter-catalog-pricing.xlsx`,
+`labor-units-starter.xlsx` or `assembly-hours-starter.xlsx` carries over
+every typed price and hours value **by item key** (catalog name through the
+rename map; assembly Ref) — **not row position or name**. Renamed items keep
+values; new items come in blank; removed items go in a "dropped values"
+report (`pricing/dropped-values-<date>.tsv`). The rebuild **STOPS and
+reports** if a typed value would be dropped for an item that still exists.
+Built into `pricing/buildStarterSheets.mts` (`pricing/sheetCarryOver.ts`;
+it reads the written file back before replacing the old one) and pinned by
+`server/sheetCarryOver.test.ts`. Full text: `pricing/README.md`. **Before a
+rebuild, put the owner's current copy at the repo path** — the carry-over
+reads the file it replaces.
+
+## UPDATE 2026-10-09 (session 26) — START HERE
+
+**Staging now runs the catalog review's code; live untouched.**
+
+- **Code on staging**: owner said yes; `d36bfc9` pushed to `staging`
+  (02:53 UTC). Totals **789/789 unchanged** (old code before, new after);
+  catalog on staging: 107 added, 23 renamed, 138 retired, 0 deleted,
+  **1,793 active**, 108 Specialty, 0 old spellings / duplicates, only the
+  intended ground swap moved (types 1, 2, 5). Gate 37874094992 re-run:
+  deploy-staging + smoke **green**. `deploying.md` § 11 "0140" steps 5–6.
+- **Cover repair on staging DONE**: backup
+  `staging-2026-10-09T02-58-38Z-before-cover-repair.sql`; 48 would swap →
+  48 swapped → re-run 48 already; totals **794/794 unchanged**.
+- **Heat shrink**: owner — keep the single generic row, no sizes
+  (`catalog-review-2026-10-08.md`).
+- **Carry-over rule built** (above). Proved on the real builder: a price
+  under an old spelling (`4" square box`) landed on the renamed row, a
+  made-up name STOPPED with the file untouched, a retired name went to the
+  dropped report; the loader read the carried values back exactly. Sheets
+  restored afterwards (still 0 typed values in the repo).
+- **Beta checklist**: admin "baseline" screen added
+  (`before-beta-checklist.md` § 3; `starter-vs-company-plan.md` § 3 says so).
+- Scratch from session 25 can go now the code is on staging:
+  `bidrender_staging_restore_0140`, `bidrender_test_fresh0140`, worktree
+  `../bidrender-before-0140` — not removed this session.
+- **Next live release**: unchanged — 0105–0140 (36), re-rehearse with the
+  catalog review's first boot, then the cover repair (`next-live-release-plan.md`
+  § 4b, § 5d).
+
+## UPDATE 2026-10-09 (session 25)
 
 **The owner's catalog review of the STARTER catalog is built; staging's
 DATABASE has 0140, staging's CODE does not yet.** Live untouched.
