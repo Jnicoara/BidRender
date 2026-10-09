@@ -1,6 +1,51 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-09, smoke test 2 PROVEN + "Fix these" walk + gap 10 (READ FIRST)
+## WHERE B STANDS — 2026-10-09 (later), coverage-check starters BUILT (READ FIRST)
+
+- **41 new starters, 224 in all.** CK1–CK26 are every missing assembly in
+  the first coverage check (owner: all 26, not 10; duplicates once). CW1–CW15
+  are the wider check's top 15. Source: `references/coverage-check.md` on
+  track-c. Hours not set, R/C/B tags as the document gives them, every part
+  a shipped row (A's 24 rows filled the gaps). Recipes:
+  `starter-assemblies-plan.md` § "CK / CW".
+- **Changes to existing starters, names unchanged:**
+  - RS12 → `4/3 NM-B Copper` (was 6/3);
+  - LT23 + `Fixture hanging kit, aircraft cable` 2 (support wire kept);
+  - RS6 stays the range hood; the microwave is CK18.
+- **Older databases get RS12/LT23 from the cover repair.** They are two
+  more entries in `STARTER_COVER_SWAPS`; the seeder never edits a starter.
+- **Track A, at the release (staging and live), no migration:**
+  1. `scripts/repairStarterCovers.mts`, report then `--apply`. Expect RS12
+     and LT23 "would swap" and the other 48 "already has it" where the
+     repair already ran. If it prints anything else, stop and find out why.
+  2. Bid totals before and after with `scripts/bidTotals.mts --compare`.
+     None may move.
+  3. The 41 starters need nothing: the seeder inserts them on boot.
+  4. Then the ONE `assembly-hours-starter.xlsx` rebuild (41 NEW rows).
+- **Measured locally** (`bidrender_local_b_new`): boot seed took shared
+  starters 183 → 224; the repair swapped RS12 and LT23; then 49 "already
+  has it"; all 4,284 bid totals unchanged (`bidTotals --compare`).
+- **Tests:** `server/coverageCheckStarters.test.ts` (new), plus updated
+  counts and repair checks. With the HEAD seed files swapped in, 50 tests
+  failed in 3 files; with the change, all pass.
+  - `starterCoverSwaps.test.ts` banned the duplex raised cover outright.
+    The audit's fault was that cover on a twist-lock, and CK12 (ceiling
+    projector duplex) uses it rightly. The test now checks that the cover
+    only covers a duplex receptacle.
+  - `starterGapAssemblies.test.ts` allows CK4 as a second user of the 6"
+    wafer.
+  - Pinned lists that grew with the new starters: specialty-row users
+    (+7, `catalogReview20261008`), wire-nut users 114 → 133, and the
+    Mounts-at list (+CK9, `deviceMountKind`).
+  - Full suite on `bidrender_test_b`: 374 files, 6,230 passed, 6 skipped.
+- **Owner questions** (missing labels, recipe choices): todo.md §
+  "Coverage-check starters".
+- **Staging cleanup:** the two `track-b-race-*` accounts are now on the
+  delete-before-stress-test list.
+- **State:** merged local-dev (A's 0141). B's databases are at 142 and
+  `schemaDrift` matches (176/176). No migrations by B. No dev server running.
+
+## WHERE B STOOD — 2026-10-09, smoke test 2 PROVEN + "Fix these" walk + gap 10
 
 - **Smoke test 2 (empty sheet list after a first upload): release blocker
   CLEARED.** The 2026-10-08 fix was only half: a re-run on Gate

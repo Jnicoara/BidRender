@@ -163,6 +163,14 @@ export const STARTER_COVER_SWAPS: StarterCoverSwap[] = [
     ],
   },
   ...swap(["MS12"], [], [duplex]),
+
+  // ── Not covers: two recipe fixes from the coverage check (owner,
+  // 2026-10-09), riding the same repair because it is the same job — an
+  // untouched shipped recipe, one line changed or added, nothing else.
+  // RS12's 48A charger needs 60A of wire, which 6/3 NM-B is not.
+  ...swap(["RS12"], [p("6-3-nm-b", 40)], [p("4-3-nm-b", 40)]),
+  // LT23 also hangs on aircraft cable, one kit per hang point.
+  ...swap(["LT23"], [], [p("fixture-hanging-kit-aircraft-cable", 2)]),
 ];
 
 /**

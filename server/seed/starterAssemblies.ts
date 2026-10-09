@@ -511,6 +511,11 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
       p("8-ft-mc-whip", 1),
       p("ceiling-support-wire", 2),
       p("wire-nuts", 3),
+      // Open-ceiling sales floor rows hang on aircraft cable, one kit per
+      // hang point (coverage-check.md § 1; owner, 2026-10-09). Added, not
+      // swapped: a row under a grid still hangs on support wire, so the
+      // estimator deletes whichever line the job does not use.
+      p("fixture-hanging-kit-aircraft-cable", 2),
     ]
   ),
   starter("LT24", "4 ft LED wraparound (back room)", "Lighting", "commercial", [
@@ -640,6 +645,10 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
       p("wire-nuts", 5),
     ]
   ),
+  // RS6 is the range hood (owner, 2026-10-09: it stays the hood). Its name
+  // still says "microwave" because a shipped starter's name is frozen — the
+  // seeder matches by name — but the over-range microwave, a 20A dedicated
+  // receptacle on 12/2, is its own starter now: CK18.
   starter(
     "RS6",
     "Range hood / microwave circuit",
@@ -709,7 +718,11 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "residential",
     [
       p("48a-ev-charger", 1, { fixture: true }),
-      p("6-3-nm-b", 40),
+      // 4/3, not 6/3 (owner, 2026-10-09; coverage-check.md § 10): a 48A
+      // charger needs 60A of wire, and NM is held to its 60°C column, where
+      // #6 copper is 55A. Older databases get it from the starter repair
+      // (starterCoverSwaps.ts), since the seeder never edits a starter.
+      p("4-3-nm-b", 40),
       p("60a-2-pole-breaker", 1),
       p("1in-cable-connector", 1),
     ]
@@ -1741,5 +1754,516 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     p("12-2-nm-b", 35),
     p("20a-single-pole-breaker", 1),
     p("wire-nuts", 3),
+  ]),
+
+  /*
+    ── CK / CW — the coverage checks (2026-10-09) ────────────────────────────
+    From references/coverage-check.md (Track C, ed8a1de): CK1–CK26 are every
+    missing assembly in the first check's three jobs, duplicates taken once,
+    in the order the document first lists them; CW1–CW15 are the wider
+    check's "Top 15", same numbers. Owner, 2026-10-09: build all of them,
+    hours not set, tagged as the document tags them (the first check is
+    tagged by its job: Dollar Tree and the office are Commercial, the remodel
+    Residential). Every part is a shipped row — Track A's 24 coverage-check
+    rows (3cb5df3) filled the gaps the document marked "NEEDS".
+
+    Choices made here, not in the document (say if wrong):
+    - CK4 uses the 6" wafer (the document says 4" or 6").
+    - CK14, the wall heater, is ONE starter on MC tagged Both, because the
+      document lists it once for the office and once for the bath.
+    - CK21 and CK23 add the box, plate and receptacle the document's parts
+      list implies but does not name (a switch needs a box; a recessed TV
+      box needs a receptacle in it).
+    - CW3 and CW11 leave out the label the document names: the catalog has
+      no emergency-disconnect or EV-ready label (listed for the owner in
+      todo.md). CW9 sits on the pole anchor kit and concrete pole base, the
+      only base rows the catalog carries.
+  */
+  starter(
+    "CK1",
+    "Emergency light (bug-eye), standalone",
+    "Lighting",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-mud-ring-fixture", 1),
+      p("emergency-light", 1, { fixture: true }),
+      p("12-2-mc-cable", 25, { branchWhip: true }),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+      p("wire-nuts", 3),
+    ]
+  ),
+  starter("CK2", "Fire alarm strobe only", "Low Voltage/EMS", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring-2-gang", 1),
+    p("fire-alarm-strobe", 1, { fixture: true }),
+    p("14-2-fire-alarm-cable", 50, { branchWhip: true }),
+  ]),
+  starter(
+    "CK3",
+    "Water heater connection, commercial (208V, MC)",
+    "Equipment Connections",
+    "commercial",
+    [
+      p("30a-non-fused-disconnect-nema-1", 1),
+      p("30a-2-pole-breaker", 1),
+      p("breaker-lock-off", 1),
+      p("10-2-mc-cable", 40),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+    ]
+  ),
+  starter(
+    "CK4",
+    "Recessed wafer downlight, commercial (MC whip)",
+    "Lighting",
+    "commercial",
+    [
+      p("5in-6in-wafer-led-downlight", 1, { fixture: true }),
+      p("6ft-mc-whip", 1),
+      p("ceiling-support-wire", 2),
+      p("independent-support-wire-clip", 1),
+      p("wire-nuts", 2),
+    ]
+  ),
+  starter(
+    "CK5",
+    "Fire alarm control panel connection",
+    "Low Voltage/EMS",
+    "commercial",
+    [
+      p("fire-alarm-control-panel", 1, { fixture: true }),
+      p("fire-alarm-battery", 2),
+      p("20a-single-pole-breaker", 1),
+      p("breaker-lock-off", 1),
+      p("4in-square-box", 1),
+      p("4in-square-blank-cover", 1),
+      p("12-2-mc-cable", 25),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+    ]
+  ),
+  starter(
+    "CK6",
+    "208V cooler / freezer receptacle (NEMA 6-20)",
+    "Devices",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-raised-cover-single-receptacle", 1),
+      p("20a-250v-receptacle-nema-6-20r", 1),
+      p("12-2-mc-cable", 40),
+      p("20a-2-pole-breaker", 1),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+    ]
+  ),
+  // CK7: the conduit and its wire are the traced run's, so only the fittings
+  // at the box are here.
+  starter("CK7", "Duplex receptacle, EMT", "Devices", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring", 1),
+    p("20a-duplex-receptacle", 1),
+    p("1-gang-wall-plate-duplex-nylon", 1),
+    p("1-2in-emt-compression-connector", 2),
+    p("grounding-pigtail", 1),
+    p("wire-nuts", 3),
+  ]),
+  starter("CK8", "Two switches, one box, MC", "Devices", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring-2-gang", 1),
+    p("20a-single-pole-switch", 2),
+    p("2-gang-wall-plate-toggle-toggle-nylon", 1),
+    p("12-2-mc-cable", 40, { branchWhip: true }),
+    p("3-8in-mc-connector", 2),
+    p("mc-anti-short-bushing", 2),
+    p("grounding-pigtail", 1),
+    p("wire-nuts", 5),
+  ]),
+  starter(
+    "CK9",
+    "Data drop, Cat6 2-port (commercial)",
+    "Low Voltage/EMS",
+    "commercial",
+    [
+      p("low-voltage-mud-ring", 1),
+      p("cat6-cable", 300),
+      p("cat6-jack", 2),
+      p("keystone-wall-plate-2-port", 1),
+      p("j-hook", 3),
+    ],
+    { mountsAt: "low-voltage" }
+  ),
+  starter("CK10", "Daylight sensor", "Devices", "commercial", [
+    p("daylight-sensor", 1),
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring-fixture", 1),
+    p("18-3-control-wire", 25),
+    p("wire-nuts", 2),
+  ]),
+  starter(
+    "CK11",
+    "Wall TV / display location, commercial",
+    "Devices",
+    "commercial",
+    [
+      p("recessed-tv-receptacle-box", 1),
+      p("20a-duplex-receptacle", 1),
+      p("hdmi-wall-plate", 1),
+      p("low-voltage-mud-ring", 1),
+      p("12-2-mc-cable", 25, { branchWhip: true }),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+    ]
+  ),
+  starter("CK12", "Ceiling receptacle for projector", "Devices", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-raised-cover-duplex", 1),
+    p("20a-duplex-receptacle", 1),
+    p("12-2-mc-cable", 25, { branchWhip: true }),
+    p("3-8in-mc-connector", 2),
+    p("mc-anti-short-bushing", 2),
+    p("wire-nuts", 3),
+  ]),
+  starter(
+    "CK13",
+    "Mini-split connection, MC",
+    "Equipment Connections",
+    "commercial",
+    [
+      p("60a-non-fused-pullout-disconnect", 1),
+      p("ac-condenser-whip", 1),
+      p("20a-2-pole-breaker", 1),
+      p("12-2-mc-cable", 35),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+      p("14-4-mini-split-cable", 25),
+    ]
+  ),
+  starter(
+    "CK14",
+    "Electric wall heater, fan-forced",
+    "Equipment Connections",
+    "both",
+    [
+      p("fan-forced-wall-heater", 1, { fixture: true }),
+      p("wall-heater-thermostat", 1),
+      p("4in-square-box", 1),
+      p("4in-square-mud-ring", 1),
+      p("12-2-mc-cable", 35),
+      p("20a-2-pole-breaker", 1),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+      p("wire-nuts", 4),
+    ]
+  ),
+  starter(
+    "CK15",
+    "Fire alarm speaker/strobe",
+    "Low Voltage/EMS",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-mud-ring-2-gang", 1),
+      p("fire-alarm-speaker-strobe", 1, { fixture: true }),
+      p("14-2-fire-alarm-cable", 50, { branchWhip: true }),
+      p("16-2-fire-alarm-cable", 50, { branchWhip: true }),
+    ]
+  ),
+  starter("CK16", "Heat detector", "Low Voltage/EMS", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring-fixture", 1),
+    p("detector-base", 1),
+    p("heat-detector", 1, { fixture: true }),
+    p("14-2-fire-alarm-cable", 50, { branchWhip: true }),
+  ]),
+  starter("CK17", "Ceiling light, old work", "Lighting", "residential", [
+    p("old-work-ceiling-box", 1),
+    p("surface-mount-ceiling-fixture", 1, { fixture: true }),
+    p("14-2-nm-b", 20, { branchWhip: true }),
+    p("wire-nuts", 3),
+  ]),
+  // CK18 carries its own home run, like DV3, so no line is a whip.
+  starter(
+    "CK18",
+    "Over-range microwave circuit, 20A",
+    "Equipment Connections",
+    "residential",
+    [
+      p("single-gang-box", 1),
+      p("20a-single-receptacle", 1),
+      p("1-gang-wall-plate-single-receptacle-nylon", 1),
+      p("12-2-nm-b", 35),
+      p("20a-single-pole-breaker", 1),
+      p("wire-nuts", 3),
+    ]
+  ),
+  starter("CK19", "GFCI receptacle, old work", "Devices", "residential", [
+    p("single-gang-old-work-box", 1),
+    p("20a-gfci-receptacle", 1),
+    p("1-gang-wall-plate-decorator-nylon", 1),
+    p("12-2-nm-b", 25, { branchWhip: true }),
+    p("wire-nuts", 3),
+  ]),
+  starter(
+    "CK20",
+    "Wall oven or cooktop, hardwired 40A",
+    "Equipment Connections",
+    "residential",
+    [
+      p("4-11-16in-square-box", 1),
+      p("4-11-16in-square-blank-cover", 1),
+      p("8-3-nm-b", 40),
+      p("40a-2-pole-breaker", 1),
+      p("3-4in-cable-connector", 1),
+      p("wire-nuts", 4),
+    ]
+  ),
+  starter(
+    "CK21",
+    "Bath fan / heater combo, 20A",
+    "Equipment Connections",
+    "residential",
+    [
+      p("bath-exhaust-fan-heater-combo", 1, { fixture: true }),
+      p("4in-insulated-flex-duct", 1),
+      p("4in-roof-vent-cap", 1),
+      p("duct-clamp", 2),
+      p("12-3-nm-b", 25),
+      p("20a-single-pole-breaker", 1),
+      p("single-gang-box", 1),
+      p("20a-single-pole-switch", 1),
+      p("1-gang-wall-plate-toggle-nylon", 1),
+      p("wire-nuts", 4),
+    ]
+  ),
+  starter(
+    "CK22",
+    "Heated bathroom floor",
+    "Equipment Connections",
+    "residential",
+    [
+      p("floor-heating-mat", 1, { fixture: true }),
+      p("floor-heating-thermostat-gfci", 1),
+      p("single-gang-box", 1),
+      p("12-2-nm-b", 35),
+      p("20a-single-pole-breaker", 1),
+      p("wire-nuts", 3),
+    ]
+  ),
+  starter("CK23", "Wall TV location (power + HDMI)", "Devices", "residential", [
+    p("recessed-tv-receptacle-box", 1),
+    p("duplex-receptacle", 1),
+    p("hdmi-wall-plate", 1),
+    p("low-voltage-mud-ring", 1),
+    p("12-2-nm-b", 25, { branchWhip: true }),
+    p("wire-nuts", 3),
+  ]),
+  starter(
+    "CK24",
+    "Island / peninsula pop-up receptacle",
+    "Devices",
+    "residential",
+    [
+      p("pop-up-countertop-receptacle", 1),
+      p("12-2-nm-b", 35),
+      p("20a-single-pole-afci-gfci-combo-breaker", 1),
+      p("wire-nuts", 3),
+    ]
+  ),
+  starter("CK25", "Pendant or sconce, old work", "Lighting", "residential", [
+    p("old-work-ceiling-box", 1),
+    p("led-pendant-fixture", 1, { fixture: true }),
+    p("14-2-nm-b", 20, { branchWhip: true }),
+    p("wire-nuts", 3),
+  ]),
+  starter("CK26", "Tandem breaker add", "Panels", "residential", [
+    p("20-20-tandem-breaker", 1),
+  ]),
+
+  starter(
+    "CW1",
+    "Equipment connection, hardwired (flex whip), 208/240V",
+    "Equipment Connections",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-blank-cover", 1),
+      p("1-2in-flexible-metal-conduit", 6),
+      p("1-2in-flexible-metal-conduit-connector", 2),
+      p("no12-thhn", 18),
+      p("20a-2-pole-breaker", 1),
+    ]
+  ),
+  starter(
+    "CW2",
+    "Commercial Level 2 EV charger, 208V",
+    "Equipment Connections",
+    "commercial",
+    [
+      p("evse-pedestal", 1, { fixture: true }),
+      p("40a-2-pole-breaker", 1),
+      p("pole-anchor-bolt-kit", 1),
+      p("concrete-pole-base", 1),
+      p("3-4in-liquidtight-flexible-conduit", 6),
+      p("3-4in-liquidtight-flexible-conduit-connector", 2),
+    ]
+  ),
+  starter(
+    "CW3",
+    "Outdoor emergency service disconnect (NEC 230.85)",
+    "Panels",
+    "residential",
+    [
+      p("200a-non-fused-disconnect-nema-3r", 1),
+      p("4-0-4-0-4-0-2-0-ser-al", 10),
+      p("2in-se-cable-connector", 2),
+    ]
+  ),
+  starter(
+    "CW4",
+    "Apartment unit panel, 125A main-lug",
+    "Panels",
+    "residential",
+    [
+      p("125a-main-lug-sub-panel-24-space", 1),
+      p("ground-bar-kit", 1),
+      p("1-2in-cable-connector", 12),
+      p("panel-directory-label", 1),
+    ]
+  ),
+  starter(
+    "CW5",
+    "Overhead door operator connection",
+    "Equipment Connections",
+    "commercial",
+    [
+      p("30a-non-fused-disconnect-nema-1", 1),
+      p("1-2in-flexible-metal-conduit", 6),
+      p("1-2in-flexible-metal-conduit-connector", 2),
+      p("no12-thhn", 18),
+      p("4in-square-box", 1),
+      p("4in-square-blank-cover", 1),
+    ]
+  ),
+  starter(
+    "CW6",
+    "Air compressor connection, 240V",
+    "Equipment Connections",
+    "both",
+    [
+      p("30a-non-fused-disconnect-nema-1", 1),
+      p("3-4in-liquidtight-flexible-conduit", 6),
+      p("3-4in-liquidtight-flexible-conduit-connector", 2),
+      p("no10-thhn", 18),
+      p("30a-2-pole-breaker", 1),
+    ]
+  ),
+  starter(
+    "CW7",
+    "Welder / shop receptacle, 50A (NEMA 6-50)",
+    "Devices",
+    "both",
+    [
+      p("4-11-16in-square-box", 1),
+      p("4-11-16in-square-raised-cover-30a-50a-power-receptacle", 1),
+      p("50a-250v-receptacle-nema-6-50r", 1),
+      p("6-2-mc-cable", 40),
+      p("50a-2-pole-breaker", 1),
+      p("3-4in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+    ]
+  ),
+  starter(
+    "CW8",
+    "Wireless access point drop (ceiling)",
+    "Low Voltage/EMS",
+    "commercial",
+    [
+      p("low-voltage-mud-ring", 1),
+      p("cat6-cable", 150),
+      p("cat6-jack", 1),
+      p("keystone-wall-plate-1-port", 1),
+      p("j-hook", 3),
+    ]
+  ),
+  starter("CW9", "Bollard light", "Lighting", "commercial", [
+    p("bollard-light", 1, { fixture: true }),
+    p("pole-anchor-bolt-kit", 1),
+    p("concrete-pole-base", 1),
+    p("wire-nuts", 3),
+  ]),
+  starter(
+    "CW10",
+    "Manual transfer switch, 6–10 circuit",
+    "Panels",
+    "residential",
+    [
+      p("manual-transfer-switch", 1, { fixture: true }),
+      p("30a-power-inlet-box", 1),
+      p("30a-generator-cord", 1),
+      p("10-3-nm-b", 25),
+      p("1-2in-cable-connector", 2),
+    ]
+  ),
+  starter(
+    "CW11",
+    "EV-ready conduit stub (EV-capable space)",
+    "Equipment Connections",
+    "both",
+    [
+      p("4-11-16in-square-box", 1),
+      p("4-11-16in-square-blank-cover", 1),
+      p("1in-emt", 10),
+      p("1in-emt-set-screw-connector", 2),
+    ]
+  ),
+  starter("CW12", "Multi-unit meter center", "Panels", "both", [
+    p("meter-center-4-position", 1),
+    p("ground-rod-8-ft", 2),
+    p("ground-rod-clamp", 2),
+    p("no4-bare-cu-stranded", 30),
+  ]),
+  starter(
+    "CW13",
+    "Hospital-grade receptacle (exam / operatory)",
+    "Devices",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-mud-ring", 1),
+      p("hospital-grade-receptacle", 1),
+      p("1-gang-wall-plate-duplex-nylon", 1),
+      p("12-2-mc-cable-healthcare-hcf", 25, { branchWhip: true }),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+      p("grounding-pigtail", 1),
+      p("wire-nuts", 3),
+    ]
+  ),
+  starter(
+    "CW14",
+    "208V kitchen equipment receptacle, 30A (NEMA 6-30)",
+    "Devices",
+    "commercial",
+    [
+      p("4in-square-box", 1),
+      p("4in-square-raised-cover-single-receptacle", 1),
+      p("30a-250v-receptacle-nema-6-30r", 1),
+      p("10-2-mc-cable", 40),
+      p("30a-2-pole-breaker", 1),
+      p("3-8in-mc-connector", 2),
+      p("mc-anti-short-bushing", 2),
+    ]
+  ),
+  starter("CW15", "Recessed clock receptacle", "Devices", "commercial", [
+    p("4in-square-box", 1),
+    p("4in-square-mud-ring", 1),
+    p("recessed-clock-receptacle", 1),
+    p("12-2-mc-cable", 25, { branchWhip: true }),
+    p("3-8in-mc-connector", 2),
+    p("mc-anti-short-bushing", 2),
+    p("wire-nuts", 2),
   ]),
 ];

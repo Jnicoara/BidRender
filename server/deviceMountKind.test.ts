@@ -356,6 +356,8 @@ describeDb(
         "Cable TV drop",
         "Data drop, Cat6 (commercial)",
         "Data drop, Cat6 (resi)",
+        // CK9, the 2-port drop (coverage check, 2026-10-09).
+        "Data drop, Cat6 2-port (commercial)",
       ]);
       for (const a of said)
         expect(shippedHeightType(a.mountsAt!)).not.toBeNull();

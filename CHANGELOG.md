@@ -13,7 +13,19 @@ This is the human-readable companion to the git history — read this to see wha
   symbol instead — its marks under the other item's name, with nothing said.
   Each symbol now always gets its own count. A legend click that cannot start
   counting now says so instead of doing nothing.
-
+- **41 new starter assemblies from the two coverage checks** — the things
+  real jobs needed that the library did not have: emergency bug-eyes, fire
+  alarm strobes, speaker/strobes and heat detectors, commercial water
+  heaters and mini-splits on MC, 6-20/6-30/6-50 receptacles, old-work
+  lights and GFCIs, wall ovens, heated floors, pop-up island receptacles,
+  commercial EV chargers, emergency service disconnects, meter centers,
+  hospital-grade receptacles and more. 224 starters now. Hours are not set,
+  like every starter, for the owner to fill in.
+- **The 48A EV charger starter now uses 4/3 cable, not 6/3.** 6/3 NM is
+  only good for 55A and a 48A charger needs 60A of wire. The 8 ft strip
+  row starter now includes aircraft-cable hangers, and the over-range
+  microwave has its own starter, separate from the range hood. Bids already
+  priced do not change.
 - **Fixed for good: a freshly uploaded plan set could still show no
   sheets.** Yesterday's fix caught one way it happened; a second way, about
   one upload in six on staging, left the sheet list empty until a reload.

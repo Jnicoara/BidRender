@@ -203,8 +203,27 @@ describe("SPECIALTY (0140)", () => {
         a.materials.some(m => isSpecialty(starterPartName(m.part)))
       ).map(a => a.ref)
     );
+    // The CK / CW refs joined 2026-10-09 (the coverage-check starters, built
+    // on rows that ship as Specialty: the panel, pedestal, TV box, meter
+    // center, HCF cable, bollard). New users, not changed ones.
     expect(Array.from(refs).sort()).toEqual(
-      ["CS9", "CS10", "GC3", "LT31", "LT32", "MH10", "MH11", "RS16"].sort()
+      [
+        "CS9",
+        "CS10",
+        "GC3",
+        "LT31",
+        "LT32",
+        "MH10",
+        "MH11",
+        "RS16",
+        "CK5",
+        "CK11",
+        "CK23",
+        "CW2",
+        "CW9",
+        "CW12",
+        "CW13",
+      ].sort()
     );
   });
 });
@@ -235,7 +254,8 @@ describe("the generic rows a starter used", () => {
       BASELINE_ASSEMBLIES.filter(a => a.materials.some(m => m.part === part))
         .map(a => a.ref)
         .sort();
-    expect(using("wire-nuts")).toHaveLength(114);
+    // 133 since 2026-10-09: 19 of the 41 coverage-check starters use it.
+    expect(using("wire-nuts")).toHaveLength(133);
     expect(using("cord-grip")).toEqual(["LT25", "MH8"]);
   });
 });
