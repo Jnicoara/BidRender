@@ -29,6 +29,16 @@ This is the human-readable companion to the git history — read this to see wha
   amber notice with the time calls started being refused and where the fix
   is written down, and it clears itself once a call works. Nothing on a bid
   was ever affected; this is about the words.
+- **A traced Wiremold 500 run now counts its own fittings.** Couplings,
+  entrance end, inside and flat elbows come from the 500 parts only, the
+  same way 700 already did; a 500 run never borrows a 700 part, and 1500 is
+  deliberately left out. Before this, a 500 run's fittings said "no catalog
+  match".
+- **The plan viewer no longer says "Nothing traced" beside traced pipe.**
+  When conduit was traced but no wires had been added on its runs, the
+  wire rows said "Nothing traced under this type yet." right next to the
+  pipe's footage — and so did the message after Send. They now say "No
+  wire on these runs yet — open a run to add its wires."
 
 ## [2026-10-08]
 

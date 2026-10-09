@@ -1,9 +1,8 @@
 # Track C — handoff, 2026-10-06
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
-section below** (per-foot work merged to local-dev as `94d63fd`; leftovers
-on `c-leftovers`; C's databases have 140 migrations — the stand-in 0139 they
-ran is the same statement and `when` as A's, so nothing more is needed).
+section below** (`c-sch80-500` merged to local-dev 2026-10-09 and looked
+at on screen; C's databases have 142 migrations, through A's 0141).
 **Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
@@ -13,6 +12,117 @@ green. `main` was `24105ad`. C's databases `bidrender_local_c` and
 origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
+
+## LATEST (2026-10-09, later) — Gate green; looked at on screen; one false sentence fixed
+
+- **Gate 37977597726 on `47e4bd8` (the merge): ALL GREEN** — test,
+  deploy-staging, smoke; drizzle-guard skipped (no `drizzle/` change).
+- **On screen, laptop 1536×864 and tablet 820×1180** (playwright via
+  `scripts/deviceAudit.mts` helpers, Bar layout check 1164558, user 1).
+  Two runs added by API (a 500 run, a 2" Sch 80 trench) and one 500 run
+  traced through the UI, all three removed afterwards; nothing sent, the
+  bid's lines untouched. Seen right: the conduit picker's
+  **"Underground (18)"** fold, closed by default, below the six saved
+  types; opened, **Sch 40 ½"…4" then Sch 80 ½"…4"**; the 500 type beside
+  700 and armable (the UI trace armed it). The 500 Traced-footage block
+  names only 500 parts (coupling, entrance end, support clip "not set",
+  inside elbow), "Send 4 lines"; the Sch 80 block's tape says "the flat
+  length only, not the risers". No horizontal overflow at either size.
+- **Found and fixed: "Nothing traced under this type yet." beside 80 ft of
+  traced raceway.** Wire comes from a run's circuits, and a run traced
+  through the UI has none until somebody adds wires — so the wire rows were
+  0 ft, and `runRowSendability` said every 0 ft row was "nothing traced"
+  (panel AND the post-Send toast; every conduit type, 700 and EMT too).
+  It now takes a REQUIRED `typeTraced` (`runTypeTraced(rows)`, shared) and
+  says "No wire on these runs yet — open a run to add its wires." when the
+  pipe has feet. Test in `server/takeoffBridge.test.ts`, **red without the
+  fix** ("expected 'No wire…', received 'Nothing traced…'"), green with it;
+  five related files 96 green; `pnpm check` clean. Looked at again on
+  screen at both sizes after the fix.
+- Stale comment in `RunTypePicker.tsx` ("ten shipped underground types")
+  now says 18.
+- Dev server stopped, whole tree; port 3004 free. Temp scripts deleted.
+
+## Earlier (2026-10-09) — `c-sch80-500` MERGED into local-dev; Q11 answered
+
+**Merged.** A's seed (`8f3045c`) and A's 0141 were on local-dev, so
+`origin/local-dev` (`679cce8`) was merged into `c-sch80-500` and the result
+pushed to local-dev as a fast-forward. Conflicts: `baselineRunTypes.ts`
+and `perFootSeed.test.ts` took A's (a superset, as A's note below said);
+CHANGELOG and this file kept both. **C's databases `bidrender_local_c` and
+`bidrender_test_c` now have 142 migrations** (0141 applied this session).
+
+- **`sch80And500Runs.test.ts` now runs on the SHIPPED rows**: the shipped
+  `2" PVC Sch 80, underground` type (waste set → it forks; the fork keeps
+  the shipped tape, which the tape line proves) and the shipped 500 type,
+  raceway and parts. The stand-in company type and the shared fixture rows
+  are gone; the file seeds the catalog it reads in `beforeAll`.
+- **Tests:** the nine Sch 80/500 files (`sch80And500Runs`,
+  `sch80And500Seed`, `surfaceRacewayFittings`, `runTypeFold`,
+  `perFootSeed`, `catalogReview20261008`, `catalogReviewSeed`,
+  `runNoWire`, `runTypeExtras`) — **118 green** on `bidrender_test_c`;
+  `pnpm check` clean. Full suite: the Gate on the local-dev push.
+- **E111 1728359 and Bar layout check 1164558 unchanged:** `bids.get`,
+  `bridgeForBid`, `materialsList.get`, `takeoffSummary.forBid`, local-dev
+  tip vs the merge, same `bidrender_local_c` — identical apart from the
+  `preparedOn` clock.
+- ~~Not done: looking at the fold and the 500 Send block on screen~~ —
+  done the same day, see above.
+- **Q11 (auto branch runs) answered by the owner: YES.** A detour over 3×
+  the straight right-angle distance is a WARNING with the fix-it buttons,
+  priced, never a block. Written into `auto-branch-runs-plan.md` § 3c,
+  § 3d, § 11, § 13 on **`track-c`** (`77479ce`) — that plan lives on
+  `track-c` only, not on local-dev yet.
+
+## Earlier (2026-10-08, proof session) — tape test proven; runNoWire reds explained and fixed; still NOT MERGED
+
+Still on `c-sch80-500`; no merge until A's seed landed (it has — above).
+
+- **Sch 80 tape test proven.** `extraFeetForRun` temporarily made to follow
+  every foot (risers included) → `sch80And500Runs.test.ts` red "expected
+  116.6 to be 110"; restored → green; tree clean before commit.
+- **The 9 runNoWire reds: test setup, not a bug.** The file read shipped
+  rows by name and never seeded; `#12 THHN green Copper` is new with A's
+  catalog review, so right after 0140 it was absent until some other file
+  seeded. Reproduced on a scratch DB (seeded at `ca8030c`, migrated to 0140):
+  11 red, "reading 'id'". Now it seeds in `beforeAll` → same DB 18/18 green.
+- **Shuffling found two more, in `runTypeExtras.test.ts`**: user created only
+  in the first describe; the $0.25 tape fork leaked into the "not priced"
+  test. File-level user + per-test reset of the company's own rows: 8/12
+  shuffle seeds red before, 12/12 green after.
+- Eight touched test files (108 tests) green on shuffle seeds 1–8 on
+  `bidrender_test_c`; `pnpm check` clean. Full suite not run on the laptop.
+  Details: `sch80-and-500-plan.md` § 7b. Scratch DB and worktree removed.
+- **Gate 37882413912 on `f4604c0`: test GREEN (full suite)**; drizzle-guard,
+  deploy-staging and smoke skipped, as expected on a `c-*` branch.
+
+## Earlier (2026-10-08, build session) — Sch 80/500: C's half BUILT on `c-sch80-500`, NOT MERGED
+
+**DO NOT MERGE `c-sch80-500` INTO local-dev UNTIL TRACK A'S SEED LANDS**
+(owner, 2026-10-08). The exact list A must add is
+`sch80-and-500-plan.md` § 7c — nine Sch 80 underground types, the 500
+rename/retire/nine adds, the 500 run type, and A's seed tests. When it is on
+local-dev: merge local-dev into `c-sch80-500`, switch the Sch 80 case in
+`server/sch80And500Runs.test.ts` to the shipped type (§ 7b), run the touched
+files, Gate, then merge — and look at the fold and the 500 Send dialog on
+screen (plan § 6).
+
+Branch from `origin/local-dev` `d36bfc9` (A's 0140 included). Built:
+`undergroundRunTypeLabel(size, schedule)` (schedule required), the fold
+sorting Sch 40 then Sch 80 by size, and the 500/700 fitting family as a
+closed list (`surfaceRacewaySeries`; 1500 off; `isSurfaceRaceway700`
+deleted) with `fittingRowsByRunType` branching on it. The seed file was
+touched only to pass `"PVC Sch 40"` to the two existing label calls. Tests
+and their red-without-it checks: plan § 7b. Full suite NOT run on the
+laptop. `bidrender_local_c` and `bidrender_test_c` now have **141**
+migrations (0140 applied this session). One unexplained first-run red in
+`runNoWire.test.ts` straight after applying 0140, not repeated — § 7b.
+**Gate 37877582385 on `c-sch80-500`: test GREEN (full suite, 10m36s);**
+drizzle-guard and deploy-staging skipped, as expected on a branch with no
+`drizzle/` change. Gate did not run on `c-*` branches before — `gate.yml`
+now includes `c-*`, as it already did `a-*`.
+
+## Earlier (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
 
 ## FROM TRACK A (2026-10-09) — A's Sch 80 / 500 seed IS ON local-dev: merge `c-sch80-500` now
 

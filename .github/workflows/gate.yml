@@ -20,9 +20,10 @@ name: Gate
 
 on:
   push:
-    # a-* is Track A's own work branches, so A's changes get the same gate
-    # before they reach local-dev.
-    branches: [local-dev, "track-*", "a-*"]
+    # a-* and c-* are Track A's and Track C's own work branches, so their
+    # changes get the same gate before they reach local-dev. c-* added
+    # 2026-10-08: c-sch80-500 was pushed and nothing ran.
+    branches: [local-dev, "track-*", "a-*", "c-*"]
   pull_request:
 
 # One run per branch at a time; a newer push cancels the older run —
