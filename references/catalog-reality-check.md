@@ -29,7 +29,12 @@ sources.
   committed as it was finished. Same method and verdicts. Large generated
   grids (fitting × size × type) are checked a row of sizes at a time: one
   manufacturer size table can confirm a whole run, and the table cites it
-  once. **Batch 2 is NOT approved**; its proposed changes wait for the
+  once. **Finished 2026-10-09; all 1,463 accounted for** (243 + 297 +
+  103 + 129 + 184 + 135 + 135 + 102 + 135, each section listing its rank
+  ranges). **The shared web-search budget ran out partway through**, so
+  batch 2 is more thinly sourced than batch 1: each section says how many
+  searches it had, and its "no page" rows are trade knowledge only.
+  **Batch 2 is NOT approved**; its proposed changes wait for the
   owner.
 
 ## Method
@@ -99,7 +104,7 @@ series`. `…, 500 series` is retired into it.
 
 | Retired or split row                     | Starter(s) that use it now                                                   | Repoint to (kept row)                                                                                                                                                                                                                                                 |
 | ---------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `60A main panel, 8-space`                | Temporary power pole                                                         | `60A main panel, 12-space`                                                                                                                                                                                                                                            |
+| `60A main panel, 8-space`                | Temporary power pole                                                         | `60A main panel, 12-space` (batch 2 found its Square D part listed as replaced; see the note in "Batch 2 — Panels and breakers")                                                                                                                                      |
 | `320A meter base`                        | Service 320A / 400A residential (two 200A panels)                            | `400A meter base` (gains "320A", "cl320" as search words)                                                                                                                                                                                                             |
 | `50A RV receptacle`                      | EV / RV receptacle, 50A (NEMA 14-50)                                         | `50A range receptacle, NEMA 14-50R` (gains "rv", "camper")                                                                                                                                                                                                            |
 | `Floor box cover`                        | Floor box receptacle (slab)                                                  | `Floor box cover, duplex`                                                                                                                                                                                                                                             |
@@ -847,3 +852,54 @@ trade knowledge. Every rank 1031–1120 and 1162–1255 is in a row below.
 - `Stainless steel weatherproof cover` → `Weatherproof flip cover, stainless`.
 - Pull box aliases → drop "trough", "wireway"; PVC pull boxes → drop "underground".
 - Gap, optional: `4" square raised cover, two duplex` is a common item the catalog lacks.
+
+## Batch 2 — PVC fittings (243 items)
+
+Checked 2026-10-09 against Carlon (ABB) listings, the Cantex online item
+catalog and Gexpro / Elliott / Crescent / Graybar pages. Every rank
+601–815 and 948–975 is in a row below.
+
+**The main finding: PVC couplings, conduit bodies and terminal adapters are
+ONE part for Sch 40 and Sch 80.** Every listing found says "for use with
+Schedule 40 and 80" (Carlon E940, E943, E983–E987; Cantex). Elbows and
+sweeps are the exception: they are separate heavy-wall products by schedule.
+So 63 of the Sch 80 rows duplicate Sch 40 rows.
+
+**This one is not seed-only, so read it before approving.** Traced Sch 80
+runs price their fittings by NAME: `shared/runFittingMaterials.ts` lists
+`"PVC Sch 80"` as its own raceway family and builds `${size} PVC Sch 80 …`
+coupling, connector and body names from it. The strap already shares one
+row across both schedules (`strapFamily`: "PVC 40 and 80 share an outside
+diameter"). Retiring the Sch 80 couplings, bodies and connectors without
+the same mapping for those fittings would leave every traced Sch 80 run
+saying "no catalog row" for them. The code change and the seed change ship
+together. The Sch 80 underground run types and their tests are C's work
+merged on 2026-10-09 (`c-sch80-500`).
+
+| #                | Item (or size run)                                   | Verdict                        | Finding                                                                                                | Sources                                                                                                                                                                                                                                                                                                                              |
+| ---------------- | ---------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 601–609, 624–631 | PVC Sch 40 45° and 90° elbow, 1/2"–4"                | OK                             | standard factory elbows                                                                                | no page                                                                                                                                                                                                                                                                                                                              |
+| 610–623, 632–645 | PVC Sch 40 45°/90° sweeps, 24" and 36" radius, 1"–4" | OK                             | confirmed at several sizes for both radii                                                              | [Gexpro UA9DF](https://www.gexpro.com/p/296775/carlon/1-pvc-90-elbow-24-radius-schedule-40-gray/034481067412/ua9df) · [Elliott 5133852](https://elliottelectric.com/Media/5133852-PVF) · [Graybar 4" 36"R](https://graybar.com/elbow-pvc-schedule-40-90-degree-angle-36-in-radius-plain-end-4-in-trade-56-5-l-x-36-h-in-/p/94073641) |
+| 646–654, 671–706 | PVC Sch 40 C, LB, LL, LR, T conduit bodies, 1/2"–4"  | OK (naming)                    | Real in every size (Carlon E986 LB to 4"; Cantex LL/LR/T/C 2-1/2"–4"), each one part for Sch 40 AND 80 | [Source Atlantic E986N](https://www.sourceatlantic.ca/Product/E986N) · [Cantex bodies](https://pvcelectrical.cantexinc.com/Page/ItemCatalog?SearchText=conduit%20bodies) · [HD E986J](https://www.homedepot.com/p/Carlon-2-in-Sch-40-and-80-Electrical-PVC-Type-LB-Conduit-Body-E986J-4-HD-E986J-4-HD/100404009)                     |
+| 655–661          | PVC Sch 40 connector, 1/2"–4"                        | FLAG: misleading (term)        | The PVC trade name is "terminal adapter" / "male adapter" (Carlon E943); one part for both schedules   | [ABB E943F](https://empower.abb.com/ecatalog/ec/EN_NA/p/E943F)                                                                                                                                                                                                                                                                       |
+| 662–670          | PVC Sch 40 coupling, 1/2"–4"                         | OK (naming)                    | Carlon E940, "Schedule 40 or 80"                                                                       | [Gexpro E940L](https://www.gexpro.com/p/572341/carlon/pvc-coupling-standard-3-in-schedule-40-or-80/034481061083/e940l)                                                                                                                                                                                                               |
+| 707–715, 730–738 | PVC Sch 80 45° and 90° elbow                         | OK                             | genuinely separate heavy-wall product                                                                  | Carlon Sch 80 elbows (Yodify listing)                                                                                                                                                                                                                                                                                                |
+| 716–729, 739–752 | PVC Sch 80 sweeps, 24" and 36" radius, 1"–4"         | OK (1" and 1-1/4" unconfirmed) | confirmed at 1-1/2"–4" (24") and 2" (36")                                                              | [Crescent Sch 80 2" 24"R](https://crescentelectric.com/conduit/elbows-couplings-and-nipples/conduit-elbows/schedule-80-elbow-size-2-inches-bend-radius-24-inches-bend-angle-90-degrees-material-pvc-belled-end)                                                                                                                      |
+| 753–761, 780–815 | PVC Sch 80 C, LB, LL, LR, T conduit bodies           | FLAG: duplicate                | Same parts as 646–654 and 671–706                                                                      | as above                                                                                                                                                                                                                                                                                                                             |
+| 762–770          | PVC Sch 80 connector                                 | FLAG: duplicate + misleading   | Same E943 terminal adapter as the Sch 40 connectors                                                    | as above                                                                                                                                                                                                                                                                                                                             |
+| 771–779          | PVC Sch 80 coupling                                  | FLAG: duplicate                | Same E940 coupling as 662–670                                                                          | as above                                                                                                                                                                                                                                                                                                                             |
+| 948–953          | PVC expansion fitting, 1/2"–2"                       | OK (naming)                    | Real; Cantex calls it an expansion coupling; no travel length named                                    | [Cantex expansion](https://pvcelectrical.cantexinc.com/Page/ItemCatalog?SearchText=expansion)                                                                                                                                                                                                                                        |
+| 954–959          | PVC female adapter, 1/2"–2"                          | OK                             | one "Sch 40/80" part                                                                                   | [Cantex adapter](https://pvcelectrical.cantexinc.com/Page/ItemCatalog?SearchText=adapter)                                                                                                                                                                                                                                            |
+| 960–965          | PVC one-hole strap, 1/2"–2"                          | OK (unverified)                | common in small sizes; no maker page found (Cantex lists two-hole only)                                | no page                                                                                                                                                                                                                                                                                                                              |
+| 966–968          | PVC one-hole strap, 2-1/2", 3", 4"                   | FLAG: wrong size (likely)      | No nonmetallic one-hole strap found at these sizes; Cantex sells two-hole to 4"                        | [Cantex strap](https://pvcelectrical.cantexinc.com/Page/ItemCatalog?SearchText=strap)                                                                                                                                                                                                                                                |
+| 969–975          | PVC weatherhead, 1"–4"                               | OK                             | Cantex SE caps 1"–4"; Carlon E998                                                                      | [Cantex SE caps](https://pvcelectrical.cantexinc.com/Page/FITTINGSANDACCESSORIES-SCH40-SCH80-FITTINGS-SERVICE-ENTRANCE-MAST-HEAD)                                                                                                                                                                                                    |
+
+**Proposed changes (batch 2, PVC) — not approved**
+
+- `PVC Sch 80 coupling` (9) → retire into the Sch 40 couplings, renamed `… PVC coupling (Sch 40/80)`; needs the `runFittingMaterials.ts` mapping above.
+- `PVC Sch 80 C/LB/LL/LR/T conduit body` (45) → retire into the Sch 40 bodies, renamed `… PVC LB conduit body (Sch 40/80)` etc.; same code dependency.
+- `PVC Sch 80 connector` (9) → retire into the Sch 40 connectors; same code dependency.
+- `PVC Sch 40 connector` (and the existing 1", 2" rows) → `… PVC terminal adapter (Sch 40/80)`, keeping "connector" and "male adapter" as search words.
+- Sch 40 and Sch 80 elbows and sweeps → keep both.
+- `2-1/2"`, `3"`, `4" PVC one-hole strap` → `… PVC two-hole strap`.
+- Optional: `PVC expansion fitting` → `PVC expansion coupling`; add 2-1/2"–4" expansion couplings and a 3/4" weatherhead.
