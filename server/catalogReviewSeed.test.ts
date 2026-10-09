@@ -86,8 +86,18 @@ async function oldBareRow(): Promise<number> {
     searchAliases: "",
     userId: null,
   });
+  INSERTED.material = result.insertId;
   return result.insertId;
 }
+
+/**
+ * SHARED rows this file inserted (userId NULL), removed in afterAll: on a
+ * fresh database neither the #12 bare row nor the 3-1/2" type exists, and
+ * leaving them would put them in every other suite's catalog (the leak
+ * guard, scripts/testLeakGuard.ts, refuses that). A row an older database
+ * already held is not ours and stays.
+ */
+const INSERTED: { material?: number; runType?: number } = {};
 
 beforeAll(async () => {
   if (!hasDb) return;
@@ -111,6 +121,12 @@ afterAll(async () => {
   const db = (await getDb())!;
   await db.delete(takeoffRunTypes).where(eq(takeoffRunTypes.userId, COMPANY));
   await db.delete(materials).where(eq(materials.userId, COMPANY));
+  if (INSERTED.runType !== undefined)
+    await db
+      .delete(takeoffRunTypes)
+      .where(eq(takeoffRunTypes.id, INSERTED.runType));
+  if (INSERTED.material !== undefined)
+    await db.delete(materials).where(eq(materials.id, INSERTED.material));
 });
 dropFixtureUsersAfterAll([COMPANY]);
 
@@ -227,6 +243,7 @@ withDb('the 3-1/2" underground run type on a database that has it', () => {
         pathType: "conduit",
       });
       id = result.insertId;
+      INSERTED.runType = id;
     }
     await db
       .update(takeoffRunTypes)

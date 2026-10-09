@@ -732,8 +732,17 @@ describe.skipIf(!hasDb)("seeding the catalog into a live database", () => {
     for (const row of await baselineRows()) {
       named.set(row.name, (named.get(row.name) ?? 0) + 1);
     }
+    // A rename INTO a row that is now retired (the catalog review,
+    // 2026-10-08: "#14 bare CU, solid" -> "#14 bare solid Copper") lands on
+    // a row only a database that once shipped it holds; a fresh one never
+    // inserts it. There it may be absent, but never twice.
+    const retired = new Set(RETIRED_BASELINE_MATERIALS);
     for (const [from, to] of Object.entries(RENAMED_BASELINE_MATERIALS)) {
       expect(named.get(from) ?? 0, `"${from}" survived the rename`).toBe(0);
+      if (retired.has(to)) {
+        expect(named.get(to) ?? 0, `"${to}" twice`).toBeLessThanOrEqual(1);
+        continue;
+      }
       expect(named.get(to) ?? 0, `"${to}" missing`).toBe(1);
     }
   });

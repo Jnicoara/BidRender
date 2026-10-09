@@ -13,9 +13,9 @@ This is the human-readable companion to the git history — read this to see wha
   H-tap, crimp terminals and multi-tap). Withdrawn means hidden from lists,
   never deleted, so a bid already priced from one still opens as it was.
   107 everyday items were added: sized set-screw splices, mechanical lugs,
-  split bolts, Polaris-style multi-taps, crimp terminals by colour, cord
+  split bolts, Polaris-style multi-taps, crimp terminals by color, cord
   grips, more crimp sleeves, grounding bushings for every size, phase tape
-  in nine colours, Carflex (nonmetallic liquidtight) and its connectors,
+  in nine colors, Carflex (nonmetallic liquidtight) and its connectors,
   6/2 NM-B, 12/3 and 10/3 UF-B and more. Wire nuts are now named by the
   wire they take ("Wire nut, 22-8 AWG (tan/red)" — the same item the
   starters use), receptacles state their NEMA type, and four boxes say

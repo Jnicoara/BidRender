@@ -3,9 +3,9 @@
  *
  * ── Wire nuts are named by WIRE RANGE (owner's catalog review, 2026-10-08) ──
  * Until then they were "Wire nuts", "Wire nuts, small" and "Wire nuts,
- * large", with colour notes that were backwards for the common brand (it
+ * large", with color notes that were backwards for the common brand (it
  * called orange the medium; orange is the smallest of orange/yellow/red).
- * Now each says the range it takes and its colours: the general-purpose
+ * Now each says the range it takes and its colors: the general-purpose
  * 22-8 (tan/red) — the SAME row the 114 starters use, renamed in place — the
  * small 22-12 (blue/orange) and the large blue wing nut, 14-6. The small and
  * large rows became those two by rename (shared/catalogReview20261008.ts).
@@ -303,32 +303,32 @@ function sizedConnectors(): BaselineMaterial[] {
         )
       )
     ),
-    // Insulated crimp terminals, by the colour code.
+    // Insulated crimp terminals, by the color code.
     ...(
       [
         ["red", "22-18 AWG"],
         ["blue", "16-14 AWG"],
         ["yellow", "12-10 AWG"],
       ] as const
-    ).flatMap(([colour, range]) => [
+    ).flatMap(([color, range]) => [
       each(
-        `Butt splice, ${colour} (${range})`,
+        `Butt splice, ${color} (${range})`,
         "crimp inline connector insulated barrel joiner splice",
-        "Insulated crimp splice, colour-coded by wire range.",
+        "Insulated crimp splice, color-coded by wire range.",
         "both",
         4
       ),
       each(
-        `Ring terminal, ${colour} (${range})`,
+        `Ring terminal, ${color} (${range})`,
         "crimp lug eye connector insulated stud screw",
-        "Insulated crimp ring, colour-coded by wire range.",
+        "Insulated crimp ring, color-coded by wire range.",
         "both",
         4
       ),
       each(
-        `Spade terminal, ${colour} (${range})`,
+        `Spade terminal, ${color} (${range})`,
         "crimp fork connector insulated screw",
-        "Insulated crimp spade, colour-coded by wire range.",
+        "Insulated crimp spade, color-coded by wire range.",
         "both",
         4
       ),
@@ -513,8 +513,8 @@ export const CONSUMABLES: BaselineMaterial[] = [
     searchAliases: aliases("vinyl 33 super 88 roll black scotch"),
     defaultQty: 2,
   },
-  // Phase-colour tape, one row per colour (owner's catalog review,
-  // 2026-10-08): bought by colour, for marking phases and conductors.
+  // Phase-color tape, one row per color (owner's catalog review,
+  // 2026-10-08): bought by color, for marking phases and conductors.
   ...[
     "red",
     "blue",
@@ -525,12 +525,12 @@ export const CONSUMABLES: BaselineMaterial[] = [
     "orange",
     "yellow",
     "gray",
-  ].map(colour => ({
+  ].map(color => ({
     ...CONS,
-    name: `Phase tape, ${colour}`,
+    name: `Phase tape, ${color}`,
     searchAliases: aliases(
-      "phasing marking colored coloured electrical vinyl tape 35 scotch",
-      colour === "gray" ? "grey" : ""
+      "phasing marking colored electrical vinyl tape 35 scotch",
+      color === "gray" ? "grey" : ""
     ),
     jobKind: "both" as const,
   })),

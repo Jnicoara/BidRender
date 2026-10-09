@@ -153,8 +153,8 @@ describe("the cover family ships whole", () => {
   });
 
   it("is one row per plate: colors are search words, never rows", () => {
-    // Phase tape is the one shipped thing bought BY colour — a red roll and
-    // a blue roll are two purchases — so its colours are rows on purpose
+    // Phase tape is the one shipped thing bought BY color — a red roll and
+    // a blue roll are two purchases — so its colors are rows on purpose
     // (owner's catalog review, 2026-10-08). The rule is about plates.
     expect(
       BASELINE_MATERIALS.filter(

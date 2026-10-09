@@ -120,7 +120,7 @@ const copperThhn: BaselineMaterial[] = [
     withdrawn: it is the ground the shipped "#12 + ground" run types name
     now (baselineRunTypes.ts). Solid, like the #12 those types pull. Only
     the green ships as its own row because it is the one a run type names;
-    other colours are bought on the plain row.
+    other colors are bought on the plain row.
   */
   {
     name: "#12 THHN green Copper",
@@ -215,8 +215,8 @@ const aluminumFeeder: BaselineMaterial[] = ALUMINUM_SIZES.map(size => {
 // ─── NM-B (Romex) ─────────────────────────────────────────────────────────────
 
 /**
- * Jacket colour is how NM-B gets called out on a job — "grab a roll of yellow"
- * — so every size carries its colour as slang. The colours are the NEC-era
+ * Jacket color is how NM-B gets called out on a job — "grab a roll of yellow"
+ * — so every size carries its color as slang. The colors are the NEC-era
  * industry convention: 14 white, 12 yellow, 10 orange, 8 and 6 black.
  */
 const NM_COLOURS: Record<string, string> = {

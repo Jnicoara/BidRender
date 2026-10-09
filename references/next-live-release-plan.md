@@ -17,7 +17,7 @@ in the state it describes, and those want opposite responses.
 | What      | State (2026-10-08)                                                                                                            |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Live      | `24105ad` (`origin/main`), database 0000–0104 (105 migrations)                                                                |
-| Staging   | follows `local-dev`; database 0000–0139 (140) since 2026-10-08 22:44 UTC, all applied before their code (`deploying.md` § 11) |
+| Staging   | follows `local-dev`; database 0000–0140 (141) since 2026-10-09 01:10 UTC, all applied before their code (`deploying.md` § 11) |
 | Gap       | `git log --oneline origin/main..origin/local-dev \| wc -l` = 207 at `8913918` (merges and docs included)                      |
 | Candidate | not chosen. Must be a commit with a green Gate (test, deploy-staging, smoke) — `live-release-plan.md` § 0 if not the tip      |
 | Last Gate | `8913918` (B's cover swaps merged): Gate 37858600880 green, 2026-10-08                                                        |
@@ -74,7 +74,17 @@ left out. One line per theme; the commits say the rest.
 - Reset page says a dead link is dead on open (`6518fc5`); reset logs why
   nothing was sent (`4a76181`); slow-request logging (`c0f7fbe`).
 
-## 3. Migrations a live release would run: 0105–0139 (35 files)
+## 3. Migrations a live release would run: 0105–0140 (36 files)
+
+> **Grew again 2026-10-09 (session 25): 0140** (`0140_material_specialty`,
+> `materials.isSpecialty`, the owner's catalog review — additive, on
+> staging). **The § 5c rehearsal was of 35; it must be RE-RUN with 36
+> before the release** — expect 36 applied, 141, matches, 176/176. The
+> catalog review's seed content (138 retired, 107 added, 23 renamed, 108
+> Specialty, the run-type ground swap and the 3-1/2" type archived) runs on
+> the new code's FIRST BOOT, so the re-rehearsal also boots that code on
+> the copy and compares the catalog (`scripts/catalogRehearsal.mts`) and
+> the totals (§ 5d).
 
 > **Grew 2026-10-08 (sessions 21 and 23):** 0135–0138 (per-foot items
 > M1–M4) and **0139** (`0139_elbow_flat_role`, the `elbowFlat` role)
@@ -84,7 +94,7 @@ left out. One line per theme; the commits say the rest.
 > errors.** The "30 / 135 / 173" figures in § 5b are the thirty's, kept as
 > the record of that run.
 
-All thirty-five are **step 1, additive** — no `UPDATE` to an older column —
+All thirty-six are **step 1, additive** — no `UPDATE` to an older column —
 per `migrations-next-batch.md` and the staging records in `deploying.md`
 § 11. So all go on BEFORE the push, in one run, in order.
 
@@ -97,10 +107,11 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 | 0132–0134 | example price / hours / labor-rate flags and wage parts                                                                         |
 | 0135–0138 | per-foot items M1–M4: `takeoff_run_type_extras`, `extra` role + `runExtraKey` key swap, `qtySource`, traced-part JSON           |
 | 0139      | `elbowFlat` appended to `bid_line_items.runMaterialRole` (the 700 flat elbow)                                                   |
+| 0140      | `materials.isSpecialty` — the catalog review's Specialty tag (sorts lower in search; no total reads it)                         |
 
-- **Expect: "Applied 35 migrations", then 140; a second run applies nothing;
+- **Expect: "Applied 36 migrations", then 141; a second run applies nothing;
   `schemaDrift` "matches"; foreign keys 176/176** (staging's number,
-  2026-10-08 after 0139). If any differs, stop and find out why — either
+  2026-10-09 after 0140). If any differs, stop and find out why — either
   this line is stale or live is not where you think.
 - **0136 swaps a unique key too** (`bid_line_items_bid_runtype_role_uq` →
   `…_role_extra_uq`, ADD before DROP in one statement). Rehearsed on staging's
@@ -109,7 +120,7 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
   `bid_group_role_uq`). Rehearsed; the one file worth reading twice.
 - **Order is a hard rule:** the migrator skips a file whose `when` is older
   than the newest applied. Never apply 0132–0134 without 0125–0131 first, and
-  never a subset of the thirty-five.
+  never a subset of the thirty-six.
 - **Step 3 — nothing in this release.** Folding the "EXISTING TO REMAIN"
   twins and clearing the 8 starters' hours wait until this code is LIVE.
 
@@ -261,6 +272,35 @@ covers the edited and forked cases.
 **Expect on the day:** 35 applied, 140, matches, 176/176, 0 holds, 183
 starters; repair 5 / 43, then 48. If any differs, stop and find out why.
 
+## 5d. Re-rehearsal with 0140 and the catalog review — TO DO before the release
+
+The § 5c run predates 0140 and the owner's catalog review (session 25,
+`references/catalog-review-2026-10-08.md`). The review changes nothing in
+a migration except one nullable column; its weight is in the SEED, which
+runs on the new code's first boot. So the re-rehearsal is § 5c's steps
+plus a catalog before/after, on a fresh copy of live:
+
+1. Backup + verify, restore to a scratch database (as § 5b).
+2. `scripts/catalogRehearsal.mts snapshot before.json` on the copy;
+   `bidTotals.mts` before, from the code live serves.
+3. Migrate: **expect 36 applied, 141**, re-run nothing, matches, 176/176.
+4. Boot the candidate on the copy (or `scripts/seedBaseline.mts`, the
+   same seed), twice. `catalogRehearsal.mts snapshot after.json`, then
+   `compare`. **Expect** on live's catalog (which predates the
+   2026-10-07 rename and adds): renamed rows grouped by round, the review's
+   23 among them where live has the row; retired = the review's rows live
+   holds (IMC, #14/#12/#10 bare, the generics — live never had 3-1/2");
+   DELETED 0; company rows unchanged; old spellings 0; duplicates 0; every
+   reference identical EXCEPT `takeoff_run_types.groundMaterialId` on the
+   shipped "#12 + ground" types (moved to #12 THHN green, by design). A
+   second boot: nothing changes.
+5. `bidTotals.mts` after, with the candidate: every total unchanged.
+6. Then the cover repair (§ 4b).
+
+Staging's own run of exactly this is `deploying.md` § 11 "0140" (rehearsed
+on a copy, 773/773 unchanged; staging 781/781 unchanged after the migration).
+If anything differs, stop and find out why.
+
 ### Still missing before the release (2026-10-08)
 
 - **Owner's yes** and the candidate commit; then a green Gate on exactly
@@ -293,10 +333,10 @@ starters; repair 5 / 43, then 48. If any differs, stop and find out why.
 
 ## SHORT SUMMARY
 
-- Live `24105ad` / 0104; staging = `local-dev` / 0139; 207 commits apart.
-- A release runs 0105–0139 (35, all additive) before the push, in one
-  ordered run; expect 140, matches, 176/176 FKs. Re-rehearsed 2026-10-08
-  (§ 5c): 4.1 s, no errors, both bids unchanged.
+- Live `24105ad` / 0104; staging = `local-dev` / 0140.
+- A release runs 0105–0140 (36, all additive) before the push, in one
+  ordered run; expect 141, matches, 176/176 FKs. Rehearsed with 35 on
+  2026-10-08 (§ 5c); **0140 and the catalog review need a re-run (§ 5d)**.
 - NEW release step after the push and first boot: `repairStarterCovers.mts`
   (§ 4b) — expect 5 swapped (DV1–DV5), 43 already, then 48 already.
 - Pairing rules 1–5 all met on `local-dev`; rule 2 now expects ZERO holds
