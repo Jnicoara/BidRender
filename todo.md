@@ -3,6 +3,39 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## When the picker finds nothing — (a) and (b) BUILT 2026-10-09 (Track B)
+
+The two owner-approved before-beta items (track-c's todo.md § "Before beta:
+when the picker finds nothing", 2026-10-08). **Whoever merges track-c's
+todo.md: tick (a) and (b) there and point at this entry.**
+
+- [x] **(b) "Build it from parts here"** — bid screen's "Add an assembly"
+      and the counting screen (`/bids/:id/count`). `bids.buildFromParts`
+      (`server/buildFromParts.ts`) creates through `assemblies.create` (its
+      own capability check and name clash), adds the line with
+      `addAssemblyToBid`, and archives the assembly when "Save to my
+      library" is unticked (default ON). No migration. Tests:
+      `server/buildFromParts.test.ts`, `client/src/lib/buildFromPartsDraft.test.ts`.
+- [x] **(a) No-match search log — code BUILT, table WAITS ON TRACK A.**
+      `search_misses` needs a migration; the SQL is
+      `SEARCH_MISSES_CREATE_SQL` in `server/searchMissLog.ts` and in
+      track-b-handoff.md. Until it is applied the code records nothing and
+      the admin panel says "not set up" — safe in either order. Logged from:
+      the bid and counting screens' assembly search, the plan viewer's stamp
+      picker and link list, and every unshelved `MaterialPicker`. A search
+      counts after it has sat on no results for 2 s; one per picker opening;
+      the server folds the same words from one company inside 10 min.
+- [ ] **Not logged yet:** "Link to material or assembly" on a hand-priced
+      line (`HandPricedLineFields.tsx`) — its assembly tab is a bare
+      `includes` search, so a miss there may be something the library has.
+      Switch it to `smartSearch` first, then add `useNoMatchLog`.
+- [ ] **Not offered yet:** the builder in the plan viewer's pickers (stamp
+      picker, Legend/Runs link list). The stamp picker already counts
+      anything typed by hand (level 1), so it is less urgent there.
+- [ ] **A fast "type and Enter" never logs** (the 2 s settle). On the stamp
+      picker, "Count it anyway" is itself a strong miss signal — consider
+      recording on that click as well.
+
 ## Coverage-check starters — BUILT 2026-10-09 (Track B), 224 starters
 
 41 new starters from `references/coverage-check.md` (track-c): CK1–CK26

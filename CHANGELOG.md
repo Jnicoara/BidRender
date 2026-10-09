@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **When the bid's assembly search finds nothing, you can build it right
+  there.** "Build it from parts here" opens under the search: name it, pick
+  catalog parts, optionally the hours and who does them, and it goes on the
+  bid. "Save to my library" is ticked by default, so next time it is a
+  normal search hit; unticked, it stays out of the library list but can be
+  restored from the archive. Works on the bid screen and the counting
+  screen. The bid screen's assembly search also now finds things the same
+  way the counting screen does (spellings and slang, not only exact text).
+- **The admin screen lists searches that found nothing.** When an assembly
+  or material search comes up empty, the words typed are recorded — only the
+  words, the company and the date; no prices, no bids, no names, and no AI
+  reads it — so the next catalog work follows what people actually look for.
+  It starts recording once its database table is added (Track A's next
+  migration); until then it records nothing and says so.
 - **Fixed: clicking a legend symbol right after linking it could count into
   the WRONG item.** When two symbols share one assembly (say a duplex and a
   switch both priced as one receptacle), a click straight after "Link" could

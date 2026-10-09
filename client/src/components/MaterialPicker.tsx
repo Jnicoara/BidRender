@@ -34,6 +34,7 @@ import { money } from "@/lib/money";
 import { useMaterialSearch } from "@/hooks/useMaterialSearch";
 import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
 import { trpc } from "@/lib/trpc";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 
 export type PickableMaterial = {
   id: number;
@@ -95,7 +96,8 @@ export function MaterialPicker({
   const ownRef = useRef<HTMLInputElement | null>(null);
   const searchRef = inputRef ?? ownRef;
 
-  const { data: catalog = [] } = trpc.materials.list.useQuery();
+  const { data: catalog = [], isSuccess: catalogReady } =
+    trpc.materials.list.useQuery();
   const { data: recent = [] } = trpc.materials.recent.useQuery({
     limit: MAX_RECENT + (exclude?.length ?? 0),
   });
@@ -162,6 +164,21 @@ export function MaterialPicker({
 
   const showingRecent = !query.trim() && results.length > 0;
 
+  /*
+    A search that settles on nothing goes in the no-match log
+    (shared/searchMiss.ts). Not on a picker limited to some shelves: there a
+    miss may be a part that exists on another shelf, which says nothing about
+    what the catalog lacks.
+  */
+  useNoMatchLog(
+    "material",
+    categories ? "" : query,
+    results.length,
+    catalogReady
+  );
+  const nothingFound =
+    catalogReady && query.trim() !== "" && results.length === 0;
+
   // The highlight is an index into a list that changes under it. Reset rather
   // than clamp: after a new search, "the first result" is the only position
   // that means anything, and a preserved index points at something else.
@@ -218,6 +235,17 @@ export function MaterialPicker({
           className={cn(compact ? "h-7 pl-7 text-xs" : "h-8 pl-9 text-sm")}
         />
       </div>
+
+      {nothingFound && (
+        <p
+          className={cn(
+            "mt-2 text-muted-foreground",
+            compact ? "text-[0.7rem]" : "text-xs"
+          )}
+        >
+          Nothing in the catalog matches “{query.trim()}”.
+        </p>
+      )}
 
       {results.length > 0 && (
         <>

@@ -436,26 +436,37 @@ export function declaredTables(): DeclaredTable[] {
   const tables: DeclaredTable[] = [];
   for (const value of Object.values(schema)) {
     if (typeof value !== "object" || value === null) continue;
-    let config;
-    try {
-      config = getTableConfig(value as never);
-    } catch {
-      // Not a table — the module also exports enums, types and constants.
-      continue;
-    }
-    tables.push({
-      name: config.name,
-      columns: config.columns.map(column => ({
-        name: column.name,
-        // drizzle marks a primary key notNull too, which matches MySQL.
-        nullable: !column.notNull,
-        // The DDL drizzle would write for it, e.g. `decimal(12,4)`.
-        type: column.getSQLType(),
-        default: declaredDefault(column as never),
-      })),
-    });
+    const table = declaredTable(value);
+    // Not a table — the module also exports enums, types and constants.
+    if (table) tables.push(table);
   }
   return tables;
+}
+
+/**
+ * One drizzle table as `compareTable` reads it, or NULL when `value` is not a
+ * table. Exported for a table declared OUTSIDE drizzle/schema.ts while its
+ * migration is pending (server/searchMissLog.ts), so its test can hold the
+ * declaration and the migration's SQL to the same comparison as every other.
+ */
+export function declaredTable(value: unknown): DeclaredTable | null {
+  let config;
+  try {
+    config = getTableConfig(value as never);
+  } catch {
+    return null;
+  }
+  return {
+    name: config.name,
+    columns: config.columns.map(column => ({
+      name: column.name,
+      // drizzle marks a primary key notNull too, which matches MySQL.
+      nullable: !column.notNull,
+      // The DDL drizzle would write for it, e.g. `decimal(12,4)`.
+      type: column.getSQLType(),
+      default: declaredDefault(column as never),
+    })),
+  };
 }
 
 /**

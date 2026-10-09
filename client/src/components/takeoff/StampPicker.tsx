@@ -42,6 +42,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { smartSearch } from "@/lib/smartSearch";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 
 export type PickableAssembly = {
   id: number;
@@ -122,6 +123,11 @@ export function StampPicker({
       .map(hit => byId.get(Number(hit.id)))
       .filter((a): a is PickableAssembly => Boolean(a));
   }, [query, searchable, assemblies]);
+
+  // A search that settles on nothing goes in the no-match log, even though
+  // "Count it anyway" is right there — that is the person working around a
+  // gap, which is exactly what the log is for.
+  useNoMatchLog("assembly", query, results.length, assemblies.length > 0);
 
   return (
     <Popover

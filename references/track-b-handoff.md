@@ -1,6 +1,112 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-09 (later), coverage-check starters BUILT (READ FIRST)
+## WHERE B STANDS — 2026-10-09 (evening), "when the picker finds nothing" BUILT (READ FIRST)
+
+- **Gate check first:** local-dev Gate 37985104078 was not red. It was
+  CANCELLED, replaced by 37985135173 (the same code plus a docs commit),
+  which went **green on every job: test, deploy-staging, smoke**.
+- **(b) "Build it from parts here" — done, no migration.** A search with no
+  hits on the bid screen's "Add an assembly" or the counting screen
+  (`/bids/:id/count`) offers it. Name, parts, optional hours and role,
+  "Save to my library" ON by default. Server: `bids.buildFromParts`
+  (`server/buildFromParts.ts`) creates through `assemblies.create` by
+  caller, adds with `addAssemblyToBid`, and **unticked means ARCHIVED**
+  (a line needs an assembly; Restore brings it back). The bid screen's
+  assembly search moved from a bare `includes` to `smartSearch`, the same
+  search the counting screen uses.
+- **(a) No-match search log — code done, NEEDS A MIGRATION (Track A).**
+  - The table is declared in `server/searchMissLog.ts`, NOT in
+    `drizzle/schema.ts`, so drift and drizzle-kit stay clean until the
+    migration exists.
+  - Every read and write survives the table being absent:
+    - record → `stored: false, "not-set-up"`;
+    - the admin panel says "not set up on this database yet".
+  - So code and migration may ship in either order.
+- **Track A — please write as the next number (ADDITIVE, step 1).** Copy
+  `SEARCH_MISSES_CREATE_SQL` from `server/searchMissLog.ts` word for word:
+
+  ```sql
+  CREATE TABLE `search_misses` (
+  	`id` int AUTO_INCREMENT NOT NULL,
+  	`companyUserId` int NOT NULL,
+  	`picker` varchar(16) NOT NULL,
+  	`words` varchar(120) NOT NULL,
+  	`createdAt` timestamp NOT NULL DEFAULT (now()),
+  	CONSTRAINT `search_misses_id` PRIMARY KEY(`id`),
+  	CONSTRAINT `search_misses_companyUserId_users_id_fk` FOREIGN KEY (`companyUserId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
+  ) COLLATE=utf8mb4_unicode_ci;
+  CREATE INDEX `search_misses_company_words_idx` ON `search_misses` (`companyUserId`,`picker`,`words`);
+  CREATE INDEX `search_misses_createdAt_idx` ON `search_misses` (`createdAt`);
+  ```
+
+  In the same change:
+  1. Move the `searchMisses` declaration into `drizzle/schema.ts`
+     unchanged. It is already in the right form.
+  2. Import it in `server/searchMissLog.ts`, and point
+     `SEARCH_MISSES_CREATE_SQL` at the migration file or delete it.
+  3. `server/searchMissLog.test.ts` can stay as it is: it uses its own
+     scratch schema. Its SQL import must follow wherever step 2 puts the
+     text. `schemaDrift.test.ts` then checks the real table as well.
+
+  Expect `schemaDrift` afterwards to say "Foreign keys match the schema
+  (177 present, 177 declared)", one more than B measured today. If it
+  prints anything else, stop and find out why: either this line is stale,
+  or the database is not in the state you think.
+- **What is logged:** words, company (owner id), picker, time. No person,
+  bid or price.
+  - Sources:
+    - the bid and counting screens' assembly search;
+    - the stamp picker and the Legend/Runs link list;
+    - every `MaterialPicker` without a shelf filter.
+  - A search counts after it has sat on no results for 2 s, once per
+    picker opening.
+  - The server folds the same words from one company inside 10 min, and
+    caps a company at 500 a day.
+  - `record` needs `library.view`; `list` is admin only.
+- **Tests:**
+  - New: `server/buildFromParts.test.ts` (7),
+    `server/searchMissLog.test.ts` (10),
+    `client/src/lib/buildFromPartsDraft.test.ts` (7),
+    `client/src/lib/noMatchLog.test.ts` (5).
+  - All four fail on HEAD (their modules do not exist there).
+  - Removing each guard turned a test red: the catalog check, the
+    archive-when-unticked, the 10-minute repeat, the missing-table catch.
+  - `searchMissLog.test.ts` works in its own scratch schema
+    (`<test db>__search_miss`). It tests the absent path first, then
+    creates the table from that SQL, checks MySQL built exactly the
+    declaration, and drops the schema at the end.
+    - **Not in the shared test DB, and that matters:** the first version
+      created, renamed and dropped the table THERE, which can race
+      `backup.test.ts` (it lists every table, then reads each one).
+    - The log functions take an optional database for this. The router
+      checks run on the app's own DB in whatever state it is in.
+- **On screen** (a throwaway playwright probe on the `deviceAudit.mts`
+  helpers; real viewports 1536x864, 820x1180 and 1180x820):
+  - search miss → "Nothing in your library matches … / Build it from
+    parts here";
+  - builder → parts, hours → line on the bid with "Not priced" and "Fix
+    this line";
+  - unticked at 820x1180 → "Added … to the bid." only;
+  - the counting screen the same;
+  - the parts picker shows "Nothing in the catalog matches …";
+  - the admin list showed 4 lines, and "zz no such part" once across three
+    sizes (the 10-min fold).
+  - Looking found one fault, now fixed: an all-unpriced builder said
+    "Parts: $0.00 each + 2 not priced". It now says "Parts: not priced
+    yet", and that is tested.
+  - The table was created in `bidrender_local_b_new` for the check and
+    dropped after. Drift: 142, matches, 176/176.
+- **Not done** (todo.md § "When the picker finds nothing"):
+  - the hand-priced line's link search is not logged (bare `includes`);
+  - no builder in the plan viewer pickers yet;
+  - a fast type-and-Enter never logs.
+- **Local leftovers** (user 1, `bidrender_local_b_new`, local only):
+  - bids "B no-match check …" and "B no-match count …";
+  - assemblies "zz pole bracket …" and "zz count gizmo …" (one of them
+    archived).
+- **State:** no migrations by B. No dev server running.
+
+## WHERE B STOOD — 2026-10-09 (later), coverage-check starters BUILT
 
 - **41 new starters, 224 in all.** CK1–CK26 are every missing assembly in
   the first coverage check (owner: all 26, not 10; duplicates once). CW1–CW15
