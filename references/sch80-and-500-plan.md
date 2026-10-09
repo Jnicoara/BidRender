@@ -413,6 +413,28 @@ passed alone, in every pair, and in the same set three times after. Read as
 a one-off first-seed-after-0140 transition, NOT proven; the Gate run on the
 branch is the full-suite answer.
 
+**Explained 2026-10-08 (later session) — TEST SETUP, not a product bug.**
+`runNoWire.test.ts` looks up shipped rows by exact name and never seeded
+them; tests do not seed (`server/seedShippedLibrary.ts`), so it passed only
+when some other file had seeded the current catalog first. `#12 THHN green
+Copper` is new with A's catalog review, so on `bidrender_test_c` right after
+0140 the lookup returned undefined → "Cannot read properties of undefined
+(reading 'id')". **Reproduced**: a scratch `bidrender_test_c_repro` migrated
+and seeded at `ca8030c`, then migrated to 0140 with this branch → 11/11 DB
+tests red with exactly that error (the original 9: presumably a file earlier
+in that set had partly seeded; not re-derived). **Fixed**: the file seeds
+materials then run types in `beforeAll`, and a `shipped()` lookup names a
+missing row. Same stale database → 18/18 green. Shuffling the order then
+found two more in `runTypeExtras.test.ts` (fixture user created only in the
+first describe; the $0.25 tape fork leaking into the "not priced" test) —
+fixed with a file-level user and a per-test reset of the company's own rows;
+red on 8 of 12 shuffle seeds before, 12/12 green after. The eight touched
+test files (108 tests) green on shuffle seeds 1–8.
+
+**Sch 80 tape test proven red without the rule** (same session):
+`extraFeetForRun` made to follow every foot for a `flat` extra → "expected
+116.6 to be 110"; restored → green.
+
 **Not looked at on screen yet** (§ 6). Nothing on screen changes until A's
 seed ships the Sch 80 types and the 500 type; the look belongs after the
 merge.

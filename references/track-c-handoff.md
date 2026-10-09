@@ -14,7 +14,27 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-08, build session) — Sch 80/500: C's half BUILT on `c-sch80-500`, NOT MERGED
+## LATEST (2026-10-08, proof session) — tape test proven; runNoWire reds explained and fixed; still NOT MERGED
+
+Still on `c-sch80-500`; **still no merge until A's seed lands** (below).
+
+- **Sch 80 tape test proven.** `extraFeetForRun` temporarily made to follow
+  every foot (risers included) → `sch80And500Runs.test.ts` red "expected
+  116.6 to be 110"; restored → green; tree clean before commit.
+- **The 9 runNoWire reds: test setup, not a bug.** The file read shipped
+  rows by name and never seeded; `#12 THHN green Copper` is new with A's
+  catalog review, so right after 0140 it was absent until some other file
+  seeded. Reproduced on a scratch DB (seeded at `ca8030c`, migrated to 0140):
+  11 red, "reading 'id'". Now it seeds in `beforeAll` → same DB 18/18 green.
+- **Shuffling found two more, in `runTypeExtras.test.ts`**: user created only
+  in the first describe; the $0.25 tape fork leaked into the "not priced"
+  test. File-level user + per-test reset of the company's own rows: 8/12
+  shuffle seeds red before, 12/12 green after.
+- Eight touched test files (108 tests) green on shuffle seeds 1–8 on
+  `bidrender_test_c`; `pnpm check` clean. Full suite not run on the laptop.
+  Details: `sch80-and-500-plan.md` § 7b. Scratch DB and worktree removed.
+
+## Earlier (2026-10-08, build session) — Sch 80/500: C's half BUILT on `c-sch80-500`, NOT MERGED
 
 **DO NOT MERGE `c-sch80-500` INTO local-dev UNTIL TRACK A'S SEED LANDS**
 (owner, 2026-10-08). The exact list A must add is
