@@ -177,6 +177,229 @@ approved change, not a different change. Elbows and
 sweeps stay per schedule, and so do the straps, which already share one
 row.
 
+## PANELS — PROPOSED, owner to approve (2026-10-09)
+
+**Not approved yet.** This replaces every panel and main-lug line in the
+batch-2 "Panels and breakers" proposals, including the idea of renaming
+small main-lug panels to 125A. The owner found that 100A main-lug panels
+DO exist (Square D Homeline HOM612L100SCP, 100A 6-space, Home Depot). So
+this researches which single-phase panels are actually stocked, in four
+types, and proposes one generic row per combination that is really sold.
+
+**Scope:** single-phase load centers, 60–225A. Out of scope and unchanged:
+the 400A rows, the 3-phase panelboards, `Generator-ready main panel`, meter
+bases and meter-mains.
+
+**How it was checked (2026-10-09):**
+
+- **Square D (Homeline, QO):** Schneider's own product page per catalog
+  number, which says "Stock — normally stocked in distribution facility" or
+  "Non-Stock". The flag does separate them (QO124M200PWG125 came back
+  Non-Stock). Rows marked † are in Royal Wholesale Electric's current
+  Schneider catalog without that flag having been checked.
+- **Siemens, Eaton:** Home Depot product titles and URLs from search results
+  (its pages refuse direct reads). Elliott Electric's stock lists were read
+  directly, which show company-wide stock counts, the strongest "stocked"
+  evidence found. [sa] = one reseller only (titles copied from Home Depot),
+  which is weak.
+- **GE/ABB:** every GE cell is unsure. ABB's catalog timed out, and Sydist
+  marks several GE parts discontinued. **GE never counts toward a row.**
+
+**The rule for a row:** a combination gets a generic row when **at least two
+brand lines** stock it, counting the lines the owner named: Homeline, QO,
+Siemens, Eaton BR, Eaton CH. Unsure (?), [sa] and GE cells do not count.
+Where the two lines are both Square D (Homeline + QO), the row says so
+under "made by", because that is one manufacturer. Brand-specific catalog
+numbers are listed for the later brand-variants pass; **no brand rows are
+proposed here.**
+
+**Naming:** `{amps}A main-lug panel, {spaces}-space, indoor|outdoor` and
+`{amps}A main-breaker panel, {spaces}-space, indoor|outdoor`. Spaces are
+full-size positions (Homeline's HOM2040 is 20 spaces / 40 circuits).
+**Search words:** "MLO" on every main-lug row; "NEMA 3R" and "outdoor" on
+every outdoor row, "NEMA 1" on indoor; every old name that maps to a row
+(table C) on that row.
+
+**If a rebuilt grid disagrees with this one**, for example a part now marked
+Non-Stock or a new size line, stop and find out why before applying it.
+Either this table is stale or a line has changed, and stock flags move.
+
+### A. What is stocked (✓ = proposed row; lines that stock it)
+
+Key: H = Homeline, Q = QO, S = Siemens, BR = Eaton BR, CH = Eaton CH.
+
+**Main-lug, indoor (NEMA 1)**
+
+| Amps | 2           | 4             | 6                     | 8        | 12            | 16          | 20            | 24            | 30                    | 40       | 42          |
+| ---- | ----------- | ------------- | --------------------- | -------- | ------------- | ----------- | ------------- | ------------- | --------------------- | -------- | ----------- |
+| 60   | S only      |               |                       |          |               |             |               |               |                       |          |             |
+| 70   | ✓ H Q BR CH |               |                       |          |               |             |               |               |                       |          |             |
+| 100  |             |               | ✓ H Q (Square D only) | Q only   |               |             |               |               |                       |          |             |
+| 125  |             | ✓ H Q S BR CH | BR only               | ✓ H S CH | ✓ H Q S BR CH | ✓ Q S BR CH | ✓ H Q S BR CH | ✓ H Q S BR CH | ✓ H Q (Square D only) | S only   |             |
+| 150  |             |               |                       |          |               |             | BR only       | ✓ S CH        |                       |          |             |
+| 200  |             |               |                       |          | ✓ Q S         |             | ✓ S BR        | S only        | ✓ Q S BR              | ✓ Q S BR |             |
+| 225  |             |               |                       |          |               |             | H only        | CH only       | H only                | H only   | ✓ H Q BR CH |
+
+**Main-lug, outdoor (NEMA 3R)**
+
+| Amps | 2           | 4             | 6                     | 8           | 12             | 16        | 20       | 24       | 30       | 40     | 42       |
+| ---- | ----------- | ------------- | --------------------- | ----------- | -------------- | --------- | -------- | -------- | -------- | ------ | -------- |
+| 60   | S only      |               |                       |             |                |           |          |          |          |        |          |
+| 70   | ✓ H Q BR CH |               |                       |             |                |           |          |          |          |        |          |
+| 100  |             |               | ✓ H Q (Square D only) | Q only      |                |           |          |          |          |        |          |
+| 125  | ✓ S CH      | ✓ H Q S BR CH | BR only               | ✓ H S BR CH | ✓ H Q S BR CH  | ✓ Q BR CH | ✓ H S BR | ✓ H Q CH | S only   |        |          |
+| 150  |             |               |                       |             |                |           | S only   |          |          |        |          |
+| 200  |             |               |                       | S (trailer) | ✓ Q S BR CH    | CH only   | ✓ S BR   |          | ✓ Q S BR | ✓ Q S  |          |
+| 225  |             |               |                       |             | H only (12/12) |           | H only   | CH only  | H only   | H only | ✓ H Q CH |
+
+**Main-breaker, indoor (NEMA 1)** — no 60A main-breaker panel is stocked by
+any line; QO112M10060 is discontinued (its Schneider page now redirects).
+
+| Amps | 8      | 12         | 16      | 20         | 24                    | 30         | 32      | 40         | 42        |
+| ---- | ------ | ---------- | ------- | ---------- | --------------------- | ---------- | ------- | ---------- | --------- |
+| 100  | H only | ✓ H Q S BR | ✓ Q BR  | ✓ H Q S BR | ✓ H Q (Square D only) | ✓ H BR CH  | Q only  |            |           |
+| 125  |        |            | BR only | BR only    | ✓ H Q S               | ✓ H S BR   | Q only  |            |           |
+| 150  |        |            |         | S only     | ✓ Q CH                | ✓ H Q S BR | ✓ Q CH  |            | Q only    |
+| 200  |        |            |         | ✓ H S BR   | ✓ Q CH                | ✓ H Q BR   | CH only | ✓ H Q S BR | ✓ H Q CH  |
+| 225  |        |            |         |            |                       |            |         |            | ✓ H BR CH |
+
+**Main-breaker, outdoor (NEMA 3R)**
+
+| Amps | 2       | 8                           | 12                | 16       | 20         | 24                    | 30         | 32      | 40         | 42      |
+| ---- | ------- | --------------------------- | ----------------- | -------- | ---------- | --------------------- | ---------- | ------- | ---------- | ------- |
+| 100  | BR only | H only                      | ✓ H Q S BR        | ✓ Q S BR | ✓ H Q S BR | Q only                | CH only    |         |            |         |
+| 125  |         |                             | H value pack only |          | BR only    | ✓ H Q (Square D only) |            |         |            |         |
+| 150  |         | feed-through only           |                   |          | ✓ Q S BR   | CH only               | ✓ H Q BR   | CH only |            |         |
+| 200  |         | trailer / feed-through only | ✓ H S             | CH only  | ✓ H Q S BR | CH only               | ✓ H Q S BR | CH only | ✓ H Q S BR | ✓ Q CH  |
+| 225  |         |                             |                   |          |            |                       |            |         |            | CH only |
+
+### B. Proposed rows (one per ✓; 56 rows)
+
+| Proposed row                                 | Brand catalog numbers (for the brand-variants pass)                 |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| `70A main-lug panel, 2-space, indoor`        | HOM24L70SCP, QO24L70SCP / QO2L70S, BR24L70SP, CH2L70SP              |
+| `100A main-lug panel, 6-space, indoor`       | HOM612L100SCP, QO612L100SCP                                         |
+| `125A main-lug panel, 4-space, indoor`       | HOM48L125GC, QO148L125GS, E0408ML1125SU, BR48L125SP, CH4L125SP      |
+| `125A main-lug panel, 8-space, indoor`       | HOM816L125PC, E0816ML1125S, CH8L125SP                               |
+| `125A main-lug panel, 12-space, indoor`      | HOM1224L125PGC, QO112L125PGC, SN1224L1125, BRP12L125, CHP12L125X0   |
+| `125A main-lug panel, 16-space, indoor`      | QO116L125PG, SN1632L1125, BRP16L125, CHP16L125X1                    |
+| `125A main-lug panel, 20-space, indoor`      | HOM2040L125PGC, QO120L125PG, SN2040L1125, BRP20L125, CHP20L125X2    |
+| `125A main-lug panel, 24-space, indoor`      | HOM2448L125PGC, QO124L125PGC, SN2424L1125, BRP24L125G, CHP24L125X2  |
+| `125A main-lug panel, 30-space, indoor`      | HOM3060L125PC, QO130L125PG                                          |
+| `150A main-lug panel, 24-space, indoor`      | SN2448L1150, CHP24L150X5                                            |
+| `200A main-lug panel, 12-space, indoor`      | QO112L200PG, SN1224L1200                                            |
+| `200A main-lug panel, 20-space, indoor`      | SN2040L1200, BRP20L200                                              |
+| `200A main-lug panel, 30-space, indoor`      | QO130L200PGC, SN3030L1200 / SN3048L1200, BR3040L200 / BRP30L200     |
+| `200A main-lug panel, 40-space, indoor`      | QO140L200PG, SN4040L1200, BRP40L200G                                |
+| `225A main-lug panel, 42-space, indoor`      | HOM4284L225PGC, QO142L225PGC, BRP42LC225, CHP42L225X6               |
+| `70A main-lug panel, 2-space, outdoor`       | HOM24L70RB, QO24L70RB / QO2L70RB, BR24L70RP, CH2L70RP               |
+| `100A main-lug panel, 6-space, outdoor`      | HOM612L100RB, QO612L100RB                                           |
+| `125A main-lug panel, 2-space, outdoor`      | W0204ML1125CU, CH2L125RP                                            |
+| `125A main-lug panel, 4-space, outdoor`      | HOM48L125GRB, QO148L125GRB, W0408ML1125, BR48L125RP, CH4L125RP      |
+| `125A main-lug panel, 8-space, outdoor`      | HOM816L125PRB, W0816ML1125CU, BR816L125RP, CH8L125RP                |
+| `125A main-lug panel, 12-space, outdoor`     | HOM1224L125PRB, QO112L125PGRB, SNW1224L1125, BRP12L125R, CHP12L125R |
+| `125A main-lug panel, 16-space, outdoor`     | QO116L125PGRB, BRP16L125R, CHP16L125R                               |
+| `125A main-lug panel, 20-space, outdoor`     | HOM2040L125PRB, SNW2040L1125, BRP20L125R                            |
+| `125A main-lug panel, 24-space, outdoor`     | HOM2448L125PRB, QO124L125PGRB, CHP24L125R                           |
+| `200A main-lug panel, 12-space, outdoor`     | QO112L200PGRB, SNW1224L1200, BR1224L200R, CHP12L200R                |
+| `200A main-lug panel, 20-space, outdoor`     | SNW2040L1200, BRP20L200R                                            |
+| `200A main-lug panel, 30-space, outdoor`     | QO130L200PGRB, SNW3048L1200, BRP30L200R                             |
+| `200A main-lug panel, 40-space, outdoor`     | QO140L200PGRB, SNW4040L1200                                         |
+| `225A main-lug panel, 42-space, outdoor`     | HOM4284L225PRB, QO142L225PGRB, CHP42L225R                           |
+| `100A main-breaker panel, 12-space, indoor`  | HOM1224M100PC, QO112M100PC, SN1224B1100, BRP12B100                  |
+| `100A main-breaker panel, 16-space, indoor`  | QO116M100P, BRP16B100                                               |
+| `100A main-breaker panel, 20-space, indoor`  | HOM2040M100PC, QO120M100PC, SN2040B1100, BRP20B100                  |
+| `100A main-breaker panel, 24-space, indoor`  | HOM2448M100PC, QO124M100PC                                          |
+| `100A main-breaker panel, 30-space, indoor`  | HOM3060M100PC, BRP30B100, CHP30B100X5                               |
+| `125A main-breaker panel, 24-space, indoor`  | HOM2448M125PC, QO124M125P, SN2424B1125                              |
+| `125A main-breaker panel, 30-space, indoor`  | HOM3060M125PC, SN3030B1125 / SN3048B1125, BRP30B125                 |
+| `150A main-breaker panel, 24-space, indoor`  | QO124M150P, CHP24B150X5                                             |
+| `150A main-breaker panel, 30-space, indoor`  | HOM3060M150PC, QO130M150PC, SN3030B1150 [sa], BRP30B150             |
+| `150A main-breaker panel, 32-space, indoor`  | QO132M150P, CHP32B150X6                                             |
+| `200A main-breaker panel, 20-space, indoor`  | HOM2040M200PC, SN2040B1200, BRP20B200                               |
+| `200A main-breaker panel, 24-space, indoor`  | QO124M200P, CHP24B200X5                                             |
+| `200A main-breaker panel, 30-space, indoor`  | HOM3060M200PC, QO130M200PC, BRP30B200                               |
+| `200A main-breaker panel, 40-space, indoor`  | HOM4080M200PC, QO140M200PC, SN4040B1200, BRP40B200                  |
+| `200A main-breaker panel, 42-space, indoor`  | HOM4284M200PC, QO142M200PC, CHP42B200X7                             |
+| `225A main-breaker panel, 42-space, indoor`  | HOM4284M225PC, BRP42BC225, CHP42B225X7                              |
+| `100A main-breaker panel, 12-space, outdoor` | HOM1224M100PRB, QO112M100PRB, SNW1224B1100, BR1224B100R             |
+| `100A main-breaker panel, 16-space, outdoor` | QO116M100PRB, SNW1632B1100, BRP16B100R                              |
+| `100A main-breaker panel, 20-space, outdoor` | HOM2040M100PRB, QO120M100PRB, SNW2020B1100, BRP20B100R              |
+| `125A main-breaker panel, 24-space, outdoor` | HOM2448M125PRB, QO124M125PRB                                        |
+| `150A main-breaker panel, 20-space, outdoor` | QO120M150PRB, SNW2040B1150, BRP20B150R                              |
+| `150A main-breaker panel, 30-space, outdoor` | HOM3060M150PRB, QO130M150PRB, BRP30B150R                            |
+| `200A main-breaker panel, 12-space, outdoor` | HOM12M200PRB (12 spaces / 12 circuits), SNW1224B1200                |
+| `200A main-breaker panel, 20-space, outdoor` | HOM2040M200PRB, QO120M200PRB, SNW2040B1200, BRP20B200R              |
+| `200A main-breaker panel, 30-space, outdoor` | HOM3060M200PRB, QO130M200PRB, SNW3048B1200, BRP30B200R              |
+| `200A main-breaker panel, 40-space, outdoor` | HOM4080M200PRB, QO140M200PRB, SNW4040B1200, BRP40B200R              |
+| `200A main-breaker panel, 42-space, outdoor` | QO142M200PRB, CHP42B200R                                            |
+
+Five of these rest on Square D's two lines alone (100A main-lug 6-space
+indoor and outdoor, 125A main-lug 30-space indoor, 100A main-breaker
+24-space indoor, 125A main-breaker 24-space outdoor). They are proposed
+because the rule counts lines; if the owner wants two MANUFACTURERS
+instead, those five drop out, and 100A main-lug panels would then have no
+generic row at all.
+
+### C. Every existing panel row, mapped (old name stays a search word)
+
+"Rename" keeps the row's id (`RENAMED_BASELINE_MATERIALS`); "retire into"
+uses `RETIRED_BASELINE_MATERIALS`. Every row in table B that no existing
+row is renamed into is a NEW row: 19 renames, so **37 new rows** of the
+56 (counted from the two tables, 2026-10-09; if a recount differs, one of
+the tables was edited without the other).
+
+| Existing row                                                                                                                                                          | Starters using it                                                                                          | Becomes                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `200A main panel, 40-space`                                                                                                                                           | Service upgrade 200A overhead; Panel replacement 200A; Service upgrade 200A underground; Service 320A/400A | **rename** → `200A main-breaker panel, 40-space, indoor`                                                                                                                                                     |
+| `200A main panel`                                                                                                                                                     | 200A main panel furnish and install                                                                        | retire into `200A main-breaker panel, 40-space, indoor` (batch 1, approved; starter repointed)                                                                                                               |
+| `100A main panel, 24-space`                                                                                                                                           | Detached garage / shop feeder and panel                                                                    | **rename** → `100A main-breaker panel, 24-space, indoor`                                                                                                                                                     |
+| `100A main-lug sub-panel, 24-space`                                                                                                                                   | Subpanel, 100A (resi, 60A feed)                                                                            | **rename** → `125A main-lug panel, 24-space, indoor`. No 100A 24-space main-lug panel is sold; the stocked 24-space can is rated 125A, which a 100A (or 60A) feed protects. The starter's name is unaffected |
+| `60A main panel, 8-space`                                                                                                                                             | Temporary power pole                                                                                       | retire into `100A main-breaker panel, 12-space, outdoor` (owner call 2; starter repointed)                                                                                                                   |
+| `60A main panel, 12-space`                                                                                                                                            | —                                                                                                          | retire into `100A main-breaker panel, 12-space, outdoor`                                                                                                                                                     |
+| `100A outdoor main panel`                                                                                                                                             | —                                                                                                          | **rename** → `100A main-breaker panel, 12-space, outdoor` (the row the two 60A rows retire into)                                                                                                             |
+| `200A outdoor main panel`                                                                                                                                             | —                                                                                                          | **rename** → `200A main-breaker panel, 40-space, outdoor`                                                                                                                                                    |
+| `100A main panel`                                                                                                                                                     | —                                                                                                          | retire into `100A main-breaker panel, 20-space, indoor`                                                                                                                                                      |
+| `125A main panel`                                                                                                                                                     | —                                                                                                          | retire into `125A main-breaker panel, 24-space, indoor`                                                                                                                                                      |
+| `150A main panel`                                                                                                                                                     | —                                                                                                          | retire into `150A main-breaker panel, 30-space, indoor`                                                                                                                                                      |
+| `100A main panel, 12-space`                                                                                                                                           | —                                                                                                          | **rename** → `100A main-breaker panel, 12-space, indoor`                                                                                                                                                     |
+| `100A main panel, 20-space`                                                                                                                                           | —                                                                                                          | **rename** → `100A main-breaker panel, 20-space, indoor`                                                                                                                                                     |
+| `125A main panel, 20-space`                                                                                                                                           | —                                                                                                          | retire into `125A main-breaker panel, 24-space, indoor` (Eaton BR only)                                                                                                                                      |
+| `125A main panel, 24-space`                                                                                                                                           | —                                                                                                          | **rename** → `125A main-breaker panel, 24-space, indoor`                                                                                                                                                     |
+| `125A main panel, 30-space`                                                                                                                                           | —                                                                                                          | **rename** → `125A main-breaker panel, 30-space, indoor`                                                                                                                                                     |
+| `150A main panel, 30-space`                                                                                                                                           | —                                                                                                          | **rename** → `150A main-breaker panel, 30-space, indoor`                                                                                                                                                     |
+| `200A main panel, 30-space`                                                                                                                                           | —                                                                                                          | **rename** → `200A main-breaker panel, 30-space, indoor`                                                                                                                                                     |
+| `150A main panel, 40-space`                                                                                                                                           | —                                                                                                          | retire into `200A main-breaker panel, 40-space, indoor` (no line makes it)                                                                                                                                   |
+| `200A main panel, 42-space`                                                                                                                                           | —                                                                                                          | **rename** → `200A main-breaker panel, 42-space, indoor`                                                                                                                                                     |
+| `225A main panel, 42-space`                                                                                                                                           | —                                                                                                          | **rename** → `225A main-breaker panel, 42-space, indoor`                                                                                                                                                     |
+| `100A main-lug sub-panel`                                                                                                                                             | —                                                                                                          | **rename** → `100A main-lug panel, 6-space, indoor` (owner: "becomes its correct sized name")                                                                                                                |
+| `125A main-lug sub-panel`                                                                                                                                             | —                                                                                                          | retire into `125A main-lug panel, 12-space, indoor`                                                                                                                                                          |
+| `150A main-lug sub-panel`                                                                                                                                             | —                                                                                                          | retire into `150A main-lug panel, 24-space, indoor`                                                                                                                                                          |
+| `200A main-lug sub-panel`                                                                                                                                             | —                                                                                                          | retire into `200A main-lug panel, 30-space, indoor`                                                                                                                                                          |
+| `60A main-lug sub-panel, 8-space`                                                                                                                                     | —                                                                                                          | retire into `125A main-lug panel, 8-space, indoor` (60A main-lug is 2-space only, one line)                                                                                                                  |
+| `60A main-lug sub-panel, 12-space`                                                                                                                                    | —                                                                                                          | retire into `125A main-lug panel, 12-space, indoor`                                                                                                                                                          |
+| `100A main-lug sub-panel, 12-space`                                                                                                                                   | —                                                                                                          | retire into `125A main-lug panel, 12-space, indoor` (only a sold-out Siemens part found)                                                                                                                     |
+| `100A main-lug sub-panel, 20-space`                                                                                                                                   | —                                                                                                          | retire into `125A main-lug panel, 20-space, indoor`                                                                                                                                                          |
+| `125A main-lug sub-panel, 20-space`                                                                                                                                   | —                                                                                                          | **rename** → `125A main-lug panel, 20-space, indoor`                                                                                                                                                         |
+| `125A main-lug sub-panel, 24-space`                                                                                                                                   | —                                                                                                          | retire into `125A main-lug panel, 24-space, indoor` (the renamed starter row above takes that name)                                                                                                          |
+| `125A main-lug sub-panel, 30-space`                                                                                                                                   | —                                                                                                          | **rename** → `125A main-lug panel, 30-space, indoor`                                                                                                                                                         |
+| `150A main-lug sub-panel, 30-space`                                                                                                                                   | —                                                                                                          | retire into `200A main-lug panel, 30-space, indoor` (no 150A 30-space main-lug)                                                                                                                              |
+| `200A main-lug sub-panel, 30-space`                                                                                                                                   | —                                                                                                          | **rename** → `200A main-lug panel, 30-space, indoor`                                                                                                                                                         |
+| `150A main-lug sub-panel, 40-space`                                                                                                                                   | —                                                                                                          | retire into `200A main-lug panel, 40-space, indoor`                                                                                                                                                          |
+| `200A main-lug sub-panel, 40-space`                                                                                                                                   | —                                                                                                          | **rename** → `200A main-lug panel, 40-space, indoor`                                                                                                                                                         |
+| `200A main-lug sub-panel, 42-space`                                                                                                                                   | —                                                                                                          | retire into `225A main-lug panel, 42-space, indoor` (the stocked 42-space can is 225A)                                                                                                                       |
+| `225A main-lug sub-panel, 42-space`                                                                                                                                   | —                                                                                                          | **rename** → `225A main-lug panel, 42-space, indoor`                                                                                                                                                         |
+| `400A main panel`, `400A main panel, 42-space`, `400A main-lug sub-panel`, `400A main-lug sub-panel, 42-space`, the 3-phase panelboards, `Generator-ready main panel` | 3-phase starters use the panelboards                                                                       | **unchanged** (out of this table's scope; batch 2's bare-400A retirements still apply)                                                                                                                       |
+
+Two of these are choices rather than findings, for the owner to confirm:
+which space count a bare-amperage row retires into (the most widely
+stocked one was picked), and `100A outdoor main panel` / `200A outdoor
+main panel` taking the 12-space and 40-space names.
+
+**Not checked:** GE/ABB, beyond listing what was found; Eaton's own site,
+which timed out (Eaton evidence is Elliott stock lists and Home Depot
+titles); stock in any one store, since Home Depot's store figures vary.
+
 ## Wire & cable, and low-voltage cable and devices (51 items)
 
 Checked 2026-10-09. **Read this before trusting the OKs:** most rows here
@@ -1006,7 +1229,11 @@ still satisfies condition 4, since the row is shipped and kept, but the
 kept row may itself be a hard-to-buy item. Track A or the owner may prefer
 `100A main panel, 12-space` (HOM1224M100PC, stocked) for that starter.
 
-**Proposed changes (batch 2, panels) — not approved**
+**Proposed changes (batch 2, panels) — APPROVED 2026-10-09, except every
+panel and main-lug line below, which the "PANELS — PROPOSED" table near
+the top of this file replaces** (the owner found 100A main-lug panels are
+sold, so the 125A renames here are withdrawn). The breaker, fuse,
+disconnect and accessory lines stand.
 
 - `30A`, `60A`, `200A`, `400A`, `600A cartridge fuse` → add voltage and class (e.g. `30A 250V Class RK5 cartridge fuse`); keep J and T aliases off R-class rows.
 - `60A main-lug sub-panel, 8-space` → `125A main-lug sub-panel, 8-space`.
