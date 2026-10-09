@@ -42,6 +42,82 @@ sources.
   family's list and then read through before being committed. Each "#" is
   the item's row in the pricing sheet's order.
 
+## APPROVED, for Track A — batch 1 (owner, 2026-10-09)
+
+**The owner approved every "Proposed changes" line in the six batch-1
+family sections below (rows 1–362), on four conditions.** Track A applies
+them; Track C changed nothing in the catalog. Batch 2 (the remaining rows,
+further down) is **not** approved yet.
+
+**The four conditions, as given:**
+
+1. **Merged and retired items keep their old names as search words.** The
+   kept row gains the retired row's name, and its distinctive words, in
+   `searchAliases`. The same applies to an in-place rename that drops words
+   somebody types (`Grid box bracket` → `T-bar box hanger` keeps "grid box
+   bracket"). Mind CLAUDE.md § Materials on aliases: a retired name goes on
+   the ONE row that replaces it, never on a neighbour.
+2. **The 500/700 Wiremold box/plate merge only if a model number fits both
+   series; otherwise they stay separate.** Checked by Track C, 2026-10-09:
+   - **Box: MERGE.** Wiremold V5747 (1-3/8" deep), V5748 (1-3/4") and V5748S
+     (15/16") are each sold as a "500 and 700 Series" 1-gang box
+     ([HD V5747](https://www.homedepot.com/p/Legrand-Wiremold-500-and-700-Series-1-3-8-in-Shallow-Switch-and-Receptacle-Box-V5747/202065081),
+     [ADI 6W-V5747](https://www.adiglobaldistribution.us/Product/6W-V5747),
+     [Platt V5748](https://www.platt.com/p/0478442/wiremold/switch-receptacle-box-1-gang-500-700-series-raceway-white/786776562989/wmd5748wh)).
+     The kept row is the one the starter uses, `Surface raceway device box,
+700 series`, renamed in place to `Surface raceway device box, 500/700
+series`. `…, 500 series` is retired into it.
+   - **Plate: KEEP SEPARATE.** No plate model number made for both series
+     was found. One listing says the 1-gang box takes a standard NEMA
+     single-gang plate
+     ([CompSource V5748S](https://www.compsource.com/buy/V5748S/Middle-Atlantic-6157/Wiremold-Raceway-V5748S-Mounting-Box--Ivory--Steel/)),
+     but that is a description, not a part number. Both plate rows stay as
+     they are.
+3. **THHN solid/stranded naming keeps whichever version the assemblies use
+   now.** Every starter and run type that uses #14, #12 or #10 THHN points
+   at the PLAIN row (`#12 THHN Copper`: 7 starters and 3 run types; `#10`:
+   7 starters; `#14`: 1 starter). The `stranded` twins are used by nothing.
+   The seed describes the plain rows as "Solid. The stranded version is a
+   separate item." (`server/seed/materials/wireAndCable.ts`). So the plain
+   rows keep their ids and their solid meaning and are renamed in place to
+   `#14 THHN solid Copper`, `#12 THHN solid Copper`, `#10 THHN solid Copper`;
+   `#12 THHN green Copper` (also described as solid, used by 3 run types)
+   becomes `#12 THHN green solid Copper`. The stranded rows do not change.
+4. **No existing bid changes, and starter assemblies are repointed to kept
+   rows.** Every change goes through `RENAMED_BASELINE_MATERIALS` (same id)
+   or `RETIRED_BASELINE_MATERIALS` (`isActive = false`, so a bid already
+   priced from the row still resolves it). Nothing is deleted, and no
+   `bid_line_items` snapshot is touched. Each starter that points at a
+   retired row is repointed in the same change (`server/seed/starterParts.ts`
+   key → the kept row):
+
+| Retired or split row                     | Starter(s) that use it now                                                   | Repoint to (kept row)                                                                                                                                                                                                                                                 |
+| ---------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `60A main panel, 8-space`                | Temporary power pole                                                         | `60A main panel, 12-space`                                                                                                                                                                                                                                            |
+| `320A meter base`                        | Service 320A / 400A residential (two 200A panels)                            | `400A meter base` (gains "320A", "cl320" as search words)                                                                                                                                                                                                             |
+| `50A RV receptacle`                      | EV / RV receptacle, 50A (NEMA 14-50)                                         | `50A range receptacle, NEMA 14-50R` (gains "rv", "camper")                                                                                                                                                                                                            |
+| `Floor box cover`                        | Floor box receptacle (slab)                                                  | `Floor box cover, duplex`                                                                                                                                                                                                                                             |
+| `1-gang blank plate`                     | Demo device, blank plate                                                     | `1-gang wall plate, blank, nylon` (2-, 3-, 4-gang blank plates: no starter uses them)                                                                                                                                                                                 |
+| `Raceway entrance end fitting`           | Surface raceway receptacle (block wall)                                      | `Surface raceway entrance end fitting, 700 series` (the starter is a 700 run: 700 box and plate)                                                                                                                                                                      |
+| `Surface raceway device box, 500 series` | none                                                                         | `Surface raceway device box, 500/700 series` (condition 2)                                                                                                                                                                                                            |
+| `200A main panel`                        | 200A main panel furnish and install                                          | `200A main panel, 40-space` (the 200A row four other starters already use)                                                                                                                                                                                            |
+| `Trapeze hanger kit`                     | Conduit trapeze (strut rack), per hanger; Dry-type transformer, 45 kVA       | `1-5/8" x 1-5/8" strut channel, 10 ft`. The trapeze starter already carries the rod, clamps, nuts and washers, so the kit only stood in for the strut; Track A sets the quantity (a 3 ft trapeze is 0.3 of a stick)                                                   |
+| `2/0-4/0 AWG crimp lug`                  | Feeder breaker, 3-pole (with `100A 3-Pole breaker`, ×4)                      | **Needs a decision before repointing:** a 100A feeder is #3–#1 copper, so a 2/0–4/0 lug was the wrong size for this starter even before the range problem. Proposed: a new single-size `#1 AWG crimp lug`, or drop the lugs (the breaker has its own mechanical lugs) |
+| `Ground lug, compression`                | Dry-type transformer, 45 kVA (×2, beside 20 ft of `#4 bare stranded Copper`) | A new single-size `#4 AWG crimp lug`, matching the conductor in the same starter                                                                                                                                                                                      |
+| `N" canless wafer LED downlight, slim`   | none                                                                         | the plain `N" canless wafer LED downlight` of the same size                                                                                                                                                                                                           |
+
+`Fan-rated ceiling box` (used by "Ceiling fan standard") is redefined, not
+retired. It loses the "brace" aliases and is described as the new-work fan
+box; the starter keeps pointing at it. If "Ceiling fan standard" means a
+retrofit, repoint it to `Ceiling fan brace box` instead. That is the
+starter's meaning to settle, not a fact this check could find.
+
+**Before Track A starts:** the starters above were read on `track-c`
+`684130a`. If `server/seed/starterAssemblies.ts` has changed since, re-run
+the "who uses this row" check (`usedBy` in `pricing/starterSheetLayout.ts`).
+If the list differs from this table, stop and find out why: either this
+table is stale or a starter moved.
+
 ## Wire & cable, and low-voltage cable and devices (51 items)
 
 Checked 2026-10-09. **Read this before trusting the OKs:** most rows here
