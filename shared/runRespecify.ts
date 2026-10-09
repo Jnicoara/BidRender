@@ -17,6 +17,8 @@
  * every run of that type. This moves one run.
  */
 
+import { withUndergroundSuffix } from "./undergroundRunTypes";
+
 export type RunPathType = "conduit" | "cable";
 
 /** What a type is made of — the fields that decide whether two are the same. */
@@ -49,9 +51,37 @@ export function wantedSpec(input: {
   racewayMaterialId: number | null;
   conductorMaterialId: number | null;
   conductorCount: number | null;
+  /**
+   * "No wire (empty pipe)" — a spare, a sleeve, a trench conduit for a
+   * future pull (2026-10-08). The type it lands on says 0 conductors, which
+   * is "says no wire" (shared/runNoWire.ts), never NULL, which is "not
+   * said". Required so a caller decides rather than inheriting a default.
+   */
+  emptyPipe: boolean;
+  /**
+   * The ground, when the editor showed it — only on a run whose type names
+   * none (an underground trench, 2026-10-08). Absent rides along from the
+   * current type (rule 7), as it always has.
+   */
+  groundMaterialId?: number | null;
   current: RunTypeSpecFields | null;
 }): RunTypeSpecFields {
   const current = input.current;
+  if (input.emptyPipe) {
+    /*
+      A GUARD on every wire field, not a pass-through (rule 7's other half):
+      an empty pipe has no ground in it either, and a ground carried over
+      from the type it came from would buy bare copper for a spare conduit.
+    */
+    return {
+      pathType: "conduit",
+      racewayMaterialId: input.racewayMaterialId,
+      conductorMaterialId: null,
+      conductorCount: 0,
+      groundMaterialId: null,
+      groundCount: 0,
+    };
+  }
   if (input.pathType === "cable") {
     const sameCable =
       current !== null &&
@@ -77,8 +107,20 @@ export function wantedSpec(input: {
       input.conductorMaterialId === null
         ? null
         : (input.conductorCount ?? current?.conductorCount ?? null),
-    groundMaterialId: current?.groundMaterialId ?? null,
-    groundCount: current?.groundCount ?? null,
+    ...(input.groundMaterialId === undefined
+      ? {
+          groundMaterialId: current?.groundMaterialId ?? null,
+          groundCount: current?.groundCount ?? null,
+        }
+      : {
+          groundMaterialId: input.groundMaterialId,
+          // One ground per circuit unless the type already said otherwise —
+          // the same default "Add wires" gives a new circuit.
+          groundCount:
+            input.groundMaterialId === null
+              ? (current?.groundCount ?? null)
+              : (current?.groundCount ?? 1),
+        }),
   };
 }
 
@@ -98,9 +140,15 @@ export function findMatchingRunType<
 >(
   palette: readonly T[],
   want: RunTypeSpecFields,
-  currentId: number | null
+  currentId: number | null,
+  /**
+   * The EXTRAS a match must carry (tape on a trench, 0135), as
+   * `extrasSignature` strings: what the run's current type carries, and a
+   * reader for every palette row. Required — see `extrasSignature`.
+   */
+  extras: { want: string; of: (typeId: number) => string }
 ): T | undefined {
-  const matches = palette.filter(t =>
+  const sameMaterials = (t: T) =>
     want.pathType === "cable"
       ? t.pathType === "cable" &&
         t.conductorMaterialId === want.conductorMaterialId
@@ -109,9 +157,41 @@ export function findMatchingRunType<
         t.conductorMaterialId === want.conductorMaterialId &&
         t.conductorCount === want.conductorCount &&
         t.groundMaterialId === want.groundMaterialId &&
-        t.groundCount === want.groundCount
+        t.groundCount === want.groundCount;
+  const matches = palette.filter(
+    t => sameMaterials(t) && extras.of(t.id) === extras.want
   );
   return matches.find(t => t.id === currentId) ?? matches[0];
+}
+
+/**
+ * What a type's EXTRAS are, as one comparable string — material, feet per
+ * foot and which feet, in a fixed order. "" for a type with none.
+ *
+ * ── Why a match has to agree on these too (2026-10-08) ──────────────────────
+ * The run editor shows conduit, wire and a count; it does not show extras. So
+ * by rule 7 they ride along from the run's current type, exactly as the
+ * ground does. Without this, picking the wire for a run on
+ * `2" PVC Sch 40, underground` landed it on a type made of the same pipe and
+ * wire and NO TAPE — or on a shop's plain `2" PVC` type — and the trench's
+ * warning tape left the bid with nothing on screen to say so: a lower number,
+ * from the edit that was meant to make it more complete.
+ *
+ * An extra whose material was deleted carries no material and is left out:
+ * it prices nothing (getRunTypeExtrasFor), and it cannot be copied.
+ */
+export type ExtraSpec = {
+  materialId: number | null;
+  feetPerFoot: number;
+  appliesTo: "flat" | "all";
+};
+
+export function extrasSignature(extras: readonly ExtraSpec[]): string {
+  return extras
+    .filter(e => e.materialId !== null)
+    .map(e => `${e.materialId}:${e.feetPerFoot.toFixed(4)}:${e.appliesTo}`)
+    .sort()
+    .join("|");
 }
 
 /**
@@ -123,7 +203,18 @@ export function findMatchingRunType<
  */
 export function respecifiedLabel(
   spec: RunTypeSpecFields,
-  names: { raceway: string | null; conductor: string | null },
+  names: {
+    raceway: string | null;
+    conductor: string | null;
+    /** The extras it carries, by material name — `+ Underground warning tape`. */
+    extras: readonly string[];
+    /**
+     * The type it came from said "underground" (shared/undergroundRunTypes.ts
+     * `saysUnderground`). Its tape is then named by that one word, as the
+     * palette already does, instead of spelt out on every row it labels.
+     */
+    underground: boolean;
+  },
   taken: ReadonlySet<string>
 ): string {
   let base: string;
@@ -131,16 +222,24 @@ export function respecifiedLabel(
     base = names.conductor ?? "Cable run";
   } else {
     const wire =
-      names.conductor === null
-        ? null
-        : spec.conductorCount === null
+      names.conductor !== null
+        ? spec.conductorCount === null
           ? names.conductor
-          : `${spec.conductorCount} ${names.conductor}`;
+          : `${spec.conductorCount} ${names.conductor}`
+        : // Zero is "says no wire" (shared/runNoWire.ts) and is named so.
+          spec.conductorCount === 0
+          ? "empty pipe"
+          : null;
     base =
       [names.raceway, wire]
         .filter((part): part is string => !!part)
         .join(", ") || "Conduit run";
   }
+  // What it carries besides, so two types that differ only by tape do not
+  // read the same in the picker.
+  if (names.underground) base = withUndergroundSuffix(base);
+  else if (names.extras.length > 0)
+    base = `${base} + ${names.extras.join(" + ")}`;
   let label = base;
   for (let n = 2; taken.has(label.trim().toLowerCase()); n++) {
     label = `${base} (${n})`;

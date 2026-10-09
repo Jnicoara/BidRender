@@ -17,31 +17,74 @@
  * carry it) are not missing wire — they are left out on purpose, and say so
  * elsewhere. A cable run is its own wire. And "none" is read from the
  * circuits the ARITHMETIC uses (`wireCircuitsFor`), so a quantity trace whose
- * type pulls a circuit is not flagged, and one whose type pulls nothing is.
+ * type pulls a circuit is not flagged.
+ *
+ * ── An EMPTY PIPE is an answer, and it lives on the type (2026-10-08) ───────
+ * A type whose conductor count is 0 says "no wire" (client/src/lib/
+ * runCircuits.ts `typeCarriesWire`: NULL has not said, zero has). A run of
+ * such a type — a spare, a sleeve, a trench conduit for a future pull — is
+ * not missing anything, and flagging it left the estimator no way to clear
+ * the warning short of putting wire in an empty pipe. NULL still flags: the
+ * shipped underground types carry NULL because what goes in a trench varies
+ * (per-foot-items-plan.md § 3b), and NULL there is "pick the wire", never
+ * "none". The run reaches a 0-type through `takeoffRuns.respecify` with
+ * `emptyPipe` — one run, D3(b), no column on the run.
+ *
+ * The type's answer is REQUIRED here, not optional, so a caller cannot forget
+ * it and go back to flagging every spare conduit on the bid.
  *
  * One function, read by the run row and the bid, so the two cannot disagree.
  */
 import { runOnBid, type RunOnBidRow } from "./runOnBid";
+import { resolveRunType } from "./runTypeLookup";
+import type { ForkableRow } from "./forkedRows";
+
+/** Does the run type this stored id resolves to say "no wire" (count 0)? */
+export type TypeSaysEmptyPipe = (runTypeId: number) => boolean;
+
+/**
+ * Built from the palette — archived types included, as the wire read loads
+ * them — following a fork the way every other reader does.
+ */
+export function emptyPipeLookup(
+  palette: readonly (ForkableRow & { conductorCount: number | null })[]
+): TypeSaysEmptyPipe {
+  return runTypeId => resolveRunType(palette, runTypeId)?.conductorCount === 0;
+}
 
 export function runCarriesNoWire(
   run: RunOnBidRow & { id: number },
-  wire: ReadonlyMap<number, readonly unknown[]>
+  wire: ReadonlyMap<number, readonly unknown[]>,
+  typeSaysEmpty: TypeSaysEmptyPipe
 ): boolean {
   if (run.pathType !== "conduit") return false;
   if (!runOnBid(run).wire) return false;
+  if (run.runTypeId !== null && typeSaysEmpty(run.runTypeId)) return false;
   return (wire.get(run.id)?.length ?? 0) === 0;
 }
 
 /**
- * How many RUNS carry no wire — a branched run counts once (D20), however
- * many of its legs are empty. Rows are keyed to their run by `parentRunId`.
+ * The runs (a branched run once, D20) that carry no wire, as ROOT ids in the
+ * order given — so the bid can say how many and a screen can open the first.
+ * Rows are keyed to their run by `parentRunId`.
  */
-export function countRunsWithNoWire(
+export function runsWithNoWire(
   rows: readonly (RunOnBidRow & { id: number; parentRunId: number | null })[],
-  wire: ReadonlyMap<number, readonly unknown[]>
-): number {
+  wire: ReadonlyMap<number, readonly unknown[]>,
+  typeSaysEmpty: TypeSaysEmptyPipe
+): number[] {
   const roots = new Set<number>();
   for (const row of rows)
-    if (runCarriesNoWire(row, wire)) roots.add(row.parentRunId ?? row.id);
-  return roots.size;
+    if (runCarriesNoWire(row, wire, typeSaysEmpty))
+      roots.add(row.parentRunId ?? row.id);
+  return Array.from(roots);
+}
+
+/** How many RUNS carry no wire — `runsWithNoWire`, counted. */
+export function countRunsWithNoWire(
+  rows: readonly (RunOnBidRow & { id: number; parentRunId: number | null })[],
+  wire: ReadonlyMap<number, readonly unknown[]>,
+  typeSaysEmpty: TypeSaysEmptyPipe
+): number {
+  return runsWithNoWire(rows, wire, typeSaysEmpty).length;
 }

@@ -208,9 +208,10 @@ const REGISTRY: Record<string, Entry> = {
     why: "Ownership (0135), like assembly_materials.assemblyId: forkRunType copies a shipped type's extras onto the fork, so an extra already points at the type it belongs to.",
   },
   "takeoff_run_type_extras.materialId": {
-    kind: "unreviewed",
-    since: "2026-10-08",
-    why: "Migration 0135 (per-foot items plan, M1). Track A seeds the shipped tape rows; NOTHING prices from this id yet. It is this file's bug shape the day the extras' footage ships: a company that prices its fork of Underground warning tape must see the tape priced, so the plan's server half must read it through resolveMaterial, like takeoff_run_types.racewayMaterialId, and turn this entry into a resolver.",
+    kind: "resolver",
+    resolver: "resolveMaterial",
+    readBy: "server/db.ts",
+    note: "Migration 0135 (per-foot items plan, M1). Registered 'unreviewed' by Track A before its code existed; resolved 2026-10-08 by the plan's server half: `getRunTypeExtrasFor` names each extra from resolveMaterial, and `addRunTypeRowToBid` prices the stored id through resolveMaterial again — so a company that priced its own Underground warning tape sees that price, like takeoff_run_types.racewayMaterialId. `server/runTypeExtras.test.ts` pins it.",
   },
   "bids.homerunRunTypeId": {
     kind: "resolver",

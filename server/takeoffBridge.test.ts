@@ -378,7 +378,9 @@ describe("a run type becomes one line per material", () => {
         insulatedInstalledFeet: 250,
         groundBoughtFeet: 125,
         groundInstalledFeet: 125,
+        extraRuns: [],
       },
+      extras: [],
     });
     expect(rows.map(r => [r.role, r.feet])).toEqual([
       ["raceway", 125],
@@ -408,7 +410,9 @@ describe("a run type becomes one line per material", () => {
         insulatedInstalledFeet: 0,
         groundBoughtFeet: 0,
         groundInstalledFeet: 0,
+        extraRuns: [],
       },
+      extras: [],
     });
     expect(rows).toHaveLength(1);
     expect(rows[0].role).toBe("raceway");
@@ -439,7 +443,9 @@ describe("a run type becomes one line per material", () => {
         insulatedInstalledFeet: 0,
         groundBoughtFeet: 0,
         groundInstalledFeet: 0,
+        extraRuns: [],
       },
+      extras: [],
     });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ role: "conductor", feet: 210 });
@@ -459,7 +465,9 @@ describe("a run type becomes one line per material", () => {
         insulatedInstalledFeet: 0,
         groundBoughtFeet: 0,
         groundInstalledFeet: 0,
+        extraRuns: [],
       },
+      extras: [],
     });
     expect(rows).toHaveLength(3);
     expect(runRowSendability(rows[0])).toMatchObject({
@@ -491,12 +499,93 @@ describe("a run type becomes one line per material", () => {
         insulatedInstalledFeet: 250,
         groundBoughtFeet: 0,
         groundInstalledFeet: 0,
+        extraRuns: [],
       },
+      extras: [],
     });
     expect(rows.map(r => r.feet)).toEqual([125, 250]);
     expect(runRowSendability(rows[0])).toMatchObject({
       ok: false,
       reason: "no-material",
     });
+  });
+});
+
+describe("a run type's EXTRAS as bid rows (per-foot plan § 3a)", () => {
+  const footage = {
+    conduitBoughtFeet: 106,
+    conduitInstalledFeet: 106,
+    cableBoughtFeet: 0,
+    cableInstalledFeet: 0,
+    insulatedBoughtFeet: 0,
+    insulatedInstalledFeet: 0,
+    groundBoughtFeet: 0,
+    groundInstalledFeet: 0,
+    // 100 ft of trench with two 3 ft risers, 10% raceway waste.
+    extraRuns: [
+      { quantities: { runFeet: 100, verticalFeet: 6 }, wastePct: 0.1 },
+    ],
+  };
+  const pipeOnly = {
+    pathType: "conduit" as const,
+    racewayMaterialId: 90,
+    racewayMaterialName: '2" PVC Sch 40',
+    conductorMaterialId: null,
+    conductorMaterialName: null,
+    groundMaterialId: null,
+    groundMaterialName: null,
+    footage,
+  };
+  const tape = {
+    key: 11,
+    materialId: 70,
+    materialName: "Underground warning tape",
+    feetPerFoot: 1,
+    appliesTo: "flat" as const,
+  };
+  const rope = {
+    key: 12,
+    materialId: 71,
+    materialName: "Pull rope",
+    feetPerFoot: 1,
+    appliesTo: "all" as const,
+  };
+
+  it("tape follows the FLAT feet, a pull rope every foot — two rows, one length", () => {
+    const rows = runTypeRows({ ...pipeOnly, extras: [tape, rope] });
+    expect(
+      rows.map(r => [r.role, r.extraKey, r.feet, r.installedFeet])
+    ).toEqual([
+      ["raceway", 0, 106, 106],
+      ["extra", 11, 110, 100],
+      ["extra", 12, 116.6, 106],
+    ]);
+    expect(rows[1].why).toContain("the flat length only, not the risers");
+  });
+
+  it("a line's shared-trench 0 is that row's answer; NULL follows the type", () => {
+    const rows = runTypeRows({
+      ...pipeOnly,
+      extras: [tape, rope],
+      lineFeetPerFootByKey: new Map([
+        [11, 0],
+        [12, null],
+      ]),
+    });
+    expect(rows.filter(r => r.role === "extra").map(r => r.feet)).toEqual([
+      0, 116.6,
+    ]);
+    expect(rows[1].why).toContain("shared trench (set on this bid)");
+  });
+
+  it("a cable type carries its extras too", () => {
+    const rows = runTypeRows({
+      ...pipeOnly,
+      pathType: "cable",
+      conductorMaterialId: 5,
+      conductorMaterialName: "12/2 UF-B Copper",
+      extras: [tape],
+    });
+    expect(rows.map(r => r.role)).toEqual(["conductor", "extra"]);
   });
 });

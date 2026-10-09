@@ -191,9 +191,70 @@ describe("wording and wire", () => {
       runsWithNoWire: 1,
     });
     expect(s.notOnBid).toMatchObject([
-      { key: "noWire", name: "Wire for 1 conduit run", send: null },
+      {
+        key: "noWire",
+        name: "1 conduit run with no wire picked",
+        send: null,
+      },
     ]);
     expect(s.sendable).toEqual([]);
+  });
+
+  it("names both answers, and says where to give them (never stuck)", () => {
+    // 2026-10-08: on an underground run the old sentence ("conduit with
+    // nothing pulled through it") read as a fault, offered nothing to press,
+    // and never mentioned that an empty pipe is a real answer.
+    const place = { runId: 5, bidPdfId: 2, pageNumber: 3, x: 10, y: 20 };
+    const s = takeoffSummary({
+      locked: false,
+      counts: [],
+      runTypes: [],
+      untypedRuns: 0,
+      runsWithNoWire: 2,
+      firstRunWithNoWire: place,
+    });
+    const item = s.notOnBid.find(i => i.key === "noWire")!;
+    expect(item.why).toMatch(/Pick the wire/);
+    expect(item.why).toMatch(/empty pipe/);
+    expect(item.fixAt).toEqual(place);
+  });
+});
+
+describe("an extra says how its feet were reached, in the preview", () => {
+  it("carries the tape's 'how' and nothing on the pipe", () => {
+    // Seen 2026-10-08: tape at 211.12 ft beside pipe at 211.12 ft, and no
+    // word in the Send dialog on why they match.
+    const s = takeoffSummary({
+      locked: false,
+      counts: [],
+      runTypes: [
+        runType({
+          rows: [
+            {
+              role: "raceway",
+              materialName: '2" PVC Sch 40',
+              feet: 211.12,
+              onBid: false,
+              sendable: { ok: true },
+            },
+            {
+              role: "extra",
+              materialName: "Underground warning tape",
+              feet: 211.12,
+              onBid: false,
+              sendable: { ok: true },
+              how: "211.12 ft over 2 runs, the flat length only, not the risers",
+            },
+          ],
+        }),
+      ],
+      untypedRuns: 0,
+    });
+    const byName = new Map(s.notOnBid.map(i => [i.name, i]));
+    expect(byName.get("Underground warning tape")?.note).toBe(
+      "211.12 ft over 2 runs, the flat length only, not the risers"
+    );
+    expect(byName.get('2" PVC Sch 40')?.note).toBeUndefined();
   });
 });
 

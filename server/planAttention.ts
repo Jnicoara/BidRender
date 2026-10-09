@@ -14,7 +14,7 @@ import {
   type BridgeGroup,
   type BridgeLine,
 } from "../shared/takeoffBridge";
-import { countRunsWithNoWire } from "../shared/runNoWire";
+import { countRunsWithNoWire, emptyPipeLookup } from "../shared/runNoWire";
 import { runsNotOnBid, type RunsNotOnBid } from "../shared/runsNotOnBid";
 
 export type PlanAttention = Awaited<ReturnType<typeof planAttentionFor>>;
@@ -95,13 +95,16 @@ export async function planAttentionFor(
     circuit is not flagged.
   */
   const runs = await db.getRunsForBid(bidId, userId);
-  const wire = await db.getWireCircuitsForRuns(runs, userId);
+  const [wire, palette] = await Promise.all([
+    db.getWireCircuitsForRuns(runs, userId),
+    db.getRunTypesFor(userId, true),
+  ]);
 
   return {
     waitingToSend: countsWaitingToSend(bridgeGroups, bridgeLines),
     countedWithNoPrice: countsWithNoPrice(bridgeGroups, bridgeLines),
     doubleCounted,
-    runsWithNoWire: countRunsWithNoWire(runs, wire),
+    runsWithNoWire: countRunsWithNoWire(runs, wire, emptyPipeLookup(palette)),
     runsNotOnBid: runsNotOnBid(
       runs,
       new Set(

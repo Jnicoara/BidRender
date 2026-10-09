@@ -76,6 +76,8 @@ import {
 import { needsPricing } from "../../shared/materialPricing";
 import { isFittingRole } from "../../shared/runFittings";
 import { footageByRunType } from "../runTypeFootage";
+import { resolveRunType } from "../../shared/runTypeLookup";
+import { extraFeetForRuns } from "../../shared/runExtrasPerFoot";
 import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
 
@@ -767,12 +769,58 @@ export const bidsRouter = router({
         (CLAUDE.md § "A test that calls the server cannot see a screen").
       */
       const fittingNotes = new Map<string, string>();
-      if (lines.some(l => isFittingRole(l.runMaterialRole))) {
-        const footage = await footageByRunType(
-          bid.id,
+      const extraNotes = new Map<number, string>();
+      const hasExtra = lines.some(l => l.runMaterialRole === "extra");
+      const footage =
+        hasExtra || lines.some(l => isFittingRole(l.runMaterialRole))
+          ? await footageByRunType(
+              bid.id,
+              ctx.scope.dataUserId,
+              bid.distributionHeightInches
+            )
+          : null;
+      /*
+        HOW EACH EXTRA WAS COUNTED — "52 ft of Underground warning tape: 50 ft
+        over 2 runs, the flat length only, not the risers + 2 ft waste", or
+        "0 ft … — shared trench (set on this bid)". Same reasoning as the
+        fitting notes: returned with the lines, so nothing extra to refresh.
+      */
+      if (footage && hasExtra) {
+        const palette = await db.getRunTypesFor(ctx.scope.dataUserId, true);
+        const extrasByType = await db.getRunTypeExtrasFor(
           ctx.scope.dataUserId,
-          bid.distributionHeightInches
+          lines
+            .filter(l => l.runMaterialRole === "extra")
+            .map(l => resolveRunType(palette, l.takeoffRunTypeId!)?.id ?? null)
+            .filter((id): id is number => id !== null)
         );
+        for (const line of lines) {
+          if (
+            line.runMaterialRole !== "extra" ||
+            line.takeoffRunTypeId === null
+          )
+            continue;
+          const typeId = resolveRunType(palette, line.takeoffRunTypeId)?.id;
+          const extra = extrasByType
+            .get(typeId ?? -1)
+            ?.find(e => e.key === line.runExtraKey);
+          const f = footage.get(line.takeoffRunTypeId);
+          extraNotes.set(
+            line.id,
+            extra
+              ? extraFeetForRuns(
+                  f?.extraRuns ?? [],
+                  extra,
+                  line.extraFeetPerFoot === null
+                    ? null
+                    : Number(line.extraFeetPerFoot),
+                  extra.materialName ?? line.name
+                ).why
+              : "This run type no longer carries this extra"
+          );
+        }
+      }
+      if (footage && lines.some(l => isFittingRole(l.runMaterialRole))) {
         const byType = await db.fittingRowsByRunType(
           ctx.scope.dataUserId,
           footage
@@ -808,6 +856,13 @@ export const bidsRouter = router({
                 line.takeoffRunTypeId + ":" + line.runMaterialRole
               ) ?? "Nothing traced under this type any more")
             : null,
+          /** How an extra line's feet were counted; null on every other line. */
+          extraNote: extraNotes.get(line.id) ?? null,
+          /** True when this extra is set to 0 on this bid — shared trench. */
+          extraShared:
+            line.runMaterialRole === "extra" &&
+            line.extraFeetPerFoot !== null &&
+            Number(line.extraFeetPerFoot) === 0,
         })),
         /**
          * True when the totals leave something out. `problems` lists every
@@ -939,6 +994,54 @@ export const bidsRouter = router({
       await requireBid(input.bidId, ctx.scope.dataUserId);
       await db.unlockBidQuantities(input.bidId);
       return { success: true };
+    }),
+
+  /**
+   * "Shared trench? Set this extra to 0" — per-foot-items-plan.md § 3a,
+   * owner decision 4.
+   *
+   * Two conduits in one trench buy one tape, but each run buys its own. This
+   * answers it on ONE extra line of ONE bid: `shared: true` writes
+   * `extraFeetPerFoot = 0`, so the line stays and reads 0 ft for every run of
+   * that type on this bid; `shared: false` writes NULL, which follows the
+   * type again. Another bid with the same type is untouched — the answer is
+   * on the line, not the type.
+   *
+   * Refused on a LOCKED bid, like every other change to a line from the
+   * plans: the lock is what freezes a bid (there is no automatic freeze on a
+   * status, shared/quantityLock.ts). Refused on any line that is not an extra
+   * — a 0 there would be a quantity nobody could see the reason for.
+   */
+  setExtraShared: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        lineId: z.number().int().positive(),
+        shared: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its extras cannot be changed"),
+        });
+      const line = await db.getBidLineItem(input.lineId, input.bidId);
+      if (!line || line.archivedAt !== null)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Line not found." });
+      if (line.runMaterialRole !== "extra")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Only an extra from a run type (like underground tape) can be set to shared trench.",
+        });
+      await db.setLineExtraFeetPerFoot(
+        line.id,
+        input.bidId,
+        input.shared ? 0 : null
+      );
+      return { lineId: line.id, shared: input.shared };
     }),
 
   /** Add an assembly to the bid, freezing its costs as they are right now. */

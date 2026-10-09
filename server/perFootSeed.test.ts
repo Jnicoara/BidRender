@@ -20,6 +20,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb, seedBaselineRunTypes } from "./db";
 import {
+  bidLineItems,
   bidPdfs,
   materials,
   takeoffRunTypeExtras,
@@ -295,7 +296,7 @@ withDb("the shipped run types on a database", () => {
     ]);
   });
 
-  it("a traced underground run sends its pipe and nothing else — no wire is invented, no extra line yet", async () => {
+  it("a traced underground run sends its pipe and its tape — no wire is invented", async () => {
     const shipped = (await caller().takeoffRunTypes.list({})).find(
       t => t.label === undergroundRunTypeLabel('1"')
     );
@@ -345,8 +346,21 @@ withDb("the shipped run types on a database", () => {
     expect(result.sent).toContain("raceway");
     expect(result.sent).not.toContain("conductor");
     expect(result.sent).not.toContain("ground");
-    // The extras' footage is the plan's server half; until it ships, the
-    // tape must not arrive as a line at all — never as a 0 ft one.
-    expect(result.sent).not.toContain("extra");
+    /*
+      The tape, since the plan's server half (2026-10-08): its own line off
+      the same 40 ft trench, the flat length — it was "not a line at all"
+      until then, never a 0 ft one. No waste here: this company has accepted
+      no starter and set no extra, so the raceway's waste is unset (0).
+    */
+    expect(result.sent).toContain("extra");
+    const lines = await db
+      .select()
+      .from(bidLineItems)
+      .where(eq(bidLineItems.bidId, bid.id));
+    const tape = lines.find(l => l.runMaterialRole === "extra");
+    expect(tape?.runExtraKey).toBeGreaterThan(0);
+    expect(Number(tape?.qty)).toBe(40);
+    const pipe = lines.find(l => l.runMaterialRole === "raceway");
+    expect(Number(pipe?.qty)).toBe(40);
   });
 });
