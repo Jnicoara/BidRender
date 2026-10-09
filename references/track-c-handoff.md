@@ -33,6 +33,8 @@ Still on `c-sch80-500`; **still no merge until A's seed lands** (below).
 - Eight touched test files (108 tests) green on shuffle seeds 1–8 on
   `bidrender_test_c`; `pnpm check` clean. Full suite not run on the laptop.
   Details: `sch80-and-500-plan.md` § 7b. Scratch DB and worktree removed.
+- **Gate 37882413912 on `f4604c0`: test GREEN (full suite)**; drizzle-guard,
+  deploy-staging and smoke skipped, as expected on a `c-*` branch.
 
 ## Earlier (2026-10-08, build session) — Sch 80/500: C's half BUILT on `c-sch80-500`, NOT MERGED
 
