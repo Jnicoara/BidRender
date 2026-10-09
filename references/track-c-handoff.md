@@ -35,6 +35,10 @@ and their red-without-it checks: plan § 7b. Full suite NOT run on the
 laptop. `bidrender_local_c` and `bidrender_test_c` now have **141**
 migrations (0140 applied this session). One unexplained first-run red in
 `runNoWire.test.ts` straight after applying 0140, not repeated — § 7b.
+**Gate 37877582385 on `c-sch80-500`: test GREEN (full suite, 10m36s);**
+drizzle-guard and deploy-staging skipped, as expected on a branch with no
+`drizzle/` change. Gate did not run on `c-*` branches before — `gate.yml`
+now includes `c-*`, as it already did `a-*`.
 
 ## Earlier (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
 
