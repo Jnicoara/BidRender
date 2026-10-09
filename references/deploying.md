@@ -1587,6 +1587,35 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: the coverage-check catalog adds (2026-10-09) — NOT on live
+
+No migration — 24 new shipped rows (`3cb5df3`, owner-approved from
+`coverage-check.md` on track-c), plus a search fix (a spoken cable spec no
+longer matches a longer NEMA number). Additive: renamed 0, retired 0.
+
+1. **Backups**: `staging-2026-10-09T05-13-27Z-before-coverage-rows.sql`
+   (rehearsal) and `staging-2026-10-09T16-13-17Z-before-coverage-push.sql`
+   (right before the push; staging had gained 8 bids in between), both 73
+   tables, in `C:\dev\bidrender-backups\`.
+2. **Rehearsal** on the first, restored locally (847 bids): staging's code
+   booted as a control, 847/847 unchanged; the new seed twice: **added 24,
+   renamed 0, retired 0, DELETED 0**, 1,825 active, 114 Specialty,
+   `VERDICT: CLEAN`; second boot nothing; **847/847 unchanged**
+   (`next-live-release-plan.md` § 5f).
+3. **Before** on staging (code `94471cc`): `bidTotals` 855 bids; catalog
+   1,941 rows / 1,801 active.
+4. **Code**: `2221948` pushed to `local-dev`; Gate 37957706459 test,
+   deploy-staging and smoke **all green**. By the time it was read, staging
+   served **`71f9f82`** — `2221948` plus two Track B commits (the "Fix
+   these" walk, a sheet-read fix; one touches `shared/lineNotPriced.ts`) —
+   so the after-read below covers both.
+5. **After** (16:53): `bidTotals --compare`: **855/855 existing bids
+   unchanged**; the 27 differences are bids 857–883 created between the
+   reads (12 by account 49162 at 16:19–16:21, 15 by the smoke account).
+   `catalogRehearsal compare`: **added 24, renamed 0, retired 0, DELETED 0,
+   1,825 active**, old spellings 0, duplicates 0, every reference
+   identical — `VERDICT: CLEAN`.
+
 ### Staging: the Sch 80 / 500 seed (2026-10-09, 04:17 UTC) — NOT on live
 
 No migration — seed content only (`sch80-and-500-plan.md`, Track A's half):
