@@ -153,6 +153,37 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 5. **Example tags** (`migrations-next-batch.md` Batch 5) — the example
    rates never without `isExampleRate`, the shipped hours never without the
    hours tag; 0132–0134 after 0125–0131 in one step.
+6. **PVC Sch 40/80 fittings: Track A's seed and Track C's code ship
+   TOGETHER or not at all** (added 2026-10-09; the same pairing as Sch
+   80 / 500). The owner approved one row per size for PVC couplings,
+   terminal adapters and conduit bodies, shared by both schedules
+   (`catalog-reality-check.md`, batch-2 approval: Carlon and Cantex sell each
+   as one "Sch 40 and 80" part). Two halves:
+   - **A's seed:** rename the Sch 40 rows in place to
+     `{size} PVC Sch 40/80 coupling`, `… terminal adapter` (was
+     `… PVC Sch 40 connector`) and `… {LB|LL|LR|T|C} conduit body`, and
+     retire the Sch 80 rows into them, old names kept as search words. Use
+     `pvcSharedFittingName` from `shared/runFittingMaterials.ts` so the seed
+     and the lookup cannot spell it two ways. Also update the commonness
+     table's PVC LB keys (`shared/materialCommonness.ts`), which are keyed by
+     shipped name.
+   - **C's code** (`c-pvc-4080`): a run of EITHER schedule looks up those
+     shared names. Elbows and sweeps stay per schedule.
+   - **Either half alone is wrong, and loudly so, not silently.** Code
+     without the seed: every PVC run's connectors, couplings and LBs say
+     "No catalog match for 2" PVC Sch 40/80 …" in the Send preview (measured
+     on `bidrender_local_c`, 2026-10-09: Bar layout check's 2" PVC Sch 40
+     type; no other bid, and no total, moved). Seed without the code: the
+     lookup asks for `PVC Sch 40 connector` names that no longer exist, the
+     same blank. Neither prices anything wrong, and neither should ship.
+   - **Order:** A's seed lands on local-dev first. Then C merges local-dev
+     into `c-pvc-4080`, confirms `server/pvcSharedFittings.test.ts` finds the
+     SHIPPED rows (it inserts stand-ins only when they are missing), runs
+     the snapshot compare (`scripts/routerSnapshot.mts`) against the
+     pre-change code, expecting Bar's PVC preview to find the SAME material
+     ids as before (164, 165 locally: renamed in place, so only the names
+     differ) and nothing else to move, and only then merges. The release
+     candidate carries both halves or neither.
 
 **One bid number moves on purpose:** at the first boot the shipped field
 roles go from $0 to the example rates. Existing lines keep their frozen

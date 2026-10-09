@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **PVC runs, either schedule, will buy one coupling, terminal adapter and
+  LB per size (not live yet; waits for the matching catalog change).**
+  Suppliers sell these as one part for Sch 40 and Sch 80, so a traced Sch
+  80 run now looks up the same shared row a Sch 40 run does, instead of a
+  Sch 80 duplicate. Elbows and sweeps stay separate per schedule, because
+  those really are different parts. This ships only together with the
+  catalog rename that creates the shared rows; on its own it would leave
+  those fittings saying "no catalog match".
+
 - **Fixed: clicking a legend symbol right after linking it could count into
   the WRONG item.** When two symbols share one assembly (say a duplex and a
   switch both priced as one receptacle), a click straight after "Link" could
