@@ -1587,6 +1587,47 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0140 + the catalog review (2026-10-09, 01:10 UTC) — NOT on live
+
+`0140_material_specialty`: `materials.isSpecialty`, nullable, no default,
+no `UPDATE` — additive, step 3 empty. With it, the owner's catalog review
+of the STARTER catalog, which runs in the SEED on the new code's first
+boot (`references/catalog-review-2026-10-08.md`): 138 retired, 107 added,
+23 renamed in place, 108 tagged Specialty, the three "#12 + ground" run
+types moved to #12 THHN green, the 3-1/2" underground type archived.
+
+1. **Backup**: `staging-2026-10-09T00-53-51Z-before-0140.sql` (73 tables,
+   `--single-transaction`, `VERIFY_IDENTITY` TLS) in
+   `C:\dev\bidrender-backups\`; restored locally as
+   `bidrender_staging_restore_0140`; 66/73 table counts equal staging's, the
+   other 7 higher on staging only by bids 775–776, "CI smoke …", written
+   at 00:55 just after the dump.
+2. **References into anything removed, before**: **no bid line** points at
+   a retired or renamed row. Starter recipe lines point at renamed rows
+   only (114 wire nut, 30 square box, …) — same ids. Four SHIPPED run
+   types point at retired rows: three grounds on #12 bare, the 3-1/2"
+   underground type's pipe; 0 runs were ever traced on that type.
+3. **Rehearsal on that copy**: drift before = exactly `isSpecialty`;
+   `bidTotals` before with staging's code `6c6a44f` (773 bids); **1
+   applied**, 141; re-run nothing; "matches", 176/176; old code's totals
+   **773/773 unchanged**. New seed (`scripts/seedBaseline.mts`, the boot's
+   own function) twice: `catalogRehearsal compare` — **added 107, renamed
+   23, retired 138, DELETED 0**, company rows unchanged, old spellings 0,
+   duplicates 0, every reference identical except
+   `takeoff_run_types.groundMaterialId` (the intended swap, all 3 now
+   `#12 THHN green Copper`); type 14 archived; 108 Specialty; second seed:
+   nothing changed. New code's totals: **773/773 unchanged**. Table counts:
+   only `__drizzle_migrations` (+1) and `materials` (+107) moved.
+4. **Staging database** (01:10 UTC): drift before the same; `bidTotals`
+   before (781 bids, old code); **1 applied**, 141; re-run nothing;
+   "matches", 176/176; site HTTP 200 on the old code; **781/781
+   unchanged**.
+5. **Code**: see the line below this record (filled in when pushed).
+
+**Live**: 0140 joins the batch — 0105–0140, 36 files, expect 141 and
+176/176 — and the live rehearsal must be re-run with the catalog review's
+first boot (`next-live-release-plan.md` § 5d).
+
 ### Staging: migration 0139 (done 2026-10-08, 22:44 UTC) — NOT on live
 
 `0139_elbow_flat_role`: `elbowFlat` appended to

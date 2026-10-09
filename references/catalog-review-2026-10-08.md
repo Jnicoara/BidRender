@@ -461,3 +461,36 @@ NOT SURE  (9 items that need your call)
 9. Found while checking, not in your list: every aught wire row (1/0, 2/0, 3/0, 4/0: THHN, XHHW, bare, USE-2, URD and others) carries a bogus search word "10ga", "20ga", "30ga" or "40ga". A search for "10ga" can surface 1/0 wire.
 
 ```
+
+## What was built — 2026-10-09 (Track A, session 25)
+
+Code: `87066f4` (with the merge `c9eebd7` and the CI fixes `66b3961`).
+The lists the seed reads are `shared/catalogReview20261008.ts` (renames,
+retired) and `server/seed/materials/specialty.ts` (the Specialty tag).
+Tests: `server/catalogReview20261008.test.ts` (pure) and
+`server/catalogReviewSeed.test.ts` (database) — each mutation-checked red.
+
+**Catalog: 1,824 -> 1,793 shipped rows.** 138 retired, 107 added, 23
+renamed in place, 108 tagged Specialty. Nothing deleted: a retired row
+keeps its id (`isActive = false`), so anything priced from one resolves.
+
+### Calls made on the NOT SURE items, and why
+
+| Item                                      | Call                                                                                                                                                                                                                                                                              |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #12 bare on 3 run types (NS 2)            | New row **`#12 THHN green Copper`** (solid, the owner's "#12 THHN green"); the three types name it. Existing databases: a seed pass moves a SHIPPED type's link off #12 bare only if it still points there (`RUN_TYPE_MATERIAL_SWAPS`). Company copies untouched.                 |
+| 3-1/2" underground run type               | Dropped from the shipped list; ARCHIVED (not deleted) where it exists (`RETIRED_BASELINE_RUN_TYPES`). Staging: 0 runs on it.                                                                                                                                                      |
+| Wire nuts small / large (§ 4)             | **Folded by rename, not kept:** "Wire nuts, small" -> `Wire nut, 22-12 AWG (blue/orange)`, "Wire nuts, large" -> `Wing nut wire connector, 14-6 AWG (blue)`. Neither on a starter; folding avoids two rows for one part. "Wire nuts" -> `Wire nut, 22-8 AWG (tan/red)`, same row. |
+| Generic connectors (§ 5)                  | Split-bolt, H-tap, Butt splice, Ring terminal, Spade terminal, Insulated multi-tap block: on no starter, **retired**. Cord grip: on LT25 and MH8, **renamed in place** to `1/2" cord grip (0.25"-0.50" cord)` — both starters keep the line with no repair pass.                  |
+| Wire ranges changed from the owner's list | Set-screw splice #8-#2 -> **#14-#2**, 4/0-500 -> **#4-500**; multi-tap 4/0-#6 -> **3/0-#6**, 500-4/0 -> **500-#4** (no maker found selling the listed ranges: Ilsco SPA-2 / SPA-500, Polaris IPL3/0 / IPLD500). Lug ranges and H-tap sizes kept as typical — verify.              |
+| Bushings (NS 4)                           | **Every size**: "N conduit bushing" -> `N insulating bushing` (renamed; PG2 keeps it) + new `N grounding bushing`. The unsized "Grounding bushing" (no starter) **retired**.                                                                                                      |
+| Box depths (§ 6)                          | Renamed ONLY where the catalog's own data stated the depth: 4" square (1-1/2"), 4-11/16" square (2-1/8"), metal octagon (1-1/2"), shallow round (1/2"). The "typical" ones are listed for the owner: `C:\dev\catalog-review\verify-box-depths.txt`.                               |
+| Half-size breakers (NS 1)                 | **Kept** as "half-size" (owner).                                                                                                                                                                                                                                                  |
+| PVC expansion (§ ADD 5)                   | Named like the shipped 1/2" row (`N" PVC expansion fitting`); "expansion coupling" is a search word on all six.                                                                                                                                                                   |
+| Snap-in NM (NS 7)                         | Split out: `1/2" snap-in NM connector`, `3/4" snap-in NM connector`; "snap in" removed from the screw clamps.                                                                                                                                                                     |
+| Gas bonding clamp (NS 7)                  | Added `Gas pipe bonding clamp`; "gas" removed from the water pipe clamp's words.                                                                                                                                                                                                  |
+| F-clips / LV2 (§ ADD 13-14)               | Added `Old-work box F-clip`, `Low-voltage mud ring, 2-gang`. "Device wing bracket" and "Low-voltage mud ring" NOT renamed (not asked); "lv1" added as a search word.                                                                                                              |
+| Already there (not added)                 | Direct-burial gel connector = `Direct burial wire nut`; UF splice kit = `Underground splice kit` ("uf" added). **Heat shrink tubing**: the generic row exists, so per "only if not already in Consumables" no sized rows were added — say if you want small/medium/large.         |
+| Specialty and search                      | Sorts after everyday rows that answer the search the SAME way (after phrase and match tier). A search that names a specialty row still finds it first ("busway", "4 pvc 80 sweep"). A company's copy is never tagged, and forking does not copy the tag.                          |
+| "10ga" words (§ 7)                        | Gone from all 12 aught rows; a test checks every "Nga" word matches the name's gauge.                                                                                                                                                                                             |
+| Found while building                      | "Wire nut" is now a FITTING noun in the search lexicon (it had read as the fastener "nut", and the wing nut led "marrette"). LFMC rows lost "carflex". The #3 MC rows keep "3/3" / "#3/4" as search words so the old names still find them.                                       |
