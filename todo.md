@@ -280,6 +280,12 @@ Not urgent if keys are created with no expiration, which is now the rule.
       > both tablet sizes 2 of 2. (At +400 ms and 200 KB/s the dev server's
       > unbundled modules did not load test 1 inside 60 s, 3 of 3 — never
       > reached the Legend; a throttle too heavy for dev mode, not this.)
+      > **LIVE (`24105ad`) has the race** (same line, same optimistic
+      > link). Gate 37983875286 on `705e1c9` all green; a must-include for
+      > the next release (`next-live-release-plan.md` § 5 items 2 and 4b).
+      > Which bids it could have touched: `scripts/legendLinkRaceCandidates.mts`
+      > (read only; candidates, since a mark does not record its symbol —
+      > proved on a planted case). Not run against live.
       > **Also:** the Legend's one silent no-op (a linked symbol whose
       > assembly is not loaded) now says so in a toast. And a failed smoke
       > test keeps a Playwright trace, sealed before upload (`gate.yml`,
