@@ -1615,6 +1615,35 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
+### LIVE: `371b2ab` and migrations 0105–0143 (released 2026-10-10)
+
+**Done with the owner's four approvals (A start, B database, C code, D done),
+per `next-live-release-plan.md`.** Live went from `24105ad` / 105 migrations
+to **`371b2ab` / 144**. Every figure matched the § 5g rehearsal on a copy of
+live. Times UTC.
+
+| Step             | Printed                                                                                                                                                                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A — pre-flight   | live `24105ad`; Gate 38024015936 green on `371b2ab` (test, deploy-staging, smoke); 216 non-merge commits read; status clean; `pnpm check` clean                                                                                                                                                                                 |
+| Backup           | **`2026-10-10T16-51-41Z`**: 65 tables, 3,480 rows, 5/5 files (324.3 MB), `r2://bidsoftware/helixbid`. One warning: `ai_correction_log` not on live yet (expected)                                                                                                                                                               |
+| Backup verified  | restored 65 / 3,480 = manifest, kept as `bidrender_backup_verify`                                                                                                                                                                                                                                                               |
+| Read-only checks | recount **0** (on the verified copy — an ad-hoc query on live was refused by the session's permission check; owner accepted the copy); `legendLinkRaceCandidates` on live: **no candidates**                                                                                                                                    |
+| Totals before    | `24105ad`'s code: read only proven, 2 bids, 2 owners (`bidrender-backups/live-totals-before-2026-10-10.json`)                                                                                                                                                                                                                   |
+| Drift before     | **105 recorded**, 25 tables out — exactly 0105–0143's                                                                                                                                                                                                                                                                           |
+| B — migrate live | **"Applied 39 migrations: 0105_assembly_labor_only to 0143_labor_steps … all 144."** Second run: nothing to apply. Drift: **matches, FKs 180/180**. Old code still serving, home and `auth.me` 200                                                                                                                              |
+| C — push         | `24105ad..371b2ab main -> main` ~18:57; `/api/version` **`371b2ab`, builtAt 18:58:39**, serving by 19:01 (also on www)                                                                                                                                                                                                          |
+| First boot       | `catalogRehearsal` before (the copy) vs after (live): added 379, renamed 433, retired 216, **deleted 0**, 1,717 active, old spellings 0, duplicates 0, orphans 0, company rows 18 → 18; pre-existing references identical except run types 2, 3 ground (#12 bare → #12 THHN green, intended); 1,182 starter lines, 24 run types |
+| Cover repair     | report 5 would swap (DV1–DV5) / 45; `--apply` **5 swapped**; again **50 already has it**                                                                                                                                                                                                                                        |
+| Retired repair   | report 1 (PG1) / 10 / 2 skipped (DV34, GR3 — expected on live); `--apply` **1 repointed**; again **11 / 2 skipped**                                                                                                                                                                                                             |
+| Lines changed    | snapshot diff around both repairs: **exactly 6** starter lines, same ids, none added or removed                                                                                                                                                                                                                                 |
+| D — totals after | **"ok all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged"**; owner opened both bids and their plans in a browser                                                                                                                                                                                             |
+
+**Not measured directly:** "224 starters, 0 holds" — inferred from 1,182
+starter lines and 24 run types (the rehearsal's figures); a held starter
+would be missing its lines. LT1/LT2 fixture repair NOT run (never on live).
+Rollback, had it been needed: DO Activity → previous deployment; all 39
+files are additive, so `24105ad` runs on the migrated database.
+
 ### LIVE: `24105ad` and migrations 0096–0104 (released 2026-10-06)
 
 **Done with the owner's four approvals (A start, B database, C code, D done),
@@ -1683,6 +1712,31 @@ link were refused.
   cause. Read the log line before changing settings.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
+
+### Staging: migrations 0144–0145 — sheet work tag + expense notes (2026-10-10 UTC) — NOT on live
+
+`0144_sheet_work_tag` (B's M2, `bid_pdf_sheets.workTag`, needed before
+`b-status-view`) and `0145_bid_expense_notes` (C's Q-M5,
+`bid_expenses.notes`): one nullable column each, no default, no `UPDATE` —
+additive, step 1, step 3 empty. `schema.ts` declares both, so they MUST be
+on a database before code from `e613723` on reaches it.
+
+1. **Backup**: `staging-2026-10-10T19-54-14Z-before-0144-0145.sql`, restored
+   to `bidrender_scratch_staging_0144`: **77/77 counts equal**.
+2. **Rehearsal** on fresh copies of live (`bidrender_scratch_live`) and
+   staging: drift before = exactly the two columns; **2 applied**, 146;
+   "matches", 180/180. Totals with the old code before vs local-dev +
+   `b-twin-fold` + `b-status-view` merged after: **0 of 2 live, 0 of 1,148
+   staging bids moved.**
+3. **Staging database**: drift before = the two columns; **2 applied**,
+   146; "matches", 180/180; **all 1,156 bids unchanged** (`bidTotals`, old
+   code, before and after).
+4. **Code**: `e613723` and the docs commit after it pushed to `staging` by
+   hand, then `local-dev` (see the track-a handoff for the Gate).
+
+**Live**: 0144–0145 join the next release's batch, BEFORE the push of any
+code from `e613723` on (both additive). Expect 146, 180/180 — **if what it
+prints does not match, stop and find out why before going on.**
 
 ### Staging: migration 0143 — step-based labor (2026-10-10 UTC) — DATABASE only, NOT on live
 

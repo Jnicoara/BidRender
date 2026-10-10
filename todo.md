@@ -3,6 +3,17 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
+
+- [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
+      answered all 12 questions on 2026-10-10 (plan § 6). Waits only on A
+      applying S1 (SQL draft in `track-b-handoff.md`).
+- [ ] Noticed while planning, not fixed: the SQL `lineNotPricedSql`
+      (`server/db.ts` ~13060) has no `lineRole` branch, while the TS
+      `lineNotPriced` decides a remove / relocate line by its hours alone.
+      The Dashboard and the bid could disagree on such a line. Check with
+      `server/dashboardNotPriced.test.ts` before trusting either.
+
 ## Catalog reality check — BUILT 2026-10-09 (Track A), NOT on staging
 
 Batch 1 + batch 2 (owner's calls), the panel table (56 rows), the box
@@ -3259,13 +3270,27 @@ path is ever revived, give it the same treatment first.
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
       header this is a separate step-3 migration, now unblocked.
-      **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, not
-      merged):** `shared/twinFold.ts` (the rules), `takeoffGroups.
-  foldExistingTwin` (one count, on demand), the bid screen's flags with
+      **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, merged
+      2026-10-10 as plain code):** `shared/twinFold.ts` (the rules),
+      `takeoffGroups.foldExistingTwin` (one count, on demand), the bid screen's flags with
       "Count these as existing" / "Remove this line", and "Count as
       existing" in Find all matching no longer makes twins. **Left for A:**
       M1, the SQL draft in `references/track-b-handoff.md`, and a live-copy
-      rehearsal with `bidTotals.mts` before merging.
+      rehearsal with `bidTotals.mts` before merging. (Superseded by A's
+      note below: M1 dropped, the code merges as plain code.)
+      **2026-10-10 (A): NO step-3 pass is needed — there is nothing to fold.**
+      `scripts/twinCountCensus.mts` (read-only) on fresh copies: live 0,
+      staging 0, local 0 twin counts / marks / lines / assemblies (the only
+      "existing to remain" text anywhere is drawing notes in
+      `bid_pdf_sheet_text`). B's M1 SQL was therefore NOT written into
+      `drizzle/`. B's code half (`b-twin-fold`, per-count fold button +
+      Find all matching no longer making twins) merges as ordinary code.
+      Rehearsed with both B branches merged on the copies: 0 of 2 live and
+      0 of 1,148 staging bids move. **Still open:** re-run the census on
+      live just before the release that carries `b-twin-fold` (the OLD
+      "Count as existing" makes twins until then); if it is not 0, the bid
+      screen's per-count fold handles each, or write the one-off script
+      that calls `planTwinFold` + `db.foldTwinGroup` then.
 - [x] **DECIDED AND BUILT 2026-10-05: option C** — priced, with "Leave it
       off" on the run row (references/vertical-drops-plan.md § 4).
       **Decide: a RUN ending on an existing mark.** A run end can claim a
@@ -3555,6 +3580,41 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 - [x] **FIXED 2026-09-26 (Track B): the Crew page called a REVOKED invite "expired".** `TeamPage.tsx` branched on `acceptedAt` then `usable`, so anything unusable and unaccepted read "expired", including a code revoked a second ago. Now `inviteStatus` (`shared/permissions.ts`, tested in `server/permissions.test.ts`) decides joined / revoked / expired / pending, revoked winning over a passed date, and the `invites` query sends it. Looked at locally: company 1's revoked code reads "revoked".
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
+
+### Two more roles — BEFORE BILLING (owner, 2026-10-10; not designed, not built)
+
+Today there are four roles (`shared/permissions.ts`): owner, admin, estimator,
+viewer. One owner per company (`companies.ownerUserId`, and every row is filed
+under that id — `ctx.scope.dataUserId`). There is no ownership transfer route
+yet, and an admin already has every capability; the owner differs only in that
+nobody can change, suspend or outrank them (`companyRouter.setRole` /
+`setStatus`). Both of these need deciding before billing, because billing
+attaches money and cancellation to "the owner".
+
+- [ ] **"Co-owner": more than one owner with equal rights.** Questions to settle
+      first: **who pays** (one billing contact, or any owner?); **who can
+      cancel** the subscription or close the company (any owner alone, or all?);
+      **what happens if an owner leaves** (suspended or removed — the company and
+      its data must not go with them, and the last owner must not be removable);
+      can one co-owner demote or remove another. The data side is the hard part:
+      every row is filed under ONE owner's user id, so a second owner cannot be a
+      second `ownerUserId` — the company, not a person, has to be what the data
+      hangs off (or the filing id stays one user and "owner" becomes a role
+      rather than that id). Read `server/_core/companyScope.ts` before
+      specifying. Pairs with the missing ownership TRANSFER route.
+- [ ] **"Field" role for workers: plans, counts and material lists, NO money.**
+      Sees the plan sets, the marks and counts, and the materials list (what to
+      pull, quantities) — but **no prices, costs, markup, overhead or profit**
+      anywhere. Today's capabilities cannot express it: a viewer has
+      `bids.view`, and `bids.view` returns every line's frozen costs and the
+      bid's totals, and `bids.pricingDefaults` (overhead, profit, markup) is
+      readable with `bids.view` too (2026-10-10, read-only check). So it needs
+      the money split OUT of `bids.view` — on the SERVER, never by hiding
+      columns in the client — and a test that a field login gets no cost field
+      from any bid, materials-list, export or proposal route. Ties to the
+      **won-job package for the foreman** (what a crew gets when a bid is won:
+      plans, counts, material list, no numbers) — build the two together so the
+      package is what the field role sees.
 
 ## Run colours (T14) — Part A and Part B deployed 2026-09-27
 

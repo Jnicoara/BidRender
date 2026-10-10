@@ -1,0 +1,13 @@
+-- 0145 — BID EXPENSE NOTES: a job cost's working, e.g. "Drive time: 6 trips ×
+-- 1.5 h × $85/h" (2026-10-10; Track C's Q-M5, references/quick-bid-plan.md
+-- § Migration). Track A owns the number.
+--
+-- ── ADDITIVE. STEP 1. MUST RUN BEFORE THE CODE ──────────────────────────────
+-- `drizzle/schema.ts` declares the column, so every bare select() of
+-- bid_expenses asks for it. NULL = no note, which is every charge made before
+-- this file. No UPDATE; no number moves — a note is words, never an amount.
+-- Shown on the bid screen and Quick bid only, NEVER on the customer quote
+-- (it can carry the labor rate).
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `bid_expenses` ADD `notes` varchar(512) NULL;

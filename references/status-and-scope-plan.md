@@ -366,3 +366,14 @@ title each time the menu opens (`shared/sheetWorkTag.ts`
 buy) and the **drops** (the vertical footage for that device)? Suggested:
 yes to both, because it is not ours to buy or wire. But it is a number on
 two screens, so the owner says.
+
+**Q10 ANSWERED — owner, 2026-10-10 (in the request for the scope build
+plan):** yes to both. A "By others" or "Excluded" line never prices and
+comes off the materials list AND the drops. Build plan:
+`references/scope-tags-plan.md`.
+
+**§ 3d narrowed, 2026-10-10 (`scope-tags-plan.md` § 0):** the note finder
+does not search "EXISTING TO REMAIN" / "E.T.R." — that is a mark status
+(§ 1 and A's fold), not a who-does-it answer. **§ 5's M5 / M6 are replaced**
+by drafts S1–S3 in `references/track-b-handoff.md`: no `bid_scope_answers`
+table, because the answer is the line's own tag (NULL vs `install`).

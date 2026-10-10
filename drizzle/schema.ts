@@ -1886,6 +1886,13 @@ export const bidExpenses = mysqlTable(
      * markup path that could drift from it.
      */
     markedUp: boolean("markedUp").default(false).notNull(),
+    /**
+     * The charge's working, e.g. "Drive time: 6 trips × 1.5 h × $85/h"
+     * (references/quick-bid-plan.md, Q-M5; drizzle/0145). Shown on the bid
+     * screen and Quick bid only — NEVER printed on the customer quote, because
+     * it can carry the labor rate. NULL = no note (every charge before 0145).
+     */
+    notes: varchar("notes", { length: 512 }),
 
     sortOrder: int("sortOrder").default(0).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
