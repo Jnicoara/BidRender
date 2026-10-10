@@ -74,6 +74,7 @@ export function BuildFromPartsPanel({
   target,
   onBuilt,
   onCancel,
+  pinActions = false,
 }: {
   bidId: number;
   /** What the search was looking for — the new assembly's starting name. */
@@ -81,6 +82,13 @@ export function BuildFromPartsPanel({
   target: BuildTarget;
   onBuilt: (result: BuiltAssembly) => void;
   onCancel: () => void;
+  /**
+   * Pin the Save/Cancel row to the bottom of the popover's own scroll area,
+   * so it is on screen however tall the builder grows (iPad landscape:
+   * todo.md "Save needs a scroll"). Only inside a `bg-popover` scroller —
+   * the row paints that colour over what scrolls beneath it.
+   */
+  pinActions?: boolean;
 }) {
   const forCount = target.kind === "count";
   const [draft, setDraft] = useState<BuildDraft>(() => newBuildDraft(query));
@@ -386,7 +394,19 @@ export function BuildFromPartsPanel({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div
+        className={
+          pinActions
+            ? // -mt-2/pt-2 and -mb-2/pb-2 cancel out, so the buttons sit
+              // exactly where they did; the padding is opaque cover for the
+              // fields scrolling under it and the popover's own p-2.
+              // bottom is -0.5rem, not 0: sticky measures against the
+              // popover's CONTENT box, so bottom-0 lifted the row 8px even
+              // with nothing to scroll (measured in Firefox, 2026-10-09).
+              "sticky bottom-[-0.5rem] z-10 -mt-2 -mb-2 flex flex-wrap gap-2 bg-popover pt-2 pb-2"
+            : "flex flex-wrap gap-2"
+        }
+      >
         <Button
           type="submit"
           size="sm"

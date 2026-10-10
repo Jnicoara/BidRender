@@ -517,6 +517,7 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
   test 2's fix, § 5 item 2). **It MUST include `705e1c9`** (the Legend-link
   fix, `44ede4f`) — live has that race today (§ 5 item 2) — and § 5 item 4b
   runs against live on the day.
+- **It MUST include `dd3f76d`** (Track B, 2026-10-09: carries `9253c6a`, Enter took the wrong part on a tablet) — live `24105ad` has the bug: `MaterialPicker.tsx:245` moves the highlight on `onMouseEnter`, and Enter (line 183) takes the highlight.
 - ~~Smoke test 2 proven fixed~~ — **done 2026-10-09** (§ 5 item 2).
 - **Owner's tablet look at staging** (the third of the owner's three
   waits; the white box and the cover swaps are done).

@@ -35,6 +35,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **Sign-in now stops after 10 wrong passwords for one address (or 30 from
+  one computer) for 15 minutes**, and says how long to wait. It answers the
+  same whether or not the address has an account, so it cannot be used to
+  find out who has one.
+- **A new password can no longer be the one you already have**, at password
+  change and at reset. A reset refused this way leaves the emailed link
+  working, so you can try a different password with it.
+- **On an iPad held sideways, "Save and count" is on screen without
+  scrolling** when building an assembly from parts in the plan viewer. The
+  button now stays pinned to the bottom of the popover; nothing else in it
+  moved, in either orientation or on a laptop.
+
 - **Fixed: on a tablet, typing a part and pressing Enter could add the
   wrong part.** After a tap, the results list grew under the spot that was
   tapped and the highlight jumped to whatever row slid there, so "4 square

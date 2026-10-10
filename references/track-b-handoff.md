@@ -1,6 +1,40 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-09 (late night), Enter took the wrong part (READ FIRST)
+## WHERE B STANDS — 2026-10-09 (last), live check, Save pinned, sign-in limits (READ FIRST)
+
+- **Live has the tablet Enter bug: YES.** `24105ad`
+  `client/src/components/MaterialPicker.tsx:245` moves the highlight on
+  `onMouseEnter`, and Enter (line 183–185) takes `results[highlight]`. Same
+  on `BidsPage.tsx:855`, `QuickBidPage.tsx:334`, `KitsPage.tsx:331`.
+- **For A: `dd3f76d` is a MUST-INCLUDE for the next live release** (it
+  carries `9253c6a`, the fix). One line added under "Still missing before
+  the release" in `references/next-live-release-plan.md`; nothing else in
+  that file was touched.
+- **"Save and count" needs a scroll — FIXED.** `BuildFromPartsPanel` takes
+  `pinActions` (default false); only the plan viewer's Count popover sets
+  it, so the Legend/Runs link lists and the bid screen are unchanged.
+  Measured in Firefox (Playwright's Gecko build, installed for this):
+  - 1180x820: Save 856–900 (below the screen) → 718–762, inside the popover.
+  - 820x1180 and 1440x900: 0 of 20 popover elements moved.
+  - Trap: sticky `bottom-0` lifted the row 8px with nothing to scroll —
+    sticky measures the popover's content box. It is `bottom-[-0.5rem]`.
+- **todo.md batch (no bid number touched, no migration):**
+  - wrong sign-in attempts limited: 10 per address / 30 per sender / 15
+    min (`createFailureLimiter`, `server/rateLimit.ts`); same answer for
+    an address with no account; seen on the sign-in form, laptop and phone.
+  - a new password equal to the current one is refused at change and at
+    reset; a refused reset leaves the link working
+    (`db.getResetTokenPasswordHash`). The reset page's wording was NOT
+    looked at on screen (needs a real emailed token); it is the same
+    `setErrorMsg` path the other reset refusals use.
+  - **Not picked, they touch bid numbers:** Undo for removing a circuit,
+    Undo for removing a bid line, "drops not priced" in analytics.
+- **Tests run locally (only these):** `server/rateLimit.test.ts`,
+  `server/auth.email.test.ts`, `server/passwordReset.test.ts` — 33 passed on
+  `bidrender_test_b`. `pnpm check` clean.
+- **No migration needed.** No dev server left running.
+
+## WHERE B STOOD — 2026-10-09 (late night), Enter took the wrong part
 
 - **The "4 square box" + Enter → pull box report was NOT the ranking.**
   - On a tablet, the results list grew under the spot of the last tap.

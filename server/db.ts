@@ -644,6 +644,32 @@ export async function isResetTokenUsable(
   return row !== undefined;
 }
 
+/**
+ * The current password hash of the account a USABLE reset link belongs to,
+ * or null (dead link, or no password). Read-only: it uses nothing up, so the
+ * reset can refuse the current password and leave the link working.
+ */
+export async function getResetTokenPasswordHash(
+  tokenHash: string,
+  now: Date = new Date()
+): Promise<string | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(passwordResetTokens)
+    .innerJoin(users, eq(users.id, passwordResetTokens.userId))
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, tokenHash),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, now)
+      )
+    )
+    .limit(1);
+  return row?.passwordHash ?? null;
+}
+
 export async function completePasswordReset(
   tokenHash: string,
   passwordHash: string,

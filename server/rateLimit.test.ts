@@ -4,7 +4,11 @@
  * is tested without waiting an hour.
  */
 import { describe, expect, it } from "vitest";
-import { clientKey, createRateLimiter } from "./rateLimit";
+import {
+  clientKey,
+  createFailureLimiter,
+  createRateLimiter,
+} from "./rateLimit";
 
 describe("createRateLimiter", () => {
   it("allows max hits per window, refuses the next, and forgets after the window", () => {
@@ -33,5 +37,31 @@ describe("clientKey", () => {
     ).toBe("1.2.3.4");
     expect(clientKey({ ip: "5.6.7.8", headers: {} })).toBe("5.6.7.8");
     expect(clientKey({ headers: {} })).toBe("unknown");
+  });
+});
+
+describe("createFailureLimiter", () => {
+  it("refuses after max failures, even before an attempt, until the window ends", () => {
+    const limiter = createFailureLimiter({ windowMs: 1000, max: 3 });
+    expect(limiter.blockedFor("a", 0)).toBe(0);
+    expect([0, 1, 2].map(t => limiter.fail("a", t))).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    // The wait runs from the FIRST failure's window.
+    expect(limiter.blockedFor("a", 400)).toBe(600);
+    expect(limiter.blockedFor("b", 400)).toBe(0);
+    expect(limiter.blockedFor("a", 1001)).toBe(0);
+  });
+
+  it("counts only failures, and clear forgets them", () => {
+    const limiter = createFailureLimiter({ windowMs: 1000, max: 2 });
+    limiter.fail("a", 0);
+    // Asking is free: a hundred checks are not a failure.
+    for (let t = 0; t < 100; t++) expect(limiter.blockedFor("a", t)).toBe(0);
+    limiter.clear("a");
+    expect(limiter.fail("a", 200)).toBe(false);
+    expect(limiter.blockedFor("a", 200)).toBe(0);
   });
 });
