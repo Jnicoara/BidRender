@@ -50,6 +50,7 @@ import { MARK_SHAPES, isMarkColor } from "../../shared/takeoffMarks";
 import { mayShareAssembly } from "../../shared/assemblyCounts";
 import { whipFeetOf } from "../../shared/branchWire";
 import { emptySplit } from "../../shared/markStatus";
+import { planTwinFold } from "../../shared/twinFold";
 import {
   countsWaitingToSend,
   countsWithNoPrice,
@@ -874,6 +875,57 @@ export const takeoffGroupsRouter = router({
          * say where they get typed — the bid line — at the moment it matters.
          */
         unpriced: group.kind === "plain",
+      };
+    }),
+
+  /**
+   * "Count these as existing" — fold ONE "- EXISTING TO REMAIN" twin count
+   * into its base count as `existing` marks (shared/twinFold.ts; owner,
+   * 2026-10-10). The same rules Track A's step-3 migration applies to every
+   * twin at once, offered here for one count, on demand.
+   *
+   * Refused on a locked bid: it moves quantities, and a locked bid's
+   * quantities are what the lock promises not to move. A line holding the
+   * twin is NEVER removed here — the twin stays for it, the line reads 0, and
+   * the bid screen flags it with "Remove this line".
+   *
+   * `previous` is each moved mark's status before, so Undo can put the marks
+   * back on the twin exactly as they were (only possible while it is kept).
+   */
+  foldExistingTwin: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const twin = await requireGroup(input.id, userId);
+      const bid = await requireBid(twin.bidId, userId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal(
+            "its existing-to-remain count cannot be moved"
+          ),
+        });
+      const [groups, line] = await Promise.all([
+        db.getGroupsForBid(twin.bidId, userId),
+        db.getBidLineForGroup(twin.id),
+      ]);
+      const plan = planTwinFold(
+        { id: twin.id, label: twin.label, onLine: line !== undefined },
+        groups
+      );
+      if (!plan)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `"${twin.label}" is not an existing-to-remain count.`,
+        });
+      const result = await db.foldTwinGroup(twin.bidId, userId, plan);
+      return {
+        moved: result.moved,
+        baseGroupId: result.baseGroupId,
+        baseLabel: plan.baseLabel,
+        /** The twin is still there, empty, for its line — Undo can use it. */
+        twinKept: plan.keepTwin,
+        previous: result.previous,
       };
     }),
 
