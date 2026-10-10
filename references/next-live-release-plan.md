@@ -248,6 +248,11 @@ ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scri
 DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterCovers.mts           # again: expect 48 already has it
 ```
 
+> **Superseded 2026-10-10 by § 5g** (fresh copy of live, the candidate's
+> catalog): **5 would swap, 45 already has it, then 50 already has it.**
+> The 43 / 48 below are the 2026-10-08 figures, before the reality check
+> added cover starters.
+
 **Expect (from § 5c, on the 2026-10-08 copy of live): report only says
 `5 would swap, 43 already has it`** — DV1–DV5, live's original starters
 ids 1–5, each "old recipe exactly" with no company copies; the other 43
@@ -278,6 +283,12 @@ DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.m
 ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts --apply
 DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # again: all "already has it"
 ```
+
+> **ON LIVE, expect § 5g's figures instead** (fresh copy, 2026-10-10):
+> **1 would repoint (PG1), 10 already has it, 2 skipped: part not in
+> catalog (DV34, GR3)**, then 11 / 2 skipped. Live never had the old parts
+> of DV34 and GR3; the first boot creates both on the new recipe, so the
+> two skips are expected there, and only there. The 13 below is staging's.
 
 **Expect on a database seeded before the check: `13 would repoint`** (PG1,
 DV33, DV34, RS13, PG15, PG16, PG20, DR2, MS5, GR3, CW3, CW4, CW11 — measured
@@ -535,6 +546,59 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
 - Not blockers, logged by session 22 in `todo.md`: the tally saying
   "0 marks" while loading (Track C has since fixed it, `cd8db42`).
 
+## 5g. Fresh rehearsal on a copy of LIVE, all 39 + both repairs — DONE 2026-10-10 (nothing changed on live)
+
+Track A, 04:19–04:27 UTC. **Candidate: `dd3f76d`** (local-dev; Track B's
+merge of the tablet Enter fix). It contains every must-include:
+`11f5466`, `705e1c9`, `dd3f76d`. The rehearsal booted `a1527ac`, which is
+`dd3f76d` plus two docs files and nothing else. `a1527ac`'s own Gate was
+cancelled (superseded), so the named candidate is the commit with the green
+Gate (38022621884: test, deploy-staging, smoke 96 passed with the 2
+by-design skips). The newer `371b2ab` (B's `ca82a0b`: sign-in limits,
+password checks, a popover fix) changes no file under `drizzle/` or
+`server/seed/`, so this rehearsal's database figures hold for it too. Its
+code is NOT this candidate; choosing it means its own green Gate.
+
+**A FRESH read of live this time**: `mysqldump --single-transaction` over
+TLS, read only, to
+`C:\dev\bidrender-backups\live-2026-10-10T04-19-55Z-release-rehearsal.sql`.
+Restored into the local throwaway `bidrender_rehearse_live`. Every write
+below went to that copy.
+
+| Step                       | Result                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Restore                    | **65/65 tables, 3,480/3,480 rows, every table's count equal to live's.** 105 migrations, 3 users, 2 bids, **0 bid lines**, 8 shared starters, 1,554 active shipped materials, 18 company rows.                                                                                                                                             |
+| Read-only checks ON LIVE   | Recount (pre-0087 recipe-live lines): **0** (live has 0 lines). `legendLinkRaceCandidates`: **"no candidates — no bid can have been touched."**                                                                                                                                                                                            |
+| `bidTotals` before         | live's code `24105ad` (worktree, today's `bidTotals.mts`): read only proved, 2 bids, 2 owners.                                                                                                                                                                                                                                             |
+| Migrate 0105–0143          | **"Applied 39 migrations: 0105_assembly_labor_only to 0143_labor_steps … all 144."** No errors. Re-run: "Nothing to apply … all 144". (Not timed.)                                                                                                                                                                                         |
+| Drift after                | **"Database matches the schema." Foreign keys 180 present, 180 declared.**                                                                                                                                                                                                                                                                 |
+| First boot ×2              | `scripts/seedBaseline.mts`, exit 0 both, no "Holding" line. **1,717 active shipped** (1,935 rows; = the seed files), **24 shipped run types**, **224 starters**, 95 Specialty, 47 labor steps with NO minutes, 194 starter step lines. Company rows 18 → 18, untouched.                                                                    |
+| `catalogRehearsal compare` | added 379, renamed 433, retired 216, **DELETED 0**; old spellings 0; duplicates 0; orphans 0. Verdict "NOT CLEAN" only because reference counts grew (new starters, new run types). Row by row: **every pre-existing reference identical except run types 2 and 3's ground**, `#12 bare` → `#12 THHN green` — the intended swap (as § 5e). |
+| Totals after boot          | **"all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged."**                                                                                                                                                                                                                                                               |
+| Cover repair (§ 4b)        | report **5 would swap, 45 already has it** (DV1–DV5, ids 1–5, "old recipe exactly"; 45, not 43, because the reality check added cover starters). `--apply` **5 swapped**; again **50 already has it**.                                                                                                                                     |
+| Retired repair (§ 4c)      | report **1 would repoint, 10 already has it, 2 skipped: part not in catalog**. `--apply` **1 repointed** (PG1, id 8: `200A main panel` → `200A main-breaker panel, 40-space, indoor`); again **11 already has it, 2 skipped**. The 2 skips explained below: not a stop on live.                                                            |
+| Lines changed, measured    | snapshot of all 1,182 shared starter lines before and after both repairs: **exactly 6 changed**, same line ids, none added or removed: the five cover plates (DV1–DV5) and PG1's panel.                                                                                                                                                    |
+| Totals after repairs       | **all 2 bids unchanged** (bid 23, owner 1; bid 25, the smoke account; both $0, 0 lines). Recount after: 0. **No live bid's total changes.**                                                                                                                                                                                                |
+| LT1/LT2 fixture repair     | **NOT run**, by design. It is a staging fixture repair and must not run on live.                                                                                                                                                                                                                                                           |
+
+**The 2 "skipped: part not in catalog" on the retired repair (DV34, GR3)
+are expected ON LIVE and are not a stop.** The script looks up shared rows
+for the starter's OLD part names ("Raceway entrance end fitting", "320A
+meter base") as well as the new ones. Those rows exist on staging (retired,
+kept), but live never had them. DV34 (id 40) and GR3 (id 182) are not
+among live's 8 original starters: the first boot creates them, already on
+the new recipe. Measured: both **match the seed recipe exactly**. So a
+skip there means "nothing to repair". Any OTHER skip, or a different
+split, is still a stop.
+
+**Expect on the day:** 39 applied, 144, matches, 180/180; first boot 0
+holds, 224 starters, 1,717 active shipped, 24 run types; covers 5 / 45 then
+50; retired 1 / 10 / 2 skipped (DV34, GR3) then 11 / 2 skipped; every bid
+unchanged. **If what prints does not match, stop and find out why before
+going on**: either this line is stale or live is not in the state you
+think. Live has 0 bid lines, so "unchanged" is $0 against $0 (§ 5e's same
+limit). Pricing survival is proved on staging's bids (`deploying.md` § 11).
+
 ## 6. What should wait (NOT in this release)
 
 - **The LT1/LT2 repair script** — moves a number on old lines; waits for the
@@ -556,13 +620,13 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
 - Live `24105ad` / 0104. Staging's DATABASE is at 0143 (144); staging's
   CODE is `f03e8ef` until somebody pushes staging — the Gate refuses the
   push because `drizzle/` differs (2026-10-10).
+- **Candidate: `dd3f76d`** (has `11f5466`, `705e1c9`, `dd3f76d`).
 - A release runs 0105–0143 (39, all additive) before the push, in one
-  ordered run; expect 144, matches, 180/180 FKs. The last rehearsal on a
-  copy of LIVE was of 36 (§ 5e, 2026-10-09: clean; 1,801 active shipped, 24
-  run types, 183 starters, 0 holds, only the intended ground swap moved,
-  repair 5 / 43 → 48, both bids unchanged, on the 2026-10-08 23:54 backup).
-  0141–0143 were rehearsed on staging's copy only, so a live-copy rehearsal
-  of all 39 is still owed before the window.
+  ordered run; expect 144, matches, 180/180 FKs. **Rehearsed 2026-10-10 on
+  a FRESH copy of live (§ 5g)**: 39 applied, 180/180; first boot 0 holds,
+  224 starters, 1,717 active shipped; only the intended ground swap moved;
+  covers 5 / 45 → 50; retired 1 repointed, 2 expected skips (DV34, GR3);
+  exactly 6 starter lines changed; both bids unchanged.
 - Coverage-check catalog adds (`3cb5df3`, § 5f): +24 rows, seed only —
   expect **1,825 active / 114 Specialty** on the first boot if the
   candidate includes them. Rehearsed on staging's copy: CLEAN, 847/847.

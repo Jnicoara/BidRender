@@ -802,6 +802,45 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Staging deploy guard: let a push through once staging's DATABASE has its migrations — build AFTER the live release (Track A, 2026-10-10)
+
+**Today:** the Gate's deploy-staging step refuses every local-dev push whose
+`drizzle/` differs from the `staging` BRANCH. That stays true after Track A
+has migrated staging's database, so somebody must push `staging` by hand
+(0142, 0143, 2026-10-10). Every push in between stops at that step.
+
+**Proposed:** let the push through when staging's database already has
+every migration file in the new commit, and refuse otherwise. The Gate
+cannot ask the database itself: it holds no database secret, and the
+database only answers its trusted list (`deploying.md` § 10). So staging's
+app reports the fingerprint (sha256, the `hash` column of
+`__drizzle_migrations`) of each migration it has applied. The Gate hashes
+each `drizzle/*.sql` in the commit and passes only if every one is there.
+Checked 2026-10-10: the stored hash is the file's plain sha256. Use
+fingerprints, not a count: the 0142 → 0143 renumbering would fool a count,
+and a fingerprint also catches a file edited after it ran.
+
+**Four protections, all required:**
+
+1. **A meaning-change migration never auto-deploys.** Such a file (one that
+   changes what an existing column means, CLAUDE.md "three steps") needs
+   the code FIRST and the backfill after. A guard that opens once the
+   database has the file would teach people to run the backfill early to
+   get the push through, and that gives wrong numbers with nothing failing
+   (0063: 125.01 ft became 83.34 ft). Mark such a file `-- STEP 3`; the
+   Gate refuses it always, and that release stays a hand push.
+2. **Refuse on any error or an empty answer.** A wrong report would ship
+   code against a database without its columns ("Unknown column", screens
+   down). The app reads the same connection it serves from; no answer, a
+   failed read or an empty list is a refusal, never a pass.
+3. **Fingerprints only, never names.** The answer is public or nearly so;
+   a list of migration names would publish our schema history. Hashes say
+   nothing useful to anyone else. Or put it behind a secret the Gate holds.
+4. **Never for live.** `main` stays a hand push by design (CLAUDE.md
+   "Deploying"). This touches only the local-dev → staging step.
+
+Full reasoning: `references/track-a-handoff.md`, session 28 fourth part.
+
 ### Track A next migration batch
 
 Requests waiting for Track A, which numbers and writes the migrations.

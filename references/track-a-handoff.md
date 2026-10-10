@@ -19,7 +19,27 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-10 (session 28, fourth part) — START HERE
+## UPDATE 2026-10-10 (session 28, fifth part) — START HERE
+
+- **Release candidate `dd3f76d`**, Gate 38022621884 all green (smoke 96).
+  Has `11f5466`, `705e1c9`, `dd3f76d`. My `a1527ac` (= it + docs) had its
+  Gate cancelled by B's newer push `371b2ab` (sign-in limits; no
+  `drizzle/` or seed change; its Gate was still pending at the end).
+- **Fresh live-copy rehearsal DONE** (`next-live-release-plan.md` § 5g):
+  a read-only dump of live this time (it was not refused), 65/65 tables
+  equal; 39 applied, 144, 180/180; first boot 0 holds; covers 5 / 45 → 50;
+  retired 1 repointed + 2 expected skips (DV34, GR3: live never had their
+  old parts, measured on the new recipe already); exactly 6 starter lines
+  changed; both live bids unchanged. Recount and Legend-race check on live:
+  0 / none. LT1/LT2 repair not run.
+- **Staging-guard proposal** is in `todo.md` ("build AFTER the live
+  release"), with its four protections.
+- Scratch: the rehearsal's DB and worktree are removed. The live dump
+  stays in `C:\dev\bidrender-backups\`. Left alone: the old
+  `../bidrender-before` folder from an earlier session (a broken real
+  `node_modules` only, not a worktree). Safe to delete by hand.
+
+## UPDATE 2026-10-10 (session 28, fourth part)
 
 - **Staging pushed by hand** to `b0c8a65` (local-dev), owner-approved, after
   a read-only `schemaDrift` on staging: 144 recorded, matches, 180/180.
