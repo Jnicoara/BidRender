@@ -3253,9 +3253,9 @@ path is ever revived, give it the same treatment first.
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
       header this is a separate step-3 migration, now unblocked.
-      **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, not
-      merged):** `shared/twinFold.ts` (the rules), `takeoffGroups.
-    foldExistingTwin` (one count, on demand), the bid screen's flags with
+      **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, merged
+      2026-10-10 as plain code):** `shared/twinFold.ts` (the rules),
+      `takeoffGroups.foldExistingTwin` (one count, on demand), the bid screen's flags with
       "Count these as existing" / "Remove this line", and "Count as
       existing" in Find all matching no longer makes twins. **Left for A:**
       M1, the SQL draft in `references/track-b-handoff.md`, and a live-copy
