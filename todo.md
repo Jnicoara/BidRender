@@ -1564,6 +1564,14 @@ Design: `references/homerun-footage-plan.md` § 4.
       a scratch bid with 7 items. Time it (server ms and the panel's first
       paint) on a real 500-sheet set with marks and runs spread across it, and
       write the numbers next to the code. No number is claimed here yet.
+- [ ] **Stress test (B, 2026-10-10): time the DASHBOARD for a company with
+      50+ bids that have marks.** Since "N drops not priced" reached the
+      lists (`db.dropsNotPricedForBids`), every bid card with a mark loads
+      that bid's takeoff on each read (4 bids at a time). Only looked at on a
+      handful of bids. Measure server ms for `bids.list` / the dashboard
+      query and the cards' first paint with 50, 100 and 200 marked bids, and
+      write the numbers next to the code. Do it with the 500-sheet item
+      above. No number is claimed here yet.
 - [x] **DONE 2026-10-10 (Track B):** the remove gets the same
       "Removed circuit X." toast with Undo as every other delete
       (`notUndoableWired.test.ts`). Was:
@@ -3234,6 +3242,13 @@ path is ever revived, give it the same treatment first.
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
       header this is a separate step-3 migration, now unblocked.
+      **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, not
+      merged):** `shared/twinFold.ts` (the rules), `takeoffGroups.
+    foldExistingTwin` (one count, on demand), the bid screen's flags with
+      "Count these as existing" / "Remove this line", and "Count as
+      existing" in Find all matching no longer makes twins. **Left for A:**
+      M1, the SQL draft in `references/track-b-handoff.md`, and a live-copy
+      rehearsal with `bidTotals.mts` before merging.
 - [x] **DECIDED AND BUILT 2026-10-05: option C** — priced, with "Leave it
       off" on the run row (references/vertical-drops-plan.md § 4).
       **Decide: a RUN ending on an existing mark.** A run end can claim a

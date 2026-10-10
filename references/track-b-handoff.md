@@ -1,5 +1,140 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-10 (late), twin fold CODE HALF on `b-twin-fold` (READ FIRST)
+
+**Branch `b-twin-fold`, off local-dev `c649268`, pushed, NOT merged.** It
+needs A's M1 (below) and a live-copy rehearsal before it goes anywhere.
+Plan: `references/status-and-scope-plan.md` § 1 "A's part" and § 8 Q1.
+
+- **The rules, in one place:** `shared/twinFold.ts`.
+  - A twin already on the bid is FLAGGED, never removed. After the fold its
+    line reads 0 and the bid offers "Remove this line" (with Undo).
+  - A locked bid never moves. The fold is refused and the strip says
+    "locked … nothing here changes until you unlock them", no button.
+  - A twin mark that was new (NULL / `new`) becomes `existing`. A status a
+    person chose (remove, relocate, existing, unconfirmed) is kept.
+  - Base count = same bid, `symbolLookupKey` match, oldest first. None and no
+    line: the twin is RENAMED into the base (plain, look and drop kept).
+    None and a line: a plain base is MADE beside the kept twin.
+- **Server:** `takeoffGroups.foldExistingTwin({ id })` (one count, on
+  demand) → `db.foldTwinGroup` (one transaction). Returns `previous` statuses
+  for Undo.
+- **Bid screen:** a strip entry per kind (`pricedAsNew` / `foldedAway` /
+  `byHand`), with "Count these as existing" or "Remove this line" per line.
+  The fold invalidates the Plans screen's counts and marks too.
+- **Find all matching:** "Count as existing" now puts the mark on the SAME
+  count with status `existing`. It no longer makes or uses a twin. Not
+  offered when the search is itself for a twin count.
+- **Tests (red without the fix, checked by swapping in local-dev's files):**
+  - `server/twinFold.test.ts`, 14: 9 red with only the server code reverted
+    (the 5 that stay green don't call the fold); the whole file is red
+    without `shared/twinFold.ts`.
+  - `client/src/lib/twinFoldWired.test.ts`, 6 of 6 red.
+  - Run locally: those two, `notUndoableWired`, `existingToRemain`,
+    `moveMarksToCount` (21 passed, `bidrender_test_b`). `pnpm check` clean.
+- **On screen** (headless Chrome, laptop 1536x864, iPad 820x1180 and
+  1180x820), probe bids 1728443 (open) and 1728444 (locked):
+  - Fault found and fixed: the button labels truncated in the ~320 px
+    totals column (394 px of text in a 226 px box), so two buttons looked
+    the same. They now wrap and name the base count ("Count as existing on
+    Exit sign"). Re-measured: no truncation, no sideways scroll, all sizes.
+  - Clicked the fold: toast "3 marks now count as existing to remain on
+    Duplex receptacle." with Undo; total $270.00 → $232.50 (3 × $12.50);
+    the twin line stays at 0 with "Remove this line".
+- **Local bid totals (`scripts/bidTotals.mts`, `bidrender_local_b_new`):**
+  - **0 of the 4,304 existing bids move.** No local database (b_new, c,
+    local) holds a single twin COUNT; `bidrender_local_c` has 7 twin
+    ASSEMBLIES, none counted. So the real fold has nothing to do locally.
+  - Probe only: 1728443 moved $270.00 → $232.50 when folded on screen,
+    on purpose (existing devices stop pricing as new). 1728444 (locked)
+    did not move.
+  - **Live may also be "0 → 0"** (the 0098 plan said so). A must count twin
+    groups on the live copy first.
+- **Leftovers (user 1):** the two "B twin fold probe" bids. No dev server.
+  No migration written into `drizzle/`, nothing applied.
+
+### M1 — SQL DRAFT FOR TRACK A (NOT APPLIED; meaning migration, step 3)
+
+Runs only AFTER `b-twin-fold` is live. Mirrors `shared/twinFold.ts`; where
+they differ, the TS has the test. Rehearse on a restored live copy with
+`bidTotals.mts` before and after: **only bids holding a twin may move, and
+only DOWN by the twin's priced marks.** If anything else moves, stop.
+
+Two things A must check rather than trust:
+
+- the base match uses `LOWER(TRIM(label))`; `symbolLookupKey` also folds
+  runs of spaces to one. Close, not identical.
+- retiring an assembly here is `status='archived'` (the path at
+  `server/db.ts` ~3262). Confirm that is the retire A wants for twins.
+
+A safer option worth weighing: a one-off step-3 SCRIPT that calls
+`db.foldTwinGroup` per twin through `planTwinFold` (the tested code), with
+the same `bidTotals` before/after.
+
+```sql
+-- 0. Twins on UNLOCKED bids. A locked bid is never touched.
+CREATE TEMPORARY TABLE twin_fold AS
+SELECT t.id AS twinId, t.bidId, t.userId,
+  TRIM(REGEXP_REPLACE(t.label,
+    '[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$',
+    '', 1, 0, 'i')) AS baseLabel,
+  EXISTS (SELECT 1 FROM bid_line_items l WHERE l.takeoffGroupId = t.id) AS onLine,
+  CAST(NULL AS SIGNED) AS baseId
+FROM takeoff_groups t
+JOIN bids b ON b.id = t.bidId
+WHERE b.quantitiesLockedAt IS NULL
+  AND t.label REGEXP '(?i)[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$';
+
+-- 1. The base count on the same bid, oldest first.
+UPDATE twin_fold f SET baseId = (
+  SELECT MIN(g.id) FROM takeoff_groups g
+  WHERE g.bidId = f.bidId AND g.id <> f.twinId
+    AND LOWER(TRIM(g.label)) = LOWER(f.baseLabel));
+
+-- 2. No base, no line: the twin BECOMES the base (plain).
+UPDATE takeoff_groups g JOIN twin_fold f
+  ON f.twinId = g.id AND f.baseId IS NULL AND f.onLine = 0
+SET g.label = f.baseLabel, g.kind = 'plain', g.assemblyId = NULL,
+    g.materialId = NULL, g.unitCost = NULL, g.unitHours = NULL,
+    g.laborRateId = NULL, g.updatedAt = NOW();
+UPDATE twin_fold SET baseId = twinId WHERE baseId IS NULL AND onLine = 0;
+
+-- 3. No base, a line holds the twin: make a plain base beside it.
+INSERT INTO takeoff_groups (bidId, userId, label, kind)
+SELECT bidId, userId, baseLabel, 'plain' FROM twin_fold WHERE baseId IS NULL;
+UPDATE twin_fold f SET baseId = (
+  SELECT MAX(g.id) FROM takeoff_groups g
+  WHERE g.bidId = f.bidId AND g.label = f.baseLabel AND g.kind = 'plain')
+WHERE baseId IS NULL;
+
+-- 4. Every twin mark moves; new -> existing, a chosen status stays.
+UPDATE takeoff_stamps s
+JOIN twin_fold f ON s.groupId = f.twinId
+JOIN takeoff_groups base ON base.id = f.baseId
+LEFT JOIN assemblies a ON a.id = base.assemblyId
+SET s.groupId = base.id,
+    s.assemblyId = base.assemblyId,
+    s.assemblyName = IF(base.kind = 'assembly', base.label, NULL),
+    s.assemblyCategory = a.category,
+    s.status = IF(s.status IS NULL OR s.status = 'new', 'existing', s.status),
+    s.updatedAt = NOW();
+
+-- 5. An emptied twin with NO line goes. A twin with a line STAYS (it reads 0,
+--    and the bid flags it with "Remove this line" — never removed here).
+DELETE g FROM takeoff_groups g JOIN twin_fold f ON f.twinId = g.id
+WHERE f.onLine = 0 AND f.baseId <> f.twinId;
+
+-- 6. Twin ASSEMBLIES are retired, not deleted (CLAUDE.md § "Retire, never delete").
+UPDATE assemblies SET status = 'archived', archivedAt = NOW(), updatedAt = NOW()
+WHERE name REGEXP '(?i)[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$'
+  AND status = 'active';
+
+-- Report: twins on LOCKED bids are left as they are; list them.
+SELECT t.bidId, t.id, t.label FROM takeoff_groups t JOIN bids b ON b.id = t.bidId
+WHERE b.quantitiesLockedAt IS NOT NULL
+  AND t.label REGEXP '(?i)[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$';
+```
+
 ## WHERE B STANDS — 2026-10-10, the owner's 3 held items BUILT (READ FIRST)
 
 - **1. Undo for removing a circuit.** The remove shows "Removed circuit X."

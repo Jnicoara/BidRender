@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Existing-to-remain devices stop being priced as new work.** The old
+  "… - EXISTING TO REMAIN" counts priced their devices as new once sent to
+  a bid. The bid now flags such a line and offers "Count these as
+  existing", which moves those marks onto their own count as existing (they
+  price nothing). The emptied line is flagged with "Remove this line" — it
+  is never removed for you — and a locked bid never changes. Find all
+  matching's "Count as existing" now marks the device existing on the same
+  count instead of making a new twin count. A bid total drops when this is
+  used, on purpose: it stops charging for devices already on the wall.
+
 - **Undo for removing a bid line.** Removing a line on the bid screen or in
   Quick bid now shows "Removed …" with an Undo button. Undo brings back the
   exact same line, with the price it was frozen at, not today's catalog

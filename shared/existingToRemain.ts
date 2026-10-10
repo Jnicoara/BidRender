@@ -13,8 +13,14 @@
  * Everything that has to recognise that pairing reads it HERE — the script
  * that makes the twin assemblies, the accuracy scorer (which folds the two
  * back together, because the AI reader cannot tell them apart and is not
- * asked to), and Find all matching's "Confirm as existing". One rule, so a
- * spelling the scorer accepts is one the script makes.
+ * asked to), and the fold (shared/twinFold.ts). One rule, so a spelling the
+ * scorer accepts is one the script makes.
+ *
+ * **Superseded 2026-10-10 by `takeoff_stamps.status`.** Find all matching's
+ * "Count as existing" used to put marks on the twin, which priced them as
+ * NEW once the twin was sent; it now sets `existing` on the same count. A
+ * twin already made is folded (the bid flags it; Track A's step-3 migration
+ * does the rest). Only the reader-test script still makes twins.
  *
  * Read tolerantly — case, spacing, and a hyphen, en dash or em dash — because
  * these names are typed by a person; WRITTEN one way only.
