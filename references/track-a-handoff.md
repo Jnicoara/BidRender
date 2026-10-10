@@ -2,7 +2,36 @@
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
-release record is `deploying.md` § 11 "LIVE: `24105ad`".
+release record is `deploying.md` § 11 "LIVE: `371b2ab`".
+
+## NOW — 2026-10-10, session 29: pre-launch starter cleanup, WAITING ON THE OWNER
+
+**Step 1 done:** `pricing/assembly-cleanup.xlsx` (224 rows; built by
+`pricing/buildAssemblyCleanup.mts`). The owner marks Keep / Cut in Excel —
+**do not touch the file while they have it**. Usage columns were measured
+read-only on local copies: staging dump
+`staging-2026-10-10T19-22-24Z-before-assembly-cleanup.sql` (restored as
+`bidrender_scratch_staging`, 77/77 counts equal) and live backup
+`2026-10-10T19-22-50Z` (verified, restored as `bidrender_backup_verify`, 77
+tables / 5,539 rows) by `scripts/starterAssemblyUse.mts`. Only 8 starters are
+used by anything on staging (Duplex receptacle standard on 371 bids;
+Single-pole switch and Surface-mount ceiling fixture on 1 bid each; "0-10V
+dimmer, MC" and "120V feed for door hardware / access control" on 3 bids
+each; GFCI, Dimmer and Ceiling fan only through starter kits) and 7 on live
+(the six kit starters; Surface-mount ceiling fixture and "200A main panel
+furnish and install" on one bid's counts).
+
+**Step 2 — only on the owner's "go":** for each Cut row: fix any test /
+smoke step / seed file naming it FIRST (DV1 is in two smoke specs; kits in
+`baselineKits.ts` name six starters); remove it from the seed; RETIRE the
+shared row (hidden from pickers, never hard-deleted if anything points at
+it — re-run `starterAssemblyUse.mts` on fresh copies on the day); backup +
+rehearse + staging first; `bidTotals` unchanged; then ONE rebuild of the
+pricing sheets (standing rule above: put the owner's current sheets in
+place first). Check how a starter is retired today before writing one —
+`RETIRED_BASELINE_MATERIALS` is the materials precedent; assemblies may not
+have one yet. Scratch: `scripts/_tmpCopyDb.mts` (untracked; dumps a DB with
+the repo's dumper and restores it locally) is still on disk for step 2.
 
 ## STANDING RULE — a starter-sheet rebuild never loses a typed value
 

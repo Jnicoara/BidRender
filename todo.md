@@ -3524,6 +3524,41 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 - [ ] **A billing plan should set `seatLimit` through `db.setSeatLimit`**, so a downgrade hits the same "remove N first" refusal. Nothing else writes the column today except 0081.
 - [ ] **Nobody but a platform admin can add a seat.** "Remove someone or add a seat" names an action an owner cannot yet take themselves; it becomes self-serve with billing.
 
+### Two more roles — BEFORE BILLING (owner, 2026-10-10; not designed, not built)
+
+Today there are four roles (`shared/permissions.ts`): owner, admin, estimator,
+viewer. One owner per company (`companies.ownerUserId`, and every row is filed
+under that id — `ctx.scope.dataUserId`). There is no ownership transfer route
+yet, and an admin already has every capability; the owner differs only in that
+nobody can change, suspend or outrank them (`companyRouter.setRole` /
+`setStatus`). Both of these need deciding before billing, because billing
+attaches money and cancellation to "the owner".
+
+- [ ] **"Co-owner": more than one owner with equal rights.** Questions to settle
+      first: **who pays** (one billing contact, or any owner?); **who can
+      cancel** the subscription or close the company (any owner alone, or all?);
+      **what happens if an owner leaves** (suspended or removed — the company and
+      its data must not go with them, and the last owner must not be removable);
+      can one co-owner demote or remove another. The data side is the hard part:
+      every row is filed under ONE owner's user id, so a second owner cannot be a
+      second `ownerUserId` — the company, not a person, has to be what the data
+      hangs off (or the filing id stays one user and "owner" becomes a role
+      rather than that id). Read `server/_core/companyScope.ts` before
+      specifying. Pairs with the missing ownership TRANSFER route.
+- [ ] **"Field" role for workers: plans, counts and material lists, NO money.**
+      Sees the plan sets, the marks and counts, and the materials list (what to
+      pull, quantities) — but **no prices, costs, markup, overhead or profit**
+      anywhere. Today's capabilities cannot express it: a viewer has
+      `bids.view`, and `bids.view` returns every line's frozen costs and the
+      bid's totals, and `bids.pricingDefaults` (overhead, profit, markup) is
+      readable with `bids.view` too (2026-10-10, read-only check). So it needs
+      the money split OUT of `bids.view` — on the SERVER, never by hiding
+      columns in the client — and a test that a field login gets no cost field
+      from any bid, materials-list, export or proposal route. Ties to the
+      **won-job package for the foreman** (what a crew gets when a bid is won:
+      plans, counts, material list, no numbers) — build the two together so the
+      package is what the field role sees.
+
 ## Run colours (T14) — Part A and Part B deployed 2026-09-27
 
 Decisions and the reasons for them are in `plan-viewer-overhaul.md` § 6,
