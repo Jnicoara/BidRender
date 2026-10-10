@@ -9,9 +9,9 @@
   - the builder is in the plan viewer's Count picker and in the Legend/Counts
     "Link assembly" list.
 
-  Details are in todo.md. No migration. The `search_misses` table still
-  waits on Track A (see below); until it exists the records go nowhere,
-  safely.
+  Details are in todo.md. No migration by B. The `search_misses` table
+  now exists: Track A's 0142, merged here 2026-10-09. B's two databases
+  are at 143, and `schemaDrift` matches with 177/177 foreign keys.
 
 - **Server:** `bids.buildFromParts` takes `addLine` (default true). False
   means the assembly only and always saved; unticked with no line is
