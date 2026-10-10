@@ -285,6 +285,12 @@ after every migration and every deploy, and every moved total explained.
 M2–M6 are additive. The code reads NULL as today's behaviour, so each
 can go ahead of its code. M1 is the only meaning migration.
 
+**M2 narrowed, 2026-10-10 (Track B, `b-status-view`):** `workTag` only.
+`workTagSuggested` is dropped: the suggestion is read from the sheet's
+title each time the menu opens (`shared/sheetWorkTag.ts`
+`suggestedWorkTag`), so there is nothing to store. The SQL draft is in
+`references/track-b-handoff.md` § "M2 — SQL DRAFT".
+
 ## 6. Build order
 
 1. **1d remove / relocate labor** (Track C code; columns exist). It moves

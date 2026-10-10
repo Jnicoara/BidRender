@@ -21,11 +21,12 @@ import { createPool } from "mysql2/promise";
 import { timePool } from "./slowRequests";
 import {
   QUANTITY_MARK_STATUSES,
-  emptySplit,
   isPricedMark,
   markStatusOf,
+  splitsByGroup,
   type MarkStatus,
   type StatusSplit,
+  type StatusSplitRow,
 } from "../shared/markStatus";
 import { foldedStatus } from "../shared/twinFold";
 import { mysqlConnection } from "./databaseConnection";
@@ -10685,11 +10686,25 @@ export async function statusSplitByGroup(
   bidId: number,
   userId: number
 ): Promise<Map<number, StatusSplit>> {
+  return splitsByGroup(await statusSplitRows(bidId, userId));
+}
+
+/**
+ * The marks grouped by count, SHEET and status — the one read behind the
+ * count cards (`splitsByGroup`) and the bid's status bar (`splitsBySheet`,
+ * status-and-scope-plan § 1b), so the two cannot disagree. Display only, like
+ * `statusSplitByGroup`.
+ */
+export async function statusSplitRows(
+  bidId: number,
+  userId: number
+): Promise<StatusSplitRow[]> {
   const db = await getDb();
-  if (!db) return new Map();
+  if (!db) return [];
   const rows = await db
     .select({
       groupId: takeoffStamps.groupId,
+      sheetId: takeoffStamps.sheetId,
       status: takeoffStamps.status,
       total: sql<number>`count(*)`,
     })
@@ -10701,15 +10716,44 @@ export async function statusSplitByGroup(
         onLivePlanSheet(takeoffStamps.sheetId, bidId)
       )
     )
-    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
-  const splits = new Map<number, StatusSplit>();
+    .groupBy(
+      takeoffStamps.groupId,
+      takeoffStamps.sheetId,
+      takeoffStamps.status
+    );
+  return rows.map(row => ({ ...row, total: Number(row.total) }));
+}
+
+/**
+ * What these marks' statuses ARE, before a change — so "Mark as…" can be
+ * undone (status-and-scope-plan: "only a toggle changes numbers, with
+ * Undo"). Grouped by status, NULL kept as NULL, because that is what the
+ * undo writes back. Scoped exactly as `setStampStatus` is.
+ */
+export async function stampStatusesOf(
+  bidId: number,
+  userId: number,
+  ids: number[]
+): Promise<{ status: MarkStatus | null; ids: number[] }[]> {
+  const database = await getDb();
+  if (!database || ids.length === 0) return [];
+  const rows = await database
+    .select({ id: takeoffStamps.id, status: takeoffStamps.status })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  const byStatus = new Map<MarkStatus | null, number[]>();
   for (const row of rows) {
-    if (row.groupId === null) continue;
-    const split = splits.get(row.groupId) ?? emptySplit();
-    split[markStatusOf(row.status)] += Number(row.total);
-    splits.set(row.groupId, split);
+    const status = row.status === null ? null : markStatusOf(row.status);
+    byStatus.set(status, [...(byStatus.get(status) ?? []), row.id]);
   }
-  return splits;
+  return Array.from(byStatus, ([status, ids]) => ({ status, ids }));
 }
 
 /**

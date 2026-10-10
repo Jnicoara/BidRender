@@ -53,6 +53,7 @@ import {
 } from "../../shared/planScale";
 import { checkPdfUpload } from "../../shared/uploadLimits";
 import { sheetDisplay } from "../../shared/sheetIdentity";
+import { SHEET_WORK_TAGS } from "../../drizzle/schema";
 import { lockedEditRefusal } from "../../shared/quantityLock";
 import {
   MIN_SEARCH_LENGTH,
@@ -170,6 +171,8 @@ function toSheetView(row: db.BidPdfSheetRow) {
      * the difference between "unchecked" and "not loaded yet".
      */
     scaleCheckedAt: row.scaleCheckedAt,
+    /** Demo / new work / both; NULL = not said (shared/sheetWorkTag.ts). */
+    workTag: row.workTag,
   };
 }
 
@@ -566,6 +569,8 @@ export const bidPdfsRouter = router({
         pageNumber: number;
         number: string | null;
         title: string;
+        /** The sheet row, when it exists — the status bar finds a sheet by it. */
+        sheetId: number | null;
       }[] = [];
       for (const plan of plans) {
         const pages = new Set<number>();
@@ -586,6 +591,7 @@ export const bidPdfsRouter = router({
             pageNumber,
             number: display.number,
             title: display.title,
+            sheetId: sheet?.id ?? null,
           });
         }
       }
@@ -867,6 +873,31 @@ export const bidPdfsRouter = router({
       return {
         ...toSheetView({ ...sheet, name: input.name, nameSource: "user" }),
       };
+    }),
+
+  /**
+   * Say what work a sheet shows — demo, new work, both — or null for not
+   * said (status-and-scope-plan § 2a). Only a person sets it; the title's
+   * suggestion is shown beside the choice and applied only by this call.
+   *
+   * Allowed on a locked bid: a tag moves no number. It only decides what
+   * "Placing as" starts at, and a locked bid takes no marks anyway.
+   */
+  setSheetWorkTag: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        workTag: z.enum(SHEET_WORK_TAGS).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const sheet = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
+      if (!sheet)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sheet not found." });
+      await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
+        workTag: input.workTag,
+      });
+      return toSheetView({ ...sheet, workTag: input.workTag });
     }),
 
   /**

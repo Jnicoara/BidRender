@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Plans: see at a glance what is new, staying, removed and relocated.**
+  Once a bid has any mark that is not new, a bar above the drawing reads
+  "3 new · 1 staying · 1 removed · 1 relocated". Tap one to show only those
+  marks (the rest dim; nothing leaves the bid) and jump to the other sheets
+  that have them. Changing a mark's status can now be undone, from the
+  toast or the undo arrow. A sheet can be tagged Demo, New work or both from
+  its "…" menu; on a demo sheet new marks start as Remove and the bar offers
+  "Make them Remove" for marks already placed. Needs Track A's migration
+  for the sheet tag before it ships.
 - **Existing-to-remain devices stop being priced as new work.** The old
   "… - EXISTING TO REMAIN" counts priced their devices as new once sent to
   a bid. The bid now flags such a line and offers "Count these as

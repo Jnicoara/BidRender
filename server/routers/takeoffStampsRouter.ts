@@ -50,7 +50,7 @@ import {
 } from "../../shared/takeoffQuantities";
 import { lockedEditRefusal } from "../../shared/quantityLock";
 // A person's choices only: `unconfirmed` is the reader's, not a menu item.
-import { USER_MARK_STATUSES } from "../../shared/markStatus";
+import { MARK_STATUSES, USER_MARK_STATUSES } from "../../shared/markStatus";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
@@ -654,6 +654,14 @@ export const takeoffStampsRouter = router({
           code: "BAD_REQUEST",
           message: lockedEditRefusal("a mark's status cannot be changed"),
         });
+      // What they were, read first, so the change is an Undo step (status
+      // view, 2026-10-10: a status moves the bid, and only a change made
+      // with Undo may move it).
+      const previous = await db.stampStatusesOf(
+        input.bidId,
+        ctx.scope.dataUserId,
+        input.ids
+      );
       // NULL, not "new": NULL already means new, and one spelling of it is
       // one thing to query for.
       const updated = await db.setStampStatus(
@@ -662,7 +670,52 @@ export const takeoffStampsRouter = router({
         input.ids,
         input.status === "new" ? null : input.status
       );
-      return { updated };
+      return { updated, previous };
+    }),
+
+  /**
+   * Put marks' statuses back as `setStatus` found them — its Undo, and
+   * the Undo's redo. Takes ANY stored status, `unconfirmed` included,
+   * because it writes back what was there rather than a person's choice.
+   * Refused on a locked bid like every status change.
+   */
+  restoreStatus: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        sets: z
+          .array(
+            z.object({
+              status: z.enum(MARK_STATUSES).nullable(),
+              ids: z.array(z.number().int().positive()).min(1).max(2000),
+            })
+          )
+          .min(1)
+          .max(MARK_STATUSES.length + 1),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("a mark's status cannot be changed"),
+        });
+      const userId = ctx.scope.dataUserId;
+      const previous = await db.stampStatusesOf(
+        input.bidId,
+        userId,
+        input.sets.flatMap(s => s.ids)
+      );
+      let updated = 0;
+      for (const set of input.sets)
+        updated += await db.setStampStatus(
+          input.bidId,
+          userId,
+          set.ids,
+          set.status === "new" ? null : set.status
+        );
+      return { updated, previous };
     }),
 
   /**

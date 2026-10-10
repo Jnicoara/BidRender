@@ -274,6 +274,8 @@ export function sheetsAnUndoMoves(
     case "clearSheet":
     // Marks moved between counts are a selection on the step's sheet.
     case "moveMarks":
+    // A status is set on a selection, or by the demo offer, on one sheet.
+    case "markStatus":
     // A run's type, length, circuits and legs (Gap 4c) are on its own sheet;
     // the bid-wide figures they move are refreshed whichever sheet it is.
     case "runEdit":

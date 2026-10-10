@@ -162,3 +162,102 @@ export function unpricedStatusNote(
     parts.push(`${split.unconfirmed} unconfirmed — not counted until checked`);
   return parts.length > 0 ? parts.join(". ") : null;
 }
+
+// ─── The bid's status view (status-and-scope-plan § 1a / 1b) ─────────────────
+
+/**
+ * The words the status bar uses (owner, 2026-10-10, plan § 8 Q2): "staying"
+ * for `existing`, short on a chip; "existing to remain" stays in the tooltip
+ * (`MARK_STATUS_LABEL`). Past tense for the two that are work to do.
+ */
+export const STATUS_VIEW_WORD: Record<MarkStatus, string> = {
+  new: "new",
+  existing: "staying",
+  remove: "removed",
+  relocate: "relocated",
+  unconfirmed: "unconfirmed",
+};
+
+/** One grouped row of marks: how many of one status, on one sheet, in one count. */
+export type StatusSplitRow = {
+  groupId: number | null;
+  sheetId: number;
+  status: string | null;
+  total: number;
+};
+
+/**
+ * Per count — what the count card says. A mark with no count is left out,
+ * as it always was, so the cards and the bid's bar read the same rows and
+ * cannot disagree.
+ */
+export function splitsByGroup(
+  rows: readonly StatusSplitRow[]
+): Map<number, StatusSplit> {
+  const out = new Map<number, StatusSplit>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    const split = out.get(row.groupId) ?? emptySplit();
+    split[markStatusOf(row.status)] += Number(row.total);
+    out.set(row.groupId, split);
+  }
+  return out;
+}
+
+/** Per sheet, from the SAME rows — so "12 removed" can be found sheet by sheet. */
+export function splitsBySheet(
+  rows: readonly StatusSplitRow[]
+): Map<number, StatusSplit> {
+  const out = new Map<number, StatusSplit>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    const split = out.get(row.sheetId) ?? emptySplit();
+    split[markStatusOf(row.status)] += Number(row.total);
+    out.set(row.sheetId, split);
+  }
+  return out;
+}
+
+/** The whole bid: the count cards' splits added up. */
+export function sumSplits(splits: Iterable<StatusSplit>): StatusSplit {
+  const total = emptySplit();
+  for (const split of Array.from(splits))
+    for (const s of MARK_STATUSES) total[s] += split[s];
+  return total;
+}
+
+/**
+ * Whether the bar is shown at all. Only when some mark is NOT new: a bid
+ * that never set a status is the basic path, and "30 new" alone says nothing
+ * the count cards do not.
+ */
+export function statusViewWanted(total: StatusSplit): boolean {
+  return MARK_STATUSES.some(s => s !== "new" && total[s] > 0);
+}
+
+/**
+ * The bar's parts, in order: "30 new · 8 staying · 12 removed · 4
+ * relocated", always those four once the bar shows (a 0 is an answer), and
+ * "unconfirmed" only when there are any (plan § 1b).
+ */
+export function statusViewParts(
+  total: StatusSplit
+): { status: MarkStatus; count: number; word: string }[] {
+  return MARK_STATUSES.filter(s => s !== "unconfirmed" || total[s] > 0).map(
+    s => ({ status: s, count: total[s], word: STATUS_VIEW_WORD[s] })
+  );
+}
+
+/**
+ * How visible a mark is while the bar has one status picked. VIEW ONLY:
+ * nothing is filtered out of a count or off the bid, the others are only
+ * dimmed — still there, still clickable, still counted.
+ */
+export const STATUS_FOCUS_DIM_OPACITY = 0.18;
+export function markFocusOpacity(
+  status: string | null | undefined,
+  focus: MarkStatus | null
+): number {
+  if (focus === null) return 1;
+  return markStatusOf(status) === focus ? 1 : STATUS_FOCUS_DIM_OPACITY;
+}

@@ -1,5 +1,92 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-10 (night), STATUS VIEW on `b-status-view` (READ FIRST)
+
+**Branch `b-status-view`, off `b-twin-fold` (24843fd), pushed, NOT merged.**
+It waits on A's twin-fold step AND on M2 below. Plan:
+`references/status-and-scope-plan.md` § 1a/1b, § 2a, owner answers § 8.
+
+- **Status bar** (`StatusStrip.tsx`; rules in `client/src/lib/statusStrip.ts`
+  and `shared/markStatus.ts`): "3 new · 1 staying · 1 removed · 1
+  relocated", "unconfirmed" only when any. **Hidden on the basic path**
+  (only new marks, sheet untagged). Tap = dim the other marks (opacity
+  0.18, nothing hidden or filtered) + "1 on this sheet · also on E-102 · 5"
+  jump buttons.
+  - Numbers come from `takeoffGroups.list`: each card's `split` summed, plus
+    a new `statusBySheet` built from the SAME grouped rows
+    (`db.statusSplitRows`). Refreshed by construction (MARK_QUERIES).
+  - `sheetJumpList` entries now carry `sheetId`.
+- **A status change is now an Undo step** (was `notUndoable("markStatus")`).
+  `setStatus` returns `previous`; new `takeoffStamps.restoreStatus` puts
+  any stored status back (`unconfirmed` too) and returns what it
+  overwrote (redo). Refused on a locked bid. Toast has Undo.
+- **Sheet work tag** (Demo / New work / Demo and new / Not said): the sheet
+  "…" menu, under "More options — this sheet shows". The title's suggestion
+  shows as "title says so" and is never applied by itself
+  (`suggestedWorkTag`). `bidPdfs.setSheetWorkTag`; moves no number; noted
+  not undoable (`sheetWorkTag`), like a sheet's name.
+  - Demo: banner, "Placing as" starts at **Remove** (a third button, only on
+    demo / both sheets), and "N placed as new here · Make them Remove"
+    (through `setStatus`, so Undo; never on a locked bid).
+  - Both: banner asks "Placing as New / Remove" while a count is armed.
+  - Leaving a demo sheet puts New back (`placingOnSheet`, `fromSheet`); a
+    person's own choice stays sticky.
+- **Not built:** § 1c warnings' "Check them" step-through for unconfirmed,
+  the twin-count warning on the bar (the bid screen has it, b-twin-fold),
+  § 2b pairing/overlay, § 2c "same device?" (needs M4).
+- **Dropped from M2 on purpose:** `workTagSuggested`. The suggestion is read
+  from the title each time, so there is nothing to store. Plan § 5 says so.
+- **Tests (red without the fix, checked in a worktree at 24843fd with only
+  the test files copied in):**
+  - `server/statusView.test.ts` 10: 8 red (the 2 green are guards that must
+    pass both ways: "reading moves no number", "cannot reach another
+    company's marks").
+  - `server/sheetWorkTag.test.ts` 14, `client/src/lib/statusStrip.test.ts` 7:
+    whole files red (modules missing).
+  - `client/src/lib/statusViewWired.test.ts` 6 of 6 red.
+  - Also run: `notUndoableWired`, `undoStack` (one fixture moved from
+    `markStatus` to `markHeight`), `undoPersist`, `markStatusPricing`,
+    `twinFold`, `schemaDrift`. All green. `pnpm check` clean.
+  - **They ran on a SCRATCH database** (`bidrender_test_b_m2`: migrations
+    0000–0143 + M2), dropped afterwards. **On a DB without M2 every
+    `bid_pdf_sheets` read fails** (`Unknown column 'workTag'`) — and so will
+    CI until M2 is in `drizzle/`. That is the order: M2 first (additive,
+    step 1), then this code.
+- **On screen** (headless Chrome, 1536x864, 820x1180, 1180x820) on
+  `bidrender_local_b_m2` (a copy of `bidrender_local_b_new` + M2, dropped
+  after), bid 1728350, E-200:
+  - Bar reads "3 new · 1 staying · 1 removed · 1 relocated" at all three;
+    no sideways scroll (scrollWidth = innerWidth).
+  - "1 removed": 1 mark at full opacity, 5 dimmed, "1 on this sheet".
+  - Tagged Demo: banner + "3 placed as new here · Make them Remove";
+    arming a count shows New / Existing / **Remove\*** at all three sizes.
+  - Make them Remove: bar 3 new → 0 new, 1 → 4 removed; Undo from the
+    toast: back to 3 new · 1 removed. The bar moved both ways.
+  - Fixed after looking: "None remove on this sheet" → "None removed".
+- **Bid totals (`scripts/bidTotals.mts`):** base code on
+  `bidrender_local_b_new` vs this branch on its M2 copy: **0 of 4,306 bids
+  differ.** Expected: viewing, the tag and M2 move nothing. Numbers move only
+  when a person changes a status (Make them Remove, "Mark as…"), and then
+  only on that bid: those marks stop pricing as new devices (their remove
+  labor follows the count's remove line, if one is on the bid), with Undo.
+  The server test pins it: 7 new receptacles at $10 = $70 → $40 after 3
+  are made Remove → $70 after Undo.
+- **Leftovers:** none. No dev server; scratch DBs dropped; probe scripts
+  deleted.
+
+### M2 — SQL DRAFT FOR TRACK A (NOT APPLIED; additive, step 1)
+
+Must be applied BEFORE `b-status-view` deploys (its code selects the column
+on every sheet read). NULL = not said = today's behaviour, no default.
+
+```sql
+ALTER TABLE `bid_pdf_sheets` ADD `workTag` enum('demo','new','both') NULL;
+```
+
+`drizzle/schema.ts` already declares it (`SHEET_WORK_TAGS`). The drizzle
+snapshot is A's to regenerate; read what `generate` emits before using it
+(CLAUDE.md: it re-emits hand-written migrations).
+
 ## WHERE B STANDS — 2026-10-10 (late), twin fold CODE HALF on `b-twin-fold` (READ FIRST)
 
 **Branch `b-twin-fold`, off local-dev `c649268`, pushed, NOT merged.** It

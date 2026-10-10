@@ -2447,6 +2447,11 @@ export const SHEET_NAME_SOURCES = ["bookmark", "default", "user"] as const;
 export type SheetNameSource = (typeof SHEET_NAME_SOURCES)[number];
 
 export const SCALE_SOURCES = ["detected", "manual", "none"] as const;
+/**
+ * What work a sheet shows (status-and-scope-plan § 2a, M2). NULL = not said,
+ * which behaves exactly as before the column. Only ever set by a person.
+ */
+export const SHEET_WORK_TAGS = ["demo", "new", "both"] as const;
 export type ScaleSourceValue = (typeof SCALE_SOURCES)[number];
 
 export const bidPdfSheets = mysqlTable(
@@ -2538,6 +2543,13 @@ export const bidPdfSheets = mysqlTable(
     homerunMethod: varchar("homerunMethod", { length: 16 }),
     homerunAverageFt: decimal("homerunAverageFt", { precision: 8, scale: 2 }),
     homerunMinimumFt: decimal("homerunMinimumFt", { precision: 8, scale: 2 }),
+    /**
+     * Demo / new work / both (status-and-scope-plan § 2a, M2 — Track A's
+     * migration, drafted in references/track-b-handoff.md). NULL = not said,
+     * and nothing changes. Demo only changes what "Placing as" starts at on
+     * this sheet (shared/sheetWorkTag.ts); it never re-statuses a mark.
+     */
+    workTag: mysqlEnum("workTag", SHEET_WORK_TAGS),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

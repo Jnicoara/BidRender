@@ -49,7 +49,11 @@ import { cleanLetter } from "../../shared/pinLetters";
 import { MARK_SHAPES, isMarkColor } from "../../shared/takeoffMarks";
 import { mayShareAssembly } from "../../shared/assemblyCounts";
 import { whipFeetOf } from "../../shared/branchWire";
-import { emptySplit } from "../../shared/markStatus";
+import {
+  emptySplit,
+  splitsByGroup,
+  splitsBySheet,
+} from "../../shared/markStatus";
 import { planTwinFold } from "../../shared/twinFold";
 import {
   countsWaitingToSend,
@@ -176,13 +180,15 @@ export const takeoffGroupsRouter = router({
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
       const userId = ctx.scope.dataUserId;
-      const [groups, counts, splits] = await Promise.all([
+      const [groups, counts, splitRows] = await Promise.all([
         db.getGroupsForBid(input.bidId, userId),
         // NEW marks only — the quantity (shared/markStatus.ts).
         db.countStampsByGroup(input.bidId, userId),
-        // Every status, for the card's words. Display only.
-        db.statusSplitByGroup(input.bidId, userId),
+        // Every status, for the card's words and the bid's status bar.
+        // Display only.
+        db.statusSplitRows(input.bidId, userId),
       ]);
+      const splits = splitsByGroup(splitRows);
       const lines = await db.getBidLineItems(input.bidId);
       const bridgeLines = lines.map(toBridgeLine);
 
@@ -311,6 +317,20 @@ export const takeoffGroupsRouter = router({
          * are not. shared/quantityLock.ts owns what the state means.
          */
         quantitiesLockedAt: bid.quantitiesLockedAt,
+        /**
+         * Every mark by status, per SHEET — so the status bar can say where
+         * "12 removed" are (status-and-scope-plan § 1b). From the same rows
+         * as each count's `split`, so the bar and the cards cannot disagree;
+         * in this query because every mark change already refreshes it.
+         * Display only.
+         */
+        statusBySheet: Array.from(
+          splitsBySheet(splitRows),
+          ([sheetId, split]) => ({
+            sheetId,
+            split,
+          })
+        ),
       };
     }),
 

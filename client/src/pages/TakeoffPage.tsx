@@ -58,6 +58,7 @@ import { normaliseCaptureBox } from "@shared/symbolCapture";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  Check,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -91,8 +92,20 @@ import { PinLookEditor } from "@/components/takeoff/PinLookEditor";
 import {
   MARK_STATUS_LABEL,
   markIsSnapTarget,
+  markStatusOf,
+  sumSplits,
+  type MarkStatus,
   type UserMarkStatus,
 } from "@shared/markStatus";
+import { statusStripModel } from "@/lib/statusStrip";
+import {
+  SHEET_WORK_TAG_LABEL,
+  placingChoices,
+  placingOnSheet,
+  suggestedWorkTag,
+  type SheetWorkTag,
+} from "@shared/sheetWorkTag";
+import { StatusStrip } from "@/components/takeoff/StatusStrip";
 import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
 import { formatElevation } from "@shared/takeoffHeights";
@@ -143,6 +156,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { sheetClearQuestion } from "@/lib/sheetClearQuestion";
@@ -3687,6 +3702,31 @@ export default function TakeoffPage({
   );
   const activeSheet = sheets.find(s => s.pageNumber === page) ?? null;
   /*
+    A DEMO SHEET STARTS "PLACING AS" AT REMOVE (owner, 2026-10-10, status
+    plan § 8 Q4) — decided in @shared/sheetWorkTag `placingOnSheet`, run when
+    the sheet (or its tag) changes, never on a re-render, so a choice made on
+    the sheet stands. `placingFromSheet` remembers that the SHEET chose
+    Remove, so leaving it puts New back rather than carrying a removal onto
+    a sheet nobody tagged.
+  */
+  const activeWorkTag = activeSheet?.workTag ?? null;
+  const placingFromSheet = useRef(false);
+  const placingStatusNow = useRef(placingStatus);
+  placingStatusNow.current = placingStatus;
+  useEffect(() => {
+    const next = placingOnSheet(activeWorkTag, {
+      status: placingStatusNow.current,
+      fromSheet: placingFromSheet.current,
+    });
+    placingFromSheet.current = next.fromSheet;
+    setPlacingStatus(next.status);
+  }, [activeSheet?.id, activeWorkTag]);
+  /** A person's choice: the sheet no longer owns it. */
+  const choosePlacing = useCallback((status: UserMarkStatus) => {
+    placingFromSheet.current = false;
+    setPlacingStatus(status);
+  }, []);
+  /*
     The scale check's verdicts (@/lib/scaleCheck), keyed by document, page
     and the RATIO checked — so a scale changed since is never judged by an
     old verdict. "Keep" holds for this session only: the evidence has not
@@ -3969,6 +4009,7 @@ export default function TakeoffPage({
   const undoRestoreGroup = trpc.takeoffGroups.restore.useMutation();
   const undoRemoveGroup = trpc.takeoffGroups.remove.useMutation();
   const undoMoveMarks = trpc.takeoffStamps.moveToGroup.useMutation();
+  const undoMarkStatus = trpc.takeoffStamps.restoreStatus.useMutation();
   /** Ops whose mutations are declared further down the page. */
   const runUndoOpLater = useRef<(op: UndoOp) => Promise<UndoOp | null>>(
     async () => null
@@ -4057,6 +4098,14 @@ export default function TakeoffPage({
             ? { kind: "moveMarks", moves: reverse }
             : null;
         }
+        case "markStatus": {
+          // The statuses go back as the server found them; it says what it
+          // overwrote, which is the redo.
+          const r = await undoMarkStatus.mutateAsync({ bidId, sets: op.sets });
+          return r.previous.length > 0
+            ? { kind: "markStatus", sets: r.previous }
+            : null;
+        }
         case "runEdit": {
           const packet = await sendRunEdit(op.call);
           return packet
@@ -4091,6 +4140,8 @@ export default function TakeoffPage({
       undoRestoreGroup,
       undoRemoveGroup,
       undoMoveMarks,
+      undoMarkStatus,
+      bidId,
       sendRunEdit,
     ]
   );
@@ -5186,6 +5237,47 @@ export default function TakeoffPage({
    */
   const quantitiesLocked = bidCounts.data?.quantitiesLockedAt != null;
 
+  /*
+    ── THE STATUS VIEW (status-and-scope-plan § 1a / 1b) ──────────────────
+    "30 new · 8 staying · 12 removed · 4 relocated", summed from the SAME
+    count list the cards read — so the bar and a card cannot disagree, and it
+    moves with every mark change because that list does (takeoffRefresh,
+    MARK_QUERIES). Picking a status only dims the other marks: view only.
+  */
+  const [statusFocus, setStatusFocus] = useState<MarkStatus | null>(null);
+  const newMarkIdsHere = useMemo(
+    () => stamps.filter(s => markStatusOf(s.status) === "new").map(s => s.id),
+    [stamps]
+  );
+  const statusStrip = useMemo(
+    () =>
+      statusStripModel({
+        total: sumSplits((bidCounts.data?.groups ?? []).map(g => g.split)),
+        bySheet: bidCounts.data?.statusBySheet ?? [],
+        activeSheetId: activeSheet?.id ?? null,
+        focus: statusFocus,
+        workTag: activeWorkTag,
+        newMarksHere: newMarkIdsHere.length,
+        locked: quantitiesLocked,
+      }),
+    [
+      bidCounts.data,
+      activeSheet?.id,
+      statusFocus,
+      activeWorkTag,
+      newMarkIdsHere.length,
+      quantitiesLocked,
+    ]
+  );
+  /** A sheet named the way the sheet chip names it: its number, else title. */
+  const sheetShortName = useCallback(
+    (sheetId: number) => {
+      const entry = jumpList.find(j => j.sheetId === sheetId);
+      return entry ? (entry.number ?? entry.title) : null;
+    },
+    [jumpList]
+  );
+
   const bridgeByGroup = useMemo(() => {
     const map = new Map<number, GroupBridgeState>();
     for (const row of bidCounts.data?.groups ?? []) {
@@ -5513,13 +5605,32 @@ export default function TakeoffPage({
   */
   const setMarkStatus = trpc.takeoffStamps.setStatus.useMutation({
     onSuccess: (r, input) => {
-      notUndoable("markStatus");
+      /*
+        AN UNDO STEP since the status view (2026-10-10). It used to be noted
+        as not undoable; the owner's rule for the status view is that only a
+        toggle moves a number, and always with Undo — on the arrow and in the
+        toast, like every delete here.
+      */
       const n = r.updated;
       const what = n === 1 ? "mark" : "marks";
-      toast.success(
+      const entry =
+        n > 0 && activeSheet && r.previous.length > 0
+          ? pushUndo({
+              label: `${n} ${what} marked ${
+                input.status === null || input.status === "new"
+                  ? "new"
+                  : MARK_STATUS_LABEL[input.status].toLowerCase()
+              }`,
+              sheetId: activeSheet.id,
+              undo: { kind: "markStatus", sets: r.previous },
+              redo: null,
+            })
+          : null;
+      deletedToast(
         input.status === null || input.status === "new"
           ? `${n} ${what} marked new — counted and priced.`
-          : `${n} ${what} marked ${MARK_STATUS_LABEL[input.status].toLowerCase()} — not priced as new.`
+          : `${n} ${what} marked ${MARK_STATUS_LABEL[input.status].toLowerCase()} — not priced as new.`,
+        entry
       );
     },
     onError: e => toast.error(e.message),
@@ -5527,6 +5638,27 @@ export default function TakeoffPage({
       setSelectedStampIds(new Set());
       refreshFor("markStatus");
     },
+  });
+  /*
+    A SHEET'S WORK TAG — demo / new work / both (status plan § 2a). Moves no
+    number: it only decides what "Placing as" starts at on the sheet. Not an
+    undo step, like a sheet's name; the same menu sets it back.
+  */
+  const setWorkTag = trpc.bidPdfs.setSheetWorkTag.useMutation({
+    onSuccess: r => {
+      notUndoable("sheetWorkTag");
+      toast.success(
+        r.workTag === null
+          ? "Sheet tag cleared."
+          : r.workTag === "demo"
+            ? "Tagged as a demo sheet — marks placed here start as Remove."
+            : r.workTag === "new"
+              ? "Tagged as new work."
+              : "Tagged as demo and new — pick New or Remove in the bar above the drawing."
+      );
+    },
+    onError: e => toast.error(e.message),
+    onSettled: () => refreshFor("sheet"),
   });
   /*
     A MARK'S OWN DROP — its height, or left off (vertical-drops-plan § 2).
@@ -9518,6 +9650,58 @@ export default function TakeoffPage({
                     ? "Clear this sheet — unlock the bid first"
                     : "Clear all marks and runs on this sheet…"}
                 </DropdownMenuItem>
+                {/*
+                  MORE OPTIONS — the sheet's demo / new tag (status plan
+                  § 2a). Here, not on the toolbar: a setting made once per
+                  sheet. The title's suggestion is marked beside the tag it
+                  would pick and applied only when clicked.
+                */}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                  More options — this sheet shows
+                </DropdownMenuLabel>
+                {(() => {
+                  const suggested = suggestedWorkTag(
+                    jumpList.find(j => j.sheetId === activeSheet.id)?.title ??
+                      activeSheet.name
+                  );
+                  const choices: (SheetWorkTag | null)[] = [
+                    null,
+                    "new",
+                    "demo",
+                    "both",
+                  ];
+                  return choices.map(tag => (
+                    <DropdownMenuItem
+                      key={tag ?? "none"}
+                      disabled={setWorkTag.isPending}
+                      onSelect={() =>
+                        tag !== activeWorkTag &&
+                        setWorkTag.mutate({ id: activeSheet.id, workTag: tag })
+                      }
+                    >
+                      <Check
+                        className={cn(
+                          "w-3.5 h-3.5",
+                          activeWorkTag !== tag && "invisible"
+                        )}
+                      />
+                      {tag === null ? "Not said" : SHEET_WORK_TAG_LABEL[tag]}
+                      {tag === "demo" && (
+                        <span className="text-muted-foreground">
+                          — marks start as Remove
+                        </span>
+                      )}
+                      {tag !== null &&
+                        tag === suggested &&
+                        activeWorkTag === null && (
+                          <span className="ml-auto text-[10px] text-amber-600">
+                            title says so
+                          </span>
+                        )}
+                    </DropdownMenuItem>
+                  ));
+                })()}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -9571,26 +9755,37 @@ export default function TakeoffPage({
                   aria-label="Place marks as"
                   className="inline-flex h-7 items-center rounded-md border border-border p-0.5 text-xs"
                 >
-                  {(["new", "existing"] as const).map(s => (
+                  {/* Remove joins New and Existing on a demo sheet only
+                      (@shared/sheetWorkTag `placingChoices`), so the basic
+                      path keeps its two buttons. */}
+                  {placingChoices(activeWorkTag, placingStatus).map(s => (
                     <button
                       key={s}
                       type="button"
                       aria-pressed={placingStatus === s}
-                      onClick={() => setPlacingStatus(s)}
+                      onClick={() => choosePlacing(s)}
                       title={
                         s === "new"
                           ? "Place new devices — counted and priced on the bid"
-                          : "Place existing devices to remain — drawn hollow, not priced"
+                          : s === "existing"
+                            ? "Place existing devices to remain — drawn hollow, not priced"
+                            : "Place devices to remove — drawn with an X, priced as remove labor"
                       }
                       className={`h-full rounded px-2 transition-colors ${
                         placingStatus === s
                           ? s === "new"
                             ? "bg-primary text-primary-foreground"
-                            : "bg-amber-500 text-black"
+                            : s === "existing"
+                              ? "bg-amber-500 text-black"
+                              : "bg-red-600 text-white"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {s === "new" ? "New" : "Existing"}
+                      {s === "new"
+                        ? "New"
+                        : s === "existing"
+                          ? "Existing"
+                          : "Remove"}
                     </button>
                   ))}
                 </div>
@@ -10413,6 +10608,34 @@ export default function TakeoffPage({
         </div>
       )}
 
+      {/* What the marks ARE, and the sheet's demo / new tag. Shows nothing
+          on a bid that never set a status, on a sheet nobody tagged. */}
+      {docs.length > 0 && activeSheet && (
+        <StatusStrip
+          model={statusStrip}
+          focus={statusFocus}
+          onFocus={setStatusFocus}
+          sheetName={sheetShortName}
+          onOpenSheet={sheetId => {
+            const entry = jumpList.find(j => j.sheetId === sheetId);
+            if (!entry) return;
+            if (entry.bidPdfId !== doc?.id) setSelectedDocId(entry.bidPdfId);
+            setPage(entry.pageNumber);
+          }}
+          placingStatus={placingStatus}
+          onPlacing={choosePlacing}
+          canPlace={armedGroup !== null && !quantitiesLocked}
+          busy={setMarkStatus.isPending}
+          onMakeRemove={() =>
+            setMarkStatus.mutate({
+              bidId,
+              ids: newMarkIdsHere,
+              status: "remove",
+            })
+          }
+        />
+      )}
+
       {/* Above the workspace rather than inside the empty state, so it is in
           the same place whether this is the first plan or the tenth. */}
       <UploadProgress
@@ -11154,6 +11377,7 @@ export default function TakeoffPage({
                       }
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}
+                      statusFocus={statusFocus}
                       stamps={[
                         ...visibleStamps.map(st => ({
                           id: st.id,

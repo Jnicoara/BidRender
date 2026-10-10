@@ -28,6 +28,7 @@
 import type { inferRouterInputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 import type { EndClaims } from "./legSnap";
+import type { MarkStatus as MarkStatusValue } from "@shared/markStatus";
 
 export const UNDO_LIMIT = 50;
 
@@ -58,7 +59,6 @@ export type RunEditCall =
  * screen never notes, so an entry here cannot be a promise nothing keeps.
  */
 export const NOT_UNDOABLE = {
-  markStatus: "mark status changed",
   markHeight: "mark height changed",
   markDrop: "mark drop changed",
   countDrop: "count's drop changed",
@@ -76,6 +76,7 @@ export const NOT_UNDOABLE = {
   scale: "sheet scale set",
   sheetName: "sheet renamed",
   sheetNumber: "sheet number changed",
+  sheetWorkTag: "sheet's demo / new work tag changed",
   planRemoved: "plan set removed",
 } as const;
 
@@ -142,6 +143,16 @@ export type UndoOp =
    * count. Its own reverse: the server says where each mark was.
    */
   | { kind: "moveMarks"; moves: { groupId: number; ids: number[] }[] }
+  /**
+   * Put marks' statuses back (takeoffStamps.restoreStatus), one entry per
+   * status. Its own reverse, like moveMarks: the server says what each was.
+   * An undo step since the status view (2026-10-10) — a status moves the
+   * bid, and only a change with Undo may move it. NULL = new.
+   */
+  | {
+      kind: "markStatus";
+      sets: { status: MarkStatusValue | null; ids: number[] }[];
+    }
   /** Send this run edit again (redo of an undone one). */
   | { kind: "runEdit"; runId: number; call: RunEditCall }
   /** Put a run's network back as it was before this edit. */
