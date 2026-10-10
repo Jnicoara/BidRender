@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Opening a sheet no longer re-matches its homeruns.** Placing a panel by
+  hand could leave a "re-match" request waiting when nothing on that sheet
+  changed, and the next sheet opened, just to look at it, then had its
+  unconfirmed homeruns re-pointed and its homerun footage changed. The
+  request now belongs to the sheet the panel was placed on, and that sheet
+  is re-matched straight away as intended.
+- **A removed scale now stays removed.** Removing a sheet's scale used to
+  last only until the sheet was looked at again: the app would read the
+  scale off the drawing on its own and put it back, so traced footage on
+  that sheet came back onto the bid without anyone choosing it. Removing a
+  scale is now remembered as a person's decision, and the sheet keeps
+  asking for a scale until one is set by hand.
 - **Two new empty database columns, ready for work waiting to merge.** A
   plan sheet can now record whether it shows demolition, new work or both
   (for Track B's status view), and a job cost can carry a short working

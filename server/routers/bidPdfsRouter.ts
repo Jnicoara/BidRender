@@ -948,7 +948,25 @@ export const bidPdfsRouter = router({
       return toSheetView(updated!);
     }),
 
-  /** Remove a sheet's scale, putting it back to "not set". */
+  /**
+   * Remove a sheet's scale, putting it back to "not set" — and KEEPING it
+   * there.
+   *
+   * ── Why the source is "manual", not "none" ─────────────────────────────
+   * "none" means nobody has decided, and the viewer runs detection on its own
+   * whenever it shows a sheet with "none" (TakeoffPage `handleSheetVisible`,
+   * `scaleCatchUp`). So clearing to "none" lasted until the sheet was next
+   * looked at: a confident reading was applied again and the sheet's traced
+   * footage jumped from 0 back to feet, with nobody pressing anything
+   * (baseline-screen-plan.md § 9, F9, 2026-10-10).
+   *
+   * Removing a scale IS a person's decision, so it is recorded as one:
+   * `manual` with no ratio. Detection never overrides `manual` (below), and
+   * nothing measures without a ratio — every footage path takes the ratio
+   * through and gets null (`measurabilityOf`, `ratioFor`, runTypeFootageCore,
+   * homerunsCore). Setting a scale by hand, or applying the suggestion, still
+   * works as before. No migration: both values already exist.
+   */
   clearSheetScale: procedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ input, ctx }) => {
@@ -963,7 +981,7 @@ export const bidPdfsRouter = router({
       await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
         scaleRatio: null,
         scaleText: null,
-        scaleSource: "none",
+        scaleSource: "manual",
         // Nothing left to have checked.
         scaleCheckedAt: null,
       });

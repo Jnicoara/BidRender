@@ -519,7 +519,11 @@ describe.skipIf(!hasDb)("setting a scale by hand", () => {
     });
 
     expect(cleared.scaleRatio).toBeNull();
-    expect(cleared.scaleSource).toBe("none");
+    // "manual", not "none", since 2026-10-10. This line used to assert
+    // "none", which pinned the fault: "none" invites the viewer to detect
+    // the scale again the next time the sheet is shown, so a removed scale
+    // came back on its own (sheetScalePersistence.test.ts has the case).
+    expect(cleared.scaleSource).toBe("manual");
   });
 
   it("refuses another user's sheet", async () => {
