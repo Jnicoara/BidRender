@@ -43,8 +43,8 @@ everyone; app MATH changes follow rule (c).
     **Plausible; reproduce first.**
 - **Migrations BS-M1–M8** (additive; step 3 empty). Open owner questions
   **Q14–Q22**; 14, 19 and 22 move numbers.
-- local-dev Gate 38079512981 (job costs merge): test job GREEN;
-  deploy-staging was still running when this was written.
+- local-dev Gate 38079512981 (job costs merge): **GREEN** — test,
+  deploy-staging and smoke all passed. Job costs are on staging.
 
 ## EARLIER (2026-10-10, late night) — Quick bid phase 1 (job costs) on `c-quick-bid`; FOR TRACK A: Q-M5
 
