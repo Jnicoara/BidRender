@@ -26,6 +26,7 @@
  * builds, and one click beats a search. The moment anything is typed, ranking
  * takes over completely — recents never dilute a search result.
  */
+import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -280,7 +281,10 @@ export function MaterialPicker({
               <button
                 key={m.id}
                 type="button"
-                onMouseEnter={() => setHighlight(index)}
+                onMouseMove={e => {
+                  // Only a pointer that MOVED — see @/lib/pointerHighlight.
+                  if (pointerMovedHighlight(e)) setHighlight(index);
+                }}
                 onClick={() => {
                   setQuery("");
                   onChoose(m);

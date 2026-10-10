@@ -35,6 +35,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **Fixed: on a tablet, typing a part and pressing Enter could add the
+  wrong part.** After a tap, the results list grew under the spot that was
+  tapped and the highlight jumped to whatever row slid there, so "4 square
+  box" + Enter added a 4" LED light. Only real mouse movement moves the
+  highlight now. Search also ranks the everyday item first in a few more
+  cases: "old work box" no longer leads with the F-clip, a company's own
+  priced copy of an item (kept under its older name) ranks like the
+  original again, and "12-2" and "12/2" now find the same cable.
 - **"Build it from parts here" now works on the plan too.** When the Count
   button's search, or a legend symbol's or count's "Link assembly" search,
   finds nothing, you can build the assembly right there from catalog parts.
