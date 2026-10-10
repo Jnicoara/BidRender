@@ -189,7 +189,7 @@ describe.skipIf(!hasDb)("starter assemblies", () => {
 
     const detail = await caller().assemblies.get({ id: duplex!.id });
     expect(detail.materials.length).toBe(5);
-    expect(detail.materials.map(m => m.name)).toContain("Duplex receptacle");
+    expect(detail.materials.map(m => m.name)).toContain("15A duplex receptacle");
     expect(detail.materials.find(m => m.name === "12/2 NM-B Copper")?.qty).toBe(
       "25.0000"
     );

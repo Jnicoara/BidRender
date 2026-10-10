@@ -39,6 +39,7 @@ import {
   lrName,
   parseRacewayName,
   pullBoxFor,
+  pvcSharedFittingName,
   sweepName,
   tBodyName,
 } from "../shared/runFittingMaterials";
@@ -202,14 +203,19 @@ describe("every part the bend count can ask for is shipped", () => {
     const missing: string[] = [];
     for (const { size, family } of raceways) {
       if (family.includes("flexible")) continue;
+      // PVC bodies are ONE row per size for Sch 40 and Sch 80 since
+      // 2026-10-09 (catalog reality check): `PVC Sch 40/80 LB conduit body`.
+      const pvc = family.startsWith("PVC");
+      const body = (shape: "LB" | "T" | "LL" | "LR" | "C") =>
+        pvcSharedFittingName(size, `${shape} conduit body`);
       for (const want of [
         elbowName(size, family, 90),
         elbowName(size, family, 45),
-        lbName(size, family),
-        tBodyName(size, family),
-        llName(size, family),
-        lrName(size, family),
-        cBodyName(size, family),
+        pvc ? body("LB") : lbName(size, family),
+        pvc ? body("T") : tBodyName(size, family),
+        pvc ? body("LL") : llName(size, family),
+        pvc ? body("LR") : lrName(size, family),
+        pvc ? body("C") : cBodyName(size, family),
       ]) {
         if (!names.has(want)) missing.push(want);
       }
@@ -254,10 +260,11 @@ describe("every part the bend count can ask for is shipped", () => {
     const bodies = BASELINE_MATERIALS.filter(m =>
       m.name.endsWith(" conduit body")
     );
-    // LB, T, LL, LR and C × 4 families × 9 sizes — 5 families until IMC
-    // was withdrawn (catalog review, 2026-10-08). A floor, so a shape that
-    // stops generating goes red here as well as above.
-    expect(bodies.length).toBeGreaterThanOrEqual(180);
+    // LB, T, LL, LR and C × 3 families × 9 sizes — EMT, rigid, and ONE PVC
+    // family since Sch 40 and Sch 80 share a body (2026-10-09); 5 families
+    // until IMC was withdrawn (2026-10-08). A floor, so a shape that stops
+    // generating goes red here as well as above.
+    expect(bodies.length).toBeGreaterThanOrEqual(135);
     const undescribed = bodies
       .filter(m => m.description !== "Priced with its cover and gasket.")
       .map(m => m.name);
@@ -383,7 +390,8 @@ describe("alias hygiene across the whole catalog", () => {
     // "4/0-3" was the four-wire cable in shorthand — a duplicate, retired
     // 2026-09-25. The three-wire 4/0-4/0-2/0 is a different cable.
     const names = BASELINE_MATERIALS.map(m => m.name);
-    expect(names).toContain("4/0-4/0-2/0 SER Aluminum");
+    // The three-wire one is SEU since 2026-10-09 (catalog reality check).
+    expect(names).toContain("4/0-4/0-2/0 SEU Aluminum");
     expect(names).toContain("4/0-4/0-4/0-2/0 SER Aluminum");
     expect(names.filter(n => /^4\/0-3 SER/i.test(n))).toEqual([]);
   });
@@ -396,19 +404,27 @@ describe("alias hygiene across the whole catalog", () => {
     // (named after the plain row, third answers: "6" canless wafer LED
     // downlight, slim"), and no wafer, disc or retrofit-trim name carrying
     // two sizes — the plain 5"/6" disc and trim were split the same day.
+    //
+    // The VARIANTS changed on 2026-10-09 (catalog reality check, owner-
+    // approved): slim and wet rated went into the plain wafer of the same
+    // size, and the 2" and 8" gimbal into theirs. No SIZE went — the batch-2
+    // line retiring the 5" is held against the decision above.
     const names = new Set(BASELINE_MATERIALS.map(m => m.name));
     for (const s of ['2"', '3"', '4"', '5"', '6"', '8"']) {
       expect(names.has(`${s} canless wafer LED downlight`), s).toBe(true);
-      for (const v of ["CCT selectable", "gimbal", "slim", "wet rated"])
-        expect(
-          names.has(`${s} canless wafer LED downlight, ${v}`),
-          `${s} ${v}`
-        ).toBe(true);
+      expect(
+        names.has(`${s} canless wafer LED downlight, CCT selectable`),
+        `${s} CCT`
+      ).toBe(true);
     }
+    for (const s of ['3"', '4"', '5"', '6"'])
+      expect(names.has(`${s} canless wafer LED downlight, gimbal`), s).toBe(
+        true
+      );
     const wafers = BASELINE_MATERIALS.filter(m => /wafer/.test(m.name)).map(
       m => m.name
     );
-    expect(wafers).toHaveLength(30);
+    expect(wafers).toHaveLength(16);
     const folded = BASELINE_MATERIALS.filter(m =>
       /wafer|disc light|retrofit trim/.test(m.name)
     ).filter(m => /"\/\d/.test(m.name));
@@ -440,29 +456,41 @@ describe("alias hygiene across the whole catalog", () => {
     }
   });
 
-  it("sizes crimp lugs by conductor range, not per gauge", () => {
+  it("sizes crimp lugs one size per row", () => {
+    // REVERSED 2026-10-09 (catalog reality check, owner-approved, batch 1
+    // and 2): a range row ("2/0-4/0") does not name a part a supply house
+    // sells — a compression lug is ONE conductor size — so each range row
+    // became its largest size, in place, and the other sizes are new rows.
+    // The 2026-09-25 note below (per-gauge rows retired for ranges) is the
+    // decision this one overrides; server/seed/materials/index.ts says so.
     // "includes", not "endsWith": the 500 kcmil lug carries a qualifier after
     // a comma (connectors.ts), and a filter it slipped past would let this
     // list look complete without it.
     const lugs = BASELINE_MATERIALS.filter(m =>
       m.name.includes("crimp lug")
     ).map(m => m.name);
-    expect(lugs).toEqual([
-      "14-10 AWG crimp lug",
-      "8-6 AWG crimp lug",
-      "4-2 AWG crimp lug",
-      "1-1/0 AWG crimp lug",
-      "2/0-4/0 AWG crimp lug",
-      // Added 2026-09-25: the 350 kcmil lugs from the pricing sheet had no
-      // range to fold into once the per-size kcmil lugs were retired.
-      "250-350 kcmil crimp lug",
-      // Added 2026-09-26: single sizes, because above 350 kcmil that is how
-      // a compression lug is sold (sources in connectors.ts). The 500 has a
-      // qualifier because "500 kcmil crimp lug" is a retired name, and the
-      // 400 was renamed to match it.
-      "400 kcmil crimp lug, single size",
-      "500 kcmil crimp lug, single size",
-    ]);
+    expect([...lugs].sort()).toEqual(
+      [
+        "#8 AWG crimp lug",
+        "#6 AWG crimp lug",
+        "#4 AWG crimp lug",
+        "#3 AWG crimp lug",
+        "#2 AWG crimp lug",
+        "#1 AWG crimp lug",
+        "1/0 AWG crimp lug",
+        "2/0 AWG crimp lug",
+        "3/0 AWG crimp lug",
+        "4/0 AWG crimp lug",
+        "250 kcmil crimp lug, single size",
+        "350 kcmil crimp lug, single size",
+        // Single sizes since 2026-09-26; the 500 has its qualifier because
+        // "500 kcmil crimp lug" is a retired name.
+        "400 kcmil crimp lug, single size",
+        "500 kcmil crimp lug, single size",
+      ].sort()
+    );
+    // No range is left: "14-10" went into the yellow ring terminal.
+    expect(lugs.filter(n => /\d-\d|-\d+\/0|\d-#?\d/.test(n))).toEqual([]);
   });
 
   it("never lists a retired name as a current material", () => {
@@ -508,14 +536,14 @@ describe("searching the enlarged catalog", () => {
     // These are the searches that mattered before the catalog grew twentyfold.
     // Growth is exactly what breaks them, so they are pinned.
     expectHit("1900", '4" square box, 1-1/2" deep');
-    expectHit("gem box", "Single-gang box");
+    expectHit("gem box", "Single-gang new work box, plastic, 18 cu in");
     expectHit("romex", "12/2 NM-B Copper");
     // The dash spelling the cable was named in until 2026-10-07 — and still
     // the way plenty of people type it — finds the renamed row.
     expectHit("12-2 romex", "12/2 NM-B Copper", 3);
     expectHit("12-2", "12/2 NM-B Copper");
-    expectHit("plug", "Duplex receptacle");
-    expectHit("gfi", "GFCI receptacle");
+    expectHit("plug", "15A duplex receptacle");
+    expectHit("gfi", "15A GFCI receptacle");
     expectHit("marrette", "Wire nut, 22-8 AWG (tan/red)");
     expectHit("spring nut", "Strut channel nut");
     expectHit("thinwall", '1/2" EMT');
@@ -544,7 +572,8 @@ describe("searching the enlarged catalog", () => {
     // a query that names the LB.
     expectHit("tee body", '1/2" EMT T conduit body');
     expectHit("3/4 rigid tee", '3/4" rigid conduit T conduit body', 3);
-    expectHit("crouse hinds tee", '1/2" rigid conduit T conduit body');
+    // "crouse hinds" left the rigid T body on 2026-10-09: a brand, on a
+    // commodity part (catalog reality check, batch 2).
     expect(search("lb", 1)[0]).toMatch(/LB conduit body$/);
     expectHit("mcm", "500 kcmil THHN Copper");
     // 4" and 6" are separate rows since 2026-10-07 (owner); each size finds
@@ -554,8 +583,8 @@ describe("searching the enlarged catalog", () => {
     expectHit("4 wafer", '4" canless wafer LED downlight');
     expectHit('5"/6" wafer', '6" canless wafer LED downlight', 3);
     expectHit("bx", "12/2 MC cable Copper");
-    expectHit("3-4 mc", "#3 4-conductor MC cable Copper", 3);
-    expectHit("acorn", "Ground rod clamp");
+    expectHit("3-4 mc", "3/4 MC cable Copper", 3);
+    expectHit("acorn", 'Ground rod clamp, 5/8", direct burial');
     expectHit("driven electrode", 'Ground rod, 5/8" x 8 ft');
     expectHit("wago", "Lever wire connector, 2-port");
     expectHit("tapcon", "Masonry screw");
@@ -566,7 +595,7 @@ describe("searching the enlarged catalog", () => {
   it("ranks the item a query names above anything merely aliased to it", () => {
     // The "recep" regression, re-pinned at the new scale: a device must not be
     // outranked by something that only mentions it in passing.
-    expect(search("recep", 1)[0]).toBe("Duplex receptacle");
+    expect(search("recep", 1)[0]).toBe("15A duplex receptacle");
     expect(search("wall plate", 1)[0]).toBe("Wall plate");
     expect(search("ground rod", 1)[0]).toBe('Ground rod, 5/8" x 8 ft');
   });
@@ -575,7 +604,7 @@ describe("searching the enlarged catalog", () => {
     // An estimator's "plug" is a receptacle. The expectHit above only asks
     // for the top eight, and a Cat6 RJ45 end first built as "Cat6 plug" took
     // the top spot while passing it (2026-09-29, starter assemblies plan).
-    expect(search("plug", 1)[0]).toBe("Duplex receptacle");
+    expect(search("plug", 1)[0]).toBe("15A duplex receptacle");
   });
 
   it("ranks a product above its own accessories", () => {
@@ -588,7 +617,7 @@ describe("searching the enlarged catalog", () => {
 
   it("keeps solid and stranded 10 AWG distinguishable", () => {
     const hits = search("10 thhn", 4);
-    expect(hits).toContain("#10 THHN Copper");
+    expect(hits).toContain("#10 THHN solid Copper");
     expect(hits).toContain("#10 THHN stranded Copper");
   });
 
@@ -1091,9 +1120,9 @@ describe("breakers", () => {
       "50A 2-Pole GFCI breaker",
       "60A 2-Pole GFCI breaker",
       "20A 2-Pole AFCI breaker",
-      "30A 2-Pole AFCI breaker",
       "20A 2-Pole AFCI/GFCI combo breaker",
-      "30A 2-Pole AFCI/GFCI combo breaker",
+      // The 30A two-pole AFCI and AFCI/GFCI combo were retired 2026-10-09:
+      // no line stocks them (catalog reality check, batch 2).
     ];
     for (const name of required) {
       expect(named(name), `${name} missing`).toBeDefined();
@@ -1122,8 +1151,12 @@ describe("the Panels / Breakers split", () => {
   });
 
   it("puts every breaker on Breakers", () => {
+    // A "main-breaker panel" (the panel table, 2026-10-09) is a panel.
     const strays = BASELINE_MATERIALS.filter(
-      m => /breaker/i.test(m.name) && m.category !== "Breakers"
+      m =>
+        /breaker/i.test(m.name) &&
+        !/main-breaker panel/.test(m.name) &&
+        m.category !== "Breakers"
     );
     expect(strays.map(s => s.name)).toEqual([]);
   });
@@ -1131,11 +1164,11 @@ describe("the Panels / Breakers split", () => {
   it("puts panels, meter bases and disconnects on Panels", () => {
     const panels = inCategory("Panels");
     for (const name of [
-      "200A main panel",
-      "200A main-lug sub-panel",
+      "200A main-breaker panel, 40-space, indoor",
+      "200A main-lug panel, 30-space, indoor",
       "200A meter base",
-      "60A fused disconnect, NEMA 1",
-      "60A fused disconnect, NEMA 3R",
+      "60A fused disconnect, NEMA 1, 240V",
+      "60A fused disconnect, NEMA 3R, 240V",
       "60A non-fused pullout disconnect",
       "50A GFCI spa disconnect",
     ]) {
@@ -1146,8 +1179,9 @@ describe("the Panels / Breakers split", () => {
   it("keeps fuses with the disconnects they go in, not with breakers", () => {
     // A fuse goes in a fused disconnect, not a load center. Splitting the pair
     // across two shelves would separate two rows that are always bought together.
-    expect(inCategory("Panels")).toContain("60A cartridge fuse");
-    expect(inCategory("Breakers")).not.toContain("60A cartridge fuse");
+    const fuse = "60A 250V Class RK5 cartridge fuse";
+    expect(inCategory("Panels")).toContain(fuse);
+    expect(inCategory("Breakers")).not.toContain(fuse);
   });
 });
 

@@ -483,10 +483,12 @@ describe.skipIf(!hasDb)("default quantities", () => {
     const materials = await caller().materials.list();
     // A default of 1 is the absence of an opinion, expressed as NULL.
     expect(
-      materials.find(m => m.name === "Duplex receptacle")?.defaultQty
+      materials.find(m => m.name === "15A duplex receptacle")?.defaultQty
     ).toBeNull();
     expect(
-      materials.find(m => m.name === "200A main panel")?.defaultQty
+      materials.find(
+        m => m.name === "200A main-breaker panel, 40-space, indoor"
+      )?.defaultQty
     ).toBeNull();
   });
 });
@@ -498,7 +500,9 @@ describe.skipIf(!hasDb)("recently used materials", () => {
 
   it("lists the most recently used first, without repeats", async () => {
     const materials = await caller().materials.list();
-    const box = materials.find(m => m.name === "Single-gang box")!;
+    const box = materials.find(
+      m => m.name === "Single-gang new work box, plastic, 18 cu in"
+    )!;
     const nuts = materials.find(
       m => m.name === "Wire nut, 22-8 AWG (tan/red)"
     )!;

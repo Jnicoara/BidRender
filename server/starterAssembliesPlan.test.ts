@@ -24,6 +24,7 @@ import {
   RENAMED_BASELINE_MATERIALS,
 } from "./seed/materials";
 import { mcFittingNames } from "../shared/runFittingMaterials";
+import { REALITY_RETIRED_INTO } from "../shared/catalogRealityCheck20261009";
 
 const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
 const plan = readFileSync(
@@ -43,11 +44,15 @@ describe("the starter assemblies plan", () => {
       new Set(Array.from(tables.matchAll(/`([^`]+)`/g), match => match[1]))
     );
     expect(named.length).toBeGreaterThan(250);
-    expect(
-      named.filter(
-        name => !shipped.has(RENAMED_BASELINE_MATERIALS[name] ?? name)
-      )
-    ).toEqual([]);
+    //
+    // And a part RETIRED since (the catalog reality check, 2026-10-09)
+    // resolves to the row that took its job — the row the seed repoints the
+    // starter to ("Floor box cover" -> "Floor box cover, duplex").
+    const resolve = (name: string) => {
+      const now = RENAMED_BASELINE_MATERIALS[name] ?? name;
+      return REALITY_RETIRED_INTO[now] ?? now;
+    };
+    expect(named.filter(name => !shipped.has(resolve(name)))).toEqual([]);
   });
 
   // Surface raceway was the last ‡ part; DV34 loaded on 2026-10-08 once its
@@ -78,7 +83,10 @@ const GAP_ROWS: Array<[string, string]> = [
 
 describe("the rows built for the plan's gaps", () => {
   it.each(GAP_ROWS)("%s ships, unpriced, on %s", (name, category) => {
-    const row = BASELINE_MATERIALS.find(m => m.name === name);
+    // Under today's name ("Roof flashing boot" is the pipe flashing boot,
+    // adjustable split, since 2026-10-09).
+    const now = RENAMED_BASELINE_MATERIALS[name] ?? name;
+    const row = BASELINE_MATERIALS.find(m => m.name === now);
     expect(row?.category).toBe(category);
     expect(Number(row?.costPerUnit)).toBe(0);
     expect(row?.searchAliases.length).toBeGreaterThan(0);

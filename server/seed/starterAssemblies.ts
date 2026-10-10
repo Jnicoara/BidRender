@@ -1119,7 +1119,9 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     p("1-1-4in-flexible-metal-conduit-connector", 4),
     p("ground-lug-compression", 2),
     p("no4-bare-cu-stranded", 20),
-    p("trapeze-hanger-kit", 1),
+    // The kit was a strut channel (catalog reality check, batch 1): one 4 ft
+    // trapeze under the transformer is 0.4 of a 10 ft stick.
+    p("trapeze-hanger-kit", 0.4),
     p("1-2in-all-thread-rod-10-ft", 2),
   ]),
   starter("PG17", "Safety switch, 100A fused", "Panels", "both", [
@@ -1514,7 +1516,10 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     "General",
     "commercial",
     [
-      p("trapeze-hanger-kit", 1),
+      // The kit was a strut channel (catalog reality check, batch 1): a
+      // 3 ft trapeze is 0.3 of a 10 ft stick; the rod, clamps and hardware
+      // were always lines of their own.
+      p("trapeze-hanger-kit", 0.3),
       p("3-8in-all-thread-rod-10-ft", 1),
       p("beam-clamp", 2),
       p("3-8in-hex-nut", 4),
@@ -1611,6 +1616,10 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     here. Two places this differs from the draft, both on purpose:
     - GR3 uses the 320A meter base. The draft used `400A meter base` only
       "until it is in the catalog"; it now is.
+      SUPERSEDED 2026-10-09: the catalog reality check (batch 1, owner-
+      approved, GR3 named) found the 320A and 400A bases are ONE product (a
+      CL320 base is sold as 400A); 320A retired into 400A, and GR3's key now
+      resolves to "400A meter base" (starterParts.ts).
     - GR2 and GR5 leave out Underground warning tape. The draft gave it 1,
       but the catalog sells it by the FOOT, so 1 would buy one foot of tape
       for a whole trench. Its length is the trench's, which the traced run
@@ -1774,9 +1783,9 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     - CK21 and CK23 add the box, plate and receptacle the document's parts
       list implies but does not name (a switch needs a box; a recessed TV
       box needs a receptacle in it).
-    - CW3 and CW11 leave out the label the document names: the catalog has
-      no emergency-disconnect or EV-ready label (listed for the owner in
-      todo.md). CW9 sits on the pole anchor kit and concrete pole base, the
+    - CW3 and CW11 carry the label the document names since 2026-10-09
+      (owner; the catalog reality check added both rows). Until then they
+      left it out, as the catalog had neither. CW9 sits on the pole anchor kit and concrete pole base, the
       only base rows the catalog carries.
   */
   starter(
@@ -2119,6 +2128,7 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
       p("200a-non-fused-disconnect-nema-3r", 1),
       p("4-0-4-0-4-0-2-0-ser-al", 10),
       p("2in-se-cable-connector", 2),
+      p("emergency-disconnect-label", 1),
     ]
   ),
   starter(
@@ -2217,6 +2227,7 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
       p("4-11-16in-square-blank-cover", 1),
       p("1in-emt", 10),
       p("1in-emt-set-screw-connector", 2),
+      p("ev-ready-label", 1),
     ]
   ),
   starter("CW12", "Multi-unit meter center", "Panels", "both", [

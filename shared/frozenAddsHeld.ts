@@ -103,10 +103,9 @@ export const FROZEN_ADDS_NOT_SEEDED: Readonly<Record<string, HeldAdd>> = {
     kind: "duplicate",
     why: 'Ships as "2" meter hub" — power.ts says so where it is defined.',
   },
-  "T-bar box hanger": {
-    kind: "duplicate",
-    why: 'Ships as "Grid box bracket" (search words "t-bar ceiling box hanger"; boxes.ts names it the T-bar version).',
-  },
+  // "T-bar box hanger" was held here as a duplicate of "Grid box bracket"
+  // until 2026-10-09, when the catalog reality check renamed that row to
+  // this name in place: the frozen add now ships as itself.
   "60A Single-Pole breaker": QO_ONLY,
   "70A Single-Pole breaker": QO_ONLY,
   "Surface raceway cover, 700 series": {

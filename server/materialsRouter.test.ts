@@ -42,7 +42,7 @@ const caller = () => appRouter.createCaller(ctxFor(USER));
 const otherCaller = () => appRouter.createCaller(ctxFor(OTHER_USER));
 
 /** A baseline material guaranteed to exist, used across the fork/revert tests. */
-const BASELINE_NAME = "GFCI receptacle";
+const BASELINE_NAME = "15A GFCI receptacle";
 
 /**
  * Read the baseline row straight from the table rather than through

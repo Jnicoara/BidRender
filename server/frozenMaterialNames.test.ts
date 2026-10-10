@@ -33,6 +33,10 @@ import {
   CATALOG_REVIEW_RENAMES,
   CATALOG_REVIEW_RETIRED,
 } from "../shared/catalogReview20261008";
+import {
+  REALITY_RETIRED,
+  REALITY_RETIRED_INTO,
+} from "../shared/catalogRealityCheck20261009";
 
 const shippedNames = BASELINE_MATERIALS.map(m => m.name);
 const shipped = new Set(shippedNames);
@@ -46,6 +50,19 @@ const shipped = new Set(shippedNames);
 */
 const reviewRetired = new Set(CATALOG_REVIEW_RETIRED);
 
+/*
+  And the catalog reality check (2026-10-09) after that: it renamed frozen
+  names again (followed through latestCatalogName) and retired others into
+  the row that took their job — each by name, in
+  shared/catalogRealityCheck20261009.ts.
+*/
+const realityRetired = new Set([
+  ...Object.keys(REALITY_RETIRED_INTO),
+  ...REALITY_RETIRED,
+]);
+const retiredSince = (name: string) =>
+  reviewRetired.has(name) || realityRetired.has(name);
+
 describe("the frozen names (2026-10-07)", () => {
   it("are generated from pricing/frozen-names.json, unchanged", () => {
     expect(FROZEN_RENAMES_2026_10_07).toEqual(frozenJson.renames);
@@ -54,7 +71,8 @@ describe("the frozen names (2026-10-07)", () => {
   it("are what the seed files ship — as the catalog review left them", () => {
     const missing = FROZEN_RENAMES_2026_10_07.filter(
       r =>
-        !shipped.has(latestCatalogName(r.final)) && !reviewRetired.has(r.final)
+        !shipped.has(latestCatalogName(r.final)) &&
+        !retiredSince(latestCatalogName(r.final))
     );
     const stillOld = FROZEN_RENAMES_2026_10_07.filter(r =>
       shipped.has(r.current)
@@ -104,11 +122,14 @@ describe("the frozen ADDS (2026-10-07)", () => {
   it("are each shipped, or listed as held with a reason — never silently dropped", () => {
     const unaccounted = adds
       .map(a => a.name)
-      .filter(
-        name =>
-          !shipped.has(FROZEN_ADDS_SHIPPED_AS[name] ?? name) &&
+      .filter(name => {
+        const now = latestCatalogName(FROZEN_ADDS_SHIPPED_AS[name] ?? name);
+        return (
+          !shipped.has(now) &&
+          !retiredSince(now) &&
           !(name in FROZEN_ADDS_NOT_SEEDED)
-      );
+        );
+      });
     expect(unaccounted).toEqual([]);
   });
 
@@ -120,34 +141,60 @@ describe("the frozen ADDS (2026-10-07)", () => {
     }
     for (const [from, to] of Object.entries(FROZEN_ADDS_SHIPPED_AS)) {
       expect(frozen.has(from), from).toBe(true);
-      expect(shipped.has(to), to).toBe(true);
+      const now = latestCatalogName(to);
+      expect(shipped.has(now) || retiredSince(now), now).toBe(true);
     }
   });
 
-  it("measured 2026-10-09: 153 adds = 123 shipped + 8 duplicates + 2 declined + 20 retired", () => {
-    // 124 -> 123 on 2026-10-09: the 500 cover was retired the same way as
-    // 700's (owner; sch80-and-500-plan.md § 2a). The 500 base still counts
-    // as shipped, renamed to "Surface raceway, 500 series".
-    //
-    // 142 -> 124 later on 2026-10-08: the owner's catalog review withdrew
-    // every 3-1/2" row, 18 of them frozen adds (now `retired`).
-    // 86 shipped on the first pass and 59 were held; the owner's second
-    // answers shipped 57 of them and declined 2. If this count moves, a row
-    // was seeded, held or dropped since — find out which before trusting the
-    // summary in materials-review-sheet-plan.md.
-    //
-    // 143 -> 142 on 2026-10-08: the 700 cover was retired (owner; 700 is
-    // one-piece raceway, per-foot-items-plan.md § 3c). The 700 base still
-    // counts as shipped, renamed to "Surface raceway, 700 series".
-    const held = Object.values(FROZEN_ADDS_NOT_SEEDED);
+  it("measured 2026-10-09, after the catalog reality check: 153 adds = 72 + 16 + 36 + 29", () => {
+    // 72 ship under their frozen name (or FROZEN_ADDS_SHIPPED_AS), 16 under a
+    // name the catalog reality check gave them, 36 were retired by it into
+    // the row that took their job, and 29 are held (7 duplicates — "T-bar box
+    // hanger" left the list when it began shipping as itself — 2 declined, 20
+    // retired by the 2026-10-08 review). If what this prints does not match,
+    // stop and find out why: either this line is stale or a row was seeded,
+    // renamed, retired or dropped since.
+    const asNow = (name: string) =>
+      latestCatalogName(FROZEN_ADDS_SHIPPED_AS[name] ?? name);
+    const heldNow = Object.values(FROZEN_ADDS_NOT_SEEDED);
     expect(adds).toHaveLength(153);
-    expect(held.filter(h => h.kind === "duplicate")).toHaveLength(8);
-    expect(held.filter(h => h.kind === "declined")).toHaveLength(2);
-    expect(held.filter(h => h.kind === "retired")).toHaveLength(20);
+    expect(heldNow.filter(h => h.kind === "duplicate")).toHaveLength(7);
+    expect(heldNow.filter(h => h.kind === "declined")).toHaveLength(2);
+    expect(heldNow.filter(h => h.kind === "retired")).toHaveLength(20);
     expect(
       adds.filter(a => shipped.has(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name))
-    ).toHaveLength(123);
+    ).toHaveLength(72);
+    expect(
+      adds.filter(
+        a =>
+          !shipped.has(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name) &&
+          shipped.has(asNow(a.name))
+      )
+    ).toHaveLength(16);
+    expect(adds.filter(a => realityRetired.has(asNow(a.name)))).toHaveLength(
+      36
+    );
   });
+
+  /*
+    THE HISTORY of the count above, before the catalog reality check:
+    "153 adds = 123 shipped + 8 duplicates + 2 declined + 20 retired".
+
+    124 -> 123 on 2026-10-09: the 500 cover was retired the same way as
+    700's (owner; sch80-and-500-plan.md § 2a). The 500 base still counts
+    as shipped, renamed to "Surface raceway, 500 series".
+
+    142 -> 124 later on 2026-10-08: the owner's catalog review withdrew
+    every 3-1/2" row, 18 of them frozen adds (now `retired`).
+    86 shipped on the first pass and 59 were held; the owner's second
+    answers shipped 57 of them and declined 2. If this count moves, a row
+    was seeded, held or dropped since — find out which before trusting the
+    summary in materials-review-sheet-plan.md.
+
+    143 -> 142 on 2026-10-08: the 700 cover was retired (owner; 700 is
+    one-piece raceway, per-foot-items-plan.md § 3c). The 700 base still
+    counts as shipped, renamed to "Surface raceway, 700 series".
+  */
 });
 
 describe("the shipped run types", () => {

@@ -203,9 +203,9 @@ async function scenario() {
     label: `No wire EMT ${Date.now()}${Math.random()}`,
     pathType: "conduit",
     racewayMaterialId: id('1/2" EMT'),
-    conductorMaterialId: id("#12 THHN Copper"),
+    conductorMaterialId: id("#12 THHN solid Copper"),
     conductorCount: 2,
-    groundMaterialId: id("#12 THHN green Copper"),
+    groundMaterialId: id("#12 THHN green solid Copper"),
     groundCount: 1,
   });
   const trace = (traceMode?: "quantity", runTypeId: number = type.id) =>

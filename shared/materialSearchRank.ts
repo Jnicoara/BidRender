@@ -627,6 +627,19 @@ export function phraseTier(name: string, query: string): PhraseTier {
   if (q.includes(" ") && (n + " ").startsWith(q + " ")) {
     return PHRASE.STARTS_WITH;
   }
+  /*
+    A description that STARTS WITH A COUNT — "3 way", "4 way" — starts a
+    rated row after its rating. Since the catalog reality check (2026-10-09)
+    the plain devices say their amperage ("15A 3-way switch"), and without
+    this "3 way" started only "3-way dimmer", which then led the switch.
+    Only for a query led by a number: "main breaker" must not start "200A
+    main-breaker panel" ahead of the main breakers themselves.
+  */
+  if (/^\d/.test(q) && q.includes(" ")) {
+    const unrated = n.replace(/^\d+a /, "");
+    if (unrated !== n && (unrated + " ").startsWith(q + " "))
+      return PHRASE.STARTS_WITH;
+  }
   return PHRASE.NONE;
 }
 

@@ -403,7 +403,9 @@ describe("the searches that must not regress, against the shipped catalog", () =
   });
 
   it("still answers a named part with that part, not its family", () => {
-    expect(top("pvc connector")[0]).toContain("connector");
+    // The PVC connector is the shared terminal adapter since 2026-10-09
+    // ("connector" is its search word): still the part, not the family.
+    expect(top("pvc connector")[0]).toMatch(/connector|terminal adapter/);
     expect(top("emt coupling")[0]).toContain("coupling");
     // The unsized "EMT strap" was retired 2026-10-08; a sized one leads.
     expect(top("emt strap")[0]).toMatch(/^1\/2" EMT (one|two)-hole strap$/);
@@ -453,6 +455,13 @@ describe("an old name finds the row it was renamed to, first", () => {
     // Reads as the fraction five-sixths and finds nothing — todo.md,
     // "5/6" wafer LED downlight (the old spelling) reads as a fraction".
     '5/6" wafer LED downlight': "size parsing",
+    // The old name names a SIZE the row is not (catalog reality check,
+    // 2026-10-09): the triple-gang box became the stocked 3/4" one, and the
+    // 1-1/4" strut the real 7/8" (P3300). A 1/2" or 1-1/4" search must not
+    // find them, so the old spelling, which carries that size, cannot.
+    '1/2" weatherproof box, triple-gang': "names a size the row is not",
+    "Weatherproof box, triple-gang": "names a size the row is not",
+    '1-5/8" x 1-1/4" strut channel, 10 ft': "names a size the row is not",
   };
 
   const shipped = new Set(BASELINE_MATERIALS.map(m => m.name));
@@ -484,8 +493,8 @@ describe("an old name finds the row it was renamed to, first", () => {
 
   it('"30A fused disconnect" goes to NEMA 3R, the outdoor row, over NEMA 1', () => {
     const hits = ranked("30A fused disconnect");
-    expect(hits[0]).toBe("30A fused disconnect, NEMA 3R");
-    expect(hits).toContain("30A fused disconnect, NEMA 1");
+    expect(hits[0]).toBe("30A fused disconnect, NEMA 3R, 240V");
+    expect(hits).toContain("30A fused disconnect, NEMA 1, 240V");
   });
 
   it("typed loosely — lower case, no inch mark — it still counts", () => {
@@ -546,7 +555,7 @@ describe("conduit bodies: the LB for the generic words, each shape by name", () 
     // A one-letter shape code, finished (plan § 7, L1): smartSearch's
     // finishedLetter rule, which is what lets the C be asked for at all.
     ["c body", '1/2" EMT C conduit body'],
-    ["2 pvc c body", '2" PVC Sch 40 C conduit body'],
+    ["2 pvc c body", '2" PVC Sch 40/80 C conduit body'],
     ["t body", '1/2" EMT T conduit body'],
   ])('"%s" leads with %s', (query, expected) => {
     expect(first(query)).toBe(expected);
@@ -660,25 +669,33 @@ describe("a count before its noun matches that count, never a size", () => {
   };
 
   it('"2 gang box" has Double-gang box in its top five', () => {
-    expect(ranked("2 gang box")).toContain("Double-gang box");
+    expect(ranked("2 gang box")).toContain(
+      "Double-gang new work box, plastic, 32 cu in"
+    );
   });
 
   it.each([
     // Wrong before.
-    ["1 gang box", "Single-gang box"],
-    ["2 gang box", "Double-gang box"],
-    ["3 hole", '1/2" weatherproof box, single-gang'],
+    ["1 gang box", "Single-gang new work box, plastic, 18 cu in"],
+    ["2 gang box", "Double-gang new work box, plastic, 32 cu in"],
+    ["3 hole", '1/2" weatherproof box, single-gang, 2" deep'],
     ["2 pole 20", "20A 2-Pole breaker"],
     ["2 pole", "20A 2-Pole breaker"],
     ["2 hole strap", '1/2" EMT two-hole strap'],
     // Right before, and must stay right.
-    ["3 way", "3-way switch"],
-    ["4 gang", "4-gang box"],
+    ["3 way", "15A 3-way switch"],
+    ["4 gang", "4-gang new work box, plastic, 60 cu in"],
     ["1 hole strap", '1/2" EMT one-hole strap'],
     ["3 pole 60", "60A 3-Pole breaker"],
-    ["42 space", "200A main panel, 42-space"],
   ])('"%s" leads with %s', (query, expected) => {
     expect(ranked(query)[0]).toBe(expected);
+  });
+
+  // A COUNT, not a size: every 42-space panel answers, and which leads is
+  // commonness. The 200A row it named was renamed and the bare 200A panel
+  // retired on 2026-10-09, so the test asks only that a 42-space row leads.
+  it('"42 space" leads with a 42-space panel', () => {
+    expect(ranked("42 space")[0]).toMatch(/42-space/);
   });
 
   /*
@@ -690,7 +707,9 @@ describe("a count before its noun matches that count, never a size", () => {
   const kindOf = (name: string): "box" | "ring" | "plate" | "other" =>
     / box\b/i.test(` ${name}`)
       ? "box"
-      : /mud ring/i.test(name)
+      : // The low-voltage mud ring is a mounting bracket since 2026-10-09
+        // (nothing is SOLD as a low-voltage mud ring) — the same job.
+        /mud ring|low-voltage mounting bracket/i.test(name)
         ? "ring"
         : /\bplate\b/i.test(name)
           ? "plate"
@@ -709,9 +728,9 @@ describe("a count before its noun matches that count, never a size", () => {
   });
 
   it.each([
-    ["1 gang", "Single-gang box"],
-    ["2 gang", "Double-gang box"],
-    ["3 gang", "Triple-gang box"],
+    ["1 gang", "Single-gang new work box, plastic, 18 cu in"],
+    ["2 gang", "Double-gang new work box, plastic, 32 cu in"],
+    ["3 gang", "Triple-gang new work box, plastic, 46 cu in"],
   ])('"%s" leads with %s', (query, expected) => {
     expect(ranked(query)[0]).toBe(expected);
   });
@@ -735,9 +754,9 @@ describe("a count before its noun matches that count, never a size", () => {
     "2 gang".
   */
   it.each([
-    ["2-gang", "Double-gang box"],
-    ["1-gang", "Single-gang box"],
-    ["2-gang box", "Double-gang box"],
+    ["2-gang", "Double-gang new work box, plastic, 32 cu in"],
+    ["1-gang", "Single-gang new work box, plastic, 18 cu in"],
+    ["2-gang box", "Double-gang new work box, plastic, 32 cu in"],
     ["1-hole strap", '1/2" EMT one-hole strap'],
   ])('"%s" leads with %s', (query, expected) => {
     expect(ranked(query)[0]).toBe(expected);

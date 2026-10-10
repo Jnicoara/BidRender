@@ -118,10 +118,10 @@ describe("the 700 surface raceway", () => {
     expect(t).toMatchObject({
       pathType: "conduit",
       racewayMaterialName: RACEWAY_700,
-      conductorMaterialName: "#12 THHN Copper",
+      conductorMaterialName: "#12 THHN solid Copper",
       conductorCount: 2,
       groundCount: 1,
-      groundMaterialName: "#12 THHN green Copper",
+      groundMaterialName: "#12 THHN green solid Copper",
     });
     expect(t?.extras ?? []).toEqual([]);
     expect(byName.get(RACEWAY_700)?.unitOfSale).toBe("foot");
@@ -169,7 +169,11 @@ describe("the 700 surface raceway", () => {
       "support clip",
     ];
     for (const part of parts) {
-      const name = `Surface raceway ${part}, 700 series`;
+      // The tee and support clip are ONE row for 500 and 700 since
+      // 2026-10-09 (catalog reality check: V5715, V5703).
+      const name = ["tee", "support clip"].includes(part)
+        ? `Surface raceway ${part}, 500/700 series`
+        : `Surface raceway ${part}, 700 series`;
       const row = byName.get(name);
       expect(row, name).toBeDefined();
       expect(row!.unitOfSale, name).toBe("each");

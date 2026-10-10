@@ -216,7 +216,7 @@ describe.skipIf(!hasDb)("the starter cover repair", () => {
     expect(await recipeOf(ids.get("LT23")!)).toEqual(
       expect.arrayContaining([
         "Fixture hanging kit, aircraft cable|2.0000|false",
-        "Ceiling support wire|2.0000|false",
+        "12 ga ceiling hanger wire|2.0000|false",
       ])
     );
     expect(await linesOf(forkId)).toEqual(forkLines);

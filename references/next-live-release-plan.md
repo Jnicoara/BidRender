@@ -153,6 +153,51 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 5. **Example tags** (`migrations-next-batch.md` Batch 5) — the example
    rates never without `isExampleRate`, the shipped hours never without the
    hours tag; 0132–0134 after 0125–0131 in one step.
+6. **PVC Sch 40/80 fittings: Track A's seed and Track C's code ship
+   TOGETHER or not at all** (added 2026-10-09; the same pairing as Sch
+   80 / 500). The owner approved one row per size for PVC couplings,
+   terminal adapters and conduit bodies, shared by both schedules
+   (`catalog-reality-check.md`, batch-2 approval: Carlon and Cantex sell each
+   as one "Sch 40 and 80" part). Two halves:
+   - **A's seed:** rename the Sch 40 rows in place to
+     `{size} PVC Sch 40/80 coupling`, `… terminal adapter` (was
+     `… PVC Sch 40 connector`) and `… {LB|LL|LR|T|C} conduit body`, and
+     retire the Sch 80 rows into them, old names kept as search words. Use
+     `pvcSharedFittingName` from `shared/runFittingMaterials.ts` so the seed
+     and the lookup cannot spell it two ways. Also update the commonness
+     table's PVC LB keys (`shared/materialCommonness.ts`), which are keyed by
+     shipped name.
+   - **C's code** (`c-pvc-4080`): a run of EITHER schedule looks up those
+     shared names. Elbows and sweeps stay per schedule.
+   - **Either half alone is wrong, and loudly so, not silently.** Code
+     without the seed: every PVC run's connectors, couplings and LBs say
+     "No catalog match for 2" PVC Sch 40/80 …" in the Send preview (measured
+     on `bidrender_local_c`, 2026-10-09: Bar layout check's 2" PVC Sch 40
+     type; no other bid, and no total, moved). Seed without the code: the
+     lookup asks for `PVC Sch 40 connector` names that no longer exist, the
+     same blank. Neither prices anything wrong, and neither should ship.
+   - **Order:** A's seed lands on local-dev first. Then C merges local-dev
+     into `c-pvc-4080`, confirms `server/pvcSharedFittings.test.ts` finds the
+     SHIPPED rows (it inserts stand-ins only when they are missing), runs
+     the snapshot compare (`scripts/routerSnapshot.mts`) against the
+     pre-change code, expecting Bar's PVC preview to find the SAME material
+     ids as before (164, 165 locally: renamed in place, so only the names
+     differ) and nothing else to move, and only then merges. The release
+     candidate carries both halves or neither.
+   - **DONE TOGETHER, 2026-10-09 (Track A, `a-catalog-reality`):** C's
+     `460bd83` was merged INTO the branch that carries A's seed, so the two
+     halves reach local-dev in one merge and cannot arrive apart. On a
+     fresh database `pvcSharedFittings.test.ts` finds the shipped rows and
+     inserts nothing. The routerSnapshot compare on Bar is still Track C's
+     to run (it needs `bidrender_local_c`).
+7. **The catalog reality check (`a-catalog-reality`, 2026-10-09)** — 296
+   renames in place, 158 retirements, 50 adds; rehearsed on staging's copy
+   CLEAN, 959/959 bids unchanged
+   (`references/catalog-reality-check-build.md` § Rehearsal). Same release
+   steps as the catalog review: staging backup, rehearse on its restore,
+   push staging, then `repairStarterCovers` AND `repairStarterRetired` (§ 4c,
+   MUST-RUN) on staging. Owner 2026-10-09: the two held batch-2 lighting
+   lines are NOT applied; panels keep "main-breaker panel".
 
 **One bid number moves on purpose:** at the first boot the shipped field
 roles go from $0 to the example rates. Existing lines keep their frozen
@@ -193,6 +238,35 @@ either live changed since the copy (a company edited a starter, or the
 boot did not finish seeding) or this line is stale — find out which first.
 It writes only shared starter lines, so `bidTotals` after must still show
 every bid unchanged.
+
+## 4c. MUST-RUN release-day step: the reality-check starter repair
+
+**Owner, 2026-10-09: must run on staging and on live, right after § 4b.**
+The catalog reality check retired rows that 10 shipped starter lines point
+at, moved PG15 onto the new #3 lug, and added labels to CW3 and CW11. The
+seeder never edits a starter that exists, so on staging and live those
+starters keep the old lines until `scripts/repairStarterRetired.mts` runs
+(`server/starterRetiredRepair.ts`; build doc § "Existing databases").
+
+**When:** after the new code's first boot (it seeds the kept rows and the
+labels) and **after the cover repair** (§ 4b) — one cover starter also has a
+retired line, and the cover repair reports it "skipped: edited" until this
+one has run. Then `bidTotals` after.
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # report only
+ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts --apply
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # again: all "already has it"
+```
+
+**Expect on a database seeded before the check: `13 would repoint`** (PG1,
+DV33, DV34, RS13, PG15, PG16, PG20, DR2, MS5, GR3, CW3, CW4, CW11 — measured
+on staging's 2026-10-09 copy). A starter the database does not have yet is
+"skipped: not found" (live has fewer starters than staging). Any
+"skipped: edited" or "part not in catalog", or a different count, is a stop:
+either the database changed since it was measured, the boot did not finish,
+or this line is stale — find out which first. It writes only shared starter
+lines, so `bidTotals` after must still show every bid unchanged.
 
 ## 5. Check first — before the window
 
@@ -242,7 +316,7 @@ every bid unchanged.
 snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
    (it was 0 on 2026-10-07). Otherwise freeze first (`todo.md`
    "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE").
-4b. **Read-only check for the Legend-link race on live** (`44ede4f`):
+   4b. **Read-only check for the Legend-link race on live** (`44ede4f`):
    `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/legendLinkRaceCandidates.mts`.
    It prints CANDIDATES (a mark does not record which symbol placed it):
    "no candidates" ends it; any row means opening that bid's sheets and

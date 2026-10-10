@@ -134,7 +134,9 @@ const SCALE = {
  * troffers are feet) and nothing needs the two compared. What matters is that
  * 4x4 sorts before 12x12, which alphabetical order gets backwards.
  */
-const DIMENSION = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?=\s)/i;
+// An optional third — the depth, "6x6x4 pull box" (box-depth check,
+// 2026-10-09) — is read and set aside: the face size orders the shelf.
+const DIMENSION = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?:x\d+(?:\.\d+)?)?(?=\s)/i;
 
 /**
  * A size stated AFTER the name — "Bath exhaust fan, 50 CFM", "Ground rod,
@@ -422,8 +424,8 @@ const SIZE_PREFIXES: RegExp[] = [
   /^\d{1,4}\s*A\s+/,
   // Transformer rating — "15 kVA dry-type transformer".
   /^\d+(?:\.\d+)?\s*kVA\s+/i,
-  // Dimensions — "12x12 pull box" -> "pull box".
-  /^\d+(?:\.\d+)?x\d+(?:\.\d+)?\s+/i,
+  // Dimensions — "12x12 pull box", "12x12x4 pull box" -> "pull box".
+  /^\d+(?:\.\d+)?x\d+(?:\.\d+)?(?:x\d+(?:\.\d+)?)?\s+/i,
   // A size after the name — "Bath exhaust fan, 50 CFM" -> "Bath exhaust fan".
   TRAILING,
 ];

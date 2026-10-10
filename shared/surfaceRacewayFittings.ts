@@ -135,8 +135,16 @@ export function surfaceRacewayPartName(
   part: SurfaceRacewayPart,
   series: SurfaceRacewaySeries
 ): string {
+  // One clip (V5703) and one tee (V5715) fit both series: the 700 row was
+  // renamed in place to "500/700" and the 500 row retired into it (catalog
+  // reality check, batch 2, raceway — shared/catalogRealityCheck20261009.ts).
+  if (SHARED_500_700_PARTS.includes(part))
+    return `Surface raceway ${PART_NAME_WORDS[part]}, 500/700 series`;
   return `Surface raceway ${PART_NAME_WORDS[part]}, ${series} series`;
 }
+
+/** Parts one row serves for 500 and 700 alike. */
+const SHARED_500_700_PARTS: readonly SurfaceRacewayPart[] = ["clip", "tee"];
 
 /** A part as a pick needs it. */
 type Part = { id: number; name: string; costPerUnit: string | number };

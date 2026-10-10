@@ -3,6 +3,29 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Catalog reality check — BUILT 2026-10-09 (Track A), NOT on staging
+
+Batch 1 + batch 2 (owner's calls), the panel table (56 rows), the box
+decisions and two labels: 296 renames in place, 158 retired, 50 added,
+1,825 → 1,717 active. Rehearsed on staging's copy CLEAN, 959/959 bids
+unchanged. Full record: `references/catalog-reality-check-build.md`.
+
+- [x] **Owner, 2026-10-09: the two held batch-2 lighting lines are NOT
+      applied** — every wafer, canless, CCT-disc and LED retrofit trim size
+      stays its own row. **Panels keep "main-breaker panel".**
+- [ ] **Owner, optional lines not done** (build doc § "Lines NOT done"):
+      temp pole length, poke-through contents, floor heating mat size,
+      busway rating, the "confirm or retire" rows, filler-plate brands.
+- [x] **Starter repair BUILT** (owner): `scripts/repairStarterRetired.mts`,
+      13 shared starters, same guard as the cover repair. MUST-RUN on
+      staging and live after the cover repair (next-live-release-plan.md
+      § 4c).
+- [ ] **Track A, at the release:** staging backup → rehearse on its restore
+      → merge to local-dev (deploys staging) → `repairStarterCovers` →
+      `repairStarterRetired` → bidTotals.
+- [ ] Pricing sheets NOT rebuilt (owner). The next rebuild carries typed
+      values over by key, renamed items included.
+
 ## When the picker finds nothing — (a) and (b) BUILT 2026-10-09 (Track B)
 
 The two owner-approved before-beta items (track-c's todo.md § "Before beta:
