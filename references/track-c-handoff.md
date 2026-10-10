@@ -13,7 +13,70 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-10, latest) — baseline plan REWORKED to offers; audit of silent number moves
+## START HERE (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
+
+Both were found by the audit in `baseline-screen-plan.md` § 9. Both are
+fixed with no migration, a test that fails without the fix, and branch
+Gates green. They merged together, and the combined commit `8a593af` had
+its own green Gate before the push.
+
+**F9 — a removed scale came back when the sheet was viewed.** Branch
+`c-scale-cleared` (`67ee526`, Gate 38081790230 green; with local-dev
+merged, 38082668001).
+
+- `clearSheetScale` now stores `scaleSource = "manual"` with no ratio,
+  meaning "a person decided: no scale". It used to store "none". Detection
+  never overrides "manual", and the browser only asks for detection on
+  "none". Every footage path measures nothing without a ratio: all six
+  readers of `scaleSource` were read before choosing this.
+- **Test:** `server/sheetScalePersistence.test.ts` "a REMOVED scale stays
+  removed…" was red before the fix (1 failed) and green after.
+  `planSheets.test.ts` asserted `"none"` after a clear, which pinned the
+  fault; that line now says `"manual"` and explains why.
+- **Looked at on screen** (fixture bid 1164558 "Bar layout check", sheet
+  E0.01): after Clear, the control reads "Set scale", "0/5 scaled" and
+  "0 ft of runs (6 not measured)". The sheet still had no scale after
+  viewing it again. **Limit:** none of this fixture's five sheets reads a
+  CONFIDENT scale, so the screen check could not exercise detection
+  itself. The server test does that with the exact viewing call. Sheet
+  E0.01 was restored to its hand-set 3/16" scale, unchecked, and the bid
+  total is back at $378.15.
+
+**F10 — a hand-placed panel could re-match homeruns on the next sheet
+opened.** Branch `c-homerun-rematch` (`bbb5f85`, Gate 38082036734 green).
+
+- **REPRODUCED, at logic level, not in a browser.** No local bid has
+  circuit-tagged devices on two sheets (measured: one bid has circuits,
+  all on one sheet), so a two-sheet browser run could not be set up.
+  Steps taken:
+  1. Moved the page's sync decision, unchanged, into `homerunSyncStep`
+     (`client/src/lib/homerunSync.ts`).
+  2. Built the signatures with the real `syncSignature`.
+  3. Ran the sequence "sheet A synced → panel placed by hand, same leaving
+     devices → sheet B opened". On the OLD logic, sheet B's sync went out
+     with `rematch: true`, and the placement never re-matched sheet A at
+     all (2 tests red).
+- **Fix:** the re-match arm carries the SHEET id. Armed for this sheet:
+  send a re-match now, even if the report is unchanged. Any other sheet:
+  an ordinary visit (create only). Tests: 12 green.
+- **Still worth doing:** a browser check with a real two-sheet set that has
+  circuit tags, when one exists.
+
+**Local databases are BEHIND.** Track A added 0144 (`workTag`) and 0145
+(`bid_expenses.notes`), and `bidrender_test_c` and `bidrender_local_c` do
+not have them, so local DB-backed tests fail with "Unknown column
+'workTag'". Not applied here, because the owner said no migrations this
+session. Apply them (or reset from migrations) before the next local test
+run. GitHub's Gate is unaffected.
+
+**local-dev Gate 38083404900** on `95fb513` was pending when this was
+written. It deploys staging. Check it once.
+
+**Q-M5 is done by A** (0145, `bid_expenses.notes`). The job-cost tiles'
+working note can now be stored; that is C's next small piece
+(`quick-bid-plan.md` § 6).
+
+## EARLIER (2026-10-10, latest) — baseline plan REWORKED to offers; audit of silent number moves
 
 **`references/baseline-screen-plan.md` rewritten (plan only, no code).** The
 owner answered § 10 and changed the rule: a starter change must NEVER reach
