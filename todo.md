@@ -3234,6 +3234,19 @@ path is ever revived, give it the same treatment first.
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
       header this is a separate step-3 migration, now unblocked.
+      **2026-10-10 (A): NO step-3 pass is needed — there is nothing to fold.**
+      `scripts/twinCountCensus.mts` (read-only) on fresh copies: live 0,
+      staging 0, local 0 twin counts / marks / lines / assemblies (the only
+      "existing to remain" text anywhere is drawing notes in
+      `bid_pdf_sheet_text`). B's M1 SQL was therefore NOT written into
+      `drizzle/`. B's code half (`b-twin-fold`, per-count fold button +
+      Find all matching no longer making twins) merges as ordinary code.
+      Rehearsed with both B branches merged on the copies: 0 of 2 live and
+      0 of 1,148 staging bids move. **Still open:** re-run the census on
+      live just before the release that carries `b-twin-fold` (the OLD
+      "Count as existing" makes twins until then); if it is not 0, the bid
+      screen's per-count fold handles each, or write the one-off script
+      that calls `planTwinFold` + `db.foldTwinGroup` then.
 - [x] **DECIDED AND BUILT 2026-10-05: option C** — priced, with "Leave it
       off" on the run row (references/vertical-drops-plan.md § 4).
       **Decide: a RUN ending on an existing mark.** A run end can claim a

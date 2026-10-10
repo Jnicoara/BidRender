@@ -4,7 +4,39 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-10, session 29: pre-launch starter cleanup, WAITING ON THE OWNER
+## NOW — 2026-10-10, session 30: B's two branches unblocked (0144–0145 on staging)
+
+- **Twin census** (`scripts/twinCountCensus.mts`, read only) on fresh copies
+  (`live-2026-10-10T19-36-40Z-before-twin-fold.sql`,
+  `staging-2026-10-10T19-36-56Z-before-twin-fold.sql`, restored as
+  `bidrender_scratch_live` / `bidrender_scratch_staging`, 77/77 each):
+  **live 0, staging 0, local 0** twin counts, marks, lines, assemblies.
+  So **M1 is not needed** and no fold script was written (`todo.md` says
+  when that changes). B's fold code merges as ordinary code.
+- **0144 `bid_pdf_sheets.workTag`** (B's M2) and **0145
+  `bid_expenses.notes`** (C's Q-M5) — `e613723`, additive, `schema.ts`
+  declares both (the workTag hunk is byte-identical to `b-status-view`'s,
+  so B's merge brings no `drizzle/` diff; only `CHANGELOG.md` conflicts —
+  keep both sides).
+- **Rehearsed**: local-dev + `b-twin-fold` + `b-status-view` merged on the
+  migrated copies: `pnpm check` clean; **0 of 2 live / 0 of 1,148 staging
+  bids move** (JSONs `*-totals-{before,after}-twin-2026-10-10.json`).
+- **Applied**: local `bidrender_local` and `bidrender_test_localdev` (146);
+  **staging**: backup `staging-2026-10-10T19-54-14Z-before-0144-0145.sql`
+  (77/77 restore), 2 applied, 146, matches, 180/180, **1,156/1,156 bids
+  unchanged**. Record: `deploying.md` § "Staging: migrations 0144–0145".
+- **Local test note**: `starterAssembliesSeed` DV33 fails on
+  `bidrender_test_localdev` with OR without this change — that DB still
+  resolves the retired "Floor box cover" (26174); test-DB history (it never
+  got the cover repair), not code. The Gate's fresh DB is the real check.
+- **Next**: B merges `b-twin-fold`, then `b-status-view` (message in the
+  session summary). C can now build the drive-time note on `notes`.
+  **Live**: 0144–0145 before the push of anything from `e613723` on — owner
+  approval needed. Scratch DBs `bidrender_scratch_live`,
+  `bidrender_scratch_staging`, `bidrender_scratch_staging_0144` and the
+  `../bidrender-before-twin` worktree are kept for that day; drop after.
+
+## (earlier) 2026-10-10, session 29: pre-launch starter cleanup, WAITING ON THE OWNER
 
 **Step 1 done:** `pricing/assembly-cleanup.xlsx` (224 rows; built by
 `pricing/buildAssemblyCleanup.mts`). The owner marks Keep / Cut in Excel —

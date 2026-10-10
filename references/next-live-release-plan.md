@@ -11,6 +11,13 @@ Live is `371b2ab` / 144 migrations / 180 FKs. At the time of writing
 local-dev adds no file under `drizzle/` or `server/seed/` (`git diff 371b2ab
 origin/local-dev -- drizzle server/seed` empty) — re-check on the day.
 
+> **Changed the same day (`e613723`): local-dev now carries 0144–0145**
+> (`bid_pdf_sheets.workTag`, `bid_expenses.notes`), both additive — they go
+> on live BEFORE the push, expect 146 / 180. On staging since 2026-10-10
+> (`deploying.md` § "Staging: migrations 0144–0145"). If B's `b-twin-fold`
+> rides this release, re-run `scripts/twinCountCensus.mts` on live first
+> (0 on 2026-10-10; `todo.md`).
+
 - **Track C's remove / relocate labor (`a7fe812`, merged as `d832e34`)
   RAISES TOTALS on purpose.** On a bid with remove or relocate marks, each
   kind gets its own labor line beside the install line, priced from the
