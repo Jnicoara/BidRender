@@ -10,21 +10,19 @@ decisions and two labels: 296 renames in place, 158 retired, 50 added,
 1,825 → 1,717 active. Rehearsed on staging's copy CLEAN, 959/959 bids
 unchanged. Full record: `references/catalog-reality-check-build.md`.
 
-- [ ] **Owner: two batch-2 lighting lines are HELD** — retiring the 5"
-      wafers and folding 5"/6" disc lights and LED retrofit trims. Both
-      contradict the 2026-10-07 decision "every wafer, canless and CCT-disc
-      size its own item, never folded together". Yes or no.
-- [ ] **Owner: panels say "main-breaker"** (the table's names) where
-      `power.ts` had avoided "breaker" in panel names. Search is fixed for
-      it; say if the older "main panel" wording should come back (35 rows).
+- [x] **Owner, 2026-10-09: the two held batch-2 lighting lines are NOT
+      applied** — every wafer, canless, CCT-disc and LED retrofit trim size
+      stays its own row. **Panels keep "main-breaker panel".**
 - [ ] **Owner, optional lines not done** (build doc § "Lines NOT done"):
       temp pole length, poke-through contents, floor heating mat size,
       busway rating, the "confirm or retire" rows, filler-plate brands.
+- [x] **Starter repair BUILT** (owner): `scripts/repairStarterRetired.mts`,
+      13 shared starters, same guard as the cover repair. MUST-RUN on
+      staging and live after the cover repair (next-live-release-plan.md
+      § 4c).
 - [ ] **Track A, at the release:** staging backup → rehearse on its restore
-      → push staging → `repairStarterCovers` on staging. Existing databases
-      keep the 10 starter lines that point at retired rows (they still
-      price); repointing them is a repair pass not built (build doc §
-      "Existing databases").
+      → merge to local-dev (deploys staging) → `repairStarterCovers` →
+      `repairStarterRetired` → bidTotals.
 - [ ] Pricing sheets NOT rebuilt (owner). The next rebuild carries typed
       values over by key, renamed items included.
 

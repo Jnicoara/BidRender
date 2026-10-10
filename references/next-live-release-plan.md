@@ -195,8 +195,9 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
    CLEAN, 959/959 bids unchanged
    (`references/catalog-reality-check-build.md` § Rehearsal). Same release
    steps as the catalog review: staging backup, rehearse on its restore,
-   push staging, then `repairStarterCovers` on staging. Two batch-2 lighting
-   lines are HELD for the owner (build doc § TWO LINES HELD).
+   push staging, then `repairStarterCovers` AND `repairStarterRetired` (§ 4c,
+   MUST-RUN) on staging. Owner 2026-10-09: the two held batch-2 lighting
+   lines are NOT applied; panels keep "main-breaker panel".
 
 **One bid number moves on purpose:** at the first boot the shipped field
 roles go from $0 to the example rates. Existing lines keep their frozen
@@ -237,6 +238,35 @@ either live changed since the copy (a company edited a starter, or the
 boot did not finish seeding) or this line is stale — find out which first.
 It writes only shared starter lines, so `bidTotals` after must still show
 every bid unchanged.
+
+## 4c. MUST-RUN release-day step: the reality-check starter repair
+
+**Owner, 2026-10-09: must run on staging and on live, right after § 4b.**
+The catalog reality check retired rows that 10 shipped starter lines point
+at, moved PG15 onto the new #3 lug, and added labels to CW3 and CW11. The
+seeder never edits a starter that exists, so on staging and live those
+starters keep the old lines until `scripts/repairStarterRetired.mts` runs
+(`server/starterRetiredRepair.ts`; build doc § "Existing databases").
+
+**When:** after the new code's first boot (it seeds the kept rows and the
+labels) and **after the cover repair** (§ 4b) — one cover starter also has a
+retired line, and the cover repair reports it "skipped: edited" until this
+one has run. Then `bidTotals` after.
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # report only
+ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts --apply
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # again: all "already has it"
+```
+
+**Expect on a database seeded before the check: `13 would repoint`** (PG1,
+DV33, DV34, RS13, PG15, PG16, PG20, DR2, MS5, GR3, CW3, CW4, CW11 — measured
+on staging's 2026-10-09 copy). A starter the database does not have yet is
+"skipped: not found" (live has fewer starters than staging). Any
+"skipped: edited" or "part not in catalog", or a different count, is a stop:
+either the database changed since it was measured, the boot did not finish,
+or this line is stale — find out which first. It writes only shared starter
+lines, so `bidTotals` after must still show every bid unchanged.
 
 ## 5. Check first — before the window
 

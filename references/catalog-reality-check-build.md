@@ -39,7 +39,7 @@ rows).
 If a recount differs, stop and find out why before going on: either this
 table is stale, or one of the two modules was edited without the other.
 
-## TWO LINES HELD — for the owner
+## TWO LINES NOT APPLIED — owner decided 2026-10-09
 
 Both are batch-2 lighting lines, approved under "everything else", that
 **contradict an earlier owner decision the batch-2 section does not cite**:
@@ -55,9 +55,10 @@ two were NOT applied, pending the owner's word:
    retrofit trim → merge into 6", renamed 5/6"."** The 5" and 6" stay
    separate.
 
-If the owner says yes, both are a few lines in
-`shared/catalogRealityCheck20261009.ts` (the comments mark where) and the
-starters need nothing (the 6" trim's key already points at the 6" row).
+**Owner, 2026-10-09: DO NOT apply either.** Every wafer, canless, CCT-disc
+and LED retrofit trim size stays its own row: the 5" wafers stay, and the 5"
+and 6" disc lights and retrofit trims stay separate. The 2026-10-07 decision
+stands; batch 2's two lighting lines are withdrawn.
 
 ## Search fixes this needed (measured, then fixed)
 
@@ -105,8 +106,9 @@ the one an estimator types for a receptacle.
 3-phase panels say "main", not "main-breaker": the word "breaker" puts a
 panel in breaker searches. The panel table's names (owner-approved) use
 "main-breaker"; the search fixes above keep "20 amp breaker" and "main
-breaker" on the breakers. If the owner prefers the older convention, it is a
-rename of 35 rows.
+breaker" on the breakers. **Owner, 2026-10-09: keep "main-breaker panel"
+as approved.** The `power.ts` note about "main" stays true for the 3-phase
+panelboards only.
 
 ## Code that changed with the names
 
@@ -244,24 +246,31 @@ Fresh database (`bidrender_test_reality`, migrated, booted once): 1,717
 materials, all active, all 224 starters seeded. Full suite on it: 6,519
 passed, 0 failed.
 
-## Existing databases: starters on retired rows are NOT repointed
+## Existing databases: the starter repair — BUILT 2026-10-09 (owner)
 
 The starter seed inserts a recipe only when it is missing
 (`seedBaselineAssemblies`, `server/db.ts`), so on a database that already
-has the starters:
+has the starters, renamed rows follow by themselves (same id) but **lines on
+RETIRED rows stay on them**, and the two new labels never arrive. So, owner's
+go: `scripts/repairStarterRetired.mts` (`server/starterRetiredRepair.ts`),
+the same shape as `repairStarterCovers`:
 
-- **renamed rows follow by themselves** — same id, new name;
-- **the 10 starter lines on RETIRED rows stay on them** (temporary power
-  pole's 60A panel, the 320A meter base, the RV receptacle, the floor box
-  cover, the blank plate, the raceway entrance end, the 200A bare panel,
-  CW4's 125A sub-panel, the compression ground lug, the trapeze kit ×2, and
-  PG15's 2/0–4/0 lug). They still resolve and price — retired rows do — but
-  they are hidden from pickers and differ from a fresh database's starters.
-
-Repointing them there is a repair pass of the `repairStarterCovers` shape
-(narrow, report first, `--apply`, totals before and after). **Not built:**
-it was not asked for, and it writes to shared starter lines on staging and
-live, which wants its own yes.
+- **13 shared starters:** the 10 retired-row lines (PG20 60A panel, GR3 320A
+  base, RS13 RV receptacle, DV33 floor box cover, DR2 blank plate, DV34
+  raceway entrance end, PG1 200A bare panel, CW4 125A sub-panel, PG16
+  compression lug and trapeze kit, MS5 trapeze kit), PG15's lug (onto the
+  new #3), and the CW3 / CW11 labels.
+- Only the SHARED row, and only when its lines are EXACTLY the recipe as
+  shipped before the check; anything else is "skipped: edited". Never a
+  company's assembly, a fork, a kit or a bid line. Report first, `--apply`
+  to write; a second run reports "already has it".
+- Runs AFTER the new code's first start (that start seeds the kept rows).
+  Run `repairStarterCovers` FIRST: one cover starter also has a retired
+  line, and covers skips it as "edited" until this repair finishes it.
+- Rehearsed on staging's copy: covers 2 swapped / 1 skipped, this repair 13
+  repointed, second runs all "already has it", **959/959 bids unchanged**.
+- `server/starterRetiredRepair.test.ts` puts the 13 on the pre-check recipe
+  and repairs them; red with the write disabled.
 
 ## Not done here, on purpose
 
