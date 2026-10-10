@@ -11152,13 +11152,26 @@ export async function foldTwinGroup(
       assemblyCategory = assembly?.category ?? null;
     }
 
+    // Every mark OF THE TWIN, on any sheet, live or not (see above) — so this
+    // is read by the twin count, not bid-wide, and does not go through
+    // onLivePlanSheet. The twin is checked onto this bid here rather than by
+    // filtering marks on bidId, which would read like a bid-wide quantity
+    // read (server/quantitiesIgnoreDeletedPlans.test.ts).
+    const [twin] = await tx
+      .select({ bidId: takeoffGroups.bidId })
+      .from(takeoffGroups)
+      .where(
+        and(eq(takeoffGroups.id, plan.twinId), eq(takeoffGroups.userId, userId))
+      )
+      .limit(1);
+    if (!twin || twin.bidId !== bidId)
+      throw new Error("The twin count is not on this bid.");
     const marks = await tx
       .select({ id: takeoffStamps.id, status: takeoffStamps.status })
       .from(takeoffStamps)
       .where(
         and(
           eq(takeoffStamps.groupId, plan.twinId),
-          eq(takeoffStamps.bidId, bidId),
           eq(takeoffStamps.userId, userId)
         )
       );
