@@ -1713,6 +1713,31 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0144–0145 — sheet work tag + expense notes (2026-10-10 UTC) — NOT on live
+
+`0144_sheet_work_tag` (B's M2, `bid_pdf_sheets.workTag`, needed before
+`b-status-view`) and `0145_bid_expense_notes` (C's Q-M5,
+`bid_expenses.notes`): one nullable column each, no default, no `UPDATE` —
+additive, step 1, step 3 empty. `schema.ts` declares both, so they MUST be
+on a database before code from `e613723` on reaches it.
+
+1. **Backup**: `staging-2026-10-10T19-54-14Z-before-0144-0145.sql`, restored
+   to `bidrender_scratch_staging_0144`: **77/77 counts equal**.
+2. **Rehearsal** on fresh copies of live (`bidrender_scratch_live`) and
+   staging: drift before = exactly the two columns; **2 applied**, 146;
+   "matches", 180/180. Totals with the old code before vs local-dev +
+   `b-twin-fold` + `b-status-view` merged after: **0 of 2 live, 0 of 1,148
+   staging bids moved.**
+3. **Staging database**: drift before = the two columns; **2 applied**,
+   146; "matches", 180/180; **all 1,156 bids unchanged** (`bidTotals`, old
+   code, before and after).
+4. **Code**: `e613723` and the docs commit after it pushed to `staging` by
+   hand, then `local-dev` (see the track-a handoff for the Gate).
+
+**Live**: 0144–0145 join the next release's batch, BEFORE the push of any
+code from `e613723` on (both additive). Expect 146, 180/180 — **if what it
+prints does not match, stop and find out why before going on.**
+
 ### Staging: migration 0143 — step-based labor (2026-10-10 UTC) — DATABASE only, NOT on live
 
 `0143_labor_steps` (Track C's `c-step-labor`, renumbered from 0142 when

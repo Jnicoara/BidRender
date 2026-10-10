@@ -2,7 +2,71 @@
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
-release record is `deploying.md` § 11 "LIVE: `24105ad`".
+release record is `deploying.md` § 11 "LIVE: `371b2ab`".
+
+## NOW — 2026-10-10, session 30: B's two branches unblocked (0144–0145 on staging)
+
+- **Twin census** (`scripts/twinCountCensus.mts`, read only) on fresh copies
+  (`live-2026-10-10T19-36-40Z-before-twin-fold.sql`,
+  `staging-2026-10-10T19-36-56Z-before-twin-fold.sql`, restored as
+  `bidrender_scratch_live` / `bidrender_scratch_staging`, 77/77 each):
+  **live 0, staging 0, local 0** twin counts, marks, lines, assemblies.
+  So **M1 is not needed** and no fold script was written (`todo.md` says
+  when that changes). B's fold code merges as ordinary code.
+- **0144 `bid_pdf_sheets.workTag`** (B's M2) and **0145
+  `bid_expenses.notes`** (C's Q-M5) — `e613723`, additive, `schema.ts`
+  declares both (the workTag hunk is byte-identical to `b-status-view`'s,
+  so B's merge brings no `drizzle/` diff; only `CHANGELOG.md` conflicts —
+  keep both sides).
+- **Rehearsed**: local-dev + `b-twin-fold` + `b-status-view` merged on the
+  migrated copies: `pnpm check` clean; **0 of 2 live / 0 of 1,148 staging
+  bids move** (JSONs `*-totals-{before,after}-twin-2026-10-10.json`).
+- **Applied**: local `bidrender_local` and `bidrender_test_localdev` (146);
+  **staging**: backup `staging-2026-10-10T19-54-14Z-before-0144-0145.sql`
+  (77/77 restore), 2 applied, 146, matches, 180/180, **1,156/1,156 bids
+  unchanged**. Record: `deploying.md` § "Staging: migrations 0144–0145".
+  Code `94df0f3` pushed to `staging` by hand, then `local-dev`; staging
+  `/api/version` = `94df0f3` (built 19:59:57Z); **Gate 38081947887 green**
+  (test, deploy-staging, smoke).
+- **Local test note**: `starterAssembliesSeed` DV33 fails on
+  `bidrender_test_localdev` with OR without this change — that DB still
+  resolves the retired "Floor box cover" (26174); test-DB history (it never
+  got the cover repair), not code. The Gate's fresh DB is the real check.
+- **Next**: B merges `b-twin-fold`, then `b-status-view` (message in the
+  session summary). C can now build the drive-time note on `notes`.
+  **Live**: 0144–0145 before the push of anything from `e613723` on — owner
+  approval needed. Scratch DBs `bidrender_scratch_live`,
+  `bidrender_scratch_staging`, `bidrender_scratch_staging_0144` and the
+  `../bidrender-before-twin` worktree are kept for that day; drop after.
+
+## (earlier) 2026-10-10, session 29: pre-launch starter cleanup, WAITING ON THE OWNER
+
+**Step 1 done:** `pricing/assembly-cleanup.xlsx` (224 rows; built by
+`pricing/buildAssemblyCleanup.mts`). The owner marks Keep / Cut in Excel —
+**do not touch the file while they have it**. Usage columns were measured
+read-only on local copies: staging dump
+`staging-2026-10-10T19-22-24Z-before-assembly-cleanup.sql` (restored as
+`bidrender_scratch_staging`, 77/77 counts equal) and live backup
+`2026-10-10T19-22-50Z` (verified, restored as `bidrender_backup_verify`, 77
+tables / 5,539 rows) by `scripts/starterAssemblyUse.mts`. Only 8 starters are
+used by anything on staging (Duplex receptacle standard on 371 bids;
+Single-pole switch and Surface-mount ceiling fixture on 1 bid each; "0-10V
+dimmer, MC" and "120V feed for door hardware / access control" on 3 bids
+each; GFCI, Dimmer and Ceiling fan only through starter kits) and 7 on live
+(the six kit starters; Surface-mount ceiling fixture and "200A main panel
+furnish and install" on one bid's counts).
+
+**Step 2 — only on the owner's "go":** for each Cut row: fix any test /
+smoke step / seed file naming it FIRST (DV1 is in two smoke specs; kits in
+`baselineKits.ts` name six starters); remove it from the seed; RETIRE the
+shared row (hidden from pickers, never hard-deleted if anything points at
+it — re-run `starterAssemblyUse.mts` on fresh copies on the day); backup +
+rehearse + staging first; `bidTotals` unchanged; then ONE rebuild of the
+pricing sheets (standing rule above: put the owner's current sheets in
+place first). Check how a starter is retired today before writing one —
+`RETIRED_BASELINE_MATERIALS` is the materials precedent; assemblies may not
+have one yet. Scratch: `scripts/_tmpCopyDb.mts` (untracked; dumps a DB with
+the repo's dumper and restores it locally) is still on disk for step 2.
 
 ## STANDING RULE — a starter-sheet rebuild never loses a typed value
 

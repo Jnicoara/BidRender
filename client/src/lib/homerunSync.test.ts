@@ -4,6 +4,8 @@ import {
   homerunKey,
   homerunKeyForCircuit,
   homerunSyncPayload,
+  homerunSyncStep,
+  type HomerunSyncState,
   leavingDeviceId,
   syncSignature,
 } from "./homerunSync";
@@ -124,5 +126,67 @@ describe("matching server rows to circuits", () => {
     expect(homerunKeyForCircuit({ panel: "2b", circuits: [38, 36] })).toBe(
       homerunKey("2B", 36)
     );
+  });
+});
+
+describe("a hand-placed panel re-matches ITS sheet, never the next one", () => {
+  /*
+    The fault (baseline-screen-plan.md § 9, F10, 2026-10-10). Placing a
+    panel by hand armed "re-match on the next sync". But a sync only goes
+    out when the signature changes, and the signature does not carry the
+    panel's spot — so a placement that left every circuit's leaving device
+    the same sent nothing, the arm stayed set, and the next sync of ANY
+    sheet went out as a re-match. Opening another sheet then re-pointed
+    that sheet's unconfirmed homeruns, and its homerun feet moved, with
+    nobody pressing anything.
+  */
+  const SHEET_A = 11;
+  const SHEET_B = 12;
+  const sigA = syncSignature(
+    SHEET_A,
+    homerunSyncPayload(report([group({ devices: [device(1)] })]))
+  );
+  const sigB = syncSignature(
+    SHEET_B,
+    homerunSyncPayload(
+      report([group({ key: "2B-3", circuits: [3], devices: [device(7)] })])
+    )
+  );
+
+  it("opening another sheet after a no-change placement is NOT a re-match", () => {
+    // Sheet A is synced; the person places its panel by hand, and the
+    // closest device happens to stay the same, so A's signature is equal.
+    let state: HomerunSyncState = { lastSignature: sigA, armedSheetId: null };
+    state = { ...state, armedSheetId: SHEET_A };
+    const onA = homerunSyncStep(state, SHEET_A, sigA);
+    if (onA.send) state = onA.next;
+
+    // Then they open sheet B: a visit, nothing pressed.
+    const onB = homerunSyncStep(state, SHEET_B, sigB);
+    expect(onB.send).toBe(true);
+    expect(onB.rematch).toBe(false);
+  });
+
+  it("the placement re-matches its own sheet even when nothing else changed", () => {
+    const state: HomerunSyncState = {
+      lastSignature: sigA,
+      armedSheetId: SHEET_A,
+    };
+    const onA = homerunSyncStep(state, SHEET_A, sigA);
+    expect(onA).toMatchObject({ send: true, rematch: true });
+    expect(onA.next.armedSheetId).toBeNull();
+  });
+
+  it("an equal report with nothing armed sends nothing, as before", () => {
+    const state: HomerunSyncState = { lastSignature: sigA, armedSheetId: null };
+    expect(homerunSyncStep(state, SHEET_A, sigA).send).toBe(false);
+  });
+
+  it("a visit to a new sheet with nothing armed creates, never re-matches", () => {
+    const state: HomerunSyncState = { lastSignature: sigA, armedSheetId: null };
+    expect(homerunSyncStep(state, SHEET_B, sigB)).toMatchObject({
+      send: true,
+      rematch: false,
+    });
   });
 });

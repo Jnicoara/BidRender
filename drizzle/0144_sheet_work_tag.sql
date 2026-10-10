@@ -1,0 +1,13 @@
+-- 0144 — SHEET WORK TAG: what work a plan sheet shows (Demo / New work / both)
+-- (2026-10-10; Track B's M2, references/track-b-handoff.md "M2 — SQL DRAFT";
+-- references/status-and-scope-plan.md § 2a). Track A owns the number.
+--
+-- ── ADDITIVE. STEP 1. MUST RUN BEFORE THE CODE ──────────────────────────────
+-- `drizzle/schema.ts` declares the column, so every bare select() of
+-- bid_pdf_sheets asks for it: a database without this file fails every sheet
+-- read with `Unknown column 'workTag'`. NULL = not said = exactly today's
+-- behaviour; no default, so "not said" is a value nothing else produces.
+-- No UPDATE; no number moves.
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `bid_pdf_sheets` ADD `workTag` enum('demo','new','both') NULL;

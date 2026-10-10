@@ -57,6 +57,53 @@ export function syncSignature(
 }
 
 /**
+ * Whether the page sends a sheet's circuits now, and whether as a RE-MATCH.
+ *
+ * Viewing only CREATES circuits the server has not seen; re-pointing an
+ * unconfirmed homerun is a person's act — pressing Re-match, or placing a
+ * panel by hand (owner, 2026-10-07). `armedSheetId` is the sheet a hand
+ * placement asked to re-match.
+ */
+export type HomerunSyncState = {
+  /** The signature last sent, so an equal report is not sent again. */
+  lastSignature: string | null;
+  /** The sheet a hand-placed panel armed for a re-match, if any. */
+  armedSheetId: number | null;
+};
+
+/**
+ * ── Why the arm carries a SHEET (fixed 2026-10-10) ──────────────────────
+ * It used to be a bare "re-match on the next sync", and a sync goes out
+ * only when the signature changes. The signature does not carry the
+ * panel's spot, so a placement that left every leaving device the same
+ * sent nothing and the arm stayed set — and the next sync of ANY sheet,
+ * opened just to look at it, went out as a re-match and re-pointed that
+ * sheet's unconfirmed homeruns (baseline-screen-plan.md § 9, F10). So:
+ *
+ *   - armed for THIS sheet: send now, as a re-match, even if the report is
+ *     unchanged — the person asked for it, and the placement alone may not
+ *     change the signature;
+ *   - armed for ANOTHER sheet: this sheet's sync is an ordinary visit
+ *     (create only). The arm is cleared by whatever sync goes out next, so
+ *     it can only ever re-match the sheet the panel was placed on;
+ *   - otherwise: send only a changed report, never as a re-match.
+ */
+export function homerunSyncStep(
+  state: HomerunSyncState,
+  sheetId: number,
+  signature: string
+): { send: boolean; rematch: boolean; next: HomerunSyncState } {
+  const armedHere = state.armedSheetId === sheetId;
+  if (!armedHere && signature === state.lastSignature)
+    return { send: false, rematch: false, next: state };
+  return {
+    send: true,
+    rematch: armedHere,
+    next: { lastSignature: signature, armedSheetId: null },
+  };
+}
+
+/**
  * The key a server homerun row matches a circuit on screen by. A two-pole
  * "2B-36,38" is stored on its FIRST circuit (the router keeps `min`), so a
  * circuit's key is its panel and its lowest number.
