@@ -25,6 +25,9 @@ release record is `deploying.md` § 11 "LIVE: `371b2ab`".
   **staging**: backup `staging-2026-10-10T19-54-14Z-before-0144-0145.sql`
   (77/77 restore), 2 applied, 146, matches, 180/180, **1,156/1,156 bids
   unchanged**. Record: `deploying.md` § "Staging: migrations 0144–0145".
+  Code `94df0f3` pushed to `staging` by hand, then `local-dev`; staging
+  `/api/version` = `94df0f3` (built 19:59:57Z); **Gate 38081947887 green**
+  (test, deploy-staging, smoke).
 - **Local test note**: `starterAssembliesSeed` DV33 fails on
   `bidrender_test_localdev` with OR without this change — that DB still
   resolves the retired "Floor box cover" (26174); test-DB history (it never
