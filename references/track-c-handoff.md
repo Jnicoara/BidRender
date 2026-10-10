@@ -51,8 +51,11 @@ time is a flat cost):
   all 4,236 existing bids unchanged. The only differences were the two
   fixture bids the check created (1728377 deleted afterwards). No server,
   shared or drizzle file changed.
-- **Gate:** run 38078650646 on `200e310`. **Merge into local-dev only when it
-  is green** (pull local-dev first).
+- **Gate:** run 38078650646 on `200e310` GREEN. **MERGED into local-dev**
+  (`f50e713`, after merging local-dev's two docs-only commits in;
+  fast-forward push `2e7de83..f50e713`). local-dev Gate 38079512981 was
+  pending when this was written: **check it once**; it also deploys
+  staging. `track-c` has merged local-dev.
 
 ### FOR TRACK A — Q-M5 (additive, step 1, not urgent)
 
