@@ -19,7 +19,46 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-10 (session 28, third part) — START HERE
+## UPDATE 2026-10-10 (session 28, fourth part) — START HERE
+
+- **Staging pushed by hand** to `b0c8a65` (local-dev), owner-approved, after
+  a read-only `schemaDrift` on staging: 144 recorded, matches, 180/180.
+  Staging serves `b0c8a65`; Gate 38021938035 all green, smoke 96 passed
+  (step 10 included; 2 skipped by design). Local-dev auto-deploys again.
+- **PROPOSAL, not built — the staging guard after a migration.** Today the
+  Gate refuses every local-dev push whose `drizzle/` differs from what the
+  `staging` BRANCH holds, even once staging's DATABASE has the migration,
+  so somebody must push staging by hand. Proposed: let it through when
+  staging's database already has every migration file in the new commit.
+  - **How the Gate would know.** It cannot ask the database: it holds no
+    database secret, and the database only answers its trusted list (§ 10
+    of `deploying.md`). So staging's app reports it: `/api/version` (or a
+    sibling) adds the applied migrations' **hashes** from
+    `__drizzle_migrations`. The Gate hashes each `drizzle/*.sql` in the
+    commit the way the migrator does and passes only if every one is
+    applied (checked 2026-10-10: the stored `hash` is the file's plain
+    sha256 — 0141's matched on the local database). Hashes, not a count: the 0142 → 0143 renumbering would have
+    fooled a count, and a hash also catches a file edited after it ran.
+  - **Risk 1, the real one — the order rule.** For an additive migration
+    "database first, then code" is right, and this is what it automates.
+    For a migration that CHANGES WHAT A COLUMN MEANS, the code must ship
+    first and the backfill after. A guard that only opens once the database
+    has the file teaches people to run the backfill early to get the push
+    through — and that gives wrong numbers with nothing failing (0063 did
+    exactly that: 125.01 ft became 83.34 ft). Fix: a migration file marked
+    `-- STEP 3` is never let through; that release stays hand-pushed.
+  - **Risk 2 — a lying answer.** If the app's report were wrong (e.g. read
+    from the wrong database), the Gate would ship code against a database
+    without its columns, and screens fail with "Unknown column". Smoke
+    would catch most of it, after the fact. Fix: read the same connection
+    the app uses, and refuse on any error or an empty list.
+  - **Risk 3 — saying more than we need publicly.** A list of hashes
+    reveals nothing useful, but a list of migration names reveals our
+    schema history. Hashes only, or put it behind a secret the Gate holds.
+  - **Never for live.** `main` stays a hand push by design; this touches
+    only the local-dev → staging step.
+
+## UPDATE 2026-10-10 (session 28, third part)
 
 - **0143 `labor_steps` ON STAGING's DATABASE** (C's step labor): backup
   75 tables, rehearsed, staging migrated (144, 180/180), 1,066/1,066
