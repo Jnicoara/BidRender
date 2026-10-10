@@ -4559,9 +4559,10 @@ export default function TakeoffPage({
     runId: number | null,
     call: RunEditCall,
     packet: Packet | null
-  ) => {
-    if (!packet || runId === null || !activeSheet) return;
-    pushUndo({
+  ): UndoEntry | null => {
+    if (!packet || runId === null || !activeSheet) return null;
+    // Handed back so a delete's toast can take back exactly this step.
+    return pushUndo({
       label,
       sheetId: activeSheet.id,
       undo: { kind: "restoreRunEdit", packet, runId, call },
@@ -8172,15 +8173,32 @@ export default function TakeoffPage({
       ),
     onSettled: refreshRuns,
   });
+  /*
+    Owner, 2026-09-30 (todo.md): a removed circuit gets the same toast with an
+    Undo button as every other delete (bf88f5c). Until 2026-10-10 it was an
+    undo step on the toolbar arrow only and said nothing, so the wire it took
+    off the bid left the screen with no way back offered where you looked.
+    The name is read in onMutate, before the refresh drops the row.
+  */
   const removeCircuit = trpc.takeoffRuns.removeCircuit.useMutation({
-    onMutate: input => ({ runId: runOfCircuit(input.id) }),
+    onMutate: input => ({
+      runId: runOfCircuit(input.id),
+      name:
+        runs.flatMap(r => r.circuits).find(c => c.id === input.id)?.name ??
+        null,
+    }),
     onError: e => toast.error(e.message),
     onSuccess: (result, input, context) =>
-      pushRunEdit(
-        "circuit removed",
-        context?.runId ?? null,
-        { proc: "removeCircuit", input },
-        result.undo
+      deletedToast(
+        context?.name
+          ? `Removed circuit ${context.name}.`
+          : "Removed one circuit.",
+        pushRunEdit(
+          "circuit removed",
+          context?.runId ?? null,
+          { proc: "removeCircuit", input },
+          result.undo
+        )
       ),
     onSettled: refreshRuns,
   });

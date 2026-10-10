@@ -15062,6 +15062,46 @@ export async function bidDropsNotPriced(
 }
 
 /**
+ * `bidDropsNotPriced` for a LIST of bids — the dashboard cards, "Find a bid"
+ * and analytics (owner, 2026-10-10: "N drops not priced", never $0). Only bids
+ * with a mark ask the full question, because a bid with no marks has no drops;
+ * that is one query for the list. Every bid that does ask goes through the
+ * bid page's own function, so a card and the bid it opens cannot disagree.
+ * The filter can only let too many through, never too few. A few at a time,
+ * so a long history does not open one connection per bid.
+ */
+export async function dropsNotPricedForBids(
+  bidIds: readonly number[],
+  userId: number
+): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (bidIds.length === 0) return out;
+  const db = await getDb();
+  if (!db) return out;
+  const withMarks = (
+    await db
+      .selectDistinct({ bidId: takeoffStamps.bidId })
+      .from(takeoffStamps)
+      .where(
+        and(
+          eq(takeoffStamps.userId, userId),
+          inArray(takeoffStamps.bidId, Array.from(new Set(bidIds)))
+        )
+      )
+  ).map(r => r.bidId);
+  for (let i = 0; i < withMarks.length; i += 4) {
+    const batch = withMarks.slice(i, i + 4);
+    const counts = await Promise.all(
+      batch.map(id => bidDropsNotPriced(id, userId))
+    );
+    batch.forEach((id, k) => {
+      if (counts[k] > 0) out.set(id, counts[k]);
+    });
+  }
+  return out;
+}
+
+/**
  * Every counted group's DROPS on one bid (held-migrations plan § 3) — loaded
  * here, computed in shared/groupDrops.ts.
  *

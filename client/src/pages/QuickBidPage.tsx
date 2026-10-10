@@ -26,6 +26,7 @@ import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, Check, Copy, Plus, Search, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -146,27 +147,8 @@ export default function QuickBidPage({
     onSettled: refresh,
   });
 
-  const removeLine = trpc.bids.removeLine.useMutation({
-    onMutate: async vars => {
-      await utils.bids.get.cancel({ id: bidId });
-      const previous = utils.bids.get.getData({ id: bidId });
-      utils.bids.get.setData(
-        { id: bidId },
-        old =>
-          old && {
-            ...old,
-            lines: old.lines.filter(line => line.id !== vars.id),
-          }
-      );
-      return { previous };
-    },
-    onError: (error, _vars, context) => {
-      if (context?.previous)
-        utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
-    },
-    onSettled: refresh,
-  });
+  // Undo puts back the exact line, frozen prices included.
+  const removeLine = useRemoveBidLine(bidId, refresh);
 
   // smartSearch caches its index by array identity, so this must stay memoised.
   // Assemblies get the same trade-slang matching as materials, so "recep" finds

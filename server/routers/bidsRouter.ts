@@ -82,6 +82,21 @@ import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
 import { fixLine, fixLineOptions } from "../lineFix";
 import { buildFromParts } from "../buildFromParts";
+import {
+  withDropsNotPriced,
+  type NotPricedTally,
+} from "../../shared/lineNotPriced";
+import {
+  restoreBidLine,
+  snapshotBidLine,
+  type LineSnapshot,
+} from "../bidLineRestore";
+import {
+  LINE_PACKET,
+  openPacket,
+  packetSchema,
+  sealPacket,
+} from "../restorePacket";
 
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
@@ -199,6 +214,24 @@ async function priceForList(
   };
 }
 
+/**
+ * Each listed bid's drops with no material added to its not-priced tally —
+ * the bid page's `withDropsNotPriced`, so a card says "+ 3 drops not priced"
+ * where its bid does, never a clean $ figure (owner, 2026-10-10). A bid with
+ * none comes back exactly as it was. `drops` is `db.dropsNotPricedForBids`.
+ */
+function withListDrops<T extends { id: number; notPriced: NotPricedTally }>(
+  rows: T[],
+  drops: ReadonlyMap<number, number>
+): T[] {
+  return rows.map(row => {
+    const n = drops.get(row.id) ?? 0;
+    return n > 0
+      ? { ...row, notPriced: withDropsNotPriced(row.notPriced, n) }
+      : row;
+  });
+}
+
 export const bidsRouter = router({
   /**
    * Historical search: find a bid out of thousands, by who it was for, what
@@ -258,11 +291,17 @@ export const bidsRouter = router({
 
       // Only the page's rows are priced — this is why the page is bounded.
       const context = await listPricingContext(ctx.scope.dataUserId);
-      const priced = await Promise.all(
-        rows.map(async bid => ({
-          ...bid,
-          ...(await priceForList(bid, ctx.scope.dataUserId, context)),
-        }))
+      const priced = withListDrops(
+        await Promise.all(
+          rows.map(async bid => ({
+            ...bid,
+            ...(await priceForList(bid, ctx.scope.dataUserId, context)),
+          }))
+        ),
+        await db.dropsNotPricedForBids(
+          rows.map(r => r.id),
+          ctx.scope.dataUserId
+        )
       );
 
       const page = toPage(priced, pageSize, row =>
@@ -307,8 +346,12 @@ export const bidsRouter = router({
       db.getDashboardBids(ctx.scope.dataUserId, company.productivityPct),
       db.getLiveBidExpenseLines(ctx.scope.dataUserId),
     ]);
+    const drops = await db.dropsNotPricedForBids(
+      rows.map(r => r.id),
+      ctx.scope.dataUserId
+    );
 
-    return Promise.all(
+    const cards = await Promise.all(
       rows.map(async row => {
         const {
           lineCount,
@@ -390,6 +433,7 @@ export const bidsRouter = router({
         };
       })
     );
+    return withListDrops(cards, drops);
   }),
 
   create: procedure
@@ -1557,8 +1601,43 @@ export const bidsRouter = router({
             ),
           });
       }
+      // Read BEFORE the delete: the packet is what Undo puts back, frozen
+      // prices and all (server/bidLineRestore.ts).
+      const snapshot = await snapshotBidLine(input.id, input.bidId);
       await db.deleteBidLineItem(input.id, input.bidId);
-      return { success: true };
+      return {
+        success: true,
+        undo: snapshot
+          ? sealPacket(LINE_PACKET, ctx.scope.dataUserId, snapshot)
+          : null,
+      };
+    }),
+
+  /**
+   * Undo of `removeLine`: the same row under the same id, never a re-add at
+   * today's prices. Same lock rule as removing — a line from the plans does not
+   * come back onto a bid locked since.
+   */
+  restoreLine: procedure
+    .input(z.object({ bidId: z.number().int().positive(), undo: packetSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const snapshot = openPacket<LineSnapshot>(
+        LINE_PACKET,
+        ctx.scope.dataUserId,
+        input.undo
+      );
+      if (!snapshot || snapshot.line.bidId !== input.bidId)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "That undo step is not valid here.",
+        });
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null && followsDrawing(snapshot.line))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("lines from the plans cannot be put back"),
+        });
+      return { restored: await restoreBidLine(snapshot) };
     }),
 
   /** Distinct repeating units on a bid — the pick-list for mass duplicate. */

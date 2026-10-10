@@ -105,6 +105,30 @@ describe("the Plans screen records what undo covers and what it does not", () =>
     expect(undecided).toEqual([]);
   });
 
+  it("gives every delete a toast with its own Undo button", () => {
+    // Owner, 2026-09-30: removing a circuit was an undo step on the arrow
+    // only, with no toast (todo.md). A delete added without one fails here.
+    const deletes = mutationsWithOptions().filter(m =>
+      [
+        "takeoffSheet.clear",
+        "takeoffGroups.remove",
+        "takeoffStamps.remove",
+        "takeoffStamps.removeMany",
+        "takeoffRuns.remove",
+        "takeoffRuns.removeCircuit",
+      ].includes(m.proc)
+    );
+    expect(deletes.map(m => m.proc).sort()).toEqual([
+      "takeoffGroups.remove",
+      "takeoffRuns.remove",
+      "takeoffRuns.removeCircuit",
+      "takeoffSheet.clear",
+      "takeoffStamps.remove",
+      "takeoffStamps.removeMany",
+    ]);
+    for (const m of deletes) expect(m.body, m.proc).toContain("deletedToast(");
+  });
+
   it("lists only mutations the screen really has, and none it already decides", () => {
     const seen = mutationsWithOptions();
     for (const proc of Object.keys(NEITHER)) {

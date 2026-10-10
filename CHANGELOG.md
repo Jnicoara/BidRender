@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Undo for removing a bid line.** Removing a line on the bid screen or in
+  Quick bid now shows "Removed …" with an Undo button. Undo brings back the
+  exact same line, with the price it was frozen at, not today's catalog
+  price, so last week's bid never quietly re-prices itself.
+- **Undo for removing a circuit.** Removing a circuit from a traced run now
+  shows the same "Removed circuit …" toast with an Undo button that every
+  other delete on the Plans screen has.
+- **Dashboard cards, column totals, "Find a bid" and analytics now say
+  "N drops not priced".** Before this, a bid whose only gap was drops with no
+  drop material read as fully priced everywhere except its own bid page.
+
 - **The starter pricing sheets are rebuilt for the owner to fill — now with
   step times.** The prices workbook gains a "Steps" tab (type the minutes
   for each install step, with a suggested draft beside it) and a "Step

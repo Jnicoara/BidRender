@@ -26,6 +26,7 @@
 import {
   ANALYTICS_MAX_BIDS,
   countClosedJobs,
+  dropsNotPricedForBids,
   getBidCosts,
   getClosedJobCosts,
   getEarliestBidDate,
@@ -41,11 +42,41 @@ import {
   type CompanyPricingDefaults,
 } from "../shared/pricing";
 import { closeoutActualHours } from "../shared/closeout";
-import { tallyLeavesOut, type NotPricedTally } from "../shared/lineNotPriced";
+import {
+  tallyLeavesOut,
+  withDropsNotPriced,
+  type NotPricedTally,
+} from "../shared/lineNotPriced";
 
 /** The bid's figures leave out lines, parts or hours nobody priced. */
 function leavesUnpriced(notPriced: NotPricedTally): boolean {
   return tallyLeavesOut(notPriced);
+}
+
+/**
+ * Each bid's drops with no material added to its not-priced tally, the bid
+ * page's own count (`dropsNotPricedForBids`). Without it a bid whose only gap
+ * is its drops counted as fully priced here, at $0 for those drops, while its
+ * bid page said "N drops not priced" (owner, 2026-10-10).
+ */
+async function withBidDrops<T extends BidCostRow>(
+  rows: T[],
+  userId: number
+): Promise<T[]> {
+  const drops = await dropsNotPricedForBids(
+    rows.map(r => r.id),
+    userId
+  );
+  return rows.map(row => {
+    const n = drops.get(row.id) ?? 0;
+    return n > 0
+      ? { ...row, notPriced: withDropsNotPriced(row.notPriced, n) }
+      : row;
+  });
+}
+
+function sumDrops(rows: readonly { notPriced: NotPricedTally }[]): number {
+  return rows.reduce((n, row) => n + (row.notPriced.drops ?? 0), 0);
 }
 
 /** How many of the not-priced bids the note names, so it stays a note. */
@@ -251,6 +282,8 @@ export type OutcomesReport = {
     notPricedBids: number;
     /** The first of those, by name, to open from the note (`notPricedNamed`). */
     notPricedBidList: NamedBid[];
+    /** Drops with no drop material across those bids, counted as $0. */
+    notPricedDrops: number;
   };
   timeline: OutcomePeriod[];
   /**
@@ -290,7 +323,7 @@ export async function outcomesReport(
   const range = resolveRange(input, now);
   const company = await companyDefaultsFor(userId);
 
-  const [buckets, costs, earliest] = await Promise.all([
+  const [buckets, costRows, earliest] = await Promise.all([
     getOutcomeBuckets(userId, {
       start: range.start,
       end: range.end,
@@ -304,6 +337,7 @@ export async function outcomesReport(
     }),
     getEarliestBidDate(userId),
   ]);
+  const costs = await withBidDrops(costRows, userId);
 
   // Counts first, from the cheap query.
   const countsByBucket = new Map<string, OutcomeCounts>();
@@ -376,6 +410,7 @@ export async function outcomesReport(
       incompleteBids: costs.filter(row => row.brokenLines > 0).length,
       notPricedBids: costs.filter(row => leavesUnpriced(row.notPriced)).length,
       notPricedBidList: notPricedNamed(costs),
+      notPricedDrops: sumDrops(costs),
     },
     timeline,
     earliestBid: earliest ? asDateString(earliest) : null,
@@ -420,6 +455,8 @@ export type ProfitabilityReport = {
   notPricedJobs: number;
   /** The first of those, by name, to open from the note (`notPricedNamed`). */
   notPricedJobList: NamedBid[];
+  /** Drops with no drop material across those jobs, counted as $0. */
+  notPricedDrops: number;
   /** True when more jobs closed in the range than one call will value. */
   truncated: boolean;
   /** How many jobs there really are, when truncated. */
@@ -515,7 +552,7 @@ export async function profitabilityReport(
   const range = resolveRange(input, now);
   const company = await companyDefaultsFor(userId);
 
-  const [rows, jobsInRange] = await Promise.all([
+  const [jobRows, jobsInRange] = await Promise.all([
     getClosedJobCosts(userId, {
       start: range.start,
       end: range.end,
@@ -524,6 +561,7 @@ export async function profitabilityReport(
     }),
     countClosedJobs(userId, { start: range.start, end: range.end }),
   ]);
+  const rows = await withBidDrops(jobRows, userId);
 
   const jobs = rows.map(row => toClosedJob(row, company));
   const { groups, multiTradeJobs } = groupByTrade(jobs);
@@ -578,6 +616,7 @@ export async function profitabilityReport(
     notPricedJobList: notPricedNamed(
       jobs.map(job => ({ ...job, id: job.bidId }))
     ),
+    notPricedDrops: sumDrops(rows),
     truncated: jobsInRange > rows.length,
     jobsInRange,
   };

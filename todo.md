@@ -1036,9 +1036,15 @@ Search those before asking for a height column.
       **local-dev already has its own `tallyLeavesOut` (with `hours`): the
       merged one must read lines, parts, hours AND drops** —
       `server/dropsNotPriced.test.ts` goes red if drops fall out.
-- [ ] **Drops not priced are NOT in analytics or the dashboard cards** — those
-      list many bids and do not load each one's takeoff. A bid card can still
-      read complete while its bid page says drops are not priced. Owner's call.
+- [x] **DONE 2026-10-10 (Track B, owner YES): drops not priced are in the
+      dashboard cards, column and headline sums, "Find a bid" and analytics**
+      ("+ N drops not priced"; analytics names the drops in its note).
+      `db.dropsNotPricedForBids` runs the bid page's own count, only for bids
+      with a mark (one query decides which). `server/dropsNotPricedLists.test.ts`.
+      **Not measured:** the cost on a company with many marked bids — every
+      such bid loads its takeoff on each dashboard read. Was: those list many
+      bids and do not load each one's takeoff. A bid card can still read
+      complete while its bid page says drops are not priced. Owner's call.
 - [x] **Patent review (US 11,120,171) — Option A chosen and built 2026-10-07:**
       the dashed device-to-panel line is gone from the Circuits layer (rings
       and the panel mark stay; length math unchanged), guarded by
@@ -1536,11 +1542,20 @@ Design: `references/homerun-footage-plan.md` § 4.
       a scratch bid with 7 items. Time it (server ms and the panel's first
       paint) on a real 500-sheet set with marks and runs spread across it, and
       write the numbers next to the code. No number is claimed here yet.
-- [ ] **Owner, 2026-09-30: Undo for removing a circuit.** The delete rules
+- [x] **DONE 2026-10-10 (Track B):** the remove gets the same
+      "Removed circuit X." toast with Undo as every other delete
+      (`notUndoableWired.test.ts`). Was:
+      **Owner, 2026-09-30: Undo for removing a circuit.** The delete rules
       (bf88f5c) put Undo in every toast, but removing a circuit from a traced
       run still has none: `removeCircuit` in `TakeoffPage.tsx` shows only an
       error toast and refreshes.
-- [ ] **Owner, 2026-09-30: Undo for removing a bid line.** Same gap on the
+- [x] **DONE 2026-10-10 (Track B):** `bids.removeLine` returns a signed
+      packet of the raw row; `bids.restoreLine` puts it back under the same id,
+      frozen prices and all, and re-links a panel priced by it
+      (`server/bidLineRestore.ts`, `server/bidLineUndo.test.ts`). One hook,
+      `useRemoveBidLine`, for both screens. A linked unit copy stays forked
+      after Undo, on purpose (see the module header). Was:
+      **Owner, 2026-09-30: Undo for removing a bid line.** Same gap on the
       bid: `bids.removeLine` in `BidsPage.tsx` and `QuickBidPage.tsx` drops the
       line optimistically and offers no way back. A line carries frozen
       snapshot prices, so Undo must restore the row, not re-add it at today's

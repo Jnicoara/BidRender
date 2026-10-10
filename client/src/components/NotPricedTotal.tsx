@@ -18,7 +18,7 @@ import type { NotPricedTally } from "@shared/lineNotPriced";
 import { TapExplain } from "./TapExplain";
 
 export const NOT_PRICED_TOTAL_WHY =
-  "Lines and parts nobody has priced add nothing to this total. Each says “not priced” on the bid.";
+  "Lines, parts and drops nobody has priced add nothing to this total. Open the bid to see each one and price it.";
 
 export function NotPricedTotal({
   amount,

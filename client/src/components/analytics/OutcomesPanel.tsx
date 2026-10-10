@@ -70,6 +70,8 @@ type Report = {
     notPricedBids: number;
     /** The first of those by name, to open from the note. */
     notPricedBidList: { bidId: number; name: string }[];
+    /** Drops with no drop material across those bids. */
+    notPricedDrops: number;
   };
   timeline: Period[];
 };
@@ -210,6 +212,7 @@ export function OutcomesPanel({
         count={totals.incompleteBids}
         notPricedCount={totals.notPricedBids}
         notPricedBids={totals.notPricedBidList}
+        notPricedDrops={totals.notPricedDrops}
         onOpenBid={onOpenBid}
         noun={["bid", "bids"]}
       />
