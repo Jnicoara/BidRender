@@ -70,6 +70,7 @@ import { isTeeRole, rootOf } from "../../shared/runNetwork";
 import { runOnBid } from "../../shared/runOnBid";
 import { extraFeetForRuns } from "../../shared/runExtrasPerFoot";
 import { quantityTraceSummary } from "../../shared/quantityDrops";
+import { isLaborRoleLine } from "../../shared/roleLines";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -182,6 +183,9 @@ export const materialsListRouter = router({
         // Pipe, wire and fittings from traced runs are read from the runs
         // themselves below; listing the line too would count them twice.
         if (line.takeoffRunTypeId !== null) continue;
+        // A remove / relocate line is labor only — nothing to buy
+        // (shared/roleLines.ts: "only NEW marks price material").
+        if (isLaborRoleLine(line)) continue;
         if (
           line.assemblyId === null &&
           line.takeoffGroupId !== null &&
@@ -226,6 +230,9 @@ export const materialsListRouter = router({
       */
       const countedOnBid = new Set(
         liveLines
+          // The INSTALL line carries the new marks. A count whose only line
+          // is its remove labor must still list its new marks from the plans.
+          .filter(line => !isLaborRoleLine(line))
           .map(line => line.takeoffGroupId)
           .filter((id): id is number => id !== null)
       );

@@ -38,6 +38,7 @@
 import { needsPricing } from "./materialPricing";
 import { canPriceByHand, lineNeedsPrice } from "./handPricedLines";
 import { laborInRunRate } from "./runFittings";
+import { isLaborRoleLine } from "./roleLines";
 
 export type NotPricedLineLike = {
   qty: string | number;
@@ -59,6 +60,13 @@ export type NotPricedLineLike = {
    * labor-only line "material not priced" again.
    */
   snapshotLaborOnly: boolean | null;
+  /**
+   * install / remove / relocate (0115). REQUIRED, like `runMaterialRole`: a
+   * remove or relocate line is decided by its hours alone, and a caller that
+   * could leave this out would read its frozen $0 material as a typed answer
+   * and call a line with no hours priced.
+   */
+  lineRole: string | null;
 };
 
 export function lineNotPriced(
@@ -68,6 +76,14 @@ export function lineNotPriced(
 ): boolean {
   const qty = Number(line.qty);
   if (!Number.isFinite(qty) || qty <= 0) return false;
+  /*
+    A REMOVE / RELOCATE line (shared/roleLines.ts) is labor and nothing else:
+    its material is a frozen 0 on purpose ("only NEW marks price material"),
+    so the HOURS decide, exactly as on a field bend. Checked before the
+    hand-priced rule, which would read that 0 as a typed answer and call a
+    line with no hours priced (owner, 2026-10-05: unset = "not priced").
+  */
+  if (isLaborRoleLine(line)) return line.snapshotLaborHours === null;
   if (canPriceByHand(line)) return lineNeedsPrice(line);
   if (line.takeoffRunTypeId !== null) {
     /*

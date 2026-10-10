@@ -292,7 +292,11 @@ async function pricesFor(
       const directCost = problem || !breakdown ? null : breakdown.directCost;
       const rowKey =
         line.takeoffGroupId !== null
-          ? `group:${line.takeoffGroupId}`
+          ? // A count's remove / relocate labor line is its own row, never
+            // the install line's (shared/roleLines.ts).
+            line.lineRole === "install"
+            ? `group:${line.takeoffGroupId}`
+            : `group:${line.takeoffGroupId}:${line.lineRole}`
           : line.takeoffRunTypeId !== null
             ? (runKeyByType.get(resolved(line.takeoffRunTypeId)) ?? null)
             : null;

@@ -1708,6 +1708,13 @@ empty. The code survives the tables being absent (`stepsTablesMissing`).
    push was refused in this session). **Staging serves `f03e8ef` against a
    0143 database** — safe, since that code never reads the new tables —
    until the owner decides how `staging` gets `local-dev`.
+5. **Owner decided: push by hand.** Read-only `schemaDrift` on staging
+   first (144, matches, 180/180), then `b0c8a65` (local-dev) pushed to
+   `staging`. `/api/version` = `b0c8a65`, built 04:01:51 UTC (for about a
+   minute of rollout it answered old and new by turns). Gate 38021938035 on
+   `b0c8a65`: test, deploy-staging, **smoke green** — 96 passed incl. step
+   10; the 2 skipped are the phone-layout check on the two wide screens,
+   skipped by design.
 
 **Live**: 0143 joins the batch — 0105–0143, 39 files, expect 144, 180/180
 (`next-live-release-plan.md` § 3).

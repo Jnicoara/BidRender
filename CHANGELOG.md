@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Removing or moving a device now puts its labor on the bid (not live
+  yet).** A count with devices marked Remove or Relocate sends one labor line
+  per kind beside its install line — "Remove duplex receptacle × 4". Only new
+  devices carry material. The hours come from this bid's own setting, else
+  the assembly's; when neither is set the line says "Not priced" (never $0)
+  with a "Set remove hours" button right on it, and the count card offers
+  "Add remove labor to bid" if the labor is not on the bid yet. Bids without
+  removed or relocated devices are unchanged.
+- **The bid's warnings now name the right fix for remove, relocate and
+  hand-counted lines.** A remove or relocate line with no hours gets its own
+  warning — "1 remove line has no hours" — with a "Set remove hours" button
+  that jumps to the box, instead of being lumped in with "type a price". A
+  hand-counted item with no hours now says "Hours not set" instead of a
+  misleading "0 h", and its warning has a "Set hours" button too. No numbers
+  change.
 - **The starter pricing sheets are rebuilt for the owner to fill — now with
   step times.** The prices workbook gains a "Steps" tab (type the minutes
   for each install step, with a suggested draft beside it) and a "Step
@@ -34,6 +49,18 @@ This is the human-readable companion to the git history — read this to see wha
   official image.
 
 ## [2026-10-09]
+
+- **Sign-in now stops after 10 wrong passwords for one address (or 30 from
+  one computer) for 15 minutes**, and says how long to wait. It answers the
+  same whether or not the address has an account, so it cannot be used to
+  find out who has one.
+- **A new password can no longer be the one you already have**, at password
+  change and at reset. A reset refused this way leaves the emailed link
+  working, so you can try a different password with it.
+- **On an iPad held sideways, "Save and count" is on screen without
+  scrolling** when building an assembly from parts in the plan viewer. The
+  button now stays pinned to the bottom of the popover; nothing else in it
+  moved, in either orientation or on a laptop.
 
 - **Fixed: on a tablet, typing a part and pressing Enter could add the
   wrong part.** After a tap, the results list grew under the spot that was

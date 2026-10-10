@@ -84,7 +84,11 @@ import {
   countUnpricedLaborLines,
   groupStaleRates,
 } from "@shared/laborRatePricing";
-import { canPriceByHand, missingEntryCounts } from "@shared/handPricedLines";
+import {
+  canPriceByHand,
+  lineNeedsHours,
+  missingEntryCounts,
+} from "@shared/handPricedLines";
 import { problemFixHint } from "@shared/linePricingProblems";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import {
@@ -126,12 +130,15 @@ import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
 import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 import { smartSearch } from "@/lib/smartSearch";
 import { TapExplain } from "@/components/TapExplain";
+import { lineHoursUnset, lineNotPriced } from "@shared/lineNotPriced";
 import {
-  lineHoursNotSet,
-  lineHoursUnset,
-  lineNotPriced,
-} from "@shared/lineNotPriced";
-import { laborInRunRate } from "@shared/runFittings";
+  isLaborRoleLine,
+  LABOR_ROLES,
+  roleHoursStripText,
+  roleLinesWithoutHours,
+  setHoursLabel,
+} from "@shared/roleLines";
+import { bidHoursCell } from "@/lib/bidHoursCell";
 import {
   bidNotPricedCount,
   laborShare,
@@ -399,6 +406,18 @@ export default function BidsPage({
     setWalk(next);
     setFixingLineId(next ? walkLineId(next) : null);
     scrollToFix.current = next !== null;
+  }, []);
+  /**
+   * The fix for a line priced by hand: its hours box is ON the line, so
+   * scroll there and put the cursor in it. Every hours box on such a line is
+   * labelled "… hours for one <name>" (HandPricedLineFields).
+   */
+  const focusLineHours = useCallback((lineId: number) => {
+    const row = document.getElementById(`bid-line-${lineId}`);
+    row?.scrollIntoView({ block: "center", behavior: "smooth" });
+    row
+      ?.querySelector<HTMLInputElement>('input[aria-label*="hours for one"]')
+      ?.focus({ preventScroll: true });
   }, []);
   const startFixWalk = (kind: FixWalkKind) =>
     openWalkAt(startWalk(kind, fixWalkItems(detailQuery.data?.lines ?? [])));
@@ -761,6 +780,10 @@ export default function BidsPage({
    * clears its entry the moment the optimistic update lands.
    */
   const missingEntry = missingEntryCounts(lines);
+  /** Where that strip's "Set hours" goes: the first such line on screen. */
+  const firstNoHoursLine = groupLines(lines)
+    .flatMap(g => g.lines)
+    .find(l => canPriceByHand(l) && lineNeedsHours(l) && !isLaborRoleLine(l));
 
   /**
    * EVERY line the total leaves unpriced, of any kind — the lines whose cost
@@ -768,9 +791,15 @@ export default function BidsPage({
    * which left a $0 pipe or fitting from an unpriced catalog row out of the
    * strip entirely. Read through the same rule the cell uses.
    */
-  const notPriced = lines.filter(l =>
-    lineNotPriced(l, l.breakdown?.directCost ?? null)
+  const notPriced = lines.filter(
+    l =>
+      lineNotPriced(l, l.breakdown?.directCost ?? null) &&
+      /* A remove / relocate line has its own entry below: its gap is the
+         hours, and "the Materials total leaves it out" is not true of it. */
+      !isLaborRoleLine(l)
   );
+  /** Remove / relocate lines with no hours — their own entry and fix-it. */
+  const roleNoHours = roleLinesWithoutHours(lines);
   /**
    * Lines priced from BidRidge's EXAMPLE numbers (0132–0134), from their
    * frozen flags — the same count the warning before printing gives.
@@ -1586,14 +1615,28 @@ export default function BidsPage({
                                   whose part has no labor unit reads "Not
                                   priced", never "0 h" (owner, 2026-09-26) —
                                   the same words and colour as the cost cell. */}
-                              {lineHoursUnset(line) ? (
+                              {bidHoursCell(line) === "runLaborUnset" ? (
                                 <FixableLabel
                                   onFix={openFix}
                                   className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
                                 >
                                   Not priced
                                 </FixableLabel>
-                              ) : lineHoursNotSet(line) ? (
+                              ) : bidHoursCell(line) === "handHoursNotSet" ? (
+                                /* A line priced by hand — a free count, or a
+                                   remove / relocate line — with no hours
+                                   typed: never "0 h" (@/lib/bidHoursCell).
+                                   Its fix is the hours box on the line
+                                   itself, so the label puts the cursor
+                                   there. */
+                                <FixableLabel
+                                  onFix={() => focusLineHours(line.id)}
+                                  className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
+                                >
+                                  Hours not set
+                                </FixableLabel>
+                              ) : bidHoursCell(line) ===
+                                "assemblyHoursNotSet" ? (
                                 /* An assembly whose hours were not set when
                                    this line was added (D1): never "0 h". */
                                 <FixableLabel
@@ -1602,8 +1645,7 @@ export default function BidsPage({
                                 >
                                   Hours not set
                                 </FixableLabel>
-                              ) : line.takeoffRunTypeId !== null &&
-                                laborInRunRate(line.runMaterialRole) ? (
+                              ) : bidHoursCell(line) === "inRunRate" ? (
                                 /* A coupling, connector or strap: its labor is
                                    in the run's per-foot rate (owner,
                                    2026-09-29). Said in words, because "0 h"
@@ -1912,6 +1954,38 @@ export default function BidsPage({
                   </p>
                 </div>
               )}
+              {/*
+                REMOVE / RELOCATE lines with no hours (shared/roleLines.ts).
+                One entry per kind, and the fix-it is the hours, never a
+                price: the button scrolls to the first such line and puts the
+                cursor in its hours box — the same as the line's own button.
+              */}
+              {LABOR_ROLES.map(role =>
+                roleNoHours[role].length > 0 ? (
+                  <div
+                    key={role}
+                    className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                      <span className="text-foreground font-medium">
+                        {roleHoursStripText(role, roleNoHours[role].length)}
+                      </span>
+                      <span className="block">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1.5 h-7 px-2 text-xs border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518]"
+                          onClick={() => focusLineHours(roleNoHours[role][0])}
+                        >
+                          <Wrench className="w-3.5 h-3.5 mr-1" />
+                          {setHoursLabel(role)}
+                        </Button>
+                      </span>
+                    </p>
+                  </div>
+                ) : null
+              )}
 
               {/*
                 $0 PARTS inside lines that are otherwise priced (0087). Their
@@ -2029,6 +2103,19 @@ export default function BidsPage({
                     — no labor for {missingEntry.noHours === 1 ? "it" : "them"}{" "}
                     is in the total above. Type hours on the line (0 if someone
                     else installs it).
+                    {firstNoHoursLine !== undefined && (
+                      <span className="block">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-1.5 h-7 px-2 text-xs border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518]"
+                          onClick={() => focusLineHours(firstNoHoursLine.id)}
+                        >
+                          <Wrench className="w-3.5 h-3.5 mr-1" />
+                          Set hours
+                        </Button>
+                      </span>
+                    )}
                   </p>
                 </div>
               )}

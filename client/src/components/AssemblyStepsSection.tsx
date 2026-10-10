@@ -43,12 +43,25 @@ export function AssemblyStepsSection({
   library,
   cableUnset,
   onChange,
+  removeHours,
+  relocateHours,
+  onRemoveHours,
+  onRelocateHours,
 }: {
   steps: readonly DraftStep[];
   library: readonly LibraryStep[];
   /** Cable lines in the recipe whose hours per foot are not set. */
   cableUnset: number;
   onChange: (next: DraftStep[]) => void;
+  /**
+   * Hours to take one out / move one (0110), as typed in the draft — saved
+   * with the assembly. Blank is NOT SET: a remove / relocate bid line then
+   * reads "Not priced", never $0 (shared/roleLines.ts).
+   */
+  removeHours: string;
+  relocateHours: string;
+  onRemoveHours: (value: string) => void;
+  onRelocateHours: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState<string>("");
@@ -121,6 +134,39 @@ export function AssemblyStepsSection({
 
       {open && (
         <div className="space-y-3 pl-5">
+          <div className="space-y-1.5">
+            <div className="text-sm font-medium">Remove and relocate</div>
+            <p className="text-xs text-muted-foreground">
+              Hours to take one out, or move one, on a job that marks it Remove
+              or Relocate. Labor only — new devices carry the material. Blank is
+              not set: those bid lines read "Not priced" until it is.
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {(
+                [
+                  ["Remove", removeHours, onRemoveHours],
+                  ["Relocate", relocateHours, onRelocateHours],
+                ] as const
+              ).map(([word, value, set]) => (
+                <label
+                  key={word}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                  {word} each
+                  <Input
+                    value={value}
+                    onChange={e => set(e.target.value)}
+                    onFocus={selectOnFocus}
+                    inputMode="decimal"
+                    placeholder="not set"
+                    className="h-8 w-20 text-sm text-right"
+                    aria-label={`${word} hours for one`}
+                  />
+                  hours
+                </label>
+              ))}
+            </div>
+          </div>
           <div>
             <div className="text-sm font-medium">Build hours from steps</div>
             <p className="text-xs text-muted-foreground">

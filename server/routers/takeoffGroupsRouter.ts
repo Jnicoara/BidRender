@@ -53,6 +53,7 @@ import { emptySplit } from "../../shared/markStatus";
 import {
   countsWaitingToSend,
   countsWithNoPrice,
+  laborRolesWaiting,
   sendWarning,
   sendability,
   type BridgeLine,
@@ -64,12 +65,14 @@ function toBridgeLine(line: {
   name: string;
   takeoffGroupId: number | null;
   assemblyId: number | null;
+  lineRole: string;
 }): BridgeLine {
   return {
     id: line.id,
     name: line.name,
     takeoffGroupId: line.takeoffGroupId,
     assemblyId: line.assemblyId,
+    lineRole: line.lineRole,
   };
 }
 
@@ -234,6 +237,14 @@ export const takeoffGroupsRouter = router({
         count: counts.get(group.id) ?? 0,
         /** Every mark by status — "12 new · 4 existing". Display only. */
         split: splits.get(group.id) ?? emptySplit(),
+        /** Remove / relocate marks — each kind puts a labor line on the bid. */
+        roleCounts: {
+          remove: splits.get(group.id)?.remove ?? 0,
+          relocate: splits.get(group.id)?.relocate ?? 0,
+        },
+        /** This bid's own remove / relocate hours; NULL = the assembly's. */
+        removeLaborHours: group.removeLaborHours,
+        relocateLaborHours: group.relocateLaborHours,
         /** This job's chosen pin look (shared/pinLetters.ts). NULL = automatic. */
         look: {
           shape: group.markShape,
@@ -266,6 +277,16 @@ export const takeoffGroupsRouter = router({
            * than greying a control out and explaining none of them.
            */
           sendability: sendability(row, bridgeLines),
+          /** Remove / relocate labor lines it has marks for and the bid lacks. */
+          laborRolesWaiting: laborRolesWaiting(row, bridgeLines),
+          /** Which of its remove / relocate labor lines are on the bid. */
+          laborRolesOnBid: bridgeLines
+            .filter(
+              line =>
+                line.takeoffGroupId === row.id &&
+                (line.lineRole === "remove" || line.lineRole === "relocate")
+            )
+            .map(line => line.lineRole),
         })),
         /** The one number the panel prints under the list. */
         waitingToSend: countsWaitingToSend(rows, bridgeLines),
@@ -714,6 +735,37 @@ export const takeoffGroupsRouter = router({
     }),
 
   /**
+   * This count's own remove or relocate hours on this bid (0111) — the
+   * per-bid override of the assembly's. NULL follows the assembly. A line
+   * already on the bid keeps the hours it froze; this reaches lines sent
+   * after it. Refused on a locked bid, like every count edit.
+   */
+  setLaborRoleHours: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        role: z.enum(["remove", "relocate"]),
+        hours: z.number().min(0).max(999).nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      const bid = await requireBid(group.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be changed"),
+        });
+      await db.setGroupLaborRoleHours(
+        group.id,
+        ctx.scope.dataUserId,
+        input.role,
+        input.hours === null ? null : input.hours.toFixed(4)
+      );
+      return { id: group.id };
+    }),
+
+  /**
    * Send a counted thing to the bid as a line — the bridge.
    *
    * ── Why this is a mutation somebody calls, and not a side effect ───────────
@@ -743,11 +795,13 @@ export const takeoffGroupsRouter = router({
         with — but a locked bid must not change, and a new line is a change.
       */
       await refuseSendIfLocked(group.bidId, ctx.scope.dataUserId);
-      const [counts, lines] = await Promise.all([
+      const [counts, splits, lines] = await Promise.all([
         db.countStampsByGroup(group.bidId, ctx.scope.dataUserId),
+        db.statusSplitByGroup(group.bidId, ctx.scope.dataUserId),
         db.getBidLineItems(group.bidId),
       ]);
       const count = counts.get(group.id) ?? 0;
+      const split = splits.get(group.id);
       const bridgeLines = lines.map(toBridgeLine);
       const row = {
         id: group.id,
@@ -757,10 +811,22 @@ export const takeoffGroupsRouter = router({
         materialId: group.materialId,
         unitCost: group.unitCost === null ? null : Number(group.unitCost),
         count,
+        roleCounts: {
+          remove: split?.remove ?? 0,
+          relocate: split?.relocate ?? 0,
+        },
       };
 
+      /*
+        Two halves (owner, 2026-10-05): the INSTALL line for the new marks,
+        exactly as before, and one LABOR line per remove / relocate kind the
+        count has and the bid does not. Refused only when there is nothing
+        to add at all — so a count whose removals were sent first can still
+        send its new marks, and a demo-only count can send its removals.
+      */
       const allowed = sendability(row, bridgeLines);
-      if (!allowed.sendable) {
+      const roles = laborRolesWaiting(row, bridgeLines);
+      if (!allowed.sendable && roles.length === 0) {
         throw new TRPCError({
           code:
             allowed.reason === "already-on-bid" ? "CONFLICT" : "BAD_REQUEST",
@@ -768,24 +834,39 @@ export const takeoffGroupsRouter = router({
         });
       }
 
-      const families = await db.getAssemblyFamilies(
-        [
-          ...(group.assemblyId === null ? [] : [group.assemblyId]),
-          ...bridgeLines.flatMap(line =>
-            line.assemblyId === null ? [] : [line.assemblyId]
-          ),
-        ],
-        ctx.scope.dataUserId
-      );
-      const warning = sendWarning(row, bridgeLines, families);
-      const { id } = await db.addCountToBid(
+      let lineId: number | null = null;
+      let warning: ReturnType<typeof sendWarning> = null;
+      if (allowed.sendable) {
+        const families = await db.getAssemblyFamilies(
+          [
+            ...(group.assemblyId === null ? [] : [group.assemblyId]),
+            ...bridgeLines.flatMap(line =>
+              line.assemblyId === null ? [] : [line.assemblyId]
+            ),
+          ],
+          ctx.scope.dataUserId
+        );
+        warning = sendWarning(row, bridgeLines, families);
+        lineId = (
+          await db.addCountToBid(
+            group.bidId,
+            ctx.scope.dataUserId,
+            group,
+            count
+          )
+        ).id;
+      }
+      const roleLineIds = await db.addLaborRoleLinesToBid(
         group.bidId,
         ctx.scope.dataUserId,
         group,
-        count
+        roles,
+        row.roleCounts
       );
       return {
-        lineId: id,
+        lineId: lineId ?? roleLineIds[0],
+        /** The remove / relocate labor lines this send added. */
+        addedLaborRoles: roles,
         count,
         warning,
         /**

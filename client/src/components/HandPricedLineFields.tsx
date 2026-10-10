@@ -22,7 +22,8 @@
  * when hours are filled in"). Hours with no role price at $0, and the existing
  * "hours but no labor rate" entry on the strip says so.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { isLaborRoleLine, setHoursLabel } from "@shared/roleLines";
 import { toast } from "sonner";
 import { Link2, BookmarkPlus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -60,6 +61,8 @@ export type HandPricedLine = {
   snapshotMaterialCost: string | null;
   snapshotLaborHours: string | null;
   snapshotLaborRate: string;
+  /** install / remove / relocate — a remove or relocate line is labor only. */
+  lineRole: string;
 };
 
 type Rate = { id: number; name: string; effectiveHourlyRate: number };
@@ -111,6 +114,8 @@ export function HandPricedLineFields({
     rate" entry is what then says why the labor is still $0.
   */
   const [pickedRoleId, setPickedRoleId] = useState<number | null>(null);
+  /** The hours box, for the "Set remove hours" fix-it to focus. */
+  const hoursBox = useRef<HTMLLabelElement>(null);
   const picked = rates.find(rate => rate.id === pickedRoleId);
   const role =
     picked && Math.abs(picked.effectiveHourlyRate - frozenRate) < 1e-4
@@ -162,6 +167,88 @@ export function HandPricedLineFields({
     },
     onSettled: onChanged,
   });
+
+  /*
+    A REMOVE / RELOCATE line (shared/roleLines.ts) is labor only — "only NEW
+    marks price material" — so it shows its hours and its role, and no price
+    or library actions. With no hours it is "Not priced", and the fix is the
+    button right here: it puts the cursor in the hours box.
+  */
+  if (isLaborRoleLine(line)) {
+    return (
+      <div className="mt-1.5 space-y-1">
+        {hours === null ? (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[#F5C518]">
+            <span>
+              {line.lineRole === "remove" ? "Remove" : "Relocate"} labor not
+              priced — no hours yet.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              onClick={() => hoursBox.current?.querySelector("input")?.focus()}
+            >
+              {setHoursLabel(line.lineRole)}
+            </Button>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <label
+            ref={hoursBox}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+          >
+            {line.lineRole === "remove" ? "Remove" : "Relocate"} labor each
+            <InlineNumberField
+              value={hours}
+              whenUnset={{ placeholder: "not set" }}
+              onSave={next =>
+                update.mutate({ bidId, id: line.id, laborHours: next })
+              }
+              onClear={() =>
+                update.mutate({ bidId, id: line.id, laborHours: null })
+              }
+              rules={{ min: 0, max: 99999 }}
+              suffix="h"
+              className="h-7 w-24 text-sm"
+              ariaLabel={`${line.lineRole === "remove" ? "Remove" : "Relocate"} hours for one ${line.name}`}
+            />
+          </label>
+          {hours !== null && hours > 0 ? (
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              by
+              <select
+                className="h-7 rounded-md border border-input bg-transparent px-2 text-xs text-foreground"
+                value={role?.id ?? ""}
+                aria-label={`Who does the labor on ${line.name}`}
+                onChange={event => {
+                  const id = Number(event.target.value);
+                  if (id > 0) {
+                    setPickedRoleId(id);
+                    update.mutate({ bidId, id: line.id, laborRateId: id });
+                  }
+                }}
+              >
+                {role === null ? (
+                  <option value="">
+                    {frozenRate > 0
+                      ? `${money(frozenRate)}/h (no matching role)`
+                      : "pick a role"}
+                  </option>
+                ) : null}
+                {rates.map(rate => (
+                  <option key={rate.id} value={rate.id}>
+                    {rate.name} — {money(rate.effectiveHourlyRate)}/h
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -541,6 +628,8 @@ function SaveAsAssembly({
 
 /** Whether a line has anything blank, for the note under its name. */
 export function handPricedGap(line: HandPricedLine): string | null {
+  // A remove / relocate line says its own gap beside its fix-it button.
+  if (isLaborRoleLine(line)) return null;
   const noPrice = lineNeedsPrice(line);
   const noHours = lineNeedsHours(line);
   if (noPrice && noHours) return "No price or labor typed yet";

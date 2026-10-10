@@ -19,7 +19,95 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-10 (session 28, third part) — START HERE
+## START HERE — 2026-10-10, end of session 28: the release is READY, waiting on the owner
+
+**Release candidate: `371b2ab`** — Gate 38024015936 all green (test,
+deploy-staging, smoke). It contains every must-include (`11f5466`,
+`705e1c9`, `dd3f76d`) and changes nothing under `drizzle/` or
+`server/seed/` against `dd3f76d`, the commit § 5g rehearsed (`dd3f76d`
+was the candidate until this Gate went green; `next-live-release-plan.md`
+still names it — same database figures). On top it carries B's sign-in
+limits, the current-password refusal and the Save-pinned popover fix.
+
+**What is done:** 0105–0143 on staging (144, 180/180); staging serves
+local-dev; fresh live-copy rehearsal **§ 5g PASSED** (below).
+
+**What the release waits for — the owner, nothing else:**
+
+1. **Owner's tablet check of staging.**
+2. **Owner's yes**, naming the candidate (`371b2ab`, or a newer green one —
+   a newer one needs its own green Gate, and a re-rehearsal only if it
+   changes `drizzle/` or `server/seed/`).
+
+**Then the release** (`next-live-release-plan.md`, `live-release-plan.md`
+§ 4): fresh live backup + restore check → read-only recount (0) and
+Legend-race check (none) on live → 39 migrations before the push (expect
+144, 180/180) → push `main` → `/api/version` → cover repair (5 / 45 → 50)
+→ retired repair (1 + DV34/GR3 skips) → `bidTotals` unchanged. **If any
+figure differs from § 5g, stop and find out why.** Never the LT1/LT2
+fixture repair on live.
+
+**After the release:** build the staging-guard proposal (`todo.md`).
+
+## UPDATE 2026-10-10 (session 28, fifth part)
+
+- **Release candidate was `dd3f76d`** (Gate 38022621884 green, smoke 96);
+  superseded by `371b2ab` above once Gate 38024015936 went green. My
+  `a1527ac` (= `dd3f76d` + docs) had its Gate cancelled by B's push.
+- **Fresh live-copy rehearsal DONE** (`next-live-release-plan.md` § 5g):
+  a read-only dump of live this time (it was not refused), 65/65 tables
+  equal; 39 applied, 144, 180/180; first boot 0 holds; covers 5 / 45 → 50;
+  retired 1 repointed + 2 expected skips (DV34, GR3: live never had their
+  old parts, measured on the new recipe already); exactly 6 starter lines
+  changed; both live bids unchanged. Recount and Legend-race check on live:
+  0 / none. LT1/LT2 repair not run.
+- **Staging-guard proposal** is in `todo.md` ("build AFTER the live
+  release"), with its four protections.
+- Scratch: the rehearsal's DB and worktree are removed. The live dump
+  stays in `C:\dev\bidrender-backups\`. Left alone: the old
+  `../bidrender-before` folder from an earlier session (a broken real
+  `node_modules` only, not a worktree). Safe to delete by hand.
+
+## UPDATE 2026-10-10 (session 28, fourth part)
+
+- **Staging pushed by hand** to `b0c8a65` (local-dev), owner-approved, after
+  a read-only `schemaDrift` on staging: 144 recorded, matches, 180/180.
+  Staging serves `b0c8a65`; Gate 38021938035 all green, smoke 96 passed
+  (step 10 included; 2 skipped by design). Local-dev auto-deploys again.
+- **PROPOSAL, not built — the staging guard after a migration.** Today the
+  Gate refuses every local-dev push whose `drizzle/` differs from what the
+  `staging` BRANCH holds, even once staging's DATABASE has the migration,
+  so somebody must push staging by hand. Proposed: let it through when
+  staging's database already has every migration file in the new commit.
+  - **How the Gate would know.** It cannot ask the database: it holds no
+    database secret, and the database only answers its trusted list (§ 10
+    of `deploying.md`). So staging's app reports it: `/api/version` (or a
+    sibling) adds the applied migrations' **hashes** from
+    `__drizzle_migrations`. The Gate hashes each `drizzle/*.sql` in the
+    commit the way the migrator does and passes only if every one is
+    applied (checked 2026-10-10: the stored `hash` is the file's plain
+    sha256 — 0141's matched on the local database). Hashes, not a count: the 0142 → 0143 renumbering would have
+    fooled a count, and a hash also catches a file edited after it ran.
+  - **Risk 1, the real one — the order rule.** For an additive migration
+    "database first, then code" is right, and this is what it automates.
+    For a migration that CHANGES WHAT A COLUMN MEANS, the code must ship
+    first and the backfill after. A guard that only opens once the database
+    has the file teaches people to run the backfill early to get the push
+    through — and that gives wrong numbers with nothing failing (0063 did
+    exactly that: 125.01 ft became 83.34 ft). Fix: a migration file marked
+    `-- STEP 3` is never let through; that release stays hand-pushed.
+  - **Risk 2 — a lying answer.** If the app's report were wrong (e.g. read
+    from the wrong database), the Gate would ship code against a database
+    without its columns, and screens fail with "Unknown column". Smoke
+    would catch most of it, after the fact. Fix: read the same connection
+    the app uses, and refuse on any error or an empty list.
+  - **Risk 3 — saying more than we need publicly.** A list of hashes
+    reveals nothing useful, but a list of migration names reveals our
+    schema history. Hashes only, or put it behind a secret the Gate holds.
+  - **Never for live.** `main` stays a hand push by design; this touches
+    only the local-dev → staging step.
+
+## UPDATE 2026-10-10 (session 28, third part)
 
 - **0143 `labor_steps` ON STAGING's DATABASE** (C's step labor): backup
   75 tables, rehearsed, staging migrated (144, 180/180), 1,066/1,066

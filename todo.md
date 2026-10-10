@@ -69,7 +69,14 @@ todo.md: tick (a) and (b) there and point at this entry.**
       on nothing found, "Count …", and "Build it from parts here", in every
       picker that logs. Closing a picker on half-typed words still records
       nothing. Measured on screen: recorded 54–75 ms after Enter.
-- [ ] **Landscape: "Save and count" needs a scroll in the build-from-parts
+- [x] **DONE 2026-10-09 (B): the Save row is pinned** (`pinActions` on
+      `BuildFromPartsPanel`, set only by the plan viewer's Count popover).
+      Measured in Firefox (Gecko): at 1180x820 Save went from 856–900 (below
+      the 820 screen) to 718–762, inside the popover; at 820x1180 and
+      1440x900, 0 of 20 elements in the popover moved. `bottom-0` lifted the
+      row 8px even with nothing to scroll (sticky measures the CONTENT box);
+      it is `bottom-[-0.5rem]`. Was:
+      **Landscape: "Save and count" needs a scroll in the build-from-parts
       popover.** On the plan viewer at 1180x820 the builder (name, part,
       three recents, More options) is taller than the screen, so the
       button sits below the fold of the popover's own scroll area (80dvh).
@@ -795,6 +802,45 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Staging deploy guard: let a push through once staging's DATABASE has its migrations — build AFTER the live release (Track A, 2026-10-10)
+
+**Today:** the Gate's deploy-staging step refuses every local-dev push whose
+`drizzle/` differs from the `staging` BRANCH. That stays true after Track A
+has migrated staging's database, so somebody must push `staging` by hand
+(0142, 0143, 2026-10-10). Every push in between stops at that step.
+
+**Proposed:** let the push through when staging's database already has
+every migration file in the new commit, and refuse otherwise. The Gate
+cannot ask the database itself: it holds no database secret, and the
+database only answers its trusted list (`deploying.md` § 10). So staging's
+app reports the fingerprint (sha256, the `hash` column of
+`__drizzle_migrations`) of each migration it has applied. The Gate hashes
+each `drizzle/*.sql` in the commit and passes only if every one is there.
+Checked 2026-10-10: the stored hash is the file's plain sha256. Use
+fingerprints, not a count: the 0142 → 0143 renumbering would fool a count,
+and a fingerprint also catches a file edited after it ran.
+
+**Four protections, all required:**
+
+1. **A meaning-change migration never auto-deploys.** Such a file (one that
+   changes what an existing column means, CLAUDE.md "three steps") needs
+   the code FIRST and the backfill after. A guard that opens once the
+   database has the file would teach people to run the backfill early to
+   get the push through, and that gives wrong numbers with nothing failing
+   (0063: 125.01 ft became 83.34 ft). Mark such a file `-- STEP 3`; the
+   Gate refuses it always, and that release stays a hand push.
+2. **Refuse on any error or an empty answer.** A wrong report would ship
+   code against a database without its columns ("Unknown column", screens
+   down). The app reads the same connection it serves from; no answer, a
+   failed read or an empty list is a refusal, never a pass.
+3. **Fingerprints only, never names.** The answer is public or nearly so;
+   a list of migration names would publish our schema history. Hashes say
+   nothing useful to anyone else. Or put it behind a secret the Gate holds.
+4. **Never for live.** `main` stays a hand push by design (CLAUDE.md
+   "Deploying"). This touches only the local-dev → staging step.
+
+Full reasoning: `references/track-a-handoff.md`, session 28 fourth part.
+
 ### Track A next migration batch
 
 Requests waiting for Track A, which numbers and writes the migrations.
@@ -1308,13 +1354,25 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       k-anonymity range check against Have I Been Pwned: only the first five
       characters of the SHA-1 leave the server). The refusal says plainly
       why. Never a silent rejection.
-- [ ] **Limit repeated wrong sign-in attempts**, per address and per sender,
+- [x] **DONE 2026-10-09 (B):** 10 wrong per address, 30 per sender, 15
+      minutes, counted for addresses with no account too
+      (`createFailureLimiter` in `server/rateLimit.ts`; a right password
+      costs nothing and clears its address). Tests in
+      `server/auth.email.test.ts`; the message seen on the sign-in form at
+      laptop and phone width. In-memory, per instance, like the reset limits.
+      Was: **Limit repeated wrong sign-in attempts**, per address and per sender,
       the same way password reset is already limited (`overResetRequestLimit`
       / `overResetAddressLimit` in `authRouter.ts`). The message names the
       wait and never says whether the address has an account. Log each lock
       with a reason, masked, like the reset stops (`deploying.md` § 11,
       "reset email blocked").
-- [ ] **Refuse a new password that matches the CURRENT one** (owner,
+- [x] **DONE 2026-10-09 (B):** change (`bcrypt.compare` against the stored
+      hash) and reset (`db.getResetTokenPasswordHash`, read BEFORE the link
+      is claimed); tests in `server/auth.email.test.ts` and
+      `server/passwordReset.test.ts` (the link still works after the
+      refusal). There is no change-password screen in the client today; the
+      server refuses it for when there is. Was:
+      **Refuse a new password that matches the CURRENT one** (owner,
       2026-10-06), at password change and at reset: compare the new
       password against the stored hash (`bcrypt.compare`) and refuse with a
       plain sentence ("That is your current password. Choose a different

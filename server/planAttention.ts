@@ -43,6 +43,7 @@ export async function planAttentionFor(
     takeoffGroupId: number | null;
     takeoffRunTypeId: number | null;
     assemblyId: number | null;
+    lineRole: string;
   }[]
 ): Promise<{
   waitingToSend: number;
@@ -64,6 +65,7 @@ export async function planAttentionFor(
     name: line.name,
     takeoffGroupId: line.takeoffGroupId,
     assemblyId: line.assemblyId,
+    lineRole: line.lineRole,
   }));
 
   const families = await db.getAssemblyFamilies(
@@ -74,9 +76,12 @@ export async function planAttentionFor(
   );
   const doubleCounted = doubleCountedAssemblies(bridgeLines, families);
 
-  const [groups, counts] = await Promise.all([
+  const [groups, counts, splits] = await Promise.all([
     db.getGroupsForBid(bidId, userId),
     db.countStampsByGroup(bidId, userId),
+    // Remove / relocate marks put labor lines on the bid too, so a count
+    // whose removals are not sent is "waiting" like one whose new marks are.
+    db.statusSplitByGroup(bidId, userId),
   ]);
   const bridgeGroups: BridgeGroup[] = groups.map(group => ({
     id: group.id,
@@ -86,6 +91,10 @@ export async function planAttentionFor(
     materialId: group.materialId,
     unitCost: group.unitCost === null ? null : Number(group.unitCost),
     count: counts.get(group.id) ?? 0,
+    roleCounts: {
+      remove: splits.get(group.id)?.remove ?? 0,
+      relocate: splits.get(group.id)?.relocate ?? 0,
+    },
   }));
 
   /*

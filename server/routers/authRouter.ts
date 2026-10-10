@@ -23,7 +23,11 @@ import {
   resetLink,
 } from "../passwordReset";
 import { RESET_LINK_UNUSABLE } from "@shared/resetLinkMessages";
-import { clientKey, createRateLimiter } from "../rateLimit";
+import {
+  clientKey,
+  createFailureLimiter,
+  createRateLimiter,
+} from "../rateLimit";
 
 const SALT_ROUNDS = 12;
 
@@ -56,6 +60,36 @@ const overResetSubmitLimit = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 20,
 });
+
+/*
+  Wrong sign-in attempts (todo.md, 2026-10-09). Per address so one account
+  cannot be guessed at from many machines, per sender so one machine cannot
+  walk many accounts. Counted for addresses with NO account too, and refused
+  with the same words, so the lock never says whether an account exists. A
+  right password costs nothing and clears its address. The real backstop is
+  bcrypt's cost per guess.
+*/
+const SIGN_IN_WINDOW_MS = 15 * 60 * 1000;
+const wrongSignInsForAddress = createFailureLimiter({
+  windowMs: SIGN_IN_WINDOW_MS,
+  max: 10,
+});
+const wrongSignInsFromSender = createFailureLimiter({
+  windowMs: SIGN_IN_WINDOW_MS,
+  max: 30,
+});
+
+/** Names the wait, whole minutes, never "0". */
+export function tooManySignIns(waitMs: number): string {
+  const minutes = Math.max(1, Math.ceil(waitMs / 60_000));
+  return `Too many wrong sign-in attempts. Wait ${minutes} minute${
+    minutes === 1 ? "" : "s"
+  } and try again.`;
+}
+
+/** Said at password change and at reset (owner, 2026-10-06). */
+export const SAME_AS_CURRENT_PASSWORD =
+  "That is your current password. Choose a different one.";
 
 const TOO_MANY_RESETS =
   "Too many password reset attempts. Wait an hour and try again.";
@@ -137,24 +171,49 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const user = await db.getUserByEmail(input.email.toLowerCase());
+      const email = input.email.toLowerCase();
+      const sender = clientKey(ctx.req);
+      // Asked before the address is looked up, so a locked address and a
+      // locked sender answer alike whether or not the account exists.
+      const wait = Math.max(
+        wrongSignInsForAddress.blockedFor(email, Date.now()),
+        wrongSignInsFromSender.blockedFor(sender, Date.now())
+      );
+      if (wait > 0)
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: tooManySignIns(wait),
+        });
+
+      const wrong = () => {
+        const now = Date.now();
+        // Both counted on every failure, so neither can be skipped by
+        // tripping the other first. Logged once, as each lock begins.
+        if (wrongSignInsForAddress.fail(email, now))
+          console.warn(
+            `[auth] sign-in locked for 15 min: too many wrong passwords for ${maskAddress(email)}`
+          );
+        if (wrongSignInsFromSender.fail(sender, now))
+          console.warn(
+            "[auth] sign-in locked for 15 min: too many wrong passwords from one sender"
+          );
+        return new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password.",
+        });
+      };
+
+      const user = await db.getUserByEmail(email);
 
       if (!user || !user.passwordHash) {
         // Constant-time guard: hash a dummy password to prevent timing attacks
         await bcrypt.hash("dummy_timing_guard", SALT_ROUNDS);
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid email or password.",
-        });
+        throw wrong();
       }
 
       const valid = await bcrypt.compare(input.password, user.passwordHash);
-      if (!valid) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid email or password.",
-        });
-      }
+      if (!valid) throw wrong();
+      wrongSignInsForAddress.clear(email);
 
       // Update lastSignedIn
       await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
@@ -206,6 +265,14 @@ export const authRouter = router({
           message: "Current password is incorrect.",
         });
       }
+
+      // Against the stored hash, not the typed current password: bcrypt
+      // reads only 72 bytes, so two different strings can be one password.
+      if (await bcrypt.compare(input.newPassword, user.passwordHash))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: SAME_AS_CURRENT_PASSWORD,
+        });
 
       const newHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
       // Ends every session issued before now — this device's included…
@@ -356,6 +423,18 @@ export const authRouter = router({
         throw new TRPCError({
           code: "TOO_MANY_REQUESTS",
           message: TOO_MANY_RESETS,
+        });
+
+      // Refused BEFORE the link is claimed, so it still works for a
+      // different password (owner, 2026-10-06). A dead link falls through to
+      // the claim below, which refuses it in its own words.
+      const currentHash = await db.getResetTokenPasswordHash(
+        hashResetToken(input.token)
+      );
+      if (currentHash && (await bcrypt.compare(input.newPassword, currentHash)))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: SAME_AS_CURRENT_PASSWORD,
         });
 
       const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);

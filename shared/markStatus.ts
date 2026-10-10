@@ -134,15 +134,29 @@ export function statusSplitText(split: StatusSplit): string | null {
  * omission is stated, never silent: an existing device is correctly free, but
  * a removal or relocation has labor nobody has priced yet.
  */
-export function unpricedStatusNote(split: StatusSplit): string | null {
+export function unpricedStatusNote(
+  split: StatusSplit,
+  /**
+   * Which kinds already have their remove / relocate LABOR line on the bid
+   * (shared/roleLines.ts, built 2026-10-10). Those are no longer "not on the
+   * bid", so they drop out of the sentence. Absent = neither, which is what
+   * this said before the lines existed.
+   */
+  laborOnBid: { remove: boolean; relocate: boolean } = {
+    remove: false,
+    relocate: false,
+  }
+): string | null {
   // Short: it sits under a count's name in a narrow panel (three lines long
   // on the first screen check, 2026-10-05).
   const parts: string[] = [];
   if (split.existing > 0) parts.push(`${split.existing} existing — not priced`);
-  const labor = split.remove + split.relocate;
+  const remove = laborOnBid.remove ? 0 : split.remove;
+  const relocate = laborOnBid.relocate ? 0 : split.relocate;
+  const labor = remove + relocate;
   if (labor > 0)
     parts.push(
-      `${labor} ${split.remove > 0 && split.relocate > 0 ? "remove/relocate" : split.remove > 0 ? "remove" : "relocate"} — labor not on the bid`
+      `${labor} ${remove > 0 && relocate > 0 ? "remove/relocate" : remove > 0 ? "remove" : "relocate"} — labor not on the bid`
     );
   if (split.unconfirmed > 0)
     parts.push(`${split.unconfirmed} unconfirmed — not counted until checked`);

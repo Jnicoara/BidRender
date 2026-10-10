@@ -66,6 +66,7 @@ import {
   canPriceByHand,
   saveAsAssemblyRefusal,
 } from "../../shared/handPricedLines";
+import { isLaborRoleLine } from "../../shared/roleLines";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { resolveForkedRow } from "../../shared/forkedRows";
 import {
@@ -1165,6 +1166,16 @@ export const bidsRouter = router({
             code: "BAD_REQUEST",
             message:
               "This line's price comes from your library, so it is not typed here. Change the assembly in the Library and add it again to take the new price.",
+          });
+        }
+        // A remove / relocate line is labor only: "only NEW marks price
+        // material" (owner, 2026-10-05; shared/roleLines.ts). Its hours and
+        // role are typeable here — that is its fix-it — its price is not.
+        if (input.materialCost !== undefined && isLaborRoleLine(line)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "A remove or relocate line is labor only — only new devices carry a material price.",
           });
         }
         // A number TYPED on the bid is the shop's own, never our example —
