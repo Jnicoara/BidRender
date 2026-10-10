@@ -19,7 +19,21 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-09 (session 28) — START HERE
+## UPDATE 2026-10-10 (session 28, second part) — START HERE
+
+- **Reality check ON STAGING** (`8f28a85`, local-dev = staging): backup
+  `staging-2026-10-10T01-38-57Z-before-reality-check.sql` (74/74 counts),
+  rehearsed CLEAN, catalog CLEAN on staging, covers 2 swapped + **new
+  `repairStarterRetired` 13 repointed**, 1,027/1,027 bids unchanged
+  (`deploying.md` § 11). Live untouched: § 4b + § 4c of the release plan.
+- Owner: the two held lighting lines are NOT applied; panels keep
+  "main-breaker panel".
+- Next in order: Gate Docker Hub limit (MySQL from the AWS public mirror),
+  then B's `search_misses` migration (0142) on local-dev and staging, then
+  STOP before the sheet rebuild (Track C's Steps tab and step-labor
+  migration first).
+
+## UPDATE 2026-10-09 (session 28)
 
 **Catalog reality check BUILT on branch `a-catalog-reality` (pushed, NOT
 merged to local-dev — a green local-dev push deploys staging, so the merge IS

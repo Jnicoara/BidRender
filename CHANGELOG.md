@@ -31,6 +31,11 @@ This is the human-readable companion to the git history — read this to see wha
   rows, starters point at the kept rows, and no existing bid changes (959
   bids rehearsed, all unchanged). Two labels were added for the outdoor
   emergency disconnect and EV-ready starters.
+- **Older databases get the same starters as new ones.** A one-time repair
+  moves 13 shipped starter assemblies off the catalog rows the reality check
+  retired (and adds the two new labels), but only where nobody has changed
+  that starter. Run on staging; it rides the next live release. No bid
+  total changed (1,027 staging bids checked).
 - **Search got smarter about sizes.** A box's depth ("2" deep") and a
   panel's space count ("20-space") no longer count as its size, so "2 emt"
   and "20 amp breaker" stop listing boxes and panels.
