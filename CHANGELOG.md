@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Job costs on Quick bid.** A "More options" fold under the counting box
+  now holds the bid's flat charges, with four one-tap calculators: Permit,
+  Lift rental (days × rate), Dumpster, and Drive time (trips × hours per
+  trip × rate). Drive time is a flat cost, not labor hours, so no job
+  modifiers or productivity touch it. A calculator adds nothing until every
+  box is filled; a missing rate is refused, never priced at $0. Typing
+  "permit" or "drive" in the search box finds them too. Quick bid's totals
+  now show Job costs and Total due. The bid screen's "Additional expenses"
+  uses the same component and gained the same calculators. No existing bid
+  changes.
 - **Undo for removing a bid line.** Removing a line on the bid screen or in
   Quick bid now shows "Removed …" with an Undo button. Undo brings back the
   exact same line, with the price it was frozen at, not today's catalog
