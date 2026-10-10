@@ -1,6 +1,66 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-09 (night), picker leftovers DONE (READ FIRST)
+## WHERE B STANDS — 2026-10-09 (late night), Enter took the wrong part (READ FIRST)
+
+- **The "4 square box" + Enter → pull box report was NOT the ranking.**
+  - On a tablet, the results list grew under the spot of the last tap.
+    `mouseenter` moved the highlight to whatever row slid there, and Enter
+    takes the highlight.
+  - Reproduced 4 of 4 at 820x1180 (it added a 4" LED disc light); never at
+    laptop size.
+  - Fix: rows move the highlight on `mousemove` with real distance only
+    (`client/src/lib/pointerHighlight.ts`). It is in all four lists:
+    `MaterialPicker`, the bid screen, Quick bid and Kits.
+  - After: 4 of 4 right at 820x1180, laptop unchanged, and a real hover
+    still moves the highlight.
+- **Ranking faults found on the way, fixed:**
+  - **"old work box" led with the F-clip support.** An accessory no longer
+    gets STARTS_WITH for a query that names no role. A new `PHRASE.CONTAINS`
+    tier covers a 3+-word query found whole inside a name. The single-gang
+    old-work box is now "common".
+  - **A company's fork made before a rename lost its starter rank.**
+    `commonnessPoints` was keyed by name, and the fork keeps its old name.
+    It now looks the name up through the rename map (`starterKey`). The
+    header comment claimed forks keep the shipped name; it is corrected, and
+    the correction says what it used to claim.
+  - **"12-2" and "12/2" are now one cable spelling**, in smartSearch's
+    `sizeKey` and in the rank module's `norm`. Before this, "romex 12/2"
+    found NOTHING for a company whose fork is "12-2 NM-B".
+- **The search pipeline moved from the hook to `client/src/lib/materialSearch.ts`**
+  so the suite runs what the screen runs.
+- **Tests:**
+  - `client/src/lib/everydaySearches.test.ts`: 20 everyday searches, plus 5
+    for a company holding pre-rename forks. 5 of them are red on the old
+    ranking. To be honest, 15 of the 20 were already right on the shipped
+    catalog.
+  - `client/src/lib/pointerHighlight.test.ts`: small; the real proof was on
+    screen.
+- **Catalog names and aliases are untouched**, and A needs no search-word
+  changes for these 20.
+- **A trap hit tonight, the one CLAUDE.md warns about:** a `node` heredoc
+  edit turned `\b` into 0x08 and `\d` into `d` in a regex. It was repaired
+  from character codes and the bytes read back. Use Edit for anything with a
+  backslash.
+- **Merges:**
+  - `9253c6a` (the fix): Gate 38020525680 green.
+  - Then local-dev twice more (C's step labor with 0143; A's sheet rebuild).
+    Gates 38021299446 and 38022001680 green.
+  - local-dev = `dd3f76d`.
+- **Owner's rule since tonight:** no full suite on the laptop (it is low on
+  memory). Run only the touched test files and let the Gate run the rest.
+  Use one-off Gate checks with no background watcher (`timeout N gh run
+watch` in the foreground).
+- **State:**
+  - B's DBs (`bidrender_local_b_new`, `bidrender_test_b`) are at 144
+    migrations, and `schemaDrift` matches with 180/180 foreign keys. No
+    migrations were written by B.
+  - No dev server is running.
+  - Local leftovers (user 1): "B hover probe …" bids and "zz hover …"
+    assemblies.
+- **Open:** landscape "Save and count" needs a scroll in the plan-viewer
+  builder popover (todo.md).
+
+## WHERE B STOOD — 2026-10-09 (night), picker leftovers DONE
 
 - **The three todo.md leftovers under "When the picker finds nothing" are
   done:**
