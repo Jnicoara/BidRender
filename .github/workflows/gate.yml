@@ -77,7 +77,14 @@ jobs:
     timeout-minutes: 40
     services:
       mysql:
-        image: mysql:8.0
+        # The SAME official image (Docker's library/mysql), pulled from AWS's
+        # public mirror of Docker Official Images instead of Docker Hub.
+        # Docker Hub refused an unauthenticated pull twice on 2026-10-09
+        # ("toomanyrequests: You have reached your unauthenticated pull rate
+        # limit", Gate 37990985389 on track-b), and GitHub's runners share
+        # their IPs, so the limit is spent by strangers. The mirror needs no
+        # credentials, so no secret has to exist for the Gate to run.
+        image: public.ecr.aws/docker/library/mysql:8.0
         env:
           # A throwaway container that lives for this job only; not a secret.
           MYSQL_ROOT_PASSWORD: ci
