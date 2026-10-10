@@ -116,6 +116,26 @@ const updateSchema = z.object({
   laborOnly: z.boolean().optional(),
   // Omitted leaves it; null clears it back to "not said".
   mountHeightTypeKey: z.string().trim().min(1).max(64).nullable().optional(),
+  /**
+   * The work steps (0142). Omitted leaves the list alone; [] empties it — the
+   * same patch rule as `materials`. Replaced wholesale, in this order.
+   */
+  steps: z
+    .array(
+      z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("step"),
+          laborStepId: z.number().int().positive(),
+          count: z.number().positive().max(999),
+        }),
+        z.object({
+          kind: z.literal("cable"),
+          count: z.literal(1).default(1),
+        }),
+      ])
+    )
+    .max(60)
+    .optional(),
 });
 
 const toDecimal = (value: number) => value.toFixed(4);
@@ -195,7 +215,10 @@ export const assembliesRouter = router({
           code: "NOT_FOUND",
           message: "Assembly not found.",
         });
-      return detail;
+      // Which hours price it, and its steps' quiet cross-check — decided
+      // once on the server (shared/assemblyHoursSource.ts), never re-derived
+      // on the screen.
+      return { ...detail, hoursSource: db.assemblyHoursSourceFor(detail) };
     }),
 
   create: procedure.input(createSchema).mutation(async ({ input, ctx }) => {
@@ -247,7 +270,7 @@ export const assembliesRouter = router({
    * and callers must use what comes back.
    */
   update: procedure.input(updateSchema).mutation(async ({ input, ctx }) => {
-    const { id, materials, modifierIds, ...rest } = input;
+    const { id, materials, modifierIds, steps, ...rest } = input;
 
     const target = await db.getAssemblyById(id, ctx.scope.dataUserId);
     if (!target)
@@ -313,6 +336,9 @@ export const assembliesRouter = router({
     }
     if (modifierIds !== undefined) {
       await db.setAssemblyModifiers(editableId, modifierIds);
+    }
+    if (steps !== undefined) {
+      await db.setAssemblySteps(editableId, steps);
     }
 
     const detail = await db.getAssemblyDetail(editableId, ctx.scope.dataUserId);
@@ -524,7 +550,8 @@ export const assembliesRouter = router({
           costPerUnit: Number(m.costPerUnit),
           qty: Number(m.qty),
         })),
-        baseLaborHours: detail.baseLaborHours,
+        // Typed, else the steps' total, else not set (assemblyHoursSource).
+        baseLaborHours: db.assemblyHoursSourceFor(detail).hours,
         overheadLaborHours: Number(detail.overheadLaborHours),
         modifiers: applied,
         laborRate,

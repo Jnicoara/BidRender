@@ -71,6 +71,10 @@ const REGISTRY: Record<string, Entry> = {
     kind: "exempt",
     why: "Ownership. A kit's member rows belong to that kit and are copied when it forks.",
   },
+  "assembly_labor_steps.assemblyId": {
+    kind: "exempt",
+    why: "Ownership, exactly as assembly_materials.assemblyId: copyAssemblyChildren copies the step list (copyAssemblySteps) onto the fork (0142).",
+  },
 
   // ── Resolved ─────────────────────────────────────────────────────────────
   "assembly_materials.materialId": {
@@ -78,6 +82,12 @@ const REGISTRY: Record<string, Entry> = {
     resolver: "resolveMaterial",
     readBy: "server/db.ts",
     note: "getAssemblyMaterialLines. Fixed 2026-09-20: pricing a starter material did nothing for any assembly built from it.",
+  },
+  "assembly_labor_steps.laborStepId": {
+    kind: "resolver",
+    resolver: "resolveForkedRow",
+    readBy: "server/db.ts",
+    note: "getAssemblyStepRows (0142): the STORED shipped step id, resolved to the company's fork — editing a step's time forks it, and every assembly then reads the fork.",
   },
   "assemblies.laborRateId": {
     kind: "resolver",

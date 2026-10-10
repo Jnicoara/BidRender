@@ -995,6 +995,13 @@
       "when": 1789963100000,
       "tag": "0141_ai_service_status",
       "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "5",
+      "when": 1789963200000,
+      "tag": "0142_labor_steps",
+      "breakpoints": true
     }
   ]
 }

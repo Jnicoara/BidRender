@@ -4,6 +4,18 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-10]
+
+- **Build an assembly's hours from its work steps (not live yet; waits for
+  the owner).** An assembly can list the work it takes — mount the box,
+  prepare the cable, terminate, set the device, plate, test — each with a
+  time. With no hours typed, the steps' total prices the assembly; typed
+  hours always win, and the step total sits beside them as a quiet check.
+  Steps are shared, so fixing one time fixes every assembly that uses it,
+  while bids already priced never change. It sits under "More options" and
+  ships with NO times: nothing prices differently until the owner fills in
+  the step times.
+
 ## [2026-10-09]
 
 - **The starter catalog now names real, stocked parts (catalog reality

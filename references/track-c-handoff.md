@@ -13,7 +13,113 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-09, later) — Gate green; looked at on screen; one false sentence fixed
+## LATEST (2026-10-10) — step-based labor, code half on `c-step-labor`: NOT MERGED; FOR TRACK A: migration 0142
+
+**Branch `c-step-labor`, from `origin/a-catalog-reality` `8f28a85`** — A's
+catalog merge was NOT on local-dev when this started (local-dev was
+`aaed2a8`), and a-catalog-reality already contains local-dev, so it is the
+"local-dev after A's merge" the owner asked for. **When A pushes it to
+local-dev, merge local-dev into `c-step-labor` first.** Do NOT merge
+`c-step-labor` into local-dev until the owner says so. `c-pvc-4080` left
+alone (A merged it into the catalog job).
+
+Plan and owner answers: `references/step-based-labor-plan.md` (§ 13
+answers and the bid-number check; § 14 the Steps / Step totals tabs for A's
+one sheet rebuild). Same file on `track-c` (`519e099`).
+
+### FOR TRACK A — migration 0142 (only A runs it on shared databases)
+
+File on the branch: **`drizzle/0142_labor_steps.sql`** + journal entry
+(`when` 1789963200000). Renumber freely if 0142 is taken first. Hand-written,
+ADDITIVE, step 1 of the three steps — **safe before OR after the code**:
+
+```sql
+CREATE TABLE `labor_steps` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int,
+	`baselineId` int,
+	`stepKey` varchar(32),
+	`name` varchar(255) NOT NULL,
+	`unit` varchar(64) NOT NULL DEFAULT 'each',
+	`minutes` decimal(8,2),
+	`reasoning` text,
+	`isExampleMinutes` boolean,
+	`isActive` boolean NOT NULL DEFAULT true,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `labor_steps_id` PRIMARY KEY(`id`),
+	CONSTRAINT `labor_steps_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `labor_steps_userId_idx` ON `labor_steps` (`userId`);
+CREATE INDEX `labor_steps_baselineId_idx` ON `labor_steps` (`baselineId`);
+CREATE TABLE `assembly_labor_steps` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`assemblyId` int NOT NULL,
+	`kind` enum('step','cable') NOT NULL DEFAULT 'step',
+	`laborStepId` int,
+	`count` decimal(10,2) NOT NULL DEFAULT '1',
+	`sortOrder` int NOT NULL DEFAULT 0,
+	CONSTRAINT `assembly_labor_steps_id` PRIMARY KEY(`id`),
+	CONSTRAINT `assembly_labor_steps_assemblyId_assemblies_id_fk` FOREIGN KEY (`assemblyId`) REFERENCES `assemblies`(`id`) ON DELETE cascade ON UPDATE no action,
+	CONSTRAINT `assembly_labor_steps_laborStepId_labor_steps_id_fk` FOREIGN KEY (`laborStepId`) REFERENCES `labor_steps`(`id`) ON DELETE cascade ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `assembly_labor_steps_assemblyId_idx` ON `assembly_labor_steps` (`assemblyId`);
+```
+
+- **Before 0142** the code runs: every step read treats ER_NO_SUCH_TABLE as
+  "no steps" (`stepsTablesMissing`, server/db.ts — only that error; anything
+  else throws), the seed pass does nothing, and pricing is exactly today's.
+  `schemaCheck` / `schemaDrift` still REPORT the two tables missing, loudly,
+  until it runs. Measured: the assembly, kit, example-tag and bid-line
+  suites, 166 green on `bidrender_test_c` WITHOUT the tables (the one red,
+  DV33 in `starterAssembliesSeed`, is the same red from a clean
+  `a-catalog-reality` checkout on that database — not this change).
+- **After 0142**, first boot seeds 47 shipped steps (all minutes NOT SET) and
+  the step lists of the 30 starters (194 lines). **No number moves**:
+  measured on `bidrender_local_c`, old code before vs new code + 0142 +
+  seed after — `bidTotals` "all 4235 bid(s): totalDue unchanged; not-priced
+  and incomplete unchanged"; `routerSnapshot` 0 of 4,235 bids differ.
+- `schemaDrift` on `bidrender_test_c` after 0142: "Database matches the
+  schema", foreign keys 179/179.
+- C applied 0142 to C's OWN `bidrender_local_c` and `bidrender_test_c` (both
+  now 143 migrations). Nothing shared was touched.
+
+### What the code does
+
+- `shared/assemblyHoursSource.ts` — THE decision: typed > steps (all timed)
+  > not set; one untimed step = not set; the cable step reads each cable's
+  > own per-foot hours (Q1); `starterHoursClearable` (Q2/Q7 rule); no "0 min".
+- Bid snapshot, assembly preview, kit preview all price through it
+  (`assemblyHoursSourceFor`). Bid lines freeze it, as before.
+- `laborSteps` router (list / setMinutes forks a shipped step / create /
+  acceptAll = "Use these times"); `assemblies.update` takes `steps`;
+  `assemblies.get` returns `hoursSource`. Forks copy the step list.
+- Seed: `server/seed/starterLaborSteps.ts` (library + 30 lists, NO minutes);
+  generated-by-A's-loader `starterStepMinutes.ts` and
+  `starterAssemblyOverhead.ts` ship EMPTY — the loader spec is plan § 14.
+- Screen: assembly editor → **"More options"** (closed by default) →
+  "Build hours from steps"; the quiet grey line under the hours ("Steps: 0
+  of 8 timed" / "Steps add to 0.51 h" / "Priced from its steps: …").
+  **Looked at on screen, tablet portrait 820×1180** (playwright,
+  `scripts/deviceAudit.mts` helpers, user 1, Duplex receptacle standard):
+  closed and open; unset minutes show "not set", never "0 min"; the cable
+  row says its hours per foot are not set; no sideways scroll, nothing cut
+  off. Nothing saved.
+
+### Tests
+
+`server/stepLabor.test.ts` (21) and `client/src/lib/assemblyStepsDraft.test.ts`
+(5). **Red without the change:** the bid snapshot put back to typed-only
+hours → 2 failed ("expected null to be '0.5000'", "… '0.2000'"); restored
+→ green. `pnpm check` clean. **Full suite on `bidrender_test_c`: 375 of
+379 files green.** Of the 4 red, three were this change and are fixed
+(American spelling "colours"/"armour" in two step reasonings; `stepKey` added
+to backup.test's identifier list; `assembly_labor_steps` given its two
+decisions in forkableReferences.test) — those four files 65/65 green after.
+The fourth, `starterAssembliesSeed` DV33, is the pre-existing red described
+above. The Gate on the push is the full proof on a fresh database.
+
+## Earlier (2026-10-09, later) — Gate green; looked at on screen; one false sentence fixed
 
 - **Gate 37977597726 on `47e4bd8` (the merge): ALL GREEN** — test,
   deploy-staging, smoke; drizzle-guard skipped (no `drizzle/` change).
