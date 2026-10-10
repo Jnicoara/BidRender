@@ -13,7 +13,54 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-10) — step-based labor, code half on `c-step-labor`: NOT MERGED; FOR TRACK A: migration 0143
+## START HERE (2026-10-10, later) — remove/relocate labor on `c-remove-relocate`: NOT MERGED; quick-bid plan written
+
+**JOB 1 — remove / relocate labor, built on `c-remove-relocate` (`a7fe812`,
+branched from `track-c`, pushed).** Owner answers are in
+`status-and-scope-plan.md` § 8. What it does: a count with remove or relocate
+marks puts ONE labor line per kind beside its install line ("Remove duplex
+receptacle × 2"). The hours freeze at send: the count's per-bid override,
+else the assembly's, else NOT SET, which shows "Not priced" (never $0) with
+a "Set remove hours" / "Set relocate hours" fix-it on the line. Only NEW
+marks price material. A role line has no `assemblyId`, no material and is
+ticked labor-only. Rules: `shared/roleLines.ts`. Status in
+`remove-relocate-labor-plan.md`.
+
+- **No migration.** 0110 / 0111 / 0115 already exist. So the merge gate is
+  the CI Gate alone.
+- **Gate:** run 38024821205 on `a7fe812` was IN PROGRESS when this was
+  written (one-off check, no watcher). **Check it once. If it is green, pull
+  local-dev, merge `c-remove-relocate` into it, and push. If it is red, read
+  the failure first.**
+- **Measured:** `bidTotals.mts`, track-c vs c-remove-relocate on
+  `bidrender_local_c`: "ok all 4235 bid(s): totalDue unchanged; not-priced
+  and incomplete unchanged". 0 of 4,235 bids have remove/relocate marks,
+  and 0 role lines exist. The new test `server/removeRelocateLabor.test.ts`
+  is 9/9 green and red without the change (6 failed). The 8 touched test
+  files give 163 passed, 1 skipped. `pnpm check` is clean.
+- **Looked at on screen** (820×1180): the bid line shows "Hours not set",
+  "Not priced", and a "Set relocate hours" button that focuses the box. The
+  count card shows the split, "1 relocate — labor not on the bid", "Add
+  relocate labor to bid" and the "Hours…" fold. Nothing is below the edge.
+- **Known gaps, not fixed:** (1) the bid's warning strip text ("Type a
+  price on a line priced by hand") also counts role lines, whose fix is
+  hours, not a price. The wording wants a role-aware branch. (2) This one
+  is older: a free count with no hours shows "0 h" in the bid hours cell
+  (the role line was fixed to "Hours not set").
+
+**JOB 2 — `references/quick-bid-plan.md` (plan only).** It covers typed
+footage with no plans, homeruns by average, rooms with an ADDED difficulty
+factor, a status chip per line, job-type checklists, job costs in one spot,
+and phone walking. It lists four additive migration drafts for A (Q-M1 to
+Q-M4, unnumbered: A assigns the numbers) and nine owner questions. Q1, Q2,
+Q3, Q6 and Q8 change bid numbers. The suggested first build is job costs
+on Quick bid, which needs no migration.
+
+**Still with the owner:** `status-and-scope-plan.md` § 8 **Q10** (does a
+"By others" / "Excluded" line leave the materials list and the drops?). It
+changes numbers on two screens, so it was sent back.
+
+## EARLIER (2026-10-10) — step-based labor, code half on `c-step-labor`: MERGED (see below); FOR TRACK A: migration 0143
 
 **Branch `c-step-labor`, from `origin/a-catalog-reality` `8f28a85`** — A's
 catalog merge was NOT on local-dev when this started (local-dev was
