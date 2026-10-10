@@ -21,8 +21,20 @@ This is the human-readable companion to the git history — read this to see wha
   that have them. Changing a mark's status can now be undone, from the
   toast or the undo arrow. A sheet can be tagged Demo, New work or both from
   its "…" menu; on a demo sheet new marks start as Remove and the bar offers
-  "Make them Remove" for marks already placed. Needs Track A's migration
-  for the sheet tag before it ships.
+  "Make them Remove" for marks already placed. The sheet tag's column is
+  Track A's migration 0144, which must be on a database before this runs.
+- **Opening a sheet no longer re-matches its homeruns.** Placing a panel by
+  hand could leave a "re-match" request waiting when nothing on that sheet
+  changed, and the next sheet opened, just to look at it, then had its
+  unconfirmed homeruns re-pointed and its homerun footage changed. The
+  request now belongs to the sheet the panel was placed on, and that sheet
+  is re-matched straight away as intended.
+- **A removed scale now stays removed.** Removing a sheet's scale used to
+  last only until the sheet was looked at again: the app would read the
+  scale off the drawing on its own and put it back, so traced footage on
+  that sheet came back onto the bid without anyone choosing it. Removing a
+  scale is now remembered as a person's decision, and the sheet keeps
+  asking for a scale until one is set by hand.
 - **Existing-to-remain devices stop being priced as new work.** The old
   "… - EXISTING TO REMAIN" counts priced their devices as new once sent to
   a bid. The bid now flags such a line and offers "Count these as

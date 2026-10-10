@@ -121,6 +121,8 @@ import {
 import {
   confirmableHomeruns,
   homerunSyncPayload,
+  homerunSyncStep,
+  type HomerunSyncState,
   syncSignature,
 } from "@/lib/homerunSync";
 import {
@@ -4791,11 +4793,17 @@ export default function TakeoffPage({
     spot is only known once the circuit read re-runs with it, so this arms
     the NEXT sync to be a re-match rather than re-matching on the old read.
   */
-  const rematchOnNextSync = useRef(false);
+  const homerunSync = useRef<HomerunSyncState>({
+    lastSignature: null,
+    armedSheetId: null,
+  });
   const placePanelSpot = useCallback(
     (panel: string, spot: { x: number; y: number } | null) => {
       if (!activeSheet) return;
-      rematchOnNextSync.current = true;
+      homerunSync.current = {
+        ...homerunSync.current,
+        armedSheetId: activeSheet.id,
+      };
       placePanel.mutate({
         bidId,
         panel,
@@ -4918,7 +4926,6 @@ export default function TakeoffPage({
     setAreaTaps([]);
     setAreaError(null);
   };
-  const lastHomerunSync = useRef<string | null>(null);
   /** "Re-match homeruns on this sheet" — the person's own action. */
   const rematchHomeruns = () => {
     if (!circuitReport || !activeSheet) return;
@@ -4964,17 +4971,22 @@ export default function TakeoffPage({
     }
     const payload = homerunSyncPayload(circuitReport);
     const signature = syncSignature(sheetId, payload);
-    if (signature === lastHomerunSync.current) return;
+    /*
+      A visit only CREATES the circuits it has not seen; the server leaves
+      every existing homerun as it is. The one exception is the sync right
+      after a panel was placed by hand on THIS sheet — the decision, and
+      why it is per sheet, is `homerunSyncStep` (@/lib/homerunSync).
+    */
+    const step = homerunSyncStep(homerunSync.current, sheetId, signature);
+    if (!step.send) return;
     const timer = window.setTimeout(() => {
-      lastHomerunSync.current = signature;
-      /*
-        A visit only CREATES the circuits it has not seen; the server leaves
-        every existing homerun as it is. The one exception is the sync right
-        after a panel was placed by hand (`rematchOnNextSync`).
-      */
-      const rematch = rematchOnNextSync.current;
-      rematchOnNextSync.current = false;
-      syncHomeruns.mutate({ bidId, sheetId, circuits: payload, rematch });
+      homerunSync.current = step.next;
+      syncHomeruns.mutate({
+        bidId,
+        sheetId,
+        circuits: payload,
+        rematch: step.rematch,
+      });
     }, 600);
     return () => window.clearTimeout(timer);
     // Not the mutation objects: their state changes with every call, and an
