@@ -15,7 +15,24 @@ This is the human-readable companion to the git history — read this to see wha
   matching's "Count as existing" now marks the device existing on the same
   count instead of making a new twin count. A bid total drops when this is
   used, on purpose: it stops charging for devices already on the wall.
-
+- **Two new empty database columns, ready for work waiting to merge.** A
+  plan sheet can now record whether it shows demolition, new work or both
+  (for Track B's status view), and a job cost can carry a short working
+  note such as "Drive time: 6 trips × 1.5 h × $85/h" (for Quick bid; it
+  will never print on the customer quote). Both start empty and change no
+  number. Also a read-only check that counts old "- EXISTING TO REMAIN"
+  twin counts: live, staging and local all hold none, so the twin fold has
+  nothing to convert.
+- **Job costs on Quick bid.** A "More options" fold under the counting box
+  now holds the bid's flat charges, with four one-tap calculators: Permit,
+  Lift rental (days × rate), Dumpster, and Drive time (trips × hours per
+  trip × rate). Drive time is a flat cost, not labor hours, so no job
+  modifiers or productivity touch it. A calculator adds nothing until every
+  box is filled; a missing rate is refused, never priced at $0. Typing
+  "permit" or "drive" in the search box finds them too. Quick bid's totals
+  now show Job costs and Total due. The bid screen's "Additional expenses"
+  uses the same component and gained the same calculators. No existing bid
+  changes.
 - **Undo for removing a bid line.** Removing a line on the bid screen or in
   Quick bid now shows "Removed …" with an Undo button. Undo brings back the
   exact same line, with the price it was frozen at, not today's catalog
