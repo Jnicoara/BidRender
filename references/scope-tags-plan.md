@@ -291,8 +291,28 @@ ask" is one column (S3).
 | 6 prompts               | No (an answer is step 3).                                                                                               |
 | 7 note finder           | No (a tag is step 3).                                                                                                   |
 
-## 6. Questions for the owner
+## 6. Owner answers — 2026-10-10 (all twelve decided)
 
-Listed in `references/track-b-handoff.md` § "Scope tags — questions" and in
-the reply, one per line, each with a recommended pick and whether it moves
-a bid number.
+The questions are in `references/track-b-handoff.md` § "Scope tags —
+questions". The owner's answers, which the steps above follow:
+
+| Q   | Answer                                                                                                                                                                                    |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Yes:** a tag change is refused on a locked bid for EVERY line, typed lines too (step 3).                                                                                                |
+| 2   | **Yes:** a "…" on each line; a chip only on tagged lines; We install shows nothing (step 3).                                                                                              |
+| 3   | **Keep drops on owner-furnished lines** — we still wire them (§ 2 table, step 4).                                                                                                         |
+| 4   | **Separate:** remove / relocate lines carry their own tag; tagging the install line does not tag them (§ 2).                                                                              |
+| 5   | **Yes:** many lines at once only from the prompts and the note finder; no general line multi-select for now (steps 6–7).                                                                  |
+| 6   | **No for now:** an assembly carries no default tag; every new line starts not said (= We install).                                                                                        |
+| 7   | **Yes:** By others / Excluded lines leave the materials list with a footer, "left off: 3 by others" (step 4).                                                                             |
+| 8   | **Yes:** the proposal lists owner-furnished lines with quantity ("12 light fixtures"), by-others / excluded by name only (step 5).                                                        |
+| 9   | **Leave out:** the note finder does not search "EXISTING TO REMAIN" / E.T.R. (§ 0, step 7).                                                                                               |
+| 10  | **Per bid:** "Don't ask" hides the prompts on that bid only (S3); the shop edits the list itself in Settings (step 6b).                                                                   |
+| 11  | **Yes, but never onto locked bids:** pushing a unit template to its linked copies carries its tags, and a push that would change a tag on a locked bid does not change it there (step 3). |
+| 12  | **Yes:** wire / conduit (run-type) lines take all four tags (steps 2–4).                                                                                                                  |
+
+**What Q11 means for step 3:** `pushTemplateToLinkedCopies` copies
+`scopeTag` like every other field, behind the same lock check as
+`setLineScope` — on a locked bid the tag on a copy stays as it is, and the
+push says so. Tested in `server/lineScopeSet.test.ts` (a push to a locked
+bid's copy leaves its tag; to an unlocked one moves it).

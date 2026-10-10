@@ -21,8 +21,8 @@ with the files each touches. track-b was fast-forwarded to local-dev
   count's group, so "off the drops" filters groups in `loadGroupDrops`.
   The SQL `lineNotPricedSql` has no `lineRole` branch where the TS one
   does (todo.md).
-- **Next step:** owner answers the questions below, A applies S1, then
-  step 2 of the plan.
+- **Next step:** A applies S1, then step 2 of the plan (the owner's answers
+  are in, below).
 
 ### S1–S3 — SQL DRAFTS FOR TRACK A (NOT APPLIED; all additive, step 1)
 
@@ -70,6 +70,13 @@ pattern, not a copy. S2 is a new table, so no existing row is reinterpreted.
 S1 and S3 can go in any release; S2 only with step 6b.
 
 ### Scope tags — questions for the owner (one per line)
+
+**ANSWERED by the owner, 2026-10-10:** 1 yes · 2 yes · 3 keep drops on
+owner-furnished lines · 4 separate · 5 yes · 6 no for now · 7 yes · 8 yes ·
+9 leave out · 10 per bid · 11 yes, but never onto locked bids · 12 yes.
+Every recommendation below was taken; Q11 adds the lock. Recorded in
+`references/scope-tags-plan.md` § 6. The plan is ready to build once A
+applies S1.
 
 1. Changing a tag on a locked bid: refuse for every line, typed ones too? — **Recommend: yes, refuse.** Number: no (it stops numbers moving).
 2. Where the control lives: a "…" per line, and a chip only on tagged lines (We install shows nothing)? — **Recommend: yes.** Number: no.

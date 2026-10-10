@@ -5,9 +5,9 @@ left as written rather than rewritten to match the rename.
 
 ## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
 
-- [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. Waits on
-      the owner's 12 questions (`track-b-handoff.md` § "Scope tags —
-      questions") and on A applying S1 (SQL draft in the same handoff).
+- [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
+      answered all 12 questions on 2026-10-10 (plan § 6). Waits only on A
+      applying S1 (SQL draft in `track-b-handoff.md`).
 - [ ] Noticed while planning, not fixed: the SQL `lineNotPricedSql`
       (`server/db.ts` ~13060) has no `lineRole` branch, while the TS
       `lineNotPriced` decides a remove / relocate line by its hours alone.
