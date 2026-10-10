@@ -372,6 +372,7 @@ import {
   type LocalPlan,
   type UploadPreview,
 } from "@/lib/localPlanSource";
+import { refetchPastInFlight } from "@/lib/refetchPastInFlight";
 import { startPageTextRead, type PageTextReads } from "@/lib/pageTextRead";
 import { pageTextFor, rememberPageText } from "@/lib/pageText";
 import { loadUndo, saveUndo, tabStorage } from "@/lib/undoPersist";
@@ -4282,8 +4283,42 @@ export default function TakeoffPage({
       )
     : null;
 
+  /*
+    The set's sheet rows are refreshed by the id SENT, never the open `doc`.
+
+    `refreshSheets` reads `doc?.id` from the render it was made in, and
+    useMutation takes new options in an EFFECT, which React runs for a parent
+    after its children's. The viewer re-announces a just-attached upload to
+    its row from its own effect (Gap 6.1, "THE SAME FILE, A NEW ROW"), in the
+    very commit the row first appears — so this mutation ran with the
+    previous render's onSuccess, whose `doc` was still null, and the sheet
+    list was never told its rows now existed. When the list's first read
+    beat the insert, the screen sat on "Sheets appear here once the document
+    opens" and "This sheet: loading…" for good (local-dev Gate 37879795728,
+    smoke test 2; seen to pass on the next staging run, so a race).
+
+    THAT WAS HALF OF IT (2026-10-09). The right key was invalidated, and the
+    invalidate still did nothing when the set's FIRST sheet read was in
+    flight: React Query only cancels a running fetch for a query that already
+    has data, so a new query folded the invalidate into the read that started
+    before the insert and stored its empty answer. Seen on staging 2 of 12,
+    no second read ever sent. So the read in flight is cancelled first
+    (@/lib/refetchPastInFlight, where the trap is pinned against a real
+    QueryClient).
+  */
   const ensureSheets = trpc.bidPdfs.ensureSheets.useMutation({
-    onSuccess: refreshSheets,
+    onSuccess: (_result, { bidPdfId }) => {
+      void refetchPastInFlight({
+        cancel: () => utils.bidPdfs.sheets.cancel({ bidPdfId }),
+        invalidate: () => utils.bidPdfs.sheets.invalidate({ bidPdfId }),
+      });
+      void refetchPastInFlight({
+        cancel: () => utils.bidPdfs.sheetIdentities.cancel({ bidPdfId }),
+        invalidate: () =>
+          utils.bidPdfs.sheetIdentities.invalidate({ bidPdfId }),
+      });
+      refreshSheets();
+    },
   });
 
   const detectScale = trpc.bidPdfs.detectSheetScale.useMutation({
@@ -9572,6 +9607,7 @@ export default function TakeoffPage({
             !tracing && (
               <>
                 <StampPicker
+                  buildBidId={bidId}
                   assemblies={allAssemblies.map(a => ({
                     id: a.id,
                     name: a.name,
@@ -11563,6 +11599,7 @@ export default function TakeoffPage({
                   name: a.name,
                   category: a.category ?? null,
                 }))}
+                buildBidId={bidId}
                 onLinkAssembly={(id, assemblyId) =>
                   setGroupSource.mutate({ id, assemblyId })
                 }
@@ -11843,6 +11880,7 @@ export default function TakeoffPage({
                   <>
                     <LegendPanel
                       symbols={symbols}
+                      buildBidId={bidId}
                       assemblies={allAssemblies.map(a => ({
                         id: a.id,
                         name: a.name,
@@ -11920,7 +11958,14 @@ export default function TakeoffPage({
                         const assembly = allAssemblies.find(
                           a => a.id === symbol.assemblyId
                         );
-                        if (!assembly) return;
+                        // Never a click that silently does nothing: the
+                        // tool would stay on whatever was in hand before.
+                        if (!assembly) {
+                          toast.error(
+                            `Couldn't start counting ${symbol.label}: its assembly isn't loaded yet. Try again in a moment.`
+                          );
+                          return;
+                        }
                         // The symbol goes too: several symbols sharing one
                         // assembly each count into their own count (§ 11.2).
                         // Armed at once; clicks before the count exists are

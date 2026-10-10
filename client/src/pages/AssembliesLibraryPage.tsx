@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { PercentKindInput } from "@/components/PercentKindInput";
-import { laborForAssembly } from "@shared/materialLabor";
+import { componentLaborUnit, laborForAssembly } from "@shared/materialLabor";
 import { unpricedPartsIn } from "@shared/lineNotPriced";
 import { LaborRateQuickEdit } from "@/components/LaborRateQuickEdit";
 import { resolveLaborRate } from "@shared/laborRateLookup";
@@ -100,6 +100,8 @@ import {
 import { isPlaceholderHours } from "@shared/laborHourDefaults";
 import { HourSuggestions } from "@/components/HourSuggestions";
 import { money } from "@/lib/money";
+import { AssemblyStepsSection } from "@/components/AssemblyStepsSection";
+import { draftHoursSource, type DraftStep } from "@/lib/assemblyStepsDraft";
 import {
   ASSEMBLY_CATEGORY_ORDER,
   groupByCategory,
@@ -143,6 +145,8 @@ type MaterialLine = {
   name: string;
   unitOfSale: "each" | "foot" | "box";
   costPerUnit: number;
+  /** Its catalog category — the cable step reads the Wire & Cable lines. */
+  category: string | null;
   /**
    * The material's own labor unit, and this recipe's disagreement with it.
    *
@@ -188,6 +192,11 @@ type Draft = {
    * shop's height for that type. NULL is "not said". Round-trips (rule 7).
    */
   mountHeightTypeKey: string | null;
+  /**
+   * Its work steps (0143), saved with the assembly like its parts. Round-trips
+   * (rule 7): a save that dropped them would empty the list.
+   */
+  steps: DraftStep[];
 };
 
 const round = (value: number, places = 2) => {
@@ -214,6 +223,7 @@ const emptyDraft = (): Draft => ({
   laborOnly: false,
   // Never guessed from the name (overhaul § 6): "not said" until picked.
   mountHeightTypeKey: null,
+  steps: [],
 });
 
 // ─── Mounts at ────────────────────────────────────────────────────────────────
@@ -612,6 +622,7 @@ function AssemblyBuilder({
   onCancel,
   onSave,
   onRevert,
+  stepsEnabled,
 }: {
   initial: Draft;
   isStarter: boolean;
@@ -619,8 +630,25 @@ function AssemblyBuilder({
   onCancel: () => void;
   onSave: (draft: Draft) => void;
   onRevert: () => void;
+  /** Steps are edited on a SAVED assembly; a new one saves first. */
+  stepsEnabled: boolean;
 }) {
   const [draft, setDraft] = useState<Draft>(initial);
+  const { data: stepLibrary = [] } = trpc.laborSteps.list.useQuery(undefined, {
+    enabled: stepsEnabled,
+  });
+  // What the steps say beside the hours box — the same decision the server
+  // prices with (assemblyHoursSource), read from the draft as it stands.
+  const stepHours = useMemo(
+    () =>
+      draftHoursSource({
+        typedHours: draft.baseLaborHours,
+        steps: draft.steps,
+        library: stepLibrary,
+        recipe: draft.materials,
+      }),
+    [draft.baseLaborHours, draft.steps, draft.materials, stepLibrary]
+  );
   /** Tracks whether the user has typed in the hours box themselves. */
   const [hoursTouched, setHoursTouched] = useState(false);
 
@@ -740,6 +768,7 @@ function AssemblyBuilder({
             name: material.name,
             unitOfSale: material.unitOfSale as MaterialLine["unitOfSale"],
             costPerUnit: Number(material.costPerUnit),
+            category: material.category,
             // A material just picked from the catalog brings its own unit and
             // no override — the recipe has not disagreed with anything yet.
             laborHours: material.laborHours ?? null,
@@ -1178,7 +1207,21 @@ function AssemblyBuilder({
                 parts add to 0" is not a cross-check, it is a number pretending
                 to be one.
               */}
-              {crossCheck.shown && (
+              {/*
+                With steps, the quiet line is the STEPS' (owner Q6: one line,
+                not two) — same muted text, never a warning. With no hours
+                typed it also says the steps are what prices it.
+              */}
+              {draft.steps.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {stepHours.source.source === "steps"
+                    ? `Priced from its steps: ${round(stepHours.source.hours, 2)} h${stepHours.source.isExample ? " (Example hours)" : ""}.`
+                    : stepHours.crossCheck}
+                  {stepHours.source.source === "notSet" &&
+                    " — hours not set until every step has a time."}
+                </p>
+              )}
+              {draft.steps.length === 0 && crossCheck.shown && (
                 <p className="text-xs text-muted-foreground">
                   Your parts add to {round(crossCheck.hours, 3)} h;{" "}
                   {crossCheck.typed === null
@@ -1310,6 +1353,23 @@ function AssemblyBuilder({
                   )
                 )}
               </div>
+
+              {/* Steps (0143): behind "More options", closed by default. */}
+              {stepsEnabled && (
+                <AssemblyStepsSection
+                  steps={draft.steps}
+                  library={stepLibrary}
+                  cableUnset={
+                    draft.materials.filter(
+                      m =>
+                        m.unitOfSale === "foot" &&
+                        m.category === "Wire & Cable" &&
+                        componentLaborUnit(m) === null
+                    ).length
+                  }
+                  onChange={steps => setDraft(d => ({ ...d, steps }))}
+                />
+              )}
             </div>
 
             {/* Modifiers */}
@@ -1484,6 +1544,7 @@ export default function AssembliesLibraryPage() {
         initial={emptyDraft()}
         isStarter={false}
         canRevert={false}
+        stepsEnabled={false}
         onCancel={() => setCreating(false)}
         onRevert={() => {}}
         onSave={draft => {
@@ -1551,6 +1612,7 @@ export default function AssembliesLibraryPage() {
         name: m.name,
         unitOfSale: m.unitOfSale,
         costPerUnit: Number(m.costPerUnit),
+        category: m.category,
         laborHours: m.laborHours,
         overrideLaborHours: m.overrideLaborHours,
         isBranchWhip: m.isBranchWhip,
@@ -1558,11 +1620,23 @@ export default function AssembliesLibraryPage() {
       modifierIds: detail.modifierIds,
       laborOnly: detail.laborOnly === true,
       mountHeightTypeKey: detail.mountHeightTypeKey ?? null,
+      // The STORED step ids, so a save writes back what the list points at.
+      steps: detail.steps.map(
+        (s): DraftStep =>
+          s.kind === "cable"
+            ? { kind: "cable" }
+            : {
+                kind: "step",
+                laborStepId: s.laborStepId,
+                count: Number(s.count),
+              }
+      ),
     };
     return (
       <AssemblyBuilder
         key={detail.id}
         initial={initial}
+        stepsEnabled={true}
         isStarter={detail.userId === null}
         canRevert={detail.baselineId != null && detail.userId !== null}
         onCancel={() => setEditingId(null)}
@@ -1587,6 +1661,15 @@ export default function AssembliesLibraryPage() {
               modifierIds: draft.modifierIds,
               laborOnly: draft.laborOnly,
               mountHeightTypeKey: draft.mountHeightTypeKey,
+              steps: draft.steps.map(s =>
+                s.kind === "cable"
+                  ? { kind: "cable" as const, count: 1 as const }
+                  : {
+                      kind: "step" as const,
+                      laborStepId: s.laborStepId,
+                      count: s.count,
+                    }
+              ),
             },
             {
               // Editing a starter forks it, and the fork has a different id —

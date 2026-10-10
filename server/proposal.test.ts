@@ -430,7 +430,13 @@ describe("what leaves the building", () => {
   });
 
   it("lists unpriced lines by name, agreeing with the count", () => {
-    const line = (name: string, cost: number, unpricedParts = 0) => ({
+    const line = (
+      id: number,
+      name: string,
+      cost: number,
+      unpricedParts = 0
+    ) => ({
+      id,
       name,
       qty: 1,
       assemblyId: 1,
@@ -443,13 +449,25 @@ describe("what leaves the building", () => {
     });
     expect(
       notPricedLines([
-        { line: line("Priced", 10), directCost: 10 },
-        { line: line("Nothing priced", 0), directCost: 0 },
-        { line: line("Short a lug", 10, 2), directCost: 10 },
+        { line: line(7, "Priced", 10), directCost: 10 },
+        { line: line(8, "Nothing priced", 0), directCost: 0 },
+        { line: line(9, "Short a lug", 10, 2), directCost: 10 },
       ])
     ).toEqual([
-      { name: "Nothing priced", wholeLine: true, parts: 0, hoursNotSet: false },
-      { name: "Short a lug", wholeLine: false, parts: 2, hoursNotSet: false },
+      {
+        lineId: 8,
+        name: "Nothing priced",
+        wholeLine: true,
+        parts: 0,
+        hoursNotSet: false,
+      },
+      {
+        lineId: 9,
+        name: "Short a lug",
+        wholeLine: false,
+        parts: 2,
+        hoursNotSet: false,
+      },
     ]);
   });
 
@@ -678,8 +696,18 @@ describe.skipIf(!hasDb)("proposals end to end", () => {
         n => n.toFixed(2)
       )
     ).toBe(PRICE_PENDING);
+    // With the line's real id: the print block opens the bid on THAT line's
+    // fix (never-stuck gap 10), and a name cannot tell two lines apart.
+    const { lines } = await caller().bids.get({ id: bid.id });
+    const unpricedLine = lines.find(l => l.name === unpricedName);
     expect(full.notPricedLines).toEqual([
-      { name: unpricedName, wholeLine: true, parts: 0, hoursNotSet: false },
+      {
+        lineId: unpricedLine!.id,
+        name: unpricedName,
+        wholeLine: true,
+        parts: 0,
+        hoursNotSet: false,
+      },
     ]);
 
     // Scope-only prints no money, so it is never pending.

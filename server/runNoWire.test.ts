@@ -14,11 +14,27 @@
  *
  * Fixture ids are distinct from every other suite — vitest runs files in
  * parallel and shared ids delete each other's rows mid-run.
+ *
+ * THIS FILE SEEDS THE SHIPPED CATALOG IT READS (beforeAll). It looks up
+ * shipped materials and run types by exact name, and the tests never seed on
+ * their own (server/seedShippedLibrary.ts). Until 2026-10-08 it relied on
+ * some OTHER file having seeded first, so it went red — 9 to 11 tests, all
+ * "Cannot read properties of undefined (reading 'id')" — whenever it ran
+ * before any seeding file against a database whose catalog predated the
+ * code: first seen straight after 0140, when `#12 THHN green Copper` was new
+ * in the seed and absent from bidrender_test_c. Reproduced on a scratch
+ * database seeded from ca8030c then migrated to 0140; passes there with the
+ * seed below. `shipped()` names the missing row rather than saying `.id`.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { createRunCircuit, getDb } from "./db";
+import {
+  createRunCircuit,
+  getDb,
+  seedBaselineMaterials,
+  seedBaselineRunTypes,
+} from "./db";
 import { bidPdfs, bids, takeoffRunTypes, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { undergroundRunTypeLabel } from "../shared/undergroundRunTypes";
@@ -149,6 +165,13 @@ const caller = () =>
     user: { id: USER, openId: `test-no-wire-${USER}`, role: "user" },
   } as unknown as TrpcContext);
 
+/** A shipped row by exact name, or a failure that says WHICH name is missing. */
+function shipped<T extends { name: string }>(rows: T[], name: string): T {
+  const row = rows.find(r => r.name === name);
+  if (!row) throw new Error(`No "${name}" in the catalog — is it seeded?`);
+  return row;
+}
+
 async function scenario() {
   const bid = (await caller().bids.create({
     name: `No wire ${Date.now()}${Math.random()}`,
@@ -175,14 +198,14 @@ async function scenario() {
     scaleText: `1/4" = 1'-0"`,
   });
   const catalog = await caller().materials.list();
-  const id = (name: string) => catalog.find(m => m.name === name)!.id;
+  const id = (name: string) => shipped(catalog, name).id;
   const type = await caller().takeoffRunTypes.create({
     label: `No wire EMT ${Date.now()}${Math.random()}`,
     pathType: "conduit",
     racewayMaterialId: id('1/2" EMT'),
-    conductorMaterialId: id("#12 THHN Copper"),
+    conductorMaterialId: id("#12 THHN solid Copper"),
     conductorCount: 2,
-    groundMaterialId: id("#12 THHN green Copper"),
+    groundMaterialId: id("#12 THHN green solid Copper"),
     groundCount: 1,
   });
   const trace = (traceMode?: "quantity", runTypeId: number = type.id) =>
@@ -211,6 +234,9 @@ async function scenario() {
 
 beforeAll(async () => {
   if (!hasDb) return;
+  // Materials first: the run types name their raceway and tape by name.
+  await seedBaselineMaterials();
+  await seedBaselineRunTypes();
   const database = (await getDb())!;
   const [existing] = await database
     .select()
@@ -285,7 +311,8 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
   async function trench() {
     const s = await scenario();
     const ug = (await caller().takeoffRunTypes.list({})).find(
-      t => t.isShipped && t.label === undergroundRunTypeLabel('2"')
+      t =>
+        t.isShipped && t.label === undergroundRunTypeLabel('2"', "PVC Sch 40")
     )!;
     expect(ug).toBeDefined();
     const run = await s.traceAs(ug.id);
@@ -348,8 +375,7 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
   it("PICKING THE WIRE prices it and keeps the tape", async () => {
     const t = await trench();
     const catalog = await caller().materials.list();
-    const thhn6 = catalog.find(m => m.name === "#6 THHN Copper")!;
-    expect(thhn6).toBeDefined();
+    const thhn6 = shipped(catalog, "#6 THHN Copper");
     const tapeBefore = (await t.bridgeFor(t.run.id)).rows.find(
       r => r.role === "extra"
     )!.feet;
@@ -375,7 +401,7 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
     // stands", with no way to name it from the run.
     const t = await trench();
     const catalog = await caller().materials.list();
-    const id = (name: string) => catalog.find(m => m.name === name)!.id;
+    const id = (name: string) => shipped(catalog, name).id;
 
     await caller().takeoffRuns.respecify({
       id: t.run.id,
@@ -436,7 +462,7 @@ withDb("an underground run: pick its wire, or say it is an empty pipe", () => {
     const plain = await caller().takeoffRunTypes.create({
       label: `Raceway only ${Date.now()}${Math.random()}`,
       pathType: "conduit",
-      racewayMaterialId: catalog.find(m => m.name === '1/2" EMT')!.id,
+      racewayMaterialId: shipped(catalog, '1/2" EMT').id,
     });
     const run = await s.traceAs(plain.id);
     expect((await s.rowOf(run.id)).pickWireToAdd).toBe(false);

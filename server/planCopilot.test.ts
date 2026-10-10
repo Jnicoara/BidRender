@@ -39,7 +39,7 @@ import {
   seedBaselineMaterials,
   getStampsForSheet,
 } from "./db";
-import { invokeLLM } from "./llm";
+import { AiUnavailable, invokeLLM } from "./llm";
 import { bidPdfs, bids, symbolLinks, users } from "../drizzle/schema";
 import { PLAN_COPILOT_MODEL } from "./routers/planCopilotRouter";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";
@@ -792,9 +792,9 @@ runIf("a sheet is read once, not on every visit", () => {
 runIf("a bad reading degrades rather than misleading", () => {
   it("survives the model being unreachable", async () => {
     const s = await scenario(USER);
-    vi.mocked(invokeLLM).mockRejectedValueOnce(
-      new Error("OPENAI_API_KEY is not configured")
-    );
+    // A failure that PASSES. This was "OPENAI_API_KEY is not configured"
+    // until 2026-10-09 — a dead key, which now has its own case and words.
+    vi.mocked(invokeLLM).mockRejectedValueOnce(new Error("Request timed out."));
 
     const state = await caller().planCopilot.read(readInput(s));
     expect(state.status).toBe("failed");
@@ -948,6 +948,32 @@ runIf("a bad reading degrades rather than misleading", () => {
     });
     expect(bad.answer).toMatch(/couldn't read the sheet/i);
     // A question never writes, however it goes.
+    expect(await getStampsForSheet(s.sheetId, USER)).toHaveLength(0);
+  });
+
+  it("a missing or refused key says AI is unavailable, never 'try again later', and writes nothing", async () => {
+    // 2026-10-09: a dead key used to get "could not be reached … try again
+    // later", which cannot help — it fails until somebody swaps the key.
+    const s = await scenario(USER);
+    vi.mocked(invokeLLM).mockRejectedValueOnce(
+      new AiUnavailable("key-refused")
+    );
+    const read = await caller().planCopilot.read(readInput(s));
+    expect(read.status).toBe("failed");
+    expect(read.findings).toHaveLength(0);
+    expect(read.message).toBe(
+      "AI is unavailable right now. Nothing was changed — carry on marking by hand."
+    );
+
+    vi.mocked(invokeLLM).mockRejectedValueOnce(new AiUnavailable("no-key"));
+    const asked = await caller().planCopilot.ask({
+      sheetId: s.sheetId,
+      question: "How many receptacles?",
+      pageImage: PAGE_IMAGE,
+      pageText: "",
+    });
+    expect(asked.answer).toMatch(/^AI is unavailable right now\./);
+    expect(asked.answer).not.toMatch(/try again/i);
     expect(await getStampsForSheet(s.sheetId, USER)).toHaveLength(0);
   });
 });

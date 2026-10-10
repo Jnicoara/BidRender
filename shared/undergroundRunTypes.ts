@@ -12,9 +12,36 @@
 
 const SUFFIX = ", underground";
 
-/** `2"` -> `2" PVC Sch 40, underground`. */
-export function undergroundRunTypeLabel(size: string): string {
-  return `${size} PVC Sch 40${SUFFIX}`;
+/**
+ * The PVC schedules shipped as underground types, in the order the picker's
+ * fold lists them: Sch 40 first, then Sch 80 — an estimator picks the
+ * schedule from the spec before the size (references/sch80-and-500-plan.md
+ * § 1c).
+ */
+export const UNDERGROUND_SCHEDULES = ["PVC Sch 40", "PVC Sch 80"] as const;
+export type UndergroundSchedule = (typeof UNDERGROUND_SCHEDULES)[number];
+
+/**
+ * `2"`, `PVC Sch 80` -> `2" PVC Sch 80, underground`. The schedule is
+ * REQUIRED: a default is how a Sch 80 call site quietly gets a Sch 40 name.
+ */
+export function undergroundRunTypeLabel(
+  size: string,
+  schedule: UndergroundSchedule
+): string {
+  return `${size} ${schedule}${SUFFIX}`;
+}
+
+/**
+ * Which schedule an underground label names, by its exact words after the
+ * size, or null when it names neither — the fold's sort key.
+ */
+export function undergroundSchedule(label: string): UndergroundSchedule | null {
+  return (
+    UNDERGROUND_SCHEDULES.find(schedule =>
+      label.includes(` ${schedule}${SUFFIX}`)
+    ) ?? null
+  );
 }
 
 /**

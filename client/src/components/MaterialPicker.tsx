@@ -34,6 +34,7 @@ import { money } from "@/lib/money";
 import { useMaterialSearch } from "@/hooks/useMaterialSearch";
 import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
 import { trpc } from "@/lib/trpc";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 
 export type PickableMaterial = {
   id: number;
@@ -68,6 +69,7 @@ export function MaterialPicker({
   compact = false,
   showQty = false,
   categories,
+  maxRecent = MAX_RECENT,
 }: {
   /**
    * Only these catalog shelves. Omitted searches everything, as before.
@@ -89,15 +91,22 @@ export function MaterialPicker({
   compact?: boolean;
   /** Show a material's default quantity. Only the Assembly Builder uses it. */
   showQty?: boolean;
+  /**
+   * How many recents an empty box lists. Fewer in a small popover, where six
+   * rows push the form's own buttons below the fold (plan viewer builder,
+   * seen at 820x1180, 2026-10-09).
+   */
+  maxRecent?: number;
 }) {
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   const ownRef = useRef<HTMLInputElement | null>(null);
   const searchRef = inputRef ?? ownRef;
 
-  const { data: catalog = [] } = trpc.materials.list.useQuery();
+  const { data: catalog = [], isSuccess: catalogReady } =
+    trpc.materials.list.useQuery();
   const { data: recent = [] } = trpc.materials.recent.useQuery({
-    limit: MAX_RECENT + (exclude?.length ?? 0),
+    limit: maxRecent + (exclude?.length ?? 0),
   });
 
   const onShelf = useMemo(() => {
@@ -138,7 +147,7 @@ export function MaterialPicker({
         rows: (recent as PickableMaterial[])
           .filter(m => !chosen.has(m.id))
           .filter(m => !onShelf || onShelf(m))
-          .slice(0, MAX_RECENT),
+          .slice(0, maxRecent),
         correctedQuery: null,
       };
     }
@@ -158,9 +167,24 @@ export function MaterialPicker({
       rows: found.rows.slice(0, MAX_RESULTS),
       correctedQuery: found.correctedQuery,
     };
-  }, [query, search, recent, exclude, onShelf]);
+  }, [query, search, recent, exclude, onShelf, maxRecent]);
 
   const showingRecent = !query.trim() && results.length > 0;
+
+  /*
+    A search that settles on nothing goes in the no-match log
+    (shared/searchMiss.ts). Not on a picker limited to some shelves: there a
+    miss may be a part that exists on another shelf, which says nothing about
+    what the catalog lacks.
+  */
+  const recordMiss = useNoMatchLog(
+    "material",
+    categories ? "" : query,
+    results.length,
+    catalogReady
+  );
+  const nothingFound =
+    catalogReady && query.trim() !== "" && results.length === 0;
 
   // The highlight is an index into a list that changes under it. Reset rather
   // than clamp: after a new search, "the first result" is the only position
@@ -186,6 +210,9 @@ export function MaterialPicker({
       if (chosen) {
         setQuery("");
         onChoose(chosen);
+      } else {
+        // Enter on nothing found is a finished search: logged now.
+        recordMiss();
       }
       return;
     }
@@ -218,6 +245,17 @@ export function MaterialPicker({
           className={cn(compact ? "h-7 pl-7 text-xs" : "h-8 pl-9 text-sm")}
         />
       </div>
+
+      {nothingFound && (
+        <p
+          className={cn(
+            "mt-2 text-muted-foreground",
+            compact ? "text-[0.7rem]" : "text-xs"
+          )}
+        >
+          Nothing in the catalog matches “{query.trim()}”.
+        </p>
+      )}
 
       {results.length > 0 && (
         <>

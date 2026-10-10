@@ -43,6 +43,7 @@ import { familySizes, rankMaterialHits } from "../shared/materialSearchRank";
 import { commonnessPoints } from "../shared/materialCommonness";
 import { mcFittingNames } from "../shared/runFittingMaterials";
 import { materialTypeName } from "../shared/materialSizeOrder";
+import { latestCatalogName } from "../shared/renamedMaterials";
 import { undergroundRunTypeLabel } from "../shared/undergroundRunTypes";
 import { smartSearchCorrected } from "../client/src/lib/smartSearch";
 
@@ -92,7 +93,13 @@ describe("REMOVE: withdrawn by name, never deleted", () => {
 
   it('leave no IMC and no 3-1/2" row in the catalog', () => {
     expect(shippedNames.filter(n => /\bIMC\b/.test(n))).toEqual([]);
-    expect(shippedNames.filter(n => n.includes('3-1/2"'))).toEqual([]);
+    // A DEPTH is not a trade size: the masonry boxes say '3-1/2" deep'
+    // since 2026-10-09 (box-depth check).
+    expect(
+      shippedNames.filter(
+        n => n.includes('3-1/2"') && !n.includes('3-1/2" deep')
+      )
+    ).toEqual([]);
   });
 
   it("keep #8 bare solid and add #6, with no #14, #12 or #10 bare left", () => {
@@ -117,35 +124,53 @@ describe("the shipped run types after the review", () => {
       t.label.includes("#12 + ground")
     ).map(t => [t.label, t.groundMaterialName]);
     expect(grounds).toEqual([
-      ['1/2" EMT, 2 #12 + ground', "#12 THHN green Copper"],
-      ['3/4" EMT, 3 #12 + ground', "#12 THHN green Copper"],
-      ["700 series surface raceway, 2 #12 + ground", "#12 THHN green Copper"],
+      // "solid" in the name since 2026-10-09 (catalog reality check).
+      ['1/2" EMT, 2 #12 + ground', "#12 THHN green solid Copper"],
+      ['3/4" EMT, 3 #12 + ground', "#12 THHN green solid Copper"],
+      [
+        "700 series surface raceway, 2 #12 + ground",
+        "#12 THHN green solid Copper",
+      ],
+      // The 500 type, 2026-10-09 (sch80-and-500-plan.md § 2b): the same row.
+      [
+        "500 series surface raceway, 2 #12 + ground",
+        "#12 THHN green solid Copper",
+      ],
     ]);
-    expect(shipped.has("#12 THHN green Copper")).toBe(true);
+    expect(shipped.has("#12 THHN green solid Copper")).toBe(true);
   });
 
   it("move an EXISTING database's #12 bare ground link the same way", () => {
     expect(RUN_TYPE_MATERIAL_SWAPS).toEqual([
-      { from: "#12 bare solid Copper", to: "#12 THHN green Copper" },
+      { from: "#12 bare solid Copper", to: "#12 THHN green solid Copper" },
     ]);
   });
 
   it('no longer ship the 3-1/2" underground type, and archive it where it exists', () => {
-    const label = undergroundRunTypeLabel('3-1/2"');
+    const label = undergroundRunTypeLabel('3-1/2"', "PVC Sch 40");
     expect(BASELINE_RUN_TYPES.map(t => t.label)).not.toContain(label);
     expect(RETIRED_BASELINE_RUN_TYPES).toEqual([
       { pathType: "conduit", label },
     ]);
-    // The other nine underground types stay.
+    // The other nine Sch 40 underground types stay (nine Sch 80 beside
+    // them since 2026-10-09, sch80-and-500-plan.md § 1 — never a 3-1/2").
     expect(
       BASELINE_RUN_TYPES.filter(t => t.label.endsWith(", underground"))
-    ).toHaveLength(9);
+    ).toHaveLength(18);
+    expect(BASELINE_RUN_TYPES.map(t => t.label)).not.toContain(
+      undergroundRunTypeLabel('3-1/2"', "PVC Sch 80")
+    );
   });
 });
 
 describe("SPECIALTY (0140)", () => {
   it("tags exactly the check's 108 rows, every one shipped", () => {
-    expect(SPECIALTY_MATERIALS).toHaveLength(108);
+    // 114 since 2026-10-09: the coverage check's meter centers, switchboards
+    // and HCF cable (server/coverageCheckRows.test.ts). Then 95 the same day:
+    // the catalog reality check retired 20 tagged rows (the 3" and 5" can
+    // shells, the slim, wet-rated and 2"/8" gimbal wafers) and tagged the
+    // 5-gang box (server/seed/materials/specialty.ts).
+    expect(SPECIALTY_MATERIALS).toHaveLength(95);
     expect(SPECIALTY_MATERIALS.filter(n => !shipped.has(n))).toEqual([]);
     expect(
       BASELINE_MATERIALS.filter(m => m.isSpecialty)
@@ -186,7 +211,9 @@ describe("SPECIALTY (0140)", () => {
     expect(ranked("4 pvc 80 sweep")[0]).toMatch(
       /^4" PVC Sch 80 \d\d-degree sweep, /
     );
-    expect(ranked("20 ft light pole")[0]).toBe("20 ft light pole");
+    expect(ranked("20 ft light pole")[0]).toBe(
+      '20 ft square steel light pole, 4" 11 ga'
+    );
   });
 
   it("leaves the starters that use specialty rows exactly as they were", () => {
@@ -195,8 +222,27 @@ describe("SPECIALTY (0140)", () => {
         a.materials.some(m => isSpecialty(starterPartName(m.part)))
       ).map(a => a.ref)
     );
+    // The CK / CW refs joined 2026-10-09 (the coverage-check starters, built
+    // on rows that ship as Specialty: the panel, pedestal, TV box, meter
+    // center, HCF cable, bollard). New users, not changed ones.
     expect(Array.from(refs).sort()).toEqual(
-      ["CS9", "CS10", "GC3", "LT31", "LT32", "MH10", "MH11", "RS16"].sort()
+      [
+        "CS9",
+        "CS10",
+        "GC3",
+        "LT31",
+        "LT32",
+        "MH10",
+        "MH11",
+        "RS16",
+        "CK5",
+        "CK11",
+        "CK23",
+        "CW2",
+        "CW9",
+        "CW12",
+        "CW13",
+      ].sort()
     );
   });
 });
@@ -227,26 +273,38 @@ describe("the generic rows a starter used", () => {
       BASELINE_ASSEMBLIES.filter(a => a.materials.some(m => m.part === part))
         .map(a => a.ref)
         .sort();
-    expect(using("wire-nuts")).toHaveLength(114);
+    // 133 since 2026-10-09: 19 of the 41 coverage-check starters use it.
+    expect(using("wire-nuts")).toHaveLength(133);
     expect(using("cord-grip")).toEqual(["LT25", "MH8"]);
   });
 });
 
 describe("RENAMES", () => {
   it("are applied in place: every old name is gone and every new one shipped", () => {
+    // Through latestCatalogName: a later decision may rename the row again
+    // (the catalog reality check, 2026-10-09 — "#3 3-conductor" is "3/3"
+    // again, the 22-12 wire nut 22-14), and the map sends the old name
+    // STRAIGHT to the newest one.
     for (const [from, to] of Object.entries(CATALOG_REVIEW_RENAMES)) {
-      expect(shipped.has(from), `${from} still shipped`).toBe(false);
-      expect(shipped.has(to), `${to} not shipped`).toBe(true);
-      expect(RENAMED_BASELINE_MATERIALS[from], from).toBe(to);
+      const now = latestCatalogName(to);
+      // …which can be the very name the review renamed away from ("3/3 MC
+      // cable Copper"): then that name is shipped again, on purpose.
+      if (from !== now)
+        expect(shipped.has(from), `${from} still shipped`).toBe(false);
+      expect(shipped.has(now), `${now} not shipped`).toBe(true);
+      expect(RENAMED_BASELINE_MATERIALS[from] ?? from, from).toBe(now);
     }
   });
 
   it("send older spellings straight to the newest name", () => {
     expect(RENAMED_BASELINE_MATERIALS["3-4 MC cable"]).toBe(
-      "#3 4-conductor MC cable Copper"
+      "3/4 MC cable Copper"
     );
     expect(RENAMED_BASELINE_MATERIALS["3-3 MC cable"]).toBe(
-      "#3 3-conductor MC cable Copper"
+      "3/3 MC cable Copper"
+    );
+    expect(RENAMED_BASELINE_MATERIALS["#3 4-conductor MC cable Copper"]).toBe(
+      "3/4 MC cable Copper"
     );
   });
 
@@ -273,16 +331,16 @@ describe("RENAMES", () => {
   });
 
   it("keep a #3 MC run's connectors: the worded count reads as a #3", () => {
-    expect(mcFittingNames("#3 4-conductor MC cable Copper")).toEqual({
+    // Named "3/4" and "3/3" again since 2026-10-09 (catalog reality check):
+    // still a #3, not a 3/4" anything.
+    expect(mcFittingNames("3/4 MC cable Copper")).toEqual({
       connector: '1" MC connector',
       strap: "MC one-hole strap, large",
     });
-    expect(mcFittingNames("#3 3-conductor MC cable Copper")?.connector).toBe(
+    expect(mcFittingNames("3/3 MC cable Copper")?.connector).toBe(
       '1" MC connector'
     );
-    expect(materialTypeName("#3 4-conductor MC cable Copper")).toBe(
-      "MC cable Copper"
-    );
+    expect(materialTypeName("3/4 MC cable Copper")).toBe("MC cable Copper");
   });
 });
 
@@ -318,7 +376,11 @@ describe("ADDS", () => {
   ];
 
   it("are present", () => {
-    expect(EXPECTED.filter(n => !shipped.has(n))).toEqual([]);
+    // Under today's name: three were renamed again on 2026-10-09 (catalog
+    // reality check) — the F-clip, the 2-gang low-voltage ring, the wire nut.
+    expect(
+      EXPECTED.map(latestCatalogName).filter(n => !shipped.has(n))
+    ).toEqual([]);
   });
 
   it("include every sized connector family the review asked for", () => {
@@ -331,8 +393,10 @@ describe("ADDS", () => {
     expect(count(/^Insulated multi-tap, /)).toBe(12);
     expect(count(/^(Butt splice|Ring terminal|Spade terminal), /)).toBe(9);
     expect(count(/^H-tap, /)).toBe(3);
-    expect(count(/ cord grip \(/)).toBe(3);
-    expect(count(/^Phase tape, /)).toBe(9);
+    // The 3/4" and 1" grips lost their band from the name and black phase
+    // tape went into electrical tape (catalog reality check, 2026-10-09).
+    expect(count(/ cord grip\b/)).toBe(3);
+    expect(count(/^Phase tape, /)).toBe(8);
     expect(shipped.has("Rubber splicing tape")).toBe(true);
     expect(shipped.has("Mastic tape")).toBe(true);
   });

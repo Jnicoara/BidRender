@@ -11,9 +11,18 @@
  * A failed run's files are uploaded as a workflow artifact, which anyone can
  * download from a public repo. A Playwright TRACE records every request with
  * its headers and body — the staging password POST, the login POST and the
- * session cookie on every call after it. So traces and videos are OFF, and
- * only a screenshot of the failing page is kept. The session file the setup
- * writes (e2e/.auth/) is git-ignored and never uploaded.
+ * session cookie on every call after it. So videos are OFF, a TRACE is kept
+ * for a FAILED test only, and CI uploads that trace ENCRYPTED, never as it
+ * is: `.github/workflows/gate.yml` seals each trace.zip with the smoke
+ * secrets as the passphrase — anyone able to open it already holds every
+ * credential inside it — and the upload's patterns cannot match a plain
+ * trace.zip. How to open one: references/deploying.md § 12. The session
+ * file the setup writes (e2e/.auth/) is git-ignored and never uploaded.
+ *
+ * Why a trace at all (2026-10-09): flow test 5 failed once with a screenshot
+ * as the only evidence, and the cause took a session to find — the click
+ * had armed the WRONG count, which a picture cannot show and a trace's
+ * network tab shows at once.
  */
 import { defineConfig } from "@playwright/test";
 import dotenv from "dotenv";
@@ -42,7 +51,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["dot"], ["github"]] : [["dot"]],
   use: {
     baseURL: target.origin,
-    trace: "off",
+    trace: "retain-on-failure",
     video: "off",
     screenshot: "only-on-failure",
     storageState: AUTH_FILE,

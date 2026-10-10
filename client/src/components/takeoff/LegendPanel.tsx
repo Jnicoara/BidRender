@@ -68,6 +68,7 @@ export type PickableAssembly = { id: number; name: string; category: string };
 export function LegendPanel({
   symbols,
   assemblies,
+  buildBidId,
   activeAssemblyId,
   activeSymbolId = null,
   capturing,
@@ -88,6 +89,8 @@ export function LegendPanel({
 }: {
   symbols: SymbolEntry[];
   assemblies: PickableAssembly[];
+  /** The bid, so a link search that finds nothing can build one. */
+  buildBidId?: number;
   /** Which assembly the stamp tool currently holds, so the list can show it. */
   activeAssemblyId: number | null;
   /**
@@ -380,6 +383,7 @@ export function LegendPanel({
           </p>
           <AssemblySearchList
             assemblies={assemblies}
+            buildBidId={buildBidId}
             onPick={assembly => {
               onLink(linking.id, assembly.id);
               setLinking(null);

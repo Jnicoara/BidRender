@@ -475,6 +475,7 @@ interface IndexedItem<T extends SearchableItem> {
   descNorm: string;
   /** sizeKey() of each size-normalized description word, in order. */
   descSizes: string[];
+  firstUnratedSize: string | undefined;
   /** The same, only the words written in INCHES ('1/2"', "1/2 in"). */
   descInches: Set<string>;
   /** sizeKey() of every word in the size text that carries a digit. */
@@ -510,9 +511,13 @@ function buildIndex<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
       "1 1/4 inch" is ONE size, 1-1/4 — as two words it offered a bare
       "1/4", and "quarter inch" found 1-1/4" EMT.
     */
-    const sizeText = normalizeSizeWords(
-      normalize(
-        [item.description, item.category ?? "", getAliases(item)].join(" ")
+    const sizeText = joinCountWords(
+      withoutDepths(
+        normalizeSizeWords(
+          normalize(
+            [item.description, item.category ?? "", getAliases(item)].join(" ")
+          )
+        )
       )
     );
     const textSizes = new Set<string>();
@@ -524,7 +529,9 @@ function buildIndex<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
         if (isInches(word)) textInches.add(s);
       }
     }
-    const descSizeWords = normalizeSizeWords(descWords.join(" ")).split(" ");
+    const descSizeWords = joinCountWords(
+      withoutDepths(normalizeSizeWords(descWords.join(" ")))
+    ).split(" ");
     return {
       item,
       text,
@@ -532,6 +539,11 @@ function buildIndex<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
       descNorm: descWords.join(" "),
       // Every size each word stands for — see sizesOf.
       descSizes: descSizeWords.flatMap(sizesOf),
+      // The first size after a leading rating — see LEADING_RATING.
+      firstUnratedSize: (LEADING_RATING.test(descSizeWords[0] ?? "")
+        ? descSizeWords.slice(1)
+        : descSizeWords
+      ).flatMap(sizesOf)[0],
       descInches: new Set(descSizeWords.filter(isInches).flatMap(sizesOf)),
       textSizes,
       textInches,
@@ -556,6 +568,36 @@ function buildIndex<T extends SearchableItem>(items: T[]): IndexedItem<T>[] {
       the middle of one.
 */
 const HAS_DIGIT = /\d/;
+
+/**
+ * A leading amperage RATING word — the "15a" of "15A 3-way switch". Since the
+ * catalog reality check (2026-10-09) every plain device states its rating,
+ * so the count or size a person types ("3 way", the "3") is no longer the
+ * name's FIRST word or size. Where first-ness is asked of a count
+ * (countTier) or a size (sizeTier), the word after the rating is asked too.
+ * Not in matchTier: there it lifted every rated row — "400A switchboard" for
+ * "switch" — over the part the word names.
+ */
+const LEADING_RATING = /^\d+a$/;
+
+/**
+ * A measurement followed by "deep" is how deep a box is, never its SIZE.
+ *
+ * Added 2026-10-09, when boxes took their depth into the name (box-depth
+ * check): '1/2" weatherproof box, single-gang, 2" deep' is a 1/2" box, but
+ * read as sizes it was ALSO a 2" one, and "2 emt" listed it beside 2" EMT.
+ * Only the SIZES are read without it; the name and its text are unchanged,
+ * so the word "deep" still finds the row.
+ */
+export function withoutDepths(sizeText: string): string {
+  // Only when a size comes BEFORE it: "Concrete ring, 6" deep" has no other
+  // size, and there the depth is the one thing that tells 4" from 6".
+  return sizeText.replace(
+    /(^|\s)\S*\d\S*\s+(?=deep(?:\s|$))/g,
+    (whole, lead: string, offset: number) =>
+      /\d/.test(sizeText.slice(0, offset)) ? lead : whole
+  );
+}
 
 /**
  * Is the item's size `item` the size that was typed as `typed`? Equal, or the
@@ -589,6 +631,9 @@ function isInches(word: string): boolean {
 /** A size a person has finished typing — see sizeTier. */
 const COMPLETE_SIZE = /^#?\d+(?:-\d+\/\d+|\/\d+)?(?:"|a|v|w|ft|mm)?$/;
 
+/** A cable spec as SPOKEN_CABLE joins it: "6-3", "12-2", "14-3". */
+const SPOKEN_CABLE_KEY = /^(?:14|12|10|8|6|4|2)-[234]$/;
+
 /**
  * A word's size, in one spelling: trailing punctuation off, the inch mark
  * off, and a hyphenated word suffix off — so '1/2"', "1/2", "1/2," key alike,
@@ -597,10 +642,13 @@ const COMPLETE_SIZE = /^#?\d+(?:-\d+\/\d+|\/\d+)?(?:"|a|v|w|ft|mm)?$/;
  * "a" for amps, "x" in 4x4 — is kept, because it is part of what the size IS.
  */
 function sizeKey(word: string): string {
-  return word
-    .replace(/^[("'[]+|[)\],.;:]+$/g, "")
-    .replace(/(\d)-[a-z].*$/, "$1")
-    .replace(/(\d)"$/, "$1");
+  return (
+    word
+      .replace(/^[("'[]+|[)\],.;:]+$/g, "")
+      // A count word keeps its suffix — see joinCountWords.
+      .replace(/(\d)-(?!(?:space|circuit)$)[a-z].*$/, "$1")
+      .replace(/(\d)"$/, "$1")
+  );
 }
 
 /**
@@ -625,19 +673,37 @@ function sizeTier(term: string, indexed: IndexedItem<SearchableItem>): number {
       set.has(key) ||
       (!key.startsWith("#") && set.has("#" + key)) ||
       (aught !== null && set.has(aught));
+    // A typed rating is matched against the rating; any other size against
+    // the first size after it ("3" of "15A 3-way switch") — see LEADING_RATING.
+    const first = LEADING_RATING.test(key)
+      ? (descSizes[0] ?? "")
+      : (indexed.firstUnratedSize ?? "");
     if (isInches(term)) {
-      if (sameSize(key, descSizes[0] ?? "") && inSet(indexed.descInches))
-        return 2;
+      if (sameSize(key, first) && inSet(indexed.descInches)) return 2;
       if (inSet(indexed.descInches)) return 3;
       if (inSet(indexed.textInches)) return 6;
       return 0;
     }
-    if (sameSize(key, descSizes[0] ?? "")) return 2;
+    if (sameSize(key, first)) return 2;
     if (descSizes.some(s => sameSize(key, s))) return 3;
     if (inSet(textSizes)) return 6;
     return 0;
   }
   // Still being typed: the START of a size, never the middle.
+  //
+  // Except a whole spoken cable spec ("6 3" joined to "6-3"): it is finished,
+  // so it must not run on into a longer number. "6-3" started "6-30r" and put
+  // the 6-30R receptacle above 6/3 NM-B; "14 3" and "10 3" led with the dryer
+  // receptacles (NEMA 14-30R / 10-30R) since the 2026-10-08 catalog review.
+  // Found 2026-10-09 when the coverage-check receptacles shipped.
+  if (SPOKEN_CABLE_KEY.test(key)) {
+    const runsOn = (w: string) =>
+      w.startsWith(key) && /\d/.test(w.charAt(key.length));
+    if (descWords[0]?.startsWith(key) && !runsOn(descWords[0])) return 2;
+    if (descWords.some(w => w.startsWith(key) && !runsOn(w))) return 3;
+    if (text.split(" ").some(w => w.startsWith(key) && !runsOn(w))) return 6;
+    return 0;
+  }
   if (descWords[0]?.startsWith(key)) return 2;
   if (descWords.some(w => w.startsWith(key))) return 3;
   if (startsAWord(text, key)) return 6;
@@ -694,6 +760,14 @@ function countTier(
 ): number {
   const { descWords, text } = indexed;
   if (descWords.length > 0 && wordIsCount(descWords[0], n, noun, descWords[1]))
+    return 2;
+  // The first word after a leading rating — "3-way" of "15A 3-way switch"
+  // (see LEADING_RATING).
+  if (
+    LEADING_RATING.test(descWords[0] ?? "") &&
+    descWords.length > 1 &&
+    wordIsCount(descWords[1], n, noun, descWords[2])
+  )
     return 2;
   if (wordsHoldCount(descWords, n, noun)) return 3;
   if (phraseHoldsCount(text, n, noun)) return 6;
@@ -799,8 +873,22 @@ const SPOKEN_CABLE = /(^|\s)(14|12|10|8|6|4|2) ([234])(?=\s|$)/g;
  */
 export function normalizeQuerySizes(query: string): string {
   return splitHyphenatedCounts(
-    normalizeSizeWords(query).replace(SPOKEN_CABLE, "$1$2-$3")
+    joinCountWords(normalizeSizeWords(query).replace(SPOKEN_CABLE, "$1$2-$3"))
   );
+}
+
+/**
+ * A SPACE or CIRCUIT count is not a size: "20-space" is a panel that holds
+ * twenty breakers, not a 20 of anything. Joined into one word on both sides
+ * — the query and the index — so "42 space" still finds the 42-space panel,
+ * while the 20 of "20 amp breaker" no longer matches every 20-space panel
+ * (2026-10-09: the panel table put "main-breaker" in 35 panel names, and
+ * "20 amp breaker" led with them). `sizeKey` keeps the suffix for the same
+ * reason.
+ */
+const COUNT_WORDS = /(^|\s)(\d+)[ -](space|circuit)s?(?=\s|$)/g;
+export function joinCountWords(text: string): string {
+  return text.replace(COUNT_WORDS, "$1$2-$3");
 }
 
 /**
@@ -1093,6 +1181,18 @@ function scoreItem<T extends SearchableItem>(
   tokenExpansions: TokenExpansion[]
 ): number {
   let totalScore = 0;
+  /*
+    A SYNONYM that starts the name right after its rating starts the name:
+    "plug" expands to "duplex", and "15A duplex receptacle" is the duplex
+    receptacle (LEADING_RATING). Synonyms only — the typed word keeps the
+    plain test, or "switch" would start "400A switchboard".
+  */
+  const words = indexed.descWords;
+  const ratedStart = (alias: string): number =>
+    LEADING_RATING.test(words[0] ?? "") &&
+    words.slice(1).join(" ").startsWith(alias)
+      ? 2
+      : 99;
 
   for (const { typed, aliases, countOf, finishedLetter } of tokenExpansions) {
     // A count ("2" of "2 gang") matches only a word that IS that count of
@@ -1134,7 +1234,7 @@ function scoreItem<T extends SearchableItem>(
 
     for (const alias of aliases) {
       if (alias.length < MIN_ALIAS_TERM_LENGTH) continue;
-      const points = ALIAS_POINTS[tier(alias)];
+      const points = ALIAS_POINTS[Math.min(tier(alias), ratedStart(alias))];
       if (points > bestForToken) bestForToken = points;
     }
 

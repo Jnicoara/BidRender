@@ -98,11 +98,24 @@ export async function openPlans(page: Page, bidId: number) {
 
 /** Upload the two-sheet fixture through the screen's own file input. */
 export async function uploadFixturePlan(page: Page) {
+  /*
+    Waits for the ATTACH, not the drawing. Since Gap 6.1 (2026-10-08) a
+    bid's first set is drawn from the file on this machine while it still
+    uploads, so a visible sheet no longer means a saved one — this helper
+    waited for the canvas, its caller closed the page, and the upload died
+    with the bid left empty (local-dev Gate 37868193507, the phone panel
+    test).
+  */
+  const attached = page.waitForResponse(
+    r => r.url().includes("bidPdfs.confirmAttach") && r.ok(),
+    { timeout: 120_000 }
+  );
   await page.locator("input[type=file][accept*='pdf']").setInputFiles({
     name: "ci-smoke-plan.pdf",
     mimeType: "application/pdf",
     buffer: buildFixturePlan(),
   });
+  await attached;
   await expect(sheetCanvas(page)).toBeVisible({ timeout: 90_000 });
 }
 

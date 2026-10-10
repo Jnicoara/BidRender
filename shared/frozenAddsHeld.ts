@@ -36,6 +36,8 @@ export const FROZEN_ADDS_SHIPPED_AS: Readonly<Record<string, string>> = {
   // Owner, 2026-10-08: 700 is one-piece raceway and its own run type; the
   // base row was renamed in place (per-foot-items-plan.md § 3c).
   "Surface raceway base, 700 series": "Surface raceway, 700 series",
+  // 500 the same way (owner, 2026-10-09; sch80-and-500-plan.md § 2a).
+  "Surface raceway base, 500 series": "Surface raceway, 500 series",
   // Owner's third answers, 2026-10-07: the variants carry "canless" so the
   // plain canless wafer leads a typed "6 wafer" (lighting.ts).
   ...Object.fromEntries(
@@ -101,15 +103,18 @@ export const FROZEN_ADDS_NOT_SEEDED: Readonly<Record<string, HeldAdd>> = {
     kind: "duplicate",
     why: 'Ships as "2" meter hub" — power.ts says so where it is defined.',
   },
-  "T-bar box hanger": {
-    kind: "duplicate",
-    why: 'Ships as "Grid box bracket" (search words "t-bar ceiling box hanger"; boxes.ts names it the T-bar version).',
-  },
+  // "T-bar box hanger" was held here as a duplicate of "Grid box bracket"
+  // until 2026-10-09, when the catalog reality check renamed that row to
+  // this name in place: the frozen add now ships as itself.
   "60A Single-Pole breaker": QO_ONLY,
   "70A Single-Pole breaker": QO_ONLY,
   "Surface raceway cover, 700 series": {
     kind: "retired",
     why: "Owner, 2026-10-08: 700 is one-piece raceway and a run type of its own, so a separate cover row describes a part nobody buys. Shipped 2026-10-07 on staging only, retired 2026-10-08 (per-foot-items-plan.md § 3c).",
+  },
+  "Surface raceway cover, 500 series": {
+    kind: "retired",
+    why: "Owner, 2026-10-09: 500 is set up the same way as 700 — one-piece raceway and a run type of its own — so a separate cover row describes a part nobody buys. Shipped 2026-10-07 on staging only (sch80-and-500-plan.md § 2a).",
   },
   // The 18 frozen 3-1/2" adds (under their frozen names): shipped
   // 2026-10-07, retired with every 3-1/2" row in the catalog review.

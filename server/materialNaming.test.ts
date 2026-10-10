@@ -8,6 +8,7 @@ import {
   CATALOG_REVIEW_RETIRED,
   CATALOG_REVIEW_WIRE_ADDS,
 } from "../shared/catalogReview20261008";
+import { COVERAGE_CHECK_WIRE_ADDS } from "../shared/coverageCheck20261009";
 import {
   normaliseNewName,
   proposeMaterialName,
@@ -43,7 +44,11 @@ describe("the decided wire and cable names", () => {
       ...(frozenJson.adds as { name: string; category: string }[])
         .filter(a => a.category === "Wire & Cable")
         .map(a => latestCatalogName(FROZEN_ADDS_SHIPPED_AS[a.name] ?? a.name)),
-      ...CATALOG_REVIEW_WIRE_ADDS,
+      // Under today's name: the catalog reality check (2026-10-09) named the
+      // green #12 "solid".
+      ...CATALOG_REVIEW_WIRE_ADDS.map(latestCatalogName),
+      // The coverage check's two (2026-10-09).
+      ...COVERAGE_CHECK_WIRE_ADDS,
     ];
     expect(
       wire

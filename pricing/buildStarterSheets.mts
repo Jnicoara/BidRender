@@ -18,7 +18,8 @@
  *
  * Overwrites every file it builds. The versions it replaced (2026-10-01 and
  * -06) held no typed value — checked before the first rebuild, 2026-10-07: 0
- * pack prices, 0 hours. If a filled sheet is ever rebuilt, LOAD it first.
+ * pack prices, 0 hours. Since 2026-10-08 a filled sheet's values are carried
+ * over (below), so a rebuild no longer needs the sheet loaded first.
  *
  * ── Build ONE sheet: --only ─────────────────────────────────────────────────
  *   --only assembly-hours     (or prices, labor, brands; repeatable)
@@ -32,10 +33,51 @@
  * `git show <commit>:pricing/assembly-hours-starter.xlsx > old.xlsx`).
  * Without it the column stays blank: a rebuild cannot tell new from old on
  * its own, and marking everything would mark nothing.
+ *
+ * ── Every typed value is CARRIED OVER (owner's standing rule, 2026-10-08) ───
+ * Before writing anything it reads each file it is about to replace and
+ * carries every typed price and hours onto the rebuilt sheet BY ITEM KEY —
+ * the catalog name followed through the rename map, or the assembly Ref;
+ * never the row number or the old name (pricing/sheetCarryOver.ts). A
+ * renamed item keeps its value, a new item comes in blank, and a value for
+ * an item that no longer ships goes in pricing/dropped-values-<date>.tsv.
+ * It STOPS, writing nothing, if a value would be lost for an item that still
+ * exists (or that it cannot place). Each sheet is written to a temporary
+ * file, read back and checked value by value before it replaces the old
+ * one. `server/sheetCarryOver.test.ts` goes red if a typed value is lost.
  */
 import { createRequire } from "node:module";
+import { existsSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  RENAMED_BASELINE_MATERIALS,
+  RETIRED_BASELINE_MATERIALS,
+} from "../server/seed/materials";
+import {
+  type CarryPlan,
+  type SheetKind,
+  type TypedValues,
+  SHEET_SPECS,
+  assemblyResolver,
+  brandResolver,
+  droppedReport,
+  keyed,
+  lostValues,
+  materialResolver,
+  planCarryOver,
+  readTypedRows,
+  stepResolver,
+  stepTotalsResolver,
+} from "./sheetCarryOver";
+import { STARTER_LABOR_STEPS } from "../server/seed/starterLaborSteps";
+import { STARTER_LABOR_UNITS } from "../server/seed/materials/starterLaborUnits";
+import { STEP_DRAFT_MINUTES } from "./stepDraftMinutes";
+import {
+  cableHours,
+  startersWithSteps,
+  suggestedOverhead,
+} from "./starterSteps";
 import {
   ASSEMBLY_COLUMNS,
   ASSEMBLY_HOURS_FILE,
@@ -52,6 +94,8 @@ import {
   PRICE_COLUMNS,
   PRICE_SHEET,
   PRICES_FILE,
+  STEPS_SHEET,
+  STEP_TOTALS_SHEET,
   assembliesInSheetOrder,
   assemblyKind,
   brandVariants,
@@ -90,6 +134,113 @@ const want = (s: (typeof SHEETS)[number]) =>
 const newSinceIdx = process.argv.indexOf("--new-since");
 const newSincePath = newSinceIdx >= 0 ? process.argv[newSinceIdx + 1] : null;
 
+// ── Carry-over: plan every sheet BEFORE writing any ─────────────────────────
+const STEPS_TAB = STEPS_SHEET;
+const STEP_TOTALS_TAB = STEP_TOTALS_SHEET;
+const SHEET_FILES: Record<SheetKind, [file: string, tab: string]> = {
+  prices: [PRICES_FILE, PRICE_SHEET],
+  labor: [LABOR_FILE, LABOR_SHEET],
+  brands: [BRANDS_FILE, BRAND_SHEET],
+  "assembly-hours": [ASSEMBLY_HOURS_FILE, ASSEMBLY_SHEET],
+  // Inside the prices workbook (step-based-labor-plan.md § 14).
+  steps: [PRICES_FILE, STEPS_TAB],
+  "step-totals": [PRICES_FILE, STEP_TOTALS_TAB],
+};
+/** The tabs the prices workbook carries — built and checked together. */
+const PRICE_WORKBOOK_KINDS: readonly SheetKind[] = [
+  "prices",
+  "steps",
+  "step-totals",
+];
+async function readTyped(file: string, kind: SheetKind) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(file);
+  const ws = wb.getWorksheet(SHEET_FILES[kind][1]);
+  if (!ws) {
+    // A workbook built before the step tabs existed simply has none, so
+    // nothing was typed in them. Any other missing tab is an error.
+    if (kind === "steps" || kind === "step-totals")
+      return { rows: [], extra: new Map<string, Record<string, string>>() };
+    throw new Error(`${file}: no "${SHEET_FILES[kind][1]}" tab`);
+  }
+  return readTypedRows(ws, SHEET_SPECS[kind], HEADER_ROW, FIRST_DATA_ROW);
+}
+const withSteps = startersWithSteps();
+const plans = new Map<SheetKind, CarryPlan>();
+const planned: SheetKind[] = [
+  ...SHEETS.filter(want),
+  ...(want("prices") ? (["steps", "step-totals"] as const) : []),
+];
+for (const kind of planned) {
+  const file = path.join(HERE, SHEET_FILES[kind][0]);
+  if (!existsSync(file)) continue;
+  const { rows: old, extra } = await readTyped(file, kind);
+  const resolve =
+    kind === "steps"
+      ? stepResolver(new Set(STARTER_LABOR_STEPS.map(s => s.key)))
+      : kind === "step-totals"
+        ? stepTotalsResolver({
+            withSteps: new Set(withSteps.map(s => s.ref)),
+            shipped: new Set(assembliesInSheetOrder().rows.map(a => a.ref)),
+          })
+        : kind === "assembly-hours"
+          ? assemblyResolver({
+              current: assembliesInSheetOrder().rows.map(a => ({
+                ref: a.ref,
+                name: a.name,
+                ...(a.held ? { refuses: `HELD now: ${a.held}` } : {}),
+              })),
+              oldNames: new Map(
+                [...extra].map(([ref, { Assembly }]) => [ref, Assembly])
+              ),
+            })
+          : kind === "brands"
+            ? brandResolver(
+                new Map(
+                  brandVariants().kept.map(v => [
+                    v.name,
+                    { unit: v.parent.unitOfSale },
+                  ])
+                )
+              )
+            : materialResolver({
+                current: new Map(
+                  rows.map(m => [
+                    m.name,
+                    { unit: kind === "labor" ? hoursPer(m) : m.unitOfSale },
+                  ])
+                ),
+                renamed: RENAMED_BASELINE_MATERIALS,
+                retired: RETIRED_BASELINE_MATERIALS,
+              });
+  plans.set(kind, planCarryOver(kind, old, resolve));
+}
+const stops = [...plans.values()].flatMap(p => p.stops);
+if (stops.length) {
+  console.error(
+    `STOPPED — ${stops.length} typed value(s) would be lost for an item that still exists, or one that cannot be placed. Nothing written:`
+  );
+  for (const s of stops)
+    console.error(
+      `  - ${s.sheet} row ${s.row} (${s.label}) ${JSON.stringify(s.values)}: ${s.why}`
+    );
+  process.exit(1);
+}
+for (const p of plans.values())
+  console.log(
+    `carry-over ${p.sheet}: ${p.carried.size} row(s) carried (${p.renamed.length} onto a renamed row), ${p.dropped.length} dropped (item no longer ships)`
+  );
+const carriedFor = (kind: SheetKind, key: string): TypedValues =>
+  plans.get(kind)?.carried.get(key) ?? {};
+/** Written to a temporary name; checked and moved into place at the end. */
+const pending: { kind: SheetKind; temp: string; out: string }[] = [];
+const tempFor = (out: string) => out.replace(/\.xlsx$/, ".rebuild-tmp.xlsx");
+async function stage(kind: SheetKind, wb: any, out: string) {
+  const temp = tempFor(out);
+  await wb.xlsx.writeFile(temp);
+  pending.push({ kind, temp, out });
+}
+
 function sheetWithHeader(
   wb: any,
   name: string,
@@ -119,6 +270,15 @@ function sheetWithHeader(
 }
 
 const col = (cols: readonly string[], name: string) => cols.indexOf(name) + 1;
+
+/** Write the carried typed values onto a rebuilt row, over any default. */
+function applyCarried(row: any, cols: readonly string[], v: TypedValues) {
+  for (const [field, value] of Object.entries(v)) {
+    const c = col(cols, field);
+    if (c < 1) throw new Error(`carried "${field}" has no column here`);
+    row.getCell(c).value = value;
+  }
+}
 const letter = (n: number) => String.fromCharCode(64 + n);
 
 function howTo(wb: any, lines: [string, string][]) {
@@ -130,6 +290,138 @@ function howTo(wb: any, lines: [string, string][]) {
     r.getCell(1).font = { bold: true };
     r.getCell(2).alignment = { wrapText: true, vertical: "top" };
   }
+}
+
+// ── The step tabs (step-based-labor-plan.md § 14), in the prices workbook ───
+const STEP_COLUMNS = [
+  "Key",
+  "Step",
+  "Unit",
+  "Minutes",
+  "Draft",
+  "Reasoning",
+  "Used by",
+] as const;
+const STEP_TOTAL_COLUMNS = [
+  "Ref",
+  "Assembly",
+  "Current hours",
+  "Step minutes",
+  "Cable hours",
+  "Step total (h)",
+  "Suggested overhead",
+  "Overhead (h)",
+  "Total with overhead",
+  "Clears typed hours?",
+] as const;
+
+function writeStepTabs(wb: any) {
+  // ── Steps: one row per library step, most-used first ──
+  const used = new Map<string, { refs: string[]; total: number }>();
+  for (const s of withSteps)
+    for (const { key, count } of s.steps) {
+      const u = used.get(key) ?? { refs: [], total: 0 };
+      u.refs.push(`${s.ref} ×${count}`);
+      u.total += 1;
+      used.set(key, u);
+    }
+  const steps = [...STARTER_LABOR_STEPS].sort(
+    (a, b) => (used.get(b.key)?.total ?? 0) - (used.get(a.key)?.total ?? 0)
+  );
+  const missingDraft = steps.filter(s => !(s.key in STEP_DRAFT_MINUTES));
+  if (missingDraft.length)
+    throw new Error(
+      `no draft minutes for ${missingDraft.map(s => s.key).join(", ")} (pricing/stepDraftMinutes.ts)`
+    );
+  const S = STEP_COLUMNS;
+  const ws = sheetWithHeader(
+    wb,
+    STEPS_TAB,
+    S,
+    "STEP TIMES — type YELLOW 'Minutes' for ONE count of each step (blank = not set; never type 0 to mean unknown — 0 is a real answer). 'Draft' is a starting point to copy or change. Cable time is not on this tab — it is each cable's hours per 100 ft on labor-units-starter.xlsx (owner, Q1).",
+    [6, 44, 16, 10, 8, 70, 60]
+  );
+  steps.forEach((s, i) => {
+    const row = ws.getRow(FIRST_DATA_ROW + i);
+    const u = used.get(s.key);
+    row.getCell(col(S, "Key")).value = s.key;
+    row.getCell(col(S, "Step")).value = s.name;
+    row.getCell(col(S, "Unit")).value = s.unit;
+    row.getCell(col(S, "Draft")).value = Number(STEP_DRAFT_MINUTES[s.key]);
+    row.getCell(col(S, "Reasoning")).value = s.reasoning;
+    row.getCell(col(S, "Reasoning")).alignment = { wrapText: true };
+    row.getCell(col(S, "Used by")).value = u
+      ? `${u.refs.join(", ")} (${u.total} assembl${u.total === 1 ? "y" : "ies"})`
+      : "no starter yet";
+    const minutes = row.getCell(col(S, "Minutes"));
+    minutes.fill = YELLOW;
+    minutes.dataValidation = {
+      type: "decimal",
+      operator: "greaterThanOrEqual",
+      formulae: [0],
+      allowBlank: true,
+      showErrorMessage: true,
+      error: "Minutes are a number, 0 or more — leave blank for not set.",
+    };
+    applyCarried(row, S, carriedFor("steps", s.key));
+  });
+
+  // ── Step totals: one row per starter with a step list ──
+  const T = STEP_TOTAL_COLUMNS;
+  const tw = sheetWithHeader(
+    wb,
+    STEP_TOTALS_TAB,
+    T,
+    "STEP TOTALS — what each starter's steps add up to, as you type on 'Steps'. Type YELLOW 'Overhead (h)': layout, handling and cleanup (owner, Q2). 'Clears typed hours?' is a preview only — the loader decides by the rule (step total + overhead must not land below the current hours).",
+    [8, 40, 12, 12, 12, 12, 14, 12, 14, 30]
+  );
+  const keyCol = letter(col(S, "Key"));
+  const minCol = letter(col(S, "Minutes"));
+  const at = (key: string) =>
+    `INDEX('${STEPS_TAB}'!$${minCol}:$${minCol},MATCH("${key}",'${STEPS_TAB}'!$${keyCol}:$${keyCol},0))`;
+  withSteps.forEach((s, i) => {
+    const r = FIRST_DATA_ROW + i;
+    const row = tw.getRow(r);
+    const c = (name: (typeof T)[number]) => letter(col(T, name));
+    row.getCell(col(T, "Ref")).value = s.ref;
+    row.getCell(col(T, "Assembly")).value = s.name;
+    row.getCell(col(T, "Current hours")).value = s.currentHours ?? "not set";
+    // Σ count × Minutes, or blank when any step's Minutes is blank. ISBLANK
+    // on INDEX, not VLOOKUP: a VLOOKUP of a blank cell is 0, and a blank
+    // must stay "not set".
+    row.getCell(col(T, "Step minutes")).value = s.steps.length
+      ? {
+          formula: `IF(OR(${s.steps.map(x => `ISBLANK(${at(x.key)})`).join(",")}),"",${s.steps.map(x => `${x.count}*${at(x.key)}`).join("+")})`,
+        }
+      : 0;
+    const cable = cableHours(s, STARTER_LABOR_UNITS);
+    row.getCell(col(T, "Cable hours")).value = cable ?? "not set";
+    row.getCell(col(T, "Step total (h)")).value = {
+      formula: `IF(OR(${c("Step minutes")}${r}="",${c("Cable hours")}${r}="not set"),"",ROUND(${c("Step minutes")}${r}/60+${c("Cable hours")}${r},4))`,
+    };
+    row.getCell(col(T, "Suggested overhead")).value = suggestedOverhead(s);
+    const overhead = row.getCell(col(T, "Overhead (h)"));
+    overhead.fill = YELLOW;
+    overhead.dataValidation = {
+      type: "decimal",
+      operator: "greaterThanOrEqual",
+      formulae: [0],
+      allowBlank: true,
+      showErrorMessage: true,
+      error: "Overhead is hours, 0 or more — leave blank for none.",
+    };
+    row.getCell(col(T, "Total with overhead")).value = {
+      formula: `IF(${c("Step total (h)")}${r}="","",${c("Step total (h)")}${r}+N(${c("Overhead (h)")}${r}))`,
+    };
+    row.getCell(col(T, "Clears typed hours?")).value = {
+      formula: `IF(${c("Current hours")}${r}="not set","no typed hours to clear",IF(${c("Step total (h)")}${r}="","step total not set",IF(${c("Total with overhead")}${r}>=${c("Current hours")}${r},"Yes","below the current hours")))`,
+    };
+    applyCarried(row, T, carriedFor("step-totals", s.ref));
+  });
+  wb.calcProperties = { ...(wb.calcProperties ?? {}), fullCalcOnLoad: true };
+  console.log(
+    `  + tabs "${STEPS_TAB}" (${steps.length} steps) and "${STEP_TOTALS_TAB}" (${withSteps.length} starters)`
+  );
 }
 
 // ── Pricing sheet ───────────────────────────────────────────────────────────
@@ -163,6 +455,7 @@ if (want("prices")) {
     row.getCell(col(C, "Price per unit")).numFmt = "$#,##0.0000";
     row.getCell(col(C, "Pack price")).numFmt = "$#,##0.00";
     row.getCell(col(C, "Notes")).value = m.description ?? "";
+    applyCarried(row, C, carriedFor("prices", m.name));
     for (const k of ["Pack price", "Pack size", "Pack qty"])
       row.getCell(col(C, k)).fill = YELLOW;
     row.getCell(col(C, "Pack price")).dataValidation = {
@@ -182,6 +475,7 @@ if (want("prices")) {
       error: "Pack qty is how many units the pack holds — more than 0.",
     };
   });
+  writeStepTabs(wb);
   howTo(wb, [
     [
       "What this is",
@@ -194,6 +488,14 @@ if (want("prices")) {
     [
       "Order",
       "Items used by the most shipped starters and run types first, then by category and size. Price the top and the shipped recipes start pricing.",
+    ],
+    [
+      `"${STEPS_TAB}" tab`,
+      "Minutes (yellow) for ONE of each install step. Blank = not set; 0 is a real answer, so never type 0 to mean unknown. Draft is a starting suggestion — copy it or change it. Cable time is not here: it is each cable's hours per 100 ft on labor-units-starter.xlsx.",
+    ],
+    [
+      `"${STEP_TOTALS_TAB}" tab`,
+      'Overhead (h) (yellow) per starter: layout, handling, cleanup. Everything else on that tab is worked out for you and moves as you type minutes. "Clears typed hours?" is a preview only — when loaded, a starter\'s typed hours are cleared (so its steps price it) only if step total + overhead is at least the current hours.',
     ],
     [
       "No store, no date",
@@ -209,7 +511,7 @@ if (want("prices")) {
     ],
   ]);
   const out = path.join(HERE, PRICES_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("prices", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${rows.length} rows`
   );
@@ -238,6 +540,7 @@ if (want("labor")) {
     row.getCell(col(C, "Hours per")).value = hoursPer(m);
     row.getCell(col(C, "MY HOURS")).fill = YELLOW;
     row.getCell(col(C, "Notes")).value = m.description ?? "";
+    applyCarried(row, C, carriedFor("labor", m.name));
     const bend = row.getCell(col(C, "Bend hours (raceway only)"));
     if (m.raceway) {
       raceways++;
@@ -280,7 +583,7 @@ if (want("labor")) {
     ],
   ]);
   const out = path.join(HERE, LABOR_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("labor", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${rows.length} rows (${raceways} raceways take bend hours)`
   );
@@ -319,6 +622,7 @@ if (want("brands")) {
     };
     row.getCell(col(C, "Price per unit")).numFmt = "$#,##0.0000";
     row.getCell(col(C, "Pack price")).numFmt = "$#,##0.00";
+    applyCarried(row, C, carriedFor("brands", v.name));
     for (const k of ["Pack price", "Pack size", "Pack qty"])
       row.getCell(col(C, k)).fill = YELLOW;
     row.getCell(col(C, "Pack price")).dataValidation = {
@@ -355,7 +659,7 @@ if (want("brands")) {
     ],
   ]);
   const out = path.join(HERE, BRANDS_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("brands", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${kept.length} rows (${dropped.length} left off — parent not shipped)`
   );
@@ -429,6 +733,7 @@ if (want("assembly-hours")) {
       return;
     }
     my.fill = YELLOW;
+    applyCarried(row, C, carriedFor("assembly-hours", a.ref));
     my.dataValidation = {
       type: "decimal",
       operator: "greaterThan",
@@ -475,8 +780,43 @@ if (want("assembly-hours")) {
     ],
   ]);
   const out = path.join(HERE, ASSEMBLY_HOURS_FILE);
-  await wb.xlsx.writeFile(out);
+  await stage("assembly-hours", wb, out);
   console.log(
     `wrote ${path.relative(process.cwd(), out)}: ${assemblies.length} rows, ${previous ? `${newCount} NEW` : "new not marked"}, ${held.length} HELD (${held.map(a => a.ref).join(", ") || "none"}), ${notShipped.length} listed refs not shipped: ${notShipped.join(", ") || "none"}`
   );
 }
+
+// ── Check every carried value is IN the written file, then replace ──────────
+// Read back from the temporary file, not taken from the plan: a value the
+// plan carried and the workbook did not hold is exactly the loss this exists
+// to catch. Nothing is replaced unless every sheet passes.
+const lost: string[] = [];
+for (const p of pending) {
+  // The prices workbook holds three carried tabs; every one is checked.
+  const kinds = p.kind === "prices" ? PRICE_WORKBOOK_KINDS : [p.kind];
+  for (const kind of kinds) {
+    const plan = plans.get(kind);
+    if (!plan) continue;
+    lost.push(...lostValues(plan, keyed((await readTyped(p.temp, kind)).rows)));
+  }
+}
+if (lost.length) {
+  for (const p of pending) rmSync(p.temp, { force: true });
+  console.error(
+    `STOPPED — ${lost.length} typed value(s) missing from the rebuilt sheets. Nothing replaced:`
+  );
+  for (const l of lost) console.error(`  - ${l}`);
+  process.exit(1);
+}
+for (const p of pending) renameSync(p.temp, p.out);
+const report = droppedReport([...plans.values()]);
+if (report) {
+  const f = path.join(
+    HERE,
+    `dropped-values-${new Date().toISOString().slice(0, 10)}.tsv`
+  );
+  writeFileSync(f, report);
+  console.log(
+    `DROPPED VALUES (items no longer shipped) — read them: ${path.relative(process.cwd(), f)}`
+  );
+} else console.log("dropped values: none");

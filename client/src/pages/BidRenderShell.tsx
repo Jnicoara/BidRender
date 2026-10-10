@@ -111,7 +111,10 @@ export default function BidRenderShell() {
   const { route, projectId: activeProjectId, view: activeView } = routeState;
 
   const navigate = useCallback(
-    (r: Route, options: { id?: number; view?: string } = {}) => {
+    (
+      r: Route,
+      options: { id?: number; view?: string; fixLineId?: number } = {}
+    ) => {
       window.location.hash = routeToPath(r, options);
     },
     []
@@ -262,6 +265,7 @@ export default function BidRenderShell() {
         <BidsPage
           key={activeProjectId}
           bidId={activeProjectId}
+          fixLineId={routeState.fixLineId}
           onBack={() => navigate("dashboard")}
         />
       );
@@ -292,6 +296,9 @@ export default function BidRenderShell() {
           key={`proposal-${activeProjectId}`}
           bidId={activeProjectId}
           onBack={() => navigate("bids", { id: activeProjectId })}
+          onFixLine={lineId =>
+            navigate("bids", { id: activeProjectId, fixLineId: lineId })
+          }
         />
       );
     }

@@ -337,7 +337,7 @@ describe("the tee box's size (D20, answer 3)", () => {
   });
   it("follows the pull-box rule from 1-1/2 inch up, cover included", () => {
     expect(teeBoxFor('2" EMT', null)).toMatchObject({
-      box: "12x12 pull box",
+      box: "12x12x4 pull box",
       cover: null,
     });
   });

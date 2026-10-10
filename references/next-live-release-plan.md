@@ -14,6 +14,10 @@ in the state it describes, and those want opposite responses.
 
 ## 1. Where things stand
 
+> **2026-10-09:** the latest rehearsal is § 5e (36 migrations, catalog
+> review, Sch 80 / 500 seed, cover repair). The table below is from
+> 2026-10-08; re-read `origin/local-dev` for the gap on the day.
+
 | What      | State (2026-10-08)                                                                                                            |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Live      | `24105ad` (`origin/main`), database 0000–0104 (105 migrations)                                                                |
@@ -74,7 +78,32 @@ left out. One line per theme; the commits say the rest.
 - Reset page says a dead link is dead on open (`6518fc5`); reset logs why
   nothing was sent (`4a76181`); slow-request logging (`c0f7fbe`).
 
-## 3. Migrations a live release would run: 0105–0140 (36 files)
+## 3. Migrations a live release would run: 0105–0143 (39 files)
+
+> **Grew 2026-10-10 (later): 0143** (`0143_labor_steps`, Track C's
+> step-based labor — two new tables, `labor_steps` and
+> `assembly_labor_steps`, three foreign keys; additive, on staging,
+> `deploying.md` § 11 "0143"). **Expect 39 applied, 144, matches,
+> 180/180.** Rehearsed on staging's copy: 1,062/1,062 bid totals unchanged
+> with the old code, with C's code, and after C's code first boot (which
+> seeds 47 shipped steps and 194 starter step lines, all with NO time, so
+> no number moves). The 0142 note below says 38 / 143 / 177 — read it as
+> 39 / 144 / 180. If what prints differs, stop and find out why: either
+> this line is stale or live is not where you think.
+
+> **Grew 2026-10-10: 0142** (`0142_search_misses`, Track B's no-match
+> search log — one new table with one foreign key to `users`, additive,
+> on staging, `deploying.md` § 11 "0142"). **Expect 38 applied, 143,
+> matches, 177/177.** The lines below that say 37 / 142 / 176 are the 0141
+> figures — read them as 38 / 143 / 177. If what prints differs, stop and
+> find out why: either this line is stale or live is not where you think.
+
+> **Grew 2026-10-09 (later): 0141** (`0141_ai_service_status`, one new
+> table for "a dead AI key says so" — additive, on staging, `deploying.md`
+> § 11 "0141"). **Expect 37 applied, 142, matches, 176/176** (the table has
+> no foreign key). § 5e rehearsed 36; 0141 was rehearsed on staging's copy
+> only. The counts below that say 36 / 141 are the 0140 figures — read them
+> as 37 / 142. If what prints differs, stop and find out why.
 
 > **Grew again 2026-10-09 (session 25): 0140** (`0140_material_specialty`,
 > `materials.isSpecialty`, the owner's catalog review — additive, on
@@ -108,6 +137,9 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 | 0135–0138 | per-foot items M1–M4: `takeoff_run_type_extras`, `extra` role + `runExtraKey` key swap, `qtySource`, traced-part JSON           |
 | 0139      | `elbowFlat` appended to `bid_line_items.runMaterialRole` (the 700 flat elbow)                                                   |
 | 0140      | `materials.isSpecialty` — the catalog review's Specialty tag (sorts lower in search; no total reads it)                         |
+| 0141      | `ai_service_status` — one row: whether AI calls are being refused (dead key), for the admin AI screen                           |
+| 0142      | `search_misses` — what a company's picker found nothing for, for the admin screen (one FK to `users`)                           |
+| 0143      | `labor_steps`, `assembly_labor_steps` — step-based labor; ships with no times, so no total reads a number from it (three FKs)   |
 
 - **Expect: "Applied 36 migrations", then 141; a second run applies nothing;
   `schemaDrift` "matches"; foreign keys 176/176** (staging's number,
@@ -141,6 +173,51 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 5. **Example tags** (`migrations-next-batch.md` Batch 5) — the example
    rates never without `isExampleRate`, the shipped hours never without the
    hours tag; 0132–0134 after 0125–0131 in one step.
+6. **PVC Sch 40/80 fittings: Track A's seed and Track C's code ship
+   TOGETHER or not at all** (added 2026-10-09; the same pairing as Sch
+   80 / 500). The owner approved one row per size for PVC couplings,
+   terminal adapters and conduit bodies, shared by both schedules
+   (`catalog-reality-check.md`, batch-2 approval: Carlon and Cantex sell each
+   as one "Sch 40 and 80" part). Two halves:
+   - **A's seed:** rename the Sch 40 rows in place to
+     `{size} PVC Sch 40/80 coupling`, `… terminal adapter` (was
+     `… PVC Sch 40 connector`) and `… {LB|LL|LR|T|C} conduit body`, and
+     retire the Sch 80 rows into them, old names kept as search words. Use
+     `pvcSharedFittingName` from `shared/runFittingMaterials.ts` so the seed
+     and the lookup cannot spell it two ways. Also update the commonness
+     table's PVC LB keys (`shared/materialCommonness.ts`), which are keyed by
+     shipped name.
+   - **C's code** (`c-pvc-4080`): a run of EITHER schedule looks up those
+     shared names. Elbows and sweeps stay per schedule.
+   - **Either half alone is wrong, and loudly so, not silently.** Code
+     without the seed: every PVC run's connectors, couplings and LBs say
+     "No catalog match for 2" PVC Sch 40/80 …" in the Send preview (measured
+     on `bidrender_local_c`, 2026-10-09: Bar layout check's 2" PVC Sch 40
+     type; no other bid, and no total, moved). Seed without the code: the
+     lookup asks for `PVC Sch 40 connector` names that no longer exist, the
+     same blank. Neither prices anything wrong, and neither should ship.
+   - **Order:** A's seed lands on local-dev first. Then C merges local-dev
+     into `c-pvc-4080`, confirms `server/pvcSharedFittings.test.ts` finds the
+     SHIPPED rows (it inserts stand-ins only when they are missing), runs
+     the snapshot compare (`scripts/routerSnapshot.mts`) against the
+     pre-change code, expecting Bar's PVC preview to find the SAME material
+     ids as before (164, 165 locally: renamed in place, so only the names
+     differ) and nothing else to move, and only then merges. The release
+     candidate carries both halves or neither.
+   - **DONE TOGETHER, 2026-10-09 (Track A, `a-catalog-reality`):** C's
+     `460bd83` was merged INTO the branch that carries A's seed, so the two
+     halves reach local-dev in one merge and cannot arrive apart. On a
+     fresh database `pvcSharedFittings.test.ts` finds the shipped rows and
+     inserts nothing. The routerSnapshot compare on Bar is still Track C's
+     to run (it needs `bidrender_local_c`).
+7. **The catalog reality check (`a-catalog-reality`, 2026-10-09)** — 296
+   renames in place, 158 retirements, 50 adds; rehearsed on staging's copy
+   CLEAN, 959/959 bids unchanged
+   (`references/catalog-reality-check-build.md` § Rehearsal). Same release
+   steps as the catalog review: staging backup, rehearse on its restore,
+   push staging, then `repairStarterCovers` AND `repairStarterRetired` (§ 4c,
+   MUST-RUN) on staging. Owner 2026-10-09: the two held batch-2 lighting
+   lines are NOT applied; panels keep "main-breaker panel".
 
 **One bid number moves on purpose:** at the first boot the shipped field
 roles go from $0 to the example rates. Existing lines keep their frozen
@@ -182,6 +259,35 @@ boot did not finish seeding) or this line is stale — find out which first.
 It writes only shared starter lines, so `bidTotals` after must still show
 every bid unchanged.
 
+## 4c. MUST-RUN release-day step: the reality-check starter repair
+
+**Owner, 2026-10-09: must run on staging and on live, right after § 4b.**
+The catalog reality check retired rows that 10 shipped starter lines point
+at, moved PG15 onto the new #3 lug, and added labels to CW3 and CW11. The
+seeder never edits a starter that exists, so on staging and live those
+starters keep the old lines until `scripts/repairStarterRetired.mts` runs
+(`server/starterRetiredRepair.ts`; build doc § "Existing databases").
+
+**When:** after the new code's first boot (it seeds the kept rows and the
+labels) and **after the cover repair** (§ 4b) — one cover starter also has a
+retired line, and the cover repair reports it "skipped: edited" until this
+one has run. Then `bidTotals` after.
+
+```bash
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # report only
+ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts --apply
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/repairStarterRetired.mts           # again: all "already has it"
+```
+
+**Expect on a database seeded before the check: `13 would repoint`** (PG1,
+DV33, DV34, RS13, PG15, PG16, PG20, DR2, MS5, GR3, CW3, CW4, CW11 — measured
+on staging's 2026-10-09 copy). A starter the database does not have yet is
+"skipped: not found" (live has fewer starters than staging). Any
+"skipped: edited" or "part not in catalog", or a different count, is a stop:
+either the database changed since it was measured, the boot did not finish,
+or this line is stale — find out which first. It writes only shared starter
+lines, so `bidTotals` after must still show every bid unchanged.
+
 ## 5. Check first — before the window
 
 1. **Owner's yes** to release, and to which candidate commit.
@@ -193,6 +299,36 @@ every bid unchanged.
    every run); Gate 37845117225 green, then its smoke re-run against staging
    5 of 5 green. **A red step 10 is now a real failure — do NOT re-run past
    it**; find out why first.
+   ~~Smoke test 2 (empty sheet list after a first upload)~~ — **CLEARED
+   2026-10-09 by Track B**:
+   - Fixes: `526d295`, then `11f5466`, the half that mattered (cancel the
+     first sheet read in flight before re-reading).
+   - Before the fix: 2 of 12 failed on a staging probe. After: **0 of 24**.
+   - Test 2 green in all 10 smoke runs since (Gates 37960082974 and
+     37970377380 with 3 re-runs each, plus A's two Gates).
+   - **The candidate must contain `11f5466`.** A red test 2 is now a real
+     failure, so do not re-run past it.
+
+   **Two OTHER smoke tests each failed once in those 10 runs**, with no
+   deploy running (`track-b-handoff.md`, todo.md):
+   - screens / Proposal: an unbounded network-idle wait. Bounded in
+     `739eae6`.
+   - flow test 5: a Legend click that did not arm. ~~Cause NOT found.~~
+     **FOUND AND FIXED 2026-10-09 (`44ede4f`, merged as `705e1c9`) — a real
+     wrong count, not a flake. MUST-INCLUDE for the candidate.** A Legend
+     click straight after "Link" could arm ANOTHER item's count of the same
+     assembly (the server dropped the not-yet-linked symbol). **LIVE
+     (`24105ad`) has this race** — same `forAssembly` line, same optimistic
+     link. Flow 5 now forces it every run (red without the fix), so a red
+     flow 5 is a real failure: do not re-run past it. Gate 37983875286 on
+     `705e1c9`: all green, smoke included.
+     **On the day, before the release:** run
+     `scripts/legendLinkRaceCandidates.mts` against live (read only, § 5
+     item 4b) — it lists every bid the race could have touched.
+
+   Either can turn the candidate's Gate red. If one does, read the failure
+   before re-running.
+
 3. ~~The white box on plan open~~ — **FIXED by Track B (`14fead9`, batch 1)**: `stagingOpenFlash.mts` prints "No flash" on staging at laptop and
    tablet (`todo.md` § White box). ~~Track B's cover swaps~~ — **on
    local-dev (`7fb0c80`)**, with the repair script in § 4b.
@@ -200,6 +336,13 @@ every bid unchanged.
 snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
    (it was 0 on 2026-10-07). Otherwise freeze first (`todo.md`
    "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE").
+   4b. **Read-only check for the Legend-link race on live** (`44ede4f`):
+   `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/legendLinkRaceCandidates.mts`.
+   It prints CANDIDATES (a mark does not record which symbol placed it):
+   "no candidates" ends it; any row means opening that bid's sheets and
+   looking for one count's marks on two different symbols. Live had 2 bids
+   on 2026-10-06, both with no lines, so the expected answer is none — if it
+   prints rows, stop and look before releasing.
 5. **Backup of live**, restored locally, table counts equal; rehearse the
    thirty-five on that copy (apply, re-run, drift, `bidTotals` before/after
    with the candidate's code booted, the starter count with zero holds, the
@@ -301,19 +444,95 @@ Staging's own run of exactly this is `deploying.md` § 11 "0140" (rehearsed
 on a copy, 773/773 unchanged; staging 781/781 unchanged after the migration).
 If anything differs, stop and find out why.
 
-### Still missing before the release (2026-10-08)
+**DONE 2026-10-09 — see § 5e**, with the Sch 80 / 500 seed added.
+
+## 5e. Re-rehearsal with 0140, the catalog review AND the Sch 80 / 500 seed — DONE 2026-10-09 (nothing changed on live)
+
+Track A, 04:00–04:10 UTC. Candidate code: `a-sch80-500` `8f3045c`
+(`local-dev` `c1e7b35` + the Sch 80 / 500 seed, `sch80-and-500-plan.md`;
+no migration in it). Every write was to the local throwaway copy
+`bidrender_backup_verify`.
+
+**The copy is NOT a fresh read of live.** A new `scripts/backup.mts` run
+against live was refused by this session's permission classifier
+("Production Reads"), so the copy is the NEWEST backup in the bucket,
+`2026-10-08T23-54-07Z` — the one § 5c took by hand, about four hours old
+at the time; no nightly had run since. Live is three users and two bids,
+so a change in four hours is unlikely, but it was not measured. **On the
+day, the release's own backup (`live-release-plan.md` § 4) is the fresh
+read; if it differs from the figures here, stop and find out why.**
+
+| Step                           | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Restore                        | `verifyBackup.mts`, `KEEP_SCRATCH=1`: **VERIFIED**, 65 tables / 3,479 rows. 105 migrations. 3 users, 2 bids, **0 bid lines**, 8 shared assemblies, 7 run types (4 shipped, 1 company, 2 archived smoke copies), 1,554 active shipped materials, 18 company rows. No surface raceway rows at all (0117 is not on live).                                                                                                                                                                                                                                    |
+| Recount (pre-0087 recipe-live) | **0** before the migration and **0** after the repair.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `bidTotals` before             | from live's code `24105ad` (worktree, today's `bidTotals.mts` copied in): read only proved, 2 bids for 2 owners.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Migrate 0105–0140              | **"Applied 36 migrations: 0105_assembly_labor_only to 0140_material_specialty … all 141."** No errors. Re-run: "Nothing to apply … all 141". (Not timed this run; § 5c's 35 took 4.1 s.)                                                                                                                                                                                                                                                                                                                                                                  |
+| Drift after                    | **"Database matches the schema." Foreign keys 176 present, 176 declared.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| First boot (seed) ×2           | `scripts/seedBaseline.mts` (the boot's own function), exit 0 both times, no "Holding" line. **1,801 active shipped** (1,908 rows), **24 shipped run types**, **183 starters** (175 hours NULL), 108 Specialty. Second boot: added 0, renamed 0, retired 0, every reference identical.                                                                                                                                                                                                                                                                     |
+| `catalogRehearsal compare`     | added 352, renamed 173 (earlier rounds + the review), retired 105, **DELETED 0**; old spellings 0; duplicates 0; company rows 18 → 18, changed 0. Its verdict line says "NOT CLEAN" because reference COUNTS grew (903 new starter lines, 20 new run types); checked row by row from the two snapshots: **every pre-existing reference identical except** run types 2 and 3's ground, `#12 bare solid Copper` → `#12 THHN green Copper` — the intended swap. The smoke account's own copy (type 7) still on #12 bare: a company row, untouched by design. |
+| Sch 80 / 500 content           | 9 `N" PVC Sch 80, underground` types, all 9 with tape; 18 active underground types; `Surface raceway, 500 series` (foot) + its 9 parts (each); the 500 type on that row with `#12 THHN green Copper` as ground. Live never had the 500 base or cover, so the rename and retire are no-ops there — the rows simply arrive new.                                                                                                                                                                                                                             |
+| `bidTotals` after + compare    | **"all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged."**                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Cover repair                   | report **`5 would swap, 43 already has it`** (DV1–DV5, ids 1–5, "old recipe exactly"); `--apply` **5 swapped** — measured both sides, only the "Wall plate" line on each of ids 1–5 changed (duplex/decorator/toggle nylon), same line ids; re-run **`48 already has it`**; `bidTotals` still all 2 unchanged.                                                                                                                                                                                                                                            |
+
+**Same honest limit as § 5b/5c:** live has 0 bid lines, so "totals
+unchanged" is $0 against $0; pricing survival was proved on staging's
+bids (`deploying.md` § 11).
+
+**Expect on the day:** 36 applied, 141, matches, 176/176; first boot 0
+holds, 183 starters, 1,801 active shipped, 24 shipped run types; repair 5 /
+43, then 48. If any differs, stop and find out why.
+
+> **Changed 2026-10-09, later — the coverage-check catalog adds (§ 5f).**
+> A candidate that includes `3cb5df3` ships **24 more rows: expect 1,825
+> active shipped and 114 Specialty** on live's first boot, not 1,801 / 108.
+> Seed only, no migration, additive (renamed 0, retired 0), so § 5e's
+> migration and repair figures are unchanged. § 5e itself was NOT re-run
+> with them; they were rehearsed on a copy of STAGING (§ 5f), which holds
+> the same catalog live will reach after this release's first boot.
+
+## 5f. The coverage-check catalog adds (24 rows) — rehearsed on staging's copy, 2026-10-09
+
+Owner-approved rows from `coverage-check.md` (track-c), `3cb5df3`:
+receptacles (6-15R, 6-20R, 6-30R, 6-50R, L15-30, L21-30, red emergency,
+pop-up countertop), wall and floor heat (4), 4/3 NM-B, HCF MC cable,
+meter centers (4, 6), switchboards (400/600/800A), handhole, dock light,
+cord reel, telecom backboard and busbar. CT cabinet already shipped. No
+migration; the seed adds them on the first boot.
+
+| Step                         | Result                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backup                       | `staging-2026-10-09T05-13-27Z-before-coverage-rows.sql` (73 tables), restored locally: 847 bids, 438 lines, 1,801 active, 141 migrations       |
+| Before (staging's `94471cc`) | `bidTotals` 847; catalog 1,941 rows / 1,801 active. Control: booting that same code changed no total (847/847)                                 |
+| New code's boot ×2           | **added 24, renamed 0, retired 0, DELETED 0**, 1,825 active, 114 Specialty, every reference identical — `VERDICT: CLEAN`; second boot: nothing |
+| Totals                       | **847/847 unchanged**                                                                                                                          |
+
+Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
+
+### Still missing before the release (2026-10-09)
 
 - **Owner's yes** and the candidate commit; then a green Gate on exactly
-  that commit (`8913918` is green; anything newer needs its own).
+  that commit (test, deploy-staging, smoke). The candidate must include the
+  Sch 80 / 500 seed if it is to match § 5e, and Track B's `11f5466` (smoke
+  test 2's fix, § 5 item 2). **It MUST include `705e1c9`** (the Legend-link
+  fix, `44ede4f`) — live has that race today (§ 5 item 2) — and § 5 item 4b
+  runs against live on the day.
+- ~~Smoke test 2 proven fixed~~ — **done 2026-10-09** (§ 5 item 2).
 - **Owner's tablet look at staging** (the third of the owner's three
   waits; the white box and the cover swaps are done).
-- **The cover repair has NOT been run on staging.** Staging's starters
-  still have the old covers (B rehearsed on a copy only). Run it there
-  first, with a backup, the same way — it is what the live step will do.
+- **A fresh backup of live on the day** — this session could not take one
+  (above); the release's own backup is that read.
 - The recount (§ 5 item 4) on LIVE itself on the day — the 0 here is the
   copy's.
+- ~~The cover repair has NOT been run on staging~~ — **done on staging
+  2026-10-09** (48 swapped, 794/794 unchanged; `deploying.md` § 11 "0140"
+  step 6).
+- Track C's half of Sch 80 / 500 (`c-sch80-500`: the 500 fitting family, the
+  fold sort's other callers) merges after this seed; until it does, a 500
+  run's fittings say "no catalog match" — an honest blank, no wrong number.
+  The release candidate should carry both or neither of the 500 halves.
 - Not blockers, logged by session 22 in `todo.md`: the tally saying
-  "0 marks" while loading.
+  "0 marks" while loading (Track C has since fixed it, `cd8db42`).
 
 ## 6. What should wait (NOT in this release)
 
@@ -333,17 +552,26 @@ If anything differs, stop and find out why.
 
 ## SHORT SUMMARY
 
-- Live `24105ad` / 0104; staging = `local-dev` / 0140.
-- A release runs 0105–0140 (36, all additive) before the push, in one
-  ordered run; expect 141, matches, 176/176 FKs. Rehearsed with 35 on
-  2026-10-08 (§ 5c); **0140 and the catalog review need a re-run (§ 5d)**.
+- Live `24105ad` / 0104. Staging's DATABASE is at 0143 (144); staging's
+  CODE is `f03e8ef` until somebody pushes staging — the Gate refuses the
+  push because `drizzle/` differs (2026-10-10).
+- A release runs 0105–0143 (39, all additive) before the push, in one
+  ordered run; expect 144, matches, 180/180 FKs. The last rehearsal on a
+  copy of LIVE was of 36 (§ 5e, 2026-10-09: clean; 1,801 active shipped, 24
+  run types, 183 starters, 0 holds, only the intended ground swap moved,
+  repair 5 / 43 → 48, both bids unchanged, on the 2026-10-08 23:54 backup).
+  0141–0143 were rehearsed on staging's copy only, so a live-copy rehearsal
+  of all 39 is still owed before the window.
+- Coverage-check catalog adds (`3cb5df3`, § 5f): +24 rows, seed only —
+  expect **1,825 active / 114 Specialty** on the first boot if the
+  candidate includes them. Rehearsed on staging's copy: CLEAN, 847/847.
 - NEW release step after the push and first boot: `repairStarterCovers.mts`
   (§ 4b) — expect 5 swapped (DV1–DV5), 43 already, then 48 already.
 - Pairing rules 1–5 all met on `local-dev`; rule 2 now expects ZERO holds
   (DV34 loads).
 - Check first: owner's yes, green Gate on the candidate, owner's tablet
-  look, the cover repair run on STAGING, live recipe-live recount = 0.
-  White box and cover swaps are done.
+  look, a fresh live backup, live recipe-live recount = 0. White box, cover
+  swaps and the staging cover repair are done.
 - Wait: LT1/LT2 repair, any shipped prices/hours, brand prices, step 3,
   C's per-foot extras plan.
 - Rehearsed on a copy of live 2026-10-08 (§ 5b): recount 0, 30 applied in

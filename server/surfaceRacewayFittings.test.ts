@@ -13,9 +13,10 @@ import { describe, expect, it } from "vitest";
 import {
   SURFACE_RACEWAY_PARTS,
   countSurfaceRacewayFittings,
-  isSurfaceRaceway700,
   surfaceRacewayFittingRows,
   surfaceRacewayPartName,
+  surfaceRacewaySeries,
+  type SurfaceRacewaySeries,
   type SurfaceRacewayCount,
   type SurfaceRacewaySpec,
 } from "../shared/surfaceRacewayFittings";
@@ -31,6 +32,7 @@ import { fittingRowSpeaks } from "../shared/runFittingMaterials";
 
 const R700: SurfaceRacewaySpec = {
   name: "Surface raceway, 700 series",
+  series: "700",
   stickLengthFeet: 10,
   strapSpacingFeet: 5,
   strapFromBoxFeet: 1,
@@ -301,11 +303,19 @@ describe("factory 700 parts only", () => {
 });
 
 describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
+  // BOTH series' rows in the catalog, so a count that ignored its series
+  // would find the other one's part rather than nothing.
   const names = new Map(
-    SURFACE_RACEWAY_PARTS.map((part, i) => [
-      surfaceRacewayPartName(part),
-      { id: 900 + i, name: surfaceRacewayPartName(part), costPerUnit: 0 },
-    ])
+    (["500", "700"] as const).flatMap((series, s) =>
+      SURFACE_RACEWAY_PARTS.map((part, i) => [
+        surfaceRacewayPartName(part, series),
+        {
+          id: 900 + s * 100 + i,
+          name: surfaceRacewayPartName(part, series),
+          costPerUnit: 0,
+        },
+      ])
+    )
   );
   const found = (name: string) => names.get(name);
   const counts = countSurfaceRacewayFittings(
@@ -321,7 +331,7 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
   );
 
   it("go out under six DIFFERENT roles — the inside and flat elbows apart", () => {
-    const rows = surfaceRacewayFittingRows(counts, {}, found);
+    const rows = surfaceRacewayFittingRows("700", counts, {}, found);
     expect(rows.map(r => r.role)).toEqual([
       "coupling",
       "connector",
@@ -347,8 +357,11 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
 
   it("the type's own choice of part wins, and a missing part says so by name", () => {
     const own = { id: 5, name: "Shop's own 700 coupling", costPerUnit: 1.5 };
-    const rows = surfaceRacewayFittingRows(counts, { coupling: own }, name =>
-      name.includes("tee") ? undefined : found(name)
+    const rows = surfaceRacewayFittingRows(
+      "700",
+      counts,
+      { coupling: own },
+      name => (name.includes("tee") ? undefined : found(name))
     );
     expect(rows.find(r => r.role === "coupling")!.pick).toMatchObject({
       ok: true,
@@ -357,14 +370,83 @@ describe("the 700 parts as bid ROWS (wired 2026-10-08)", () => {
     });
     expect(rows.find(r => r.role === "teeBox")!.pick).toEqual({
       ok: false,
-      why: "No catalog match for Surface raceway tee, 700 series",
+      // One tee for 500 and 700 since 2026-10-09 (V5715).
+      why: "No catalog match for Surface raceway tee, 500/700 series",
     });
   });
 
-  it("is recognised by the SHIPPED raceway name only", () => {
-    expect(isSurfaceRaceway700("Surface raceway, 700 series")).toBe(true);
-    expect(isSurfaceRaceway700("Surface raceway, 500 series")).toBe(false);
-    expect(isSurfaceRaceway700(null)).toBe(false);
+  it("knows 500 and 700 by their SHIPPED names, as two series — 1500 and 2400 are neither", () => {
+    // sch80-and-500-plan.md § 2d. Before 2026-10-09 the 500 row was "not a
+    // family" here; 1500 contains "500", which is why the list is closed.
+    expect(surfaceRacewaySeries("Surface raceway, 500 series")).toBe("500");
+    expect(surfaceRacewaySeries("Surface raceway, 700 series")).toBe("700");
+    expect(surfaceRacewaySeries("Surface raceway, 1500 series")).toBeNull();
+    expect(
+      surfaceRacewaySeries("Surface raceway, 2400 series two-channel")
+    ).toBeNull();
+    // The 500 row's name before A's rename, and a shop's own raceway.
+    expect(surfaceRacewaySeries("Surface raceway base, 500 series")).toBeNull();
+    expect(surfaceRacewaySeries("Shop's own raceway")).toBeNull();
+    expect(surfaceRacewaySeries(null)).toBeNull();
+  });
+
+  it("a 500 run names 500 parts only — never a 700 one", () => {
+    const counts500 = countSurfaceRacewayFittings(
+      [
+        leg("1", 40, {
+          turn: 90,
+          startDrop: { state: "none" },
+          endDrop: { state: "counted", feet: 3.5 },
+        }),
+      ],
+      { ...R700, name: "Surface raceway, 500 series", series: "500" },
+      []
+    );
+    const rows = surfaceRacewayFittingRows("500", counts500, {}, found);
+    const by = (role: string) => rows.find(r => r.role === role)!;
+    expect(by("elbow90")).toMatchObject({
+      qty: 1,
+      pick: { ok: true, name: "Surface raceway inside elbow, 500 series" },
+    });
+    expect(by("elbowFlat")).toMatchObject({
+      qty: 1,
+      pick: { ok: true, name: "Surface raceway flat elbow, 500 series" },
+    });
+    // The clip and tee are ONE part for 500 and 700 since 2026-10-09
+    // (V5703, V5715): "500/700" is a 500 part too. Never a 700-only one.
+    for (const row of rows)
+      if (row.pick.ok)
+        expect(row.pick.name, row.role).toMatch(/, (500|500\/700) series$/);
+    // And the sentences say 500 where they name a part.
+    expect(counts500.entranceEnd).toMatchObject({
+      why: expect.stringContaining("goes into the 500 box"),
+    });
+  });
+
+  it("a missing 500 part says so by its 500 name, and does not borrow the 700 one", () => {
+    const only700 = (name: string) =>
+      name.endsWith(", 700 series") ? found(name) : undefined;
+    const rows = surfaceRacewayFittingRows("500", counts, {}, only700);
+    for (const row of rows)
+      expect(row.pick, row.role).toEqual({
+        ok: false,
+        why: expect.stringMatching(
+          /^No catalog match for .*, (500|500\/700) series$/
+        ),
+      });
+  });
+
+  it("700 sentences are unchanged by the series argument", () => {
+    const series: SurfaceRacewaySeries = "700";
+    expect(counts.entranceEnd).toMatchObject({
+      why: "1 entrance end: one at the start of each run — the far end goes into the 700 box",
+    });
+    expect(surfaceRacewayPartName("tee", series)).toBe(
+      "Surface raceway tee, 500/700 series"
+    );
+    expect(surfaceRacewayPartName("coupling", series)).toBe(
+      "Surface raceway coupling, 700 series"
+    );
   });
 
   it("a PIPE never buys a flat elbow, and that 0 stays quiet", () => {

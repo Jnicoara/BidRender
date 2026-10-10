@@ -236,6 +236,70 @@ export const RECEPTACLES: BaselineMaterial[] = [
     name: `${nema} receptacle`,
     searchAliases: aliases("twistlock locking", RECEP_SLANG, slang),
   })),
+  /*
+    Coverage check, 2026-10-09 (owner-approved; references/coverage-check.md
+    on track-c): the receptacles real jobs needed and the catalog lacked.
+    Three-phase locking first, named as their L-series siblings are.
+  */
+  ...[
+    {
+      nema: "L15-30",
+      slang:
+        "l15-30r 30 amp 30a 250v 3 phase three phase 3ph delta 4 wire shop",
+    },
+    {
+      nema: "L21-30",
+      slang:
+        "l21-30r 30 amp 30a 120/208v 3 phase three phase 3ph wye 5 wire shop",
+    },
+  ].map(({ nema, slang }) => ({
+    ...device("Receptacles"),
+    name: `${nema} receptacle`,
+    searchAliases: aliases("twistlock locking", RECEP_SLANG, slang),
+    jobKind: "commercial" as const,
+  })),
+  /*
+    250V straight-blade, NEMA in the name as the catalog review named the
+    range and dryer receptacles (2026-10-08). Amps first so they sort with
+    their size; "208v 240v" because that is what the equipment tag says.
+  */
+  ...(
+    [
+      [
+        "15",
+        "6-15",
+        "window ac air conditioner office equipment",
+        "commercial",
+      ],
+      ["20", "6-20", "cooler freezer compressor 208v equipment", "both"],
+      ["30", "6-30", "ptac kitchen equipment restaurant fryer", "commercial"],
+      ["50", "6-50", "welder oven commercial range kiln shop", "both"],
+    ] as const
+  ).map(([amps, nema, slang, jobKind]) => ({
+    ...device("Receptacles"),
+    name: `${amps}A 250V receptacle, NEMA ${nema}R`,
+    searchAliases: aliases(
+      RECEP_SLANG,
+      // No "2 pole": it put the 6-20R in a "sp 20" breaker search
+      // (materialsCatalog.test.ts), and nobody asks for a receptacle so.
+      // "N amp" is how a typed "50 amp" finds the row (a bare number never
+      // matches "50A"). Not on the 6-20R: its "20" out-ranked the 20A
+      // breaker for "sp 20" (materialsCatalog.test.ts); "6-20" and "20a"
+      // still find it.
+      `${nema}r ${amps === "20" ? "" : `${amps} amp`} 208v 240v 3 wire straight blade ${slang}`
+    ),
+    jobKind,
+  })),
+  {
+    ...device("Receptacles"),
+    name: "20A red emergency receptacle",
+    searchAliases: aliases(
+      "critical branch life safety generator medical hospital healthcare",
+      RECEP_SLANG,
+      "5-20r red"
+    ),
+    jobKind: "commercial",
+  },
   {
     ...device("Receptacles"),
     // NEMA in the name since the owner's catalog review, 2026-10-08.
@@ -254,6 +318,17 @@ export const RECEPTACLES: BaselineMaterial[] = [
     ...device("Receptacles"),
     name: "Pop-up floor receptacle",
     searchAliases: aliases("popup countertop island tombstone", RECEP_SLANG),
+  },
+  {
+    ...device("Receptacles"),
+    // Coverage check, 2026-10-09: the kitchen-island tower that rises out of
+    // the counter — not the floor box above.
+    name: "Pop-up countertop receptacle",
+    searchAliases: aliases(
+      "popup island kitchen counter retractable tower",
+      RECEP_SLANG
+    ),
+    jobKind: "residential",
   },
   {
     ...device("Receptacles"),
@@ -864,6 +939,14 @@ const FAMILY_WEATHERPROOF: BaselineMaterial[] = [
   },
 ];
 
+/*
+  103 -> 96 on 2026-10-09: the catalog reality check (batch 2, owner-
+  approved) retired the three mixed 3-gang plates nobody stocks — D/Dec/Dec,
+  D/D/Dec, T/D/Dec, nylon and stainless — and the stainless oversized
+  duplex/decorator. They are generated here still and withdrawn by name in
+  shared/catalogRealityCheck20261009.ts, so a bid priced from one keeps
+  resolving it (server/coverPlateFamily.test.ts counts the family).
+*/
 export const COVER_PLATE_FAMILY: BaselineMaterial[] = [
   ...STANDARD_PLATES,
   ...BIG_PLATES,

@@ -205,6 +205,20 @@ describe.skipIf(!hasDb)("the starter cover repair", () => {
         "1-gang wall plate, toggle, nylon|1.0000|false",
       ])
     );
+    // The coverage-check recipe fixes (owner, 2026-10-09) ride the same
+    // repair: RS12's wire is swapped on its line, LT23's kit is added.
+    expect(await recipeOf(ids.get("RS12")!)).toContain(
+      "4/3 NM-B Copper|40.0000|false"
+    );
+    expect(await recipeOf(ids.get("RS12")!)).not.toContain(
+      "6/3 NM-B Copper|40.0000|false"
+    );
+    expect(await recipeOf(ids.get("LT23")!)).toEqual(
+      expect.arrayContaining([
+        "Fixture hanging kit, aircraft cable|2.0000|false",
+        "12 ga ceiling hanger wire|2.0000|false",
+      ])
+    );
     expect(await linesOf(forkId)).toEqual(forkLines);
   });
 

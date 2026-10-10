@@ -317,35 +317,36 @@ export function withDropsNotPriced(
  * The lines a total leaves something out of, by name, for a warning that has
  * to say WHICH ("Duplex receptacle, 2 parts not priced"). Same two predicates
  * as `countNotPriced` below, so the list and the count cannot disagree.
+ *
+ * Each carries its `lineId`, so the print block can jump to THAT line with
+ * its fix open (never-stuck-plan.md, gap 10) — a name alone cannot tell two
+ * lines of the same assembly apart.
  */
-export function notPricedLines<L extends PartsLineLike & { name: string }>(
-  lines: readonly { line: L; directCost: number | null }[]
-): { name: string; wholeLine: boolean; parts: number; hoursNotSet: boolean }[] {
-  return lines.flatMap(
-    ({
-      line,
-      directCost,
-    }): {
-      name: string;
-      wholeLine: boolean;
-      parts: number;
-      /** Its assembly hours were not set — said apart from parts. */
-      hoursNotSet: boolean;
-    }[] => {
-      if (lineNotPriced(line, directCost)) {
-        return [
-          { name: line.name, wholeLine: true, parts: 0, hoursNotSet: false },
-        ];
-      }
-      const parts = linePartsNotPriced(line, directCost);
-      // A line whose ONLY gap is its hours is listed too: it used to appear
-      // because hours counted as a part, and must not drop out now they don't.
-      const hoursNotSet = lineHoursMissing(line, directCost);
-      return parts > 0 || hoursNotSet
-        ? [{ name: line.name, wholeLine: false, parts, hoursNotSet }]
-        : [];
+export type NotPricedLine = {
+  lineId: number;
+  name: string;
+  wholeLine: boolean;
+  parts: number;
+  /** Its assembly hours were not set — said apart from parts. */
+  hoursNotSet: boolean;
+};
+
+export function notPricedLines<
+  L extends PartsLineLike & { id: number; name: string },
+>(lines: readonly { line: L; directCost: number | null }[]): NotPricedLine[] {
+  return lines.flatMap(({ line, directCost }): NotPricedLine[] => {
+    const base = { lineId: line.id, name: line.name };
+    if (lineNotPriced(line, directCost)) {
+      return [{ ...base, wholeLine: true, parts: 0, hoursNotSet: false }];
     }
-  );
+    const parts = linePartsNotPriced(line, directCost);
+    // A line whose ONLY gap is its hours is listed too: it used to appear
+    // because hours counted as a part, and must not drop out now they don't.
+    const hoursNotSet = lineHoursMissing(line, directCost);
+    return parts > 0 || hoursNotSet
+      ? [{ ...base, wholeLine: false, parts, hoursNotSet }]
+      : [];
+  });
 }
 
 /** How much of a bid the total leaves unpriced. */

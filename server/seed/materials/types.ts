@@ -248,10 +248,19 @@ export function dropRestatedWords(
   // that "1-1/4" stays one token — right for sizes, wrong for words, because it
   // leaves "Single-gang box" looking as though it does not contain "gang". A
   // word only escapes if neither reading finds it in the name.
+  /*
+    Except a SLASH compound of two numbers of three digits or more —
+    "500/700" — whose sides are series in their own right. Search reads "500/700" as one token, so
+    "700" there does not find the row; splitting it here dropped "700" from
+    the search words as "already in the name" and left "700 clip" finding
+    nothing (catalog reality check, 2026-10-09). Fractions — "1/2", "1/0",
+    "3/4" — have a short side and are split as before.
+  */
   const inName = new Set<string>(
     Array.from(wordsInName(material.name)).concat(
       material.name
         .toLowerCase()
+        .replace(/\d{3,}\/\d{3,}/g, " ")
         .replace(/[^a-z0-9 ]/g, " ")
         .split(/\s+/)
         .filter(Boolean)

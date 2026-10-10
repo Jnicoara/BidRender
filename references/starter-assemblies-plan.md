@@ -85,19 +85,21 @@ only two groups have no home:
 
 ## Counts
 
-| Group                  | Assemblies | of which ship today (★) |
-| ---------------------- | ---------- | ----------------------- |
-| DV Devices             | 34         | 5                       |
-| LT Lighting            | 33         | 2                       |
-| RS Resi specials       | 20         | 0                       |
-| CS Commercial specials | 16         | 0                       |
-| PG Power / gear        | 20         | 1                       |
-| MH Motor / HVAC        | 14         | 0                       |
-| DR Demo / retrofit     | 20         | 0                       |
-| MS Misc                | 14         | 0                       |
-| GC Commercial gaps     | 5          | 0                       |
-| GR Residential gaps    | 7          | 0                       |
-| **Total**              | **183**    | **8**                   |
+| Group                   | Assemblies | of which ship today (★) |
+| ----------------------- | ---------- | ----------------------- |
+| DV Devices              | 34         | 5                       |
+| LT Lighting             | 33         | 2                       |
+| RS Resi specials        | 20         | 0                       |
+| CS Commercial specials  | 16         | 0                       |
+| PG Power / gear         | 20         | 1                       |
+| MH Motor / HVAC         | 14         | 0                       |
+| DR Demo / retrofit      | 20         | 0                       |
+| MS Misc                 | 14         | 0                       |
+| GC Commercial gaps      | 5          | 0                       |
+| GR Residential gaps     | 7          | 0                       |
+| CK First coverage check | 26         | 0                       |
+| CW Wider coverage check | 15         | 0                       |
+| **Total**               | **224**    | **8**                   |
 
 168 by decision (D4): the commercial MC device versions, DV20–DV34, ship
 alongside the resi devices. **183 since 2026-10-07** (owner):
@@ -108,6 +110,9 @@ alongside the resi devices. **183 since 2026-10-07** (owner):
 - **Can lights at 4" and 6", in both new construction and remodel.** LT5,
   LT4 and LT6 already existed, so this adds LT33, the 4" remodel.
 - **GC1–GC5 and GR1–GR7**, the top-30 gaps (§ "GC / GR").
+
+**224 since 2026-10-09** (owner): **CK1–CK26 and CW1–CW15**, the two
+coverage checks (§ "CK / CW").
 
 ---
 
@@ -193,7 +198,7 @@ Commercial — the Dollar Tree job. Project type Commercial.
 | LT20 | 2x2 LED troffer, lay-in             | as LT19, F `2x2 LED troffer`                                                                                                                                        |
 | LT21 | 1x4 LED troffer, lay-in             | as LT19, F `1x4 LED troffer`                                                                                                                                        |
 | LT22 | 4 ft LED strip, surface / suspended | F `4 ft LED strip fixture` 1 · `6ft MC whip` 1 · `Ceiling support wire` 2 · `Wire nuts` 3                                                                           |
-| LT23 | 8 ft LED strip (sales floor rows)   | F `8 ft LED strip fixture` 1 · `8 ft MC whip` 1 · `Ceiling support wire` 2 · `Wire nuts` 3                                                                          |
+| LT23 | 8 ft LED strip (sales floor rows)   | F `8 ft LED strip fixture` 1 · `8 ft MC whip` 1 · `Ceiling support wire` 2 · `Wire nuts` 3 · `Fixture hanging kit, aircraft cable` 2 (added 2026-10-09)             |
 | LT24 | 4 ft LED wraparound (back room)     | F `4 ft LED wraparound` 1 · `4" square box` 1 · `4" square mud ring, fixture` 1 · `Wire nuts` 3                                                                     |
 | LT25 | 4 ft vapor tight (cooler, dock)     | F `4 ft vapor tight fixture` 1 · `6ft MC whip` 1 · `Cord grip` 1 · `Wire nuts` 3                                                                                    |
 | LT26 | High bay                            | F `High bay` 1 · `8 ft MC whip` 1 · `Beam clamp` 2 · `Wire nuts` 3                                                                                                  |
@@ -211,13 +216,13 @@ Commercial — the Dollar Tree job. Project type Commercial.
 | RS3  | Electric water heater connection      | `10-2 NM-B` 40 · `30A 2-Pole breaker` 1 · `Breaker lock-off` 1 · `1/2" cable connector` 1 · `Wire nuts` 3                                                                                                                    |
 | RS4  | Dishwasher connection                 | F `Dishwasher whip` 1 · `12-2 NM-B` 35 · `20A Single-Pole AFCI/GFCI combo breaker` 1 · `3/8" cable connector` 1 · `Wire nuts` 3                                                                                              |
 | RS5  | Garbage disposal, switched            | `Single-gang box` 2 · `Duplex receptacle` 1 · `Single-pole switch` 1 · `Wall plate` 2 · F `Garbage disposal cord` 1 · `12-2 NM-B` 35 · `12-3 NM-B` 10 · `20A Single-Pole AFCI/GFCI combo breaker` 1 · `Wire nuts` 5          |
-| RS6  | Range hood / microwave circuit        | F `Range hood fan` 1 · `14-2 NM-B` 20 whip · `3/8" cable connector` 1 · `Wire nuts` 3                                                                                                                                        |
+| RS6  | Range hood / microwave circuit        | F `Range hood fan` 1 · `14-2 NM-B` 20 whip · `3/8" cable connector` 1 · `Wire nuts` 3 — the range hood; the over-range microwave is CK18 (2026-10-09)                                                                        |
 | RS7  | Bath exhaust fan wiring               | F `Bath exhaust fan, 80 CFM` 1 · `4" insulated flex duct` 1 · `4" roof vent cap` 1 · `Duct clamp` 2 · `14-3 NM-B` 20 whip · `3/8" cable connector` 1 · `Wire nuts` 3                                                         |
 | RS8  | Bath fan/light combo, humidity switch | F `Bath exhaust fan, light combo` 1 · `Humidity sensor switch` 1 · `Single-gang box` 1 · `Wall plate` 1 · `4" insulated flex duct` 1 · `4" wall vent cap` 1 · `Duct clamp` 2 · `14-3 NM-B` 20 whip · `Wire nuts` 4           |
 | RS9  | Combination smoke/CO detector         | `Shallow round box` 1 · F `Hardwired smoke/CO detector` 1 · `14-3 NM-B` 20 whip · `Wire nuts` 4                                                                                                                              |
 | RS10 | Doorbell, wired                       | `Doorbell transformer` 1 · `Doorbell button` 1 · `Doorbell chime, wired` 1 · `18/2 control wire` 50                                                                                                                          |
 | RS11 | Video doorbell wiring                 | F `Video doorbell` 1 · `Video doorbell chime kit` 1 · `Doorbell transformer` 1 · `18/2 control wire` 30                                                                                                                      |
-| RS12 | EV charger circuit, 48A hardwired     | F `48A EV charger` 1 · `6-3 NM-B` 40 · `60A 2-Pole breaker` 1 · `1" cable connector` 1                                                                                                                                       |
+| RS12 | EV charger circuit, 48A hardwired     | F `48A EV charger` 1 · `4/3 NM-B Copper` 40 (was 6-3 NM-B until 2026-10-09: NM #6 is 55A, a 48A charger needs 60A) · `60A 2-Pole breaker` 1 · `1" cable connector` 1                                                         |
 | RS13 | EV / RV receptacle, 50A (NEMA 14-50)  | `4-11/16" square box` 1 · `50A RV receptacle` 1 · `6-3 NM-B` 40 · `50A 2-Pole GFCI breaker` 1 · `1" cable connector` 1                                                                                                       |
 | RS14 | Hot tub / spa connection              | `60A GFCI spa disconnect` 1 · `60A 2-Pole breaker` 1 · `3/4" liquidtight flexible conduit` 6 · `3/4" liquidtight flexible conduit connector` 2 · `#6 THHN` 18 · `#10 THHN` 6 · `Spa bonding lug` 1 · `#8 bare CU, solid` 20  |
 | RS15 | Pool pump connection                  | `30A non-fused disconnect, NEMA 3R` 1 · `20A 2-Pole GFCI breaker` 1 · `1/2" liquidtight flexible conduit` 6 · `1/2" liquidtight flexible conduit connector` 2 · `#12 THHN` 18 · `#8 bare CU, solid` 20 · `Spa bonding lug` 1 |
@@ -362,6 +367,72 @@ by the foot, and its length is the trench's (owner question, todo.md).
 | GR5 | Detached garage / shop feeder and panel           | Resi | `100A main panel, 24-space` 1 · `60A 2-Pole breaker` 1 · `Ground rod, 5/8" x 8 ft` 2 · `Ground rod clamp` 2 · `#6 bare stranded Copper` 20 · `1" PVC Sch 40 connector` 2 · `Panel directory label` 1                                                                                                                                                           |
 | GR6 | Kitchen countertop 20A circuit                    | Resi | `Single-gang box` 1 · `20A GFCI receptacle` 1 · `Wall plate` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole AFCI breaker` 1 · `Wire nuts` 3 — own home run, like DV3                                                                                                                                                                                                  |
 | GR7 | Bathroom 20A circuit                              | Resi | `Single-gang box` 1 · `20A GFCI receptacle` 1 · `Wall plate` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole breaker` 1 · `Wire nuts` 3 — own home run, like DV3                                                                                                                                                                                                       |
+
+---
+
+## CK / CW — the coverage checks (added 2026-10-09)
+
+(Backticks in this file name catalog rows — a test checks every one ships —
+so file names and commits below are plain text.)
+
+From references/coverage-check.md (Track C, ed8a1de). **CK1–CK26** are
+every missing assembly in the first check's three jobs (Dollar Tree remodel,
+office TI, residential remodel), duplicates taken once, in the order the
+document first lists them. **CW1–CW15** are the wider check's "Top 15", same
+numbers. Owner, 2026-10-09: build all of them, hours not set (D1), every part
+a shipped row (Track A's 24 coverage-check catalog rows, 3cb5df3, filled
+the "NEEDS" gaps). Choices made in the seed rather than the document are in
+the comment above CK1 in server/seed/starterAssemblies.ts.
+
+Two existing starters changed with them (owner, 2026-10-09): **RS12** buys
+`4/3 NM-B Copper`, not 6/3 (a 48A charger needs 60A of wire; NM-B #6 is 55A),
+and **LT23** adds `Fixture hanging kit, aircraft cable` 2. **RS6** stays the
+range hood; the over-range microwave is CK18. Databases seeded earlier get
+RS12/LT23 from scripts/repairStarterCovers.mts.
+
+| #    | Assembly                                              | Type | Parts                                                                                                                                                                                                                                                                                           |
+| ---- | ----------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CK1  | Emergency light (bug-eye), standalone                 | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring, fixture` 1 · F `Emergency light` 1 · `12/2 MC cable Copper` 25 whip · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                |
+| CK2  | Fire alarm strobe only                                | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring, 2-gang` 1 · F `Fire alarm strobe` 1 · `14/2 fire alarm cable Copper` 50 whip                                                                                                                                                              |
+| CK3  | Water heater connection, commercial (208V, MC)        | Comm | `30A non-fused disconnect, NEMA 1` 1 · `30A 2-Pole breaker` 1 · `Breaker lock-off` 1 · `10/2 MC cable Copper` 40 · `3/8" MC connector` 2 · `MC anti-short bushing` 2                                                                                                                            |
+| CK4  | Recessed wafer downlight, commercial (MC whip)        | Comm | F `6" canless wafer LED downlight` 1 · `6 ft MC whip` 1 · `Ceiling support wire` 2 · `Independent support wire clip` 1 · `Wire nut, 22-8 AWG (tan/red)` 2                                                                                                                                       |
+| CK5  | Fire alarm control panel connection                   | Comm | F `Fire alarm control panel` 1 · `Fire alarm battery` 2 · `20A 1-Pole breaker` 1 · `Breaker lock-off` 1 · `4" square box, 1-1/2" deep` 1 · `4" square blank cover` 1 · `12/2 MC cable Copper` 25 · `3/8" MC connector` 2 · `MC anti-short bushing` 2                                            |
+| CK6  | 208V cooler / freezer receptacle (NEMA 6-20)          | Comm | `4" square box, 1-1/2" deep` 1 · `4" square raised cover, single receptacle` 1 · `20A 250V receptacle, NEMA 6-20R` 1 · `12/2 MC cable Copper` 40 · `20A 2-Pole breaker` 1 · `3/8" MC connector` 2 · `MC anti-short bushing` 2                                                                   |
+| CK7  | Duplex receptacle, EMT                                | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring` 1 · `20A duplex receptacle` 1 · `1-gang wall plate, duplex, nylon` 1 · `1/2" EMT compression connector` 2 · `Grounding pigtail` 1 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                      |
+| CK8  | Two switches, one box, MC                             | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring, 2-gang` 1 · `20A single-pole switch` 2 · `2-gang wall plate, toggle/toggle, nylon` 1 · `12/2 MC cable Copper` 40 whip · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `Grounding pigtail` 1 · `Wire nut, 22-8 AWG (tan/red)` 5      |
+| CK9  | Data drop, Cat6 2-port (commercial)                   | Comm | `Low-voltage mud ring` 1 · `Cat6 cable Copper` 300 · `Cat6 jack` 2 · `Keystone wall plate, 2-port` 1 · `J-hook` 3                                                                                                                                                                               |
+| CK10 | Daylight sensor                                       | Comm | `Daylight sensor` 1 · `4" square box, 1-1/2" deep` 1 · `4" square mud ring, fixture` 1 · `18/3 control wire Copper` 25 · `Wire nut, 22-8 AWG (tan/red)` 2                                                                                                                                       |
+| CK11 | Wall TV / display location, commercial                | Comm | `Recessed TV receptacle box` 1 · `20A duplex receptacle` 1 · `HDMI wall plate` 1 · `Low-voltage mud ring` 1 · `12/2 MC cable Copper` 25 whip · `3/8" MC connector` 2 · `MC anti-short bushing` 2                                                                                                |
+| CK12 | Ceiling receptacle for projector                      | Comm | `4" square box, 1-1/2" deep` 1 · `4" square raised cover, duplex` 1 · `20A duplex receptacle` 1 · `12/2 MC cable Copper` 25 whip · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                         |
+| CK13 | Mini-split connection, MC                             | Comm | `60A non-fused pullout disconnect` 1 · `AC condenser whip` 1 · `20A 2-Pole breaker` 1 · `12/2 MC cable Copper` 35 · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `14/4 mini-split cable Copper` 25                                                                                       |
+| CK14 | Electric wall heater, fan-forced                      | Both | F `Fan-forced wall heater` 1 · `Wall heater thermostat` 1 · `4" square box, 1-1/2" deep` 1 · `4" square mud ring` 1 · `12/2 MC cable Copper` 35 · `20A 2-Pole breaker` 1 · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `Wire nut, 22-8 AWG (tan/red)` 4                                 |
+| CK15 | Fire alarm speaker/strobe                             | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring, 2-gang` 1 · F `Fire alarm speaker/strobe` 1 · `14/2 fire alarm cable Copper` 50 whip · `16/2 fire alarm cable Copper` 50 whip                                                                                                             |
+| CK16 | Heat detector                                         | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring, fixture` 1 · `Detector base` 1 · F `Heat detector` 1 · `14/2 fire alarm cable Copper` 50 whip                                                                                                                                             |
+| CK17 | Ceiling light, old work                               | Resi | `Old-work ceiling box` 1 · F `Surface-mount ceiling fixture` 1 · `14/2 NM-B Copper` 20 whip · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                                                                  |
+| CK18 | Over-range microwave circuit, 20A                     | Resi | `Single-gang box` 1 · `20A single receptacle` 1 · `1-gang wall plate, single receptacle, nylon` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole breaker` 1 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                           |
+| CK19 | GFCI receptacle, old work                             | Resi | `Single-gang old-work box` 1 · `20A GFCI receptacle` 1 · `1-gang wall plate, decorator, nylon` 1 · `12/2 NM-B Copper` 25 whip · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                                |
+| CK20 | Wall oven or cooktop, hardwired 40A                   | Resi | `4-11/16" square box, 2-1/8" deep` 1 · `4-11/16" square blank cover` 1 · `8/3 NM-B Copper` 40 · `40A 2-Pole breaker` 1 · `3/4" cable connector` 1 · `Wire nut, 22-8 AWG (tan/red)` 4                                                                                                            |
+| CK21 | Bath fan / heater combo, 20A                          | Resi | F `Bath exhaust fan, heater combo` 1 · `4" insulated flex duct` 1 · `4" roof vent cap` 1 · `Duct clamp` 2 · `12/3 NM-B Copper` 25 · `20A 1-Pole breaker` 1 · `Single-gang box` 1 · `20A single-pole switch` 1 · `1-gang wall plate, toggle, nylon` 1 · `Wire nut, 22-8 AWG (tan/red)` 4         |
+| CK22 | Heated bathroom floor                                 | Resi | F `Floor heating mat` 1 · `Floor heating thermostat, GFCI` 1 · `Single-gang box` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole breaker` 1 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                          |
+| CK23 | Wall TV location (power + HDMI)                       | Resi | `Recessed TV receptacle box` 1 · `Duplex receptacle` 1 · `HDMI wall plate` 1 · `Low-voltage mud ring` 1 · `12/2 NM-B Copper` 25 whip · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                         |
+| CK24 | Island / peninsula pop-up receptacle                  | Resi | `Pop-up countertop receptacle` 1 · `12/2 NM-B Copper` 35 · `20A 1-Pole AFCI/GFCI combo breaker` 1 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                                                            |
+| CK25 | Pendant or sconce, old work                           | Resi | `Old-work ceiling box` 1 · F `LED pendant fixture` 1 · `14/2 NM-B Copper` 20 whip · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                                                                            |
+| CK26 | Tandem breaker add                                    | Resi | `20/20 tandem breaker` 1                                                                                                                                                                                                                                                                        |
+| CW1  | Equipment connection, hardwired (flex whip), 208/240V | Comm | `4" square box, 1-1/2" deep` 1 · `4" square blank cover` 1 · `1/2" flexible metal conduit` 6 · `1/2" flexible metal conduit connector` 2 · `#12 THHN Copper` 18 · `20A 2-Pole breaker` 1                                                                                                        |
+| CW2  | Commercial Level 2 EV charger, 208V                   | Comm | F `EVSE pedestal` 1 · `40A 2-Pole breaker` 1 · `Pole anchor bolt kit` 1 · `Concrete pole base` 1 · `3/4" liquidtight flexible conduit` 6 · `3/4" liquidtight flexible conduit connector` 2                                                                                                      |
+| CW3  | Outdoor emergency service disconnect (NEC 230.85)     | Resi | `200A non-fused disconnect, NEMA 3R` 1 · `4/0-4/0-4/0-2/0 SER Aluminum` 10 · `2" SE cable connector` 2                                                                                                                                                                                          |
+| CW4  | Apartment unit panel, 125A main-lug                   | Resi | `125A main-lug sub-panel, 24-space` 1 · `Ground bar kit` 1 · `1/2" cable connector` 12 · `Panel directory label` 1                                                                                                                                                                              |
+| CW5  | Overhead door operator connection                     | Comm | `30A non-fused disconnect, NEMA 1` 1 · `1/2" flexible metal conduit` 6 · `1/2" flexible metal conduit connector` 2 · `#12 THHN Copper` 18 · `4" square box, 1-1/2" deep` 1 · `4" square blank cover` 1                                                                                          |
+| CW6  | Air compressor connection, 240V                       | Both | `30A non-fused disconnect, NEMA 1` 1 · `3/4" liquidtight flexible conduit` 6 · `3/4" liquidtight flexible conduit connector` 2 · `#10 THHN Copper` 18 · `30A 2-Pole breaker` 1                                                                                                                  |
+| CW7  | Welder / shop receptacle, 50A (NEMA 6-50)             | Both | `4-11/16" square box, 2-1/8" deep` 1 · `4-11/16" square raised cover, 30A/50A power receptacle` 1 · `50A 250V receptacle, NEMA 6-50R` 1 · `6/2 MC cable Copper` 40 · `50A 2-Pole breaker` 1 · `3/4" MC connector` 2 · `MC anti-short bushing` 2                                                 |
+| CW8  | Wireless access point drop (ceiling)                  | Comm | `Low-voltage mud ring` 1 · `Cat6 cable Copper` 150 · `Cat6 jack` 1 · `Keystone wall plate, 1-port` 1 · `J-hook` 3                                                                                                                                                                               |
+| CW9  | Bollard light                                         | Comm | F `Bollard light` 1 · `Pole anchor bolt kit` 1 · `Concrete pole base` 1 · `Wire nut, 22-8 AWG (tan/red)` 3                                                                                                                                                                                      |
+| CW10 | Manual transfer switch, 6–10 circuit                  | Resi | F `Manual transfer switch` 1 · `30A power inlet box` 1 · `30A generator cord` 1 · `10/3 NM-B Copper` 25 · `1/2" cable connector` 2                                                                                                                                                              |
+| CW11 | EV-ready conduit stub (EV-capable space)              | Both | `4-11/16" square box, 2-1/8" deep` 1 · `4-11/16" square blank cover` 1 · `1" EMT` 10 · `1" EMT set-screw connector` 2                                                                                                                                                                           |
+| CW12 | Multi-unit meter center                               | Both | `Meter center, 4-position` 1 · `Ground rod, 5/8" x 8 ft` 2 · `Ground rod clamp` 2 · `#4 bare stranded Copper` 30                                                                                                                                                                                |
+| CW13 | Hospital-grade receptacle (exam / operatory)          | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring` 1 · `Hospital-grade receptacle` 1 · `1-gang wall plate, duplex, nylon` 1 · `12/2 MC cable healthcare (HCF) Copper` 25 whip · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `Grounding pigtail` 1 · `Wire nut, 22-8 AWG (tan/red)` 3 |
+| CW14 | 208V kitchen equipment receptacle, 30A (NEMA 6-30)    | Comm | `4" square box, 1-1/2" deep` 1 · `4" square raised cover, single receptacle` 1 · `30A 250V receptacle, NEMA 6-30R` 1 · `10/2 MC cable Copper` 40 · `30A 2-Pole breaker` 1 · `3/8" MC connector` 2 · `MC anti-short bushing` 2                                                                   |
+| CW15 | Recessed clock receptacle                             | Comm | `4" square box, 1-1/2" deep` 1 · `4" square mud ring` 1 · `Recessed clock receptacle` 1 · `12/2 MC cable Copper` 25 whip · `3/8" MC connector` 2 · `MC anti-short bushing` 2 · `Wire nut, 22-8 AWG (tan/red)` 2                                                                                 |
 
 ---
 

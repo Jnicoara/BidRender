@@ -20,9 +20,15 @@
  * Plus: factory fittings only — no field bend, no 45 (none is shipped), no
  * LB or pull box (the legs' pull-point answers are not read).
  *
+ * ── 500 too (references/sch80-and-500-plan.md § 2c, owner 2026-10-09) ────────
+ * Wiremold 500 counts by the same three rules with its OWN parts: the flat
+ * and inside elbows are sold per series (plan § 5, Q2), so a 500 run is
+ * priced from 500 rows only. `SURFACE_RACEWAY_SERIES` is a closed list, not a
+ * pattern — 1500 and 2400 have no fitting family and stay off this path.
+ *
  * ── Wired (2026-10-08) ───────────────────────────────────────────────────────
  * `fittingRowsByRunType` (server/db.ts) sends a type whose raceway is the
- * shipped 700 row here instead of to `countFittings`, and each part goes out
+ * shipped 500 or 700 row here instead of to `countFittings`, and each part goes out
  * under the role `SURFACE_RACEWAY_PART_ROLE` names. The flat elbow has its own
  * role, `elbowFlat` (0139), because an inside elbow and a flat elbow are two
  * parts on one type and a line is one per type and role.
@@ -67,17 +73,32 @@ export const SURFACE_RACEWAY_PART_LABELS: Record<
   tee: { one: "tee", many: "tees" },
 };
 
-/** The shipped raceway row the 700 type prices — matched by BASELINE name. */
-export const SURFACE_RACEWAY_700 = "Surface raceway, 700 series";
+/**
+ * The series this counter knows — a CLOSED list, never a pattern, so
+ * `Surface raceway, 1500 series` cannot match by containing "500".
+ */
+export const SURFACE_RACEWAY_SERIES = ["500", "700"] as const;
+export type SurfaceRacewaySeries = (typeof SURFACE_RACEWAY_SERIES)[number];
+
+/** The shipped raceway row a series' run type prices. */
+export function surfaceRacewayName(series: SurfaceRacewaySeries): string {
+  return `Surface raceway, ${series} series`;
+}
 
 /**
- * Whether a raceway is the 700 family, by its SHIPPED name, so a company's
- * renamed fork of the row still counts as 700. A raceway the company made
- * itself has no shipped name and is not (it falls to the pipe path, which
+ * Which series a raceway is, by its SHIPPED name and that name exactly, so a
+ * company's renamed fork of the row still counts. A raceway the company made
+ * itself has no shipped name and is none (it falls to the pipe path, which
  * says "no catalog match" rather than guessing).
  */
-export function isSurfaceRaceway700(baselineName: string | null): boolean {
-  return baselineName === SURFACE_RACEWAY_700;
+export function surfaceRacewaySeries(
+  baselineName: string | null
+): SurfaceRacewaySeries | null {
+  return (
+    SURFACE_RACEWAY_SERIES.find(
+      series => baselineName === surfaceRacewayName(series)
+    ) ?? null
+  );
 }
 
 /**
@@ -105,20 +126,37 @@ const PART_NAME_WORDS: Record<SurfaceRacewayPart, string> = {
   tee: "tee",
 };
 
-/** The shipped catalog name of one 700 part (seed: raceUndergroundService). */
-export function surfaceRacewayPartName(part: SurfaceRacewayPart): string {
-  return `Surface raceway ${PART_NAME_WORDS[part]}, 700 series`;
+/**
+ * The shipped catalog name of one part of one series (seed:
+ * raceUndergroundService). The series is REQUIRED — a default is how a 500
+ * run would quietly price 700 parts.
+ */
+export function surfaceRacewayPartName(
+  part: SurfaceRacewayPart,
+  series: SurfaceRacewaySeries
+): string {
+  // One clip (V5703) and one tee (V5715) fit both series: the 700 row was
+  // renamed in place to "500/700" and the 500 row retired into it (catalog
+  // reality check, batch 2, raceway — shared/catalogRealityCheck20261009.ts).
+  if (SHARED_500_700_PARTS.includes(part))
+    return `Surface raceway ${PART_NAME_WORDS[part]}, 500/700 series`;
+  return `Surface raceway ${PART_NAME_WORDS[part]}, ${series} series`;
 }
+
+/** Parts one row serves for 500 and 700 alike. */
+const SHARED_500_700_PARTS: readonly SurfaceRacewayPart[] = ["clip", "tee"];
 
 /** A part as a pick needs it. */
 type Part = { id: number; name: string; costPerUnit: string | number };
 
 /**
- * The 700 type's fitting ROWS for the bid — one per part, under its role
- * (`SURFACE_RACEWAY_PART_ROLE`). The type's own choice of part wins where
- * the type has a column for that role; otherwise the 700 catalog row.
+ * A surface-raceway type's fitting ROWS for the bid — one per part, under
+ * its role (`SURFACE_RACEWAY_PART_ROLE`). The type's own choice of part wins
+ * where the type has a column for that role; otherwise the catalog row of
+ * the SAME series.
  */
 export function surfaceRacewayFittingRows(
+  series: SurfaceRacewaySeries,
   counts: Record<SurfaceRacewayPart, SurfaceRacewayCount>,
   overrides: Partial<Record<SurfaceRacewayPart, Part | null>>,
   found: (name: string) => Part | undefined
@@ -137,7 +175,7 @@ export function surfaceRacewayFittingRows(
           }
         : { kind: role, status: "unknown", why: c.why };
     const override = overrides[part] ?? null;
-    const wanted = surfaceRacewayPartName(part);
+    const wanted = surfaceRacewayPartName(part, series);
     const row = override ?? found(wanted);
     return {
       role,
@@ -171,6 +209,8 @@ export type SurfaceRacewayCount =
 export type SurfaceRacewaySpec = {
   /** For the sentences: `Surface raceway, 700 series`. */
   name: string;
+  /** Whose parts the sentences name — "goes into the 500 box". */
+  series: SurfaceRacewaySeries;
   /** 10 ft for 700. NULL is not set: couplings say so, never a quiet 0. */
   stickLengthFeet: number | null;
   /**
@@ -195,10 +235,10 @@ export function countSurfaceRacewayFittings(
 ): Record<SurfaceRacewayPart, SurfaceRacewayCount> {
   return {
     coupling: countCouplings(legs, raceway),
-    entranceEnd: countEntranceEnds(legs),
+    entranceEnd: countEntranceEnds(legs, raceway.series),
     clip: countClips(legs, raceway),
-    ...countElbows(legs),
-    tee: countTees(ownedTees),
+    ...countElbows(legs, raceway.series),
+    tee: countTees(ownedTees, raceway.series),
   };
 }
 
@@ -259,7 +299,10 @@ function countCouplings(
  * anything is there — and buys none either, the same rule a pipe's connector
  * follows (D21). Needs no scale: a run with no measurement still has a start.
  */
-function countEntranceEnds(legs: readonly FittingLeg[]): SurfaceRacewayCount {
+function countEntranceEnds(
+  legs: readonly FittingLeg[],
+  series: SurfaceRacewaySeries
+): SurfaceRacewayCount {
   const part = "entranceEnd" as const;
   if (legs.length === 0) return nothingTraced(part);
   let qty = 0;
@@ -279,7 +322,7 @@ function countEntranceEnds(legs: readonly FittingLeg[]): SurfaceRacewayCount {
     qty,
     atLeast: false,
     why:
-      `${plural(qty, "entrance end")}: one at the start of each run — the far end goes into the 700 box` +
+      `${plural(qty, "entrance end")}: one at the start of each run — the far end goes into the ${series} box` +
       notes,
   };
 }
@@ -336,7 +379,8 @@ function countClips(
  * to a 90. A homerun's corners nobody drew (`extraCorners`) are corners too.
  */
 function countElbows(
-  legs: readonly FittingLeg[]
+  legs: readonly FittingLeg[],
+  series: SurfaceRacewaySeries
 ): Pick<
   Record<SurfaceRacewayPart, SurfaceRacewayCount>,
   "insideElbow" | "flatElbow"
@@ -378,7 +422,7 @@ function countElbows(
   const insideNotes: string[] = [];
   if (angled.length > 0)
     insideNotes.push(
-      `${plural(angled.length, "corner")} not square (${angled.map(d => `${d}°`).join(", ")}) — no 700 elbow makes the 45° part, add it by hand`
+      `${plural(angled.length, "corner")} not square (${angled.map(d => `${d}°`).join(", ")}) — no ${series} elbow makes the 45° part, add it by hand`
     );
   if (wobble > 0)
     insideNotes.push(
@@ -421,10 +465,13 @@ function countElbows(
 /**
  * Rule 3: a tee fitting at every tee this type owns, except one standing on a
  * counted mark — that mark is the box the branch leaves from, already bought.
- * A tee with no fitting chosen still buys a 700 tee: on surface raceway there
+ * A tee with no fitting chosen still buys a tee of the run's series: on surface raceway there
  * is nothing else it could be, so there is no question to leave unanswered.
  */
-function countTees(owned: readonly TeeRef[]): SurfaceRacewayCount {
+function countTees(
+  owned: readonly TeeRef[],
+  series: SurfaceRacewaySeries
+): SurfaceRacewayCount {
   const part = "tee" as const;
   if (owned.length === 0)
     return {
@@ -445,7 +492,7 @@ function countTees(owned: readonly TeeRef[]): SurfaceRacewayCount {
     status: "counted",
     qty,
     atLeast: false,
-    why: `${plural(qty, "tee")}: a 700 tee fitting at each branch, not a box${onMarkNote}`,
+    why: `${plural(qty, "tee")}: a ${series} tee fitting at each branch, not a box${onMarkNote}`,
   };
 }
 

@@ -38,6 +38,7 @@ import {
 import { sizesFor } from "./seed/materials/conduit";
 import { FROZEN_ADDS_NOT_SEEDED } from "../shared/frozenAddsHeld";
 import {
+  UNDERGROUND_SCHEDULES,
   isShippedUndergroundType,
   undergroundRunTypeLabel,
 } from "../shared/undergroundRunTypes";
@@ -53,12 +54,15 @@ const underground = BASELINE_RUN_TYPES.filter(t =>
 );
 
 describe("the shipped underground run types", () => {
-  it("are one per PVC Sch 40 size the catalog ships — nine since the 2026-10-08 catalog review withdrew 3-1/2 inch", () => {
+  it("are one per PVC size the catalog ships, for BOTH schedules — nine each since the 2026-10-08 catalog review withdrew 3-1/2 inch", () => {
     // Built from sizesFor, so an eleventh PVC size ships its type with it.
-    const sizes = sizesFor("PVC Sch 40");
-    expect(sizes).toHaveLength(9);
+    // Sch 80 joined 2026-10-09 (references/sch80-and-500-plan.md § 1).
+    expect(sizesFor("PVC Sch 40")).toHaveLength(9);
+    expect(sizesFor("PVC Sch 80")).toHaveLength(9);
     expect(underground.map(t => t.label)).toEqual(
-      sizes.map(undergroundRunTypeLabel)
+      UNDERGROUND_SCHEDULES.flatMap(schedule =>
+        sizesFor(schedule).map(size => undergroundRunTypeLabel(size, schedule))
+      )
     );
     for (const t of underground) {
       expect(t.pathType).toBe("conduit");
@@ -94,15 +98,15 @@ describe("the shipped underground run types", () => {
     expect(others.filter(t => (t.extras ?? []).length > 0)).toEqual([]);
   });
 
-  it("the fold's test finds exactly the nine, and never a shop's own type", () => {
+  it("the fold's test finds exactly the eighteen, and never a shop's own type", () => {
     const folded = BASELINE_RUN_TYPES.filter(t =>
       isShippedUndergroundType({ isShipped: true, label: t.label })
     );
-    expect(folded).toHaveLength(9);
+    expect(folded).toHaveLength(18);
     expect(
       isShippedUndergroundType({
         isShipped: false,
-        label: undergroundRunTypeLabel('2"'),
+        label: undergroundRunTypeLabel('2"', "PVC Sch 80"),
       })
     ).toBe(false);
   });
@@ -114,10 +118,10 @@ describe("the 700 surface raceway", () => {
     expect(t).toMatchObject({
       pathType: "conduit",
       racewayMaterialName: RACEWAY_700,
-      conductorMaterialName: "#12 THHN Copper",
+      conductorMaterialName: "#12 THHN solid Copper",
       conductorCount: 2,
       groundCount: 1,
-      groundMaterialName: "#12 THHN green Copper",
+      groundMaterialName: "#12 THHN green solid Copper",
     });
     expect(t?.extras ?? []).toEqual([]);
     expect(byName.get(RACEWAY_700)?.unitOfSale).toBe("foot");
@@ -165,7 +169,11 @@ describe("the 700 surface raceway", () => {
       "support clip",
     ];
     for (const part of parts) {
-      const name = `Surface raceway ${part}, 700 series`;
+      // The tee and support clip are ONE row for 500 and 700 since
+      // 2026-10-09 (catalog reality check: V5715, V5703).
+      const name = ["tee", "support clip"].includes(part)
+        ? `Surface raceway ${part}, 500/700 series`
+        : `Surface raceway ${part}, 700 series`;
       const row = byName.get(name);
       expect(row, name).toBeDefined();
       expect(row!.unitOfSale, name).toBe("each");
@@ -266,7 +274,8 @@ withDb("the shipped run types on a database", () => {
 
   it("a FORK of an underground type keeps its tape, pointing back at the shipped extra", async () => {
     const shipped = (await caller().takeoffRunTypes.list({})).find(
-      t => t.isShipped && t.label === undergroundRunTypeLabel('2"')
+      t =>
+        t.isShipped && t.label === undergroundRunTypeLabel('2"', "PVC Sch 40")
     );
     expect(shipped).toBeDefined();
     const [shippedExtra] = (await shippedExtras()).filter(
@@ -306,7 +315,7 @@ withDb("the shipped run types on a database", () => {
 
   it("a traced underground run sends its pipe and its tape — no wire is invented", async () => {
     const shipped = (await caller().takeoffRunTypes.list({})).find(
-      t => t.label === undergroundRunTypeLabel('1"')
+      t => t.label === undergroundRunTypeLabel('1"', "PVC Sch 40")
     );
     expect(shipped).toBeDefined();
     const bid = (await caller().bids.create({

@@ -75,8 +75,9 @@ export type QuoteGap = {
   /**
    * Where to fix it, per gap (audit #17, 2026-10-06). The panel used to say
    * "Price them on the bid" for every gap, which is wrong advice for a /usr/bin/bash
-   * labor rate (fixed in Labor rates) or a traced part (fixed on the
-   * Materials screen, then Send again).
+   * labor rate (fixed in Labor rates). Since gap 11 (2026-10-08) a part,
+   * hours or a traced part's price are fixed ON the bid line ("Fix this
+   * line"); this used to send them to the Materials screen and a re-add.
    */
   fix: string;
 };
@@ -138,9 +139,8 @@ export function quoteGaps(
         detail: "no price",
         fix: canPriceByHand(line)
           ? "Type its price on the bid."
-          : line.takeoffRunTypeId !== null
-            ? "Price the part on the Materials screen, then Send again from the Plans screen."
-            : "Price its parts on the Materials screen, then remove the line and add the assembly again.",
+          : // "Fix this line" on the bid prices it in place (gap 11).
+            'Press "Fix this line" on the bid and type the price there.',
       });
     } else if (lineHoursUnset(line)) {
       gaps.push({
@@ -148,7 +148,7 @@ export function quoteGaps(
         name,
         status: "Not priced",
         detail: "labor hours not set",
-        fix: "Give the part labor on the Materials screen, then Send again from the Plans screen.",
+        fix: 'Press "Fix this line" on the bid and type its labor hours there.',
       });
     } else if (
       breakdown &&
@@ -190,8 +190,8 @@ export function quoteGaps(
         parts <= 0
           ? ""
           : noMaterial
-            ? 'Add the material to the assembly (or tick "Labor only" if it has none on purpose)'
-            : "Price the parts on the Materials screen";
+            ? 'Add the material (or tick "Labor only" on the assembly if it has none on purpose)'
+            : "Price the parts";
       const fix = partsFix
         ? hoursNotSet
           ? `${partsFix} and set the assembly's hours`
@@ -203,7 +203,8 @@ export function quoteGaps(
           name,
           status: "Not priced",
           detail: details.join(", "),
-          fix: `${fix}, then remove the line and add the assembly again.`,
+          // Done in place since gap 11: no removing and re-adding the line.
+          fix: `${fix} — press "Fix this line" on the bid to do it there.`,
         });
     }
   }

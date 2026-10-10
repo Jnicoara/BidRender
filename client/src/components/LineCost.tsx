@@ -22,11 +22,18 @@ import { lineShortfallWords } from "@/lib/notPricedTotal";
 import type { LineExampleFlags } from "@shared/exampleTags";
 import { ExampleTags } from "./ExampleTags";
 import { TapExplain } from "./TapExplain";
+import { FixableLabel } from "./FixableLabel";
 
 export function LineCost({
   line,
   className,
+  onFix,
 }: {
+  /**
+   * Opens the line's "fix this line" panel (bid screen only, gap 11). Given,
+   * the amber words become that button; the panel says what they explained.
+   */
+  onFix?: () => void;
   line: PartsLineLike &
     LineExampleFlags & {
       breakdown: { directCost: number } | null;
@@ -58,6 +65,15 @@ export function LineCost({
   }
   const cost = line.breakdown.directCost;
   if (lineNotPriced(line, cost)) {
+    if (onFix)
+      return (
+        <FixableLabel
+          onFix={onFix}
+          className={cn("text-xs text-[#F5C518]", className)}
+        >
+          Not priced
+        </FixableLabel>
+      );
     return (
       <TapExplain
         explanation={
@@ -102,18 +118,27 @@ export function LineCost({
         )}
       >
         <span className="font-mono text-sm">{money(cost)}</span>
-        <TapExplain
-          className="text-[11px] text-[#F5C518] whitespace-nowrap"
-          explanation={
-            hoursMissing && parts === "hours not set"
-              ? `${money(cost)} of material is in the total. The assembly's hours were not set when this line was added, so its labor is not.`
-              : materialMissing
-                ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
-                : "This line's price was frozen when it was added, and some of the assembly's parts (or its hours) had no price then. They add nothing to it."
-          }
-        >
-          + {parts}
-        </TapExplain>
+        {onFix ? (
+          <FixableLabel
+            onFix={onFix}
+            className="text-[11px] text-[#F5C518] whitespace-nowrap"
+          >
+            + {parts}
+          </FixableLabel>
+        ) : (
+          <TapExplain
+            className="text-[11px] text-[#F5C518] whitespace-nowrap"
+            explanation={
+              hoursMissing && parts === "hours not set"
+                ? `${money(cost)} of material is in the total. The assembly's hours were not set when this line was added, so its labor is not.`
+                : materialMissing
+                  ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
+                  : "This line's price was frozen when it was added, and some of the assembly's parts (or its hours) had no price then. They add nothing to it."
+            }
+          >
+            + {parts}
+          </TapExplain>
+        )}
         <ExampleTags line={line} only={["price"]} />
       </span>
     );

@@ -44,6 +44,7 @@ import { extraNumber } from "../../shared/runExtras";
 import {
   runTypeRows,
   runRowSendability,
+  runTypeTraced,
   type RunTypeRow,
 } from "../../shared/takeoffBridge";
 import { EXTRA_APPLIES_TO, runLineSlot } from "../../shared/runExtrasPerFoot";
@@ -940,7 +941,7 @@ export const takeoffRunTypesRouter = router({
               materialName: row.materialName,
               feet: row.feet,
               onBid: onBid.has(storedId + ":" + slotOf(row)),
-              sendable: runRowSendability(row),
+              sendable: runRowSendability(row, runTypeTraced(rows)),
               resend: resendOf(slotOf(row), row.feet),
             })),
             /*
@@ -1090,7 +1091,7 @@ export const takeoffRunTypesRouter = router({
           laborQty: row.installedFeet as number | null,
           materialId: row.materialId,
           materialName: row.materialName,
-          sendable: runRowSendability(row),
+          sendable: runRowSendability(row, runTypeTraced(rows)),
           speaks: true,
         })),
         ...fittings.map(row => ({

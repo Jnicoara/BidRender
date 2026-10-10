@@ -705,13 +705,13 @@ describe("factory or field, and which pull point to offer", () => {
   });
 
   it("sizes a pull box by NEC 314.28's angle pull, to a box the catalog ships", () => {
-    expect(pullBoxFor('1/2" EMT', null).name).toBe("4x4 pull box");
+    expect(pullBoxFor('1/2" EMT', null).name).toBe("4x4x4 pull box");
     expect(pullBoxFor('2" EMT', null)).toEqual({
-      name: "12x12 pull box",
+      name: "12x12x4 pull box",
       why: 'angle pull: at least 6 × 2" = 12" (NEC 314.28), more if other conduits enter the box',
     });
     expect(pullBoxFor('3-1/2" rigid conduit', null).name).toBe(
-      "24x24 pull box"
+      "24x24x6 pull box"
     );
     expect(pullBoxFor(null, "Custom").name).toBeNull();
   });

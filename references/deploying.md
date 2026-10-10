@@ -1197,6 +1197,103 @@ is absent. So the message means "no Anthropic key", worded by the wrong layer.
 It has sent one investigation down the wrong path already. Removing the shim is
 tracked in `todo.md`.
 
+### 8a. API key rotation — the Anthropic key
+
+**Written 2026-10-09**, when the live key `bidrender-app` was 7 days from
+expiring. **Create every replacement key with NO EXPIRATION** (Anthropic
+console → API keys → Create key → expiration "Never"). An expiring key is a
+scheduled outage nobody is watching for: AI goes quiet on the day, and the
+only signal is a log line (below). Spend is capped on the WORKSPACE (monthly
+limit and email alert, `todo.md`), not on the key, so a non-expiring key
+loses no protection.
+
+**Where the key lives — every place, by setting name** (checked 2026-10-09;
+values never written down here):
+
+| Place                              | Setting name                             | Key                                                                                                          |
+| ---------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Live app (DigitalOcean)            | `ANTHROPIC_API_KEY`, encrypted, Run Time | `bidrender-app` (the one expiring)                                                                           |
+| Staging app (DigitalOcean)         | `ANTHROPIC_API_KEY`, encrypted, Run Time | its OWN key, `bidridge-staging` (§ 11) — check its expiry too                                                |
+| Laptop, `.env.production.local`    | `ANTHROPIC_API_KEY`                      | a copy of live's; only `scripts/aiSmokeTest.mts`, `readerAccuracy.mts` and `scanMatchingCheck.mts` borrow it |
+| Laptop, `.env`                     | none — `DISABLE_AI_FEATURES` instead     | —                                                                                                            |
+| GitHub Actions                     | **none.** Secrets are `SMOKE_*` only     | the Gate's deploy-staging step only pushes a branch; it never carries a key                                  |
+| Tests                              | none — `vitest.setup.ts` blanks it       | —                                                                                                            |
+| Cloudflare Worker (`workers/cron`) | none                                     | —                                                                                                            |
+
+The code reads exactly one name, `ANTHROPIC_API_KEY` (`server/llm/anthropic.ts`).
+`BUILT_IN_FORGE_API_*` are the dead Manus fallback and are not set on either
+app; do not put the key there.
+
+**Keep staging and live on separate keys.** Staging's own key keeps its
+spend apart and means a leaked staging setting cannot spend live's money.
+Do not paste live's new key into staging to "keep it simple".
+
+**The swap — staging first, then live:**
+
+1. Anthropic console: create the new key, **no expiration**, named for where
+   it goes (`bidridge-staging-2`, `bidrender-app-2`). Put it straight into
+   the password manager. Leave the old key ENABLED until step 6.
+2. DigitalOcean → Apps → the **staging** app → Settings → find
+   `ANTHROPIC_API_KEY` (App-Level Environment Variables, or the web
+   component's own list — wherever it is shown today; change it there, do not
+   add a second copy at the other level) → Edit → paste the new key, keep
+   **Encrypt** ticked → Save. Saving REDEPLOYS the app; nothing in GitHub
+   needs changing. Wait for Activity to show the deploy live (3–6 min).
+3. Confirm the restart happened: `curl -s https://staging.bidridge.com/api/version`
+   — `builtAt` must be AFTER you pressed Save. (The key is read once per
+   process, so a server that did not restart is still on the old key.)
+4. **Confirm AI works on staging** (password page first):
+   - Dashboard → "Ask where to find something" → ask "where are labor
+     rates". **Pass:** an answer WITH a button that opens the labor rates
+     screen. **Fail:** "AI is unavailable right now. Every screen is in the
+     sidebar." — the key is missing or refused. (On code older than 0141,
+     which is LIVE until the next release, a refused key shows "I'm not sure
+     which screen you want…" instead; treat that as a fail too.)
+   - DigitalOcean → Runtime Logs, search `llm-`: `[llm-cost]
+feature=navigation … cost=…` is the pass. `[llm-unavailable]
+feature=navigation reason=key-refused` (or, on older code, `helper call
+failed … 401 authentication_error`) means the key was refused —
+     re-paste it.
+   - Admin → AI spend (from 0141): no amber "AI calls are being refused
+     since …" notice. It clears itself on the first call that works.
+   - Anthropic console → API keys: the new key shows a recent "last used".
+5. Repeat steps 2–4 on the **live** app, at `https://bidridge.com`. Do it
+   when nobody is mid-read in the plan viewer: the redeploy restarts the
+   server (requests in flight fail once; nothing is lost).
+6. Only now, in the Anthropic console, **disable** the old keys. Delete them
+   a day later, once nothing in the logs has asked for them.
+7. Laptop: replace `ANTHROPIC_API_KEY` in `.env.production.local` with live's
+   new key. Optional check, costs a few cents: `pnpm tsx scripts/aiSmokeTest.mts`
+   (one real call per feature).
+
+**When the key is missing or refused — what users see** (measured
+2026-10-09 with a refused key: the adapter raises `AuthenticationError`, 401,
+and every caller catches it). Nothing is written and no bid, quantity or
+price moves, so no $0 and no broken bid.
+
+**Since 0141 (2026-10-09; on staging, LIVE from the next release)** a
+missing key or a 401/403 is told apart from a failure that passes
+(`server/llm/unavailable.ts`, by the SDK's error type and status — never by
+the words), and every feature says so:
+
+- Navigation helper: "AI is unavailable right now. Every screen is in the
+  sidebar."
+- Plan reader: "AI is unavailable right now. Nothing was changed — carry on
+  marking by hand." Sheet question, tie-break and scan finds: the same
+  sentence with their own manual step. No "try again later".
+- Alias suggestions: "Suggestions aren't available right now" (unchanged).
+- Admin → AI spend: an amber "AI calls are being refused since <time>"
+  notice naming the fault (no key / key refused) and this section. Kept on
+  `ai_service_status` (0141, one row, no key text); the first call that
+  works clears it.
+
+A timeout, an overload or a bad reply still gets the old words ("could not
+be reached … try again later", "not sure which screen") — those pass.
+
+**Before 0141 (live today)** a dead key read "could not be reached … try
+again later" in the plan reader and, in the navigation helper, "I'm not sure
+which screen you want…" — which blamed the question (`todo.md`, done).
+
 ## 9. Storage needs a CORS rule, and without it no plan uploads — or views
 
 > **Configured — this is no longer an outstanding issue.** The rule is on the
@@ -1587,6 +1684,183 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0143 — step-based labor (2026-10-10 UTC) — DATABASE only, NOT on live
+
+`0143_labor_steps` (Track C's `c-step-labor`, renumbered from 0142 when
+B's search log took that number): two new tables, `labor_steps` and
+`assembly_labor_steps`, three foreign keys — additive, step 1, step 3
+empty. The code survives the tables being absent (`stepsTablesMissing`).
+
+1. **Backup**: `staging-2026-10-10T03-30-47Z-before-0143.sql` (75 tables);
+   restored to `bidrender_staging_restore_0143`: every count equal except
+   `bids`, which was one short — the CI smoke bid created during the dump.
+2. **Rehearsal** on that restore: drift before = exactly 0143's tables and
+   3 FKs; **1 applied**, 144; re-run nothing; "matches", 180/180;
+   **1,062/1,062 unchanged** with the old code, with C's code, and after C's
+   code's first boot (47 shipped steps, 194 starter step lines, no times).
+3. **Staging database**: **1 applied**, 144; "matches", 180/180; **all
+   1,066 existing bids unchanged**. The one new bid after (1068) is the
+   smoke account's.
+4. **Code**: C fast-forwarded `local-dev` to `585f5d9`. Gate 38021158859:
+   test green, **deploy-staging REFUSED** — "this push changes drizzle/
+   against what staging runs" (0143, the journal, `schema.ts`). That is the
+   guard working: unlike 0142, staging was not pushed by hand first (that
+   push was refused in this session). **Staging serves `f03e8ef` against a
+   0143 database** — safe, since that code never reads the new tables —
+   until the owner decides how `staging` gets `local-dev`.
+
+**Live**: 0143 joins the batch — 0105–0143, 39 files, expect 144, 180/180
+(`next-live-release-plan.md` § 3).
+
+### Staging: migration 0142 — the no-match search log (2026-10-10 UTC) — NOT on live
+
+`0142_search_misses` (Track B's table, B's SQL word for word): one new table
+and a foreign key to `users` — additive, step 1, step 3 empty. Migrated
+before the code. Branch `a-search-misses` (B's `track-b` merged, the
+declaration moved into `drizzle/schema.ts`).
+
+1. **Backup**: `staging-2026-10-10T02-24-10Z-before-0142.sql` (74 tables);
+   restored to `bidrender_staging_restore_0142`: **74/74 counts equal**.
+2. **Rehearsal** on that restore: drift before = exactly `search_misses`;
+   `bidTotals` 1,035 with staging's code (`bf829b3`); **1 applied**, 143;
+   re-run nothing; "matches", 177/177; **1,035/1,035 unchanged** with the old
+   code AND the new.
+3. **Staging database** (02:36 UTC): drift before the same; `bidTotals`
+   1,043 (old code); **1 applied**, 143; re-run nothing; "matches",
+   177/177; **1,043/1,043 unchanged** on the old code.
+4. **Code**: branch Gate 38017501652 green; `9975a12` pushed to `staging`
+   by hand (BEFORE local-dev, so the auto-deploy's drizzle check finds
+   nothing new), then local-dev, after merging Track B's own merge of the
+   same code.
+
+**Live**: 0142 joins the batch — 0105–0142, 38 files, expect 143, 177/177
+(`next-live-release-plan.md` § 3).
+
+### Staging: the catalog reality check + both starter repairs (2026-10-10 UTC) — NOT on live
+
+No migration — seed and code only (`a-catalog-reality`, `334104a` +
+`8f28a85`; `references/catalog-reality-check-build.md`).
+
+1. **Backup**: `staging-2026-10-10T01-38-57Z-before-reality-check.sql` (74
+   tables) in `C:\dev\bidrender-backups\`; restored to
+   `bidrender_staging_restore_reality`: **all 74 table counts equal
+   staging's**.
+2. **Rehearsal on that restore** (staging's code `aaed2a8` booted as the
+   control): catalog 1,965 / 1,825 active; `bidTotals` 1,027. New code boot:
+   **added 50, renamed 296, retired 158, deleted 0**, 1,717 active, every
+   reference identical, `VERDICT: CLEAN`; second boot nothing. Covers: 2
+   swapped (RS12, LT23), 1 skipped (RS13); retired repair: **13 repointed**;
+   second runs 50 / 13 "already has it"; **1,027/1,027 unchanged**.
+3. **Staging before** (02:43 local / 01:43 UTC, old code): 1,027 bids;
+   catalog 1,965 / 1,825 active.
+4. **Code**: branch Gate 38013969109 green; `local-dev` fast-forwarded to
+   `8f28a85` and pushed; Gate 38014707002: test, deploy-staging, **smoke all
+   green**. `/api/version` = `8f28a85`, built 02:00 UTC.
+5. **After the first boot**: catalog compare against step 3 — added 50,
+   renamed 296, retired 158, deleted 0, 0 on an old spelling, 0 duplicates,
+   `VERDICT: CLEAN`; 1,717 active.
+6. **Repairs**: covers report RS12 / LT23 "would swap", RS13 "skipped:
+   edited" (its RV receptacle line); `--apply`: 2 swapped. Retired repair
+   report "13 would repoint" (same 13 as the rehearsal); `--apply`: 13
+   repointed. Second runs: 50 and 13 "already has it" (RS13 included).
+7. **Totals**: **all 1,027 existing bids unchanged**. `--compare` printed 3
+   differences, all bids missing before: 1029–1031, "CI smoke …", the
+   smoke account's (owner 597), made during step 4's smoke.
+
+**Live**: rides the next release with § 4b AND § 4c of
+`next-live-release-plan.md` (both repairs, covers first).
+
+### Staging: migration 0141 — a dead AI key says so (2026-10-09) — NOT on live
+
+`0141_ai_service_status`: one new table, one row, no `UPDATE` — additive,
+step 1, step 3 empty (§ 8a, `todo.md`). Migrated before the code.
+
+1. **Backup**: `staging-2026-10-09T18-23-28Z-before-0141.sql` (73 tables) in
+   `C:\dev\bidrender-backups\`.
+2. **Rehearsal** on its restore (959 bids): drift before = exactly
+   `ai_service_status`; `bidTotals` with staging's code `f058ab5`; **1
+   applied**, 142; re-run nothing; "matches", 176/176 (the table has no
+   foreign key); **959/959 unchanged** with the old code AND the new.
+3. **Staging database** (18:27 UTC): drift before the same; `bidTotals`
+   before (963 bids, old code); **1 applied**, 142; re-run nothing;
+   "matches", 176/176; site HTTP 200 on the old code; **963/963
+   unchanged**.
+4. **Code**: `679cce8` pushed to `staging` by hand at 18:47 UTC (BEFORE
+   `local-dev`, so the Gate's drizzle check finds nothing new), then
+   `local-dev`. `/api/version` = `679cce8`, built 18:48. The Gate run on
+   Track B's `8be0c18` (started 18:41) then failed its deploy-staging step
+   with "staging has commits local-dev does not" — correct: staging was
+   already ahead of it. Superseded by the run on `679cce8`.
+5. **After** (18:58, new code): `bidTotals --compare` against step 3's
+   before: **963/963 existing bids unchanged**; the 16 differences are bids
+   965–980 made by the smoke account at 18:29–18:39. Drift "matches",
+   176/176.
+6. **AI panel**: `ai_service_status` on staging is EMPTY — no AI call since
+   the deploy — so the admin panel shows no notice (no false alarm). NOT yet
+   proved: a real call through staging's key on the new code. To prove it:
+   staging → Dashboard → ask "where are labor rates" → an answer with a
+   button; then Admin → AI spend shows no amber notice, and the row reads
+   `lastWorkedAt` set, `refusedSince` NULL.
+7. **PROVED by the owner (2026-10-09), on `679cce8`**: staging's Dashboard
+   helper answered, and Admin showed no amber notice. A real call through
+   staging's key works on the new code.
+
+**Live**: 0141 joins the next release's batch — 0105–0141, 37 files,
+expect 142 (`next-live-release-plan.md`).
+
+### Staging: the coverage-check catalog adds (2026-10-09) — NOT on live
+
+No migration — 24 new shipped rows (`3cb5df3`, owner-approved from
+`coverage-check.md` on track-c), plus a search fix (a spoken cable spec no
+longer matches a longer NEMA number). Additive: renamed 0, retired 0.
+
+1. **Backups**: `staging-2026-10-09T05-13-27Z-before-coverage-rows.sql`
+   (rehearsal) and `staging-2026-10-09T16-13-17Z-before-coverage-push.sql`
+   (right before the push; staging had gained 8 bids in between), both 73
+   tables, in `C:\dev\bidrender-backups\`.
+2. **Rehearsal** on the first, restored locally (847 bids): staging's code
+   booted as a control, 847/847 unchanged; the new seed twice: **added 24,
+   renamed 0, retired 0, DELETED 0**, 1,825 active, 114 Specialty,
+   `VERDICT: CLEAN`; second boot nothing; **847/847 unchanged**
+   (`next-live-release-plan.md` § 5f).
+3. **Before** on staging (code `94471cc`): `bidTotals` 855 bids; catalog
+   1,941 rows / 1,801 active.
+4. **Code**: `2221948` pushed to `local-dev`; Gate 37957706459 test,
+   deploy-staging and smoke **all green**. By the time it was read, staging
+   served **`71f9f82`** — `2221948` plus two Track B commits (the "Fix
+   these" walk, a sheet-read fix; one touches `shared/lineNotPriced.ts`) —
+   so the after-read below covers both.
+5. **After** (16:53): `bidTotals --compare`: **855/855 existing bids
+   unchanged**; the 27 differences are bids 857–883 created between the
+   reads (12 by account 49162 at 16:19–16:21, 15 by the smoke account).
+   `catalogRehearsal compare`: **added 24, renamed 0, retired 0, DELETED 0,
+   1,825 active**, old spellings 0, duplicates 0, every reference
+   identical — `VERDICT: CLEAN`.
+
+### Staging: the Sch 80 / 500 seed (2026-10-09, 04:17 UTC) — NOT on live
+
+No migration — seed content only (`sch80-and-500-plan.md`, Track A's half):
+nine `N" PVC Sch 80, underground` run types with tape, the 500 base
+renamed in place, the 500 cover retired, nine 500 parts, the 500 run type.
+
+1. **Backup**: `staging-2026-10-09T03-57-40Z-before-sch80-500.sql` (73
+   tables, `--single-transaction`, `VERIFY_IDENTITY` TLS) in
+   `C:\dev\bidrender-backups\`. Not restored (no migration to rehearse).
+2. **Before** (staging's code `c1e7b35`, worktree): `bidTotals` 814 bids;
+   `catalogRehearsal snapshot` 1,932 baseline rows, 1,793 active.
+3. **Code**: `8f3045c` + docs `13b0dd9` merged to `local-dev`; Gate
+   37882505343 test, deploy-staging, smoke (on staging) **all green**;
+   `/api/version` = `13b0dd9`, built 04:17.
+4. **After**: `bidTotals --compare`: **814/814 existing bids unchanged**;
+   the 9 "differences" are bids 816–824 created between the reads (817–824
+   the Gate's smoke account, 04:21–04:25; 816 another account, 04:04).
+   `catalogRehearsal compare`: **added 9, renamed 1** (`Surface raceway
+base, 500 series` → `Surface raceway, 500 series`, same id #1683),
+   **retired 1** (the 500 cover), DELETED 0, **1,801 active**, old
+   spellings 0, duplicates 0; every pre-existing reference identical,
+   checked row by row (its verdict line says "NOT CLEAN" only because the
+   10 new run types add references).
+
 ### Staging: migration 0140 + the catalog review (2026-10-09, 01:10 UTC) — NOT on live
 
 `0140_material_specialty`: `materials.isSpecialty`, nullable, no default,
@@ -1622,7 +1896,24 @@ types moved to #12 THHN green, the 3-1/2" underground type archived.
    before (781 bids, old code); **1 applied**, 141; re-run nothing;
    "matches", 176/176; site HTTP 200 on the old code; **781/781
    unchanged**.
-5. **Code**: see the line below this record (filled in when pushed).
+5. **Code** (2026-10-09, 02:53 UTC): `d36bfc9` pushed to `staging` by hand
+   (owner's yes); `/api/version` = `d36bfc9`. `bidTotals` before (old code,
+   789 bids) vs after (new code): **789/789 unchanged**; the only two
+   differences were bids 791–792, "CI smoke …", created between the reads.
+   `catalogRehearsal compare` on staging itself: **added 107, renamed 23,
+   retired 138, DELETED 0**, 1,793 active, 108 Specialty, old spellings 0,
+   duplicates 0, company rows unchanged, every reference identical except
+   `takeoff_run_types.groundMaterialId` — the intended swap, run types 1, 2
+   and 5 now on `#12 THHN green Copper`. Gate 37874094992 re-run on
+   `d36bfc9`: deploy-staging and smoke (96 passed) **green**.
+6. **Starter cover repair** (Track B's `scripts/repairStarterCovers.mts`,
+   right after the new code's first boot, as `next-live-release-plan.md`
+   § 4b orders it for live): backup
+   `staging-2026-10-09T02-58-38Z-before-cover-repair.sql` (73 tables); dry
+   run **48 would swap** (staging's starters were all still on the old
+   recipe — live's copy had 43 already); `--apply` **48 swapped**; re-run
+   **48 already has it**; `bidTotals` **794/794 unchanged** (bids 796–797,
+   "CI smoke …", created between the reads).
 
 **Live**: 0140 joins the batch — 0105–0140, 36 files, expect 141 and
 176/176 — and the live rehearsal must be re-run with the catalog review's
@@ -2104,8 +2395,31 @@ start a server on that port, then `pnpm smoke`. A production build
 (`pnpm build && pnpm start`) is the closer match to staging — the new-version
 bar only exists in a build.
 
-**Artifacts stay credential-free on purpose.** The repo is public, so anyone
-can download a run's artifacts. Playwright TRACES record every request with
-headers and bodies — the passwords and the session — so traces and video are
-off (`e2e/playwright.config.ts`), and only failure screenshots are uploaded.
-Do not turn traces on in CI.
+**Artifacts never carry a credential in the clear.** The repo is public, so
+anyone can download a run's artifacts. Playwright TRACES record every request
+with headers and bodies — the passwords and the session.
+
+> **Changed 2026-10-09.** This said "traces off, do not turn them on in CI".
+> Flow test 5 then failed once with a screenshot as the only evidence, and the
+> cause (the click armed the WRONG count — a server answer, invisible in a
+> picture) took a session to find. So a FAILED test now keeps a trace
+> (`trace: "retain-on-failure"`), and the Gate SEALS it before upload:
+> `openssl` AES-256 with the passphrase **`SMOKE_STAGING_PASSWORD` followed
+> directly by `SMOKE_PASSWORD`** (no space). Anyone able to open it already
+> holds every credential inside it. The upload matches `*.png` and
+> `*.trace.enc` only, so a trace the seal step missed is never uploaded.
+> Video stays off.
+
+**Opening a sealed trace** — download the run's `smoke-failures` artifact,
+then, with both passwords from your password manager:
+
+```bash
+read -rs -p "staging password then smoke password, no space: " TRACE_KEY; export TRACE_KEY; echo
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:TRACE_KEY \
+  -in trace.trace.enc -out trace.zip
+unset TRACE_KEY
+npx playwright show-trace trace.zip
+```
+
+The decrypted `trace.zip` holds the session and both passwords: open it, then
+delete it. Never attach it to an issue or commit it.

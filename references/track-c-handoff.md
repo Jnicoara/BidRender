@@ -1,9 +1,8 @@
 # Track C — handoff, 2026-10-06
 
 Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
-section below** (per-foot work merged to local-dev as `94d63fd`; leftovers
-on `c-leftovers`; C's databases have 140 migrations — the stand-in 0139 they
-ran is the same statement and `when` as A's, so nothing more is needed).
+section below** (`c-sch80-500` merged to local-dev 2026-10-09 and looked
+at on screen; C's databases have 142 migrations, through A's 0141).
 **Earlier, 2026-10-08:**
 `c-homerun-footage` is MERGED into local-dev by Track A (`bea4d8f`, with
 0125–0134); that branch is finished. Current work is on
@@ -13,6 +12,293 @@ green. `main` was `24105ad`. C's databases `bidrender_local_c` and
 origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
+
+## LATEST (2026-10-10) — step-based labor, code half on `c-step-labor`: NOT MERGED; FOR TRACK A: migration 0143
+
+**Branch `c-step-labor`, from `origin/a-catalog-reality` `8f28a85`** — A's
+catalog merge was NOT on local-dev when this started (local-dev was
+`aaed2a8`), and a-catalog-reality already contains local-dev, so it is the
+"local-dev after A's merge" the owner asked for. **When A pushes it to
+local-dev, merge local-dev into `c-step-labor` first.** Do NOT merge
+`c-step-labor` into local-dev until the owner says so. `c-pvc-4080` left
+alone (A merged it into the catalog job).
+
+**MERGED to local-dev 2026-10-10** (fast-forward from `c-step-labor`)
+after: Gate 38019884197 on `21468a9` green (full suite); Track A applied
+0143 to staging 03:34 UTC (backup
+`staging-2026-10-10T03-30-47Z-before-0143.sql`; rehearsed on its restore:
+1 applied, 144, 180/180 FKs, 1,062/1,062 bids unchanged with the old code,
+this code and after its first boot; on staging 1,066/1,066 existing bids
+unchanged). The local-dev push is what deploys this code to staging; A
+checks that Gate.
+
+**Merge order (owner, 2026-10-10):** wait until A has (a) pushed the catalog
+job to local-dev — DONE, `334104a` / `8f28a85` / `aec561b` on local-dev as
+of 2026-10-10 02:20 UTC — AND (b) applied migration 0143 — NOT YET (0143 is
+on `c-step-labor` only). Then: pull local-dev, merge it into
+`c-step-labor`, push, check the Gate ONCE (no background watcher), and
+merge to local-dev only after it is green (pull first). Every bid total
+must stay unchanged (measure with `scripts/bidTotals.mts` before and after).
+**Laptop rule (owner):** never run the full suite here — low memory; GitHub
+Actions runs it. Run only the test files touched.
+
+**THE OWNER PRICES CABLE PER-FOOT HOURS FIRST (owner, 2026-10-10).** Step
+totals stay "not set" on every starter that carries cable (28 of the 30)
+until the cable rows have hours per foot, because the cable step reads each
+cable's own per-foot hours (Q1). So the order is: the owner fills the cable
+rows on `pricing/labor-units-starter.xlsx` (hours per 100 ft) → A loads
+them → THEN the step minutes and overheads on the Steps / Step totals tabs
+can unlock step totals, and only then can `starterHoursClearable` let any
+typed starter hours clear (Q2/Q7). Typing step minutes before the cable
+hours is harmless, but nothing will price from steps until both exist.
+
+Plan and owner answers: `references/step-based-labor-plan.md` (§ 13
+answers and the bid-number check; § 14 the Steps / Step totals tabs for A's
+one sheet rebuild). Same file on `track-c` (`519e099`).
+
+### FOR TRACK A — migration 0143 (only A runs it on shared databases)
+
+File on the branch: **`drizzle/0143_labor_steps.sql`** + journal entry
+(`when` 1789963300000), **renumbered from 0142 on 2026-10-10** because A's
+`0142_search_misses` took that number (same `when` as the old 0142 entry —
+so a database that had C's old 0142 recorded must drop that record and the
+two tables before migrating, or the migrator counts A's 0142 as applied;
+C's two databases were reset that way). Renumber again freely if 0143 is
+taken first. Hand-written,
+ADDITIVE, step 1 of the three steps — **safe before OR after the code**:
+
+```sql
+CREATE TABLE `labor_steps` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int,
+	`baselineId` int,
+	`stepKey` varchar(32),
+	`name` varchar(255) NOT NULL,
+	`unit` varchar(64) NOT NULL DEFAULT 'each',
+	`minutes` decimal(8,2),
+	`reasoning` text,
+	`isExampleMinutes` boolean,
+	`isActive` boolean NOT NULL DEFAULT true,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `labor_steps_id` PRIMARY KEY(`id`),
+	CONSTRAINT `labor_steps_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `labor_steps_userId_idx` ON `labor_steps` (`userId`);
+CREATE INDEX `labor_steps_baselineId_idx` ON `labor_steps` (`baselineId`);
+CREATE TABLE `assembly_labor_steps` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`assemblyId` int NOT NULL,
+	`kind` enum('step','cable') NOT NULL DEFAULT 'step',
+	`laborStepId` int,
+	`count` decimal(10,2) NOT NULL DEFAULT '1',
+	`sortOrder` int NOT NULL DEFAULT 0,
+	CONSTRAINT `assembly_labor_steps_id` PRIMARY KEY(`id`),
+	CONSTRAINT `assembly_labor_steps_assemblyId_assemblies_id_fk` FOREIGN KEY (`assemblyId`) REFERENCES `assemblies`(`id`) ON DELETE cascade ON UPDATE no action,
+	CONSTRAINT `assembly_labor_steps_laborStepId_labor_steps_id_fk` FOREIGN KEY (`laborStepId`) REFERENCES `labor_steps`(`id`) ON DELETE cascade ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `assembly_labor_steps_assemblyId_idx` ON `assembly_labor_steps` (`assemblyId`);
+```
+
+- **Before 0143** the code runs: every step read treats ER_NO_SUCH_TABLE as
+  "no steps" (`stepsTablesMissing`, server/db.ts — only that error; anything
+  else throws), the seed pass does nothing, and pricing is exactly today's.
+  `schemaCheck` / `schemaDrift` still REPORT the two tables missing, loudly,
+  until it runs. Measured: the assembly, kit, example-tag and bid-line
+  suites, 166 green on `bidrender_test_c` WITHOUT the tables (the one red,
+  DV33 in `starterAssembliesSeed`, is the same red from a clean
+  `a-catalog-reality` checkout on that database — not this change).
+- **After 0143**, first boot seeds 47 shipped steps (all minutes NOT SET) and
+  the step lists of the 30 starters (194 lines). **No number moves**:
+  measured on `bidrender_local_c`, old code before vs new code + 0143 +
+  seed after — `bidTotals` "all 4235 bid(s): totalDue unchanged; not-priced
+  and incomplete unchanged"; `routerSnapshot` 0 of 4,235 bids differ.
+  **Re-measured after the renumber (2026-10-10):** both C databases reset to
+  local-dev's state (old 0142 record and the two tables dropped, A's
+  `0142_search_misses` applied from local-dev's own `drizzle/`), `bidTotals`
+  taken with local-dev's code (`f03e8ef`), then 0143 applied, the step seed
+  run (47 steps, all not set; 30 lists, 194 lines), `bidTotals` with
+  `c-step-labor`: **"ok all 4235 bid(s): totalDue unchanged; not-priced and
+  incomplete unchanged"**.
+- `schemaDrift` on `bidrender_test_c` after 0143: "Database matches the
+  schema", foreign keys 180/180.
+- C applied 0143 to C's OWN `bidrender_local_c` and `bidrender_test_c` (both
+  now **144** migrations, through 0143). Nothing shared was touched.
+
+### What the code does
+
+- `shared/assemblyHoursSource.ts` — THE decision: typed > steps (all timed)
+  > not set; one untimed step = not set; the cable step reads each cable's
+  > own per-foot hours (Q1); `starterHoursClearable` (Q2/Q7 rule); no "0 min".
+- Bid snapshot, assembly preview, kit preview all price through it
+  (`assemblyHoursSourceFor`). Bid lines freeze it, as before.
+- `laborSteps` router (list / setMinutes forks a shipped step / create /
+  acceptAll = "Use these times"); `assemblies.update` takes `steps`;
+  `assemblies.get` returns `hoursSource`. Forks copy the step list.
+- Seed: `server/seed/starterLaborSteps.ts` (library + 30 lists, NO minutes);
+  generated-by-A's-loader `starterStepMinutes.ts` and
+  `starterAssemblyOverhead.ts` ship EMPTY — the loader spec is plan § 14.
+- Screen: assembly editor → **"More options"** (closed by default) →
+  "Build hours from steps"; the quiet grey line under the hours ("Steps: 0
+  of 8 timed" / "Steps add to 0.51 h" / "Priced from its steps: …").
+  **Looked at on screen, tablet portrait 820×1180** (playwright,
+  `scripts/deviceAudit.mts` helpers, user 1, Duplex receptacle standard):
+  closed and open; unset minutes show "not set", never "0 min"; the cable
+  row says its hours per foot are not set; no sideways scroll, nothing cut
+  off. Nothing saved.
+
+### Tests
+
+`server/stepLabor.test.ts` (21) and `client/src/lib/assemblyStepsDraft.test.ts`
+(5). **Red without the change:** the bid snapshot put back to typed-only
+hours → 2 failed ("expected null to be '0.5000'", "… '0.2000'"); restored
+→ green. `pnpm check` clean. **Full suite on `bidrender_test_c`: 375 of
+379 files green.** Of the 4 red, three were this change and are fixed
+(American spelling "colours"/"armour" in two step reasonings; `stepKey` added
+to backup.test's identifier list; `assembly_labor_steps` given its two
+decisions in forkableReferences.test) — those four files 65/65 green after.
+The fourth, `starterAssembliesSeed` DV33, is the pre-existing red described
+above. The Gate on the push is the full proof on a fresh database.
+
+## Earlier (2026-10-09, later) — Gate green; looked at on screen; one false sentence fixed
+
+- **Gate 37977597726 on `47e4bd8` (the merge): ALL GREEN** — test,
+  deploy-staging, smoke; drizzle-guard skipped (no `drizzle/` change).
+- **On screen, laptop 1536×864 and tablet 820×1180** (playwright via
+  `scripts/deviceAudit.mts` helpers, Bar layout check 1164558, user 1).
+  Two runs added by API (a 500 run, a 2" Sch 80 trench) and one 500 run
+  traced through the UI, all three removed afterwards; nothing sent, the
+  bid's lines untouched. Seen right: the conduit picker's
+  **"Underground (18)"** fold, closed by default, below the six saved
+  types; opened, **Sch 40 ½"…4" then Sch 80 ½"…4"**; the 500 type beside
+  700 and armable (the UI trace armed it). The 500 Traced-footage block
+  names only 500 parts (coupling, entrance end, support clip "not set",
+  inside elbow), "Send 4 lines"; the Sch 80 block's tape says "the flat
+  length only, not the risers". No horizontal overflow at either size.
+- **Found and fixed: "Nothing traced under this type yet." beside 80 ft of
+  traced raceway.** Wire comes from a run's circuits, and a run traced
+  through the UI has none until somebody adds wires — so the wire rows were
+  0 ft, and `runRowSendability` said every 0 ft row was "nothing traced"
+  (panel AND the post-Send toast; every conduit type, 700 and EMT too).
+  It now takes a REQUIRED `typeTraced` (`runTypeTraced(rows)`, shared) and
+  says "No wire on these runs yet — open a run to add its wires." when the
+  pipe has feet. Test in `server/takeoffBridge.test.ts`, **red without the
+  fix** ("expected 'No wire…', received 'Nothing traced…'"), green with it;
+  five related files 96 green; `pnpm check` clean. Looked at again on
+  screen at both sizes after the fix.
+- Stale comment in `RunTypePicker.tsx` ("ten shipped underground types")
+  now says 18.
+- Dev server stopped, whole tree; port 3004 free. Temp scripts deleted.
+
+## Earlier (2026-10-09) — `c-sch80-500` MERGED into local-dev; Q11 answered
+
+**Merged.** A's seed (`8f3045c`) and A's 0141 were on local-dev, so
+`origin/local-dev` (`679cce8`) was merged into `c-sch80-500` and the result
+pushed to local-dev as a fast-forward. Conflicts: `baselineRunTypes.ts`
+and `perFootSeed.test.ts` took A's (a superset, as A's note below said);
+CHANGELOG and this file kept both. **C's databases `bidrender_local_c` and
+`bidrender_test_c` now have 142 migrations** (0141 applied this session).
+
+- **`sch80And500Runs.test.ts` now runs on the SHIPPED rows**: the shipped
+  `2" PVC Sch 80, underground` type (waste set → it forks; the fork keeps
+  the shipped tape, which the tape line proves) and the shipped 500 type,
+  raceway and parts. The stand-in company type and the shared fixture rows
+  are gone; the file seeds the catalog it reads in `beforeAll`.
+- **Tests:** the nine Sch 80/500 files (`sch80And500Runs`,
+  `sch80And500Seed`, `surfaceRacewayFittings`, `runTypeFold`,
+  `perFootSeed`, `catalogReview20261008`, `catalogReviewSeed`,
+  `runNoWire`, `runTypeExtras`) — **118 green** on `bidrender_test_c`;
+  `pnpm check` clean. Full suite: the Gate on the local-dev push.
+- **E111 1728359 and Bar layout check 1164558 unchanged:** `bids.get`,
+  `bridgeForBid`, `materialsList.get`, `takeoffSummary.forBid`, local-dev
+  tip vs the merge, same `bidrender_local_c` — identical apart from the
+  `preparedOn` clock.
+- ~~Not done: looking at the fold and the 500 Send block on screen~~ —
+  done the same day, see above.
+- **Q11 (auto branch runs) answered by the owner: YES.** A detour over 3×
+  the straight right-angle distance is a WARNING with the fix-it buttons,
+  priced, never a block. Written into `auto-branch-runs-plan.md` § 3c,
+  § 3d, § 11, § 13 on **`track-c`** (`77479ce`) — that plan lives on
+  `track-c` only, not on local-dev yet.
+
+## Earlier (2026-10-08, proof session) — tape test proven; runNoWire reds explained and fixed; still NOT MERGED
+
+Still on `c-sch80-500`; no merge until A's seed landed (it has — above).
+
+- **Sch 80 tape test proven.** `extraFeetForRun` temporarily made to follow
+  every foot (risers included) → `sch80And500Runs.test.ts` red "expected
+  116.6 to be 110"; restored → green; tree clean before commit.
+- **The 9 runNoWire reds: test setup, not a bug.** The file read shipped
+  rows by name and never seeded; `#12 THHN green Copper` is new with A's
+  catalog review, so right after 0140 it was absent until some other file
+  seeded. Reproduced on a scratch DB (seeded at `ca8030c`, migrated to 0140):
+  11 red, "reading 'id'". Now it seeds in `beforeAll` → same DB 18/18 green.
+- **Shuffling found two more, in `runTypeExtras.test.ts`**: user created only
+  in the first describe; the $0.25 tape fork leaked into the "not priced"
+  test. File-level user + per-test reset of the company's own rows: 8/12
+  shuffle seeds red before, 12/12 green after.
+- Eight touched test files (108 tests) green on shuffle seeds 1–8 on
+  `bidrender_test_c`; `pnpm check` clean. Full suite not run on the laptop.
+  Details: `sch80-and-500-plan.md` § 7b. Scratch DB and worktree removed.
+- **Gate 37882413912 on `f4604c0`: test GREEN (full suite)**; drizzle-guard,
+  deploy-staging and smoke skipped, as expected on a `c-*` branch.
+
+## Earlier (2026-10-08, build session) — Sch 80/500: C's half BUILT on `c-sch80-500`, NOT MERGED
+
+**DO NOT MERGE `c-sch80-500` INTO local-dev UNTIL TRACK A'S SEED LANDS**
+(owner, 2026-10-08). The exact list A must add is
+`sch80-and-500-plan.md` § 7c — nine Sch 80 underground types, the 500
+rename/retire/nine adds, the 500 run type, and A's seed tests. When it is on
+local-dev: merge local-dev into `c-sch80-500`, switch the Sch 80 case in
+`server/sch80And500Runs.test.ts` to the shipped type (§ 7b), run the touched
+files, Gate, then merge — and look at the fold and the 500 Send dialog on
+screen (plan § 6).
+
+Branch from `origin/local-dev` `d36bfc9` (A's 0140 included). Built:
+`undergroundRunTypeLabel(size, schedule)` (schedule required), the fold
+sorting Sch 40 then Sch 80 by size, and the 500/700 fitting family as a
+closed list (`surfaceRacewaySeries`; 1500 off; `isSurfaceRaceway700`
+deleted) with `fittingRowsByRunType` branching on it. The seed file was
+touched only to pass `"PVC Sch 40"` to the two existing label calls. Tests
+and their red-without-it checks: plan § 7b. Full suite NOT run on the
+laptop. `bidrender_local_c` and `bidrender_test_c` now have **141**
+migrations (0140 applied this session). One unexplained first-run red in
+`runNoWire.test.ts` straight after applying 0140, not repeated — § 7b.
+**Gate 37877582385 on `c-sch80-500`: test GREEN (full suite, 10m36s);**
+drizzle-guard and deploy-staging skipped, as expected on a branch with no
+`drizzle/` change. Gate did not run on `c-*` branches before — `gate.yml`
+now includes `c-*`, as it already did `a-*`.
+
+## Earlier (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
+
+## FROM TRACK A (2026-10-09) — A's Sch 80 / 500 seed IS ON local-dev: merge `c-sch80-500` now
+
+A's seed (`sch80-and-500-plan.md` § 7c, all four items) is on
+`origin/local-dev` as **`8f3045c`** (tip `13b0dd9`), and on **staging**
+(814/814 bids unchanged; `deploying.md` § 11 "Sch 80 / 500 seed"). Gate
+37882505343 green (test, deploy-staging, smoke).
+
+What C needs to know for the merge:
+
+- **A took C's label change and fold sort FILE-IDENTICAL** from
+  `c-sch80-500` (`shared/undergroundRunTypes.ts`,
+  `client/src/lib/runTypeFold.ts` + `.test.ts`, and the call sites in
+  `catalogReview20261008.test.ts`, `catalogReviewSeed.test.ts`,
+  `runNoWire.test.ts`, `runTypeExtras.test.ts`), so those merge clean.
+  NOT taken: `surfaceRacewayFittings.ts` / its test, `server/db.ts`,
+  `sch80And500Runs.test.ts`, `gate.yml` — still C's to land.
+- **Expect conflicts** in `server/seed/baselineRunTypes.ts` and
+  `server/perFootSeed.test.ts` (A's version is a superset — take A's), in
+  `CHANGELOG.md`, this file and `sch80-and-500-plan.md` (docs; keep both).
+  `catalogReview20261008.test.ts` now expects 18 underground types and the
+  500 type in the "#12 + ground" list.
+- Seeded names exactly as § 7c: the nine 500 parts, `Surface raceway, 500
+series` (renamed in place — #1683 on staging), the 500 cover retired.
+  A's tests: `server/sch80And500Seed.test.ts` (fixture 91354).
+- Still C's per § 7c/§ 6: switch the Sch 80 case in
+  `sch80And500Runs.test.ts` to the SHIPPED type; once C's family code is in,
+  its fixture 500 rows are no longer inserted (they exist); look at the fold
+  ("Underground (18)") and the 500 Send dialog on screen.
 
 ## LATEST (2026-10-08, session after) — owner's Sch 80/500 answers recorded; "0 marks" flash fixed
 

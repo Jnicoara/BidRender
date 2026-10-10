@@ -541,6 +541,11 @@ function extraRows(type: Parameters<typeof runTypeRows>[0]): RunTypeRow[] {
   });
 }
 
+/** Whether anything is traced under a type: any of its rows has feet. */
+export function runTypeTraced(rows: readonly RunTypeRow[]): boolean {
+  return rows.some(row => row.feet > 0);
+}
+
 /** Whether one of those rows can become a bid line yet, and if not, why not. */
 export type RunRowSendability =
   | { ok: true }
@@ -559,8 +564,18 @@ export type RunRowSendability =
  *
  * **No footage means nothing to send yet**, which is the ordinary state of a
  * type nobody has traced with, and of the wire rows on an empty conduit.
+ *
+ * **Which of those two it is decides the sentence**, so `typeTraced` (any of
+ * the type's rows has feet) is REQUIRED. Until 2026-10-09 every 0 ft row said
+ * "Nothing traced under this type yet." — including the wire rows of a 500
+ * run with 80 ft of raceway traced and no wires added on the run, which is
+ * false on the panel and in the Send toast alike. Found by looking at the
+ * Send block on screen.
  */
-export function runRowSendability(row: RunTypeRow): RunRowSendability {
+export function runRowSendability(
+  row: RunTypeRow,
+  typeTraced: boolean
+): RunRowSendability {
   if (row.materialId === null) {
     return {
       ok: false,
@@ -573,7 +588,11 @@ export function runRowSendability(row: RunTypeRow): RunRowSendability {
     return {
       ok: false,
       reason: "no-footage",
-      message: "Nothing traced under this type yet.",
+      message: !typeTraced
+        ? "Nothing traced under this type yet."
+        : row.role === "conductor" || row.role === "ground"
+          ? "No wire on these runs yet — open a run to add its wires."
+          : "None on the runs traced so far.",
     };
   }
   return { ok: true };

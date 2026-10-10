@@ -46,6 +46,17 @@ function mixes(n: number): string[] {
   return out;
 }
 
+/*
+  The three mixed 3-gang plates nobody stocks (D/Dec/Dec, D/D/Dec, T/D/Dec)
+  were retired 2026-10-09, nylon and stainless (catalog reality check, batch
+  2, owner-approved): 54 -> 48 standard rows.
+*/
+const RETIRED_MIXES = [
+  "duplex/decorator/decorator",
+  "duplex/duplex/decorator",
+  "toggle/duplex/decorator",
+];
+
 const STANDARD: string[] = [];
 for (const material of ["nylon", "stainless"]) {
   for (const o of [
@@ -58,7 +69,8 @@ for (const material of ["nylon", "stainless"]) {
     STANDARD.push(`1-gang wall plate, ${o}, ${material}`);
   for (const g of [2, 3]) {
     for (const o of [...mixes(g), "blank"])
-      STANDARD.push(`${g}-gang wall plate, ${o}, ${material}`);
+      if (!RETIRED_MIXES.includes(o))
+        STANDARD.push(`${g}-gang wall plate, ${o}, ${material}`);
   }
   for (const o of [
     "toggle/toggle/toggle/toggle",
@@ -75,8 +87,11 @@ for (const [material, size] of [
 ]) {
   for (const o of ["toggle", "duplex", "decorator", "blank"])
     BIG.push(`1-gang wall plate, ${o}, ${material}, ${size}`);
+  // The stainless oversized duplex/decorator retired into the standard
+  // one (2026-10-09): 22 -> 21.
   for (const o of [...mixes(2), "blank"])
-    BIG.push(`2-gang wall plate, ${o}, ${material}, ${size}`);
+    if (!(o === "duplex/decorator" && size === "oversized"))
+      BIG.push(`2-gang wall plate, ${o}, ${material}, ${size}`);
 }
 const RAISED = [
   '4" square raised cover, single receptacle',
@@ -108,7 +123,8 @@ const OTHER = [
   "Floor box cover, data",
   "Floor box cover, duplex and data",
   "Floor box carpet flange",
-  "Surface raceway device box, 700 series",
+  // One box for 500 and 700 since 2026-10-09 (Wiremold V5747/V5748).
+  "Surface raceway device box, 500/700 series",
   "Surface raceway device plate, 700 series",
 ];
 const FAMILY = [...STANDARD, ...BIG, ...RAISED, ...POWER, ...OTHER];
@@ -119,7 +135,7 @@ describe("the cover family ships whole", () => {
     expect(FAMILY.filter(n => !shipped(n))).toEqual([]);
   });
 
-  it("is 103 rows: 54 standard, 22 midway/oversized, 12 raised, 4 power, 11 other", () => {
+  it("is 96 rows: 48 standard, 21 midway/oversized, 12 raised, 4 power, 11 other", () => {
     // If this count moves, the family changed: say why in devices.ts.
     expect([
       STANDARD.length,
@@ -127,8 +143,8 @@ describe("the cover family ships whole", () => {
       RAISED.length,
       POWER.length,
       OTHER.length,
-    ]).toEqual([54, 22, 12, 4, 11]);
-    expect(FAMILY.length).toBe(103);
+    ]).toEqual([48, 21, 12, 4, 11]);
+    expect(FAMILY.length).toBe(96);
   });
 
   it("keeps every older cover row it sits beside", () => {
@@ -136,12 +152,8 @@ describe("the cover family ships whole", () => {
       "Wall plate",
       "2-gang wall plate",
       "3-gang wall plate",
-      "1-gang blank plate",
-      "4-gang blank plate",
-      "Duplex/toggle combo plate",
       "Stainless steel wall plate",
       "Jumbo wall plate",
-      "Floor box cover",
       "Weatherproof in-use cover",
       '4" square raised cover, duplex',
       "Handy box cover, blank",
@@ -150,6 +162,18 @@ describe("the cover family ships whole", () => {
       "Handy box cover, decorator",
     ])
       expect(shipped(name), name).toBe(true);
+    // Four older rows were RETIRED into the family row that does the same
+    // job, 2026-10-09 (catalog reality check, owner-approved) — kept as
+    // that row's search words, never deleted.
+    for (const [old, kept] of [
+      ["1-gang blank plate", "1-gang wall plate, blank, nylon"],
+      ["4-gang blank plate", "4-gang wall plate, blank, nylon"],
+      ["Duplex/toggle combo plate", "2-gang wall plate, toggle/duplex, nylon"],
+      ["Floor box cover", "Floor box cover, duplex"],
+    ]) {
+      expect(shipped(old), old).toBe(false);
+      expect(shipped(kept), kept).toBe(true);
+    }
   });
 
   it("is one row per plate: colors are search words, never rows", () => {
@@ -222,10 +246,10 @@ describe("the cover family's search words", () => {
     BASELINE_MATERIALS[Number(smartSearch(index, q, 1)[0].id)].name;
 
   it.each([
-    ["recep", "Duplex receptacle"],
-    ["plug", "Duplex receptacle"],
+    ["recep", "15A duplex receptacle"],
+    ["plug", "15A duplex receptacle"],
     ["switch", "Switch/receptacle combo device"],
-    ["gfci", "GFCI receptacle"],
+    ["gfci", "15A GFCI receptacle"],
     ["dryer", "Dryer cord, 3-wire"],
     ["wall plate", "Wall plate"],
   ])("%s still leads with %s", (q, expected) => {

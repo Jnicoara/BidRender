@@ -116,6 +116,25 @@ const lvFromSheet: BaselineMaterial[] = [
 ];
 
 export const LOW_VOLTAGE: BaselineMaterial[] = [
+  /*
+    The telecom room's wall and its ground (coverage check, 2026-10-09,
+    owner-approved): where the demarc, patch panel and service land in a
+    retail strip or an office.
+  */
+  {
+    ...part(
+      "Telecom backboard, plywood 4x8",
+      "fire rated fire-retardant fr painted 3/4 ply demarc mdf idf data room wall"
+    ),
+    jobKind: "commercial",
+  },
+  {
+    ...part(
+      "Telecom grounding busbar",
+      "tgb tmgb tbb bus bar communications bonding demarc mdf idf data room"
+    ),
+    jobKind: "commercial",
+  },
   {
     ...lv("foot"),
     name: "Cat6 cable Copper",

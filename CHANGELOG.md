@@ -4,8 +4,198 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-10]
+
+- **The starter pricing sheets are rebuilt for the owner to fill — now with
+  step times.** The prices workbook gains a "Steps" tab (type the minutes
+  for each install step, with a suggested draft beside it) and a "Step
+  totals" tab (type each starter's overhead; it shows what each starter's
+  steps add up to as you type). The loader reads both and clears a
+  starter's typed hours only when its steps plus overhead come to at least
+  what it charges today. Every sheet also picks up the catalog cleanup of
+  2026-10-09. Nothing had been typed in the old sheets, so nothing was
+  carried; a rebuild over filled-in copies proved every typed value
+  survives.
+- **Build an assembly's hours from its work steps (not live yet; waits for
+  the owner).** An assembly can list the work it takes — mount the box,
+  prepare the cable, terminate, set the device, plate, test — each with a
+  time. With no hours typed, the steps' total prices the assembly; typed
+  hours always win, and the step total sits beside them as a quiet check.
+  Steps are shared, so fixing one time fixes every assembly that uses it,
+  while bids already priced never change. It sits under "More options" and
+  ships with NO times: nothing prices differently until the owner fills in
+  the step times.
+- **The no-match search log is switched on (staging).** When a search in a
+  picker finds nothing, the words are kept (company, picker, words, time —
+  never who or which bid), so the catalog can grow from what estimators
+  actually looked for. Database table added on staging; live next release.
+- **The automatic test run no longer fails on Docker Hub's download limit.**
+  Its MySQL test database now comes from Amazon's public copy of the same
+  official image.
+
+## [2026-10-09]
+
+- **"Build it from parts here" now works on the plan too.** When the Count
+  button's search, or a legend symbol's or count's "Link assembly" search,
+  finds nothing, you can build the assembly right there from catalog parts.
+  It is then counted or linked straight away, exactly as if it had been
+  found, and its count reaches the bid the usual way. It always goes into
+  your library so every sheet can find it. Category, hours and who does the
+  work sit under "More options". Counting what you typed with no library item
+  is still the first choice offered.
+- **Searches that found nothing are now recorded even when you are quick.**
+  Typing and pressing Enter (or choosing "Count it anyway" or "Build it from
+  parts") used to slip past the two-second wait and never get recorded.
+  Those are now recorded straight away. The search for "Link to … assembly"
+  on a hand-priced line also understands slang and spellings now ("recep",
+  "gfi"), the same as every other assembly search, and records its misses
+  too.
+- **When the bid's assembly search finds nothing, you can build it right
+  there.** "Build it from parts here" opens under the search: name it, pick
+  catalog parts, optionally the hours and who does them, and it goes on the
+  bid. "Save to my library" is ticked by default, so next time it is a
+  normal search hit; unticked, it stays out of the library list but can be
+  restored from the archive. Works on the bid screen and the counting
+  screen. The bid screen's assembly search also now finds things the same
+  way the counting screen does (spellings and slang, not only exact text).
+- **The admin screen lists searches that found nothing.** When an assembly
+  or material search comes up empty, the words typed are recorded — only the
+  words, the company and the date; no prices, no bids, no names, and no AI
+  reads it — so the next catalog work follows what people actually look for.
+  It starts recording once its database table is added (Track A's next
+  migration); until then it records nothing and says so.
+- **The starter catalog now names real, stocked parts (catalog reality
+  check).** About 300 items were renamed to what a supply house actually
+  sells: plastic boxes by cubic inches ("Single-gang new work box, plastic,
+  18 cu in"), box depths that match real products, panels as the 56
+  single-phase load centers that are really stocked (main-lug or main-breaker,
+  spaces, indoor/outdoor), single-size crimp lugs, fuses and disconnects with
+  their voltage, and "15A" on the plain devices. 158 items nobody stocks were
+  retired into the row that does the same job. Old names still find their
+  rows, starters point at the kept rows, and no existing bid changes (959
+  bids rehearsed, all unchanged). Two labels were added for the outdoor
+  emergency disconnect and EV-ready starters.
+- **Older databases get the same starters as new ones.** A one-time repair
+  moves 13 shipped starter assemblies off the catalog rows the reality check
+  retired (and adds the two new labels), but only where nobody has changed
+  that starter. Run on staging; it rides the next live release. No bid
+  total changed (1,027 staging bids checked).
+- **Search got smarter about sizes.** A box's depth ("2" deep") and a
+  panel's space count ("20-space") no longer count as its size, so "2 emt"
+  and "20 amp breaker" stop listing boxes and panels.
+
+- **PVC runs, either schedule, will buy one coupling, terminal adapter and
+  LB per size (not live yet; waits for the matching catalog change).**
+  Suppliers sell these as one part for Sch 40 and Sch 80, so a traced Sch
+  80 run now looks up the same shared row a Sch 40 run does, instead of a
+  Sch 80 duplicate. Elbows and sweeps stay separate per schedule, because
+  those really are different parts. This ships only together with the
+  catalog rename that creates the shared rows; on its own it would leave
+  those fittings saying "no catalog match".
+
+- **Fixed: clicking a legend symbol right after linking it could count into
+  the WRONG item.** When two symbols share one assembly (say a duplex and a
+  switch both priced as one receptacle), a click straight after "Link" could
+  arrive before the link had saved, and the app then kept counting the first
+  symbol instead — its marks under the other item's name, with nothing said.
+  Each symbol now always gets its own count. A legend click that cannot start
+  counting now says so instead of doing nothing.
+- **41 new starter assemblies from the two coverage checks** — the things
+  real jobs needed that the library did not have: emergency bug-eyes, fire
+  alarm strobes, speaker/strobes and heat detectors, commercial water
+  heaters and mini-splits on MC, 6-20/6-30/6-50 receptacles, old-work
+  lights and GFCIs, wall ovens, heated floors, pop-up island receptacles,
+  commercial EV chargers, emergency service disconnects, meter centers,
+  hospital-grade receptacles and more. 224 starters now. Hours are not set,
+  like every starter, for the owner to fill in.
+- **The 48A EV charger starter now uses 4/3 cable, not 6/3.** 6/3 NM is
+  only good for 55A and a 48A charger needs 60A of wire. The 8 ft strip
+  row starter now includes aircraft-cable hangers, and the over-range
+  microwave has its own starter, separate from the range hood. Bids already
+  priced do not change.
+- **Fixed for good: a freshly uploaded plan set could still show no
+  sheets.** Yesterday's fix caught one way it happened; a second way, about
+  one upload in six on staging, left the sheet list empty until a reload.
+  The list is now always read again after the sheets are saved.
+
+## [2026-10-09]
+
+- **A dead AI key now says so.** If the server has no Anthropic key, or the
+  key has expired or been disabled, the help assistant and the plan reader
+  now say "AI is unavailable right now" with what to do by hand, instead of
+  "I'm not sure which screen you want" (which blamed the question) or "try
+  again later" (which would never work). The admin AI spend screen shows an
+  amber notice with the time calls started being refused and where the fix
+  is written down, and it clears itself once a call works. Nothing on a bid
+  was ever affected; this is about the words.
+- **A traced Wiremold 500 run now counts its own fittings.** Couplings,
+  entrance end, inside and flat elbows come from the 500 parts only, the
+  same way 700 already did; a 500 run never borrows a 700 part, and 1500 is
+  deliberately left out. Before this, a 500 run's fittings said "no catalog
+  match".
+- **The plan viewer no longer says "Nothing traced" beside traced pipe.**
+  When conduit was traced but no wires had been added on its runs, the
+  wire rows said "Nothing traced under this type yet." right next to the
+  pipe's footage — and so did the message after Send. They now say "No
+  wire on these runs yet — open a run to add its wires."
+
 ## [2026-10-08]
 
+- **Fix every flagged line in one pass.** Each warning under the bid total
+  ("3 parts are not priced", "2 lines have hours not set", …) now has a
+  "Fix these" button that opens the first line's fix, then the next after
+  each save, with Skip to pass one.
+- **The proposal's "price these first" list now takes you to the fix.**
+  Clicking a line in it opens the bid on that line with its fix open,
+  instead of leaving you to find it.
+- **24 catalog items real jobs were missing.** From the coverage check of
+  thirteen real jobs: 250V receptacles (6-15R, 6-20R, 6-30R, 6-50R),
+  3-phase twist-locks (L15-30, L21-30), a red emergency receptacle, a pop-up
+  countertop receptacle, fan-forced wall heater and its thermostat, a floor
+  heating mat and its GFCI thermostat, 4/3 NM-B, healthcare (HCF) MC cable,
+  4- and 6-position meter centers, 400/600/800A switchboards, a
+  polymer-concrete handhole, a swing-arm dock light, a cord reel, and a
+  plywood telecom backboard with its grounding busbar. Each is tagged
+  residential, commercial or both; the big gear and the HCF cable sort as
+  Specialty. Nothing existing was renamed or removed. (The CT cabinet the
+  check asked for was already in the catalog under its full name.)
+- **Searching "14 3" or "6 3" finds the cable again.** A spoken cable size
+  like "14 3" was matching the start of a receptacle's NEMA number (14-30R),
+  so the dryer receptacle led a search for 14/3 Romex. A finished cable size
+  now only matches that size.
+- **Fixing a line on a Won or Lost bid now asks first instead of refusing.**
+  Only a locked bid refuses. On a Won or Lost bid, Save asks "Changing it
+  changes a price you may have already sent. Change anyway?" and changes
+  nothing unless you press Continue.
+- **Fixed: a freshly uploaded plan set could show no sheets.** Right after a
+  bid's first upload, the sheet list sometimes stayed on "Sheets appear here
+  once the document opens" and the scale was never read, until the page was
+  reloaded. The sheets are now always picked up once they are saved.
+- **Schedule 80 underground pipe and Wiremold 500 are ready to trace.**
+  Nine "PVC Sch 80, underground" run types (one per size, each with its
+  warning tape) sit in the same Underground fold as the Sch 40 ones, Sch 40
+  listed first. Wiremold 500 now works like 700: one raceway row priced by
+  the foot, its own run type (2 #12 + ground) and nine of its own parts,
+  coupling to device plate. The old 500 "base" row keeps its place under the
+  new name; the separate 500 cover row is withdrawn, since 500 is one piece.
+  Nothing on an existing bid moves.
+- **Fix a line right on the bid.** A line that says "Not priced", "Hours not
+  set" or "+ 1 part not priced" now has a "Fix this line" button. Type the
+  missing price or hours (or pick the material or the role) and only that
+  line changes. "Also save to my library" is ticked by default, so the next
+  bid isn't missing it too. Before this, the only fix was editing the
+  library, removing the line and adding it again. Locked, Won and Lost bids
+  keep their numbers; the panel says so and can still save to the library.
+- **Rebuilding the starter pricing sheets can no longer lose what the owner
+  typed.** Every price and hours value is carried onto the new sheet by
+  item, so a renamed item keeps its number, a new item arrives blank, and a
+  number for an item that was removed is listed in a "dropped values"
+  report. If a number would be lost for an item that still exists, the
+  rebuild stops and writes nothing. A test fails if a typed value goes
+  missing.
+- **Beta checklist gains an admin "baseline" screen** for editing the
+  shipped starter prices and hours, reaching every company except on items
+  that company already changed.
 - **The starter catalog follows the owner's catalog review.** 138 shipped
   items were withdrawn — all IMC and all 3-1/2" conduit and fittings, #14 to
   #10 bare copper, and unsized "generic" rows whose sized versions cover

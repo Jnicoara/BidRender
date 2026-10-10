@@ -112,6 +112,12 @@ screen must NOT exist before he fills the sheets.** Reasons:
    exist.
 3. Filling the sheets does not depend on it — he fills spreadsheets either way.
 
+> **On the beta checklist since 2026-10-08 (owner).** The screen is now a
+> beta item (`before-beta-checklist.md` § 3): edits shipped starter prices
+> and hours, reaches every company except items a company already changed.
+> That schedules it; it does not change the order above — the loader stays
+> the way in until it exists, and it is still Shape B.
+
 > **BUILT 2026-10-07 (owner: "build the file loader").**
 > `pricing/loadStarterSheets.mts` reads the filled sheets and writes
 > `server/seed/materials/starterPrices.ts` and `starterLaborUnits.ts` (dry

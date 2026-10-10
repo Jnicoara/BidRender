@@ -57,6 +57,9 @@ import {
   assemblies,
   assemblyMaterials,
   assemblyModifiers,
+  laborSteps,
+  assemblyLaborSteps,
+  type LaborStep,
   InsertPricingDefaults,
   PricingDefaults,
   pricingDefaults,
@@ -177,6 +180,8 @@ import {
   projectItems,
   bidSummary,
   aiUsageDaily,
+  aiServiceStatus,
+  type AiServiceStatus,
   pricingProblemReports,
   takeoffHeightDefaults,
   takeoffExtraDefaults,
@@ -242,6 +247,15 @@ import {
 } from "./seed/assemblyRecipe";
 import { starterPartName } from "./seed/starterParts";
 import { STARTER_ASSEMBLY_HOURS } from "./seed/starterAssemblyHours";
+import {
+  STARTER_ASSEMBLY_STEPS,
+  STARTER_LABOR_STEPS,
+} from "./seed/starterLaborSteps";
+import { STARTER_STEP_MINUTES } from "./seed/starterStepMinutes";
+import {
+  STARTER_ASSEMBLY_OVERHEAD,
+  STARTER_HOURS_CLEARED,
+} from "./seed/starterAssemblyOverhead";
 import { BASELINE_KITS } from "./seed/baselineKits";
 import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import {
@@ -312,9 +326,9 @@ import {
 import {
   SURFACE_RACEWAY_PARTS,
   countSurfaceRacewayFittings,
-  isSurfaceRaceway700,
   surfaceRacewayFittingRows,
   surfaceRacewayPartName,
+  surfaceRacewaySeries,
 } from "../shared/surfaceRacewayFittings";
 import {
   canRejoin,
@@ -334,6 +348,13 @@ import {
   usableTerm,
 } from "../shared/bidSearch";
 import { assemblyHours, snapshotHoursFor } from "../shared/assemblyHours";
+import {
+  assemblyHoursSource,
+  type AssemblyHoursSource,
+  type StepLine,
+} from "../shared/assemblyHoursSource";
+import { resolveForkedRow } from "../shared/forkedRows";
+import { isMissingTable } from "./schemaCheck";
 import {
   markupDiffers,
   materialItemKey,
@@ -3320,13 +3341,42 @@ export type AssemblyMaterialLine = {
    * mapping that drops it cannot compile.
    */
   isExamplePrice: boolean;
+  /**
+   * The RESOLVED material's "Example hours" flag on its labor unit (0133) —
+   * read by the cable step (owner Q1), which prices from that unit.
+   * Required for the same reason as `isExamplePrice`.
+   */
+  isExampleLaborHours: boolean;
 };
 
 export type AssemblyDetail = Assembly & {
   materials: AssemblyMaterialLine[];
   /** Ids of the modifiers switched on for this assembly. */
   modifierIds: number[];
+  /**
+   * Its work steps (0143), resolved to the company's forks. Empty when it has
+   * none — and when the tables do not exist yet, which before the migration
+   * is the truth, not a degraded answer (`stepsTablesMissing`).
+   */
+  steps: AssemblyStepRow[];
 };
+
+/** One step-list line as the editor shows it and the pricing reads it. */
+export type AssemblyStepRow =
+  | {
+      kind: "step";
+      /** The STORED id (a shipped step's), like a material line. */
+      laborStepId: number;
+      /** The row it resolves to — the company's fork, if any. */
+      resolvedStepId: number;
+      name: string;
+      unit: string;
+      minutes: string | null;
+      reasoning: string | null;
+      isExample: boolean;
+      count: string;
+    }
+  | { kind: "cable"; count: string };
 
 /** Starter assemblies plus the user's own, forked starters collapsed away. */
 /**
@@ -3515,6 +3565,7 @@ export async function getAssemblyMaterialLines(
       category: material.category,
       itemKey: materialItemKey(material),
       isExamplePrice: material.isExamplePrice === true,
+      isExampleLaborHours: material.isExampleLaborHours === true,
     });
   }
   return resolved;
@@ -3714,11 +3765,474 @@ export async function getAssemblyDetail(
 ): Promise<AssemblyDetail | undefined> {
   const assembly = await getAssemblyById(id, userId);
   if (!assembly) return undefined;
-  const [materialLines, modifierIds] = await Promise.all([
+  const [materialLines, modifierIds, steps] = await Promise.all([
     getAssemblyMaterialLines(id, userId),
     getAssemblyModifierIds(id),
+    getAssemblyStepRows(id, userId),
   ]);
-  return { ...assembly, materials: materialLines, modifierIds };
+  return { ...assembly, materials: materialLines, modifierIds, steps };
+}
+
+// ── Labor steps (0143, references/step-based-labor-plan.md) ──────────────────
+
+/**
+ * Run a read of the step tables; "table doesn't exist" answers `fallback`.
+ *
+ * NOT the defensive catch schemaCheck.ts argues against. That argument is
+ * about a MISSING COLUMN on a table that holds data: catching it hides real
+ * rows. Here the whole table is new (0143, additive), and before it exists
+ * no assembly has a single step — so "no steps" is exactly the truth, not a
+ * screen showing less than there is. The drift is still reported, loudly,
+ * where it belongs: schemaCheck lists both tables until 0143 runs. Only
+ * ER_NO_SUCH_TABLE is caught; anything else still throws.
+ */
+export async function stepsTablesMissing<T>(
+  read: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await read();
+  } catch (err) {
+    if (isMissingTable(err)) return fallback;
+    throw err;
+  }
+}
+
+/** Shipped steps plus the company's own, forks superseding what they fork. */
+async function visibleLaborSteps(userId: number): Promise<LaborStep[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return stepsTablesMissing(async () => {
+    const rows = await db
+      .select()
+      .from(laborSteps)
+      .where(or(isNull(laborSteps.userId), eq(laborSteps.userId, userId)));
+    return mergeLibraryRows(rows, userId);
+  }, []);
+}
+
+/** An assembly's step list, resolved to the company's forks, in order. */
+export async function getAssemblyStepRows(
+  assemblyId: number,
+  userId: number
+): Promise<AssemblyStepRow[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return stepsTablesMissing(async () => {
+    const lines = await db
+      .select()
+      .from(assemblyLaborSteps)
+      .where(eq(assemblyLaborSteps.assemblyId, assemblyId))
+      .orderBy(asc(assemblyLaborSteps.sortOrder), asc(assemblyLaborSteps.id));
+    if (lines.length === 0) return [];
+    const visible = await visibleLaborSteps(userId);
+    const out: AssemblyStepRow[] = [];
+    for (const line of lines) {
+      if (line.kind === "cable") {
+        out.push({ kind: "cable", count: line.count });
+        continue;
+      }
+      const step = resolveForkedRow(visible, line.laborStepId);
+      // A step deleted outright drops its line; retired ones still resolve.
+      if (!step) continue;
+      out.push({
+        kind: "step",
+        laborStepId: line.laborStepId!,
+        resolvedStepId: step.id,
+        name: step.name,
+        unit: step.unit,
+        minutes: step.minutes,
+        reasoning: step.reasoning,
+        isExample: step.isExampleMinutes === true,
+        count: line.count,
+      });
+    }
+    return out;
+  }, []);
+}
+
+/**
+ * The step lines as `assemblyHoursSource` reads them. The cable step takes
+ * the recipe's Wire & Cable lines sold by the foot, each at its OWN labor
+ * unit (owner, Q1) — the same number a traced run reads.
+ */
+export function stepLinesForPricing(
+  detail: Pick<AssemblyDetail, "steps" | "materials">
+): StepLine[] {
+  return detail.steps.map((row): StepLine => {
+    if (row.kind === "step")
+      return {
+        kind: "step",
+        minutes: row.minutes,
+        count: row.count,
+        isExample: row.isExample,
+      };
+    return {
+      kind: "cable",
+      cableLines: detail.materials
+        .filter(
+          line => line.unitOfSale === "foot" && line.category === "Wire & Cable"
+        )
+        .map(line => ({
+          qty: line.qty,
+          overrideLaborHours: line.overrideLaborHours,
+          laborHours: line.laborHours,
+          isExample: line.isExampleLaborHours,
+        })),
+    };
+  });
+}
+
+/** THE hours an assembly prices at — see shared/assemblyHoursSource.ts. */
+export function assemblyHoursSourceFor(
+  detail: Pick<
+    AssemblyDetail,
+    "steps" | "materials" | "baseLaborHours" | "isExampleHours"
+  >
+): AssemblyHoursSource {
+  return assemblyHoursSource({
+    baseLaborHours: detail.baseLaborHours,
+    isExampleHours: detail.isExampleHours,
+    steps: stepLinesForPricing(detail),
+  });
+}
+
+/** Replace an assembly's step list wholesale (the editor sends the list). */
+export async function setAssemblySteps(
+  assemblyId: number,
+  lines: ReadonlyArray<
+    | { kind: "step"; laborStepId: number; count: number }
+    | { kind: "cable"; count: number }
+  >
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    await tx
+      .delete(assemblyLaborSteps)
+      .where(eq(assemblyLaborSteps.assemblyId, assemblyId));
+    if (lines.length === 0) return;
+    await tx.insert(assemblyLaborSteps).values(
+      lines.map((line, i) => ({
+        assemblyId,
+        kind: line.kind,
+        laborStepId: line.kind === "step" ? line.laborStepId : null,
+        count: line.count.toFixed(2),
+        sortOrder: i,
+      }))
+    );
+  });
+}
+
+/** Copy an assembly's step list onto another (a fork, a duplicate). */
+async function copyAssemblySteps(fromAssemblyId: number, toAssemblyId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await stepsTablesMissing(async () => {
+    const lines = await db
+      .select()
+      .from(assemblyLaborSteps)
+      .where(eq(assemblyLaborSteps.assemblyId, fromAssemblyId))
+      .orderBy(asc(assemblyLaborSteps.sortOrder), asc(assemblyLaborSteps.id));
+    if (lines.length === 0) return;
+    // The STORED step ids travel, as material ids do on a fork — a fork must
+    // copy what the line points at, not what it currently resolves to.
+    await db.insert(assemblyLaborSteps).values(
+      lines.map(line => ({
+        assemblyId: toAssemblyId,
+        kind: line.kind,
+        laborStepId: line.laborStepId,
+        count: line.count,
+        sortOrder: line.sortOrder,
+      }))
+    );
+  }, undefined);
+}
+
+/** The step library a company sees, with how many of its assemblies use each. */
+export async function listLaborSteps(userId: number): Promise<
+  Array<{
+    id: number;
+    name: string;
+    unit: string;
+    minutes: string | null;
+    reasoning: string | null;
+    isExample: boolean;
+    isShipped: boolean;
+    /** The shipped step this is the company's fork of; null otherwise. */
+    baselineId: number | null;
+    usedBy: number;
+  }>
+> {
+  const db = await getDb();
+  if (!db) return [];
+  const visible = (await visibleLaborSteps(userId)).filter(s => s.isActive);
+  if (visible.length === 0) return [];
+  // Uses are counted on the assemblies this company actually sees: its own,
+  // and the shipped ones it has not forked.
+  const usedBy = await stepsTablesMissing(async () => {
+    const rows = await db
+      .select({
+        laborStepId: assemblyLaborSteps.laborStepId,
+        assemblyId: assemblyLaborSteps.assemblyId,
+        userId: assemblies.userId,
+        baselineId: assemblies.baselineId,
+        id: assemblies.id,
+      })
+      .from(assemblyLaborSteps)
+      .innerJoin(assemblies, eq(assemblies.id, assemblyLaborSteps.assemblyId))
+      .where(
+        and(
+          eq(assemblyLaborSteps.kind, "step"),
+          or(isNull(assemblies.userId), eq(assemblies.userId, userId))
+        )
+      );
+    const seen = mergeLibraryRows(rows, userId);
+    const counts = new Map<number, Set<number>>();
+    for (const row of seen) {
+      const step = resolveForkedRow(visible, row.laborStepId);
+      if (!step) continue;
+      if (!counts.has(step.id)) counts.set(step.id, new Set());
+      counts.get(step.id)!.add(row.assemblyId);
+    }
+    return counts;
+  }, new Map<number, Set<number>>());
+  return visible.map(step => ({
+    id: step.id,
+    name: step.name,
+    unit: step.unit,
+    minutes: step.minutes,
+    reasoning: step.reasoning,
+    isExample: step.isExampleMinutes === true,
+    isShipped: step.userId === null,
+    baselineId: step.baselineId,
+    usedBy: usedBy.get(step.id)?.size ?? 0,
+  }));
+}
+
+/**
+ * Set a step's minutes (NULL = not set). A shipped step FORKS to the company's
+ * own copy — the seed's re-stamp never reaches a fork — and the fork carries
+ * no example flag: editing a time is accepting it (plan § 4).
+ */
+export async function setLaborStepMinutes(
+  stepId: number,
+  userId: number,
+  minutes: string | null
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const visible = await visibleLaborSteps(userId);
+  const step = resolveForkedRow(visible, stepId);
+  if (!step) throw new Error("Step not found");
+  if (step.userId === userId) {
+    await db
+      .update(laborSteps)
+      .set({ minutes, isExampleMinutes: null })
+      .where(and(eq(laborSteps.id, step.id), eq(laborSteps.userId, userId)));
+    return step.id;
+  }
+  const [result] = await db.insert(laborSteps).values({
+    userId,
+    baselineId: step.id,
+    stepKey: step.stepKey,
+    name: step.name,
+    unit: step.unit,
+    minutes,
+    reasoning: step.reasoning,
+    isExampleMinutes: null,
+  });
+  return result.insertId;
+}
+
+/** A company's own step. */
+export async function createLaborStep(
+  userId: number,
+  input: { name: string; unit: string; minutes: string | null }
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(laborSteps).values({
+    userId,
+    name: input.name,
+    unit: input.unit,
+    minutes: input.minutes,
+  });
+  return result.insertId;
+}
+
+/**
+ * SEED the shipped step library and the starters' step lists (0143), on every
+ * boot, after the starters themselves (server/seedShippedLibrary.ts).
+ *
+ * Shared rows ONLY — every write is scoped `isNull(userId)`, so a company's
+ * forked step or forked assembly is never touched (the seed rule in CLAUDE.md
+ * § "Where a priced catalog lands"). Re-stamps only what differs, so a boot
+ * with nothing changed writes nothing. Minutes come from the GENERATED
+ * starterStepMinutes.ts, which ships empty: until the owner's sheet loads,
+ * every shipped step is NOT SET and no number moves (plan § 13a).
+ *
+ * Also stamps the owner's overhead (Q2) and clears typed hours (Q7) for the
+ * starters the loader listed — both empty today.
+ *
+ * Before 0143 the tables do not exist, and this does nothing.
+ */
+export async function seedStarterLaborSteps(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await stepsTablesMissing(async () => {
+    // ── The library ──
+    const shipped = await db
+      .select()
+      .from(laborSteps)
+      .where(isNull(laborSteps.userId));
+    const byKey = new Map(
+      shipped.filter(r => r.stepKey !== null).map(r => [r.stepKey!, r])
+    );
+    const wantedKeys = new Set(STARTER_LABOR_STEPS.map(step => step.key));
+    for (const step of STARTER_LABOR_STEPS) {
+      const minutes = STARTER_STEP_MINUTES[step.key] ?? null;
+      const fields = {
+        name: step.name,
+        unit: step.unit,
+        reasoning: step.reasoning,
+        minutes: minutes === null ? null : Number(minutes).toFixed(2),
+        isExampleMinutes: minutes === null ? null : true,
+        isActive: true,
+      };
+      const row = byKey.get(step.key);
+      if (!row) {
+        const [result] = await db
+          .insert(laborSteps)
+          .values({ userId: null, stepKey: step.key, ...fields });
+        byKey.set(step.key, {
+          ...(fields as object),
+          id: result.insertId,
+          userId: null,
+          baselineId: null,
+          stepKey: step.key,
+        } as LaborStep);
+        continue;
+      }
+      const same =
+        row.name === fields.name &&
+        row.unit === fields.unit &&
+        row.reasoning === fields.reasoning &&
+        (row.minutes === null ? null : Number(row.minutes).toFixed(2)) ===
+          fields.minutes &&
+        (row.isExampleMinutes ?? null) === fields.isExampleMinutes &&
+        row.isActive === true;
+      if (!same)
+        await db
+          .update(laborSteps)
+          .set(fields)
+          .where(and(eq(laborSteps.id, row.id), isNull(laborSteps.userId)));
+    }
+    // Retire, never delete: an assembly pointing at it still resolves.
+    for (const row of shipped)
+      if (row.stepKey !== null && !wantedKeys.has(row.stepKey) && row.isActive)
+        await db
+          .update(laborSteps)
+          .set({ isActive: false })
+          .where(and(eq(laborSteps.id, row.id), isNull(laborSteps.userId)));
+
+    // ── The starters' step lists ──
+    const names = Object.keys(STARTER_ASSEMBLY_STEPS);
+    const starters =
+      names.length === 0
+        ? []
+        : await db
+            .select({ id: assemblies.id, name: assemblies.name })
+            .from(assemblies)
+            .where(
+              and(isNull(assemblies.userId), inArray(assemblies.name, names))
+            );
+    for (const starter of starters) {
+      const wanted = STARTER_ASSEMBLY_STEPS[starter.name].map(line =>
+        "cable" in line
+          ? { kind: "cable" as const, laborStepId: null, count: "1.00" }
+          : {
+              kind: "step" as const,
+              laborStepId: byKey.get(line.step)?.id ?? null,
+              count: line.count.toFixed(2),
+            }
+      );
+      // A key with no library row is a content fault; the test catches it.
+      if (wanted.some(l => l.kind === "step" && l.laborStepId === null))
+        continue;
+      const current = await db
+        .select()
+        .from(assemblyLaborSteps)
+        .where(eq(assemblyLaborSteps.assemblyId, starter.id))
+        .orderBy(asc(assemblyLaborSteps.sortOrder), asc(assemblyLaborSteps.id));
+      const same =
+        current.length === wanted.length &&
+        current.every(
+          (row, i) =>
+            row.kind === wanted[i].kind &&
+            (row.laborStepId ?? null) === wanted[i].laborStepId &&
+            Number(row.count).toFixed(2) === wanted[i].count
+        );
+      if (same) continue;
+      await db.transaction(async tx => {
+        await tx
+          .delete(assemblyLaborSteps)
+          .where(eq(assemblyLaborSteps.assemblyId, starter.id));
+        await tx.insert(assemblyLaborSteps).values(
+          wanted.map((line, i) => ({
+            assemblyId: starter.id,
+            kind: line.kind,
+            laborStepId: line.laborStepId,
+            count: line.count,
+            sortOrder: i,
+          }))
+        );
+      });
+    }
+  }, undefined);
+
+  // ── Owner Q2 / Q7, from the loader's generated file (empty today) ──
+  for (const [name, overhead] of Object.entries(STARTER_ASSEMBLY_OVERHEAD)) {
+    const hours = Number(overhead).toFixed(4);
+    await db
+      .update(assemblies)
+      .set({ overheadLaborHours: hours, isExampleHours: true })
+      .where(
+        and(
+          isNull(assemblies.userId),
+          eq(assemblies.name, name),
+          sql`(NOT (${assemblies.overheadLaborHours} <=> ${hours}) OR NOT (${assemblies.isExampleHours} <=> TRUE))`
+        )
+      );
+  }
+  if (STARTER_HOURS_CLEARED.length > 0)
+    await db
+      .update(assemblies)
+      .set({ baseLaborHours: null, isExampleHours: true })
+      .where(
+        and(
+          isNull(assemblies.userId),
+          inArray(assemblies.name, [...STARTER_HOURS_CLEARED]),
+          isNotNull(assemblies.baseLaborHours)
+        )
+      );
+}
+
+/**
+ * "Use these times" (plan § 4): fork every shipped step that still carries an
+ * example time, UNCHANGED, as the company's own — accepting them without
+ * typing a thing. Returns how many it accepted.
+ */
+export async function acceptLaborStepTimes(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const visible = await visibleLaborSteps(userId);
+  const shippedExamples = visible.filter(
+    s => s.userId === null && s.isExampleMinutes === true && s.isActive
+  );
+  for (const step of shippedExamples)
+    await setLaborStepMinutes(step.id, userId, step.minutes);
+  return shippedExamples.length;
 }
 
 export async function createAssembly(data: InsertAssembly): Promise<number> {
@@ -3917,6 +4431,9 @@ async function copyAssemblyChildren(
   */
   await setAssemblyMaterials(toAssemblyId, lines.map(assemblyMaterialLine));
   await setAssemblyModifiers(toAssemblyId, modifierIds);
+  // The step list is part of the assembly too (0143): a fork without it
+  // would silently stop pricing from steps the moment anything is edited.
+  await copyAssemblySteps(fromAssemblyId, toAssemblyId);
 }
 
 /**
@@ -6719,6 +7236,10 @@ async function snapshotForAssembly(
     0
   );
 
+  // Typed hours, else the work steps' total, else NOT SET — decided once
+  // (shared/assemblyHoursSource.ts). Frozen below like every other number.
+  const hoursSource = assemblyHoursSourceFor(detail);
+
   return {
     snapshotMaterialCost: materialCost.toFixed(4),
     /**
@@ -6743,7 +7264,7 @@ async function snapshotForAssembly(
      * (`snapshotHoursFor`, shared/assemblyHours.ts).
      */
     snapshotLaborHours: snapshotHoursFor(
-      detail.baseLaborHours,
+      hoursSource.hours,
       detail.overheadLaborHours
     ),
     snapshotModifierPct: modifierPct.toFixed(4),
@@ -6770,7 +7291,9 @@ async function snapshotForAssembly(
       print warning cannot change after the fact.
     */
     snapshotPriceWasExample: detail.materials.some(line => line.isExamplePrice),
-    snapshotHoursWereExample: detail.isExampleHours === true,
+    // From the SAME decision as the hours: the typed number's own flag, or
+    // a step total fed by any shipped time not yet accepted.
+    snapshotHoursWereExample: hoursSource.isExample,
     snapshotLaborRateWasExample: rateRow?.isExampleRate === true,
   };
 }
@@ -13016,6 +13539,57 @@ export async function recordAiUsage(entry: {
 }
 
 /**
+ * An AI call was REFUSED (no key, or the key answered 401/403): note it on the
+ * one `ai_service_status` row (0141). `refusedSince` keeps the FIRST refusal
+ * of the run — COALESCE leaves an earlier time alone — so the admin screen
+ * says when it started, not when it last happened.
+ */
+export async function recordAiRefusal(
+  reason: string,
+  now: Date
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .insert(aiServiceStatus)
+    .values({
+      id: 1,
+      refusedSince: now,
+      lastRefusedAt: now,
+      lastRefusalReason: reason,
+    })
+    .onDuplicateKeyUpdate({
+      set: {
+        refusedSince: sql`COALESCE(${aiServiceStatus.refusedSince}, ${now})`,
+        lastRefusedAt: now,
+        lastRefusalReason: reason,
+      },
+    });
+}
+
+/** An AI call worked: the run of refusals, if any, is over. */
+export async function recordAiWorked(now: Date): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .insert(aiServiceStatus)
+    .values({ id: 1, lastWorkedAt: now })
+    .onDuplicateKeyUpdate({ set: { refusedSince: null, lastWorkedAt: now } });
+}
+
+/** The one status row, or null when no AI call has ever been made here. */
+export async function getAiServiceStatus(): Promise<AiServiceStatus | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select()
+    .from(aiServiceStatus)
+    .where(eq(aiServiceStatus.id, 1))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
  * How many calls this user has made today in each feature group's worth of
  * features — returned per feature, so the caller can sum the group it cares
  * about without this function knowing what the groups are.
@@ -13714,9 +14288,13 @@ export async function fittingRowsByRunType(
         }
         const name = racewayBaselineName(resolved(type!.racewayMaterialId));
         if (name === null) return [];
-        // The 700 family names its own parts (per-foot plan § 3c).
-        if (isSurfaceRaceway700(name))
-          return SURFACE_RACEWAY_PARTS.map(surfaceRacewayPartName);
+        // The 500 and 700 families name their own parts (per-foot plan § 3c,
+        // sch80-and-500 plan § 2c) — each series its own rows.
+        const series = surfaceRacewaySeries(name);
+        if (series !== null)
+          return SURFACE_RACEWAY_PARTS.map(part =>
+            surfaceRacewayPartName(part, series)
+          );
         return FITTING_KINDS.map(kind =>
           fittingMaterialName(name, kind, type!.fittingStyle)
         ).filter((n): n is string => n !== null);
@@ -13815,17 +14393,23 @@ export async function fittingRowsByRunType(
       tee => teeOwners.get(tee.id) === storedId
     );
     /*
-      THE 700 FAMILY (per-foot plan § 3c): one entrance end per run, corner =
-      inside elbow, end drop = flat elbow, a tee is a fitting, factory parts
-      only. Its own counter so a pipe cannot pick up a 700 rule — see
-      shared/surfaceRacewayFittings.ts. The type's own coupling, connector,
-      strap and 90 choices still win, as on any type.
+      THE 500 AND 700 FAMILIES (per-foot plan § 3c; sch80-and-500 plan
+      § 2c): one entrance end per run, corner = inside elbow, end drop = flat
+      elbow, a tee is a fitting, factory parts only. Its own counter so a pipe
+      cannot pick up a surface-raceway rule — see
+      shared/surfaceRacewayFittings.ts. Each series is priced from its own
+      rows. The type's own coupling, connector, strap and 90 choices still
+      win, as on any type.
     */
-    if (raceway && isSurfaceRaceway700(racewayBaselineName(raceway))) {
+    const series = raceway
+      ? surfaceRacewaySeries(racewayBaselineName(raceway))
+      : null;
+    if (raceway && series !== null) {
       const counts = countSurfaceRacewayFittings(
         row.legs,
         {
           name: raceway.name,
+          series,
           stickLengthFeet:
             raceway.stickLengthFeet === null
               ? null
@@ -13844,6 +14428,7 @@ export async function fittingRowsByRunType(
       out.set(
         storedId,
         surfaceRacewayFittingRows(
+          series,
           counts,
           {
             coupling: resolved(t.couplingMaterialId) ?? null,

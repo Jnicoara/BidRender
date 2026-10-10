@@ -35,6 +35,8 @@ import {
 } from "@/components/ui/popover";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { MaterialPicker } from "@/components/MaterialPicker";
+import { searchAssemblies } from "@/lib/assemblySearch";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 import { money } from "@/lib/money";
 import {
   lineNeedsHours,
@@ -258,9 +260,13 @@ function LinkToLibrary({
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<"material" | "assembly">("material");
   const [query, setQuery] = useState("");
-  const { data: assemblies = [] } = trpc.assemblies.list.useQuery(undefined, {
+  const assembliesQuery = trpc.assemblies.list.useQuery(undefined, {
     enabled: open && source === "assembly",
   });
+  const assemblies = useMemo(
+    () => assembliesQuery.data ?? [],
+    [assembliesQuery.data]
+  );
 
   const link = trpc.bids.linkLine.useMutation({
     onSuccess: ({ from }) => {
@@ -271,13 +277,18 @@ function LinkToLibrary({
     onSettled: onChanged,
   });
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const pool = q
-      ? assemblies.filter(a => a.name.toLowerCase().includes(q))
-      : assemblies;
-    return pool.slice(0, 8);
-  }, [assemblies, query]);
+  // The shared ranking, so slang finds what it finds everywhere else — and a
+  // miss logged from here is a real miss, not an `includes` that missed.
+  const matches = useMemo(
+    () => searchAssemblies(assemblies, query, 8),
+    [assemblies, query]
+  );
+  const recordMiss = useNoMatchLog(
+    "assembly",
+    source === "assembly" && open ? query : "",
+    matches.length,
+    assemblies.length > 0
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -333,6 +344,12 @@ function LinkToLibrary({
               autoFocus
               value={query}
               onChange={event => setQuery(event.target.value)}
+              onKeyDown={event => {
+                // Enter on nothing found is a finished search, logged now.
+                // Enter does NOT link the top hit: linking re-prices the
+                // line, which wants a deliberate click, not a stray key.
+                if (event.key === "Enter" && matches.length === 0) recordMiss();
+              }}
               placeholder="Search assemblies"
               className="h-8 text-sm"
               aria-label="Search assemblies"

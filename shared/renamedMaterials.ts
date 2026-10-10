@@ -13,6 +13,10 @@ import { TRADE_SIZES } from "./tradeSizes";
 import { emtStyledFittingName } from "./runFittingMaterials";
 import { FROZEN_RENAMES_2026_10_07 } from "./frozenMaterialNames";
 import { CATALOG_REVIEW_RENAMES } from "./catalogReview20261008";
+import {
+  REALITY_RENAMES,
+  REALITY_RETIRED_INTO,
+} from "./catalogRealityCheck20261009";
 
 /**
  * Baseline rows to rename in place, old name -> new name.
@@ -214,6 +218,8 @@ const AFTER_FREEZE: Record<string, string> = {
       ])
     )
   ),
+  // The catalog reality check (2026-10-09) proposed merging these back; it
+  // is HELD against this split (shared/catalogRealityCheck20261009.ts).
   '5"/6" LED disc light': '6" LED disc light',
   '5"/6" LED retrofit trim': '6" LED retrofit trim',
   // 700 is one-piece raceway and a run type of its own (owner, 2026-10-08;
@@ -221,6 +227,8 @@ const AFTER_FREEZE: Record<string, string> = {
   // id, and the cover is retired (server/seed/materials/index.ts). Allowed
   // because neither row had reached live (0117 is staging-only).
   "Surface raceway base, 700 series": "Surface raceway, 700 series",
+  // 500 the same way (owner, 2026-10-09; sch80-and-500-plan.md § 2a).
+  "Surface raceway base, 500 series": "Surface raceway, 500 series",
 };
 
 /**
@@ -231,25 +239,56 @@ const AFTER_FREEZE: Record<string, string> = {
  */
 export const latestCatalogName = (name: string): string => {
   const afterFreeze = AFTER_FREEZE[name] ?? name;
-  return CATALOG_REVIEW_RENAMES[afterFreeze] ?? afterFreeze;
+  const reviewed = CATALOG_REVIEW_RENAMES[afterFreeze] ?? afterFreeze;
+  return REALITY_RENAMES[reviewed] ?? reviewed;
 };
 const latest = latestCatalogName;
 
-export const RENAMED_BASELINE_MATERIALS: Record<string, string> = {
-  ...Object.fromEntries(
-    Object.entries(RENAMED_BEFORE_2026_10_07).map(([from, to]) => [
-      from,
-      latest(FROZEN_FINAL[to] ?? to),
-    ])
-  ),
-  ...Object.fromEntries(
-    Object.entries(FROZEN_FINAL).map(([from, to]) => [from, latest(to)])
-  ),
-  ...Object.fromEntries(
-    Object.entries(AFTER_FREEZE).map(([from, to]) => [from, latest(to)])
-  ),
-  ...CATALOG_REVIEW_RENAMES,
-};
+/*
+  A later decision can turn an earlier rename back (the reality check put
+  "3/3 MC cable Copper" and '5"/6" LED disc light' back), and then an old
+  spelling's final name IS that spelling. Such an entry would rename a row
+  to itself, so it is dropped rather than shipped as a key that is also a
+  value.
+*/
+const withoutSelfRenames = (
+  map: Record<string, string>
+): Record<string, string> =>
+  Object.fromEntries(Object.entries(map).filter(([from, to]) => from !== to));
+
+export const RENAMED_BASELINE_MATERIALS: Record<string, string> =
+  withoutSelfRenames({
+    ...Object.fromEntries(
+      Object.entries(RENAMED_BEFORE_2026_10_07).map(([from, to]) => [
+        from,
+        latest(FROZEN_FINAL[to] ?? to),
+      ])
+    ),
+    ...Object.fromEntries(
+      Object.entries(FROZEN_FINAL).map(([from, to]) => [from, latest(to)])
+    ),
+    ...Object.fromEntries(
+      Object.entries(AFTER_FREEZE).map(([from, to]) => [from, latest(to)])
+    ),
+    ...Object.fromEntries(
+      Object.entries(CATALOG_REVIEW_RENAMES).map(([from, to]) => [
+        from,
+        latest(to),
+      ])
+    ),
+    ...REALITY_RENAMES,
+  });
+
+/**
+ * The shipped row a name stands for TODAY: an old spelling through the map
+ * above, then a row the catalog reality check retired (2026-10-09) to the
+ * row that took its job. For records that keep the names of their day — the
+ * pricing sheet's moved rows (pricing/movedFromSheet.ts), the starter plan.
+ */
+export function currentShippedName(name: string): string {
+  const renamed = RENAMED_BASELINE_MATERIALS[name] ?? name;
+  return REALITY_RETIRED_INTO[renamed] ?? renamed;
+}
 
 /** An old spelling, normalised the way search ranking compares names. */
 const formerKey = (s: string): string =>

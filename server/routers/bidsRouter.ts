@@ -80,6 +80,8 @@ import { resolveRunType } from "../../shared/runTypeLookup";
 import { extraFeetForRuns } from "../../shared/runExtrasPerFoot";
 import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
+import { fixLine, fixLineOptions } from "../lineFix";
+import { buildFromParts } from "../buildFromParts";
 
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
@@ -1361,6 +1363,93 @@ export const bidsRouter = router({
       await db.updateBidLineItem(line.id, input.bidId, patch);
       return { from: material.name };
     }),
+
+  /**
+   * What the "fix this line" panel can set on an assembly or run line, and
+   * whether this bid lets the line change (references/never-stuck-plan.md,
+   * gap 11). Asked when the panel opens, never on a page load.
+   */
+  fixLineOptions: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        lineId: z.number().int().positive(),
+      })
+    )
+    .query(({ input, ctx }) => fixLineOptions(ctx, input)),
+
+  /**
+   * Fix an assembly or run line in place: the typed price, hours or role go
+   * onto THIS line's snapshot, and — with "Also save to my library", ticked
+   * by default — onto the library row too (owner, 2026-10-07). Nothing else
+   * moves. A locked bid refuses the line and still takes the library half; a
+   * Won or Lost one asks "Change anyway?" first (`changeClosedBid`). The
+   * rules: shared/lineFix.ts; the writes: server/lineFix.ts.
+   */
+  fixLine: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        lineId: z.number().int().positive(),
+        partPrices: z
+          .array(
+            z.object({
+              materialId: z.number().int().positive(),
+              price: moneySchema,
+            })
+          )
+          .max(100)
+          .optional(),
+        addMaterial: z
+          .object({
+            materialId: z.number().int().positive(),
+            qtyPerOne: z.number().positive().max(99999),
+            price: moneySchema.optional(),
+          })
+          .optional(),
+        runPrice: moneySchema.optional(),
+        hours: hoursPerUnitSchema.optional(),
+        laborRateId: z.number().int().positive().optional(),
+        saveToLibrary: z.boolean(),
+        changeClosedBid: z.boolean().optional(),
+      })
+    )
+    .mutation(({ input, ctx }) => fixLine(ctx, input)),
+
+  /**
+   * "Build it from parts here": the assembly search found nothing, so the
+   * person builds one from catalog parts and it goes straight on the bid.
+   * Saved to the library unless they untick it (then archived — see
+   * server/buildFromParts.ts, which says why it is never a lesser row).
+   */
+  buildFromParts: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        name: z.string().trim().min(1).max(255),
+        category: z.enum(ASSEMBLY_CATEGORIES),
+        parts: z
+          .array(
+            z.object({
+              materialId: z.number().int().positive(),
+              qty: z.number().positive().max(999999),
+            })
+          )
+          .min(1)
+          .max(200),
+        // NULL = hours not set (D1), never 0. Required, so a caller says which.
+        baseLaborHours: z.number().min(0).max(10000).nullable(),
+        laborRateId: z.number().int().positive().nullable(),
+        qty: qtySchema.default(1),
+        unitLabel: labelSchema.nullable().default(null),
+        saveToLibrary: z.boolean(),
+        merge: z.boolean().default(false),
+        // FALSE from the plan viewer: the assembly only, no line — its count
+        // reaches the bid through the marks (server/buildFromParts.ts).
+        addLine: z.boolean().default(true),
+      })
+    )
+    .mutation(({ input, ctx }) => buildFromParts(ctx, input)),
 
   /**
    * Save a hand-priced line to the library as an assembly — optional, never

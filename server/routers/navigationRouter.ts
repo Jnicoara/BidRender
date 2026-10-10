@@ -23,7 +23,12 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import type { Tool } from "../_core/llm";
-import { AiLimitReached, invokeLLM } from "../llm";
+import {
+  AI_UNAVAILABLE,
+  AiLimitReached,
+  AiUnavailable,
+  invokeLLM,
+} from "../llm";
 import { aiFeaturesEnabled } from "../aiFeatures";
 import {
   NAVIGATION_TARGETS,
@@ -173,9 +178,19 @@ export const navigationRouter = router({
         if (error instanceof AiLimitReached) {
           return { message: error.message, target: null };
         }
-        // The one that matters: a bad model id, a missing key and a timeout all
-        // land here and are indistinguishable on screen. The message carries
-        // the reason, so the log can tell them apart.
+        // No key, or the key was refused: say THAT. This used to fall to
+        // "I'm not sure which screen you want", which blamed the question
+        // for a dead key (2026-10-09).
+        if (error instanceof AiUnavailable) {
+          return {
+            message: `${AI_UNAVAILABLE} Every screen is in the sidebar.`,
+            target: null,
+          };
+        }
+        // The rest: a bad model id, a timeout, an overloaded model. These
+        // pass, so the ordinary "not sure" stands; the message carries the
+        // reason for the log. (A missing or refused key no longer lands here
+        // — it is AiUnavailable, above. This said it did until 2026-10-09.)
         return fallbackAfter(
           "request rejected",
           error instanceof Error ? error.message : error

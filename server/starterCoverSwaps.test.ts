@@ -20,22 +20,46 @@ const covers = (ref: string) =>
     .map(l => starterPartName(l.part))
     .filter(name => /plate|cover/i.test(name));
 
-/** The covers the audit names as wrong, or as standing for three plates. */
+/** The covers the audit names as standing for three plates. */
 const GENERIC: StarterPart[] = [
   "wall-plate",
   "2-gang-wall-plate",
   "3-gang-wall-plate",
-  "4in-square-raised-cover-duplex",
 ];
 
 describe("starter cover plates", () => {
-  it("no starter uses the generic wall plate or a duplex raised cover", () => {
+  it("no starter uses the generic wall plate", () => {
     const left = BASELINE_ASSEMBLIES.flatMap(a =>
       a.materials
         .filter(l => GENERIC.includes(l.part))
         .map(l => `${a.ref} ${starterPartName(l.part)}`)
     );
     expect(left).toEqual([]);
+  });
+
+  /*
+    The audit's fault was a duplex raised cover on a TWIST-LOCK (CS6–8), not
+    the cover itself: on a duplex receptacle it is the right one. This test
+    banned it outright while those were its only users, which stopped being
+    true with CK12, the ceiling projector receptacle (2026-10-09).
+  */
+  it("a duplex raised cover only ever covers a duplex receptacle", () => {
+    const wrong = BASELINE_ASSEMBLIES.filter(a =>
+      a.materials.some(l => l.part === "4in-square-raised-cover-duplex")
+    )
+      .filter(
+        a =>
+          !a.materials.some(l =>
+            /duplex receptacle/i.test(starterPartName(l.part))
+          ) ||
+          a.materials.some(l =>
+            /^L\d+-\d+ receptacle$|NEMA \d|single receptacle$/i.test(
+              starterPartName(l.part)
+            )
+          )
+      )
+      .map(a => a.ref);
+    expect(wrong).toEqual([]);
   });
 
   it("puts each device behind the plate it takes", () => {

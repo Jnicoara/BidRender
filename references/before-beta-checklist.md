@@ -196,6 +196,18 @@ prices ship without them.
       `materials-track-c-plan.md` § 7
 - [ ] **Search: the old spelling `5/6" wafer` finds nothing** · C · small ·
       no · `todo.md` ~1847
+- [ ] **An admin "baseline" screen for the shared starter** (owner,
+      2026-10-08). Edits the shipped starter prices and hours on a screen,
+      and pushes each change to every company EXCEPT on items that company
+      already changed (its own copy) — never moving a sent bid, and working
+      on a brand-new database too. Until it exists the sheets plus
+      `pricing/loadStarterSheets.mts` are the only way in. The design is
+      `starter-vs-company-plan.md` § 3 "Shape B": the starter moves into
+      starter tables that a new database is seeded from, because a screen
+      that writes shipped rows is overwritten by the next start's re-stamp.
+      Needs the example-price / example-hours tags and the
+      `snapshotUnpricedParts` freeze first · A (schema) + B (screen) ·
+      large · **yes** · `starter-vs-company-plan.md` § 3
 - [ ] **Seed-heavy tests time out when another worktree's suite is running.**
       The one-query fix is written and measured in `todo.md` § "Flaky
       tests", and waits on whoever owns `server/db.ts`. It also takes

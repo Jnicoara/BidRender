@@ -16,11 +16,18 @@
  *
  * Fixture id 91352 is this file's own (perFootSeed.test.ts is 91351).
  */
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import * as db from "./db";
-import { bidLineItems, bidPdfs, users } from "../drizzle/schema";
+import {
+  bidLineItems,
+  bidPdfs,
+  bids,
+  materials,
+  takeoffRunTypes,
+  users,
+} from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { undergroundRunTypeLabel } from "../shared/undergroundRunTypes";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
@@ -38,6 +45,7 @@ const caller = () =>
   } as unknown as TrpcContext);
 
 const TAPE = "Underground warning tape";
+const sch40 = (size: string) => undergroundRunTypeLabel(size, "PVC Sch 40");
 const TYPE_700 = "700 series surface raceway, 2 #12 + ground";
 /** 1/4" = 1'-0" is 18 page points a foot. */
 const FT = 18;
@@ -107,24 +115,47 @@ async function linesOf(bidId: number) {
   return (await caller().bids.get({ id: bidId })).lines;
 }
 
-withDb("a run type's extras on a bid", () => {
-  beforeAll(async () => {
-    const database = (await db.getDb())!;
-    const [existing] = await database
-      .select()
-      .from(users)
-      .where(eq(users.id, COMPANY))
-      .limit(1);
-    if (!existing)
-      await database.insert(users).values({
-        id: COMPANY,
-        openId: `test-run-extras-${COMPANY}`,
-        name: "Run extras company",
-      });
-  });
+/*
+  EVERY TEST STARTS FROM THE SHIPPED CATALOG, WITH THE FIXTURE USER PRESENT.
+  Both are file-level since 2026-10-08, when shuffling the order
+  (`--sequence.shuffle`) turned up two faults the written order hid:
+  - the user was created in the FIRST describe's beforeAll, so the 700
+    describe run first had no user ("companies_ownerUserId_users_id_fk");
+  - "a company's own price for the tape" forks the tape at $0.25 and left the
+    fork behind, so "tape is its own line" — which asserts the SHIPPED tape is
+    not priced — failed whenever it ran after it.
+  The reset deletes only this company's own rows (bids, run types, material
+  forks), never a shared one.
+*/
+beforeAll(async () => {
+  if (!hasDb) return;
+  const database = (await db.getDb())!;
+  const [existing] = await database
+    .select()
+    .from(users)
+    .where(eq(users.id, COMPANY))
+    .limit(1);
+  if (!existing)
+    await database.insert(users).values({
+      id: COMPANY,
+      openId: `test-run-extras-${COMPANY}`,
+      name: "Run extras company",
+    });
+});
 
+beforeEach(async () => {
+  if (!hasDb) return;
+  const database = (await db.getDb())!;
+  await database.delete(bids).where(eq(bids.userId, COMPANY));
+  await database
+    .delete(takeoffRunTypes)
+    .where(eq(takeoffRunTypes.userId, COMPANY));
+  await database.delete(materials).where(eq(materials.userId, COMPANY));
+});
+
+withDb("a run type's extras on a bid", () => {
   it("tape is its own line off the trench, and follows the trench when it moves", async () => {
-    const ug = await typeId(undergroundRunTypeLabel('3/4"'));
+    const ug = await typeId(sch40('3/4"'));
     const at = await bidWithSheet();
     await trace(at, ug, straight(40));
     const sent = await caller().takeoffRunTypes.sendToBid({
@@ -151,7 +182,7 @@ withDb("a run type's extras on a bid", () => {
   });
 
   it("puts the run's raceway waste on the tape's MATERIAL only", async () => {
-    const label = undergroundRunTypeLabel('1-1/4"');
+    const label = sch40('1-1/4"');
     const ug = await typeId(label);
     // 10% on the type — this forks the shipped type, tape and all.
     await caller().takeoffRunTypes.update({ id: ug, conduitExtraPct: 0.1 });
@@ -170,7 +201,7 @@ withDb("a run type's extras on a bid", () => {
   });
 
   it("SHARED TRENCH is 0 on this bid only, NULL follows the type, and a locked bid refuses it", async () => {
-    const ug = await typeId(undergroundRunTypeLabel('1/2"'));
+    const ug = await typeId(sch40('1/2"'));
     const a = await bidWithSheet();
     const b = await bidWithSheet();
     for (const at of [a, b]) {
@@ -242,7 +273,7 @@ withDb("a run type's extras on a bid", () => {
   });
 
   it("two extras on one type are two lines; a fork keeps the first; Send again adds no third", async () => {
-    const label = undergroundRunTypeLabel('2"');
+    const label = sch40('2"');
     const shippedId = await typeId(label);
     const at = await bidWithSheet();
     await trace(at, shippedId, straight(30));
@@ -288,7 +319,7 @@ withDb("a run type's extras on a bid", () => {
     // The preview keyed an extra by its role alone, so two extras on one type
     // were one key twice — and each item's send sent both, so the second
     // reported "Nothing was added" for a line that was on the bid.
-    const shippedId = await typeId(undergroundRunTypeLabel('1"'));
+    const shippedId = await typeId(sch40('1"'));
     const at = await bidWithSheet();
     await trace(at, shippedId, straight(40));
     const tracer = (await caller().materials.list()).find(
@@ -330,7 +361,7 @@ withDb("a run type's extras on a bid", () => {
   it("a company's own price for the tape is the one on the line", async () => {
     const tape = (await caller().materials.list()).find(m => m.name === TAPE)!;
     await caller().materials.update({ id: tape.id, costPerUnit: 0.25 });
-    const ug = await typeId(undergroundRunTypeLabel('2-1/2"'));
+    const ug = await typeId(sch40('2-1/2"'));
     const at = await bidWithSheet();
     await trace(at, ug, straight(20));
     await caller().takeoffRunTypes.sendToBid({
@@ -344,7 +375,7 @@ withDb("a run type's extras on a bid", () => {
   });
 
   it("a trench on a sheet with no scale is said, never counted as 0 ft of tape", async () => {
-    const ug = await typeId(undergroundRunTypeLabel('3"'));
+    const ug = await typeId(sch40('3"'));
     const at = await bidWithSheet(false);
     await trace(at, ug, straight(40));
     const bridge = await caller().takeoffRunTypes.bridgeForBid({
@@ -358,7 +389,7 @@ withDb("a run type's extras on a bid", () => {
   });
 
   it("the materials list orders the tape, through the bid's shared-trench answer", async () => {
-    const ug = await typeId(undergroundRunTypeLabel('3"'));
+    const ug = await typeId(sch40('3"'));
     const at = await bidWithSheet();
     await trace(at, ug, straight(35));
     // Listed whether or not it was sent, like the fittings.
@@ -388,7 +419,7 @@ withDb("a run type's extras on a bid", () => {
     )!;
     await expect(
       caller().takeoffRunTypes.addExtra({
-        runTypeId: await typeId(undergroundRunTypeLabel('4"')),
+        runTypeId: await typeId(sch40('4"')),
         materialId: box.id,
         feetPerFoot: 1,
         appliesTo: "flat",

@@ -182,18 +182,30 @@ describe("never fuzz numbers: a size matches itself, whole", () => {
 
 describe("counts and cable specs keep working", () => {
   it('"2 gang box" still finds the double-gang box (a count, not a size)', () => {
-    expect(search("2 gang box")).toContain("Double-gang box");
-    expect(search("3 way switch")[0]).toBe("3-way switch");
+    expect(search("2 gang box")).toContain(
+      "Double-gang new work box, plastic, 32 cu in"
+    );
+    expect(search("3 way switch")[0]).toBe("15A 3-way switch");
   });
 
   it("a cable spec typed with a space, and a conductor inside a spec", () => {
     expect(search("6 3")[0]).toBe("6/3 NM-B Copper");
     expect(search("12 2")[0]).toBe("12/2 NM-B Copper");
+    // A finished spec never runs on into a longer number: "14 3" is not the
+    // NEMA 14-30R dryer receptacle, "6 3" not the 6-30R (2026-10-09).
+    expect(search("14 3")[0]).toBe("14/3 NM-B Copper");
+    expect(search("10 3")[0]).toBe("10/3 NM-B Copper");
+    expect(search("6 3")).not.toContain("30A 250V receptacle, NEMA 6-30R");
+    // …while the receptacles are still found by their own number.
+    expect(search("6-30")[0]).toBe("30A 250V receptacle, NEMA 6-30R");
+    expect(search("14-30")).toContain(
+      "30A dryer receptacle, NEMA 14-30R (4-wire)"
+    );
     expect(search("2/0 ser")).toContain("2/0-2/0-2/0-1 SER Aluminum");
   });
 
   it('"12" still finds #12 wire, and "#12" is only the gauge', () => {
-    expect(search("12 thhn")[0]).toBe("#12 THHN Copper");
+    expect(search("12 thhn")[0]).toBe("#12 THHN solid Copper");
     expect(search("#12").some(n => /under-cabinet/.test(n))).toBe(false);
   });
 
@@ -205,8 +217,16 @@ describe("counts and cable specs keep working", () => {
     // and led the plain row; the owner had them renamed "6" canless wafer LED
     // downlight, slim" (third answers) so the plain one leads. This goes red
     // if it stops.
+    //
+    // As many hits as that size SHIPS rows (four variants until 2026-10-09,
+    // when slim and wet rated went into the plain wafer): the 6" row keeps
+    // the old '5"/6"' spelling as a search word on purpose, and below the
+    // 5" rows' own it is allowed to answer.
     for (const s of ["2", "3", "4", "5", "6", "8"]) {
-      const hits = search(`${s} wafer`).slice(0, 5);
+      const own = BASELINE_MATERIALS.filter(m =>
+        m.name.startsWith(`${s}" canless wafer`)
+      ).length;
+      const hits = search(`${s} wafer`).slice(0, own);
       onlySize(hits, s);
       expect(hits[0], `${s} wafer`).toBe(`${s}" canless wafer LED downlight`);
     }

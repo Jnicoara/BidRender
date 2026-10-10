@@ -1,6 +1,304 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-08, owner cover decisions + batch 3 (READ FIRST)
+## WHERE B STANDS — 2026-10-09 (night), picker leftovers DONE (READ FIRST)
+
+- **The three todo.md leftovers under "When the picker finds nothing" are
+  done:**
+  - the hand-priced line's link search now uses `smartSearch` and logs;
+  - a fast type-and-Enter logs at once;
+  - the builder is in the plan viewer's Count picker and in the Legend/Counts
+    "Link assembly" list.
+
+  Details are in todo.md. No migration by B. The `search_misses` table
+  now exists: Track A's 0142, merged here 2026-10-09. B's two databases
+  are at 143, and `schemaDrift` matches with 177/177 foreign keys.
+
+- **Server:** `bids.buildFromParts` takes `addLine` (default true). False
+  means the assembly only and always saved; unticked with no line is
+  refused before any write.
+- **Shared component changes, default unchanged:**
+  - `MaterialPicker` takes `maxRecent` (default 6; 3 in the plan viewer
+    builder);
+  - `BuildFromPartsPanel` takes `target` (`line` | `count`) in place of
+    `qty`/`unitLabel`/`merge`.
+- **Tests (each red without its fix):**
+  - `client/src/lib/noMatchLog.test.ts` (+6);
+  - `client/src/lib/assemblySearch.test.ts` (5, new);
+  - `server/buildFromParts.test.ts` (+3).
+
+  Only those files were run locally; the full suite runs on the Gate (the
+  owner's rule since 2026-10-09: no full suite on the laptop, it is short
+  of memory).
+
+- **On screen** (throwaway playwright probe, deleted; 820x1180 and
+  1180x820):
+  - the probe found and fixed 3 faults: a part name cut to "4…", Save below
+    a 36rem popover cap, and a × wrapping onto its own line;
+  - an edit that had silently not applied (the "More options" block) was
+    found the same way.
+- **For A:**
+  - prettier flags `references/next-live-release-plan.md`; its fix nests
+    "4b." under step 4, so it was left alone;
+  - on one run, "4 square box" + Enter added "4×4×4 pull box" ahead of the
+    4" square box — ranking or recents, worth a look after the catalog job.
+- **Local leftovers** (`bidrender_local_b_new`, user 1): "B builder probe
+  …" bids and "zz probe bracket / zz link probe / zz bid screen …"
+  assemblies.
+
+## WHERE B STOOD — 2026-10-09 (evening), "when the picker finds nothing" BUILT
+
+- **Gate check first:** local-dev Gate 37985104078 was not red. It was
+  CANCELLED, replaced by 37985135173 (the same code plus a docs commit),
+  which went **green on every job: test, deploy-staging, smoke**.
+- **(b) "Build it from parts here" — done, no migration.** A search with no
+  hits on the bid screen's "Add an assembly" or the counting screen
+  (`/bids/:id/count`) offers it. Name, parts, optional hours and role,
+  "Save to my library" ON by default. Server: `bids.buildFromParts`
+  (`server/buildFromParts.ts`) creates through `assemblies.create` by
+  caller, adds with `addAssemblyToBid`, and **unticked means ARCHIVED**
+  (a line needs an assembly; Restore brings it back). The bid screen's
+  assembly search moved from a bare `includes` to `smartSearch`, the same
+  search the counting screen uses.
+- **(a) No-match search log — code done, NEEDS A MIGRATION (Track A).**
+  - The table is declared in `server/searchMissLog.ts`, NOT in
+    `drizzle/schema.ts`, so drift and drizzle-kit stay clean until the
+    migration exists.
+  - Every read and write survives the table being absent:
+    - record → `stored: false, "not-set-up"`;
+    - the admin panel says "not set up on this database yet".
+  - So code and migration may ship in either order.
+- **Track A — please write as the next number (ADDITIVE, step 1).** Copy
+  `SEARCH_MISSES_CREATE_SQL` from `server/searchMissLog.ts` word for word:
+
+  ```sql
+  CREATE TABLE `search_misses` (
+  	`id` int AUTO_INCREMENT NOT NULL,
+  	`companyUserId` int NOT NULL,
+  	`picker` varchar(16) NOT NULL,
+  	`words` varchar(120) NOT NULL,
+  	`createdAt` timestamp NOT NULL DEFAULT (now()),
+  	CONSTRAINT `search_misses_id` PRIMARY KEY(`id`),
+  	CONSTRAINT `search_misses_companyUserId_users_id_fk` FOREIGN KEY (`companyUserId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
+  ) COLLATE=utf8mb4_unicode_ci;
+  CREATE INDEX `search_misses_company_words_idx` ON `search_misses` (`companyUserId`,`picker`,`words`);
+  CREATE INDEX `search_misses_createdAt_idx` ON `search_misses` (`createdAt`);
+  ```
+
+  In the same change:
+  1. Move the `searchMisses` declaration into `drizzle/schema.ts`
+     unchanged. It is already in the right form.
+  2. Import it in `server/searchMissLog.ts`, and point
+     `SEARCH_MISSES_CREATE_SQL` at the migration file or delete it.
+  3. `server/searchMissLog.test.ts` can stay as it is: it uses its own
+     scratch schema. Its SQL import must follow wherever step 2 puts the
+     text. `schemaDrift.test.ts` then checks the real table as well.
+
+  Expect `schemaDrift` afterwards to say "Foreign keys match the schema
+  (177 present, 177 declared)", one more than B measured today. If it
+  prints anything else, stop and find out why: either this line is stale,
+  or the database is not in the state you think.
+
+- **What is logged:** words, company (owner id), picker, time. No person,
+  bid or price.
+  - Sources:
+    - the bid and counting screens' assembly search;
+    - the stamp picker and the Legend/Runs link list;
+    - every `MaterialPicker` without a shelf filter.
+  - A search counts after it has sat on no results for 2 s, once per
+    picker opening.
+  - The server folds the same words from one company inside 10 min, and
+    caps a company at 500 a day.
+  - `record` needs `library.view`; `list` is admin only.
+- **Tests:**
+  - New: `server/buildFromParts.test.ts` (7),
+    `server/searchMissLog.test.ts` (10),
+    `client/src/lib/buildFromPartsDraft.test.ts` (7),
+    `client/src/lib/noMatchLog.test.ts` (5).
+  - All four fail on HEAD (their modules do not exist there).
+  - Removing each guard turned a test red: the catalog check, the
+    archive-when-unticked, the 10-minute repeat, the missing-table catch.
+  - `searchMissLog.test.ts` works in its own scratch schema
+    (`<test db>__search_miss`). It tests the absent path first, then
+    creates the table from that SQL, checks MySQL built exactly the
+    declaration, and drops the schema at the end.
+    - **Not in the shared test DB, and that matters:** the first version
+      created, renamed and dropped the table THERE, which can race
+      `backup.test.ts` (it lists every table, then reads each one).
+    - The log functions take an optional database for this. The router
+      checks run on the app's own DB in whatever state it is in.
+- **On screen** (a throwaway playwright probe on the `deviceAudit.mts`
+  helpers; real viewports 1536x864, 820x1180 and 1180x820):
+  - search miss → "Nothing in your library matches … / Build it from
+    parts here";
+  - builder → parts, hours → line on the bid with "Not priced" and "Fix
+    this line";
+  - unticked at 820x1180 → "Added … to the bid." only;
+  - the counting screen the same;
+  - the parts picker shows "Nothing in the catalog matches …";
+  - the admin list showed 4 lines, and "zz no such part" once across three
+    sizes (the 10-min fold).
+  - Looking found one fault, now fixed: an all-unpriced builder said
+    "Parts: $0.00 each + 2 not priced". It now says "Parts: not priced
+    yet", and that is tested.
+  - The table was created in `bidrender_local_b_new` for the check and
+    dropped after. Drift: 142, matches, 176/176.
+- **Not done** (todo.md § "When the picker finds nothing"):
+  - the hand-priced line's link search is not logged (bare `includes`);
+  - no builder in the plan viewer pickers yet;
+  - a fast type-and-Enter never logs.
+- **Local leftovers** (user 1, `bidrender_local_b_new`, local only):
+  - bids "B no-match check …" and "B no-match count …";
+  - assemblies "zz pole bracket …" and "zz count gizmo …" (one of them
+    archived).
+- **State:** no migrations by B. No dev server running.
+
+## WHERE B STOOD — 2026-10-09 (later), coverage-check starters BUILT
+
+- **41 new starters, 224 in all.** CK1–CK26 are every missing assembly in
+  the first coverage check (owner: all 26, not 10; duplicates once). CW1–CW15
+  are the wider check's top 15. Source: `references/coverage-check.md` on
+  track-c. Hours not set, R/C/B tags as the document gives them, every part
+  a shipped row (A's 24 rows filled the gaps). Recipes:
+  `starter-assemblies-plan.md` § "CK / CW".
+- **Changes to existing starters, names unchanged:**
+  - RS12 → `4/3 NM-B Copper` (was 6/3);
+  - LT23 + `Fixture hanging kit, aircraft cable` 2 (support wire kept);
+  - RS6 stays the range hood; the microwave is CK18.
+- **Older databases get RS12/LT23 from the cover repair.** They are two
+  more entries in `STARTER_COVER_SWAPS`; the seeder never edits a starter.
+- **Track A, at the release (staging and live), no migration:**
+  1. `scripts/repairStarterCovers.mts`, report then `--apply`. Expect RS12
+     and LT23 "would swap" and the other 48 "already has it" where the
+     repair already ran. If it prints anything else, stop and find out why.
+  2. Bid totals before and after with `scripts/bidTotals.mts --compare`.
+     None may move.
+  3. The 41 starters need nothing: the seeder inserts them on boot.
+  4. Then the ONE `assembly-hours-starter.xlsx` rebuild (41 NEW rows).
+- **Measured locally** (`bidrender_local_b_new`): boot seed took shared
+  starters 183 → 224; the repair swapped RS12 and LT23; then 49 "already
+  has it"; all 4,284 bid totals unchanged (`bidTotals --compare`).
+- **Tests:** `server/coverageCheckStarters.test.ts` (new), plus updated
+  counts and repair checks. With the HEAD seed files swapped in, 50 tests
+  failed in 3 files; with the change, all pass.
+  - `starterCoverSwaps.test.ts` banned the duplex raised cover outright.
+    The audit's fault was that cover on a twist-lock, and CK12 (ceiling
+    projector duplex) uses it rightly. The test now checks that the cover
+    only covers a duplex receptacle.
+  - `starterGapAssemblies.test.ts` allows CK4 as a second user of the 6"
+    wafer.
+  - Pinned lists that grew with the new starters: specialty-row users
+    (+7, `catalogReview20261008`), wire-nut users 114 → 133, and the
+    Mounts-at list (+CK9, `deviceMountKind`).
+  - Full suite on `bidrender_test_b`: 374 files, 6,230 passed, 6 skipped.
+- **Owner questions** (missing labels, recipe choices): todo.md §
+  "Coverage-check starters".
+- **Staging cleanup:** the two `track-b-race-*` accounts are now on the
+  delete-before-stress-test list.
+- **Merged into local-dev as `09b0294`** after track-b Gate 37983660993
+  went green (merged tree: 375 files, 6,235 passed). The local-dev merge
+  had one conflict, CHANGELOG.md (both entries kept). The local-dev Gate
+  (staging deploy and smoke) was not watched to the end; check it.
+- **State:** merged local-dev (A's 0141). B's databases are at 142 and
+  `schemaDrift` matches (176/176). No migrations by B. No dev server running.
+
+## WHERE B STOOD — 2026-10-09, smoke test 2 PROVEN + "Fix these" walk + gap 10
+
+- **Smoke test 2 (empty sheet list after a first upload): release blocker
+  CLEARED.** The 2026-10-08 fix was only half: a re-run on Gate
+  37883298465 (attempt 3) failed test 2 with nothing deploying. A staging
+  probe reproduced it 2 of 12, and its network log showed the cause. The
+  set's FIRST sheet read was in flight when `ensureSheets` answered, and
+  React Query folds an invalidate into a running fetch when the query has
+  no data yet, so no second read was sent. Fix `11f5466`: cancel, then
+  invalidate (`client/src/lib/refetchPastInFlight.ts`; its test pins the
+  trap against a real QueryClient and goes red without the cancel).
+- **Proof after the fix:**
+  - Staging probe on `71f9f82`: **0 of 24 failed**. All 24 had the first
+    read racing the insert, and every one re-read afterwards.
+  - **Test 2 passed in all 10 smoke runs since:**
+    - Gate 37960082974 (`71f9f82`): first run + re-runs 2–4;
+    - A's Gates 37962455841 and 37967963402;
+    - Gate 37970377380 (`f058ab5`): first run + re-runs 2–4.
+  - 8 of those 10 smoke JOBS were fully green. The other 2 failed on
+    DIFFERENT tests, with no deploy running:
+    - **screens / Proposal, tablet-landscape** (37960082974 attempt 4): the
+      network-idle wait had no bound and one request never came back.
+      Bounded at 15 s and made to name what is pending (`739eae6`). No
+      warnings in the 4 runs since. Which request hung is not known.
+    - **flow test 5** (37970377380 attempt 2): clicking CI SWITCH in the
+      Legend did not arm its count, so the forced-race hook never fired.
+      Not caused by B's changes (nothing touches the legend or arming).
+      Cause NOT found (`trace: "off"`). In todo.md for whoever owns the
+      legend.
+- **Built: the "Fix these" walk and gap 10** (`88feaf9`). Six bid warning
+  boxes have "Fix these N", which walks the "Fix this line" panel one line
+  at a time ("Line 2 of 5", Skip; Save goes to the next, Cancel ends it).
+  Each line in the Proposal's print block opens
+  `/bids/:id?fix=<lineId>` with that line's fix open. Tests red on the old
+  code. Seen on screen at 1536x864 and 820x1180. todo.md § "Fix this line".
+- **State:** `track-b` = `local-dev` at `f058ab5` + this docs commit. B's
+  databases are at 141 and `schemaDrift` matches (176/176); A's new rows
+  are seed, not migrations. No migrations by B. No dev server running.
+  Leftovers:
+  - staging: one more `track-b-race-*@example.com` per probe run (2 runs),
+    their plan sets removed and bids archived;
+  - local only: throwaway "B walk check …" and "B race probe …" data in
+    `bidrender_local_b_new`.
+
+## WHERE B STOOD — 2026-10-08, Won/Lost ask first + smoke race fixed
+
+- **Smoke (local-dev Gate 37879795728) FAILED at test 2**: after a first
+  upload the sheet list stayed on "Sheets appear here once the document
+  opens", so no "1/2 scaled". A real race from Gap 6.1, not the test:
+  `useMutation` takes new options in an effect, a parent's effects run after
+  its children's, and the viewer re-announces a just-attached set from its
+  own effect in the commit the row first appears — so `ensureSheets` ran
+  with the previous render's `onSuccess` (`doc` null) and the sheet-list
+  refresh was skipped. When the list's first read beat the insert, nothing
+  ever refetched it. A staging probe passed (the read lost the race that
+  time). Fix: `ensureSheets` refreshes by the id it SENT
+  (`TakeoffPage.tsx`). No vitest can reach this (component); **proof is the
+  next local-dev smoke run**: test 2 must be green.
+- **Owner decision, "Fix this line":** only a LOCKED bid refuses. Won/Lost
+  ask "This bid is marked Won/Lost. Changing it changes a price you may
+  have already sent. Change anyway?" (Continue / Cancel, focus on Cancel).
+  Server refuses until `changeClosedBid` is sent, so a forgotten question
+  cannot change a sent price. Tests: 6 changed/new in
+  `server/fixLine.test.ts`, all red on the old code (run in a HEAD worktree
+  with the new tests). On screen at 1536x864 and 820x1180: asked, Cancel kept
+  the typed value, Continue fixed the line ($63.99 → $83.49). Recorded in
+  todo.md and `references/never-stuck-plan.md`.
+- **Leftovers** listed in todo.md's staging-cleanup item: one more
+  `track-b-upload-*` account (the probe), and local-only "B fix-line
+  check" data plus local smoke account `b-smoke-local@example.test`
+  (`.env.test.local` in B's worktree, git-ignored, points at it).
+- **State:** no migrations. No dev server running.
+
+## WHERE B STOOD — 2026-10-08, "fix this line" (gap 11) BUILT
+
+- **Built (c), the "fix this line" panel.** Assembly and run lines with a
+  gap show "Fix this line", and their amber words open it too. It prices $0
+  parts, picks a material for a line with none, sets hours, picks the role,
+  and prices or sets hours on a traced part. "Also save to my library" is ON
+  by default. Other lines are only offered. Locked, Won and Lost bids refuse
+  the line and still take the library half. No migration. Details, decisions
+  and gaps: todo.md § "Fix this line"; the plan's gap 11 note.
+- **Owner to confirm:** "sent" is read as Won or Lost, since the schema has
+  no Sent status (Active is still editable).
+- **Tests:** `server/fixLine.test.ts` (21) and
+  `client/src/lib/fixLineDraft.test.ts` (9), each guard seen red when
+  removed. On screen at 1536x864 and 820x1180, all pass; looking found one
+  fault (the "update other lines" offer vanished) and it is fixed.
+- **Gap 6.1 on staging (`fa0c697`):** sheet 1 drawn 1.51 s after picking a
+  6.6 MB set; the upload finished at 2.2 s. 0 MB pulled back.
+- **Local leftovers:** throwaway "B fix-line check …" bids, assemblies and
+  materials for user 1 in `bidrender_local_b_new` (local only). One more
+  `track-b-upload-*` account on staging.
+- **Next:** gap 10 (print block jumps to the line's fix) and the strips'
+  "Fix these" walk.
+- **State:** no migrations. No dev server running.
+
+## WHERE B STOOD — 2026-10-08, owner cover decisions + batch 3
 
 - **Cover decisions DONE (`efe06c6`).** Nylon stays. RS1/RS2: the BOX was
   wrong (no 2-gang power plate; RS1's 6/3 overfills a 1-gang box) → owner
@@ -27,6 +325,17 @@
   changes (my preview wrapper re-indented that block). Resolved by taking
   C's block verbatim and re-wrapping; `git diff -w origin/local-dev`
   shows only B's changes (212 lines, the same as B's own diff).
+- **local-dev Gate 37868193507 went red at SMOKE** (test and staging
+  deploy green): the smoke helper `uploadFixturePlan` waited for the sheet
+  canvas, which Gap 6.1 now draws from the file BEFORE the attach, so
+  `beforeAll` closed the page mid-upload and the phone-panel test found an
+  empty bid. Fixed in `e2e/smoke/helpers.ts` (waits for `confirmAttach`).
+  Worth knowing generally: **a drawn sheet no longer means a saved set.**
+  **The smoke fix is NOT yet proven on staging:** the last local-dev run
+  (37873032008, `a748e96`) passed TEST, but deploy-staging was refused
+  ("staging has commits local-dev does not" — A's hand push for 0140), so
+  smoke did not run. First local-dev run after A reconciles staging must
+  show smoke green, the phone-panel test included.
 - **Next:** (c) the "fix this line" panel. Optional: staging timing of 6.1
   with `scripts/stagingUploadTiming.mts` once it is on staging.
 - **State:** no migrations. No dev server running.

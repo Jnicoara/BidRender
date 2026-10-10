@@ -13,6 +13,7 @@ import { BASELINE_MATERIALS } from "./seed/materials";
 import { starterPartName } from "./seed/starterParts";
 
 const PLAIN_WAFER = /^(\d+)" canless wafer LED downlight$/;
+const COMMERCIAL_WAFERS = ["Recessed wafer downlight, commercial (MC whip)"];
 const usersOf = (name: string) =>
   BASELINE_ASSEMBLIES.filter(a =>
     a.materials.some(l => starterPartName(l.part) === name)
@@ -48,11 +49,13 @@ describe('canless wafers: a starter at 2", 4", 6", 8" only', () => {
         a.materials.some(l => starterPartName(l.part) === wafer)
       );
       // One starter per size: never a variant (CCT, gimbal, slim, wet) and
-      // never a different size standing in.
-      expect(users.map(a => a.name)).toEqual([
-        `Wafer LED downlight, ${size}" (canless)`,
-      ]);
-      const [spec] = users;
+      // never a different size standing in. The one other user allowed is
+      // CK4, the commercial MC-whip install of the 6" (coverage check,
+      // 2026-10-09): the same wafer, a different way of wiring it.
+      expect(
+        users.map(a => a.name).filter(n => !COMMERCIAL_WAFERS.includes(n))
+      ).toEqual([`Wafer LED downlight, ${size}" (canless)`]);
+      const [spec] = users.filter(a => !COMMERCIAL_WAFERS.includes(a.name));
       const line = spec.materials.find(l => starterPartName(l.part) === wafer)!;
       expect(line.fixture).toBe(true);
       expect(line.qty).toBe(1);
@@ -135,12 +138,20 @@ describe("the twelve top-30 gap starters", () => {
     expect(spec?.missingParts ?? []).toEqual([]);
   });
 
-  it("GR3 is on the 320A meter base, not the 400A stand-in", () => {
+  it("GR3 is on the 400A meter base, which IS the 320A (CL320) one", () => {
+    // This said "on the 320A meter base, not the 400A stand-in" until
+    // 2026-10-09. The catalog reality check (batch 1, owner-approved, this
+    // starter named) found they are ONE product — a CL320 base is sold as
+    // "400A" — so 320A retired into 400A, which carries "320a" and "cl320".
     const parts = BASELINE_ASSEMBLIES.find(a => a.ref === "GR3")!.materials.map(
       l => starterPartName(l.part)
     );
-    expect(parts).toContain("320A meter base");
-    expect(parts).not.toContain("400A meter base");
+    expect(parts).toContain("400A meter base");
+    expect(parts).not.toContain("320A meter base");
+    const base = BASELINE_MATERIALS.find(m => m.name === "400A meter base");
+    expect(base?.searchAliases.split(" ")).toEqual(
+      expect.arrayContaining(["320a", "cl320"])
+    );
   });
 });
 
@@ -185,9 +196,11 @@ describe("DV34 surface raceway receptacle, per the owner's answers", () => {
   it("is 700 series throughout — box AND matching plate — plus the entrance fitting", () => {
     expect(parts).toEqual(
       expect.arrayContaining([
-        "Surface raceway device box, 700 series",
+        // One box for 500 and 700 since 2026-10-09; the generic entrance
+        // end retired into the 700 one (catalog reality check, batch 1).
+        "Surface raceway device box, 500/700 series",
         "Surface raceway device plate, 700 series",
-        "Raceway entrance end fitting",
+        "Surface raceway entrance end fitting, 700 series",
         "20A duplex receptacle",
       ])
     );

@@ -36,6 +36,12 @@
  * name, so a rename cannot quietly strand an entry.
  */
 
+import {
+  REALITY_RENAMES,
+  REALITY_RETIRED,
+  REALITY_RETIRED_INTO,
+} from "./catalogRealityCheck20261009";
+
 export type StarterCommonness = "core" | "common";
 
 /**
@@ -88,7 +94,10 @@ function rigidRacewaysAndTheirNineties(): Record<string, StarterCommonness> {
   return out;
 }
 
-export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
+/** The table as written, under the names the rows had when each line was. */
+const STARTER_COMMONNESS_AS_WRITTEN: Readonly<
+  Record<string, StarterCommonness>
+> = {
   // First, so every entry below for the same name wins. See the function.
   ...rigidRacewaysAndTheirNineties(),
   // ── Breakers ──
@@ -271,6 +280,9 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // with "Raceway blank end plate" — an accessory before the raceway.
   // 700 renamed to one row on 2026-10-08 (one-piece; the cover retired).
   "Surface raceway, 700 series": "common",
+  // 500 the same way, 2026-10-09 (sch80-and-500-plan.md § 2): with nine 500
+  // parts sharing "500 v500", "wiremold 500" led with the coupling.
+  "Surface raceway, 500 series": "common",
 
   // ── Grounding: on every service ──
   'Ground rod, 5/8" x 8 ft': "common",
@@ -280,6 +292,36 @@ export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> = {
   // with three rows sharing the slang, "marrette" led with the wing nut.
   "Wire nut, 22-8 AWG (tan/red)": "common",
 };
+
+/**
+ * The table the ranker reads: every key under its CURRENT shipped name. The
+ * catalog reality check of 2026-10-09 renamed and retired rows by the
+ * hundred; a renamed key follows its row (the PVC Sch 40 LB is now the
+ * shared `PVC Sch 40/80 LB conduit body`, next-live-release-plan.md § 4
+ * item 6) and a retired one is dropped, keeping its place in the order. One
+ * map does it, so a later rename in that map cannot strand an entry here.
+ */
+export const STARTER_COMMONNESS: Readonly<Record<string, StarterCommonness>> =
+  Object.fromEntries(
+    Object.entries(STARTER_COMMONNESS_AS_WRITTEN)
+      .filter(([name]) => !REALITY_RETIRED.includes(name))
+      // A retired key hands its rank to the row that took its job ("200A
+      // main panel" -> the 200A 40-space main-breaker panel) — unless that
+      // row has an entry of its own, which wins.
+      .filter(
+        ([name]) =>
+          !(name in REALITY_RETIRED_INTO) ||
+          !Object.keys(STARTER_COMMONNESS_AS_WRITTEN).some(
+            own =>
+              !(own in REALITY_RETIRED_INTO) &&
+              (REALITY_RENAMES[own] ?? own) === REALITY_RETIRED_INTO[name]
+          )
+      )
+      .map(([name, tier]): [string, StarterCommonness] => [
+        REALITY_RETIRED_INTO[name] ?? REALITY_RENAMES[name] ?? name,
+        tier,
+      ])
+  );
 
 /**
  * Where each name sits in the list above. WITHIN A TIER, LISTED FIRST MEANS
