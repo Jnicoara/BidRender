@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Opening a sheet no longer re-matches its homeruns.** Placing a panel by
+  hand could leave a "re-match" request waiting when nothing on that sheet
+  changed, and the next sheet opened, just to look at it, then had its
+  unconfirmed homeruns re-pointed and its homerun footage changed. The
+  request now belongs to the sheet the panel was placed on, and that sheet
+  is re-matched straight away as intended.
 - **Job costs on Quick bid.** A "More options" fold under the counting box
   now holds the bid's flat charges, with four one-tap calculators: Permit,
   Lift rental (days × rate), Dumpster, and Drive time (trips × hours per
