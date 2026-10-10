@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Two new empty database columns, ready for work waiting to merge.** A
+  plan sheet can now record whether it shows demolition, new work or both
+  (for Track B's status view), and a job cost can carry a short working
+  note such as "Drive time: 6 trips × 1.5 h × $85/h" (for Quick bid; it
+  will never print on the customer quote). Both start empty and change no
+  number. Also a read-only check that counts old "- EXISTING TO REMAIN"
+  twin counts: live, staging and local all hold none, so the twin fold has
+  nothing to convert.
 - **Job costs on Quick bid.** A "More options" fold under the counting box
   now holds the bid's flat charges, with four one-tap calculators: Permit,
   Lift rental (days × rate), Dumpster, and Drive time (trips × hours per
