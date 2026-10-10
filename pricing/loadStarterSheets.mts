@@ -12,6 +12,10 @@
  * With --write it regenerates
  *   server/seed/materials/starterPrices.ts      (name -> price per unit)
  *   server/seed/materials/starterLaborUnits.ts  (name -> hours)
+ * and, from the "Steps" and "Step totals" tabs of the prices workbook
+ * (step-based-labor-plan.md § 14),
+ *   server/seed/starterStepMinutes.ts           (step key -> minutes)
+ *   server/seed/starterAssemblyOverhead.ts      (overhead; hours cleared)
  * and touches nothing else — no database, no other seed file. The values
  * reach a database only when the commit is deployed and the server starts
  * (the seed re-stamps shipped rows; a shop's own copies are never touched).
@@ -21,6 +25,8 @@
  *     guessed at — rename it in the sheet);
  *   - a Unit of sale / Hours per that disagrees with the catalog;
  *   - a price or hours that is not a number, or is 0 or less (blank = unset);
+ *     step Minutes and Overhead may be 0, a real answer, but not below it;
+ *   - a step Key the library does not have, or a Ref with no step list;
  *   - a Pack qty that is not above 0;
  *   - bend hours on a row that is not a raceway;
  *   - the same name twice.
@@ -44,6 +50,21 @@ import { STARTER_LABOR_UNITS } from "../server/seed/materials/starterLaborUnits"
 import { STARTER_BRAND_PRICES } from "../server/seed/materials/starterBrandPrices";
 import { STARTER_ASSEMBLY_HOURS } from "../server/seed/starterAssemblyHours";
 import { BASELINE_ASSEMBLIES } from "../server/seed/baselineAssemblies";
+import { STARTER_LABOR_STEPS } from "../server/seed/starterLaborSteps";
+import { STARTER_STEP_MINUTES } from "../server/seed/starterStepMinutes";
+import {
+  STARTER_ASSEMBLY_OVERHEAD,
+  STARTER_HOURS_CLEARED,
+} from "../server/seed/starterAssemblyOverhead";
+import {
+  starterHoursClearable,
+  stepTotalHours,
+} from "../shared/assemblyHoursSource";
+import {
+  type LaborUnits,
+  startersWithSteps,
+  stepLinesFor,
+} from "./starterSteps";
 import {
   ASSEMBLY_SHEET,
   BRAND_SHEET,
@@ -51,6 +72,8 @@ import {
   HEADER_ROW,
   LABOR_SHEET,
   PRICE_SHEET,
+  STEPS_SHEET,
+  STEP_TOTALS_SHEET,
   brandVariants,
   heldNote,
   hoursPer,
@@ -323,6 +346,99 @@ if (assemblyHoursPath) {
   }
 }
 
+// ── Step times and overhead (step-based-labor-plan.md § 14) ─────────────────
+// Two more tabs in the PRICES workbook. Read after labor and assembly hours
+// so a step total is computed against the cable units and current hours
+// this same run is loading, not the ones it is about to replace.
+let nextStepMinutes: Record<string, string> | null = null;
+let nextOverhead: Record<string, string> | null = null;
+let nextCleared: string[] | null = null;
+const clearLines: string[] = [];
+if (pricesPath) {
+  const steps = await open(pricesPath, STEPS_SHEET);
+  const [cKey, cMinutes] = [steps.col("Key"), steps.col("Minutes")];
+  const libraryKeys = new Set(STARTER_LABOR_STEPS.map(s => s.key));
+  nextStepMinutes = {};
+  const seenKeys = new Set<string>();
+  for (let r = FIRST_DATA_ROW; r <= steps.ws.rowCount; r++) {
+    const row = steps.ws.getRow(r);
+    const key = text(row.getCell(cKey).value);
+    if (!key) continue;
+    const at = `steps row ${r} (${key})`;
+    if (!libraryKeys.has(key)) {
+      problems.push(`${at}: not a step in the library`);
+      continue;
+    }
+    if (seenKeys.has(key)) problems.push(`${at}: listed twice`);
+    seenKeys.add(key);
+    const minutes = num(row.getCell(cMinutes).value);
+    if (minutes === null) continue; // blank: not set
+    // 0 is a real answer here (a motion that takes no time), so only a
+    // negative or a non-number is refused.
+    if (Number.isNaN(minutes) || minutes < 0) {
+      problems.push(`${at}: Minutes is not a number of 0 or more`);
+      continue;
+    }
+    nextStepMinutes[key] = minutes.toFixed(2);
+  }
+
+  const totals = await open(pricesPath, STEP_TOTALS_SHEET);
+  const [cRef, cName, cOverhead] = [
+    totals.col("Ref"),
+    totals.col("Assembly"),
+    totals.col("Overhead (h)"),
+  ];
+  const withSteps = new Map(startersWithSteps().map(s => [s.ref, s]));
+  nextOverhead = {};
+  const seenRefs = new Set<string>();
+  for (let r = FIRST_DATA_ROW; r <= totals.ws.rowCount; r++) {
+    const row = totals.ws.getRow(r);
+    const ref = text(row.getCell(cRef).value);
+    if (!ref) continue;
+    const at = `step totals row ${r} (${ref})`;
+    const s = withSteps.get(ref);
+    if (!s) {
+      problems.push(`${at}: not a starter with a step list`);
+      continue;
+    }
+    if (seenRefs.has(ref)) problems.push(`${at}: listed twice`);
+    seenRefs.add(ref);
+    const name = text(row.getCell(cName).value);
+    if (name !== s.name)
+      problems.push(`${at}: assembly "${name}", ${ref} is "${s.name}"`);
+    const overhead = num(row.getCell(cOverhead).value);
+    if (overhead === null) continue; // blank: no overhead
+    if (Number.isNaN(overhead) || overhead < 0) {
+      problems.push(`${at}: Overhead is not a number of 0 or more`);
+      continue;
+    }
+    nextOverhead[s.name] = dec(overhead);
+  }
+
+  // Which typed hours clear — decided by the app's own rule, never by the
+  // sheet's "Clears typed hours?" preview column.
+  const units: LaborUnits = nextLabor ?? STARTER_LABOR_UNITS;
+  const specs = new Map(BASELINE_ASSEMBLIES.map(a => [a.name, a]));
+  nextCleared = [];
+  for (const s of withSteps.values()) {
+    const sheetHours = nextAssemblyHours
+      ? nextAssemblyHours[s.name]
+      : STARTER_ASSEMBLY_HOURS[s.name];
+    const currentHours =
+      sheetHours ?? specs.get(s.name)?.baseLaborHours ?? null;
+    const total = stepTotalHours(stepLinesFor(s, nextStepMinutes, units));
+    const verdict = starterHoursClearable({
+      currentHours,
+      stepTotal: total.hours,
+      overheadHours: nextOverhead[s.name] ?? null,
+    });
+    if (verdict.clear) nextCleared.push(s.name);
+    clearLines.push(
+      `  ${s.ref}: ${verdict.why}${verdict.clear ? ", typed hours cleared" : ""}`
+    );
+  }
+}
+
 if (problems.length) {
   console.error(`REFUSED — ${problems.length} problem(s), nothing written:`);
   for (const p of problems) console.error(`  - ${p}`);
@@ -364,6 +480,26 @@ if (nextAssemblyHours)
   diff("assembly hours", STARTER_ASSEMBLY_HOURS, nextAssemblyHours, v =>
     v === undefined ? "as shipped" : `${v} h`
   );
+if (nextStepMinutes)
+  diff("step minutes", STARTER_STEP_MINUTES, nextStepMinutes, v =>
+    v === undefined ? "not set" : `${v} min`
+  );
+if (nextOverhead)
+  diff("starter overhead", STARTER_ASSEMBLY_OVERHEAD, nextOverhead, v =>
+    v === undefined ? "none" : `${v} h`
+  );
+if (nextCleared) {
+  const flag = (names: readonly string[]) =>
+    Object.fromEntries(names.map(n => [n, "cleared"]));
+  diff(
+    "typed hours cleared",
+    flag(STARTER_HOURS_CLEARED),
+    flag(nextCleared),
+    v => v ?? "kept"
+  );
+  console.log("each starter with steps:");
+  for (const line of clearLines) console.log(line);
+}
 
 if (!WRITE) {
   console.log(
@@ -418,6 +554,31 @@ if (nextAssemblyHours) {
       path.basename(assemblyHoursPath!)
     ) +
       `export const STARTER_ASSEMBLY_HOURS: Readonly<Record<string, string>> = ${JSON.stringify(nextAssemblyHours, null, 2)};\n`
+  );
+  written.push(f);
+}
+// The two step files get their own header: they say what a MISSING key
+// means (not set), which the price header above does not cover.
+const stepHeader = (what: string) =>
+  `/**\n * ${what} — GENERATED by pricing/loadStarterSheets.mts from ${path.basename(pricesPath ?? "")} on ${new Date().toISOString().slice(0, 10)}\n * (references/step-based-labor-plan.md § 14). Do not edit by hand: change\n * the sheet and run the loader (Track A only).\n *\n * A step key not listed ships with NO time (NULL — "not set", never 0). A\n * loaded value arrives tagged as an example ("Example hours").\n */\n`;
+if (nextStepMinutes) {
+  const f = path.join(ROOT, "server/seed/starterStepMinutes.ts");
+  writeFileSync(
+    f,
+    stepHeader("Shipped STEP TIMES, minutes for one count") +
+      `export const STARTER_STEP_MINUTES: Readonly<Record<string, string>> = ${JSON.stringify(nextStepMinutes, null, 2)};\n`
+  );
+  written.push(f);
+}
+if (nextOverhead && nextCleared) {
+  const f = path.join(ROOT, "server/seed/starterAssemblyOverhead.ts");
+  writeFileSync(
+    f,
+    stepHeader(
+      "Shipped starter OVERHEAD (hours), and the starters whose typed hours were CLEARED because `starterHoursClearable` said step total + overhead ≥ current hours"
+    ) +
+      `export const STARTER_ASSEMBLY_OVERHEAD: Readonly<Record<string, string>> = ${JSON.stringify(nextOverhead, null, 2)};\n\n` +
+      `export const STARTER_HOURS_CLEARED: readonly string[] = ${JSON.stringify(nextCleared, null, 2)};\n`
   );
   written.push(f);
 }
