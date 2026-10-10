@@ -19,6 +19,7 @@
  * a bid of a few hundred lines renders fine, and the Quick-bid step is where
  * windowing belongs if bids ever get big enough to need it.
  */
+import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -1175,7 +1176,11 @@ export default function BidsPage({
                   {assemblyResults.map((assembly, index) => (
                     <button
                       key={assembly.id}
-                      onMouseEnter={() => setAssemblyHighlight(index)}
+                      onMouseMove={e => {
+                        // Only a pointer that MOVED — see @/lib/pointerHighlight.
+                        if (pointerMovedHighlight(e))
+                          setAssemblyHighlight(index);
+                      }}
                       onClick={() => addHighlighted(assembly.id)}
                       className={cn(
                         "w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors border-b border-border last:border-0",

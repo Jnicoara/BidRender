@@ -648,6 +648,19 @@ function sizeKey(word: string): string {
       // A count word keeps its suffix — see joinCountWords.
       .replace(/(\d)-(?!(?:space|circuit)$)[a-z].*$/, "$1")
       .replace(/(\d)"$/, "$1")
+      /*
+        ONE spelling for a cable spec: "12-2" is "12/2" (2026-10-09). The
+        shipped catalog writes the slash since the 2026-10-07 rename; a
+        company's own rows, forks made before it and supply-house lists
+        write the dash. Each spelling found only itself, so "romex 12/2"
+        found NOTHING for a company whose priced copy is "12-2 NM-B", and
+        "12/2 mc" ranked "12/2 MC … isolated ground" over their "12-2 MC
+        cable". Both the typed word and every item's size words pass here,
+        so either spelling finds either. Only the conductor sizes
+        SPOKEN_CABLE_KEY knows, so a fraction ("1/2", "3/4") and a NEMA
+        "6-30R" cannot match.
+      */
+      .replace(/^(14|12|10|8|6|4|2)-([234])$/, "$1/$2")
   );
 }
 

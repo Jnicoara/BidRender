@@ -17,8 +17,14 @@
  *
  * ── Three sources, added together ────────────────────────────────────────────
  *   1. STARTER — a shipped guess at what is used on most jobs. Keyed by the
- *      shipped NAME, which a company's own fork of the row keeps, so their copy
- *      ranks like ours. A row the company created itself has no starter rank;
+ *      shipped NAME. This said a company's fork "keeps" that name, so their
+ *      copy ranks like ours — true until shipped rows were renamed in place.
+ *      The seeder renames only OUR row; a fork keeps the name it was made
+ *      under, so "Duplex receptacle" (forked before it became "15A duplex
+ *      receptacle") got no starter rank and "recep" put it 30th, under the
+ *      contractor's own priced copy of the thing they meant (2026-10-09).
+ *      A name is now looked up as itself, then through the rename map
+ *      (starterKey). A row the company created itself has no starter rank;
  *      it earns one through use instead.
  *   2. USAGE — how many of THIS COMPANY'S bids the material is on. Read per
  *      company on the server (materials.usage), never pooled across
@@ -36,6 +42,7 @@
  * name, so a rename cannot quietly strand an entry.
  */
 
+import { renamedTo } from "./renamedMaterials";
 import {
   REALITY_RENAMES,
   REALITY_RETIRED,
@@ -198,6 +205,10 @@ const STARTER_COMMONNESS_AS_WRITTEN: Readonly<
   "Single-gang metal box": "common",
   "Double-gang metal box": "common",
   "Triple-gang box": "common",
+  // The everyday old-work box (2026-10-09): "old work box" tied the
+  // single-, double- and triple-gang on every signal and went to catalog
+  // order, which listed the double-gang first.
+  "Single-gang old work box, plastic, 20 cu in": "common",
   "Fan-rated ceiling box": "common",
   "Octagon box, plastic": "common",
   'Octagon box, metal, 1-1/2" deep': "common",
@@ -359,19 +370,33 @@ const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
  * `now` is a parameter, never Date.now(), so "used 29 days ago" and "used 31
  * days ago" can both be tested without waiting a month.
  */
+/**
+ * The shipped name a row's starter rank is filed under: its own name, or —
+ * for a fork made before a rename — the name that row carries now. NULL
+ * when neither is a starter.
+ */
+export function starterKey(name: string): string | null {
+  if (STARTER_COMMONNESS[name] !== undefined) return name;
+  const renamed = renamedTo(name);
+  if (renamed !== null && STARTER_COMMONNESS[renamed] !== undefined)
+    return renamed;
+  return null;
+}
+
 export function commonnessPoints(
   name: string,
   usage: MaterialUsage | undefined,
   now: Date
 ): number {
-  const starter = STARTER_COMMONNESS[name];
+  const key = starterKey(name);
+  const starter = key === null ? undefined : STARTER_COMMONNESS[key];
   let points = starter ? STARTER_POINTS[starter] : 0;
   /*
     List order, worth LESS THAN ONE POINT in total, so it only ever orders
     rows the whole points already tie — it cannot lift a "common" row over a
     "core" one, or outweigh a single bid of the company's own use.
   */
-  const index = STARTER_ORDER.get(name);
+  const index = key === null ? undefined : STARTER_ORDER.get(key);
   if (index !== undefined)
     points += (STARTER_ORDER.size - index) / (STARTER_ORDER.size + 1);
   if (usage) {
