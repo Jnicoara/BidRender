@@ -219,7 +219,18 @@ every bid unchanged.
    deploy running (`track-b-handoff.md`, todo.md):
    - screens / Proposal: an unbounded network-idle wait. Bounded in
      `739eae6`.
-   - flow test 5: a Legend click that did not arm. Cause NOT found.
+   - flow test 5: a Legend click that did not arm. ~~Cause NOT found.~~
+     **FOUND AND FIXED 2026-10-09 (`44ede4f`, merged as `705e1c9`) — a real
+     wrong count, not a flake. MUST-INCLUDE for the candidate.** A Legend
+     click straight after "Link" could arm ANOTHER item's count of the same
+     assembly (the server dropped the not-yet-linked symbol). **LIVE
+     (`24105ad`) has this race** — same `forAssembly` line, same optimistic
+     link. Flow 5 now forces it every run (red without the fix), so a red
+     flow 5 is a real failure: do not re-run past it. Gate 37983875286 on
+     `705e1c9`: all green, smoke included.
+     **On the day, before the release:** run
+     `scripts/legendLinkRaceCandidates.mts` against live (read only, § 5
+     item 4b) — it lists every bid the race could have touched.
 
    Either can turn the candidate's Gate red. If one does, read the failure
    before re-running.
@@ -231,6 +242,13 @@ every bid unchanged.
 snapshotUnpricedParts IS NULL AND archivedAt IS NULL` — must be **0**
    (it was 0 on 2026-10-07). Otherwise freeze first (`todo.md`
    "WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE").
+4b. **Read-only check for the Legend-link race on live** (`44ede4f`):
+   `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/legendLinkRaceCandidates.mts`.
+   It prints CANDIDATES (a mark does not record which symbol placed it):
+   "no candidates" ends it; any row means opening that bid's sheets and
+   looking for one count's marks on two different symbols. Live had 2 bids
+   on 2026-10-06, both with no lines, so the expected answer is none — if it
+   prints rows, stop and look before releasing.
 5. **Backup of live**, restored locally, table counts equal; rehearse the
    thirty-five on that copy (apply, re-run, drift, `bidTotals` before/after
    with the candidate's code booted, the starter count with zero holds, the
@@ -402,7 +420,9 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
 - **Owner's yes** and the candidate commit; then a green Gate on exactly
   that commit (test, deploy-staging, smoke). The candidate must include the
   Sch 80 / 500 seed if it is to match § 5e, and Track B's `11f5466` (smoke
-  test 2's fix, § 5 item 2).
+  test 2's fix, § 5 item 2). **It MUST include `705e1c9`** (the Legend-link
+  fix, `44ede4f`) — live has that race today (§ 5 item 2) — and § 5 item 4b
+  runs against live on the day.
 - ~~Smoke test 2 proven fixed~~ — **done 2026-10-09** (§ 5 item 2).
 - **Owner's tablet look at staging** (the third of the owner's three
   waits; the white box and the cover swaps are done).
