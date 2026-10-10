@@ -188,9 +188,20 @@ export const ROLE = {
 } as const;
 export type MaterialRole = (typeof ROLE)[keyof typeof ROLE];
 
+/*
+  "12-2" is read as "12/2" (2026-10-09) — the same one-spelling rule
+  smartSearch's sizeKey applies to sizes. Here, BEFORE the hyphen becomes a
+  space: a company's "12-2 MC cable" was "12 2 mc cable", so it neither
+  started "12/2 mc" nor held "12/2" as a name word, and lost to "12/2 MC
+  cable isolated ground". Conductor sizes only, and the count must end the
+  spec: "6-30r" is a NEMA configuration, not 6/3.
+*/
+const CABLE_SPEC_DASH = /\b(14|12|10|8|6|4|2)-([234])\b(?!-?\d)/g;
+
 const norm = (s: string): string =>
   s
     .toLowerCase()
+    .replace(CABLE_SPEC_DASH, "$1/$2")
     .replace(/[^a-z0-9/ ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -586,7 +597,9 @@ export const PHRASE = {
   EXACT: 0,
   /** The name begins with everything typed — two or more words of it. */
   STARTS_WITH: 1,
-  NONE: 2,
+  /** Everything typed, three words or more, in order inside the name. */
+  CONTAINS: 2,
+  NONE: 3,
 } as const;
 export type PhraseTier = (typeof PHRASE)[keyof typeof PHRASE];
 
@@ -624,8 +637,18 @@ export function phraseTier(name: string, query: string): PhraseTier {
   if (n === q) return PHRASE.EXACT;
   const renamed = renamedTo(query);
   if (renamed !== null && norm(renamed) === n) return PHRASE.EXACT;
+  /*
+    AN ACCESSORY DOES NOT GET "STARTS WITH" FOR A PRODUCT QUERY (2026-10-09).
+    "old work box" started "Old-work box support (F-clip)", so the clip
+    outranked every old-work box: the name begins with the description and
+    then turns it into a different thing. When the query names no role and
+    the row is not a product, beginning with the query is not evidence.
+    "1/2 emt connector" names its role, so the connector keeps the tier.
+  */
+  const startsAccessory =
+    materialRole(name) !== ROLE.BASE && queryRole(query) === null;
   if (q.includes(" ") && (n + " ").startsWith(q + " ")) {
-    return PHRASE.STARTS_WITH;
+    return startsAccessory ? PHRASE.NONE : PHRASE.STARTS_WITH;
   }
   /*
     A description that STARTS WITH A COUNT — "3 way", "4 way" — starts a
@@ -638,8 +661,22 @@ export function phraseTier(name: string, query: string): PhraseTier {
   if (/^\d/.test(q) && q.includes(" ")) {
     const unrated = n.replace(/^\d+a /, "");
     if (unrated !== n && (unrated + " ").startsWith(q + " "))
-      return PHRASE.STARTS_WITH;
+      return startsAccessory ? PHRASE.NONE : PHRASE.STARTS_WITH;
   }
+  /*
+    THE WHOLE DESCRIPTION, IN ORDER, INSIDE THE NAME (2026-10-09). "old work
+    box" is the middle of "Single-gang old work box"; the old-work CEILING
+    box only shares the words, and outscored it because its name STARTS
+    with "old". Three words or more: two-word phrases ("main breaker") sit
+    inside too many different things ("200A main-breaker panel"). The same
+    accessory guard as STARTS_WITH.
+  */
+  if (
+    q.split(" ").length >= 3 &&
+    !startsAccessory &&
+    (" " + n + " ").includes(" " + q + " ")
+  )
+    return PHRASE.CONTAINS;
   return PHRASE.NONE;
 }
 

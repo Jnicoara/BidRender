@@ -69,6 +69,41 @@ todo.md: tick (a) and (b) there and point at this entry.**
       on nothing found, "Count …", and "Build it from parts here", in every
       picker that logs. Closing a picker on half-typed words still records
       nothing. Measured on screen: recorded 54–75 ms after Enter.
+- [ ] **Landscape: "Save and count" needs a scroll in the build-from-parts
+      popover.** On the plan viewer at 1180x820 the builder (name, part,
+      three recents, More options) is taller than the screen, so the
+      button sits below the fold of the popover's own scroll area (80dvh).
+      Reachable, not hidden — but a button you have to find. Options: pin
+      the Save row to the bottom of the popover, or hide the recents once
+      a part is chosen. Portrait (820x1180) shows it without scrolling.
+
+## Enter took the wrong part on a tablet — FIXED 2026-10-09 (Track B)
+
+"4 square box" + Enter added a 4x4x4 pull box (seen in a plan-viewer probe)
+and, reproduced, a 4" LED disc light, 4 of 4 times at 820x1180. **Not the
+ranking**: the list grew under a pointer left standing where the last tap
+landed, `mouseenter` moved the highlight to whatever row slid under it, and
+Enter takes the highlight. Rows now move it on `mousemove` with real
+distance only (`client/src/lib/pointerHighlight.ts`, all four lists:
+MaterialPicker, bid screen, Quick bid, Kits). After: 4 of 4 right at
+820x1180, laptop unchanged, a real hover still moves it.
+
+Ranking faults found on the way, fixed (`client/src/lib/everydaySearches.test.ts`,
+20 everyday searches + 5 for a company's pre-rename copies; 5 red before):
+
+- [x] "old work box" led with the F-clip SUPPORT (its name starts with the
+      query). An accessory no longer gets "starts with" for a query that
+      names no role; a 3+-word query found whole inside a name now ranks
+      next (CONTAINS); single-gang old-work box marked "common".
+- [x] A company's copy made before a rename ("Duplex receptacle", "12-2 MC
+      cable", "Single-gang box") had no starter rank — `commonnessPoints`
+      keyed by name, and the copy keeps its old one. Now looked up through
+      the rename map. "recep" had put their own priced duplex 30th.
+- [x] "12-2" and "12/2" are one spelling for a cable spec, in matching and
+      in ranking. "romex 12/2" found NOTHING for a company whose copy is
+      "12-2 NM-B".
+- **Search words for Track A: none needed** for these 20 searches. Every
+  fix was ranking. (A's catalog names and aliases were not touched.)
 
 ## Coverage-check starters — BUILT 2026-10-09 (Track B), 224 starters
 

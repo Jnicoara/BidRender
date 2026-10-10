@@ -22,6 +22,7 @@
  * save, Escape revert and the save flash for free (CLAUDE.md § Editing fields).
  * The total updates optimistically with no spinner (§ Responsiveness).
  */
+import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -383,7 +384,10 @@ export default function QuickBidPage({
                 {results.map((assembly, index) => (
                   <button
                     key={assembly.id}
-                    onMouseEnter={() => setHighlight(index)}
+                    onMouseMove={e => {
+                      // Only a pointer that MOVED — see @/lib/pointerHighlight.
+                      if (pointerMovedHighlight(e)) setHighlight(index);
+                    }}
                     onClick={() => add(assembly.id)}
                     className={cn(
                       "w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors border-b border-border last:border-0",
