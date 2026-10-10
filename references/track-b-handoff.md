@@ -52,6 +52,7 @@
   (177 present, 177 declared)", one more than B measured today. If it
   prints anything else, stop and find out why: either this line is stale,
   or the database is not in the state you think.
+
 - **What is logged:** words, company (owner id), picker, time. No person,
   bid or price.
   - Sources:

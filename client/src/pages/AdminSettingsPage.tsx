@@ -53,9 +53,9 @@ export default function AdminSettingsPage() {
           <div>
             <h1 className="text-lg font-semibold">Admin</h1>
             <p className="text-xs text-muted-foreground">
-              Early access signups, AI spend, pricing problems, searches
-              that found nothing, seats per company, and what each platform
-              role can reach.
+              Early access signups, AI spend, pricing problems, searches that
+              found nothing, seats per company, and what each platform role can
+              reach.
             </p>
           </div>
         </div>

@@ -293,6 +293,7 @@ Not urgent if keys are created with no expiration, which is now the rule.
       "Counting ci duplex". The test's forced-race hook waits on the
       `bidridge:last-count:<bid>` write and timed out at 20 s. Passed in the
       3 runs on either side.
+
       > **Cause:** the click DID arm — and the server handed back the DUPLEX
       > count. The Legend shows a link the moment it is picked, so the click
       > after "Link" can reach `takeoffGroups.forAssembly` before
@@ -317,6 +318,7 @@ Not urgent if keys are created with no expiration, which is now the rule.
       > assembly is not loaded) now says so in a toast. And a failed smoke
       > test keeps a Playwright trace, sealed before upload (`gate.yml`,
       > `deploying.md` § 12 says how to open one).
+
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the
