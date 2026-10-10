@@ -78,7 +78,18 @@ left out. One line per theme; the commits say the rest.
 - Reset page says a dead link is dead on open (`6518fc5`); reset logs why
   nothing was sent (`4a76181`); slow-request logging (`c0f7fbe`).
 
-## 3. Migrations a live release would run: 0105–0142 (38 files)
+## 3. Migrations a live release would run: 0105–0143 (39 files)
+
+> **Grew 2026-10-10 (later): 0143** (`0143_labor_steps`, Track C's
+> step-based labor — two new tables, `labor_steps` and
+> `assembly_labor_steps`, three foreign keys; additive, on staging,
+> `deploying.md` § 11 "0143"). **Expect 39 applied, 144, matches,
+> 180/180.** Rehearsed on staging's copy: 1,062/1,062 bid totals unchanged
+> with the old code, with C's code, and after C's code first boot (which
+> seeds 47 shipped steps and 194 starter step lines, all with NO time, so
+> no number moves). The 0142 note below says 38 / 143 / 177 — read it as
+> 39 / 144 / 180. If what prints differs, stop and find out why: either
+> this line is stale or live is not where you think.
 
 > **Grew 2026-10-10: 0142** (`0142_search_misses`, Track B's no-match
 > search log — one new table with one foreign key to `users`, additive,
@@ -127,6 +138,8 @@ per `migrations-next-batch.md` and the staging records in `deploying.md`
 | 0139      | `elbowFlat` appended to `bid_line_items.runMaterialRole` (the 700 flat elbow)                                                   |
 | 0140      | `materials.isSpecialty` — the catalog review's Specialty tag (sorts lower in search; no total reads it)                         |
 | 0141      | `ai_service_status` — one row: whether AI calls are being refused (dead key), for the admin AI screen                           |
+| 0142      | `search_misses` — what a company's picker found nothing for, for the admin screen (one FK to `users`)                           |
+| 0143      | `labor_steps`, `assembly_labor_steps` — step-based labor; ships with no times, so no total reads a number from it (three FKs)   |
 
 - **Expect: "Applied 36 migrations", then 141; a second run applies nothing;
   `schemaDrift` "matches"; foreign keys 176/176** (staging's number,
@@ -539,14 +552,16 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
 
 ## SHORT SUMMARY
 
-- Live `24105ad` / 0104; staging = `local-dev` / 0140.
-- A release runs 0105–0140 (36, all additive) before the push, in one
-  ordered run; expect 141, matches, 176/176 FKs. \*\*Re-rehearsed with all 36
-  - the catalog review + the Sch 80 / 500 seed + the cover repair on
-    2026-10-09 (§ 5e)\*\*: clean; 1,801 active shipped, 24 run types, 183
-    starters, 0 holds, only the intended ground swap moved, repair 5 / 43 →
-    48, both bids unchanged. The copy was the 2026-10-08 23:54 backup (a fresh
-    read of live was refused this session).
+- Live `24105ad` / 0104. Staging's DATABASE is at 0143 (144); staging's
+  CODE is `f03e8ef` until somebody pushes staging — the Gate refuses the
+  push because `drizzle/` differs (2026-10-10).
+- A release runs 0105–0143 (39, all additive) before the push, in one
+  ordered run; expect 144, matches, 180/180 FKs. The last rehearsal on a
+  copy of LIVE was of 36 (§ 5e, 2026-10-09: clean; 1,801 active shipped, 24
+  run types, 183 starters, 0 holds, only the intended ground swap moved,
+  repair 5 / 43 → 48, both bids unchanged, on the 2026-10-08 23:54 backup).
+  0141–0143 were rehearsed on staging's copy only, so a live-copy rehearsal
+  of all 39 is still owed before the window.
 - Coverage-check catalog adds (`3cb5df3`, § 5f): +24 rows, seed only —
   expect **1,825 active / 114 Specialty** on the first boot if the
   candidate includes them. Rehearsed on staging's copy: CLEAN, 847/847.

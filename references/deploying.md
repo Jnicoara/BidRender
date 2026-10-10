@@ -1684,6 +1684,34 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0143 — step-based labor (2026-10-10 UTC) — DATABASE only, NOT on live
+
+`0143_labor_steps` (Track C's `c-step-labor`, renumbered from 0142 when
+B's search log took that number): two new tables, `labor_steps` and
+`assembly_labor_steps`, three foreign keys — additive, step 1, step 3
+empty. The code survives the tables being absent (`stepsTablesMissing`).
+
+1. **Backup**: `staging-2026-10-10T03-30-47Z-before-0143.sql` (75 tables);
+   restored to `bidrender_staging_restore_0143`: every count equal except
+   `bids`, which was one short — the CI smoke bid created during the dump.
+2. **Rehearsal** on that restore: drift before = exactly 0143's tables and
+   3 FKs; **1 applied**, 144; re-run nothing; "matches", 180/180;
+   **1,062/1,062 unchanged** with the old code, with C's code, and after C's
+   code's first boot (47 shipped steps, 194 starter step lines, no times).
+3. **Staging database**: **1 applied**, 144; "matches", 180/180; **all
+   1,066 existing bids unchanged**. The one new bid after (1068) is the
+   smoke account's.
+4. **Code**: C fast-forwarded `local-dev` to `585f5d9`. Gate 38021158859:
+   test green, **deploy-staging REFUSED** — "this push changes drizzle/
+   against what staging runs" (0143, the journal, `schema.ts`). That is the
+   guard working: unlike 0142, staging was not pushed by hand first (that
+   push was refused in this session). **Staging serves `f03e8ef` against a
+   0143 database** — safe, since that code never reads the new tables —
+   until the owner decides how `staging` gets `local-dev`.
+
+**Live**: 0143 joins the batch — 0105–0143, 39 files, expect 144, 180/180
+(`next-live-release-plan.md` § 3).
+
 ### Staging: migration 0142 — the no-match search log (2026-10-10 UTC) — NOT on live
 
 `0142_search_misses` (Track B's table, B's SQL word for word): one new table
