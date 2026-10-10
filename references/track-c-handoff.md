@@ -23,6 +23,15 @@ local-dev, merge local-dev into `c-step-labor` first.** Do NOT merge
 `c-step-labor` into local-dev until the owner says so. `c-pvc-4080` left
 alone (A merged it into the catalog job).
 
+**MERGED to local-dev 2026-10-10** (fast-forward from `c-step-labor`)
+after: Gate 38019884197 on `21468a9` green (full suite); Track A applied
+0143 to staging 03:34 UTC (backup
+`staging-2026-10-10T03-30-47Z-before-0143.sql`; rehearsed on its restore:
+1 applied, 144, 180/180 FKs, 1,062/1,062 bids unchanged with the old code,
+this code and after its first boot; on staging 1,066/1,066 existing bids
+unchanged). The local-dev push is what deploys this code to staging; A
+checks that Gate.
+
 **Merge order (owner, 2026-10-10):** wait until A has (a) pushed the catalog
 job to local-dev — DONE, `334104a` / `8f28a85` / `aec561b` on local-dev as
 of 2026-10-10 02:20 UTC — AND (b) applied migration 0143 — NOT YET (0143 is
