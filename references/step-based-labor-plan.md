@@ -428,3 +428,178 @@ Notes on reading the lists:
     _Suggested:_ ship them as example times, adjusted by the owner. "Not
     set" everywhere gives a new shop nothing to react to, and the example
     tag already keeps a shipped number from passing as the shop's own.
+
+## 13. OWNER ANSWERS (2026-10-09) — these override § 12 where they differ
+
+| Q   | Answer                                                                                                                                                                                                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Yes:** the cable inside an assembly reads the cable's own per-foot hours (the part step, § 2, § 6d).                                                                                                                 |
+| 2   | **Yes:** layout, handling and cleanup go in the assembly's `overheadLaborHours`. **Rule: no starter's step total + overhead may land BELOW its current hours until the owner reviews it** ("a little high beats low"). |
+| 3   | Suggested answer: typed hours win; the step total is a grey line, never a warning.                                                                                                                                     |
+| 4   | Suggested answer: both — editing a step accepts it; "Use these times" accepts all, after saying how many.                                                                                                              |
+| 5   | Suggested answer: minutes on steps, hours on assemblies and bids.                                                                                                                                                      |
+| 6   | Suggested answer: one quiet line — steps when the assembly has steps, otherwise parts.                                                                                                                                 |
+| 7   | **Yes, clear the typed hours on the 30 starters — but only once their overhead is filled per Q2** (enforced, § 13b).                                                                                                   |
+| 8   | Suggested answer: plain steps plus the Retrofit modifier; only genuinely different work gets its own step.                                                                                                             |
+| 9   | Suggested answer: no role on steps; one rate per assembly.                                                                                                                                                             |
+| 10  | Suggested answer: ship example times, adjusted by the owner.                                                                                                                                                           |
+
+### 13a. Does any suggested answer change a bid number? Checked — no.
+
+The owner's condition was: use the suggested answers unless one changes a
+bid number, and if so, list it and stop. Checked 2026-10-09 against the code
+on `origin/a-catalog-reality` (local-dev plus A's catalog merge):
+
+- **Existing bids cannot move.** A bid line freezes its hours at add time
+  (`snapshotLaborHours` via `snapshotHoursFor`) and its example tag
+  (`snapshotHoursWereExample`). todo.md's table of what a bid line reads
+  live ("WRONG-NUMBER RISK: older bid lines read their assembly's recipe
+  LIVE") lists ONE live read, the pre-0087 "parts not priced" count, and no
+  hours. No answer touches parts or prices.
+- **Q3–Q6, Q8, Q9** change screens or where a number is kept, never a number.
+- **Q10 (ship example times) is the only one that changes what a NEW line
+  prices at.** A starter whose hours are not set today, and whose steps
+  are all timed, would price new lines with "Example hours" instead of
+  "Hours not set". That is the purpose of Q7, which the owner approved, and
+  Q2's rule presupposes shipped step times. So it is not an independent
+  change. **And the code ships inert:** the step library and the starters'
+  step lists ship with NO minutes, so not one new line prices differently
+  until the owner types minutes in the sheet (§ 14) and A loads it.
+
+### 13b. What Q2 and Q7 mean in numbers — and why typed hours stay for now
+
+**The current hours** (Q2's floor): seven of the 30 have typed shipped hours
+today, hard-coded in `server/seed/baselineAssemblies.ts`: DV1 0.75, DV4 0.6,
+DV2 0.9, LT1 0.6, DV5 0.7, LT2 1.5, DV3 1.25. The other 23 are "not set",
+so the floor does not bind them.
+
+**Overhead needed so step total + overhead ≥ current**, using the § 10
+draft times and draft cable units, rounded UP to 0.05 h:
+
+| Starter  | Current h | Draft step total h | Overhead to fill                                                                  |
+| -------- | --------- | ------------------ | --------------------------------------------------------------------------------- |
+| DV1      | 0.75      | 0.51               | 0.25                                                                              |
+| DV4      | 0.6       | 0.47               | 0.15                                                                              |
+| DV2      | 0.9       | 0.56               | 0.35                                                                              |
+| LT1      | 0.6       | 0.62               | 0.05 (already above; a little high beats low)                                     |
+| DV5      | 0.7       | 0.50               | 0.20                                                                              |
+| LT2      | 1.5       | 1.17               | 0.35                                                                              |
+| DV3      | 1.25      | 0.79               | 0.50                                                                              |
+| other 23 | not set   | § 11               | suggested 0.10 (devices, demo, panel) / 0.15 (fixtures, equipment) — owner's call |
+
+**Why the typed hours cannot be cleared yet:** 28 of the 30 starters carry
+cable, and under Q1 their step total reads the cable's own hours, which ship
+EMPTY today (`server/seed/materials/starterLaborUnits.ts` is `{}`: every cable
+row "not set"). A step total that is not set can never satisfy Q2's floor,
+so the rule itself holds those typed hours in place until the owner fills
+the cable rows on the labor sheet.
+
+**The rule as code, not a sentence:** `starterHoursClearable(current,
+stepTotal, overhead)` in `shared/assemblyHoursSource.ts` returns false when
+the step total is not set, or when step total + overhead is below the
+current hours. A's loader clears a starter's typed hours only when it
+returns true, and a seed test fails if any shipped starter has its typed
+hours cleared while the function says no.
+
+## 14. The "Steps" tab — for A's ONE sheet rebuild
+
+**Two new tabs in `pricing/starter-catalog-pricing.xlsx`**, so the owner
+types step times and overheads in the file he already fills. A builds them
+in the same rebuild as everything else (`pricing/buildStarterSheets.mts`
+`want("prices")`, the same workbook). Nothing about the other tabs changes.
+
+**Content files the builder and loader read** (Track C writes the first;
+A's loader writes the other two; on `c-step-labor`):
+
+- `server/seed/starterLaborSteps.ts` — `STARTER_LABOR_STEPS` (the library:
+  `key`, `name`, `unit`, `reasoning`, sorted as § 10) and
+  `STARTER_ASSEMBLY_STEPS` (shipped assembly NAME → its steps in order:
+  `{ step: key, count }` or `{ cable: true }` for the part step on the
+  recipe's foot-sold cable line). Hand-written content, like the starters.
+- `server/seed/starterStepMinutes.ts` — `STARTER_STEP_MINUTES`: step key →
+  minutes as a string. **GENERATED by the loader, ships `{}`.**
+- `server/seed/starterAssemblyOverhead.ts` — `STARTER_ASSEMBLY_OVERHEAD`:
+  starter name → overhead hours as a string, and `STARTER_HOURS_CLEARED`:
+  the names whose typed hours the loader cleared. **GENERATED, ships empty.**
+
+### Tab "Steps" — one row per library step
+
+| Column      | What                                                                                          | Typed?  |
+| ----------- | --------------------------------------------------------------------------------------------- | ------- |
+| Key         | `S01`… — the carry-over key. Never shown in the app                                           | no      |
+| Step        | the name                                                                                      | no      |
+| Unit        | "each", "per cable end", …                                                                    | no      |
+| **Minutes** | **YELLOW.** Blank = not set (never type 0 to mean unknown; 0 is a real answer)                | **yes** |
+| Draft       | the § 10 draft minutes, for reference — the owner copies or changes them                      | no      |
+| Reasoning   | the motions (§ 10)                                                                            | no      |
+| Used by     | refs and counts, e.g. "DV1 ×1, DV2 ×1, DV20 ×1 (14 assemblies)" from `STARTER_ASSEMBLY_STEPS` | no      |
+
+Sorted by number of assemblies using the step, most first. A note row at the
+top: **"Cable time is not on this tab — it is each cable's hours per 100 ft
+on labor-units-starter.xlsx (owner, Q1)."**
+
+### Tab "Step totals" — one row per starter that has a step list
+
+| Column              | What                                                                                                                                          | Typed?  |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Ref, Assembly       | as the assembly-hours sheet                                                                                                                   | no      |
+| Current hours       | its shipped typed hours today, or "not set"                                                                                                   | no      |
+| Step minutes        | **a FORMULA**: Σ count × that step's Minutes on "Steps" (`SUMPRODUCT`/`VLOOKUP`), so it moves as he types; blank if any of its steps is blank | no      |
+| Cable hours         | the recipe's cable feet × the cable's loaded hours per foot, written at build time; "not set" when the cable row is not set                   | no      |
+| Step total (h)      | formula: Step minutes / 60 + Cable hours; blank when either is not set                                                                        | no      |
+| Suggested overhead  | § 13b                                                                                                                                         | no      |
+| **Overhead (h)**    | **YELLOW**                                                                                                                                    | **yes** |
+| Total with overhead | formula                                                                                                                                       | no      |
+| Clears typed hours? | formula: "Yes" only when Step total is set AND Total with overhead ≥ Current hours; else the reason                                           | no      |
+
+The "Clears typed hours?" column is the owner's preview only. **The loader
+decides with `starterHoursClearable`, never by reading that cell.**
+
+### What the BUILDER needs (`pricing/buildStarterSheets.mts`)
+
+1. Two new `SheetKind`s in `pricing/sheetCarryOver.ts`: `"steps"` (key =
+   step Key; value = Minutes) and `"step-totals"` (key = Ref; value =
+   Overhead). `SHEET_FILES` maps both to `[PRICES_FILE, "Steps"]` and
+   `[PRICES_FILE, "Step totals"]`, so `readTyped` reads the old tabs from
+   the prices file it is about to replace.
+2. **The standing rule holds** (`pricing/README.md`): a typed Minutes or
+   Overhead carries over by KEY. A step whose key left the library goes in
+   the dropped-values report; a typed value for a step or starter that still
+   exists and cannot be placed STOPS the rebuild.
+3. Both tabs are written inside the `want("prices")` workbook, before
+   `stage`, so the existing write → read-back → verify step covers them.
+4. `server/sheetCarryOver.test.ts` gains: a typed Minutes survives a rebuild;
+   a typed Overhead survives one; a step removed from the library lands in the
+   dropped report.
+
+### What the LOADER needs (`pricing/loadStarterSheets.mts --prices`)
+
+1. Read "Steps": Minutes per Key → `STARTER_STEP_MINUTES` (number ≥ 0 as a
+   string; blank skipped, i.e. not set; anything else REFUSES the load,
+   naming the row).
+2. Read "Step totals": Overhead per Ref → `STARTER_ASSEMBLY_OVERHEAD` (by
+   starter name).
+3. Compute each starter's step total exactly as the app will
+   (`stepTotalHours` in `shared/assemblyHoursSource.ts`, fed the new minutes
+   and the cable labor units being loaded in the same run), then
+   `starterHoursClearable(current, total, overhead)` → `STARTER_HOURS_CLEARED`.
+4. Print the same before → after diff it prints for the other maps, plus
+   one line per starter: "DV1: steps 0.51 h + overhead 0.25 h = 0.76 h ≥
+   0.75 h, typed hours cleared" or the reason it was not.
+5. Write the two generated files. `--write` only, as today.
+
+### What the SEED does with them (Track C's code, `c-step-labor`)
+
+- Shared steps re-stamped from `STARTER_LABOR_STEPS` + `STARTER_STEP_MINUTES`
+  (`isExampleMinutes` TRUE where a minute value was loaded), scoped
+  `isNull(userId)`, never a company's fork.
+- Shared starters' step lists re-stamped from `STARTER_ASSEMBLY_STEPS`.
+- Overhead from `STARTER_ASSEMBLY_OVERHEAD`, and typed hours cleared for
+  `STARTER_HOURS_CLEARED`, on SHARED rows only, with `isExampleHours` TRUE,
+  in the existing re-stamp pass beside `STARTER_ASSEMBLY_HOURS`.
+
+**One build decision recorded here:** a step's time is stored in MINUTES
+(`labor_steps.minutes`, decimal(8,2)), not hours, because the owner types
+minutes and 1 min is 0.01666… h. Sums are taken in minutes and divided by
+60 once. § 2's "hours: decimal(10,4)" is replaced by this, and its
+example flag is named `isExampleMinutes` to match.
