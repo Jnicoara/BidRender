@@ -174,6 +174,54 @@ describe.skipIf(!hasDb)("a scale belongs to one sheet", () => {
     const after = await caller().bidPdfs.sheets({ bidPdfId });
     expect(after.map(s => s.scaleRatio)).toEqual([48, null, 48]);
   });
+
+  it("a REMOVED scale stays removed when the sheet is viewed again", async () => {
+    /*
+      The fault (baseline-screen-plan.md § 9, F9, 2026-10-10): removing a
+      scale put the sheet back to "none", and showing a sheet with "none"
+      runs detection on its own (TakeoffPage, handleSheetVisible). A
+      confident reading was then applied again, and traced footage on the
+      sheet jumped from 0 back to feet — with nobody pressing anything.
+
+      Viewing is exactly this call: the page's text, sent without a click.
+    */
+    const { bidPdfId } = await newDocument(1);
+    const [sheet] = await caller().bidPdfs.sheets({ bidPdfId });
+    const first = await caller().bidPdfs.detectSheetScale({
+      id: sheet.id,
+      sheetText: `POWER PLAN\nSCALE: 1/4" = 1'-0"`,
+    });
+    expect(first.applied).toBe(true);
+
+    await caller().bidPdfs.clearSheetScale({ id: sheet.id });
+    const viewedAgain = await caller().bidPdfs.detectSheetScale({
+      id: sheet.id,
+      sheetText: `POWER PLAN\nSCALE: 1/4" = 1'-0"`,
+    });
+    expect(viewedAgain.applied).toBe(false);
+
+    const [reloaded] = await caller().bidPdfs.sheets({ bidPdfId });
+    expect(reloaded.scaleRatio).toBeNull();
+    // A person decided it: the browser's "detect when none" never fires.
+    expect(reloaded.scaleSource).not.toBe("none");
+    // And the sheet still asks for a scale rather than measuring anything.
+    expect(reloaded.scaleText).toBeNull();
+  });
+
+  it("setting a scale by hand after removing it still works", async () => {
+    const { bidPdfId } = await newDocument(1);
+    const [sheet] = await caller().bidPdfs.sheets({ bidPdfId });
+    await caller().bidPdfs.setSheetScale({
+      id: sheet.id,
+      scaleText: `1/4" = 1'-0"`,
+    });
+    await caller().bidPdfs.clearSheetScale({ id: sheet.id });
+    const set = await caller().bidPdfs.setSheetScale({
+      id: sheet.id,
+      scaleText: `1/8" = 1'-0"`,
+    });
+    expect(set.scaleRatio).toBe(96);
+  });
 });
 
 describe.skipIf(!hasDb)("whether a scale has been checked", () => {
