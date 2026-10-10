@@ -117,8 +117,8 @@ export function ProfitabilityPanel({
         count={report.incompleteJobs}
         notPricedCount={report.notPricedJobs}
         notPricedBids={report.notPricedJobList}
-        notPricedDrops={report.notPricedDrops}
         onOpenBid={onOpenBid}
+        notPricedDrops={report.notPricedDrops}
         noun={["job", "jobs"]}
       />
 

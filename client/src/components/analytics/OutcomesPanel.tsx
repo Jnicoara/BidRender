@@ -212,8 +212,8 @@ export function OutcomesPanel({
         count={totals.incompleteBids}
         notPricedCount={totals.notPricedBids}
         notPricedBids={totals.notPricedBidList}
-        notPricedDrops={totals.notPricedDrops}
         onOpenBid={onOpenBid}
+        notPricedDrops={totals.notPricedDrops}
         noun={["bid", "bids"]}
       />
 
