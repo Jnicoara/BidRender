@@ -12,15 +12,16 @@ session 31). Owner's yes is still needed before `main` is pushed.
 
 ### What is queued (as of 2026-10-10)
 
-| Item                                                      | Where now                                             | Moves a total?                                                              |
-| --------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| **0144** `bid_pdf_sheets.workTag` (B's M2)                | local-dev `e613723`; staging DB + code                | No — additive, step 1, **on live BEFORE the push**                          |
-| **0145** `bid_expenses.notes` (C's Q-M5)                  | same                                                  | No — additive, step 1, before the push                                      |
-| **B's twin fold** (`b-twin-fold`, `24843fd`)              | branch, NOT yet merged to local-dev                   | Lowers twin bids on purpose — live has 0 twins, so none                     |
-| **B's status view** (`b-status-view`, after the fold)     | branch, NOT yet merged; needs 0144                    | No (screens only)                                                           |
-| **C's remove / relocate labor** (`a7fe812` → `d832e34`)   | local-dev, staging                                    | **RAISES** bids with remove/relocate marks — see the gate below             |
-| **C's job costs** (Quick bid phase 1, `200e310`)          | local-dev, staging; the drive-time note waits on 0145 | Only bids with job-cost rows; live has **0** `bid_expenses` rows (measured) |
-| B's `b72188d` (undo removed line, "+ N drops not priced") | local-dev, staging                                    | No — what screens SAY; check on staging, not a bidTotals item               |
+| Item                                                                                                | Where now                                             | Moves a total?                                                                        |
+| --------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **0144** `bid_pdf_sheets.workTag` (B's M2)                                                          | local-dev `e613723`; staging DB + code                | No — additive, step 1, **on live BEFORE the push**                                    |
+| **0145** `bid_expenses.notes` (C's Q-M5)                                                            | same                                                  | No — additive, step 1, before the push                                                |
+| **B's twin fold** (`b-twin-fold`, `24843fd`)                                                        | branch, NOT yet merged to local-dev                   | Lowers twin bids on purpose — live has 0 twins, so none                               |
+| **B's status view** (`b-status-view`, after the fold)                                               | branch, NOT yet merged; needs 0144                    | No (screens only)                                                                     |
+| **C's remove / relocate labor** (`a7fe812` → `d832e34`)                                             | local-dev, staging                                    | **RAISES** bids with remove/relocate marks — see the gate below                       |
+| **C's job costs** (Quick bid phase 1, `200e310`)                                                    | local-dev, staging; the drive-time note waits on 0145 | Only bids with job-cost rows; live has **0** `bid_expenses` rows (measured)           |
+| B's `b72188d` (undo removed line, "+ N drops not priced")                                           | local-dev, staging                                    | No — what screens SAY; check on staging, not a bidTotals item                         |
+| C's F9 / F10 (`67ee526` cleared scale stays cleared; `bbb5f85` homerun re-match stays on its sheet) | local-dev (merged during session 31), no migration    | No stored total; stops footage coming back unasked — bidTotals before/after covers it |
 
 Live migrations for this release: **0144–0145, 2 files, expect 146 / 180**
 (`deploying.md` § "Staging: migrations 0144–0145" is the staging record).
