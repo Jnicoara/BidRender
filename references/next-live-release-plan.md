@@ -1,5 +1,39 @@
 # Next live release — PLAN ONLY (Track A, 2026-10-08)
 
+> **RELEASED 2026-10-10: `371b2ab` + 0105–0143 are LIVE** (owner approvals
+> A–D). What printed: `deploying.md` § 11 "LIVE: `371b2ab`". Every figure
+> matched § 5g. The rest of this file is the record of that release; the
+> section below is the start of the NEXT one.
+
+## For the NEXT release (after `371b2ab`) — started 2026-10-10
+
+Live is `371b2ab` / 144 migrations / 180 FKs. At the time of writing
+local-dev adds no file under `drizzle/` or `server/seed/` (`git diff 371b2ab
+origin/local-dev -- drizzle server/seed` empty) — re-check on the day.
+
+- **Track C's remove / relocate labor (`a7fe812`, merged as `d832e34`)
+  RAISES TOTALS on purpose.** On a bid with remove or relocate marks, each
+  kind gets its own labor line beside the install line, priced from the
+  count's override hours, else the assembly's, else NOT PRICED (with a "Set
+  remove hours" fix). So `bidTotals --compare` will report those bids as
+  changed, and that is not by itself a fault. Before the release:
+  1. **Count the live bids with remove/relocate marks** (read only, on the
+     release's own verified backup copy if a live query is refused) —
+     probably 0 on today's live (2 bids, 0 lines), but measure it.
+  2. **`bidTotals` before (live's code) and after (the new code), then
+     `--compare`.** Every bid WITHOUT such marks must be unchanged. Every bid
+     WITH them must change only by its new remove/relocate lines — list them
+     by bid and check each one's line, rather than accepting "changed" as
+     expected wholesale. Same shape as the 2026-10-06 EXPECTED label
+     (`live-release-plan.md` § 1b).
+- Track B's `b72188d` (undo for a removed line / circuit, "+ N drops not
+  priced" on the dashboard and lists) changes what screens SAY about drops,
+  not any total — check on staging, not a bidTotals item.
+- Queued, NOT started (owner's go needed): Track B's twin fold (branch
+  `b-twin-fold`, `24843fd`; M1 draft in `track-b-handoff.md`) — a one-off
+  script calling the tested fold code, not SQL. First step on the go: count
+  twin counts on a copy of live (live may have none).
+
 **Nothing here has been run against live.** This is what a release of
 today's `local-dev` would carry, what it would run, the rules it must keep,
 what to check first, and what must wait. The day-of checklist is still
@@ -13,6 +47,16 @@ out why before going on** — either this file is stale or the system is not
 in the state it describes, and those want opposite responses.
 
 ## 1. Where things stand
+
+> **RELEASE CANDIDATE: `371b2ab` — chosen 2026-10-10 (Track A, session 29).**
+> Gate 38024015936 on exactly `371b2ab`: test, deploy-staging, smoke all
+> green (drizzle-guard skipped). It contains `11f5466`, `705e1c9` and
+> `dd3f76d` (`git merge-base --is-ancestor`), and `git diff dd3f76d 371b2ab
+-- drizzle server/seed` is EMPTY, so § 5g's rehearsal of `dd3f76d` holds
+> for it unchanged. It replaces `dd3f76d` (§ 5g, SHORT SUMMARY), which was
+> named before this Gate went green. Newer local-dev tip `07c7407` is docs
+> only on top of it (Gate 38068418606 still running at the time of the
+> check); the candidate does not move to anything newer without the owner.
 
 > **2026-10-09:** the latest rehearsal is § 5e (36 migrations, catalog
 > review, Sch 80 / 500 seed, cover repair). The table below is from
@@ -548,6 +592,9 @@ Staging itself: `deploying.md` § 11 "coverage-check catalog adds".
 
 ## 5g. Fresh rehearsal on a copy of LIVE, all 39 + both repairs — DONE 2026-10-10 (nothing changed on live)
 
+> **Candidate since moved to `371b2ab`** (§ 1): same `drizzle/` and seed,
+> so every figure below holds for it.
+
 Track A, 04:19–04:27 UTC. **Candidate: `dd3f76d`** (local-dev; Track B's
 merge of the tablet Enter fix). It contains every must-include:
 `11f5466`, `705e1c9`, `dd3f76d`. The rehearsal booted `a1527ac`, which is
@@ -620,7 +667,9 @@ limit). Pricing survival is proved on staging's bids (`deploying.md` § 11).
 - Live `24105ad` / 0104. Staging's DATABASE is at 0143 (144); staging's
   CODE is `f03e8ef` until somebody pushes staging — the Gate refuses the
   push because `drizzle/` differs (2026-10-10).
-- **Candidate: `dd3f76d`** (has `11f5466`, `705e1c9`, `dd3f76d`).
+- **Candidate: `371b2ab`** (Gate 38024015936 green; has `11f5466`,
+  `705e1c9`, `dd3f76d`; same `drizzle/` and `server/seed/` as `dd3f76d`,
+  which § 5g rehearsed and which was the candidate until then).
 - A release runs 0105–0143 (39, all additive) before the push, in one
   ordered run; expect 144, matches, 180/180 FKs. **Rehearsed 2026-10-10 on
   a FRESH copy of live (§ 5g)**: 39 applied, 180/180; first boot 0 holds,
@@ -631,7 +680,9 @@ limit). Pricing survival is proved on staging's bids (`deploying.md` § 11).
   expect **1,825 active / 114 Specialty** on the first boot if the
   candidate includes them. Rehearsed on staging's copy: CLEAN, 847/847.
 - NEW release step after the push and first boot: `repairStarterCovers.mts`
-  (§ 4b) — expect 5 swapped (DV1–DV5), 43 already, then 48 already.
+  (§ 4b) — expect 5 swapped (DV1–DV5), 45 already, then 50 already (§ 5g;
+  the 43 / 48 were 2026-10-08's). Then `repairStarterRetired.mts` (§ 4c):
+  1 repointed (PG1), 10 already, 2 expected skips (DV34, GR3).
 - Pairing rules 1–5 all met on `local-dev`; rule 2 now expects ZERO holds
   (DV34 loads).
 - Check first: owner's yes, green Gate on the candidate, owner's tablet

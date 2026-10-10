@@ -19,7 +19,11 @@
  * change the column figures included the sample bid's fictional value while
  * the headline did not; both now go through here.
  */
-import { NOTHING_NOT_PRICED, type NotPricedTally } from "./lineNotPriced";
+import {
+  NOTHING_NOT_PRICED,
+  withDropsNotPriced,
+  type NotPricedTally,
+} from "./lineNotPriced";
 import { countsTowardTotals } from "./sampleProject";
 
 export type SummableBid = {
@@ -58,11 +62,17 @@ export function sumBidTotals<T extends SummableBid>(
     }
     total += value(bid);
     count += 1;
-    notPriced = {
-      lines: notPriced.lines + bid.notPriced.lines,
-      parts: notPriced.parts + bid.notPriced.parts,
-      hours: notPriced.hours + bid.notPriced.hours,
-    };
+    // Drops through `withDropsNotPriced`, so a sum with none carries no
+    // `drops: 0` and reads exactly as it did (owner, 2026-10-10).
+    notPriced = withDropsNotPriced(
+      {
+        lines: notPriced.lines + bid.notPriced.lines,
+        parts: notPriced.parts + bid.notPriced.parts,
+        hours: notPriced.hours + bid.notPriced.hours,
+        ...(notPriced.drops ? { drops: notPriced.drops } : {}),
+      },
+      bid.notPriced.drops ?? 0
+    );
     incomplete = incomplete || bid.incomplete;
   }
   return {

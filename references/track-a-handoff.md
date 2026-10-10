@@ -1,4 +1,4 @@
-# Track A handoff — 2026-10-06, after the live release
+# Track A handoff — 2026-10-10, after the `371b2ab` live release
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
@@ -19,7 +19,32 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## START HERE — 2026-10-10, end of session 28: the release is READY, waiting on the owner
+## START HERE — 2026-10-10, session 29: `371b2ab` IS LIVE
+
+**Released with the owner's A–D approvals.** Live: **`371b2ab` / 144
+migrations / 180 FKs** (`builtAt` 2026-10-10T18:58:39Z). Record:
+`deploying.md` § 11 "LIVE: `371b2ab`". Every figure matched § 5g: 39
+applied; first boot added 379 / renamed 433 / retired 216 / deleted 0, 1,717
+active; covers 5 → 50; retired 1 repointed + DV34/GR3 skips; exactly 6
+starter lines changed; both bids' totals unchanged, and the owner opened both
+with plans. Backup `2026-10-10T16-51-41Z` (verified).
+
+- **Scratch left:** `bidrender_backup_verify` (live's pre-release copy, at 105) — keep it for the twin-fold count below, drop after. Catalog and
+  totals JSONs in `C:\dev\bidrender-backups\` (`*-2026-10-10.json`).
+- **Next release:** `next-live-release-plan.md` "For the NEXT release" —
+  C's remove/relocate labor (`d832e34`) RAISES totals on bids with
+  remove/relocate marks: count them on live and compare totals
+  before/after, bid by bid.
+- **QUEUED, do NOT start without the owner's go:** Track B's twin fold
+  (`b-twin-fold`, `24843fd`; M1 draft in `track-b-handoff.md`). Prefer B's
+  one-off script that calls the tested fold code, not SQL. First step: count
+  twin counts on a copy of live (live may have none).
+- **Then:** the staging-guard proposal (`todo.md`), as before.
+- Session note: ad-hoc read-only queries against live were refused by the
+  permission check; committed repo scripts (`bidTotals`, `schemaDrift`,
+  `catalogRehearsal`, `legendLinkRaceCandidates`, the repairs) ran fine.
+
+## (superseded) 2026-10-10, end of session 28: the release is READY, waiting on the owner
 
 **Release candidate: `371b2ab`** — Gate 38024015936 all green (test,
 deploy-staging, smoke). It contains every must-include (`11f5466`,

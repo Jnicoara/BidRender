@@ -78,6 +78,7 @@ type Report = {
   notPricedJobs: number;
   /** The first of those by name, to open from the note. */
   notPricedJobList: { bidId: number; name: string }[];
+  notPricedDrops: number;
   truncated: boolean;
   jobsInRange: number;
 };
@@ -117,6 +118,7 @@ export function ProfitabilityPanel({
         notPricedCount={report.notPricedJobs}
         notPricedBids={report.notPricedJobList}
         onOpenBid={onOpenBid}
+        notPricedDrops={report.notPricedDrops}
         noun={["job", "jobs"]}
       />
 

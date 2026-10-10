@@ -1,6 +1,76 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-09 (last), live check, Save pinned, sign-in limits (READ FIRST)
+## WHERE B STANDS — 2026-10-10, the owner's 3 held items BUILT (READ FIRST)
+
+- **1. Undo for removing a circuit.** The remove shows "Removed circuit X."
+  with an Undo button, like every other Plans delete (`deletedToast`, and
+  `pushRunEdit` now returns its step). It was already an undo step on the
+  toolbar arrow; only the toast was missing.
+- **2. Undo for removing a bid line.** `bids.removeLine` returns a signed
+  packet (`LINE_PACKET`) holding the RAW row, read before the delete.
+  `bids.restoreLine` puts that row back under the same id, every frozen
+  price included, and re-links a panel that was priced by it
+  (`server/bidLineRestore.ts`).
+  - It refuses a second Undo, a packet from another bid, a forged packet,
+    a plans line on a bid locked since, and a count re-sent since.
+  - One hook, `client/src/hooks/useRemoveBidLine.ts`, serves both the bid
+    screen and Quick bid.
+  - **On purpose:** a linked unit copy stays FORKED after Undo. Un-forking
+    would let a later "push to copies" overwrite edits made since, and a
+    fork changes no number.
+- **3. "N drops not priced" on the lists.** The dashboard cards, the column
+  and headline sums (`sumBidTotals` dropped `drops` before), "Find a bid"
+  and analytics now count them.
+  - Analytics counts such bids as not priced and its note reads "(3 drops
+    not priced — drop material not set)".
+  - `db.dropsNotPricedForBids` runs the bid page's own `bidDropsNotPriced`,
+    only for bids with a mark (one query picks them), 4 at a time.
+  - The tap-explanation under every "+ N not priced" now names drops too.
+  - **Not measured:** dashboard time for a company with many marked bids.
+    Every such bid loads its takeoff on each read. Worth timing alongside
+    the 500-sheet summary item in todo.md.
+- **"Bids that don't use it are unchanged":**
+  - `bidLineUndo.test.ts` compares another bid row for row, and its totals.
+  - `dropsNotPricedLists.test.ts` checks that a bid without drops has no
+    `drops` key and the same total due as its bid page.
+  - `sumBidTotals` with no drops returns no `drops` key.
+- **Red without the fix (checked by swapping in HEAD's files):**
+  - `server/bidLineUndo.test.ts`: 4 of 4 red.
+  - `server/dropsNotPricedLists.test.ts`: 4 of 5 red. The 5th is the
+    "no drops key" guard, which must pass both ways.
+  - `client/src/lib/bidLineUndoWired.test.ts`: 2 of 3 red.
+  - `notUndoableWired.test.ts` "every delete has a toast with Undo": red.
+- **On screen** (headless Chrome at 1536x864, 820x1180 and 1180x820,
+  throwaway probe scripts, deleted):
+  - Line remove: toast + Undo. The row comes back in its slot and every $
+    on the page is identical.
+  - Circuit: toast + Undo, and PROBE-1 comes back.
+  - Dashboard: card, Active column and headline read "+ 3 drops not
+    priced".
+  - Analytics: the note names the drops.
+  - Seen, not touched: at 820 wide, the bid table's Hours cell crowds
+    "2 h" against the "Example rate" chip. It is older than this work.
+- **Gate:** the first track-b run 38070215794 went RED. My new prop sat
+  between two props whose order `neverStuck.test.ts` gap 7 pins. I moved
+  the prop and did not loosen the test.
+  - Then 38071028228 green.
+  - Merged Track C's local-dev in (CHANGELOG conflict only, no migrations):
+    38071844496 green.
+  - local-dev = `c83a4fe` (fast-forward from track-b). Its Gate,
+    38072645973, is green on test, deploy-staging and smoke.
+- **Trap hit:** a `sed` edit of a probe script mangled `\n` and broke it.
+  I rewrote it with Write. Use Edit/Write, as CLAUDE.md says.
+- **Trap:** `git checkout local-dev` fails here, because it is checked out
+  in another worktree. Use `git push origin track-b:local-dev` after
+  `git merge-base --is-ancestor origin/local-dev track-b`.
+- **State:** no migration needed or written. DBs still at 144. No dev
+  server running.
+  - Local leftovers (user 1): "B undo probe lines …", "B drops probe …",
+    and "zz undo probe …" material and assembly, plus the "zz probe EMT …"
+    run type.
+  - The probe run on "Bar layout check" was removed.
+
+## WHERE B STOOD — 2026-10-09 (last), live check, Save pinned, sign-in limits
 
 - **Live has the tablet Enter bug: YES.** `24105ad`
   `client/src/components/MaterialPicker.tsx:245` moves the highlight on

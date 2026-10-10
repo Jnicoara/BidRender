@@ -19,6 +19,7 @@ export function IncompleteFiguresNote({
   count,
   notPricedCount = 0,
   notPricedBids = [],
+  notPricedDrops = 0,
   onOpenBid,
   noun,
 }: {
@@ -31,6 +32,11 @@ export function IncompleteFiguresNote({
    * opens the bid — the count alone was a dead end (never-stuck plan, gap 7).
    */
   notPricedBids?: readonly { bidId: number; name: string }[];
+  /**
+   * Drops with no drop material across them (owner, 2026-10-10), said as
+   * "N drops not priced" — the words the cards and the bid page use.
+   */
+  notPricedDrops?: number;
   onOpenBid?: (bidId: number) => void;
   noun: [one: string, many: string];
 }) {
@@ -51,8 +57,11 @@ export function IncompleteFiguresNote({
         <p className="text-xs text-[#F5C518]">
           <span className="font-medium">not priced</span> — {notPricedCount}{" "}
           {notPricedCount === 1 ? noun[0] : noun[1]} in this range{" "}
-          {notPricedCount === 1 ? "has" : "have"} lines or parts nobody has
-          priced. The dollar figures here count them as $0.
+          {notPricedCount === 1 ? "has" : "have"} lines, parts or drops nobody
+          has priced
+          {notPricedDrops > 0 &&
+            ` (${notPricedDrops} ${notPricedDrops === 1 ? "drop" : "drops"} not priced — drop material not set)`}
+          . The dollar figures here count them as $0.
         </p>
       )}
       {notPricedCount > 0 && onOpenBid && notPricedBids.length > 0 && (

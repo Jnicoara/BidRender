@@ -26,8 +26,18 @@ import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Check, Copy, Plus, Search, X, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Copy,
+  Plus,
+  Receipt,
+  Search,
+  X,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -46,6 +56,8 @@ import { bidNotPricedCount } from "@/lib/notPricedTotal";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import { BidExpensesSection } from "@/components/BidExpensesSection";
+import { matchJobCostTiles, type JobCostTileKey } from "@/lib/jobCostTiles";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -85,6 +97,16 @@ export default function QuickBidPage({
   const [qty, setQty] = useState("1");
   const [unitLabel, setUnitLabel] = useState("");
   const [showDuplicate, setShowDuplicate] = useState(false);
+  /**
+   * "More options" — everything beyond type, quantity, Enter. Closed by
+   * default so the counting loop is the whole screen (quick-bid-plan § 0).
+   */
+  const [showMore, setShowMore] = useState(false);
+  /** A job cost tile to open, set when Enter lands on one in the search. */
+  const [openTile, setOpenTile] = useState<{
+    key: JobCostTileKey;
+    nonce: number;
+  } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const utils = trpc.useUtils();
@@ -95,6 +117,10 @@ export default function QuickBidPage({
   const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
   const { data: kits = [] } = trpc.kits.list.useQuery();
   const { data: units = [] } = trpc.bids.units.useQuery({ bidId });
+  /** For the "More options" summary — the same query the section reads. */
+  const { data: jobCosts = [] } = trpc.bidExtras.expenses.onBid.useQuery({
+    bidId,
+  });
 
   const refresh = useCallback(() => {
     void utils.bids.get.invalidate({ id: bidId });
@@ -146,27 +172,8 @@ export default function QuickBidPage({
     onSettled: refresh,
   });
 
-  const removeLine = trpc.bids.removeLine.useMutation({
-    onMutate: async vars => {
-      await utils.bids.get.cancel({ id: bidId });
-      const previous = utils.bids.get.getData({ id: bidId });
-      utils.bids.get.setData(
-        { id: bidId },
-        old =>
-          old && {
-            ...old,
-            lines: old.lines.filter(line => line.id !== vars.id),
-          }
-      );
-      return { previous };
-    },
-    onError: (error, _vars, context) => {
-      if (context?.previous)
-        utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
-    },
-    onSettled: refresh,
-  });
+  // Undo puts back the exact line, frozen prices included.
+  const removeLine = useRemoveBidLine(bidId, refresh);
 
   // smartSearch caches its index by array identity, so this must stay memoised.
   // Assemblies get the same trade-slang matching as materials, so "recep" finds
@@ -190,10 +197,18 @@ export default function QuickBidPage({
       .filter((a): a is NonNullable<typeof a> => Boolean(a));
   }, [query, searchable, assemblies]);
 
+  /**
+   * Job costs the query names ("permit", "dump", "drive"), listed under the
+   * assemblies so the type → Enter loop reaches them too. Enter on one opens
+   * its tile under More options rather than adding — it needs an amount.
+   */
+  const costHits = useMemo(() => matchJobCostTiles(query), [query]);
+  const resultCount = results.length + costHits.length;
+
   const recordMiss = useNoMatchLog(
     "assembly",
     query,
-    results.length,
+    resultCount,
     assembliesReady
   );
   /** "Build it from parts here" — open, and the search it was opened from. */
@@ -230,10 +245,17 @@ export default function QuickBidPage({
     [addAssembly, bidId, qty, unitLabel, focusSearch]
   );
 
+  /** Open a job cost tile under More options, its first box focused. */
+  const openJobCost = useCallback((key: JobCostTileKey) => {
+    setShowMore(true);
+    setOpenTile({ key, nonce: Date.now() });
+    setQuery("");
+  }, []);
+
   const onSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setHighlight(h => Math.min(h + 1, results.length - 1));
+      setHighlight(h => Math.min(h + 1, resultCount - 1));
       return;
     }
     if (event.key === "ArrowUp") {
@@ -244,7 +266,9 @@ export default function QuickBidPage({
     if (event.key === "Enter") {
       event.preventDefault();
       const chosen = results[highlight];
+      const chosenCost = costHits[highlight - results.length];
       if (chosen) add(chosen.id);
+      else if (chosenCost) openJobCost(chosenCost.key);
       // Enter on nothing found is a finished search: logged now, not after
       // a settle time a fast typist never waits for.
       else recordMiss();
@@ -379,7 +403,7 @@ export default function QuickBidPage({
                   focusSearch();
                 }}
               />
-            ) : results.length > 0 ? (
+            ) : resultCount > 0 ? (
               <div className="rounded-lg border border-border overflow-hidden">
                 {results.map((assembly, index) => (
                   <button
@@ -437,6 +461,45 @@ export default function QuickBidPage({
                     )}
                   </button>
                 ))}
+                {costHits.map((tile, offset) => {
+                  const index = results.length + offset;
+                  return (
+                    <button
+                      key={`cost-${tile.key}`}
+                      onMouseMove={e => {
+                        if (pointerMovedHighlight(e)) setHighlight(index);
+                      }}
+                      onClick={() => openJobCost(tile.key)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors border-b border-border last:border-0",
+                        index === highlight
+                          ? "bg-[#F5C518]/10 text-foreground"
+                          : "hover:bg-muted/40"
+                      )}
+                    >
+                      <Receipt
+                        className={cn(
+                          "w-3.5 h-3.5 shrink-0",
+                          index === highlight
+                            ? "text-[#F5C518]"
+                            : "text-muted-foreground"
+                        )}
+                      />
+                      <span className="flex-1 truncate">{tile.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        job cost
+                      </span>
+                      {index === highlight && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          Enter
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
@@ -476,6 +539,50 @@ export default function QuickBidPage({
                   </>
                 )}
               </p>
+            )}
+          </div>
+
+          {/* More options — ONE fold for everything past type, qty, Enter
+              (CLAUDE.md § "Customization available, but never in the way").
+              It holds job costs today and is where rooms, typed footage and
+              checklists go next (quick-bid-plan § 10). The summary names
+              what is inside, so a closed fold still says there are charges. */}
+          <div className="rounded-xl border border-border bg-card">
+            <button
+              type="button"
+              onClick={() => setShowMore(v => !v)}
+              aria-expanded={showMore}
+              className={cn(
+                "w-full flex items-center gap-2 px-4 text-left",
+                coarse ? "min-h-12 py-2" : "py-2.5"
+              )}
+            >
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 shrink-0 text-muted-foreground transition-transform",
+                  showMore ? "" : "-rotate-90"
+                )}
+              />
+              <span className="text-sm font-medium">More options</span>
+              <span className="text-xs text-muted-foreground truncate">
+                {jobCosts.length === 0
+                  ? "Job costs — permit, lift, dumpster, drive time"
+                  : `Job costs: ${jobCosts.length} · ${money(
+                      jobCosts.reduce((sum, c) => sum + c.amount, 0)
+                    )}`}
+              </span>
+            </button>
+            {showMore && (
+              <div className="border-t border-border px-4 py-3 space-y-2">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Job costs
+                </div>
+                <BidExpensesSection
+                  bidId={bidId}
+                  openTile={openTile}
+                  onTileClosed={focusSearch}
+                />
+              </div>
             )}
           </div>
 
@@ -608,7 +715,7 @@ export default function QuickBidPage({
             )}
           </div>
 
-          {detail && lines.length > 0 && (
+          {detail && (lines.length > 0 || detail.totals.expensesTotal > 0) && (
             <div className="rounded-xl border border-border bg-card p-4 flex flex-wrap items-baseline gap-x-6 gap-y-2">
               {/* Materials, direct cost and bid price each say how many lines
                   they leave out, as on the bid screen (owner, 2026-09-26).
@@ -682,6 +789,33 @@ export default function QuickBidPage({
                   className="font-mono text-lg text-[#F5C518]"
                 />
               </div>
+              {/* Job costs are billed on their own line, beside the work and
+                  never inside "Bid price" — as on the bid screen, where a
+                  marked-up charge inside it would be counted twice. So once
+                  there are any, the all-in figure says so, under the name
+                  the bid lists use for it. */}
+              {detail.totals.expensesTotal > 0 && (
+                <div className="basis-full flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1 border-t border-border pt-2">
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">
+                      Job costs
+                    </div>
+                    <div className="font-mono text-sm">
+                      {money(detail.totals.expensesTotal)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-muted-foreground">
+                      Total due <IncompletePriceTag show={detail.incomplete} />
+                    </div>
+                    <NotPricedTotal
+                      amount={money(detail.totals.totalDue)}
+                      notPriced={notPriced}
+                      className="font-mono text-lg text-[#F5C518]"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

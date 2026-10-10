@@ -31,6 +31,8 @@ export const RUN_PACKET = "runNetwork";
 export const SHEET_PACKET = "sheet";
 /** A whole count and its marks on every sheet: `GroupSnapshot`. */
 export const GROUP_PACKET = "group";
+/** One removed bid line, frozen prices included: server/bidLineRestore.ts. */
+export const LINE_PACKET = "bidLine";
 
 /** A packet as a procedure accepts it. Capped: a sheet clear is the biggest. */
 export const packetSchema = z.object({
