@@ -1258,6 +1258,7 @@ export function RunsPanel({
   countedWithNoPrice,
   onSendToBid,
   linkAssemblies,
+  buildBidId,
   onLinkAssembly,
   sendingGroupId,
   onJumpTo,
@@ -1405,6 +1406,8 @@ export function RunsPanel({
    * this and `onLinkAssembly` must be given for the control to appear.
    */
   linkAssemblies?: SearchableAssembly[];
+  /** The bid, so a link search that finds nothing can build one. */
+  buildBidId?: number;
   onLinkAssembly?: (groupId: number, assemblyId: number) => void;
   /** The count currently crossing, so its own control can say so. */
   sendingGroupId?: number | null;
@@ -1919,6 +1922,7 @@ export function RunsPanel({
                       </p>
                       <AssemblySearchList
                         assemblies={linkAssemblies}
+                        buildBidId={buildBidId}
                         onPick={assembly => {
                           onLinkAssembly(group.groupId as number, assembly.id);
                           setLinkingGroupId(null);

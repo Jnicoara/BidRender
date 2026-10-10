@@ -28,6 +28,17 @@
  * If adding fails after the create, the assembly is in their library (which
  * is what the tick asked for) and the line is not — something they can see
  * and use, never a line the library does not explain.
+ *
+ * ── From the plan viewer: the assembly, and NO line (2026-10-09) ────────────
+ * The plan viewer's pickers (stamp picker, Legend/Runs link list) build here
+ * too, with `addLine: false`. There the new assembly is ARMED or LINKED, and
+ * its quantity reaches the bid the way every count does — through the marks
+ * and "Send to bid" (shared/takeoffBridge.ts). A line added here as well would
+ * be a second, hand-typed quantity for the same thing.
+ *
+ * Without a line the assembly MUST be saved to the library: an archived one
+ * with no line would be a row nothing points at and no picker shows, so the
+ * count it was built for could not find it again. Refused before any write.
  */
 import { TRPCError } from "@trpc/server";
 import type { TrpcContext } from "./_core/context";
@@ -62,6 +73,8 @@ export interface BuildFromPartsInput {
   saveToLibrary: boolean;
   /** Quick bid stacks repeat counts on one line, as `addAssembly` does. */
   merge: boolean;
+  /** FALSE from the plan viewer: make the assembly only (see the header). */
+  addLine: boolean;
 }
 
 /** Sum repeats of one material, keeping the order they were first chosen. */
@@ -85,6 +98,13 @@ export async function buildFromParts(
   const bid = await db.getBidById(input.bidId, userId);
   if (!bid)
     throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
+
+  if (!input.addLine && !input.saveToLibrary)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "An assembly built for counting has to be saved to your library, or the count could not find it again.",
+    });
 
   const parts = mergeParts(input.parts);
   if (parts.length === 0)
@@ -130,6 +150,14 @@ export async function buildFromParts(
       code: "INTERNAL_SERVER_ERROR",
       message: "The assembly was saved but could not be read back.",
     });
+
+  if (!input.addLine)
+    return {
+      line: null,
+      merged: false,
+      assemblyId: assembly.id,
+      savedToLibrary: true,
+    };
 
   const { id: lineId, merged } = await db.addAssemblyToBid(
     input.bidId,

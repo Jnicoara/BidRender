@@ -189,7 +189,12 @@ export default function QuickBidPage({
       .filter((a): a is NonNullable<typeof a> => Boolean(a));
   }, [query, searchable, assemblies]);
 
-  useNoMatchLog("assembly", query, results.length, assembliesReady);
+  const recordMiss = useNoMatchLog(
+    "assembly",
+    query,
+    results.length,
+    assembliesReady
+  );
   /** "Build it from parts here" — open, and the search it was opened from. */
   const [buildingFrom, setBuildingFrom] = useState<string | null>(null);
 
@@ -239,6 +244,9 @@ export default function QuickBidPage({
       event.preventDefault();
       const chosen = results[highlight];
       if (chosen) add(chosen.id);
+      // Enter on nothing found is a finished search: logged now, not after
+      // a settle time a fast typist never waits for.
+      else recordMiss();
       return;
     }
     if (event.key === "Escape") {
@@ -347,9 +355,12 @@ export default function QuickBidPage({
               <BuildFromPartsPanel
                 bidId={bidId}
                 query={buildingFrom}
-                qty={Number(qty)}
-                unitLabel={unitLabel.trim() || null}
-                merge
+                target={{
+                  kind: "line",
+                  qty: Number(qty),
+                  unitLabel: unitLabel.trim() || null,
+                  merge: true,
+                }}
                 onCancel={() => {
                   setBuildingFrom(null);
                   focusSearch();
@@ -433,7 +444,10 @@ export default function QuickBidPage({
                         size="sm"
                         variant="outline"
                         className="h-8"
-                        onClick={() => setBuildingFrom(query)}
+                        onClick={() => {
+                          recordMiss();
+                          setBuildingFrom(query);
+                        }}
                       >
                         <Plus className="w-3.5 h-3.5 mr-1" />
                         Build it from parts here

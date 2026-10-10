@@ -1,6 +1,51 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-09 (evening), "when the picker finds nothing" BUILT (READ FIRST)
+## WHERE B STANDS — 2026-10-09 (night), picker leftovers DONE (READ FIRST)
+
+- **The three todo.md leftovers under "When the picker finds nothing" are
+  done:**
+  - the hand-priced line's link search now uses `smartSearch` and logs;
+  - a fast type-and-Enter logs at once;
+  - the builder is in the plan viewer's Count picker and in the Legend/Counts
+    "Link assembly" list.
+
+  Details are in todo.md. No migration. The `search_misses` table still
+  waits on Track A (see below); until it exists the records go nowhere,
+  safely.
+
+- **Server:** `bids.buildFromParts` takes `addLine` (default true). False
+  means the assembly only and always saved; unticked with no line is
+  refused before any write.
+- **Shared component changes, default unchanged:**
+  - `MaterialPicker` takes `maxRecent` (default 6; 3 in the plan viewer
+    builder);
+  - `BuildFromPartsPanel` takes `target` (`line` | `count`) in place of
+    `qty`/`unitLabel`/`merge`.
+- **Tests (each red without its fix):**
+  - `client/src/lib/noMatchLog.test.ts` (+6);
+  - `client/src/lib/assemblySearch.test.ts` (5, new);
+  - `server/buildFromParts.test.ts` (+3).
+
+  Only those files were run locally; the full suite runs on the Gate (the
+  owner's rule since 2026-10-09: no full suite on the laptop, it is short
+  of memory).
+
+- **On screen** (throwaway playwright probe, deleted; 820x1180 and
+  1180x820):
+  - the probe found and fixed 3 faults: a part name cut to "4…", Save below
+    a 36rem popover cap, and a × wrapping onto its own line;
+  - an edit that had silently not applied (the "More options" block) was
+    found the same way.
+- **For A:**
+  - prettier flags `references/next-live-release-plan.md`; its fix nests
+    "4b." under step 4, so it was left alone;
+  - on one run, "4 square box" + Enter added "4×4×4 pull box" ahead of the
+    4" square box — ranking or recents, worth a look after the catalog job.
+- **Local leftovers** (`bidrender_local_b_new`, user 1): "B builder probe
+  …" bids and "zz probe bracket / zz link probe / zz bid screen …"
+  assemblies.
+
+## WHERE B STOOD — 2026-10-09 (evening), "when the picker finds nothing" BUILT
 
 - **Gate check first:** local-dev Gate 37985104078 was not red. It was
   CANCELLED, replaced by 37985135173 (the same code plus a docs commit),

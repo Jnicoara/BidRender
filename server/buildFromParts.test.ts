@@ -212,3 +212,98 @@ describe.skipIf(!hasDb)("building an assembly from parts on the bid", () => {
     expect(lines[0].snapshotLaborHours).toBe(null);
   });
 });
+
+/*
+  From the plan viewer (stamp picker, Legend/Runs link list): the assembly is
+  armed or linked there, and its count reaches the bid through the marks — so
+  the build must add NO line, and must not leave an archived row nothing
+  points at.
+*/
+describe.skipIf(!hasDb)("building from parts in the plan viewer", () => {
+  let partId: number;
+  let bidId: number;
+
+  const clear = async () => {
+    const db = await getDb();
+    await db!.delete(bids).where(eq(bids.userId, USER));
+    await db!.delete(assemblies).where(eq(assemblies.userId, USER));
+    await db!.delete(materials).where(eq(materials.userId, USER));
+  };
+
+  beforeAll(async () => {
+    const db = await getDb();
+    const [existing] = await db!
+      .select()
+      .from(users)
+      .where(eq(users.id, USER))
+      .limit(1);
+    if (!existing)
+      await db!.insert(users).values({
+        id: USER,
+        openId: `test-build-parts-${USER}`,
+        name: "Build from parts test user",
+      });
+  });
+  afterAll(clear);
+  beforeEach(async () => {
+    await clear();
+    const part = await caller().materials.create({
+      name: `Build-parts viewer probe ${Date.now()}${Math.random()}`,
+      unitOfSale: "each",
+      costPerUnit: 7,
+      category: "Boxes",
+    });
+    partId = part!.id;
+    bidId = (await caller().bids.create({ name: "Build-parts viewer bid" }))!
+      .id;
+  });
+
+  const build = (over: Record<string, unknown> = {}) =>
+    caller().bids.buildFromParts({
+      bidId,
+      name: "Pole bracket, viewer probe",
+      category: "Devices",
+      parts: [{ materialId: partId, qty: 1 }],
+      baseLaborHours: null,
+      laborRateId: null,
+      saveToLibrary: true,
+      addLine: false,
+      ...over,
+    });
+
+  it("makes the library assembly and puts NO line on the bid", async () => {
+    const result = await build();
+    expect(result.line).toBe(null);
+    expect((await caller().bids.get({ id: bidId })).lines).toHaveLength(0);
+    const library = await caller().assemblies.list();
+    expect(library.find(a => a.id === result.assemblyId)?.name).toBe(
+      "Pole bracket, viewer probe"
+    );
+  });
+
+  it("refuses 'do not save' with no line, and writes nothing", async () => {
+    await expect(build({ saveToLibrary: false })).rejects.toThrow(
+      /saved to your library/
+    );
+    const all = [
+      ...(await caller().assemblies.list()),
+      ...(await caller().assemblies.list({ status: "archived" })),
+    ];
+    expect(all.some(a => a.name === "Pole bracket, viewer probe")).toBe(false);
+  });
+
+  it("the bid screen's call still adds its line (addLine defaults on)", async () => {
+    const result = await caller().bids.buildFromParts({
+      bidId,
+      name: "Pole bracket, bid probe",
+      category: "Devices",
+      parts: [{ materialId: partId, qty: 1 }],
+      baseLaborHours: null,
+      laborRateId: null,
+      qty: 2,
+      saveToLibrary: true,
+    });
+    expect(result.line).not.toBe(null);
+    expect((await caller().bids.get({ id: bidId })).lines).toHaveLength(1);
+  });
+});

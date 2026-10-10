@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-09]
 
+- **"Build it from parts here" now works on the plan too.** When the Count
+  button's search, or a legend symbol's or count's "Link assembly" search,
+  finds nothing, you can build the assembly right there from catalog parts.
+  It is then counted or linked straight away, exactly as if it had been
+  found, and its count reaches the bid the usual way. It always goes into
+  your library so every sheet can find it. Category, hours and who does the
+  work sit under "More options". Counting what you typed with no library item
+  is still the first choice offered.
+- **Searches that found nothing are now recorded even when you are quick.**
+  Typing and pressing Enter (or choosing "Count it anyway" or "Build it from
+  parts") used to slip past the two-second wait and never get recorded.
+  Those are now recorded straight away. The search for "Link to … assembly"
+  on a hand-priced line also understands slang and spellings now ("recep",
+  "gfi"), the same as every other assembly search, and records its misses
+  too.
 - **When the bid's assembly search finds nothing, you can build it right
   there.** "Build it from parts here" opens under the search: name it, pick
   catalog parts, optionally the hours and who does them, and it goes on the

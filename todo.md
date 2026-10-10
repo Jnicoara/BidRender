@@ -48,16 +48,27 @@ todo.md: tick (a) and (b) there and point at this entry.**
       picker and link list, and every unshelved `MaterialPicker`. A search
       counts after it has sat on no results for 2 s; one per picker opening;
       the server folds the same words from one company inside 10 min.
-- [ ] **Not logged yet:** "Link to material or assembly" on a hand-priced
-      line (`HandPricedLineFields.tsx`) — its assembly tab is a bare
-      `includes` search, so a miss there may be something the library has.
-      Switch it to `smartSearch` first, then add `useNoMatchLog`.
-- [ ] **Not offered yet:** the builder in the plan viewer's pickers (stamp
-      picker, Legend/Runs link list). The stamp picker already counts
-      anything typed by hand (level 1), so it is less urgent there.
-- [ ] **A fast "type and Enter" never logs** (the 2 s settle). On the stamp
-      picker, "Count it anyway" is itself a strong miss signal — consider
-      recording on that click as well.
+- [x] **Hand-priced line's link search — DONE 2026-10-09 (B).** Its
+      assembly tab now ranks with `smartSearch` through
+      `searchAssemblies` (`client/src/lib/assemblySearch.ts`, tested red
+      on the old `includes`) and logs its misses. Enter there records a
+      miss and does NOT link the top hit: linking re-prices the line.
+- [x] **Builder in the plan viewer — DONE 2026-10-09 (B).** Count picker
+      (below "Count …", which stays first) and the Legend/Counts "Link
+      assembly" list. `bids.buildFromParts` with `addLine: false`: the
+      assembly only, then armed or linked as if found; no bid line (the
+      count reaches the bid through its marks). Always saved — unticked
+      with no line is refused, since an archived row nothing points at
+      could not be found by the count. Category, hours, role under "More
+      options". `server/buildFromParts.test.ts` (3 new, 2 red on HEAD).
+      Seen at 820x1180 and 1180x820: armed pill names it, link toast "Every
+      mark kept", 0 bid lines. In landscape "Save and count" needs a scroll
+      inside the popover (80dvh scroll area).
+- [x] **Fast type-and-Enter — DONE 2026-10-09 (B).** `createMissRecorder`
+      (`client/src/lib/noMatchLog.ts`): `now()` records at once on Enter
+      on nothing found, "Count …", and "Build it from parts here", in every
+      picker that logs. Closing a picker on half-typed words still records
+      nothing. Measured on screen: recorded 54–75 ms after Enter.
 
 ## Coverage-check starters — BUILT 2026-10-09 (Track B), 224 starters
 

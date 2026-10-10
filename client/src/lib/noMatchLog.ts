@@ -33,3 +33,62 @@ export function missToRecord(candidate: MissCandidate): string | null {
   if (candidate.alreadySent.has(words)) return null;
   return words;
 }
+
+/** The clock the recorder waits on, passed in so a test need not wait. */
+export interface MissTimers {
+  set: (fire: () => void, ms: number) => unknown;
+  clear: (handle: unknown) => void;
+}
+
+/**
+ * One picker opening's worth of no-match recording.
+ *
+ * `observe` is called whenever the box or its results change. A miss is held
+ * for `settleMs` and dropped if the box changes first, so a word typed slowly
+ * is not recorded once per prefix.
+ *
+ * `now` is for the moment the person ACTS on a search that found nothing —
+ * Enter, "Count it anyway", "Build it from parts here". Until 2026-10-09 the
+ * only path was the timer, so a fast type-and-Enter inside the settle time
+ * never logged at all, and those are the most decided searches there are
+ * (todo.md § "When the picker finds nothing"). Acting is the settle: the
+ * words are final, so they are recorded at once and the timer is dropped.
+ *
+ * `dispose` drops a pending miss WITHOUT recording it. Closing a picker on
+ * half-typed words is not a search anybody finished.
+ */
+export function createMissRecorder(
+  send: (words: string) => void,
+  timers: MissTimers,
+  settleMs: number
+) {
+  const sent = new Set<string>();
+  let pending: { words: string; handle: unknown } | null = null;
+
+  const cancel = () => {
+    if (pending) timers.clear(pending.handle);
+    pending = null;
+  };
+  const fire = (words: string) => {
+    pending = null;
+    sent.add(words);
+    send(words);
+  };
+
+  return {
+    observe(candidate: Omit<MissCandidate, "alreadySent">) {
+      cancel();
+      const words = missToRecord({ ...candidate, alreadySent: sent });
+      if (words === null) return;
+      const handle = timers.set(() => fire(words), settleMs);
+      pending = { words, handle };
+    },
+    now() {
+      if (!pending) return;
+      const { words } = pending;
+      cancel();
+      fire(words);
+    },
+    dispose: cancel,
+  };
+}

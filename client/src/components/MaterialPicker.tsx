@@ -69,6 +69,7 @@ export function MaterialPicker({
   compact = false,
   showQty = false,
   categories,
+  maxRecent = MAX_RECENT,
 }: {
   /**
    * Only these catalog shelves. Omitted searches everything, as before.
@@ -90,6 +91,12 @@ export function MaterialPicker({
   compact?: boolean;
   /** Show a material's default quantity. Only the Assembly Builder uses it. */
   showQty?: boolean;
+  /**
+   * How many recents an empty box lists. Fewer in a small popover, where six
+   * rows push the form's own buttons below the fold (plan viewer builder,
+   * seen at 820x1180, 2026-10-09).
+   */
+  maxRecent?: number;
 }) {
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -99,7 +106,7 @@ export function MaterialPicker({
   const { data: catalog = [], isSuccess: catalogReady } =
     trpc.materials.list.useQuery();
   const { data: recent = [] } = trpc.materials.recent.useQuery({
-    limit: MAX_RECENT + (exclude?.length ?? 0),
+    limit: maxRecent + (exclude?.length ?? 0),
   });
 
   const onShelf = useMemo(() => {
@@ -140,7 +147,7 @@ export function MaterialPicker({
         rows: (recent as PickableMaterial[])
           .filter(m => !chosen.has(m.id))
           .filter(m => !onShelf || onShelf(m))
-          .slice(0, MAX_RECENT),
+          .slice(0, maxRecent),
         correctedQuery: null,
       };
     }
@@ -160,7 +167,7 @@ export function MaterialPicker({
       rows: found.rows.slice(0, MAX_RESULTS),
       correctedQuery: found.correctedQuery,
     };
-  }, [query, search, recent, exclude, onShelf]);
+  }, [query, search, recent, exclude, onShelf, maxRecent]);
 
   const showingRecent = !query.trim() && results.length > 0;
 
@@ -170,7 +177,7 @@ export function MaterialPicker({
     miss may be a part that exists on another shelf, which says nothing about
     what the catalog lacks.
   */
-  useNoMatchLog(
+  const recordMiss = useNoMatchLog(
     "material",
     categories ? "" : query,
     results.length,
@@ -203,6 +210,9 @@ export function MaterialPicker({
       if (chosen) {
         setQuery("");
         onChoose(chosen);
+      } else {
+        // Enter on nothing found is a finished search: logged now.
+        recordMiss();
       }
       return;
     }

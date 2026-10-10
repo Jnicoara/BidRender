@@ -9607,6 +9607,7 @@ export default function TakeoffPage({
             !tracing && (
               <>
                 <StampPicker
+                  buildBidId={bidId}
                   assemblies={allAssemblies.map(a => ({
                     id: a.id,
                     name: a.name,
@@ -11598,6 +11599,7 @@ export default function TakeoffPage({
                   name: a.name,
                   category: a.category ?? null,
                 }))}
+                buildBidId={bidId}
                 onLinkAssembly={(id, assemblyId) =>
                   setGroupSource.mutate({ id, assemblyId })
                 }
@@ -11878,6 +11880,7 @@ export default function TakeoffPage({
                   <>
                     <LegendPanel
                       symbols={symbols}
+                      buildBidId={bidId}
                       assemblies={allAssemblies.map(a => ({
                         id: a.id,
                         name: a.name,

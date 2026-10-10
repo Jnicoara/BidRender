@@ -1444,6 +1444,9 @@ export const bidsRouter = router({
         unitLabel: labelSchema.nullable().default(null),
         saveToLibrary: z.boolean(),
         merge: z.boolean().default(false),
+        // FALSE from the plan viewer: the assembly only, no line — its count
+        // reaches the bid through the marks (server/buildFromParts.ts).
+        addLine: z.boolean().default(true),
       })
     )
     .mutation(({ input, ctx }) => buildFromParts(ctx, input)),

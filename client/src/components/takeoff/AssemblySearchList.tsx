@@ -10,10 +10,17 @@
  *
  * Ranking is `smartSearch`, the same as the Assembly Builder and the stamp
  * picker, so a query finds the same assembly wherever it is typed.
+ *
+ * A search that finds nothing offers "Build it from parts here" when the
+ * host passes `buildBidId` (todo.md § "When the picker finds nothing",
+ * 2026-10-09): the built assembly is picked exactly as if it had been found,
+ * so linking it is the same path as linking any other.
  */
 import { useMemo, useState } from "react";
-import { Check, Search } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
 import { smartSearch } from "@/lib/smartSearch";
 import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 
@@ -29,13 +36,18 @@ export function AssemblySearchList({
   assemblies,
   onPick,
   onCancel,
+  buildBidId,
 }: {
   assemblies: SearchableAssembly[];
   onPick: (assembly: SearchableAssembly) => void;
   /** Escape in the box. */
   onCancel: () => void;
+  /** The bid, to offer "Build it from parts here" on a miss. */
+  buildBidId?: number;
 }) {
   const [query, setQuery] = useState("");
+  /** The builder, open on the words it was opened from. */
+  const [buildingFrom, setBuildingFrom] = useState<string | null>(null);
 
   const searchable = useMemo(
     () =>
@@ -58,7 +70,29 @@ export function AssemblySearchList({
 
   // A search that settles on nothing goes in the no-match log. An empty list
   // is a library still loading (or none at all), not a miss.
-  useNoMatchLog("assembly", query, results.length, assemblies.length > 0);
+  const recordMiss = useNoMatchLog(
+    "assembly",
+    query,
+    results.length,
+    assemblies.length > 0
+  );
+
+  if (buildingFrom !== null && buildBidId !== undefined)
+    return (
+      <BuildFromPartsPanel
+        bidId={buildBidId}
+        query={buildingFrom}
+        target={{ kind: "count", action: "Save and link" }}
+        onCancel={() => setBuildingFrom(null)}
+        onBuilt={built =>
+          onPick({
+            id: built.assemblyId,
+            name: built.name,
+            category: built.category,
+          })
+        }
+      />
+    );
 
   return (
     <div className="space-y-2">
@@ -70,7 +104,11 @@ export function AssemblySearchList({
           onKeyDown={e => {
             if (e.key === "Escape") onCancel();
             // Enter takes the top hit, so a typed name is one keystroke away.
-            if (e.key === "Enter" && results[0]) onPick(results[0]);
+            if (e.key === "Enter") {
+              if (results[0]) onPick(results[0]);
+              // Enter on nothing found is a finished search: logged now.
+              else recordMiss();
+            }
           }}
           placeholder="Search assemblies…"
           className="h-7 pl-7 text-xs"
@@ -96,11 +134,26 @@ export function AssemblySearchList({
         ))}
         {results.length === 0 && (
           <p className="text-xs text-muted-foreground px-2 py-2">
-            {assemblies.length === 0
+            {assemblies.length === 0 && !query.trim()
               ? "Your library has no assemblies yet."
-              : `Nothing matches “${query}”.`}
+              : `Nothing matches “${query.trim()}”.`}
           </p>
         )}
+        {results.length === 0 && query.trim() && buildBidId !== undefined ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 w-full text-xs"
+            onClick={() => {
+              recordMiss();
+              setBuildingFrom(query);
+            }}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" />
+            Build it from parts here
+          </Button>
+        ) : null}
       </div>
     </div>
   );

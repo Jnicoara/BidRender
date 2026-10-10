@@ -602,7 +602,7 @@ export default function BidsPage({
       .filter((a): a is NonNullable<typeof a> => Boolean(a));
   }, [assemblies, assemblySearchable, assemblyQuery]);
 
-  useNoMatchLog(
+  const recordAssemblyMiss = useNoMatchLog(
     "assembly",
     assemblyQuery,
     assemblyResults.length,
@@ -658,7 +658,12 @@ export default function BidsPage({
    * inconsistency that reads as the app being broken rather than different.
    */
   const onAssemblyKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (assemblyResults.length === 0) return;
+    if (assemblyResults.length === 0) {
+      // Enter on nothing found is a finished search, so it is logged now
+      // rather than after the settle time it may never sit for.
+      if (event.key === "Enter") recordAssemblyMiss();
+      return;
+    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setAssemblyHighlight(h => Math.min(h + 1, assemblyResults.length - 1));
@@ -1192,8 +1197,11 @@ export default function BidsPage({
                 <BuildFromPartsPanel
                   bidId={bidId}
                   query={buildingFrom}
-                  qty={Number(addQty)}
-                  unitLabel={addUnit.trim() || null}
+                  target={{
+                    kind: "line",
+                    qty: Number(addQty),
+                    unitLabel: addUnit.trim() || null,
+                  }}
                   onCancel={() => setBuildingFrom(null)}
                   onBuilt={({ name, savedToLibrary }) => {
                     toast.success(
@@ -1220,7 +1228,10 @@ export default function BidsPage({
                     size="sm"
                     variant="outline"
                     className="h-8"
-                    onClick={() => setBuildingFrom(assemblyQuery)}
+                    onClick={() => {
+                      recordAssemblyMiss();
+                      setBuildingFrom(assemblyQuery);
+                    }}
                   >
                     <Plus className="w-3.5 h-3.5 mr-1" />
                     Build it from parts here
