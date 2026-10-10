@@ -4,7 +4,29 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-10, session 30: B's two branches unblocked (0144–0145 on staging)
+## NOW — 2026-10-10, session 31: remove/relocate census, next-release plan, test DB
+
+- **Remove/relocate census** (`scripts/removeRelocateCensus.mts`, new, read
+  only) on `bidrender_scratch_live` (dumped 19:36Z, after the release):
+  **0 of 2 live bids** have remove/relocate marks or lines (all 22 marks
+  status NULL; both bids Draft, unlocked). Staging copy 0 of 1,148. So C's
+  rule (c) does **not** block the next release today — re-run it on the
+  release's own fresh copy; one such mark on a non-Draft or locked bid
+  flips it to blocked.
+- **`next-live-release-plan.md` "For the NEXT release" rewritten**: queue
+  table (0144, 0145, B's fold + status view, C's remove/relocate + job
+  costs, `b72188d`), the remove/relocate gate, the twin census re-check.
+- **`bidrender_test_localdev` REBUILT** from scratch the way the Gate does
+  (create utf8mb4_unicode_ci → `migrate.mts` 146 → `seedBaseline.mts`).
+  `starterAssembliesSeed` 14/14; full suite 392/392 files on it. Patching was whack-a-mole: after the cover
+  and retired repairs DV33 passed but RS13 (hand-edited shape) and then CS14
+  failed — its starters were from several seed eras.
+- Scratch still kept: `bidrender_scratch_live`, `bidrender_scratch_staging`,
+  `bidrender_scratch_staging_0144`, `../bidrender-before-twin`;
+  `scripts/_tmpCopyDb.mts` (untracked, step 2's tool).
+- Assembly cleanup STEP 2 still NOT approved — the xlsx was not opened.
+
+## (earlier) 2026-10-10, session 30: B's two branches unblocked (0144–0145 on staging)
 
 - **Twin census** (`scripts/twinCountCensus.mts`, read only) on fresh copies
   (`live-2026-10-10T19-36-40Z-before-twin-fold.sql`,
@@ -32,6 +54,7 @@ release record is `deploying.md` § 11 "LIVE: `371b2ab`".
   `bidrender_test_localdev` with OR without this change — that DB still
   resolves the retired "Floor box cover" (26174); test-DB history (it never
   got the cover repair), not code. The Gate's fresh DB is the real check.
+  **Fixed in session 31: the test DB was rebuilt; 14/14.**
 - **Next**: B merges `b-twin-fold`, then `b-status-view` (message in the
   session summary). C can now build the drive-time note on `notes`.
   **Live**: 0144–0145 before the push of anything from `e613723` on — owner

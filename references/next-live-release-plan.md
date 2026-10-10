@@ -7,39 +7,66 @@
 
 ## For the NEXT release (after `371b2ab`) — started 2026-10-10
 
-Live is `371b2ab` / 144 migrations / 180 FKs. At the time of writing
-local-dev adds no file under `drizzle/` or `server/seed/` (`git diff 371b2ab
-origin/local-dev -- drizzle server/seed` empty) — re-check on the day.
+Live is `371b2ab` / 144 migrations / 180 FKs. Updated 2026-10-10 (Track A,
+session 31). Owner's yes is still needed before `main` is pushed.
 
-> **Changed the same day (`e613723`): local-dev now carries 0144–0145**
-> (`bid_pdf_sheets.workTag`, `bid_expenses.notes`), both additive — they go
-> on live BEFORE the push, expect 146 / 180. On staging since 2026-10-10
-> (`deploying.md` § "Staging: migrations 0144–0145"). If B's `b-twin-fold`
-> rides this release, re-run `scripts/twinCountCensus.mts` on live first
-> (0 on 2026-10-10; `todo.md`).
+### What is queued (as of 2026-10-10)
 
-- **Track C's remove / relocate labor (`a7fe812`, merged as `d832e34`)
-  RAISES TOTALS on purpose.** On a bid with remove or relocate marks, each
-  kind gets its own labor line beside the install line, priced from the
-  count's override hours, else the assembly's, else NOT PRICED (with a "Set
-  remove hours" fix). So `bidTotals --compare` will report those bids as
-  changed, and that is not by itself a fault. Before the release:
-  1. **Count the live bids with remove/relocate marks** (read only, on the
-     release's own verified backup copy if a live query is refused) —
-     probably 0 on today's live (2 bids, 0 lines), but measure it.
-  2. **`bidTotals` before (live's code) and after (the new code), then
-     `--compare`.** Every bid WITHOUT such marks must be unchanged. Every bid
-     WITH them must change only by its new remove/relocate lines — list them
-     by bid and check each one's line, rather than accepting "changed" as
-     expected wholesale. Same shape as the 2026-10-06 EXPECTED label
-     (`live-release-plan.md` § 1b).
-- Track B's `b72188d` (undo for a removed line / circuit, "+ N drops not
-  priced" on the dashboard and lists) changes what screens SAY about drops,
-  not any total — check on staging, not a bidTotals item.
-- Queued, NOT started (owner's go needed): Track B's twin fold (branch
-  `b-twin-fold`, `24843fd`; M1 draft in `track-b-handoff.md`) — a one-off
-  script calling the tested fold code, not SQL. First step on the go: count
-  twin counts on a copy of live (live may have none).
+| Item                                                      | Where now                                             | Moves a total?                                                              |
+| --------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
+| **0144** `bid_pdf_sheets.workTag` (B's M2)                | local-dev `e613723`; staging DB + code                | No — additive, step 1, **on live BEFORE the push**                          |
+| **0145** `bid_expenses.notes` (C's Q-M5)                  | same                                                  | No — additive, step 1, before the push                                      |
+| **B's twin fold** (`b-twin-fold`, `24843fd`)              | branch, NOT yet merged to local-dev                   | Lowers twin bids on purpose — live has 0 twins, so none                     |
+| **B's status view** (`b-status-view`, after the fold)     | branch, NOT yet merged; needs 0144                    | No (screens only)                                                           |
+| **C's remove / relocate labor** (`a7fe812` → `d832e34`)   | local-dev, staging                                    | **RAISES** bids with remove/relocate marks — see the gate below             |
+| **C's job costs** (Quick bid phase 1, `200e310`)          | local-dev, staging; the drive-time note waits on 0145 | Only bids with job-cost rows; live has **0** `bid_expenses` rows (measured) |
+| B's `b72188d` (undo removed line, "+ N drops not priced") | local-dev, staging                                    | No — what screens SAY; check on staging, not a bidTotals item               |
+
+Live migrations for this release: **0144–0145, 2 files, expect 146 / 180**
+(`deploying.md` § "Staging: migrations 0144–0145" is the staging record).
+If `git diff 371b2ab origin/local-dev -- drizzle server/seed` shows anything
+else on the day, **stop and find out why before going on** — this table is
+stale or local-dev changed, and those want opposite responses.
+
+### The remove / relocate gate — measured 2026-10-10: NOT BLOCKING TODAY
+
+Track C's rule (c) (`baseline-screen-plan.md` § 8 on `track-c`, "a math
+version per bid"): remove/relocate labor must not reach live before the
+math-version protection exists, **unless no Active, Won, Lost or locked bid
+would change.** `scripts/removeRelocateCensus.mts` (read only) answers that
+per bid, with status, quantity lock and archived:
+
+- **Live** (`bidrender_scratch_live`, the copy dumped 19:36Z, after the
+  `371b2ab` release; newest mark 2026-09-25): **0 of 2 bids.** All 22 marks
+  have status NULL (= new); 0 remove/relocate lines. Both bids (23, 25) are
+  **Draft, unlocked, not archived** — so even a Draft would not move.
+- **Staging** (`bidrender_scratch_staging`): 0 of 1,148; 1,955 marks all
+  NULL; 566 lines all `install`.
+
+**So the release is not blocked by this — today.** The condition is about
+the data, not the code: a single remove or relocate mark placed on a live
+Active/Won/Lost or locked bid before release day flips it to BLOCKED until
+the math version (BS-M7 + `applyMathVersion.mts`) ships. On the day:
+
+1. **Re-run `removeRelocateCensus.mts` on the release's own fresh copy of
+   live** (read only). The VERDICT line must say no Active/Won/Lost or
+   locked bid would move. If it names one, **stop**: remove/relocate cannot
+   ride, and the owner chooses between waiting for the math version and
+   holding C's commits back.
+2. **`bidTotals` before (live's code) and after (the new code), then
+   `--compare`.** With 0 such bids, every bid must be unchanged. If the
+   census found Draft bids, each must change only by its new
+   remove/relocate lines — check each by bid, never accept "changed"
+   wholesale (shape of `live-release-plan.md` § 1b).
+
+### The twin census re-check
+
+If `b-twin-fold` rides this release, re-run `scripts/twinCountCensus.mts`
+on the same fresh copy of live first. **0 on 2026-10-10** (live, staging,
+local). Not 0 on the day → **stop**: B's M1 (`track-b-handoff.md`) is
+then needed, as a one-off script calling the tested fold code, not SQL. The
+rehearsal with both B branches merged moved 0 of 2 live / 0 of 1,148
+staging bids (handoff session 30).
 
 **Nothing here has been run against live.** This is what a release of
 today's `local-dev` would carry, what it would run, the rules it must keep,
@@ -670,6 +697,9 @@ limit). Pricing survival is proved on staging's bids (`deploying.md` § 11).
 - **Before beta** sign-in protection (`todo.md`) — not built.
 
 ## SHORT SUMMARY
+
+> This summary is the `371b2ab` release (now live). The NEXT release's
+> state is "For the NEXT release" at the top of this file.
 
 - Live `24105ad` / 0104. Staging's DATABASE is at 0143 (144); staging's
   CODE is `f03e8ef` until somebody pushes staging — the Gate refuses the
