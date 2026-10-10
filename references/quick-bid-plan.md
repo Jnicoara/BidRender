@@ -404,6 +404,21 @@ kept in its `notes`: "Drive time: 6 trips × 1.5 h × $85/h". It is a frozen
 amount like every other expense, so it needs no new pricing path and no
 migration. To change it, the person opens the row and retypes it.
 
+> **CORRECTED 2026-10-10 (build): `bid_expenses` has NO `notes` column**
+> (`drizzle/schema.ts` ~1852; only `expense_items` has one). This plan said
+> otherwise without checking. The working cannot go in the NAME instead,
+> because expense names print on the customer's proposal
+> (`ProposalSheet.tsx` ~597), and "× $85/h" would show the labor rate.
+> **Built without it:** the tiles shipped on `c-quick-bid` (`200e310`); the
+> working shows live in the tile before adding and in the "Added …" message,
+> and is not stored. **Storing it needs Q-M5 below (Track A).**
+>
+> "The bid's labor rate" also does not exist: a bid has no rate of its own.
+> Built as the company's DEFAULT labor rate (`pricing_defaults.defaultLaborRateId`,
+> the one traced-run lines are priced at), prefilled and editable in the
+> tile. With no default set, the box is blank and Enter is refused in its
+> own words.
+
 Typing "permit" or "dumpster" in the main search box also finds these
 tiles, so the type → Enter loop reaches them too.
 
@@ -422,7 +437,21 @@ already in the total, so nothing about existing bids changes.
 
 ### Migration
 
-**None.**
+**None for the tiles (built). Q-M5 to store the working** — additive,
+step 1, safe before or after the code; nothing reads it until the code that
+writes the note ships. NULL = no note (every existing charge). Hand-written;
+do not `drizzle-kit generate` it.
+
+```sql
+-- Q-M5: a charge's working, shown on the bid screen, NEVER printed on the
+-- customer quote (it can carry the labor rate).
+ALTER TABLE `bid_expenses` ADD `notes` varchar(512) NULL;
+```
+
+The code half after it lands (C): the tile writes `notes`, the charge row
+shows it in small grey text under the name on the bid screen and Quick bid
+only, and `ProposalSheet` / quote exports keep NOT reading it, with a test
+pinning that.
 
 ---
 
@@ -487,7 +516,7 @@ check was done for remove/relocate labor: 0 of 4,235 bids moved.
 | Q-M2  | 3, 7 | `bid_rooms`; `bid_line_items.roomId`; `bid_typed_runs.roomId` FK     |
 | Q-M3  | 4    | `bid_line_items.lineRole` gains `'existing'` (enum value at the end) |
 | Q-M4  | 5    | `bids.checklistJobType`; `bid_checklist_answers`                     |
-| —     | 6    | none                                                                 |
+| Q-M5  | 6    | `bid_expenses.notes` — only to STORE the tiles' working (§ 6)        |
 
 Numbers are A's to assign. The latest on disk is `0143_labor_steps.sql`,
 and A's list (`migrations-next-batch.md`) may have taken more since. **None

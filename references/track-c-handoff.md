@@ -13,7 +13,61 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-10, night) — owner answers recorded; baseline screen PLANNED
+## START HERE (2026-10-10, late night) — Quick bid phase 1 (job costs) on `c-quick-bid`; FOR TRACK A: Q-M5
+
+**Branch `c-quick-bid` (from local-dev `c649268`), commit `200e310`.**
+Built per `quick-bid-plan.md` § 6 with the owner's answers (§ 12, Q6: drive
+time is a flat cost):
+
+- **Quick bid gets ONE "More options" fold** under the counting box, closed
+  by default; its header says "Job costs: 4 · $2,430.00" when closed. The
+  basic loop (type → qty → Enter) is unchanged.
+- **Job costs inside it:** the bid's charges plus four tiles: Permit, Lift
+  rental (days × $/day), Dumpster, Drive time (trips × h/trip × $/h, a flat
+  `bid_expenses` amount, never hours). Blank or zero is refused, never $0.
+  A missing rate says "No labor rate — type one, or set a default rate in
+  Settings." The rate is prefilled from the company's DEFAULT labor rate.
+- **The search box finds the tiles** ("permit", "dump", "drive", "travel",
+  "scissor"); Enter opens the tile with its first box focused, and adding
+  sends focus back to the search.
+- **Quick bid totals** now show **Job costs** and **Total due** when there
+  are any. "Bid price" stays `workPrice`, as on the bid screen.
+- **One component, two screens:** `BidExpensesSection` is now the body of
+  the bid screen's "Additional expenses" too, so the bid screen gained the
+  same tiles. The rules live in `client/src/lib/jobCostTiles.ts`.
+- **Tests:** `jobCostTiles.test.ts` (10). Red with blank-as-0 (2 failed)
+  and with the rate left out of drive time (1 failed); green restored. The
+  touched-file tests (sourceHygiene, bidLineUndoWired, mostUsedRow) pass:
+  22 in all. `pnpm check` clean.
+- **Looked at on screen** (playwright, real viewports: phone 390,
+  iPad portrait 820, iPad landscape 1180, laptop 1536), fixture bid
+  **1728378 "Quick bid job costs check"** (user 1, `bidrender_local_c`;
+  leave it or delete it). No sideways scroll, no text below the edge, no
+  overlaps; tiles and boxes are 44 px on touch. **One fault found by
+  looking, and fixed:** typing "2 Enter 450" at machine speed put 450 into
+  the Days box (focus moved a frame late). Focus now moves at once inside an
+  open tile.
+- **Bid totals:** `bidTotals.mts` before vs after on `bidrender_local_c`:
+  all 4,236 existing bids unchanged. The only differences were the two
+  fixture bids the check created (1728377 deleted afterwards). No server,
+  shared or drizzle file changed.
+- **Gate:** run 38078650646 on `200e310`. **Merge into local-dev only when it
+  is green** (pull local-dev first).
+
+### FOR TRACK A — Q-M5 (additive, step 1, not urgent)
+
+The plan assumed `bid_expenses.notes`; **it does not exist**. The working
+("6 trips × 1.5 h × $85.00/h") cannot go in the name, because names print
+on the customer's proposal. So the working is shown, not stored, until:
+
+```sql
+ALTER TABLE `bid_expenses` ADD `notes` varchar(512) NULL;
+```
+
+Hand-written, NULL = no note, safe before the code. Then C writes and
+shows it (bid screen only, never the quote). `quick-bid-plan.md` § 6, § 9.
+
+## EARLIER (2026-10-10, night) — owner answers recorded; baseline screen PLANNED
 
 - **Owner answers recorded** (`d9d49b8`): quick-bid Q1/Q2/Q3/Q6/Q8 in
   `quick-bid-plan.md` § 12, status-and-scope Q10 in § 8. All six took the
