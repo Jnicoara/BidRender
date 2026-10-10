@@ -117,7 +117,7 @@ const updateSchema = z.object({
   // Omitted leaves it; null clears it back to "not said".
   mountHeightTypeKey: z.string().trim().min(1).max(64).nullable().optional(),
   /**
-   * The work steps (0142). Omitted leaves the list alone; [] empties it — the
+   * The work steps (0143). Omitted leaves the list alone; [] empties it — the
    * same patch rule as `materials`. Replaced wholesale, in this order.
    */
   steps: z

@@ -39,6 +39,8 @@ import { money } from "@/lib/money";
 import { LineCost } from "@/components/LineCost";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { MostUsedRow } from "@/components/MostUsedRow";
+import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 import { bidNotPricedCount } from "@/lib/notPricedTotal";
 import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
@@ -86,7 +88,8 @@ export default function QuickBidPage({
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
-  const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
+  const { data: assemblies = [], isSuccess: assembliesReady } =
+    trpc.assemblies.list.useQuery();
   /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
   const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
   const { data: kits = [] } = trpc.kits.list.useQuery();
@@ -186,6 +189,15 @@ export default function QuickBidPage({
       .filter((a): a is NonNullable<typeof a> => Boolean(a));
   }, [query, searchable, assemblies]);
 
+  const recordMiss = useNoMatchLog(
+    "assembly",
+    query,
+    results.length,
+    assembliesReady
+  );
+  /** "Build it from parts here" — open, and the search it was opened from. */
+  const [buildingFrom, setBuildingFrom] = useState<string | null>(null);
+
   // Keep the highlight inside the result list as it shrinks under typing.
   useEffect(() => {
     setHighlight(0);
@@ -232,6 +244,9 @@ export default function QuickBidPage({
       event.preventDefault();
       const chosen = results[highlight];
       if (chosen) add(chosen.id);
+      // Enter on nothing found is a finished search: logged now, not after
+      // a settle time a fast typist never waits for.
+      else recordMiss();
       return;
     }
     if (event.key === "Escape") {
@@ -336,7 +351,34 @@ export default function QuickBidPage({
                 click counts it onto the bid like Enter does (merge). */}
             <MostUsedRow items={mostUsed} query={query} onAdd={add} />
 
-            {results.length > 0 ? (
+            {buildingFrom !== null ? (
+              <BuildFromPartsPanel
+                bidId={bidId}
+                query={buildingFrom}
+                target={{
+                  kind: "line",
+                  qty: Number(qty),
+                  unitLabel: unitLabel.trim() || null,
+                  merge: true,
+                }}
+                onCancel={() => {
+                  setBuildingFrom(null);
+                  focusSearch();
+                }}
+                onBuilt={({ name, savedToLibrary }) => {
+                  toast.success(
+                    savedToLibrary
+                      ? `Counted "${name}" and saved it to your library.`
+                      : `Counted "${name}".`
+                  );
+                  setBuildingFrom(null);
+                  setQuery("");
+                  void utils.assemblies.list.invalidate();
+                  refresh();
+                  focusSearch();
+                }}
+              />
+            ) : results.length > 0 ? (
               <div className="rounded-lg border border-border overflow-hidden">
                 {results.map((assembly, index) => (
                   <button
@@ -395,7 +437,23 @@ export default function QuickBidPage({
             ) : (
               <p className="text-xs text-muted-foreground">
                 {query.trim() ? (
-                  <>Nothing matches “{query}”.</>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>Nothing matches “{query}”.</span>
+                    {assembliesReady ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => {
+                          recordMiss();
+                          setBuildingFrom(query);
+                        }}
+                      >
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        Build it from parts here
+                      </Button>
+                    ) : null}
+                  </span>
                 ) : (
                   <>
                     {/* The keys mean nothing to a finger (device audit). */}

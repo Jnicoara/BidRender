@@ -19,7 +19,31 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-09 (session 28) — START HERE
+## UPDATE 2026-10-10 (session 28, second part) — START HERE
+
+- **Reality check ON STAGING** (`8f28a85`, local-dev = staging): backup
+  `staging-2026-10-10T01-38-57Z-before-reality-check.sql` (74/74 counts),
+  rehearsed CLEAN, catalog CLEAN on staging, covers 2 swapped + **new
+  `repairStarterRetired` 13 repointed**, 1,027/1,027 bids unchanged
+  (`deploying.md` § 11). Live untouched: § 4b + § 4c of the release plan.
+- Owner: the two held lighting lines are NOT applied; panels keep
+  "main-breaker panel".
+- **Gate Docker Hub limit FIXED** (`bf829b3`): MySQL from
+  `public.ecr.aws/docker/library/mysql:8.0` (AWS's mirror of the same
+  official image, no credentials); proven by Gate 38015988389 (pulled from
+  ECR, green).
+- **0142 `search_misses` ON STAGING** (B's no-match log): backup 74/74,
+  rehearsed, staging migrated (143, 177/177), 1,043/1,043 unchanged,
+  `deploying.md` § 11 "0142". Live batch is now 0105–0142, expect 143.
+- **STOPPED before the pricing-sheet rebuild** (owner): Track C adds a
+  "Steps" tab spec and a step-labor migration first, so the sheets are
+  rebuilt ONCE.
+- Scratch to remove when done: DBs `bidrender_rehearse_reality`,
+  `bidrender_staging_restore_reality`, `bidrender_staging_restore_0142`;
+  keep `bidrender_test_reality` (fresh, migrated to 143) for full runs.
+  Worktree `../bidrender-spot`.
+
+## UPDATE 2026-10-09 (session 28)
 
 **Catalog reality check BUILT on branch `a-catalog-reality` (pushed, NOT
 merged to local-dev — a green local-dev push deploys staging, so the merge IS

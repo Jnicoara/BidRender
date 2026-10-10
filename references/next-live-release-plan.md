@@ -78,7 +78,14 @@ left out. One line per theme; the commits say the rest.
 - Reset page says a dead link is dead on open (`6518fc5`); reset logs why
   nothing was sent (`4a76181`); slow-request logging (`c0f7fbe`).
 
-## 3. Migrations a live release would run: 0105–0141 (37 files)
+## 3. Migrations a live release would run: 0105–0142 (38 files)
+
+> **Grew 2026-10-10: 0142** (`0142_search_misses`, Track B's no-match
+> search log — one new table with one foreign key to `users`, additive,
+> on staging, `deploying.md` § 11 "0142"). **Expect 38 applied, 143,
+> matches, 177/177.** The lines below that say 37 / 142 / 176 are the 0141
+> figures — read them as 38 / 143 / 177. If what prints differs, stop and
+> find out why: either this line is stale or live is not where you think.
 
 > **Grew 2026-10-09 (later): 0141** (`0141_ai_service_status`, one new
 > table for "a dead AI key says so" — additive, on staging, `deploying.md`

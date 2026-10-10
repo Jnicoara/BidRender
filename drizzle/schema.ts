@@ -19,6 +19,7 @@ import {
   double,
   unique,
 } from "drizzle-orm/mysql-core";
+import { SEARCH_MISS_MAX_LENGTH } from "../shared/searchMiss";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const users = mysqlTable("users", {
@@ -1296,7 +1297,7 @@ export const assemblyModifiers = mysqlTable(
 export type AssemblyModifier = typeof assemblyModifiers.$inferSelect;
 export type InsertAssemblyModifier = typeof assemblyModifiers.$inferInsert;
 
-// ─── Labor steps (0142, references/step-based-labor-plan.md) ──────────────────
+// ─── Labor steps (0143, references/step-based-labor-plan.md) ──────────────────
 // A shared library of WORK STEPS ("Strip and terminate a device", 4 min), and
 // which steps an assembly is built from. The steps' total becomes the
 // assembly's hours when nobody has typed any — typed hours always win, and
@@ -5541,6 +5542,35 @@ export const aiServiceStatus = mysqlTable("ai_service_status", {
 });
 
 export type AiServiceStatus = typeof aiServiceStatus.$inferSelect;
+
+/**
+ * The no-match search log (0142; Track B's server/searchMissLog.ts, where
+ * the queries live). One row per search a company's picker found nothing
+ * for: the company (owner's id), which picker, the words, the time. Never
+ * the person who typed, the bid or a price.
+ */
+export const searchMisses = mysqlTable(
+  "search_misses",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    /** The COMPANY (owner's user id), never the person who typed. */
+    companyUserId: int("companyUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** "assembly" | "material" — shared/searchMiss.ts SEARCH_MISS_PICKERS. */
+    picker: varchar("picker", { length: 16 }).notNull(),
+    words: varchar("words", { length: SEARCH_MISS_MAX_LENGTH }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    index("search_misses_company_words_idx").on(
+      t.companyUserId,
+      t.picker,
+      t.words
+    ),
+    index("search_misses_createdAt_idx").on(t.createdAt),
+  ]
+);
 
 /**
  * Things on a bid the pricing engine could not price, one row per problem.

@@ -1,12 +1,12 @@
 /**
- * The shared WORK STEP library (0142, references/step-based-labor-plan.md).
+ * The shared WORK STEP library (0143, references/step-based-labor-plan.md).
  *
  * Steps are the materials pattern: shipped rows a shop forks by editing. A
  * time change reaches every assembly of the company that uses the step — the
  * screen says how many first (`usedBy`) — and never a bid line, whose hours
  * froze when it was added.
  *
- * Writes need 0142's tables; before the migration they fail with the plain
+ * Writes need 0143's tables; before the migration they fail with the plain
  * database error rather than pretending to save. Reads answer "no steps".
  */
 import { TRPCError } from "@trpc/server";

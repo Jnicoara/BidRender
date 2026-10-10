@@ -1,7 +1,8 @@
--- 0142 — LABOR STEPS: build an assembly's hours from shared work steps
+-- 0143 — LABOR STEPS: build an assembly's hours from shared work steps
 -- (2026-10-09; references/step-based-labor-plan.md, Track C's c-step-labor).
 -- PROPOSED by Track C; Track A owns the number and runs it (renumber freely
--- if another file takes 0142 first — nothing reads the number).
+-- if another file takes 0143 first — nothing reads the number). Renumbered
+-- from 0142 on 2026-10-10: A's 0142_search_misses took that number.
 --
 --   labor_steps            the shared step library, the materials pattern:
 --                          userId NULL = shipped (re-stamped from

@@ -1684,6 +1684,64 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0142 — the no-match search log (2026-10-10 UTC) — NOT on live
+
+`0142_search_misses` (Track B's table, B's SQL word for word): one new table
+and a foreign key to `users` — additive, step 1, step 3 empty. Migrated
+before the code. Branch `a-search-misses` (B's `track-b` merged, the
+declaration moved into `drizzle/schema.ts`).
+
+1. **Backup**: `staging-2026-10-10T02-24-10Z-before-0142.sql` (74 tables);
+   restored to `bidrender_staging_restore_0142`: **74/74 counts equal**.
+2. **Rehearsal** on that restore: drift before = exactly `search_misses`;
+   `bidTotals` 1,035 with staging's code (`bf829b3`); **1 applied**, 143;
+   re-run nothing; "matches", 177/177; **1,035/1,035 unchanged** with the old
+   code AND the new.
+3. **Staging database** (02:36 UTC): drift before the same; `bidTotals`
+   1,043 (old code); **1 applied**, 143; re-run nothing; "matches",
+   177/177; **1,043/1,043 unchanged** on the old code.
+4. **Code**: branch Gate 38017501652 green; `9975a12` pushed to `staging`
+   by hand (BEFORE local-dev, so the auto-deploy's drizzle check finds
+   nothing new), then local-dev, after merging Track B's own merge of the
+   same code.
+
+**Live**: 0142 joins the batch — 0105–0142, 38 files, expect 143, 177/177
+(`next-live-release-plan.md` § 3).
+
+### Staging: the catalog reality check + both starter repairs (2026-10-10 UTC) — NOT on live
+
+No migration — seed and code only (`a-catalog-reality`, `334104a` +
+`8f28a85`; `references/catalog-reality-check-build.md`).
+
+1. **Backup**: `staging-2026-10-10T01-38-57Z-before-reality-check.sql` (74
+   tables) in `C:\dev\bidrender-backups\`; restored to
+   `bidrender_staging_restore_reality`: **all 74 table counts equal
+   staging's**.
+2. **Rehearsal on that restore** (staging's code `aaed2a8` booted as the
+   control): catalog 1,965 / 1,825 active; `bidTotals` 1,027. New code boot:
+   **added 50, renamed 296, retired 158, deleted 0**, 1,717 active, every
+   reference identical, `VERDICT: CLEAN`; second boot nothing. Covers: 2
+   swapped (RS12, LT23), 1 skipped (RS13); retired repair: **13 repointed**;
+   second runs 50 / 13 "already has it"; **1,027/1,027 unchanged**.
+3. **Staging before** (02:43 local / 01:43 UTC, old code): 1,027 bids;
+   catalog 1,965 / 1,825 active.
+4. **Code**: branch Gate 38013969109 green; `local-dev` fast-forwarded to
+   `8f28a85` and pushed; Gate 38014707002: test, deploy-staging, **smoke all
+   green**. `/api/version` = `8f28a85`, built 02:00 UTC.
+5. **After the first boot**: catalog compare against step 3 — added 50,
+   renamed 296, retired 158, deleted 0, 0 on an old spelling, 0 duplicates,
+   `VERDICT: CLEAN`; 1,717 active.
+6. **Repairs**: covers report RS12 / LT23 "would swap", RS13 "skipped:
+   edited" (its RV receptacle line); `--apply`: 2 swapped. Retired repair
+   report "13 would repoint" (same 13 as the rehearsal); `--apply`: 13
+   repointed. Second runs: 50 and 13 "already has it" (RS13 included).
+7. **Totals**: **all 1,027 existing bids unchanged**. `--compare` printed 3
+   differences, all bids missing before: 1029–1031, "CI smoke …", the
+   smoke account's (owner 597), made during step 4's smoke.
+
+**Live**: rides the next release with § 4b AND § 4c of
+`next-live-release-plan.md` (both repairs, covers first).
+
 ### Staging: migration 0141 — a dead AI key says so (2026-10-09) — NOT on live
 
 `0141_ai_service_status`: one new table, one row, no `UPDATE` — additive,

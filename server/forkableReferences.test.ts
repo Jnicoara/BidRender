@@ -73,7 +73,7 @@ const REGISTRY: Record<string, Entry> = {
   },
   "assembly_labor_steps.assemblyId": {
     kind: "exempt",
-    why: "Ownership, exactly as assembly_materials.assemblyId: copyAssemblyChildren copies the step list (copyAssemblySteps) onto the fork (0142).",
+    why: "Ownership, exactly as assembly_materials.assemblyId: copyAssemblyChildren copies the step list (copyAssemblySteps) onto the fork (0143).",
   },
 
   // ── Resolved ─────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ const REGISTRY: Record<string, Entry> = {
     kind: "resolver",
     resolver: "resolveForkedRow",
     readBy: "server/db.ts",
-    note: "getAssemblyStepRows (0142): the STORED shipped step id, resolved to the company's fork — editing a step's time forks it, and every assembly then reads the fork.",
+    note: "getAssemblyStepRows (0143): the STORED shipped step id, resolved to the company's fork — editing a step's time forks it, and every assembly then reads the fork.",
   },
   "assemblies.laborRateId": {
     kind: "resolver",

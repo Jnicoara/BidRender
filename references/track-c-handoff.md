@@ -13,7 +13,7 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-10) — step-based labor, code half on `c-step-labor`: NOT MERGED; FOR TRACK A: migration 0142
+## LATEST (2026-10-10) — step-based labor, code half on `c-step-labor`: NOT MERGED; FOR TRACK A: migration 0143
 
 **Branch `c-step-labor`, from `origin/a-catalog-reality` `8f28a85`** — A's
 catalog merge was NOT on local-dev when this started (local-dev was
@@ -25,7 +25,7 @@ alone (A merged it into the catalog job).
 
 **Merge order (owner, 2026-10-10):** wait until A has (a) pushed the catalog
 job to local-dev — DONE, `334104a` / `8f28a85` / `aec561b` on local-dev as
-of 2026-10-10 02:20 UTC — AND (b) applied migration 0142 — NOT YET (0142 is
+of 2026-10-10 02:20 UTC — AND (b) applied migration 0143 — NOT YET (0143 is
 on `c-step-labor` only). Then: pull local-dev, merge it into
 `c-step-labor`, push, check the Gate ONCE (no background watcher), and
 merge to local-dev only after it is green (pull first). Every bid total
@@ -47,10 +47,15 @@ Plan and owner answers: `references/step-based-labor-plan.md` (§ 13
 answers and the bid-number check; § 14 the Steps / Step totals tabs for A's
 one sheet rebuild). Same file on `track-c` (`519e099`).
 
-### FOR TRACK A — migration 0142 (only A runs it on shared databases)
+### FOR TRACK A — migration 0143 (only A runs it on shared databases)
 
-File on the branch: **`drizzle/0142_labor_steps.sql`** + journal entry
-(`when` 1789963200000). Renumber freely if 0142 is taken first. Hand-written,
+File on the branch: **`drizzle/0143_labor_steps.sql`** + journal entry
+(`when` 1789963300000), **renumbered from 0142 on 2026-10-10** because A's
+`0142_search_misses` took that number (same `when` as the old 0142 entry —
+so a database that had C's old 0142 recorded must drop that record and the
+two tables before migrating, or the migrator counts A's 0142 as applied;
+C's two databases were reset that way). Renumber again freely if 0143 is
+taken first. Hand-written,
 ADDITIVE, step 1 of the three steps — **safe before OR after the code**:
 
 ```sql
@@ -86,7 +91,7 @@ CREATE TABLE `assembly_labor_steps` (
 CREATE INDEX `assembly_labor_steps_assemblyId_idx` ON `assembly_labor_steps` (`assemblyId`);
 ```
 
-- **Before 0142** the code runs: every step read treats ER_NO_SUCH_TABLE as
+- **Before 0143** the code runs: every step read treats ER_NO_SUCH_TABLE as
   "no steps" (`stepsTablesMissing`, server/db.ts — only that error; anything
   else throws), the seed pass does nothing, and pricing is exactly today's.
   `schemaCheck` / `schemaDrift` still REPORT the two tables missing, loudly,
@@ -94,15 +99,22 @@ CREATE INDEX `assembly_labor_steps_assemblyId_idx` ON `assembly_labor_steps` (`a
   suites, 166 green on `bidrender_test_c` WITHOUT the tables (the one red,
   DV33 in `starterAssembliesSeed`, is the same red from a clean
   `a-catalog-reality` checkout on that database — not this change).
-- **After 0142**, first boot seeds 47 shipped steps (all minutes NOT SET) and
+- **After 0143**, first boot seeds 47 shipped steps (all minutes NOT SET) and
   the step lists of the 30 starters (194 lines). **No number moves**:
-  measured on `bidrender_local_c`, old code before vs new code + 0142 +
+  measured on `bidrender_local_c`, old code before vs new code + 0143 +
   seed after — `bidTotals` "all 4235 bid(s): totalDue unchanged; not-priced
   and incomplete unchanged"; `routerSnapshot` 0 of 4,235 bids differ.
-- `schemaDrift` on `bidrender_test_c` after 0142: "Database matches the
-  schema", foreign keys 179/179.
-- C applied 0142 to C's OWN `bidrender_local_c` and `bidrender_test_c` (both
-  now 143 migrations). Nothing shared was touched.
+  **Re-measured after the renumber (2026-10-10):** both C databases reset to
+  local-dev's state (old 0142 record and the two tables dropped, A's
+  `0142_search_misses` applied from local-dev's own `drizzle/`), `bidTotals`
+  taken with local-dev's code (`f03e8ef`), then 0143 applied, the step seed
+  run (47 steps, all not set; 30 lists, 194 lines), `bidTotals` with
+  `c-step-labor`: **"ok all 4235 bid(s): totalDue unchanged; not-priced and
+  incomplete unchanged"**.
+- `schemaDrift` on `bidrender_test_c` after 0143: "Database matches the
+  schema", foreign keys 180/180.
+- C applied 0143 to C's OWN `bidrender_local_c` and `bidrender_test_c` (both
+  now **144** migrations, through 0143). Nothing shared was touched.
 
 ### What the code does
 

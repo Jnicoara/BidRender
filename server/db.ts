@@ -3354,7 +3354,7 @@ export type AssemblyDetail = Assembly & {
   /** Ids of the modifiers switched on for this assembly. */
   modifierIds: number[];
   /**
-   * Its work steps (0142), resolved to the company's forks. Empty when it has
+   * Its work steps (0143), resolved to the company's forks. Empty when it has
    * none — and when the tables do not exist yet, which before the migration
    * is the truth, not a degraded answer (`stepsTablesMissing`).
    */
@@ -3773,17 +3773,17 @@ export async function getAssemblyDetail(
   return { ...assembly, materials: materialLines, modifierIds, steps };
 }
 
-// ── Labor steps (0142, references/step-based-labor-plan.md) ──────────────────
+// ── Labor steps (0143, references/step-based-labor-plan.md) ──────────────────
 
 /**
  * Run a read of the step tables; "table doesn't exist" answers `fallback`.
  *
  * NOT the defensive catch schemaCheck.ts argues against. That argument is
  * about a MISSING COLUMN on a table that holds data: catching it hides real
- * rows. Here the whole table is new (0142, additive), and before it exists
+ * rows. Here the whole table is new (0143, additive), and before it exists
  * no assembly has a single step — so "no steps" is exactly the truth, not a
  * screen showing less than there is. The drift is still reported, loudly,
- * where it belongs: schemaCheck lists both tables until 0142 runs. Only
+ * where it belongs: schemaCheck lists both tables until 0143 runs. Only
  * ER_NO_SUCH_TABLE is caught; anything else still throws.
  */
 export async function stepsTablesMissing<T>(
@@ -4062,7 +4062,7 @@ export async function createLaborStep(
 }
 
 /**
- * SEED the shipped step library and the starters' step lists (0142), on every
+ * SEED the shipped step library and the starters' step lists (0143), on every
  * boot, after the starters themselves (server/seedShippedLibrary.ts).
  *
  * Shared rows ONLY — every write is scoped `isNull(userId)`, so a company's
@@ -4075,7 +4075,7 @@ export async function createLaborStep(
  * Also stamps the owner's overhead (Q2) and clears typed hours (Q7) for the
  * starters the loader listed — both empty today.
  *
- * Before 0142 the tables do not exist, and this does nothing.
+ * Before 0143 the tables do not exist, and this does nothing.
  */
 export async function seedStarterLaborSteps(): Promise<void> {
   const db = await getDb();
@@ -4431,7 +4431,7 @@ async function copyAssemblyChildren(
   */
   await setAssemblyMaterials(toAssemblyId, lines.map(assemblyMaterialLine));
   await setAssemblyModifiers(toAssemblyId, modifierIds);
-  // The step list is part of the assembly too (0142): a fork without it
+  // The step list is part of the assembly too (0143): a fork without it
   // would silently stop pricing from steps the moment anything is edited.
   await copyAssemblySteps(fromAssemblyId, toAssemblyId);
 }

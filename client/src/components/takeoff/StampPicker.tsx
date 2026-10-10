@@ -33,7 +33,9 @@
  * the same query finds the same assembly wherever it is typed.
  */
 import { useMemo, useState } from "react";
-import { Hash, MapPin, Search } from "lucide-react";
+import { Hash, MapPin, Plus, Search } from "lucide-react";
+import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,6 +44,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { smartSearch } from "@/lib/smartSearch";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 
 export type PickableAssembly = {
   id: number;
@@ -63,6 +66,7 @@ export function StampPicker({
   onCountPlain,
   disabled,
   onRefused,
+  buildBidId,
 }: {
   assemblies: PickableAssembly[];
   onPick: (assembly: PickableAssembly) => void;
@@ -84,6 +88,13 @@ export function StampPicker({
    * whether it may be marked — found on screen, 2026-09-29.
    */
   onRefused?: () => void;
+  /**
+   * The bid, to offer "Build it from parts here" on a search that finds
+   * nothing (2026-10-09). Second to "Count …" on purpose: counting what was
+   * typed needs no library at all (level 1), and building is for somebody who
+   * wants the assembly priced from parts now.
+   */
+  buildBidId?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -92,6 +103,8 @@ export function StampPicker({
     assembly: PickableAssembly;
     counts: PickableCount[];
   } | null>(null);
+  /** The builder, open on the words it was opened from. */
+  const [buildingFrom, setBuildingFrom] = useState<string | null>(null);
 
   /** Pick an assembly — or ask which of its counts, when it has several. */
   const pick = (assembly: PickableAssembly) => {
@@ -123,6 +136,18 @@ export function StampPicker({
       .filter((a): a is PickableAssembly => Boolean(a));
   }, [query, searchable, assemblies]);
 
+  // A search that settles on nothing goes in the no-match log, even though
+  // "Count it anyway" is right there — that is the person working around a
+  // gap, which is exactly what the log is for.
+  // Counting what was typed (Enter, or the "Count …" row) records at once:
+  // it is the person deciding the library does not have it.
+  const recordMiss = useNoMatchLog(
+    "assembly",
+    query,
+    results.length,
+    assemblies.length > 0
+  );
+
   return (
     <Popover
       open={open}
@@ -137,6 +162,7 @@ export function StampPicker({
         if (!next) {
           setQuery("");
           setChoosing(null);
+          setBuildingFrom(null);
         }
       }}
     >
@@ -158,8 +184,32 @@ export function StampPicker({
           <MapPin className="w-3.5 h-3.5" /> Count
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-2">
-        {choosing ? (
+      <PopoverContent
+        align="start"
+        className={cn(
+          "p-2",
+          // The builder needs room for a parts list; the dvh cap keeps its
+          // Save button on screen on a short tablet (CLAUDE.md § 4).
+          buildingFrom !== null ? "w-80 max-h-[80dvh] overflow-y-auto" : "w-72"
+        )}
+      >
+        {buildingFrom !== null && buildBidId !== undefined ? (
+          <BuildFromPartsPanel
+            bidId={buildBidId}
+            query={buildingFrom}
+            target={{ kind: "count", action: "Save and count" }}
+            onCancel={() => setBuildingFrom(null)}
+            onBuilt={built => {
+              setBuildingFrom(null);
+              // Exactly as if it had been found: armed, the popover closed.
+              pick({
+                id: built.assemblyId,
+                name: built.name,
+                category: built.category,
+              });
+            }}
+          />
+        ) : choosing ? (
           <div>
             <p className="text-xs font-medium mb-1">Which item?</p>
             <p className="text-[0.7rem] text-muted-foreground mb-2">
@@ -215,6 +265,7 @@ export function StampPicker({
                     if (results[0]) {
                       pick(results[0]);
                     } else if (query.trim()) {
+                      recordMiss();
                       onCountPlain(query.trim());
                       setOpen(false);
                     }
@@ -264,6 +315,7 @@ export function StampPicker({
                 <button
                   className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
                   onClick={() => {
+                    recordMiss();
                     onCountPlain(query.trim());
                     setOpen(false);
                   }}
@@ -279,6 +331,23 @@ export function StampPicker({
                     No library item needed — price it on the bid
                   </span>
                 </button>
+                {results.length === 0 && buildBidId !== undefined ? (
+                  <button
+                    className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
+                    onClick={() => {
+                      recordMiss();
+                      setBuildingFrom(query);
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Plus className="w-3 h-3 text-muted-foreground shrink-0" />
+                      Build it from parts here
+                    </span>
+                    <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
+                      Priced from catalog parts, saved to your library
+                    </span>
+                  </button>
+                ) : null}
               </>
             )}
           </>

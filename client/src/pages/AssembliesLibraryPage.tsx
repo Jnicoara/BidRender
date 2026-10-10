@@ -193,7 +193,7 @@ type Draft = {
    */
   mountHeightTypeKey: string | null;
   /**
-   * Its work steps (0142), saved with the assembly like its parts. Round-trips
+   * Its work steps (0143), saved with the assembly like its parts. Round-trips
    * (rule 7): a save that dropped them would empty the list.
    */
   steps: DraftStep[];
@@ -1354,7 +1354,7 @@ function AssemblyBuilder({
                 )}
               </div>
 
-              {/* Steps (0142): behind "More options", closed by default. */}
+              {/* Steps (0143): behind "More options", closed by default. */}
               {stepsEnabled && (
                 <AssemblyStepsSection
                   steps={draft.steps}

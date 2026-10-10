@@ -59,14 +59,16 @@ export const COOKIE_NAME = "app_session_id"; // shared/const.ts
 
 /** Mint a session JWT. Exported so smoke.mjs can reuse it. */
 export async function mintToken(openId = "test-open-id") {
-  return new SignJWT({ openId, appId: APP_ID, name: "Dev" })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    // An issue time, like the app's own tokens (sdk.ts signSession): a token
-    // without one is refused for any user whose password has been reset or
-    // changed (shared/sessionValidity.ts).
-    .setIssuedAt()
-    .setExpirationTime(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30)
-    .sign(new TextEncoder().encode(JWT_SECRET));
+  return (
+    new SignJWT({ openId, appId: APP_ID, name: "Dev" })
+      .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      // An issue time, like the app's own tokens (sdk.ts signSession): a token
+      // without one is refused for any user whose password has been reset or
+      // changed (shared/sessionValidity.ts).
+      .setIssuedAt()
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30)
+      .sign(new TextEncoder().encode(JWT_SECRET))
+  );
 }
 
 async function listUsers() {

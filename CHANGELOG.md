@@ -15,9 +15,45 @@ This is the human-readable companion to the git history — read this to see wha
   while bids already priced never change. It sits under "More options" and
   ships with NO times: nothing prices differently until the owner fills in
   the step times.
+- **The no-match search log is switched on (staging).** When a search in a
+  picker finds nothing, the words are kept (company, picker, words, time —
+  never who or which bid), so the catalog can grow from what estimators
+  actually looked for. Database table added on staging; live next release.
+- **The automatic test run no longer fails on Docker Hub's download limit.**
+  Its MySQL test database now comes from Amazon's public copy of the same
+  official image.
 
 ## [2026-10-09]
 
+- **"Build it from parts here" now works on the plan too.** When the Count
+  button's search, or a legend symbol's or count's "Link assembly" search,
+  finds nothing, you can build the assembly right there from catalog parts.
+  It is then counted or linked straight away, exactly as if it had been
+  found, and its count reaches the bid the usual way. It always goes into
+  your library so every sheet can find it. Category, hours and who does the
+  work sit under "More options". Counting what you typed with no library item
+  is still the first choice offered.
+- **Searches that found nothing are now recorded even when you are quick.**
+  Typing and pressing Enter (or choosing "Count it anyway" or "Build it from
+  parts") used to slip past the two-second wait and never get recorded.
+  Those are now recorded straight away. The search for "Link to … assembly"
+  on a hand-priced line also understands slang and spellings now ("recep",
+  "gfi"), the same as every other assembly search, and records its misses
+  too.
+- **When the bid's assembly search finds nothing, you can build it right
+  there.** "Build it from parts here" opens under the search: name it, pick
+  catalog parts, optionally the hours and who does them, and it goes on the
+  bid. "Save to my library" is ticked by default, so next time it is a
+  normal search hit; unticked, it stays out of the library list but can be
+  restored from the archive. Works on the bid screen and the counting
+  screen. The bid screen's assembly search also now finds things the same
+  way the counting screen does (spellings and slang, not only exact text).
+- **The admin screen lists searches that found nothing.** When an assembly
+  or material search comes up empty, the words typed are recorded — only the
+  words, the company and the date; no prices, no bids, no names, and no AI
+  reads it — so the next catalog work follows what people actually look for.
+  It starts recording once its database table is added (Track A's next
+  migration); until then it records nothing and says so.
 - **The starter catalog now names real, stocked parts (catalog reality
   check).** About 300 items were renamed to what a supply house actually
   sells: plastic boxes by cubic inches ("Single-gang new work box, plastic,
@@ -29,6 +65,11 @@ This is the human-readable companion to the git history — read this to see wha
   rows, starters point at the kept rows, and no existing bid changes (959
   bids rehearsed, all unchanged). Two labels were added for the outdoor
   emergency disconnect and EV-ready starters.
+- **Older databases get the same starters as new ones.** A one-time repair
+  moves 13 shipped starter assemblies off the catalog rows the reality check
+  retired (and adds the two new labels), but only where nobody has changed
+  that starter. Run on staging; it rides the next live release. No bid
+  total changed (1,027 staging bids checked).
 - **Search got smarter about sizes.** A box's depth ("2" deep") and a
   panel's space count ("20-space") no longer count as its size, so "2 emt"
   and "20 amp breaker" stop listing boxes and panels.

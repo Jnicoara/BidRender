@@ -52,7 +52,7 @@ export async function seedShippedLibrary(
   } catch (err) {
     report("BaselineAssemblies/Kits/RunTypes", err);
   }
-  // Steps after the starters they attach to (0142). Its own catch, so a step
+  // Steps after the starters they attach to (0143). Its own catch, so a step
   // failure can never stop the starters, kits or run types above.
   await seedStarterLaborSteps().catch(err => report("StarterLaborSteps", err));
 }

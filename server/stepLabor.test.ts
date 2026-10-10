@@ -1,6 +1,6 @@
 /**
  * BUILD AN ASSEMBLY'S HOURS FROM ITS WORK STEPS — Track C's code half of
- * references/step-based-labor-plan.md (0142, owner answers § 13).
+ * references/step-based-labor-plan.md (0143, owner answers § 13).
  *
  *   - which hours price: typed > steps (all timed) > NOT SET, decided once;
  *   - one step not set makes the total not set, never a smaller number;
@@ -9,7 +9,7 @@
  *   - a shop's fork of a shipped step survives the seed's re-stamp;
  *   - shipped example times tag the line; "Use these times" accepts them;
  *   - Q2/Q7: typed starter hours clear only when steps + overhead ≥ current;
- *   - before 0142, "no tables" reads as "no steps" and nothing else is caught.
+ *   - before 0143, "no tables" reads as "no steps" and nothing else is caught.
  *
  * Fixture id 91356 is this file's own.
  */
@@ -188,7 +188,7 @@ describe("the shipped step content", () => {
   });
 });
 
-describe("the table guard (before 0142)", () => {
+describe("the table guard (before 0143)", () => {
   it("reads 'table missing' as no steps, and lets anything else through", async () => {
     const missing = Object.assign(new Error("wrapped"), {
       cause: { code: "ER_NO_SUCH_TABLE", errno: 1146 },
