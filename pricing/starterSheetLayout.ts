@@ -77,6 +77,10 @@ export const BRAND_COLUMNS = [
   "Price per unit",
 ] as const;
 
+/** Two more tabs in the PRICES workbook (step-based-labor-plan.md § 14). */
+export const STEPS_SHEET = "Steps";
+export const STEP_TOTALS_SHEET = "Step totals";
+
 export const ASSEMBLY_HOURS_FILE = "assembly-hours-starter.xlsx";
 export const ASSEMBLY_SHEET = "Starter assembly hours";
 export const ASSEMBLY_COLUMNS = [

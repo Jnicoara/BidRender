@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **The starter pricing sheets are rebuilt for the owner to fill — now with
+  step times.** The prices workbook gains a "Steps" tab (type the minutes
+  for each install step, with a suggested draft beside it) and a "Step
+  totals" tab (type each starter's overhead; it shows what each starter's
+  steps add up to as you type). The loader reads both and clears a
+  starter's typed hours only when its steps plus overhead come to at least
+  what it charges today. Every sheet also picks up the catalog cleanup of
+  2026-10-09. Nothing had been typed in the old sheets, so nothing was
+  carried; a rebuild over filled-in copies proved every typed value
+  survives.
 - **Build an assembly's hours from its work steps (not live yet; waits for
   the owner).** An assembly can list the work it takes — mount the box,
   prepare the cable, terminate, set the device, plate, test — each with a

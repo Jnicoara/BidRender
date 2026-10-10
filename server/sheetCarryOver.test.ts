@@ -27,7 +27,12 @@ import {
   materialResolver,
   planCarryOver,
   readTypedRows,
+  stepResolver,
+  stepTotalsResolver,
 } from "../pricing/sheetCarryOver";
+import { startersWithSteps } from "../pricing/starterSteps";
+import { STARTER_LABOR_STEPS } from "./seed/starterLaborSteps";
+import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 
 const current = new Map([
   ["Widget, new name", { unit: "each" }],
@@ -189,24 +194,24 @@ describe("lostValues — the check on the WRITTEN file", () => {
   });
 });
 
-describe("readTypedRows — reads by column NAME", () => {
-  /** A worksheet with the columns in an order the builder never writes. */
-  function sheet(rows: unknown[][], header: string[]): SheetLike {
-    const all = [
-      [],
-      ["Instruction line"],
-      ["", ...header],
-      ...rows.map(r => ["", ...r]),
-    ];
-    return {
-      rowCount: all.length - 1,
-      getRow: i => ({
-        values: all[i] ?? [],
-        getCell: c => ({ value: (all[i] ?? [])[c] ?? null }),
-      }),
-    };
-  }
+/** A worksheet with the columns in an order the builder never writes. */
+function sheet(rows: unknown[][], header: string[]): SheetLike {
+  const all = [
+    [],
+    ["Instruction line"],
+    ["", ...header],
+    ...rows.map(r => ["", ...r]),
+  ];
+  return {
+    rowCount: all.length - 1,
+    getRow: i => ({
+      values: all[i] ?? [],
+      getCell: c => ({ value: (all[i] ?? [])[c] ?? null }),
+    }),
+  };
+}
 
+describe("readTypedRows — reads by column NAME", () => {
   it("takes a pack price with its pack, skips blank rows, and keeps the unit", () => {
     const ws = sheet(
       [
@@ -277,5 +282,73 @@ describe("the real catalog — every rename carries, every retirement drops", ()
         expect(p.dropped, from).toHaveLength(1);
       }
     }
+  });
+});
+
+describe("the Steps and Step totals tabs — the same rule, by Key and by Ref", () => {
+  // The REAL library and starters: a test on invented keys would pass on a
+  // resolver the builder never builds.
+  const keys = new Set(STARTER_LABOR_STEPS.map(s => s.key));
+  const withSteps = startersWithSteps();
+  const refsWithSteps = new Set(withSteps.map(s => s.ref));
+  const shipped = new Set(BASELINE_ASSEMBLIES.map(a => a.ref));
+  const steps = stepResolver(keys);
+  const totals = stepTotalsResolver({ withSteps: refsWithSteps, shipped });
+
+  it("a typed Minutes on every step survives a rebuild — 0 included, a real answer", () => {
+    const old = sheet(
+      STARTER_LABOR_STEPS.map((s, i) => [s.key, s.name, i === 0 ? 0 : i + 0.5]),
+      ["Key", "Step", "Minutes"]
+    );
+    const { rows } = readTypedRows(old, SHEET_SPECS.steps, 2, 3);
+    const p = planCarryOver("steps", rows, steps);
+    expect(p.stops).toEqual([]);
+    expect(p.dropped).toEqual([]);
+    expect(p.carried.size).toBe(STARTER_LABOR_STEPS.length);
+    expect(p.carried.get(STARTER_LABOR_STEPS[0].key)).toEqual({ Minutes: 0 });
+    // And the written file is checked against it: a lost minute goes red.
+    expect(lostValues(p, p.carried)).toEqual([]);
+    const lost = new Map(p.carried);
+    lost.delete(STARTER_LABOR_STEPS[1].key);
+    expect(lostValues(p, lost)).toHaveLength(1);
+  });
+
+  it("a typed Overhead on every starter with steps survives a rebuild", () => {
+    const old = sheet(
+      withSteps.map((s, i) => [s.ref, s.name, (i + 1) / 20]),
+      ["Ref", "Assembly", "Overhead (h)"]
+    );
+    const { rows } = readTypedRows(old, SHEET_SPECS["step-totals"], 2, 3);
+    const p = planCarryOver("step-totals", rows, totals);
+    expect(p.stops).toEqual([]);
+    expect(p.dropped).toEqual([]);
+    expect(p.carried.size).toBe(withSteps.length);
+    expect(p.carried.get(withSteps[0].ref)).toEqual({ "Overhead (h)": 0.05 });
+  });
+
+  it("a step removed from the library lands in the dropped report, not a stop", () => {
+    const p = planCarryOver(
+      "steps",
+      [{ row: 9, label: "S999", values: { Minutes: 4 } }],
+      steps
+    );
+    expect(p.stops).toEqual([]);
+    expect(droppedReport([p])).toContain("S999");
+    expect(droppedReport([p])).toContain("Minutes=4");
+  });
+
+  it("STOPS on an overhead for a starter that still ships but lost its step list", () => {
+    const noSteps = Array.from(shipped).find(ref => !refsWithSteps.has(ref));
+    expect(noSteps, "a shipped starter without steps").toBeDefined();
+    const p = planCarryOver(
+      "step-totals",
+      [
+        { row: 4, label: noSteps!, values: { "Overhead (h)": 0.2 } },
+        { row: 5, label: "ZZ99", values: { "Overhead (h)": 0.3 } },
+      ],
+      totals
+    );
+    expect(p.stops.map(s => s.label)).toEqual([noSteps]);
+    expect(p.dropped.map(d => d.label)).toEqual(["ZZ99"]);
   });
 });

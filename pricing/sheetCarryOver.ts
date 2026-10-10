@@ -31,7 +31,15 @@
  * there is the same loss.
  */
 
-export type SheetKind = "prices" | "labor" | "brands" | "assembly-hours";
+export type SheetKind =
+  | "prices"
+  | "labor"
+  | "brands"
+  | "assembly-hours"
+  // The two step tabs inside the prices workbook (step-based-labor-plan.md
+  // § 14): a step by its library Key, a starter's overhead by its Ref.
+  | "steps"
+  | "step-totals";
 
 /** The typed cells of one row, as the sheet holds them (blank = absent). */
 export type TypedValues = Readonly<Record<string, string | number>>;
@@ -268,7 +276,43 @@ export const SHEET_SPECS: Readonly<Record<SheetKind, SheetSpec>> = {
     key: "Ref",
     typed: ["MY HOURS"],
   },
+  steps: {
+    sheet: "steps",
+    key: "Key",
+    typed: ["Minutes"],
+  },
+  "step-totals": {
+    sheet: "step-totals",
+    key: "Ref",
+    typed: ["Overhead (h)"],
+  },
 };
+
+/** Library steps: by Key; a step that left the library is dropped. */
+export function stepResolver(
+  keys: ReadonlySet<string>
+): (label: string) => Resolution {
+  return key =>
+    keys.has(key) ? { key } : { gone: "no longer a step in the library" };
+}
+
+/**
+ * Step totals: by Ref. A starter that still ships but no longer has a step
+ * list cannot hold its overhead here, and it still exists: STOP.
+ */
+export function stepTotalsResolver(opts: {
+  withSteps: ReadonlySet<string>;
+  shipped: ReadonlySet<string>;
+}): (label: string) => Resolution {
+  return ref => {
+    if (opts.withSteps.has(ref)) return { key: ref };
+    if (opts.shipped.has(ref))
+      return {
+        unknown: `${ref} still ships but has no step list now — move its overhead by hand or give it steps before rebuilding`,
+      };
+    return { gone: "no longer a shipped starter" };
+  };
+}
 
 /** The little of an exceljs worksheet this reads. */
 export type SheetLike = {

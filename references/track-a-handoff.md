@@ -19,7 +19,29 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-10 (session 28, second part) — START HERE
+## UPDATE 2026-10-10 (session 28, third part) — START HERE
+
+- **0143 `labor_steps` ON STAGING's DATABASE** (C's step labor): backup
+  75 tables, rehearsed, staging migrated (144, 180/180), 1,066/1,066
+  unchanged. C merged to local-dev (`585f5d9`).
+- **Staging's CODE is still `f03e8ef`.** Gate 38021158859 (`585f5d9`): test
+  green, deploy-staging REFUSED on `drizzle/` (the guard; staging was not
+  pushed by hand first — that push was refused this session). Every later
+  local-dev push stops at the same step until `staging` gets `local-dev`.
+  **Owner decides how.** Safe meanwhile: the old code never reads 0143.
+- **Pricing sheets REBUILT, the one rebuild** (`a1a9171`): + "Steps" (47)
+  and "Step totals" (30) tabs; nothing was typed in the old sheets (0
+  carried, 0 dropped, 0 stops); a rebuild over filled copies carried 47 /
+  30 / 1,717 values. Loader `--prices` now writes
+  `starterStepMinutes.ts` + `starterAssemblyOverhead.ts`, clearing typed
+  hours only by `starterHoursClearable`. **Excel is safe to open.**
+- Live batch is now **0105–0143, 39 files, expect 144, 180/180**
+  (`next-live-release-plan.md` § 3); a live-copy rehearsal of all 39 is
+  still owed.
+- Scratch: all restore DBs and both worktrees removed.
+  `bidrender_test_reality` is now at 144 (0143 applied for the step tests).
+
+## UPDATE 2026-10-10 (session 28, second part)
 
 - **Reality check ON STAGING** (`8f28a85`, local-dev = staging): backup
   `staging-2026-10-10T01-38-57Z-before-reality-check.sql` (74/74 counts),
