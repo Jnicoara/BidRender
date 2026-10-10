@@ -3,6 +3,17 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
+
+- [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. Waits on
+      the owner's 12 questions (`track-b-handoff.md` § "Scope tags —
+      questions") and on A applying S1 (SQL draft in the same handoff).
+- [ ] Noticed while planning, not fixed: the SQL `lineNotPricedSql`
+      (`server/db.ts` ~13060) has no `lineRole` branch, while the TS
+      `lineNotPriced` decides a remove / relocate line by its hours alone.
+      The Dashboard and the bid could disagree on such a line. Check with
+      `server/dashboardNotPriced.test.ts` before trusting either.
+
 ## Catalog reality check — BUILT 2026-10-09 (Track A), NOT on staging
 
 Batch 1 + batch 2 (owner's calls), the panel table (56 rows), the box

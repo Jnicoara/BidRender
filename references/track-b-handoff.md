@@ -1,6 +1,90 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-10, the owner's 3 held items BUILT (READ FIRST)
+## WHERE B STANDS — 2026-10-10 (last), SCOPE TAGS PLANNED (plan only, READ FIRST)
+
+**`b-twin-fold` and `b-status-view` are NOT on track-b and wait on A.** Their
+merge order, M1 and M2 are in the handoff ON `b-status-view` (b-twin-fold
+first, then b-status-view; M2 applied before b-status-view runs). Do not
+merge them until A says so.
+
+This session wrote a plan and no app code: `references/scope-tags-plan.md`,
+the SCOPE part of `status-and-scope-plan.md` (§ 3), as seven build steps
+with the files each touches. track-b was fast-forwarded to local-dev
+(37c52c3) first, so the plan reads current code (c-remove-relocate is in it).
+
+- **Owner, 2026-10-10 (in the request):** By others / Excluded never price
+  and come off the materials list AND the drops. That answers plan § 8
+  Q10; recorded there.
+- **Found while planning:** `snapshotLaborOnly` changes no money (it only
+  silences "material not priced"), so "Owner furnishes" needs its own
+  branch in `priceLine`. Drops have no link to a bid line except the
+  count's group, so "off the drops" filters groups in `loadGroupDrops`.
+  The SQL `lineNotPricedSql` has no `lineRole` branch where the TS one
+  does (todo.md).
+- **Next step:** owner answers the questions below, A applies S1, then
+  step 2 of the plan.
+
+### S1–S3 — SQL DRAFTS FOR TRACK A (NOT APPLIED; all additive, step 1)
+
+All three are add-only. NULL = not said = today's behaviour, no defaults on
+existing tables, so each can go in ahead of its code and moves no number.
+Measure with `scripts/bidTotals.mts` before and after: expect every bid
+unchanged; **if any moved, stop and find out why before going on.** They
+replace the plan's M5 / M6 (`bid_scope_answers` is not needed: the answer IS
+the line's tag).
+
+```sql
+-- S1 (plan step 1) — needed before ANY scope code: every line read is a bare select().
+-- NULL = not said = We install. 'install' = somebody answered "We install".
+ALTER TABLE `bid_line_items`
+  ADD `scopeTag` enum('install','ofci','by_others','excluded') NULL;
+
+-- S3 (plan step 6a) — "Don't ask on this bid" for the Who does this? prompts.
+ALTER TABLE `bids` ADD `scopePromptsDismissedAt` timestamp NULL;
+
+-- S2 (plan step 6b, only when the prompt list becomes editable) —
+-- the modifiers pattern: shipped rows have userId NULL and a baselineId,
+-- re-stamped from server/seed/baselineScopePrompts.ts; a shop's edit forks.
+CREATE TABLE `scope_prompts` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `userId` int NULL,
+  `baselineId` varchar(64) NULL,
+  `baselineVersion` int NULL,
+  `name` varchar(128) NOT NULL,
+  `matchWords` varchar(512) NOT NULL,
+  `matchCategories` varchar(512) NULL,
+  `isActive` boolean NOT NULL DEFAULT true,
+  `createdAt` timestamp NOT NULL DEFAULT (now()),
+  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `scope_prompts_id` PRIMARY KEY(`id`),
+  CONSTRAINT `scope_prompts_userId_users_id_fk` FOREIGN KEY (`userId`)
+    REFERENCES `users`(`id`) ON DELETE cascade
+);
+CREATE INDEX `scope_prompts_userId_idx` ON `scope_prompts` (`userId`);
+CREATE INDEX `scope_prompts_baselineId_idx` ON `scope_prompts` (`baselineId`);
+```
+
+Before writing S2, check `modifiers`' exact baseline columns in
+`drizzle/schema.ts` (~1040–1085) and match them; the names above are the
+pattern, not a copy. S2 is a new table, so no existing row is reinterpreted.
+S1 and S3 can go in any release; S2 only with step 6b.
+
+### Scope tags — questions for the owner (one per line)
+
+1. Changing a tag on a locked bid: refuse for every line, typed ones too? — **Recommend: yes, refuse.** Number: no (it stops numbers moving).
+2. Where the control lives: a "…" per line, and a chip only on tagged lines (We install shows nothing)? — **Recommend: yes.** Number: no.
+3. "Owner furnishes" line: keep its drops (we still wire it)? — **Recommend: keep.** Number: yes vs the alternative (keeping leaves drop footage as today).
+4. Remove / relocate lines get their own tag, separate from the install line? — **Recommend: separate.** Number: only when someone picks one.
+5. Tag many lines at once only from the prompts and the note finder for now (no general line multi-select)? — **Recommend: yes.** Number: no.
+6. Should an assembly carry a default tag (e.g. "fixture, owner furnished")? — **Recommend: no, not now.** Number: yes if built (new lines would start tagged).
+7. By others / Excluded lines on the materials list: leave them off with a footer "left off: 3 by others"? — **Recommend: yes, footer.** Number: list quantities only (already decided), not totals.
+8. Proposal wording: owner-furnished lines with quantity ("12 light fixtures"), by-others / excluded by name only? — **Recommend: yes.** Number: no.
+9. Note finder leaves out "EXISTING TO REMAIN" / E.T.R. (a mark status, not who-does-it)? — **Recommend: leave out.** Number: no.
+10. "Don't ask" on the Who does this? prompts: per bid only (the shop edits the list itself in Settings)? — **Recommend: per bid.** Number: no.
+11. Pushing a unit template to its linked copies also pushes its tags? — **Recommend: yes, like every other field.** Number: yes, on the copies, when pushed.
+12. Wire / conduit (run-type) lines can be tagged too, all four tags? — **Recommend: yes.** Number: only when picked (footage leaves the money and the list).
+
+## WHERE B STOOD — 2026-10-10, the owner's 3 held items BUILT
 
 - **1. Undo for removing a circuit.** The remove shows "Removed circuit X."
   with an Undo button, like every other Plans delete (`deletedToast`, and
