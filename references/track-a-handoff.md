@@ -19,12 +19,41 @@ it reads the written file back before replacing the old one) and pinned by
 rebuild, put the owner's current copy at the repo path** — the carry-over
 reads the file it replaces.
 
-## UPDATE 2026-10-10 (session 28, fifth part) — START HERE
+## START HERE — 2026-10-10, end of session 28: the release is READY, waiting on the owner
 
-- **Release candidate `dd3f76d`**, Gate 38022621884 all green (smoke 96).
-  Has `11f5466`, `705e1c9`, `dd3f76d`. My `a1527ac` (= it + docs) had its
-  Gate cancelled by B's newer push `371b2ab` (sign-in limits; no
-  `drizzle/` or seed change; its Gate was still pending at the end).
+**Release candidate: `371b2ab`** — Gate 38024015936 all green (test,
+deploy-staging, smoke). It contains every must-include (`11f5466`,
+`705e1c9`, `dd3f76d`) and changes nothing under `drizzle/` or
+`server/seed/` against `dd3f76d`, the commit § 5g rehearsed (`dd3f76d`
+was the candidate until this Gate went green; `next-live-release-plan.md`
+still names it — same database figures). On top it carries B's sign-in
+limits, the current-password refusal and the Save-pinned popover fix.
+
+**What is done:** 0105–0143 on staging (144, 180/180); staging serves
+local-dev; fresh live-copy rehearsal **§ 5g PASSED** (below).
+
+**What the release waits for — the owner, nothing else:**
+
+1. **Owner's tablet check of staging.**
+2. **Owner's yes**, naming the candidate (`371b2ab`, or a newer green one —
+   a newer one needs its own green Gate, and a re-rehearsal only if it
+   changes `drizzle/` or `server/seed/`).
+
+**Then the release** (`next-live-release-plan.md`, `live-release-plan.md`
+§ 4): fresh live backup + restore check → read-only recount (0) and
+Legend-race check (none) on live → 39 migrations before the push (expect
+144, 180/180) → push `main` → `/api/version` → cover repair (5 / 45 → 50)
+→ retired repair (1 + DV34/GR3 skips) → `bidTotals` unchanged. **If any
+figure differs from § 5g, stop and find out why.** Never the LT1/LT2
+fixture repair on live.
+
+**After the release:** build the staging-guard proposal (`todo.md`).
+
+## UPDATE 2026-10-10 (session 28, fifth part)
+
+- **Release candidate was `dd3f76d`** (Gate 38022621884 green, smoke 96);
+  superseded by `371b2ab` above once Gate 38024015936 went green. My
+  `a1527ac` (= `dd3f76d` + docs) had its Gate cancelled by B's push.
 - **Fresh live-copy rehearsal DONE** (`next-live-release-plan.md` § 5g):
   a read-only dump of live this time (it was not refused), 65/65 tables
   equal; 39 applied, 144, 180/180; first boot 0 holds; covers 5 / 45 → 50;
