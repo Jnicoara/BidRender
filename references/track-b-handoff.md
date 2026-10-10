@@ -33,6 +33,11 @@
   `server/auth.email.test.ts`, `server/passwordReset.test.ts` — 33 passed on
   `bidrender_test_b`. `pnpm check` clean.
 - **No migration needed.** No dev server left running.
+- **Merged:** `ca82a0b` + local-dev (docs only, no migrations) as `371b2ab`.
+  Gate on track-b 38023993642 green (tests); Gate on local-dev 38024015936
+  green on every job (test, deploy-staging, smoke). local-dev was pushed
+  while the track-b Gate was still running (wrong order, same commit; both
+  then went green).
 
 ## WHERE B STOOD — 2026-10-09 (late night), Enter took the wrong part
 
