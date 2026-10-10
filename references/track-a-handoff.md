@@ -28,10 +28,20 @@ reads the file it replaces.
   (`deploying.md` § 11). Live untouched: § 4b + § 4c of the release plan.
 - Owner: the two held lighting lines are NOT applied; panels keep
   "main-breaker panel".
-- Next in order: Gate Docker Hub limit (MySQL from the AWS public mirror),
-  then B's `search_misses` migration (0142) on local-dev and staging, then
-  STOP before the sheet rebuild (Track C's Steps tab and step-labor
-  migration first).
+- **Gate Docker Hub limit FIXED** (`bf829b3`): MySQL from
+  `public.ecr.aws/docker/library/mysql:8.0` (AWS's mirror of the same
+  official image, no credentials); proven by Gate 38015988389 (pulled from
+  ECR, green).
+- **0142 `search_misses` ON STAGING** (B's no-match log): backup 74/74,
+  rehearsed, staging migrated (143, 177/177), 1,043/1,043 unchanged,
+  `deploying.md` § 11 "0142". Live batch is now 0105–0142, expect 143.
+- **STOPPED before the pricing-sheet rebuild** (owner): Track C adds a
+  "Steps" tab spec and a step-labor migration first, so the sheets are
+  rebuilt ONCE.
+- Scratch to remove when done: DBs `bidrender_rehearse_reality`,
+  `bidrender_staging_restore_reality`, `bidrender_staging_restore_0142`;
+  keep `bidrender_test_reality` (fresh, migrated to 143) for full runs.
+  Worktree `../bidrender-spot`.
 
 ## UPDATE 2026-10-09 (session 28)
 

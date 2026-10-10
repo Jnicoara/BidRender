@@ -1,22 +1,15 @@
 /**
  * The no-match search log — storage. See shared/searchMiss.ts for what it is.
  *
- * ── Why the table is declared HERE and not in drizzle/schema.ts ─────────────
- * `search_misses` needs a migration, and migrations are Track A's. Until that
- * file is written and applied, declaring the table in drizzle/schema.ts would
- * make `schemaDrift.test.ts` red on every machine and make drizzle-kit queue
- * a CREATE nobody read. So the declaration lives in this module, which
- * neither of those reads, and every query below survives the table being
- * absent:
+ * ── The table ────────────────────────────────────────────────────────────────
+ * `search_misses` is migration 0142 (drizzle/0142_search_misses.sql) and is
+ * declared in drizzle/schema.ts with every other table; it is re-exported
+ * here, where its queries live. Every query below still survives the table
+ * being absent — a database that has not run 0142 yet:
  *
  *   - `recordSearchMiss` writes nothing and says so (`stored: false`);
  *   - `listSearchMisses` returns `ready: false`, and the admin panel says the
  *     log is not set up on this database yet.
- *
- * So the code is safe in either order: shipped before the migration, it logs
- * nothing; the migration applied before the code, the table sits empty. When
- * Track A writes the migration (track-b-handoff.md has the exact SQL), this
- * declaration moves into drizzle/schema.ts unchanged.
  *
  * ── What is stored, and what never is ────────────────────────────────────────
  * The company (the owner's id, `ctx.scope.dataUserId` — the same id every
@@ -24,66 +17,16 @@
  * person who typed it, not the bid, not a price.
  */
 import { and, count, desc, eq, gte, max, min, sql } from "drizzle-orm";
-import {
-  index,
-  int,
-  mysqlTable,
-  timestamp,
-  varchar,
-} from "drizzle-orm/mysql-core";
-import { users } from "../drizzle/schema";
+import { searchMisses } from "../drizzle/schema";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { getDb } from "./db";
 import { isMissingTable } from "./schemaCheck";
 import {
-  SEARCH_MISS_MAX_LENGTH,
   normalizeMissWords,
   type SearchMissPicker,
 } from "../shared/searchMiss";
 
-export const searchMisses = mysqlTable(
-  "search_misses",
-  {
-    id: int("id").autoincrement().primaryKey(),
-    /** The COMPANY (owner's user id), never the person who typed. */
-    companyUserId: int("companyUserId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    /** "assembly" | "material" — shared/searchMiss.ts SEARCH_MISS_PICKERS. */
-    picker: varchar("picker", { length: 16 }).notNull(),
-    words: varchar("words", { length: SEARCH_MISS_MAX_LENGTH }).notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  t => [
-    index("search_misses_company_words_idx").on(
-      t.companyUserId,
-      t.picker,
-      t.words
-    ),
-    index("search_misses_createdAt_idx").on(t.createdAt),
-  ]
-);
-
-/**
- * The CREATE that Track A's migration copies, word for word. Kept beside the
- * declaration so `searchMissLog.test.ts` can create the table from THIS text
- * (in a scratch schema of its own) and compare what MySQL built against the
- * declaration above — a mismatch is a red test here, not drift on staging.
- *
- * ADDITIVE, step 1: a new table, nothing existing changes. The code already
- * survives its absence (see the header), so it may go before or after.
- */
-export const SEARCH_MISSES_CREATE_SQL = `CREATE TABLE \`search_misses\` (
-	\`id\` int AUTO_INCREMENT NOT NULL,
-	\`companyUserId\` int NOT NULL,
-	\`picker\` varchar(16) NOT NULL,
-	\`words\` varchar(120) NOT NULL,
-	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT \`search_misses_id\` PRIMARY KEY(\`id\`),
-	CONSTRAINT \`search_misses_companyUserId_users_id_fk\` FOREIGN KEY (\`companyUserId\`) REFERENCES \`users\`(\`id\`) ON DELETE cascade ON UPDATE no action
-) COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX \`search_misses_company_words_idx\` ON \`search_misses\` (\`companyUserId\`,\`picker\`,\`words\`);
-CREATE INDEX \`search_misses_createdAt_idx\` ON \`search_misses\` (\`createdAt\`);`;
+export { searchMisses };
 
 /**
  * The same words from the same company inside this window are one search.
