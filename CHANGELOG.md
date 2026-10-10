@@ -18,6 +18,15 @@ This is the human-readable companion to the git history — read this to see wha
   that sheet came back onto the bid without anyone choosing it. Removing a
   scale is now remembered as a person's decision, and the sheet keeps
   asking for a scale until one is set by hand.
+- **Existing-to-remain devices stop being priced as new work.** The old
+  "… - EXISTING TO REMAIN" counts priced their devices as new once sent to
+  a bid. The bid now flags such a line and offers "Count these as
+  existing", which moves those marks onto their own count as existing (they
+  price nothing). The emptied line is flagged with "Remove this line" — it
+  is never removed for you — and a locked bid never changes. Find all
+  matching's "Count as existing" now marks the device existing on the same
+  count instead of making a new twin count. A bid total drops when this is
+  used, on purpose: it stops charging for devices already on the wall.
 - **Two new empty database columns, ready for work waiting to merge.** A
   plan sheet can now record whether it shows demolition, new work or both
   (for Track B's status view), and a job cost can carry a short working

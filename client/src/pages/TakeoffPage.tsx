@@ -424,10 +424,7 @@ import {
   MatchPanel,
   type MatchPanelState,
 } from "@/components/takeoff/FindMatching";
-import {
-  existingToRemainName,
-  splitExistingToRemain,
-} from "@shared/existingToRemain";
+import { splitExistingToRemain } from "@shared/existingToRemain";
 import { symbolLookupKey } from "@shared/takeoffCounts";
 import { TextSelectLayer } from "@/components/takeoff/TextSelect";
 import { useUploadSpeeds } from "@/lib/useUploadSpeeds";
@@ -6507,7 +6504,9 @@ export default function TakeoffPage({
   const queueMarksFor = useCallback(
     (
       group: { groupId: number; label: string; assemblyId: number | null },
-      at: readonly { x: number; y: number }[]
+      at: readonly { x: number; y: number }[],
+      /** What the marks are; absent = whatever "Placing as" is set to. */
+      status?: UserMarkStatus
     ) => {
       if (!activeSheet || at.length === 0) return;
       const sheetId = activeSheet.id;
@@ -6527,7 +6526,7 @@ export default function TakeoffPage({
           assemblyCategory: category,
           x: point.x,
           y: point.y,
-          status: placingStatus,
+          status: status ?? placingStatus,
           sent: false,
         })),
       ]);
@@ -6547,29 +6546,13 @@ export default function TakeoffPage({
   );
 
   /**
-   * The "- EXISTING TO REMAIN" twin of the count being searched for, if the
-   * library or the bid has one (shared/existingToRemain.ts). Null when the
-   * search is already FOR an existing count, or there is no twin to use.
+   * Is the search FOR an old "- EXISTING TO REMAIN" twin count? Then every
+   * find is already existing by its count's name, and "Count as existing"
+   * is not offered — fold the twin from the bid instead (shared/twinFold.ts).
    */
-  const existingTwin = useMemo(() => {
-    if (!findSession) return null;
-    const { base, existing } = splitExistingToRemain(findSession.group.label);
-    if (existing) return null;
-    const key = symbolLookupKey(existingToRemainName(base));
-    const assembly = allAssemblies.find(a => symbolLookupKey(a.name) === key);
-    if (assembly)
-      return {
-        kind: "assembly" as const,
-        id: assembly.id,
-        label: assembly.name,
-      };
-    const count = (bidCounts.data?.groups ?? []).find(
-      g => symbolLookupKey(g.label) === key
-    );
-    return count
-      ? { kind: "count" as const, id: count.id, label: count.label }
-      : null;
-  }, [findSession, allAssemblies, bidCounts.data?.groups]);
+  const searchingTwin =
+    findSession !== null &&
+    splitExistingToRemain(findSession.group.label).existing;
 
   const startFind = useCallback(() => {
     if (!activeSheet || !armedGroup || quantitiesLocked) return;
@@ -6715,40 +6698,26 @@ export default function TakeoffPage({
     [findSession, findItems, queueMarksFor, decideFound]
   );
 
+  /*
+    "Count as existing" places the mark on the SAME count with status
+    `existing` (shared/markStatus.ts), which prices nothing. Until
+    2026-10-10 it put a NEW mark on a "- EXISTING TO REMAIN" twin count,
+    which priced the device as new the moment the twin was sent to the bid
+    (references/status-and-scope-plan.md § 1, A's part, step 4). No twin is
+    made any more; the ones already made are folded (shared/twinFold.ts).
+  */
   const confirmFoundExisting = useCallback(
-    async (ids: number[]) => {
-      if (!findItems || !existingTwin) return;
+    (ids: number[]) => {
+      if (!findSession || !findItems || searchingTwin) return;
       const chosen = findItems.filter(i => ids.includes(i.id));
-      let group: { groupId: number; label: string; assemblyId: number | null };
-      if (existingTwin.kind === "assembly") {
-        const g = await groupForAssembly
-          .mutateAsync({ bidId, assemblyId: existingTwin.id })
-          .catch(() => null);
-        if (!g) return;
-        group = { groupId: g.id, label: g.label, assemblyId: existingTwin.id };
-        void bidCounts.refetch();
-      } else {
-        group = {
-          groupId: existingTwin.id,
-          label: existingTwin.label,
-          assemblyId: null,
-        };
-      }
       queueMarksFor(
-        group,
-        chosen.map(i => ({ x: i.x, y: i.y }))
+        findSession.group,
+        chosen.map(i => ({ x: i.x, y: i.y })),
+        "existing"
       );
       decideFound(ids, "confirmedExisting");
     },
-    [
-      findItems,
-      existingTwin,
-      groupForAssembly,
-      bidId,
-      bidCounts,
-      queueMarksFor,
-      decideFound,
-    ]
+    [findSession, findItems, searchingTwin, queueMarksFor, decideFound]
   );
 
   /*
@@ -11344,7 +11313,9 @@ export default function TakeoffPage({
                           )}
                           <MatchPanel
                             label={findSession.group.label}
-                            existingLabel={existingTwin?.label ?? null}
+                            existingLabel={
+                              searchingTwin ? null : "existing to remain"
+                            }
                             state={findSession.panel}
                             chromeTarget={size.chromeTarget}
                             canAskAi={readerAvailable}
