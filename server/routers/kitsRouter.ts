@@ -98,7 +98,8 @@ async function priceAssemblyAt(
       costPerUnit: Number(m.costPerUnit),
       qty: Number(m.qty),
     })),
-    baseLaborHours: detail.baseLaborHours,
+    // Typed, else the steps' total, else not set (assemblyHoursSource).
+    baseLaborHours: db.assemblyHoursSourceFor(detail).hours,
     // A kit is its assemblies, so it carries their overhead hours too — a
     // package of six assemblies each with 10 minutes of setup really is an hour
     // of setup, and a kit preview that dropped it would disagree with the bid.

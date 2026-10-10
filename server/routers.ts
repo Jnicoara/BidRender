@@ -35,6 +35,7 @@ import { takeoffRunTypesRouter } from "./routers/takeoffRunTypesRouter";
 import { takeoffStampsRouter } from "./routers/takeoffStampsRouter";
 import { takeoffSheetRouter } from "./routers/takeoffSheetRouter";
 import { kitsRouter } from "./routers/kitsRouter";
+import { laborStepsRouter } from "./routers/laborStepsRouter";
 import { onboardingRouter } from "./routers/onboardingRouter";
 import { navigationRouter } from "./routers/navigationRouter";
 import { planCopilotRouter } from "./routers/planCopilotRouter";
@@ -99,6 +100,7 @@ export const appRouter = router({
   takeoffStamps: takeoffStampsRouter,
   takeoffSheet: takeoffSheetRouter,
   kits: kitsRouter,
+  laborSteps: laborStepsRouter,
   onboarding: onboardingRouter,
   navigation: navigationRouter,
   // Separate from `navigation` on purpose — separate scope, separate action

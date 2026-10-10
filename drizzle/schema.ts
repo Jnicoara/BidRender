@@ -1297,6 +1297,90 @@ export const assemblyModifiers = mysqlTable(
 export type AssemblyModifier = typeof assemblyModifiers.$inferSelect;
 export type InsertAssemblyModifier = typeof assemblyModifiers.$inferInsert;
 
+// ─── Labor steps (0143, references/step-based-labor-plan.md) ──────────────────
+// A shared library of WORK STEPS ("Strip and terminate a device", 4 min), and
+// which steps an assembly is built from. The steps' total becomes the
+// assembly's hours when nobody has typed any — typed hours always win, and
+// the one function that decides is `assemblyHoursSource`
+// (shared/assemblyHoursSource.ts).
+//
+// The library is the MATERIALS pattern exactly: a NULL `userId` row is
+// shipped and re-stamped from server/seed/starterLaborSteps.ts on every boot;
+// a shop's edit FORKS it (its `userId`, `baselineId` = the shipped id), and the
+// re-stamp is scoped `isNull(userId)` so it can never reach the fork.
+//
+// ADDITIVE (step 1): two new tables, nothing existing changes meaning. The
+// code also runs WITHOUT them — every read treats "table missing" as "no
+// steps", which before the migration is simply true (server/laborSteps.ts).
+export const laborSteps = mysqlTable(
+  "labor_steps",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").references(() => users.id, { onDelete: "cascade" }),
+    baselineId: int("baselineId"),
+    /** The seed's key (`S05`) on a shipped row; NULL on a shop's own step. */
+    stepKey: varchar("stepKey", { length: 32 }),
+    name: varchar("name", { length: 255 }).notNull(),
+    /** What one count means: "each", "per cable end". */
+    unit: varchar("unit", { length: 64 }).default("each").notNull(),
+    /**
+     * Minutes for ONE count. NULL = NOT SET, never 0 (CLAUDE.md § Editing
+     * fields 6) — and one step not set makes the assembly's step total not
+     * set, never a smaller number. 0 is a real answer. Stored in minutes
+     * because that is what is typed, and sums are divided by 60 once.
+     */
+    minutes: decimal("minutes", { precision: 8, scale: 2 }),
+    /** How the time was built, in plain motions (plan § 9). */
+    reasoning: text("reasoning"),
+    /**
+     * TRUE on a shipped time from the owner's Steps sheet ("Example hours",
+     * 0133's rule). A shop's fork clears it; "Use these times" clears it
+     * unchanged. NULL = not an example.
+     */
+    isExampleMinutes: boolean("isExampleMinutes"),
+    /** Retire, never delete: an assembly pointing at it still resolves. */
+    isActive: boolean("isActive").default(true).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    index("labor_steps_userId_idx").on(t.userId),
+    index("labor_steps_baselineId_idx").on(t.baselineId),
+  ]
+);
+
+export type LaborStep = typeof laborSteps.$inferSelect;
+export type InsertLaborStep = typeof laborSteps.$inferInsert;
+
+/**
+ * One line of an assembly's step list.
+ *
+ * `kind = "step"`: `laborStepId` × `count`, the STORED id (a shipped step's),
+ * resolved to the company's fork at read time like a material line.
+ *
+ * `kind = "cable"`: the part step (owner, Q1) — the recipe's foot-sold lines,
+ * each at its own labor unit, so "NM-B per foot" is ONE number serving runs and
+ * assemblies. No `laborStepId`.
+ */
+export const assemblyLaborSteps = mysqlTable(
+  "assembly_labor_steps",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    assemblyId: int("assemblyId")
+      .notNull()
+      .references(() => assemblies.id, { onDelete: "cascade" }),
+    kind: mysqlEnum("kind", ["step", "cable"]).default("step").notNull(),
+    laborStepId: int("laborStepId").references(() => laborSteps.id, {
+      onDelete: "cascade",
+    }),
+    count: decimal("count", { precision: 10, scale: 2 }).default("1").notNull(),
+    sortOrder: int("sortOrder").default(0).notNull(),
+  },
+  t => [index("assembly_labor_steps_assemblyId_idx").on(t.assemblyId)]
+);
+
+export type AssemblyLaborStep = typeof assemblyLaborSteps.$inferSelect;
+
 // ─── Pricing Defaults ─────────────────────────────────────────────────────────
 // Company-level defaults that auto-fill new estimates. The per-project override
 // layer is deliberately NOT here — that belongs to Bid/Project structure (build

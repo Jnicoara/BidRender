@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Build an assembly's hours from its work steps (not live yet; waits for
+  the owner).** An assembly can list the work it takes — mount the box,
+  prepare the cable, terminate, set the device, plate, test — each with a
+  time. With no hours typed, the steps' total prices the assembly; typed
+  hours always win, and the step total sits beside them as a quiet check.
+  Steps are shared, so fixing one time fixes every assembly that uses it,
+  while bids already priced never change. It sits under "More options" and
+  ships with NO times: nothing prices differently until the owner fills in
+  the step times.
 - **The no-match search log is switched on (staging).** When a search in a
   picker finds nothing, the words are kept (company, picker, words, time —
   never who or which bid), so the catalog can grow from what estimators

@@ -436,6 +436,10 @@ describe("stored files", () => {
           // bid_line_items.runExtraKey (0136) — which extra of a run type a
           // line is, an extra's id or 0. An integer, not a file.
           "runExtraKey",
+          // labor_steps.stepKey (0143) — the seed's key for a shipped work
+          // step (`S05`), what the owner's sheet carries a minute by. An
+          // identifier, not a file.
+          "stepKey",
         ].includes(column)
       ) {
         continue;
