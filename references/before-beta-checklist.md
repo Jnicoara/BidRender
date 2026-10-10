@@ -207,7 +207,9 @@ prices ship without them.
       that writes shipped rows is overwritten by the next start's re-stamp.
       Needs the example-price / example-hours tags and the
       `snapshotUnpricedParts` freeze first · A (schema) + B (screen) ·
-      large · **yes** · `starter-vs-company-plan.md` § 3
+      large · **yes** · `starter-vs-company-plan.md` § 3. **Full plan:
+      `baseline-screen-plan.md`** (2026-10-10, plan only; 13 owner
+      questions, 4 move numbers on new lines)
 - [ ] **Seed-heavy tests time out when another worktree's suite is running.**
       The one-query fix is written and measured in `todo.md` § "Flaky
       tests", and waits on whoever owns `server/db.ts`. It also takes

@@ -182,6 +182,13 @@ a Starter screen listing shared rows with "changed by N shops" beside each,
 edits written to the starter tables with an audit row, and the seed files
 retired to first-boot. Its own plan when the time comes.
 
+> **That plan is written: `references/baseline-screen-plan.md` (Track C,
+> 2026-10-10, plan only).** It keeps this section's rules and the
+> "starter lives in the database" idea, but uses the existing
+> `userId IS NULL` rows as the starter rather than new `starter_*` tables
+> (one source, not two), and turns the seed files into an export of live
+> for price and hours. Not decided until the owner answers its § 10.
+
 ### What HE should do in the meantime
 
 - **Fill the sheets; do not type starter values into his own account.** What

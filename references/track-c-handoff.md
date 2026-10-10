@@ -13,7 +13,26 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-10, evening) — remove/relocate MERGED to local-dev (`d832e34`); FOR TRACK A: recount bids with remove/relocate marks before it goes live
+## LATEST (2026-10-10, night) — owner answers recorded; baseline screen PLANNED
+
+- **Owner answers recorded** (`d9d49b8`): quick-bid Q1/Q2/Q3/Q6/Q8 in
+  `quick-bid-plan.md` § 12, status-and-scope Q10 in § 8. All six took the
+  suggested answer.
+- **`references/baseline-screen-plan.md`, plan only, no code.** It covers
+  the admin screen on live for the shipped starter's prices, labor hours
+  and assembly hours: a `starter_editor` login with no company plus an
+  authenticator code; one `applyStarterChange` path with a field-by-field
+  push under a double guard (tag not FALSE AND value equals the old
+  starter); a change log with undo; sheet upload with preview; export to
+  seed plus a drift line; "My changes" and "Copy from my company". Three
+  additive migration drafts (BS-M1–M3) are for A. **13 owner questions;
+  5, 6, 7 and 13 move numbers on new lines.**
+- **Found while planning, not fixed:** editing an assembly's OVERHEAD
+  hours does not clear `isExampleHours` (`assembliesRouter.ts:316` clears
+  it on base hours only). The plan fixes it with the push code. Today it
+  only means a shop's edited overhead still shows "Example hours".
+
+## EARLIER (2026-10-10, evening) — remove/relocate MERGED to local-dev (`d832e34`); FOR TRACK A: recount bids with remove/relocate marks before it goes live
 
 **Both known gaps below are FIXED on `c-remove-relocate` `d832e34`**, and
 that commit is now local-dev (fast-forward push `07c7407..d832e34`;
