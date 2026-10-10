@@ -93,11 +93,14 @@ import {
   MARK_STATUS_LABEL,
   markIsSnapTarget,
   markStatusOf,
+  nextMarkToCheck,
   sumSplits,
   type MarkStatus,
   type UserMarkStatus,
 } from "@shared/markStatus";
 import { statusStripModel } from "@/lib/statusStrip";
+import { twinCountWarnings } from "@shared/twinFold";
+import { useFoldTwin } from "@/hooks/useFoldTwin";
 import {
   SHEET_WORK_TAG_LABEL,
   placingChoices,
@@ -3889,6 +3892,9 @@ export default function TakeoffPage({
         case "takeoffGroups.list":
           void utils.takeoffGroups.list.invalidate({ bidId });
           return;
+        case "takeoffStamps.unconfirmedForBid":
+          void utils.takeoffStamps.unconfirmedForBid.invalidate({ bidId });
+          return;
         case "takeoffSummary.forBid":
           void utils.takeoffSummary.forBid.invalidate({ bidId });
           return;
@@ -5259,6 +5265,7 @@ export default function TakeoffPage({
         workTag: activeWorkTag,
         newMarksHere: newMarkIdsHere.length,
         locked: quantitiesLocked,
+        twins: twinCountWarnings(bidCounts.data?.groups ?? []),
       }),
     [
       bidCounts.data,
@@ -5277,6 +5284,127 @@ export default function TakeoffPage({
     },
     [jumpList]
   );
+  /*
+    "COUNT THESE AS EXISTING" from the bar — the bid screen's own fold and
+    Undo (@/hooks/useFoldTwin). It moves marks between counts on every
+    sheet, so every sheet's marks refresh; its Undo lives in its toast, so
+    the arrow notes it as a change it does not cover.
+  */
+  const foldTwin = useFoldTwin(
+    bidId,
+    () => refreshFor("marksMoved", "every"),
+    () => notUndoable("twinFold")
+  );
+
+  /*
+    ── "CHECK THEM" (status-and-scope-plan § 1c) ────────────────────────────
+    One unconfirmed mark at a time: its sheet opened, the view centred on it,
+    the mark selected, and the answer given in the bar. The order and the
+    skipping are @shared/markStatus `nextMarkToCheck`, tested. The list is a
+    bid-wide query in MARK_QUERIES, so an answer, an Undo, a delete or the
+    reader adding marks moves it with nothing here to remember.
+  */
+  const unconfirmedList = trpc.takeoffStamps.unconfirmedForBid.useQuery(
+    { bidId },
+    { enabled: statusStrip.offerCheck !== null }
+  );
+  const [checkingId, setCheckingId] = useState<number | null>(null);
+  const [checkSkipped, setCheckSkipped] = useState<ReadonlySet<number>>(
+    () => new Set()
+  );
+  const [checkAnswered, setCheckAnswered] = useState<ReadonlySet<number>>(
+    () => new Set()
+  );
+  const checkJumped = useRef<number | null>(null);
+  const toCheck = unconfirmedList.data ?? [];
+  const checkingMark = toCheck.find(m => m.id === checkingId) ?? null;
+  const startUnconfirmedWalk = useCallback(() => {
+    const first = nextMarkToCheck(toCheck, new Set(), new Set(), null);
+    setCheckSkipped(new Set());
+    setCheckAnswered(new Set());
+    checkJumped.current = null;
+    setCheckingId(first?.id ?? null);
+    if (!first) toast.info("No unconfirmed marks left to check.");
+  }, [toCheck]);
+  const advanceCheck = useCallback(
+    (
+      from: number,
+      skipped: ReadonlySet<number>,
+      answered: ReadonlySet<number>
+    ) => {
+      const next = nextMarkToCheck(toCheck, skipped, answered, from);
+      setCheckingId(next?.id ?? null);
+      if (!next) {
+        const left = toCheck.filter(m => !answered.has(m.id)).length;
+        toast.success(
+          left === 0
+            ? "Every unconfirmed mark has an answer."
+            : `Done — ${left} skipped ${left === 1 ? "mark stays" : "marks stay"} unconfirmed, not counted.`
+        );
+      }
+    },
+    [toCheck]
+  );
+  /*
+    A FRESH list that still holds an "answered" mark means the answer was
+    taken back (Undo, here or on the arrow): it is unconfirmed again, so it
+    is no longer answered. Without this the walk skipped it and its closing
+    toast said "1 skipped mark stays unconfirmed" while 2 did — caught on
+    screen, 2026-10-10. On data UPDATES only: right after an answer the list
+    still holds that mark until its own refetch lands, and must not undo it.
+  */
+  useEffect(() => {
+    const present = new Set(toCheck.map(m => m.id));
+    setCheckAnswered(prev =>
+      Array.from(prev).some(id => present.has(id))
+        ? new Set(Array.from(prev).filter(id => !present.has(id)))
+        : prev
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on a new answer from the server only
+  }, [unconfirmedList.dataUpdatedAt]);
+  // The mark leaves the list on its own refetch; if it is gone and it was not
+  // answered here (deleted, or answered elsewhere), move on rather than stall.
+  useEffect(() => {
+    if (checkingId === null || unconfirmedList.isFetching) return;
+    if (!toCheck.some(m => m.id === checkingId))
+      advanceCheck(checkingId, checkSkipped, checkAnswered);
+  }, [
+    checkingId,
+    toCheck,
+    unconfirmedList.isFetching,
+    advanceCheck,
+    checkSkipped,
+    checkAnswered,
+  ]);
+  // Open its sheet, centre it once, and keep it selected so it is the ringed one.
+  useEffect(() => {
+    if (!checkingMark) return;
+    if (activeSheet?.id !== checkingMark.sheetId) {
+      const entry = jumpList.find(j => j.sheetId === checkingMark.sheetId);
+      if (!entry) return;
+      if (entry.bidPdfId !== doc?.id) setSelectedDocId(entry.bidPdfId);
+      setPage(entry.pageNumber);
+      return;
+    }
+    if (checkJumped.current !== checkingMark.id) {
+      checkJumped.current = checkingMark.id;
+      jumpTo({ x: checkingMark.x, y: checkingMark.y });
+    }
+    setSelectedStampIds(current =>
+      current.size === 1 && current.has(checkingMark.id)
+        ? current
+        : new Set([checkingMark.id])
+    );
+    // On the selection too: an answer's save clears the selection when it
+    // lands, after the walk has moved on — this selects the next one again.
+  }, [
+    checkingMark,
+    activeSheet?.id,
+    jumpList,
+    doc?.id,
+    jumpTo,
+    selectedStampIds,
+  ]);
 
   const bridgeByGroup = useMemo(() => {
     const map = new Map<number, GroupBridgeState>();
@@ -10633,6 +10761,42 @@ export default function TakeoffPage({
               status: "remove",
             })
           }
+          locked={quantitiesLocked}
+          onFoldTwin={id => foldTwin.mutate({ id })}
+          foldBusy={foldTwin.isPending}
+          checking={
+            checkingMark
+              ? {
+                  position: toCheck.indexOf(checkingMark) + 1,
+                  total: toCheck.length,
+                  label:
+                    bidCounts.data?.groups.find(
+                      g => g.id === checkingMark.groupId
+                    )?.label ?? "Mark",
+                  sheet: sheetShortName(checkingMark.sheetId),
+                }
+              : null
+          }
+          onStartCheck={startUnconfirmedWalk}
+          onAnswerCheck={status => {
+            if (!checkingMark || quantitiesLocked) return;
+            // "Mark as…"'s own call: an Undo step, toast with Undo.
+            setMarkStatus.mutate({
+              bidId,
+              ids: [checkingMark.id],
+              status,
+            });
+            const answered = new Set(checkAnswered).add(checkingMark.id);
+            setCheckAnswered(answered);
+            advanceCheck(checkingMark.id, checkSkipped, answered);
+          }}
+          onSkipCheck={() => {
+            if (!checkingMark) return;
+            const skipped = new Set(checkSkipped).add(checkingMark.id);
+            setCheckSkipped(skipped);
+            advanceCheck(checkingMark.id, skipped, checkAnswered);
+          }}
+          onStopCheck={() => setCheckingId(null)}
         />
       )}
 

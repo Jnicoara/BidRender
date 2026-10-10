@@ -15,11 +15,43 @@ const base: StatusStripInput = {
   workTag: null,
   newMarksHere: 30,
   locked: false,
+  twins: [],
+};
+
+const twin = {
+  groupId: 7,
+  label: "Duplex receptacle - EXISTING TO REMAIN",
+  newMarks: 3,
+  baseLabel: "Duplex receptacle",
 };
 
 describe("the status strip", () => {
   it("is not shown on the basic path: only new marks, sheet not tagged", () => {
-    expect(statusStripModel(base).visible).toBe(false);
+    const m = statusStripModel(base);
+    expect(m.visible).toBe(false);
+    expect(m.offerCheck).toBeNull();
+    expect(m.twins).toEqual([]);
+  });
+
+  it("offers 'Check them' exactly when there are unconfirmed marks — locked bids too, since looking moves nothing", () => {
+    const total = split({ new: 4, unconfirmed: 3 });
+    expect(statusStripModel({ ...base, total }).offerCheck).toBe(3);
+    expect(statusStripModel({ ...base, total, locked: true }).offerCheck).toBe(
+      3
+    );
+    expect(
+      statusStripModel({ ...base, total: split({ new: 4, remove: 1 }) })
+        .offerCheck
+    ).toBeNull();
+  });
+
+  it("shows a twin warning even when every mark is new, with its fix — and no fix on a locked bid", () => {
+    const m = statusStripModel({ ...base, twins: [twin] });
+    expect(m.visible).toBe(true);
+    expect(m.twins).toEqual([{ ...twin, fixable: true }]);
+    expect(
+      statusStripModel({ ...base, twins: [twin], locked: true }).twins
+    ).toEqual([{ ...twin, fixable: false }]);
   });
 
   it("shows the bar once any mark is not new", () => {

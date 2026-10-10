@@ -1,6 +1,90 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-10 (night), STATUS VIEW on `b-status-view` (READ FIRST)
+## MERGE ORDER — b-twin-fold FIRST, then b-status-view (READ FIRST)
+
+`b-status-view` is built ON `b-twin-fold` (24843fd) and uses its fold
+(`takeoffGroups.foldExistingTwin`) from the status bar. Merge them in this
+order, never the other way and never `b-status-view` alone:
+
+1. **A:** M1 rehearsed on a live copy; **M2** applied (additive, step 1 —
+   SQL below). M2 must be in the database BEFORE any code from
+   `b-status-view` runs against it: every `bid_pdf_sheets` read selects
+   `workTag`.
+2. **`b-twin-fold`** → track-b → local-dev (Gate green), the usual way.
+3. **`b-status-view`** → track-b → local-dev (Gate green). It already
+   contains b-twin-fold, so this is a fast-forward of the rest.
+4. M1 (the fold, meaning, step 3) runs after both are live.
+
+## WHERE B STANDS — 2026-10-10 (late night), the two leftovers BUILT on `b-status-view`
+
+Same branch, a second commit; still NOT merged.
+
+- **"Check them" (plan § 1c):** a "Check them" button beside "N
+  unconfirmed". The walk shows one unconfirmed mark at a time: its sheet
+  opens, the view centres and zooms on it, it is selected (so the
+  selection bar's Delete is there for a misplaced mark), and the card in
+  the bar reads "Checking 1 of 2 · Single pole switch on E-200 · New ·
+  Staying · Remove · Relocate · Skip · Done".
+  - Each answer is `setStatus` — the same call as "Mark as…", so an Undo
+    step with Undo in its toast.
+  - Order and skipping: `shared/markStatus.ts` `nextMarkToCheck` (by
+    sheet, then down and across, wrapping).
+  - List: new `takeoffStamps.unconfirmedForBid`, in MARK_QUERIES, so every
+    mark change refreshes it.
+  - Locked bid: the walk still opens (looking), with Next / Done only and
+    "the bid is locked; unlock it to change marks".
+  - **Fault found on screen and fixed:** after an Undo the walk still
+    treated the put-back mark as answered, and its closing toast said "1
+    skipped mark stays unconfirmed" while 2 did. A fresh list now drops
+    put-back marks from the answered set.
+- **Twin warning on the bar:** each "… - EXISTING TO REMAIN" count still
+  holding NEW marks gets a row: "“Duplex receptacle - EXISTING TO REMAIN”: 2
+  marks count as NEW devices." + "Count these as existing on Duplex
+  receptacle". Rule: `shared/twinFold.ts` `twinCountWarnings`.
+  - The button is the bid screen's own fold AND Undo, now ONE hook,
+    `client/src/hooks/useFoldTwin.ts`, used by BidsPage and the Plans
+    screen. BidsPage's copy is gone; `twinFoldWired.test.ts` now reads the
+    hook for the invalidations.
+  - Undo shows exactly when the twin was on a bid line (`twinKept`), which
+    is exactly when the fold moves a number. A twin on no line prices
+    nothing, and the toast says "Nothing on the bid moved — that count was
+    not on it."
+  - On the Plans undo arrow it is noted (`notUndoable("twinFold")`); its
+    Undo is in the toast.
+  - Locked bid: warning shown, no button, "the bid is locked; unlock it to
+    fix".
+- **Demo-sheet pairing (§ 2b) and "same device?" (§ 2c):** not built, in
+  todo.md § "Separate demo sheets".
+- **Tests (red without the change, worktree at 163907e + the test files):**
+  - `server/statusChecks.test.ts` 14: 13 red (the green one is the guard
+    "another company cannot read it").
+  - `client/src/lib/statusStrip.test.ts`: the 3 new tests red.
+  - `client/src/lib/statusViewWired.test.ts`: the 3 new tests red; a 4th
+    pins the put-back fix.
+  - `twinFoldWired.test.ts`: the moved check red until the hook exists.
+  - Also run, green: statusView, notUndoableWired, undoStack, twinFold,
+    sourceHygiene. `pnpm check` clean. All on a scratch
+    `bidrender_test_b_m2` (migrations + M2), dropped after.
+- **On screen** (headless Chrome, 1536x864, 820x1180, 1180x820, scratch copy
+  of `bidrender_local_b_new` + M2, dropped after; bid 1728350, E-200, its 2
+  switch marks set unconfirmed and a 2-mark twin count seeded):
+  - All three sizes: the bar, the twin row, and the walk card; no sideways
+    scroll.
+  - Answer "Staying": 1 → 2 staying, 2 → 1 unconfirmed, "1 of 1"; Undo:
+    back to 2 unconfirmed; Skip then returns to the put-back mark.
+  - Fold: the twin row goes; 3 new → 1 new, 1 → 3 staying.
+  - Locked: no fold button, no answer buttons.
+  - This bid has no priced lines, so its total stays $0. The money is in
+    the server test: $80 → $50 after the fold → $80 after Undo; one answer
+    moves $30 → $40 and Undo puts it back to $30.
+- **Bid totals (`scripts/bidTotals.mts`):** 163907e vs this commit on the
+  same clean copy: **all 4,306 bids unchanged** (totalDue, not-priced,
+  incomplete). Nothing here moves a number until a person answers a mark
+  or presses the fold; each of those is on one bid, with Undo.
+- **Leftovers:** none. No dev server, scratch DBs dropped, probe scripts
+  deleted.
+
+## WHERE B STANDS — 2026-10-10 (night), STATUS VIEW on `b-status-view`
 
 **Branch `b-status-view`, off `b-twin-fold` (24843fd), pushed, NOT merged.**
 It waits on A's twin-fold step AND on M2 below. Plan:

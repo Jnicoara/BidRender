@@ -46,7 +46,31 @@ export function StatusStrip({
   onMakeRemove,
   busy,
   canPlace,
+  onFoldTwin,
+  foldBusy,
+  checking,
+  onStartCheck,
+  onAnswerCheck,
+  onSkipCheck,
+  onStopCheck,
+  locked,
 }: {
+  /** "Count these as existing" for one twin count (@/hooks/useFoldTwin). */
+  onFoldTwin: (groupId: number) => void;
+  foldBusy: boolean;
+  /** The walk through unconfirmed marks, while it is open. */
+  checking: {
+    position: number;
+    total: number;
+    label: string;
+    sheet: string | null;
+  } | null;
+  onStartCheck: () => void;
+  onAnswerCheck: (status: UserMarkStatus) => void;
+  onSkipCheck: () => void;
+  onStopCheck: () => void;
+  /** The bid's quantities are locked: show, never offer a change. */
+  locked: boolean;
   model: StatusStripModel;
   focus: MarkStatus | null;
   onFocus: (status: MarkStatus | null) => void;
@@ -202,6 +226,115 @@ export function StatusStrip({
           {model.elsewhere.length > 4 && (
             <span>+{model.elsewhere.length - 4} more sheets</span>
           )}
+        </span>
+      )}
+
+      {/* "Check them" — the fix-it for "N unconfirmed" (plan § 1c). */}
+      {model.offerCheck !== null && checking === null && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2 text-xs"
+          onClick={onStartCheck}
+          title="Step through the unconfirmed marks one at a time and say what each one is. Unconfirmed marks are not counted until checked."
+        >
+          Check them
+        </Button>
+      )}
+
+      {/*
+        TWIN COUNTS still counting existing-to-remain devices as NEW (plan
+        § 1c). One row each, its own fix beside it — the same fold and Undo
+        as the bid screen (@/hooks/useFoldTwin). The button names the count
+        the marks go to, and wraps rather than truncating (b-twin-fold found
+        two truncated buttons that looked the same).
+      */}
+      {model.twins.map(twin => (
+        <span
+          key={twin.groupId}
+          className="basis-full inline-flex flex-wrap items-center gap-1.5"
+          data-testid="twin-warning"
+        >
+          <span className="text-amber-600 dark:text-amber-400">
+            “{twin.label}”: {twin.newMarks}{" "}
+            {twin.newMarks === 1 ? "mark counts" : "marks count"} as NEW devices
+            {twin.fixable ? "." : " — the bid is locked; unlock it to fix."}
+          </span>
+          {twin.fixable && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-auto min-h-7 whitespace-normal px-2 py-0.5 text-left text-xs"
+              disabled={foldBusy}
+              onClick={() => onFoldTwin(twin.groupId)}
+              title="Move these marks onto their own count as existing to remain — they stop counting as new devices."
+            >
+              Count these as existing on {twin.baseLabel}
+            </Button>
+          )}
+        </span>
+      ))}
+
+      {/*
+        THE WALK — one unconfirmed mark at a time, centred and selected on the
+        drawing, answered right here. Each answer goes through "Mark as…"'s
+        own call, so it is an Undo step with Undo in its toast. On a locked bid
+        it is a look only: no answers, the way through is unlocking.
+      */}
+      {checking !== null && (
+        <span
+          className="basis-full inline-flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/50 px-2 py-1"
+          data-testid="check-walk"
+        >
+          <span className="font-medium tabular-nums">
+            Checking {checking.position} of {checking.total}
+          </span>
+          <span className="text-muted-foreground">
+            {checking.label}
+            {checking.sheet ? ` on ${checking.sheet}` : ""}
+          </span>
+          {locked ? (
+            <span className="text-muted-foreground">
+              — the bid is locked; unlock it to change marks.
+            </span>
+          ) : (
+            (["new", "existing", "remove", "relocate"] as const).map(s => (
+              <Button
+                key={s}
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                disabled={busy}
+                onClick={() => onAnswerCheck(s)}
+                title={TOOLTIP[s]}
+              >
+                {s === "new"
+                  ? "New"
+                  : s === "existing"
+                    ? "Staying"
+                    : s === "remove"
+                      ? "Remove"
+                      : "Relocate"}
+              </Button>
+            ))
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={onSkipCheck}
+            title="Leave this one unconfirmed for now and go to the next"
+          >
+            {locked ? "Next" : "Skip"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            onClick={onStopCheck}
+          >
+            Done
+          </Button>
         </span>
       )}
     </div>

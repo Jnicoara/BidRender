@@ -60,7 +60,11 @@ describe("the bid screen flags a twin line and offers the fix there", () => {
   });
 
   it("tells the Plans screen its counts and marks moved", () => {
-    expect(bids).toContain("utils.takeoffGroups.invalidate()");
-    expect(bids).toContain("utils.takeoffStamps.invalidate()");
+    // Since 2026-10-10 the fold and its Undo live in ONE hook, shared with
+    // the Plans screen's status bar; the bid screen calls it.
+    const hook = read("../hooks/useFoldTwin.ts");
+    expect(bids).toContain("useFoldTwin(bidId, refresh)");
+    expect(hook).toContain("utils.takeoffGroups.invalidate()");
+    expect(hook).toContain("utils.takeoffStamps.invalidate()");
   });
 });

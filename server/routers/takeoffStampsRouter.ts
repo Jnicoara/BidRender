@@ -674,6 +674,18 @@ export const takeoffStampsRouter = router({
     }),
 
   /**
+   * Every unconfirmed mark on the bid, for the status bar's "Check them"
+   * (status-and-scope-plan § 1c). Read-only, so it answers on a locked bid
+   * too: looking is allowed, only the answers are refused.
+   */
+  unconfirmedForBid: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      return db.unconfirmedStampsForBid(input.bidId, ctx.scope.dataUserId);
+    }),
+
+  /**
    * Put marks' statuses back as `setStatus` found them — its Undo, and
    * the Undo's redo. Takes ANY stored status, `unconfirmed` included,
    * because it writes back what was there rather than a person's choice.

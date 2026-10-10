@@ -261,3 +261,35 @@ export function markFocusOpacity(
   if (focus === null) return 1;
   return markStatusOf(status) === focus ? 1 : STATUS_FOCUS_DIM_OPACITY;
 }
+
+// ─── "Check them": stepping through the unconfirmed marks (plan § 1c) ────────
+
+/** An unconfirmed mark, as the walk-through needs it. */
+export type MarkToCheck = { id: number; sheetId: number };
+
+/**
+ * The next unconfirmed mark to look at, after `afterId`, in the list's order
+ * (the server sorts it by sheet, then down and across the drawing), wrapping
+ * to the start. Skipped marks are passed over; answered ones are gone from
+ * the list by the time it is asked again, and `answered` hides them before
+ * the refetch lands, so the walk never shows a mark twice. Null = nothing
+ * left that was not skipped.
+ */
+export function nextMarkToCheck(
+  list: readonly MarkToCheck[],
+  skipped: ReadonlySet<number>,
+  answered: ReadonlySet<number>,
+  afterId: number | null
+): MarkToCheck | null {
+  const open = list.filter(m => !answered.has(m.id));
+  if (open.length === 0) return null;
+  const from = afterId === null ? -1 : list.findIndex(m => m.id === afterId);
+  const ordered =
+    from < 0
+      ? open
+      : [
+          ...list.slice(from + 1).filter(m => !answered.has(m.id)),
+          ...list.slice(0, from + 1).filter(m => !answered.has(m.id)),
+        ];
+  return ordered.find(m => !skipped.has(m.id)) ?? null;
+}

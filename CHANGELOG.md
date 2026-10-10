@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Plans: check unconfirmed marks one at a time, and fix old
+  "existing to remain" counts from the same bar.** "Check them" steps
+  through every mark nobody has confirmed. It opens the sheet, zooms to
+  the mark and lets you say New, Staying, Remove or Relocate right there,
+  with Undo. An old "… - EXISTING TO REMAIN" count still counting its
+  devices as new now shows a warning with the same "Count these as
+  existing" fix the bid screen has. On a locked bid you can look but
+  nothing changes.
 - **Plans: see at a glance what is new, staying, removed and relocated.**
   Once a bid has any mark that is not new, a bar above the drawing reads
   "3 new · 1 staying · 1 removed · 1 relocated". Tap one to show only those

@@ -70,3 +70,66 @@ describe("the status view on the Plans screen", () => {
     expect(page).toContain("More options — this sheet shows");
   });
 });
+
+const bidsPage = read("../pages/BidsPage.tsx");
+const strip = read("../components/takeoff/StatusStrip.tsx");
+
+describe("the status bar's fix-its (plan § 1c)", () => {
+  it("'Check them' answers through Mark as…'s own call — an undo step — and only when the bid is not locked", () => {
+    const answer = page.slice(
+      page.indexOf("onAnswerCheck={status => {"),
+      page.indexOf("onSkipCheck={")
+    );
+    expect(answer).toContain("if (!checkingMark || quantitiesLocked) return;");
+    expect(answer).toMatch(
+      /setMarkStatus\.mutate\(\{\s*bidId,\s*ids: \[checkingMark\.id\],\s*status,/
+    );
+    // The walk's order is the tested one.
+    expect(page).toContain("nextMarkToCheck(toCheck,");
+    // A locked bid gets no answer buttons in the card.
+    expect(strip).toMatch(/\{locked \? \(\s*<span[^>]*>\s*— the bid is locked/);
+  });
+
+  it("a mark put back by Undo stops counting as answered once a fresh list says so", () => {
+    // Seen on screen 2026-10-10: without it the closing toast said 1 mark
+    // stayed unconfirmed while 2 did.
+    const prune = page.slice(
+      page.indexOf("A FRESH list that still holds"),
+      page.indexOf("}, [unconfirmedList.dataUpdatedAt]);")
+    );
+    expect(prune).toContain("setCheckAnswered(prev =>");
+    expect(prune).toContain("filter(id => !present.has(id))");
+  });
+
+  it("the walk's list is refreshed by every mark change, not by its own buttons", () => {
+    for (const change of [
+      "markStatus",
+      "marksPlaced",
+      "markRemoved",
+      "marksMoved",
+      "undo",
+    ] as const)
+      expect(QUERIES_MOVED_BY[change]).toContain(
+        "takeoffStamps.unconfirmedForBid"
+      );
+    expect(page).toContain(
+      'case "takeoffStamps.unconfirmedForBid":\n          void utils.takeoffStamps.unconfirmedForBid.invalidate({ bidId });'
+    );
+  });
+
+  it("the twin warning's button is the bid screen's own fold, through one hook", () => {
+    expect(page).toContain(
+      "twins: twinCountWarnings(bidCounts.data?.groups ?? [])"
+    );
+    expect(page).toMatch(/const foldTwin = useFoldTwin\(\s*bidId,/);
+    expect(page).toContain('() => notUndoable("twinFold")');
+    expect(page).toContain("onFoldTwin={id => foldTwin.mutate({ id })}");
+    expect(bidsPage).toContain("const foldTwin = useFoldTwin(bidId, refresh);");
+    // Neither screen keeps a copy of the fold or its Undo.
+    for (const src of [page, bidsPage]) {
+      expect(src).not.toContain("takeoffGroups.foldExistingTwin.useMutation");
+      expect(src).not.toContain("unfoldMove");
+    }
+    expect(Object.keys(NOT_UNDOABLE)).toContain("twinFold");
+  });
+});

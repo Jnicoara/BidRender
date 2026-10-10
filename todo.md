@@ -802,6 +802,23 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Separate demo sheets: pairing, overlay and "same device?" — LATER (Track B, 2026-10-10)
+
+Owner's answer (status-and-scope-plan § 8 Q5): demo and new on ONE sheet
+first, which `b-status-view` covers (the sheet tag, the Remove default, and
+the status bar's "removed" view as the overlay on a shared sheet). Left for
+when a real job arrives with SEPARATE demo sheets — use it as the test set:
+
+- [ ] § 2b: pair a Demo sheet with its New-work sheet and line them up by
+      two matching points (the calibrate interaction); "Show demo marks"
+      under More options draws the paired sheet's Remove marks as ghosts.
+      Needs M3 (`bid_sheet_alignments`). Marks only, never the drawing
+      (`code-first-ceiling.md`: a real pair shared 15% of its line work).
+- [ ] § 2c: "Same device?" card when a New mark lands within 2 ft (sheet
+      scale, same item) of a Remove mark — Staying / Relocated / No, both
+      (default). Needs M4 (`takeoff_stamps.sameAsStampId`). Never automatic;
+      moves a number only when accepted, with Undo.
+
 ### Staging deploy guard: let a push through once staging's DATABASE has its migrations — build AFTER the live release (Track A, 2026-10-10)
 
 **Today:** the Gate's deploy-staging step refuses every local-dev push whose
@@ -3244,7 +3261,7 @@ path is ever revived, give it the same treatment first.
       header this is a separate step-3 migration, now unblocked.
       **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, not
       merged):** `shared/twinFold.ts` (the rules), `takeoffGroups.
-    foldExistingTwin` (one count, on demand), the bid screen's flags with
+  foldExistingTwin` (one count, on demand), the bid screen's flags with
       "Count these as existing" / "Remove this line", and "Count as
       existing" in Find all matching no longer makes twins. **Left for A:**
       M1, the SQL draft in `references/track-b-handoff.md`, and a live-copy

@@ -77,6 +77,8 @@ export const NOT_UNDOABLE = {
   sheetName: "sheet renamed",
   sheetNumber: "sheet number changed",
   sheetWorkTag: "sheet's demo / new work tag changed",
+  // Its own Undo is in the fold's toast (@/hooks/useFoldTwin), not here.
+  twinFold: "existing-to-remain count folded",
   planRemoved: "plan set removed",
 } as const;
 

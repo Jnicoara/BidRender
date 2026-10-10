@@ -10725,6 +10725,51 @@ export async function statusSplitRows(
 }
 
 /**
+ * Every UNCONFIRMED mark on the bid, for "Check them" (status-and-scope-plan
+ * § 1c): by sheet, then down and across the drawing, so the walk moves the
+ * way an eye reads a sheet. Live plan sheets only, like every other read.
+ */
+export async function unconfirmedStampsForBid(
+  bidId: number,
+  userId: number
+): Promise<
+  {
+    id: number;
+    sheetId: number;
+    groupId: number | null;
+    x: number;
+    y: number;
+  }[]
+> {
+  const database = await getDb();
+  if (!database) return [];
+  const rows = await database
+    .select({
+      id: takeoffStamps.id,
+      sheetId: takeoffStamps.sheetId,
+      groupId: takeoffStamps.groupId,
+      x: takeoffStamps.x,
+      y: takeoffStamps.y,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.status, "unconfirmed"),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    )
+    .orderBy(
+      asc(takeoffStamps.sheetId),
+      asc(takeoffStamps.y),
+      asc(takeoffStamps.x),
+      asc(takeoffStamps.id)
+    );
+  return rows.map(r => ({ ...r, x: Number(r.x), y: Number(r.y) }));
+}
+
+/**
  * What these marks' statuses ARE, before a change — so "Mark as…" can be
  * undone (status-and-scope-plan: "only a toggle changes numbers, with
  * Undo"). Grouped by status, NULL kept as NULL, because that is what the

@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
+import { useFoldTwin } from "@/hooks/useFoldTwin";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -569,60 +570,10 @@ export default function BidsPage({
 
   /*
     "Count these as existing" on a line from an old "- EXISTING TO REMAIN"
-    twin count (shared/twinFold.ts). Moves marks, so the Plans screen's
-    counts and marks are told too, not only this bid. Undo puts the marks
-    back on the twin as they were — the twin is always kept here, because a
-    line holds it.
+    twin count — one hook with the Plans screen's status bar, so the fold and
+    its Undo are the same in both places (@/hooks/useFoldTwin).
   */
-  const unfoldMove = trpc.takeoffStamps.moveToGroup.useMutation();
-  const unfoldStatus = trpc.takeoffStamps.setStatus.useMutation();
-  const afterFold = useCallback(() => {
-    refresh();
-    void utils.takeoffGroups.invalidate();
-    void utils.takeoffStamps.invalidate();
-  }, [refresh, utils]);
-  const foldTwin = trpc.takeoffGroups.foldExistingTwin.useMutation({
-    onError: error => toast.error(error.message),
-    onSuccess: (result, vars) => {
-      const marks = `${result.moved} mark${result.moved === 1 ? "" : "s"}`;
-      const backToNew = result.previous
-        .filter(m => m.status === null || m.status === "new")
-        .map(m => m.id);
-      toast.success(
-        `${marks} now count as existing to remain on ${result.baseLabel}.`,
-        result.twinKept && result.moved > 0
-          ? {
-              action: {
-                label: "Undo",
-                onClick: () =>
-                  void (async () => {
-                    try {
-                      await unfoldMove.mutateAsync({
-                        ids: result.previous.map(m => m.id),
-                        groupId: vars.id,
-                      });
-                      if (backToNew.length > 0)
-                        await unfoldStatus.mutateAsync({
-                          bidId,
-                          ids: backToNew,
-                          status: null,
-                        });
-                      toast.success("Put back.");
-                    } catch (error) {
-                      toast.error(
-                        error instanceof Error ? error.message : String(error)
-                      );
-                    } finally {
-                      afterFold();
-                    }
-                  })(),
-              },
-            }
-          : undefined
-      );
-    },
-    onSettled: afterFold,
-  });
+  const foldTwin = useFoldTwin(bidId, refresh);
 
   const updateBid = trpc.bids.update.useMutation({
     onError: error => toast.error(error.message),

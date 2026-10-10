@@ -167,3 +167,38 @@ export function twinFlagText(kind: TwinLineFlag["kind"], n: number): string {
         : `${n} lines added by hand are for devices existing to remain — they are not bought or installed.`;
   }
 }
+
+/**
+ * The Plans screen's status bar: every "… - EXISTING TO REMAIN" count that
+ * still holds NEW marks (status-and-scope-plan § 1c). Those marks count as
+ * new devices until folded — on the bid too, once the count is sent — so
+ * the bar warns and offers the same "Count these as existing" the bid
+ * screen does (one fold, `takeoffGroups.foldExistingTwin`). A twin whose
+ * marks are all existing / remove / relocate already counts nothing as new
+ * and is not listed. Base name as `planTwinFold` would find it.
+ */
+export type TwinWarning = {
+  groupId: number;
+  label: string;
+  /** NEW marks on the twin — what counts as new devices today. */
+  newMarks: number;
+  baseLabel: string;
+};
+
+export function twinCountWarnings(
+  groups: readonly { id: number; label: string; count: number }[]
+): TwinWarning[] {
+  const out: TwinWarning[] = [];
+  for (const group of groups) {
+    if (group.count <= 0 || !isTwinLabel(group.label)) continue;
+    const plan = planTwinFold({ ...group, onLine: false }, groups);
+    if (!plan) continue;
+    out.push({
+      groupId: group.id,
+      label: group.label,
+      newMarks: group.count,
+      baseLabel: plan.baseLabel,
+    });
+  }
+  return out;
+}

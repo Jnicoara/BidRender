@@ -24,6 +24,7 @@ import {
   type StatusSplit,
 } from "@shared/markStatus";
 import type { SheetWorkTag } from "@shared/sheetWorkTag";
+import type { TwinWarning } from "@shared/twinFold";
 
 export type StatusStripInput = {
   /** The whole bid, summed from the count cards' splits. */
@@ -37,6 +38,8 @@ export type StatusStripInput = {
   /** Marks on the open sheet that are NEW — what the demo offer would change. */
   newMarksHere: number;
   locked: boolean;
+  /** "… - EXISTING TO REMAIN" counts still holding new marks (shared/twinFold). */
+  twins: readonly TwinWarning[];
 };
 
 export type StatusStripModel = {
@@ -51,6 +54,14 @@ export type StatusStripModel = {
   banner: SheetWorkTag | null;
   /** "N placed as new here — make them Remove?", or null. */
   offerRemove: number | null;
+  /**
+   * The twin counts to warn about, each with its fix. `fixable` is false on a
+   * locked bid: the warning still shows (the estimator should know), the
+   * button does not, and the words say unlocking is the way through.
+   */
+  twins: (TwinWarning & { fixable: boolean })[];
+  /** "Check them" is offered: there are unconfirmed marks to step through. */
+  offerCheck: number | null;
 };
 
 export function statusStripModel(input: StatusStripInput): StatusStripModel {
@@ -76,8 +87,16 @@ export function statusStripModel(input: StatusStripInput): StatusStripModel {
       ? input.newMarksHere
       : null;
 
+  const twins = input.twins.map(t => ({ ...t, fixable: !input.locked }));
+  // Offered on a locked bid too: stepping through is looking, and the walk
+  // itself refuses the answers there (StatusStrip).
+  const offerCheck =
+    input.total.unconfirmed > 0 ? input.total.unconfirmed : null;
+
   return {
-    visible: parts !== null || input.workTag !== null,
+    visible: parts !== null || input.workTag !== null || twins.length > 0,
+    twins,
+    offerCheck,
     parts,
     here,
     elsewhere,
