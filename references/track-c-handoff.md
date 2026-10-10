@@ -23,6 +23,26 @@ local-dev, merge local-dev into `c-step-labor` first.** Do NOT merge
 `c-step-labor` into local-dev until the owner says so. `c-pvc-4080` left
 alone (A merged it into the catalog job).
 
+**Merge order (owner, 2026-10-10):** wait until A has (a) pushed the catalog
+job to local-dev — DONE, `334104a` / `8f28a85` / `aec561b` on local-dev as
+of 2026-10-10 02:20 UTC — AND (b) applied migration 0142 — NOT YET (0142 is
+on `c-step-labor` only). Then: pull local-dev, merge it into
+`c-step-labor`, push, check the Gate ONCE (no background watcher), and
+merge to local-dev only after it is green (pull first). Every bid total
+must stay unchanged (measure with `scripts/bidTotals.mts` before and after).
+**Laptop rule (owner):** never run the full suite here — low memory; GitHub
+Actions runs it. Run only the test files touched.
+
+**THE OWNER PRICES CABLE PER-FOOT HOURS FIRST (owner, 2026-10-10).** Step
+totals stay "not set" on every starter that carries cable (28 of the 30)
+until the cable rows have hours per foot, because the cable step reads each
+cable's own per-foot hours (Q1). So the order is: the owner fills the cable
+rows on `pricing/labor-units-starter.xlsx` (hours per 100 ft) → A loads
+them → THEN the step minutes and overheads on the Steps / Step totals tabs
+can unlock step totals, and only then can `starterHoursClearable` let any
+typed starter hours clear (Q2/Q7). Typing step minutes before the cable
+hours is harmless, but nothing will price from steps until both exist.
+
 Plan and owner answers: `references/step-based-labor-plan.md` (§ 13
 answers and the bid-number check; § 14 the Steps / Step totals tabs for A's
 one sheet rebuild). Same file on `track-c` (`519e099`).
