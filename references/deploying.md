@@ -1684,6 +1684,30 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migration 0142 — the no-match search log (2026-10-10 UTC) — NOT on live
+
+`0142_search_misses` (Track B's table, B's SQL word for word): one new table
+and a foreign key to `users` — additive, step 1, step 3 empty. Migrated
+before the code. Branch `a-search-misses` (B's `track-b` merged, the
+declaration moved into `drizzle/schema.ts`).
+
+1. **Backup**: `staging-2026-10-10T02-24-10Z-before-0142.sql` (74 tables);
+   restored to `bidrender_staging_restore_0142`: **74/74 counts equal**.
+2. **Rehearsal** on that restore: drift before = exactly `search_misses`;
+   `bidTotals` 1,035 with staging's code (`bf829b3`); **1 applied**, 143;
+   re-run nothing; "matches", 177/177; **1,035/1,035 unchanged** with the old
+   code AND the new.
+3. **Staging database** (02:36 UTC): drift before the same; `bidTotals`
+   1,043 (old code); **1 applied**, 143; re-run nothing; "matches",
+   177/177; **1,043/1,043 unchanged** on the old code.
+4. **Code**: branch Gate 38017501652 green; `9975a12` pushed to `staging`
+   by hand (BEFORE local-dev, so the auto-deploy's drizzle check finds
+   nothing new), then local-dev, after merging Track B's own merge of the
+   same code.
+
+**Live**: 0142 joins the batch — 0105–0142, 38 files, expect 143, 177/177
+(`next-live-release-plan.md` § 3).
+
 ### Staging: the catalog reality check + both starter repairs (2026-10-10 UTC) — NOT on live
 
 No migration — seed and code only (`a-catalog-reality`, `334104a` +

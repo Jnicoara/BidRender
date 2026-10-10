@@ -4,6 +4,16 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-10]
+
+- **The no-match search log is switched on (staging).** When a search in a
+  picker finds nothing, the words are kept (company, picker, words, time —
+  never who or which bid), so the catalog can grow from what estimators
+  actually looked for. Database table added on staging; live next release.
+- **The automatic test run no longer fails on Docker Hub's download limit.**
+  Its MySQL test database now comes from Amazon's public copy of the same
+  official image.
+
 ## [2026-10-09]
 
 - **When the bid's assembly search finds nothing, you can build it right
