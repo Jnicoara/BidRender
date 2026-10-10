@@ -1,7 +1,24 @@
 # Remove and relocate labor — PLAN ONLY, 2026-10-05
 
-**Status: nothing built.** No migration written, no code changed. The owner's
-decision is `owner-questions.md` § 2; this file says what it needs.
+**Status: BUILT 2026-10-10 on `c-remove-relocate` (Track C), NOT MERGED.**
+No migration needed: 0110 / 0111 / 0115 were already applied. Code:
+`shared/roleLines.ts` (the rules), `addLaborRoleLinesToBid` and the
+role-aware live quantity in `server/db.ts`, `takeoffGroups.sendToBid`
+(install line plus any missing role line) and `setLaborRoleHours` (the
+per-bid override), the assembly editor's Remove / Relocate hours under
+"More options", the count card's note and "Add remove labor to bid" fix-it
+(`CountLaborNote.tsx`), and on the bid line the hours box with "Set remove
+hours" (`HandPricedLineFields.tsx`). Test: `server/removeRelocateLabor.test.ts`.
+
+**One deliberate difference from the code steps below:** a role line is
+stored with NO `assemblyId` (step 3 implied the assembly's link). Its hours
+and rate come from the assembly at send time; with no link, nothing that
+reads a recipe (the materials list, markup, the double-count warning) can
+ever give a removal parts. So its hours are typed on the line like a free
+count's (step 6's path for every role line), which is also its fix-it.
+
+The owner's decision is `owner-questions.md` § 2; this file says what it
+needs.
 
 ## The decision (owner, 2026-10-05)
 

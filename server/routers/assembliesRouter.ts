@@ -109,6 +109,13 @@ const updateSchema = z.object({
   // partial update that omits this must leave the overhead hours alone, not
   // silently reset them to 0.
   overheadLaborHours: hoursSchema.optional(),
+  /**
+   * Hours to take one of this out / move one (0110). Omitted leaves them;
+   * null clears to NOT SET ("not priced" on a remove / relocate line), and
+   * 0 is a real answer (shared/roleLines.ts).
+   */
+  removeLaborHours: hoursSchema.nullable().optional(),
+  relocateLaborHours: hoursSchema.nullable().optional(),
   laborRateId: z.number().int().positive().nullable().optional(),
   materials: materialsSchema.optional(),
   modifierIds: modifierIdsSchema.optional(),
@@ -314,6 +321,17 @@ export const assembliesRouter = router({
     // its hours or its recipe does.
     if (rest.overheadLaborHours !== undefined)
       patch.overheadLaborHours = toDecimal(rest.overheadLaborHours);
+    // NULL stays NULL — "not set" is never written as 0 (CLAUDE.md § rule 6).
+    if (rest.removeLaborHours !== undefined)
+      patch.removeLaborHours =
+        rest.removeLaborHours === null
+          ? null
+          : toDecimal(rest.removeLaborHours);
+    if (rest.relocateLaborHours !== undefined)
+      patch.relocateLaborHours =
+        rest.relocateLaborHours === null
+          ? null
+          : toDecimal(rest.relocateLaborHours);
 
     if (Object.keys(patch).length > 0) {
       await db.updateAssembly(editableId, ctx.scope.dataUserId, patch);

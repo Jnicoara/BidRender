@@ -31,12 +31,16 @@
  * suite can reach it.
  */
 
+import { isLaborRoleLine } from "./roleLines";
+
 /** The fields these rules read. A stored line or a priced one both fit. */
 export type HandPricedLineLike = {
   assemblyId: number | null;
   takeoffRunTypeId: number | null;
   snapshotMaterialCost: string | number | null;
   snapshotLaborHours: string | number | null;
+  /** install / remove / relocate (0115); absent reads as install. */
+  lineRole?: string | null;
 };
 
 /**
@@ -83,6 +87,14 @@ export function missingEntryCounts(lines: readonly HandPricedLineLike[]): {
       `lineHoursUnset` in shared/lineNotPriced.ts, which counts those.
     */
     if (!canPriceByHand(line)) continue;
+    /*
+      A remove / relocate line is hand-priced too (no assembly), but its gap
+      is never a price and its fix is "Set remove hours", so it has its own
+      strip entry (`roleLinesWithoutHours`, shared/roleLines.ts). Counted
+      here as well until 2026-10-10, which told the estimator to type hours
+      with no button, beside a not-priced count saying "type a price".
+    */
+    if (isLaborRoleLine({ lineRole: line.lineRole })) continue;
     if (lineNeedsPrice(line)) noPrice += 1;
     if (lineNeedsHours(line)) noHours += 1;
   }

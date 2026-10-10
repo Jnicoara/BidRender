@@ -4018,6 +4018,15 @@ glance from a quantity.
 
 ### 5m.2 AI ROUTING — the wire between devices. Specified 2026-09-21, not built
 
+> **Proposed override, 2026-10-08 (owner's brief; plan only, pending the
+> owner's answers and the attorney):** `references/auto-branch-runs-plan.md`
+> routes the wire between devices with **plain geometry, no AI** (the
+> homerun engine's own pieces), and draws **no proposed path over the
+> drawing** — devices are ringed instead, because a drawn route sits close
+> to the McCormick claims (`homerun-patent-notes.md`). Kept from this
+> section: the whip retires per device instance, the footage is called an
+> estimate in words, review is per circuit, and hand-tracing stays complete.
+
 Everything above is about the reader COUNTING. This is the other half of the AI
 work and it is the one D18 was designed around: the app already knows the whip
 is an interim that retires per device when something routes the circuit. This

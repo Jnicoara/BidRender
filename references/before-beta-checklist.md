@@ -144,6 +144,13 @@ prices ship without them.
 - [ ] **AI correction log.** Must ship before outside users touch the AI, or
       their first corrections are lost for good · A · medium · **yes**
       (`ai_correction_log`) · `stage-4-safety-plan.md` build order 4
+- [ ] **Attorney answer on route-around before any outside user sees it.**
+      Auto branch runs routing around the building outline and no-go areas
+      sit close to the McCormick patent's claims 4–6; until the attorney
+      answers the four questions, route-around works only for the owner's
+      company and test accounts, and outside users get flag-only · owner
+      (attorney), then C moves the switch · small · no · owner 2026-10-09,
+      `auto-branch-runs-plan.md` § 3f and § 9
 - [ ] **Run the orphaned-plan-file sweep against production** (customer
       drawings). The code is built; the dry run and reading its list are
       not done · owner step, B · small · no · `todo.md` ~1479,

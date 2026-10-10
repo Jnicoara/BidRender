@@ -226,11 +226,8 @@ import { unmatchedKindWords, type FittingKind } from "@shared/runFittings";
 import { fittingRowSpeaks } from "@shared/runFittingMaterials";
 import type { TraceMode } from "@shared/traceMode";
 import type { RunTotalsLeftOut } from "@shared/runOnBid";
-import {
-  statusSplitText,
-  unpricedStatusNote,
-  type StatusSplit,
-} from "@shared/markStatus";
+import { CountLaborNote } from "./CountLaborNote";
+import { statusSplitText, type StatusSplit } from "@shared/markStatus";
 
 /**
  * One run's bends and pull points, as the server works them out
@@ -1052,6 +1049,15 @@ export type GroupBridgeState = {
    * caller that never offers linking need not say.
    */
   byNameOnly?: boolean;
+  /**
+   * Remove / relocate LABOR (shared/roleLines.ts): the kinds this count has
+   * marks for and the bid has no line for yet — the card's fix-it sends them —
+   * and the kinds already on the bid. Optional for callers that never send.
+   */
+  laborRolesWaiting?: readonly ("remove" | "relocate")[];
+  laborRolesOnBid?: readonly string[];
+  /** This bid's own remove / relocate hours; NULL follows the assembly. */
+  laborHours?: { remove: string | null; relocate: string | null };
 };
 
 export type PanelStampGroup = {
@@ -1780,11 +1786,20 @@ export function RunsPanel({
                     <p className="text-xs">
                       {statusSplitText(group.split) ?? `${group.placed} placed`}
                     </p>
-                    {unpricedStatusNote(group.split) && (
-                      <p className="text-[0.7rem] text-amber-600 dark:text-amber-400">
-                        {unpricedStatusNote(group.split)}
-                      </p>
-                    )}
+                    {/* What is not priced, and its fix-it right here
+                        (remove / relocate labor, shared/roleLines.ts). */}
+                    <CountLaborNote
+                      groupId={group.groupId}
+                      split={group.split}
+                      state={
+                        group.groupId === null
+                          ? undefined
+                          : bridge?.get(group.groupId)
+                      }
+                      locked={quantitiesLocked ?? false}
+                      busy={sendingGroupId === group.groupId}
+                      onSendToBid={onSendToBid}
+                    />
                   </div>
                   <span className="font-mono text-sm tabular-nums">
                     {group.count}

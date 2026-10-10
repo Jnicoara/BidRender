@@ -349,6 +349,14 @@ import {
 } from "../shared/bidSearch";
 import { assemblyHours, snapshotHoursFor } from "../shared/assemblyHours";
 import {
+  LABOR_ROLES,
+  isLaborRoleLine,
+  laborRoleHours,
+  laborRoleLineName,
+  type LaborRole,
+  type RoleCounts,
+} from "../shared/roleLines";
+import {
   assemblyHoursSource,
   type AssemblyHoursSource,
   type StepLine,
@@ -6509,6 +6517,43 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
 }
 
 /**
+ * Each group's REMOVE and RELOCATE marks — the live quantity of its remove /
+ * relocate labor lines (shared/roleLines.ts), the same way
+ * `stampCountsForBid` is its install line's. Same scope and the same live-sheet
+ * rule, so the two can never count a different set of sheets.
+ */
+async function stampRoleCountsForBid(
+  bidId: number
+): Promise<Map<number, RoleCounts>> {
+  const db = await getDb();
+  if (!db) return new Map();
+  const rows = await db
+    .select({
+      groupId: takeoffStamps.groupId,
+      status: takeoffStamps.status,
+      total: sql<number>`count(*)`,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.status, [...LABOR_ROLES])
+      )
+    )
+    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
+  const counts = new Map<number, RoleCounts>();
+  for (const row of rows) {
+    if (row.groupId === null) continue;
+    const entry = counts.get(row.groupId) ?? { remove: 0, relocate: 0 };
+    if (row.status === "remove" || row.status === "relocate")
+      entry[row.status] += Number(row.total);
+    counts.set(row.groupId, entry);
+  }
+  return counts;
+}
+
+/**
  * Give every from-plans line the quantity and the name its count actually has.
  *
  * ── THIS IS THE CHOKEPOINT, and it is why the count is not stored ───────────
@@ -6853,11 +6898,15 @@ async function resolveAgainstPlans(
   rows = withRunFootage;
   if (!rows.some(row => row.takeoffGroupId !== null)) return rows;
 
-  const [counted, groups] = await Promise.all([
+  const [counted, roleCounted, groups] = await Promise.all([
     // Not asked for at all when the quantities are frozen: the marks cannot
     // change the answer, and counting them to throw the result away is a query
     // per bid on every dashboard for nothing.
     options.quantities ? stampCountsForBid(bidId) : new Map<number, number>(),
+    // Only when a remove / relocate line exists to read it.
+    options.quantities && rows.some(row => isLaborRoleLine(row))
+      ? stampRoleCountsForBid(bidId)
+      : new Map<number, RoleCounts>(),
     getGroupsForBidUnscoped(bidId),
   ]);
   const labels = new Map(groups.map(group => [group.id, group.label]));
@@ -6881,12 +6930,26 @@ async function resolveAgainstPlans(
   for (const group of groups) counts.set(group.id, 0);
   counted.forEach((total, groupId) => counts.set(groupId, total));
 
+  /*
+    A remove / relocate line follows the marks of ITS status, seeded at 0 for
+    every group for the same reason as `counts` above: removing the last
+    remove mark must take that line to 0, not leave it holding its old number.
+  */
+  const roleCounts = {
+    remove: new Map<number, number>(),
+    relocate: new Map<number, number>(),
+  };
+  for (const group of groups) {
+    roleCounts.remove.set(group.id, roleCounted.get(group.id)?.remove ?? 0);
+    roleCounts.relocate.set(group.id, roleCounted.get(group.id)?.relocate ?? 0);
+  }
+
   return rows.map(row => {
     if (row.takeoffGroupId === null) return row;
     const qty = options.quantities
       ? resolveLineQty(
           { takeoffGroupId: row.takeoffGroupId, qty: Number(row.qty) },
-          counts
+          isLaborRoleLine(row) ? roleCounts[row.lineRole] : counts
         ).toFixed(4)
       : // Frozen. The stored column is the answer the lock wrote, so it is
         // passed through untouched rather than re-derived and re-rounded.
@@ -6897,8 +6960,15 @@ async function resolveAgainstPlans(
       qty,
       // The live label wins while there is one; the snapshot on the line is
       // the fallback, which is the same two-step `stampName` and `runName`
-      // already use for a name that lives somewhere else.
-      name: label ?? row.name,
+      // already use for a name that lives somewhere else. A remove / relocate
+      // line keeps its kind in front ("Remove duplex") — the bare label
+      // would make it read as a second install line.
+      name:
+        label === undefined
+          ? row.name
+          : isLaborRoleLine(row)
+            ? laborRoleLineName(row.lineRole, label)
+            : label,
     };
   });
 }
@@ -7785,6 +7855,78 @@ export async function addCountToBid(
 }
 
 /**
+ * Put a count's REMOVE and/or RELOCATE labor lines on the bid (owner,
+ * 2026-10-05; shared/roleLines.ts). One line per kind, beside the install line.
+ *
+ * Each is LABOR ONLY: no assembly link (so nothing that reads a recipe can
+ * give it parts), material frozen at a typed 0, `snapshotLaborOnly` true. Its
+ * hours freeze now — the count's per-bid override, else the assembly's, else
+ * NULL, which is "Not priced" and says "Set remove hours" on the line. The
+ * job-condition modifiers and the labor rate are the assembly's, through the
+ * same `snapshotForAssembly` the install line uses, so a remove line at height
+ * carries the height. A free count has neither: rate 0 and NULL hours, typed
+ * on the line like its install line.
+ *
+ * Quantity follows the marks of that status, live (`withPlanCounts`).
+ */
+export async function addLaborRoleLinesToBid(
+  bidId: number,
+  userId: number,
+  group: TakeoffGroup,
+  roles: readonly LaborRole[],
+  counts: RoleCounts
+): Promise<number[]> {
+  if (roles.length === 0) return [];
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+
+  const detail =
+    group.kind === "assembly" && group.assemblyId !== null
+      ? await getAssemblyForStoredReference(group.assemblyId, userId)
+      : undefined;
+  const base = detail ? await snapshotForAssembly(userId, detail) : null;
+  const markup = markupSnapshot([], await getMarkupRuleSet(userId));
+
+  const ids: number[] = [];
+  for (const role of roles) {
+    await releaseArchivedPlanSlot(bidId, { groupId: group.id, lineRole: role });
+    const hours = laborRoleHours({
+      groupOverride:
+        role === "remove" ? group.removeLaborHours : group.relocateLaborHours,
+      assemblyHours: detail
+        ? role === "remove"
+          ? detail.removeLaborHours
+          : detail.relocateLaborHours
+        : null,
+    });
+    const [result] = await db.insert(bidLineItems).values({
+      bidId,
+      assemblyId: null,
+      takeoffGroupId: group.id,
+      lineRole: role,
+      name: laborRoleLineName(role, group.label),
+      qty: counts[role].toFixed(4),
+      // "Only NEW marks price material" (owner): a typed 0, an answer.
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborHours: hours,
+      snapshotModifierPct: base?.snapshotModifierPct ?? "0",
+      snapshotLaborRate: base?.snapshotLaborRate ?? "0",
+      snapshotModifierNames: base?.snapshotModifierNames ?? [],
+      ...markup,
+      snapshotUnpricedParts: 0,
+      snapshotLaborOnly: true,
+      snapshotPriceWasExample: false,
+      // Remove / relocate hours carry no example flag (0110 has none).
+      snapshotHoursWereExample: false,
+      snapshotLaborRateWasExample: base?.snapshotLaborRateWasExample ?? false,
+      sortOrder: await nextBidSortOrder(bidId),
+    });
+    ids.push(result.insertId);
+  }
+  return ids;
+}
+
+/**
  * Price a hand-priced line from a library ASSEMBLY — "Link to material or
  * assembly" on the bid.
  *
@@ -7906,7 +8048,7 @@ export async function saveLineAsAssembly(input: {
 async function releaseArchivedPlanSlot(
   bidId: number,
   slot:
-    | { groupId: number }
+    | { groupId: number; lineRole?: LaborRole | "install" }
     | { runTypeId: number; role: RunMaterialRole; extraKey: number }
 ): Promise<void> {
   const db = await getDb();
@@ -7916,7 +8058,12 @@ async function releaseArchivedPlanSlot(
       eq(bidLineItems.bidId, bidId),
       isNotNull(bidLineItems.archivedAt),
       "groupId" in slot
-        ? eq(bidLineItems.takeoffGroupId, slot.groupId)
+        ? and(
+            eq(bidLineItems.takeoffGroupId, slot.groupId),
+            // The third column of the unique key (0115): one role's archived
+            // line must not be cleared to make room for another's.
+            eq(bidLineItems.lineRole, slot.lineRole ?? "install")
+          )
         : and(
             eq(bidLineItems.takeoffRunTypeId, slot.runTypeId),
             eq(bidLineItems.runMaterialRole, slot.role),
@@ -8480,6 +8627,8 @@ export async function getMaterialUsageForCompany(
           JOIN bids b ON b.id = li.bidId
           JOIN takeoff_groups g ON g.id = li.takeoffGroupId
          WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
+           -- A remove / relocate line buys nothing (shared/roleLines.ts).
+           AND li.lineRole = 'install'
         UNION ALL
         SELECT am.materialId, li.bidId, li.createdAt
           FROM bid_line_items li
@@ -8487,6 +8636,7 @@ export async function getMaterialUsageForCompany(
           JOIN takeoff_groups g ON g.id = li.takeoffGroupId
           JOIN assembly_materials am ON am.assemblyId = g.assemblyId
          WHERE b.userId = ${dataUserId} AND li.archivedAt IS NULL
+           AND li.lineRole = 'install'
         UNION ALL
         -- The line's own part first: a fitting (coupling, connector, strap,
         -- elbow, box, cover...) is counted from the trace, so its type names
@@ -15233,6 +15383,32 @@ export async function setGroupDrop(
   await db
     .update(takeoffGroups)
     .set({ ...values, updatedAt: new Date() })
+    .where(
+      and(eq(takeoffGroups.id, groupId), eq(takeoffGroups.userId, userId))
+    );
+}
+
+/**
+ * This count's own remove or relocate hours on THIS bid (0111) — the per-bid
+ * override of the assembly's (shared/roleLines.ts). NULL follows the assembly.
+ * Reaches lines sent after it, never one already on the bid (its hours froze).
+ */
+export async function setGroupLaborRoleHours(
+  groupId: number,
+  userId: number,
+  role: LaborRole,
+  hours: string | null
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(takeoffGroups)
+    .set({
+      ...(role === "remove"
+        ? { removeLaborHours: hours }
+        : { relocateLaborHours: hours }),
+      updatedAt: new Date(),
+    })
     .where(
       and(eq(takeoffGroups.id, groupId), eq(takeoffGroups.userId, userId))
     );

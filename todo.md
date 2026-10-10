@@ -1387,6 +1387,28 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       way must NOT use up the link (the same rule as "refuses a password the
       rules refuse, and uses nothing up" in `server/passwordReset.test.ts`).
 
+### Before beta: when the picker finds nothing (owner-approved, 2026-10-08)
+
+Two pieces, owner-approved to build before beta. They came out of the
+coverage checks in `references/coverage-check.md`, which list what the
+starters miss. These two catch what a list cannot.
+
+- [ ] **(a) No-match search log.** When a picker search (assembly or
+      material) returns nothing, record the search words: company id, the
+      words, and the date. **No prices and no bid contents** — only the
+      words typed. Add a simple list the owner can view (admin), newest
+      first, with repeats counted. **No AI** reads it or suggests from it.
+      It shows what people look for and do not find, so the next catalog
+      and starter work follows real searches, not guesses.
+- [ ] **(b) "Build it from parts here."** When a user cannot find an
+      assembly, let them build one from parts on the spot, use it on the
+      bid, and save it to their library. Ties to
+      `references/never-stuck-plan.md` (the owner's rule: a user must never
+      feel stuck; gap 11's "Also save to my library" tick, ON by default).
+      Must pass CLAUDE.md § "As manual or as automated as the user wants":
+      somebody who never opens the library screen can do this, and what it
+      makes is a first-class assembly afterwards, not a lesser one.
+
 ### Before beta: price an unpriced line right where it blocks you
 
 > **PARTLY SUPERSEDED 2026-10-08 (Track B) by never-stuck gap 11, "fix this

@@ -5200,6 +5200,13 @@ export default function TakeoffPage({
         sendable: row.sendability.sendable,
         // Made by name, with nothing from the library behind it (§ 8a).
         byNameOnly: row.kind === "plain" || row.kind === "typed",
+        // Remove / relocate labor lines (shared/roleLines.ts).
+        laborRolesWaiting: row.laborRolesWaiting,
+        laborRolesOnBid: row.laborRolesOnBid,
+        laborHours: {
+          remove: row.removeLaborHours,
+          relocate: row.relocateLaborHours,
+        },
       });
     }
     return map;

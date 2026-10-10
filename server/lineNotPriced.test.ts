@@ -20,6 +20,7 @@ const base = {
   snapshotMaterialCost: null as string | null,
   snapshotLaborHours: null as string | null,
   snapshotLaborOnly: null,
+  lineRole: "install",
 };
 
 describe("a line priced by hand", () => {
@@ -168,6 +169,7 @@ describe("a line from an assembly", () => {
       snapshotMaterialCost: "42",
       snapshotLaborHours: "6",
       snapshotLaborOnly: null,
+      lineRole: "install",
       unpricedParts: 0,
     };
     expect(lineMaterialNotPriced(line, 552)).toBe(false);
