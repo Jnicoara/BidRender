@@ -14,6 +14,13 @@ This is the human-readable companion to the git history — read this to see wha
   with a "Set remove hours" button right on it, and the count card offers
   "Add remove labor to bid" if the labor is not on the bid yet. Bids without
   removed or relocated devices are unchanged.
+- **The bid's warnings now name the right fix for remove, relocate and
+  hand-counted lines.** A remove or relocate line with no hours gets its own
+  warning — "1 remove line has no hours" — with a "Set remove hours" button
+  that jumps to the box, instead of being lumped in with "type a price". A
+  hand-counted item with no hours now says "Hours not set" instead of a
+  misleading "0 h", and its warning has a "Set hours" button too. No numbers
+  change.
 - **The starter pricing sheets are rebuilt for the owner to fill — now with
   step times.** The prices workbook gains a "Steps" tab (type the minutes
   for each install step, with a suggested draft beside it) and a "Step

@@ -25,7 +25,11 @@ import {
   laborRoleHours,
   laborRoleNote,
   laborRolesToAdd,
+  roleHoursStripText,
+  roleLinesWithoutHours,
+  setHoursLabel,
 } from "../shared/roleLines";
+import { missingEntryCounts } from "../shared/handPricedLines";
 import { lineNotPriced } from "../shared/lineNotPriced";
 
 describe("the rules (shared/roleLines.ts)", () => {
@@ -83,6 +87,52 @@ describe("the rules (shared/roleLines.ts)", () => {
     expect(laborRoleNote({ role: "relocate", marks: 0, onBid: false })).toBe(
       null
     );
+  });
+
+  /*
+    The bid's warning strip (2026-10-10). A role line's material is a frozen
+    0 and its gap is the HOURS, so it must not be counted under the
+    hand-priced "type it on the line" advice — it gets its own entry, by
+    kind, whose fix-it is "Set remove hours".
+  */
+  const roleLine = (
+    id: number,
+    lineRole: string,
+    snapshotLaborHours: string | null
+  ) => ({
+    id,
+    lineRole,
+    assemblyId: null,
+    takeoffRunTypeId: null,
+    snapshotMaterialCost: "0",
+    snapshotLaborHours,
+  });
+
+  it("the strip counts role lines with no hours by kind, never as hand-priced blanks", () => {
+    const lines = [
+      roleLine(1, "remove", null),
+      roleLine(2, "relocate", null),
+      roleLine(3, "remove", null),
+      roleLine(4, "remove", "0.25"),
+      roleLine(5, "install", null),
+    ];
+    expect(roleLinesWithoutHours(lines)).toEqual({
+      remove: [1, 3],
+      relocate: [2],
+    });
+    // Only the install line (a free count) is a hand-priced blank.
+    expect(missingEntryCounts(lines)).toEqual({ noPrice: 0, noHours: 1 });
+  });
+
+  it("the strip says hours, with the fix named for the kind — not a price", () => {
+    expect(roleHoursStripText("remove", 1)).toBe(
+      "1 remove line has no hours — its labor is not in the total above."
+    );
+    expect(roleHoursStripText("relocate", 2)).toBe(
+      "2 relocate lines have no hours — their labor is not in the total above."
+    );
+    expect(setHoursLabel("remove")).toBe("Set remove hours");
+    expect(setHoursLabel("relocate")).toBe("Set relocate hours");
   });
 });
 

@@ -71,6 +71,35 @@ export function laborRoleHours(input: {
   return inherited === null ? null : inherited.toFixed(4);
 }
 
+/**
+ * Remove / relocate lines with no hours, by kind, in the order given — the
+ * bid's warning strip says each kind with its own fix-it ("Set remove
+ * hours"), never "type a price": a role line's material is a frozen 0 and
+ * its gap is the hours. The first id is where the fix-it goes.
+ */
+export function roleLinesWithoutHours(
+  lines: readonly {
+    id: number;
+    lineRole: string | null | undefined;
+    snapshotLaborHours: string | number | null;
+  }[]
+): Record<LaborRole, number[]> {
+  const out: Record<LaborRole, number[]> = { remove: [], relocate: [] };
+  for (const line of lines) {
+    if (isLaborRoleLine(line) && line.snapshotLaborHours === null)
+      out[line.lineRole].push(line.id);
+  }
+  return out;
+}
+
+/** The strip's sentence for one kind of role line with no hours. */
+export function roleHoursStripText(role: LaborRole, lines: number): string {
+  const word = role === "remove" ? "remove" : "relocate";
+  return lines === 1
+    ? `1 ${word} line has no hours — its labor is not in the total above.`
+    : `${lines} ${word} lines have no hours — their labor is not in the total above.`;
+}
+
 /** How many marks of each status a count has (the display split). */
 export type RoleCounts = { remove: number; relocate: number };
 
