@@ -31,8 +31,8 @@ import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { readFileSync } from "node:fs";
 import {
-  SEARCH_MISSES_CREATE_SQL,
   SEARCH_MISS_REPEAT_WINDOW_MS,
   listSearchMisses,
   recordSearchMiss,
@@ -81,9 +81,18 @@ describe.skipIf(!hasDb)("the search-miss table, in a scratch schema", () => {
   let pool: mysql.Pool;
   let db: MySql2Database;
 
+  // The table is built from the MIGRATION itself (0142, since 2026-10-09),
+  // so what this compares with the declaration is exactly what staging and
+  // live will run.
   const createTable = async () => {
-    for (const statement of SEARCH_MISSES_CREATE_SQL.split(/;\s*\n/)) {
-      if (statement.trim()) await db.execute(sql.raw(statement));
+    const migration = readFileSync("drizzle/0142_search_misses.sql", "utf8");
+    for (const statement of migration.split("--> statement-breakpoint")) {
+      const body = statement
+        .split("\n")
+        .filter(line => !line.trim().startsWith("--"))
+        .join("\n")
+        .trim();
+      if (body) await db.execute(sql.raw(body));
     }
   };
 
