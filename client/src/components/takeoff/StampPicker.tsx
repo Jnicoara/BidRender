@@ -188,8 +188,11 @@ export function StampPicker({
         align="start"
         className={cn(
           "p-2",
-          // The builder needs room for a parts list; the dvh cap keeps its
-          // Save button on screen on a short tablet (CLAUDE.md § 4).
+          // The builder needs room for a parts list; the dvh cap keeps the
+          // popover on screen on a short tablet (CLAUDE.md § 4). This used to
+          // say the cap kept the SAVE button on screen — it did not: at iPad
+          // landscape Save sat below the fold of this scroll area. The panel's
+          // `pinActions` is what keeps it there now.
           buildingFrom !== null ? "w-80 max-h-[80dvh] overflow-y-auto" : "w-72"
         )}
       >
@@ -198,6 +201,7 @@ export function StampPicker({
             bidId={buildBidId}
             query={buildingFrom}
             target={{ kind: "count", action: "Save and count" }}
+            pinActions
             onCancel={() => setBuildingFrom(null)}
             onBuilt={built => {
               setBuildingFrom(null);
