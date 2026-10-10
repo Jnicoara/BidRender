@@ -522,3 +522,23 @@ foreign key on `bid_typed_runs.roomId`.
 | 9   | Staying devices: listed on the customer proposal as "existing to remain", or bid screen only?          | **Bid screen and proposal scope**, worded per `status-and-scope-plan.md` § 8 Q2. No price shows.                                   | No                   |
 
 Questions 1, 2, 3, 6 and 8 change bid numbers. The owner decides them.
+
+## 12. OWNER ANSWERS (2026-10-10, evening) — these override § 11 where they differ
+
+| Q   | Answer                                                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **The extra 10% for ups and downs on typed runs is OFF by default, one tap to turn on.** Off adds nothing; on adds 10% to that run's typed feet and the run says so.                             |
+| 2   | **The homerun average INCLUDES ups and downs, and its label says so** ("average feet per homerun, ups and downs included"). No verticals are added on top from job heights.                      |
+| 3   | **Yes: 5 ft of makeup at the panel per homerun**, on top of the average, the same rule as plan homeruns.                                                                                         |
+| 4   | Not answered; the suggestion (separate for now) stands until the owner says otherwise. Moves no number.                                                                                          |
+| 5   | Not answered; the suggestion stands. Moves no number.                                                                                                                                            |
+| 6   | **Drive time is a FLAT COST, not labor hours**: trips × hours per trip × rate, frozen as one `bid_expenses` amount with the working in its note. It takes no modifiers, room %, or productivity. |
+| 7   | Not answered; the suggestion ("Not saved — Retry" first) stands. Moves no number.                                                                                                                |
+| 8   | **Yes: a room's difficulty factor applies to typed wire runs in that room too, LABOR ONLY.** Feet and material are never scaled by it.                                                           |
+| 9   | Not answered here; see `status-and-scope-plan.md` § 8 Q2 for the wording. Moves no number.                                                                                                       |
+
+All five answers that move a number (1, 2, 3, 6, 8) agree with the § 11
+suggestions, so §§ 1, 2, 3 and 6 stand as written. None moves an existing
+bid: they apply only to typed runs, homeruns, rooms and job costs, none of
+which exist on any bid yet. `scripts/bidTotals.mts` before and after each
+build still has to say so.

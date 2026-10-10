@@ -62,7 +62,9 @@ live bids move and by how much before it ships. No migration (0110 / 0111
 
 Given to the owner in chat: quick-bid Q1, Q2, Q3, Q6, Q8 and
 status-and-scope Q10, each with what it means on a job, the suggested
-answer and what it does to the numbers. Answers still with the owner.
+answer and what it does to the numbers. **ANSWERED the same evening — all
+six took the suggested answer.** Recorded in `quick-bid-plan.md` § 12 and
+`status-and-scope-plan.md` § 8 Q10.
 
 ## EARLIER (2026-10-10, later) — remove/relocate labor on `c-remove-relocate`; quick-bid plan written
 
@@ -107,7 +109,7 @@ Q-M4, unnumbered: A assigns the numbers) and nine owner questions. Q1, Q2,
 Q3, Q6 and Q8 change bid numbers. The suggested first build is job costs
 on Quick bid, which needs no migration.
 
-**Still with the owner:** `status-and-scope-plan.md` § 8 **Q10** (does a
+**Was still with the owner (answered 2026-10-10 evening — yes to both):** `status-and-scope-plan.md` § 8 **Q10** (does a
 "By others" / "Excluded" line leave the materials list and the drops?). It
 changes numbers on two screens, so it was sent back.
 
