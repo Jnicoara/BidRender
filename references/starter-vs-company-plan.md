@@ -188,6 +188,14 @@ retired to first-boot. Its own plan when the time comes.
 > `userId IS NULL` rows as the starter rather than new `starter_*` tables
 > (one source, not two), and turns the seed files into an export of live
 > for price and hours. Not decided until the owner answers its § 10.
+>
+> **REVERSED 2026-10-10 (owner rule):** a starter change must NEVER reach an
+> existing company, even one still on the shipped Example values. So the
+> table above, "Reaches every shop except items a shop changed — Already
+> true", now describes the FAULT: today every unforked company follows the
+> shared row live, and the boot re-stamp changes it on every deploy. The
+> fix is pin-then-offer: `baseline-screen-plan.md` § 0, § 2 and § 6, with
+> the audit in § 9.
 
 ### What HE should do in the meantime
 

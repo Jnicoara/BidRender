@@ -1,582 +1,566 @@
-# Baseline screen — editing the shipped starter on LIVE. PLAN ONLY, 2026-10-10
+# Baseline screen — improving the shipped starter on LIVE. PLAN ONLY
 
-Track C, at the owner's request. **Plan only: no code, no migration.** Facts
-are cited by file and line from `track-c` at `d9d49b8`. Nothing was run
-against a database.
+Track C. **Plan only: no code, no migration.** First written 2026-10-10
+(`eddc870`). **Reworked the same night after the owner's answers and a rule
+change (§ 0).** Facts are cited by file and line from `track-c` at `6dbf210`.
+The audit in § 9 was read from the code, not run against a database, except
+where it says "measured".
 
-**What it is:** an admin-only screen on the live site. The owner uses it to
-edit the shipped starter's **material prices**, **material labor hours** and
-**assembly hours**. Each change reaches every company **except** on items
-that company already changed, and it never moves a sent or locked bid.
+**What changed in the rework, in one line:** the first version PUSHED a
+starter change into every company that had not touched that number. **The
+owner ruled that out.** A starter change now reaches only brand-new
+companies; existing companies get it as an **offer** they accept or ignore.
 
-**What this builds on, and what it overrides. Read these first:**
+**Builds on, and overrides:**
 
 - `before-beta-checklist.md` § 3, "An admin 'baseline' screen" (owner,
   2026-10-08): the item this plan answers.
-- `starter-vs-company-plan.md` § 3 (Track A, 2026-10-07): the rules, the
-  "Shape A / Shape B" choice, and "the screen must NOT exist before he
-  fills the sheets". This plan is the "its own plan when the time comes"
-  that § 3 promised. It keeps Shape B's idea (the live database holds the
-  starter), but **not** its separate `starter_*` tables. See § 5 for why.
-- **CLAUDE.md § "Where a priced catalog lands: THE SEED FILES, AND NOTHING
-  ELSE" (2026-09-21) is overridden by this plan for three fields only**:
-  price, material labor hours and assembly hours. For those, the live
-  database becomes the truth and the seed files become an export of it.
-  CLAUDE.md is changed **in the same commit as the boot change in § 5**,
-  not before, and the old paragraph keeps a line saying what replaced it.
-  Until then the seed files stay the only way in (`pricing/loadStarterSheets.mts`).
+- `starter-vs-company-plan.md` § 3 (Track A, 2026-10-07): its Shape B (the
+  live database holds the starter) is kept. **Its rule "reaches every shop
+  except items a shop changed — already true" is REVERSED by § 0**: under
+  the owner's rule that sentence describes the fault, not the goal. That file
+  carries a line saying so.
+- **CLAUDE.md § "Where a priced catalog lands: THE SEED FILES"** (2026-09-21)
+  is overridden for starter content once this is built: the live database
+  is the truth and the seed files become an export of it (§ 6). CLAUDE.md is
+  changed in the same commit as the boot change, not before.
+- **CLAUDE.md § "Settings are inherited, not copied"** is questioned by
+  finding F8 (§ 9). It is not overridden here. Q16 asks the owner.
 - The "Example price" / "Example hours" rule (owner, 2026-10-07,
-  `shared/exampleTags.ts`): shown on the shop's own bid screen, never on the
-  quote, cleared when a shop edits that number, frozen onto each bid line.
+  `shared/exampleTags.ts`) is unchanged, and the tag still clears only when
+  the shop edits.
+- `material-markup.md` D2/D6 (starter markup bands are shown, dated and
+  **inert until accepted**). That is already the offer shape; § 2 copies it.
 
 ---
 
-## 0. The rules every piece keeps
+## 0. The owner's rule (2026-10-10) — everything below serves it
 
-1. **A shop's own edit is never overwritten.** Not by the screen, not by a
-   sheet, not by "Copy from my company", not by an undo.
-2. **No bid moves.** A sent, locked or open bid keeps every number it has.
-   A starter change reaches only lines **added after it**. This is already
-   true for price, hours and rate (`snapshotMaterialCost`,
-   `snapshotLaborHours`, `snapshotLaborRate`). It is **proved per release
-   with `scripts/bidTotals.mts`**, not asserted (§ 6).
-3. **Every starter number stays tagged "Example price" / "Example hours"**
-   until a shop edits it. The screen cannot write an untagged starter
-   number.
-4. **One path writes the starter.** The screen, the sheet upload, the copy
-   step, an undo and the seed's boot pass all go through ONE function
-   (`applyStarterChange`, § 3). There are not four writers that agree today
-   and drift tomorrow.
-5. **Preview before every write.** Nothing reaches the database until the
-   owner has seen the list of changes and pressed Confirm.
+> The admin screen must be able to **edit, add, hide and improve ANYTHING**
+> in the shipped starter (materials, assemblies, hours, defaults, run types)
+> over time, but it must **NEVER change an existing company's prices, hours,
+> items or bids, EVEN if they still use the shipped "Example" values.**
 
----
+**Two kinds of update, and only one is held back:**
 
-## 1. Who can open it — a separate master account and a second sign-in step
+| Kind                                                                         | Reaches existing companies?                                                                                                               |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Company data**: prices, hours, items, assemblies, defaults, run types      | **Never automatically.** An OFFER: "N starter updates available", old vs new, accept one or all. New companies get the latest.            |
+| **App updates**: security, bug fixes, new features, screen changes           | **Always, automatically.**                                                                                                                |
+| **App updates that change bid MATH** (e.g. remove/relocate labor, twin fold) | Rule (c), § 8: Active / Won / Lost / locked bids never move. A Draft takes the fix and says "Total changed because…" with the old number. |
 
-### What exists
+**Consequences that drive the design:**
 
-- `users.role` is `user | admin | contractor` (`drizzle/schema.ts:34`).
-  `adminProcedure` admits `role === "admin"`. **The owner's own account is
-  that admin AND his company's owner**, so today "admin" and "my shop" are
-  one login.
-- Sign-in is email and password (`authRouter.ts`). Sessions last a year
-  (`ONE_YEAR_MS`, `server/_core/sdk.ts:187`). `users.sessionsValidAfter`
-  (schema:111) kills older sessions.
-- **No second factor exists anywhere.** Email sending exists (Resend,
-  `server/email/`).
-- `companyScope` **fails closed**: a user with no company membership gets
-  an error from every company procedure (`server/_core/companyScope.ts`).
-
-### What is new
-
-**A master account that is not a company.** A new role, `starter_editor`,
-on its own login (for example `starter@bidridge.com`). It is not the
-owner's account.
-
-- **It has no company.** Because `companyScope` fails closed, every normal
-  screen and procedure refuses it. It can open the baseline screen and
-  nothing else. So it cannot quietly price a bid, and the owner's own
-  account cannot quietly edit the starter.
-- **The owner's own account cannot open the baseline screen**, even though
-  it is `admin`. The two roles never overlap: one enum value each.
-- **It cannot be made from the app.** Signup can never produce
-  `starter_editor`. Track A creates it with a script
-  (`scripts/createStarterEditor.mts`, behind `ALLOW_REMOTE_DATABASE=yes`,
-  like every script that writes).
-- **The screen looks different on purpose.** A coloured band across the
-  top reads "STARTER: changes reach every company". It is not the shop
-  screen with one more menu item.
-- **Use a separate browser profile for it.** One browser holds one session
-  cookie. Signing in as the master account in the same window signs the
-  owner out of his shop. The screen says so on the sign-in page.
-
-**The second step: a 6-digit code from an authenticator app** (TOTP, the
-standard 30-second code that Google Authenticator, 1Password and Authy
-show). Suggested over an emailed code (Q1): this account can change every
-company's next bid, so a stolen email inbox must not be enough.
-
-- **Enrolment:** on its first sign-in the account shows a QR code once.
-  The owner scans it and types one code to prove it works. Then it shows
-  **10 recovery codes once**, stored hashed, each usable once.
-- **Every sign-in asks for the code.** Five wrong codes lock the account
-  for 15 minutes, and that is said in the message. A code is accepted once
-  (replay is refused), within one 30-second step either side.
-- **Short sessions:** 8 hours at most, and 30 minutes idle. Not a year.
-- **The session carries "second step done at T".** A new
-  `starterEditorProcedure` checks the role AND that mark. A password alone
-  reaches nothing.
-- **The secret is encrypted at rest** with a key from the environment
-  (`STARTER_TOTP_KEY`), so a copy of the database alone cannot mint codes.
-- The code check is about 30 lines of `node:crypto` (RFC 6238). No new
-  package is needed for it. The QR image needs one small client package or
-  a typed-in secret (Q2).
-
-### Lost phone
-
-A recovery code works once. With none left, Track A resets the second step
-with the same script (`--reset-2fa`). That also sets `sessionsValidAfter`,
-so every open session of that account dies.
+1. **Today a company reads the shared starter row LIVE** until it edits that
+   row (`mergeLibraryRows`, `server/db.ts` ~1598). So any change to a shared
+   row changes what every unforked company sees, and the price of its next
+   line. **Under the rule, a company must stop following the starter.** §
+   2 does this by PINNING: before a starter row changes, every existing
+   company without its own copy gets one, holding today's values.
+2. **The boot re-stamp is a starter change too.** Every server start today
+   rewrites shared rows from the seed files: prices, labor hours, raceway
+   facts, run-type parts, labor rates (§ 9, F2–F6). Those all reach
+   existing companies today. They must go through the same pin-then-offer
+   path, or the rule is broken on every deploy.
+3. **A shipped default held in CODE is a starter value too.** Mounting
+   heights (`SHIPPED_HEIGHT_TYPES`, `shared/takeoffHeights.ts:145`) and bend
+   settings (`takeoff_bend_defaults`, NULL = the shipped value) are read
+   live. Changing one in a release moves vertical and fitting quantities on
+   open bids (F7).
 
 ---
 
-## 2. Which fields, and the rules for each
+## 1. Who can open it — the master account (owner answers Q1, Q2, Q11)
 
-### In scope (first version)
+Unchanged from the first version except where marked. Answers recorded:
+**Q1 authenticator app, Q2 QR code setup, Q11 copy source fixed in server
+settings.**
 
-| Table        | Field                 | Tag that marks it "not the shop's own" |
-| ------------ | --------------------- | -------------------------------------- |
-| `materials`  | `costPerUnit`         | `isExamplePrice`                       |
-| `materials`  | `laborHours`          | `isExampleLaborHours`                  |
-| `materials`  | `fieldBendLaborHours` | `isExampleLaborHours`                  |
-| `assemblies` | `baseLaborHours`      | `isExampleHours`                       |
-| `assemblies` | `overheadLaborHours`  | `isExampleHours`                       |
-
-All five are `decimal(10,4)`. Only **shared** rows (`userId IS NULL`) are
-edited. NULL means "not set" and the screen keeps it that way: a blank box
-is NULL, never 0 (CLAUDE.md § Editing fields, rule 6).
-
-**Out of scope for now:** labor rates (`isExampleRate` exists), labor-step
-minutes (0143, `isExampleMinutes`), names, categories, recipes. See Q8.
-Every one could join later as one more row in the field list; the log and
-the push rule do not change shape.
-
-### Rule A — never overwrite a shop's own edit
-
-A company that edits a starter item gets a **fork**: its own row with
-`baselineId` pointing at the starter (`forkMaterial`, `server/db.ts:1960`).
-That company reads its fork from then on (`mergeLibraryRows`). So a change
-to the shared row **already** reaches every company with no fork, and
-skips every company with one.
-
-**The gap: a fork is made for ANY edit.** A shop that renamed a wire, or
-changed its supplier, has a fork holding the OLD starter price, although
-it never touched the price. Rule A as worded would leave that shop on the
-old price forever.
-
-**So the push goes field by field, into forks too, under a double guard.**
-A fork's field gets the new starter value only when **both** are true:
-
-1. its tag for that field is **not FALSE** (the shop has not edited that
-   number; `shared/exampleTags.ts` clears the tag only when the number
-   really changes, `materialsRouter.ts` update), **and**
-2. its value **still equals the starter's OLD value** (NULL equals NULL).
-
-Both, because each one alone has a hole:
-
-- **The tag alone** misses a real case found while writing this plan:
-  editing an assembly's **overhead** hours does NOT clear
-  `isExampleHours`. Only a base-hours change does
-  (`server/routers/assembliesRouter.ts:316`; overhead at :322). A tag-only
-  push would overwrite a shop's overhead edit. **Fix in the same change:**
-  clear the tag when either hours field changes. Guard 2 catches it
-  regardless.
-- **The value alone** cannot tell "never touched" from "typed the same
-  number". Forks from before the tags existed (tag NULL) rely on it, and
-  that is the safe reading: equal to the starter means nothing to protect.
-
-A fork that fails either guard is **left alone and counted** in the
-preview: "12 companies changed this price themselves — left as theirs". A
-fork that has the tag but a different value (a stale copy from before a
-seed re-stamp) is also left alone, and counted separately: "3 copies still
-tagged Example but on an older value". Leaving them alone is the safe
-direction (§ 7 Q5 asks whether to bring them up to date).
-
-A pushed fork gets the new value **and** the tag TRUE. Its own `updatedAt`
-moves; `priceUpdatedAt` does not, because the shop did not price it.
-
-### Rule B — sent and locked bids never move
-
-Bid lines freeze price, hours, rate and both example flags when added
-(`snapshotMaterialCost`, `snapshotLaborHours`, `snapshotPriceWasExample`,
-`snapshotHoursWereExample`; `server/db.ts` ~14883). So **no existing line
-moves**: sent, locked or open.
-
-**The one known exception must be closed before the screen's first write:**
-lines from before 0087 read their recipe's not-priced count LIVE
-(`todo.md` "WRONG-NUMBER RISK", `snapshotUnpricedParts`). Live had **0**
-such lines when counted 2026-10-07 (`live-release-plan.md`). **Recount
-before release. It must be 0, or the one-time freeze runs first.**
-
-**What does move, on purpose:** a line added AFTER a change uses the new
-value. That is the point of the screen.
-
-### Rule C — tags stay until a shop edits
-
-The screen always writes the tag TRUE on the shared row with the number.
-There is no "untagged" option. A shop's edit clears it as today. Copying
-from the owner's company (§ 8) also writes TRUE: to every other company it
-is still BidRidge's example, not their own.
+- **A new role, `starter_editor`, on its own login, with no company.**
+  `companyScope` fails closed (`server/_core/companyScope.ts`), so every
+  company screen refuses it. The owner's own `admin` account cannot open the
+  baseline screen. The two roles never overlap.
+- **Made only by a script** (`scripts/createStarterEditor.mts`, behind
+  `ALLOW_REMOTE_DATABASE=yes`). Signup can never produce it.
+- **Every sign-in asks for a 6-digit authenticator code** (TOTP, RFC 6238,
+  about 30 lines of `node:crypto`). It is enrolled once by **QR code**, with
+  10 recovery codes shown once and stored hashed. Five wrong codes lock it
+  for 15 minutes, and a code is accepted only once.
+- **Sessions last 8 hours at most, 30 minutes idle.** The session records
+  "second step done", and `starterEditorProcedure` checks it.
+- **The secret is encrypted at rest** (`STARTER_TOTP_KEY`).
+- **A band across the screen reads "STARTER: changes reach NEW companies;
+  existing ones get an offer".** (Reworded for § 0.)
+- **Use a separate browser profile**: one browser holds one session.
+- Lost phone: a recovery code, else Track A resets with `--reset-2fa`, which
+  also sets `sessionsValidAfter`.
 
 ---
 
-## 3. The change log, and undo
+## 2. Changing an existing starter item = an OFFER (owner, rework item 1)
 
-### What is recorded
+### The mechanism: pin, then change, then offer
 
-Every write, from any source, is one **change**: one shared row, one field.
-Changes are grouped in a **batch**: one Confirm press, one sheet upload,
-one copy step, one undo, or one boot of the seed.
+When the starter changes an item in a way that affects a number (§ 3 lists
+which fields), ONE function, `applyStarterChange`, does this in one
+transaction:
 
-Each change records: who (the editor's user id, or NULL for the seed
-boot), when, the row and field, **old value and new value**, the old tag,
-an optional note, and how many forks were updated and left alone. Each
-fork write records the fork's id and its old value and tag, so an undo is
-exact. **The log stores numbers only, never a company's name**. The screen
-shows counts of companies, never which ones (another contractor's prices
-are not the owner's to browse).
+1. **Pin.** For every existing company that has no copy of the item, create
+   one: a fork (`userId` = the company, `baselineId` = the starter row)
+   holding the item **as it is now**, marked `isPinnedCopy = TRUE`, with
+   `baselineVersion` = the starter's current `version`. The Example tags are
+   copied, so the item still says "Example price" there. The forking functions
+   exist (`forkMaterial` `server/db.ts:1960`, `forkAssembly` :4398,
+   `forkLaborRate` :2636). Every stored id already resolves to a company's
+   fork (`resolveForkedRow`), so no bid, recipe or run type needs re-pointing.
+   **To prove, not assume:** a test that pins every starter row for a
+   company and reads its every bid, recipe and run type back unchanged.
+2. **Change** the starter row and **bump its `version`**. The column exists
+   on materials, labor rates, modifiers and assemblies (schema 688, 919,
+   1007, 1053), and **nothing bumps it today**. This makes it mean something.
+3. **Log** it (§ 4): old value, new value, version.
 
-### The screen
+**Result:** every existing company sees exactly what it saw before, and so
+does its next line. A company created afterwards has no copy, so it reads
+the starter, which is the latest. **"New companies get the latest" needs no
+code at all.**
 
-A **History** tab: newest batch first. "Sheet upload, 412 changes, Sat
-10 Oct 21:04, starter@bidridge.com". Opening it lists each change: item,
-field, old → new, forks updated / left. Filter by item name.
+**What the pinned copy looks like to the company:** like the starter, not
+like "their" item. `isPinnedCopy` is what the Materials and Assemblies
+screens read to show it as shipped (Example tag, no "edited" badge, not in
+"My changes"). The company's first real edit of it sets
+`isPinnedCopy = FALSE`.
 
-### Undo one change
+### The offer
 
-- **Allowed only if the shared row still holds this change's new value.**
-  If something changed it since, the undo says which change did ("Changed
-  again by #318 on 12 Oct — undo that first"). It never guesses.
-- It writes the old value and old tag back to the shared row. Then, for
-  each fork this change pushed, it writes the fork's old value back **only
-  if that fork still holds the pushed value with the tag still TRUE**. A
-  shop that edited it since keeps its edit, and the undo says how many.
-- **An undo is itself a change** (source `undo`), logged like any other.
-  So an undo can be undone; that is "redo".
-- **An undo moves no bid either.** Lines added between the change and the
-  undo keep the value they were priced at.
+A company's **offers** are the logged starter changes with a version newer
+than its copy's `baselineVersion`, for items where its copy still holds the
+OLD value of that field.
 
-### Undo a whole batch
+- **Where:** "N starter updates available" on the Dashboard, and an
+  **Updates** tab on Materials, Assemblies and Settings (defaults). Each row
+  shows the item, the field, **old → new**, and the date.
+- **Accept one** writes the new value into the company's copy and moves its
+  `baselineVersion` forward. **Accept all** does it for every row listed.
+  **Ignore** hides the row (it stays under "Ignored", reversible).
+- **Items the company edited itself** (its copy's value differs from the old
+  starter value) are listed apart: "BidRidge changed this; you have your own
+  value (yours $0.48, BidRidge's new $0.55)". They are **never in Accept
+  all**; one at a time only (Q18).
+- **Accepting moves no existing bid**, because bid lines freeze their
+  numbers (§ 9a). It changes the company's NEXT lines.
 
-Every change in the batch, newest first, by the same rule. It runs as **a
-preview first**: "408 of 412 can be undone. 4 were changed again since:
-[list]". Confirm undoes the 408 in one transaction and logs one `undo`
-batch; the 4 stay and are listed. All-or-nothing is offered as a choice
-when anything is blocked (Q6).
+**Scale, said plainly:** a sheet that changes 1,700 prices pins up to 1,700
+rows per existing company. That is trivial at beta size (live has 3
+companies) and about 1.7 million rows at 1,000 companies. Past that point,
+the cheaper shape is a per-company "starter version" pointer with versioned
+starter rows. That is a rewrite of every library read, so it waits until the
+row count says it is needed. **Measure it at each release: count companies ×
+pinned rows.**
 
----
-
-## 4. Bulk edit — load the pricing sheet through the screen
-
-So Excel still works for big fills.
-
-- **The same sheets** the owner fills today: `starter-catalog-pricing.xlsx`,
-  `labor-units-starter.xlsx`, `assembly-hours-starter.xlsx`, built by
-  `pricing/buildStarterSheets.mts`.
-- **The same checks** `pricing/loadStarterSheets.mts` runs today: unknown
-  name, unit mismatch, bad number, bend hours off a raceway, duplicate
-  rows, each refused with its sheet row. **They move into one shared
-  module** that both the script and the screen call. Two copies of the
-  checks would drift (CLAUDE.md § "Copying a layout does not copy the
-  behaviour").
-- **Where the .xlsx is read:** `exceljs` is deliberately NOT a dependency
-  (`pricing/buildStarterSheets.mts:9`). Suggested: the browser reads the
-  file with a library loaded only on this screen, and sends rows; the
-  server re-checks every row with the shared module before anything is
-  previewed. The server never trusts the browser's parse. Q3 asks.
-- **Preview, then Confirm.** The preview lists only rows that would
-  CHANGE: item, field, current → new, and how many companies it reaches
-  vs leaves. Unchanged rows are a count ("1,203 rows unchanged"). Refused
-  rows are listed with their sheet row and reason, and **one refused row
-  blocks Confirm** until the sheet is fixed (Q4).
-- **Blank cell = no change**, never "set to not set". Clearing a value to
-  "not set" is a typed action on the screen, so a half-filled sheet can
-  never wipe numbers.
-- The batch records the file name and its SHA-256, so History can say
-  which file did it.
-- **Download current values** as the same .xlsx shape, so a round trip
-  (download, edit, upload) is the normal way to fill in bulk.
+**Owner answers Q5 and Q7 are superseded by this section:** nothing is
+pushed, so neither "bring old copies up to date" nor "reach copies made for
+another reason" exists any more. Both become offers.
 
 ---
 
-## 5. Keeping the seed files and the live starter in step
+## 3. What the screen can do to the starter, field by field
 
-### The problem
+### Number fields — OFFER (pin, change, offer)
 
-Today the boot re-stamps every shared row's price and labor hours from the
-seed files on every start (`server/db.ts` ~2420–2440), and starter
-assembly hours for the names `starterAssemblyHours.ts` lists (~4732). **A
-screen edit would be wiped by the next deploy.** And a brand-new database
-(local, test, a rebuilt staging) only ever gets the seed files.
+Material: price (`costPerUnit`), `laborHours`, `fieldBendLaborHours`,
+raceway facts (`stickLengthFeet`, `strapSpacingFeet`, `strapFromBoxFeet`,
+`stickJoint`), `defaultQty`. Assembly: `baseLaborHours`,
+`overheadLaborHours`, remove/relocate hours, `laborOnly`,
+`mountHeightTypeKey`, `laborRateId`, and the parts list (recipe). Labor rate:
+every amount. Run type: its parts, waste %, fitting style, extras. Modifier
+%. Kit contents. Labor-step minutes (later, Q8).
 
-### The design
+### Finding fields — reach everyone (no number, no item identity)
 
-1. **On LIVE, the shared rows are the starter.** New companies read them
-   directly, so a new company on live gets every screen change at once.
-   No copying is involved.
-2. **The boot stops re-stamping a field the screen has changed.** For the
-   five fields in § 2, the boot pass skips any (row, field) with an
-   un-undone change in the log from a source other than the seed. Every
-   other field, and every row the screen never touched, re-stamps as
-   today.
-3. **When the boot DOES change one of those five fields, it goes through
-   `applyStarterChange`** with source `seed`. So it pushes to untouched
-   forks by the same guards and appears in History. Today it does neither.
-4. **Export to seed.** A button writes `starterPrices.ts`,
-   `starterLaborUnits.ts` and `starterAssemblyHours.ts` from the live
-   values, in the exact format `loadStarterSheets.mts` writes today. Track
-   A commits them. Then a brand-new database seeds to the same values as
-   live.
-5. **Disagreement is shown, not hidden.** The screen has a line: "Seed
-   files differ from live on 37 values: Export". After A commits the
-   export and it deploys, the line reads 0. A read-only
-   `scripts/starterDrift.mts` reports the same from a command line, the
-   way `scripts/schemaDrift.mts` does for migrations.
-6. **When a seed value conflicts with a screen change** (A loaded a new
-   sheet into the seed, and the owner had also changed that item on the
-   screen), the live value stays and the screen lists the conflict: "seed
-   says $0.55, live says $0.52: Keep live / Take seed". Taking the seed is
-   an ordinary logged change.
+Search aliases, category shelf, description, sort order, the Specialty tag.
+They help a person FIND an item and change nothing on a bid, so they are
+app improvements (§ 0). Q21 confirms this split.
 
-**Why not separate `starter_*` tables**, which `starter-vs-company-plan.md`
-§ 3 Shape B suggested: the `userId IS NULL` rows already ARE a starter
-table. Every screen, fork and revert reads them. A second copy would be
-two sources of truth, which is what this section exists to prevent.
+**Names** sit between the two. A name is what a company sees on its bid
+screen, but bid lines freeze their own name. Suggested: **an offer** (Q17).
 
-**What this changes for staging:** staging has its own database. A change
-on live reaches staging only through the export, a commit and a deploy.
-That is correct: staging should run what the seed says.
+### Units — NEVER changed (owner, rework item 3)
 
-### The test that makes it a guard
+`unitOfSale` (each / foot / box, and per-100-ft pricing) is **never edited
+on an existing starter item**. `applyStarterChange` refuses it, and so does
+the sheet upload. A unit change is a NEW item plus hiding the old one with
+the new one named as its replacement. Reason: every quantity on every bid
+using it means "so many of THAT unit"; changing the unit under them changes
+what the number means.
 
-`server/starterPush.test.ts` (C): round trip. Seed a test database, change
-values through `applyStarterChange`, export, re-seed a fresh database from
-the export, and compare. They must be identical. Plus the guards: a fork
-with tag FALSE is never written, a fork whose value differs is never
-written, an undo never touches a fork the shop edited since, and the boot
-pass skips a screen-changed field. Each test must fail with its guard
-removed.
+### Adding — "New", changes no number (owner, rework item 2)
+
+A new starter item appears in existing companies straight away, with a
+**"New"** badge until the company dismisses it. It is shared, not pinned.
+Adding an item changes no price, hour or bid; it is one more choice.
+
+- **"New"** = the starter row was created after the company's
+  `starterSeenAt` (a new column, starting at the company's creation date).
+  "Mark all seen" moves it forward.
+- **Exception to check at build:** adding an EXTRA to a shipped run type
+  (`seedBaselineRunTypes` adds extras, `server/db.ts` ~2954) is not adding
+  an item: it changes what an existing run type produces. That is a
+  run-type change, so an OFFER.
+
+### Hiding — never deleting (owner, rework items 2 and 5)
+
+**Hide** is the only removal the screen has. It never hard-deletes anything,
+and anything a bid uses stays resolvable (CLAUDE.md § "Retire, never
+delete").
+
+- **Hiding affects new companies only.** Every existing company is pinned
+  first, so the item stays in its list. Then the starter row is marked
+  `hiddenAt` and new companies never see it.
+- **Existing companies get an offer:** "BidRidge retired _Wire nut, red_. Hide
+  it in yours too?"
+- **Never hide a material a company's own assembly uses without a
+  replacement.** The hide form asks for a replacement (`replacedById`).
+  - With one, the offer reads "Replace with _Wire connector, red_ in your 3
+    assemblies, then hide". Accepting swaps the part in the company's OWN
+    assemblies, which is an ordinary fork edit, and moves no existing bid.
+  - Without one, a company whose assemblies use the item is offered nothing
+    but a note: "BidRidge retired this; your 3 assemblies still use it".
+    Its copy is never hidden.
+- **Starter assemblies hide the same way.** An assembly a company's kit uses
+  follows the same replacement rule.
+- **Un-hide** is a button, logged like any change.
+
+### Adding your own custom items to the starter later (owner Q10)
+
+Not in this version. **Room planned:** the log's `kind` includes `add`
+(below), and "Copy from my company" (§ 7) lists custom items in a separate,
+greyed section, "Not yet: adding your own items to the starter". The later
+step is a form that asks for what CLAUDE.md § Materials requires of a
+shipped item (name, category, search slang) before it can be added.
 
 ---
 
-## 6. Proof that no bid moves — per release, measured
+## 4. The change log and undo (owner Q6)
 
-- **Before the first write on live:** recount the pre-0087 lines (§ 2,
-  rule B). Must be 0.
-- **In the build:** on a migrated copy, `scripts/bidTotals.mts`, then
-  apply a sheet that changes every in-scope field, then `bidTotals.mts`
-  again. It must say "all N bid(s): totalDue unchanged; not-priced and
-  incomplete unchanged". Any moved total fails the build. This is the
-  number-level version of rule B, and it covers every line kind, including
-  takeoff-linked lines (quantity live, pricing frozen) and run-type lines.
-  A claim that they freeze is not proof.
-- **Counted in the preview, not asserted:** companies reached, forks
-  updated, forks left as the shop's own.
+Every starter change (screen, sheet, copy, seed boot, undo, hide, add) is a
+**change** inside a **batch**, recording who, when, the row, the field, old →
+new, and the version it produced. Pins are recorded per change too
+(`starter_change_pins`), so an undo knows which copies it created.
+
+- **Undo one change**: allowed only if the starter row still holds this
+  change's new value. It writes the old value back and bumps the version
+  again. **It is logged as a change of its own**, so it is an offer too.
+  Companies that already accepted the change are offered the undo. **Pinned
+  copies are left in place**: removing them could change what a company sees
+  if the starter has moved since.
+- **Undo a batch (owner Q6): undo the rest and list the ones edited since.**
+  Preview first: "408 of 412 can be undone; 4 were changed again since:
+  [list]". Confirm undoes the 408 in one transaction.
+- **No bid moves on an undo** either.
+- **The log stores numbers and ids only.** The screen shows how many
+  companies have an offer pending or accepted, never which companies.
 
 ---
 
-## 7. Migrations — drafts for Track A, unnumbered
+## 5. Bulk edit — the sheet through the screen (owner Q3, Q4)
 
-The latest file on disk is `0143_labor_steps.sql`; A assigns numbers. **All
-additive (step 1)**, safe before the code, because nothing reads them
-until the code ships. **Step 3 is empty.**
+- **The browser reads the .xlsx** (a library loaded only on this screen),
+  and **the server re-checks every row** with the same shared module
+  `pricing/loadStarterSheets.mts` uses. That module is pulled out so the
+  script and the screen run one copy of the checks.
+- **Any bad row stops the whole upload** and lists every bad row with its
+  sheet row number and reason (Q4).
+- **A unit that differs from the item's is a bad row** (§ 3).
+- **Blank = no change.** Clearing to "not set" is a typed action on screen.
+- **Preview, then Confirm.** The preview lists only rows that change, and
+  says how many companies will be pinned and offered each one. One batch,
+  with the file name and SHA-256 recorded.
+- **Download current values** in the same shape, so download, edit and
+  upload is the normal round trip.
 
-**BS-M1: the role.** Appends one enum value at the end.
+---
+
+## 6. Seeds and the live starter — one source, measured
+
+- **On LIVE, the shared rows are the starter.** New companies read them
+  directly.
+- **The boot stops writing number fields to shared rows on its own.** Today
+  it re-stamps them every start (F2–F6). Instead, a seed value that differs
+  from live goes through `applyStarterChange` with source `seed`: pin, change,
+  offer, log. **The cleaner option** (suggested): the boot does NOT apply
+  number changes at all on a database that has a `starter_changes` log. It
+  lists them on the screen as "Seed file proposes 37 changes: Review", and
+  the owner confirms them as one batch. A deploy then never changes the
+  starter by itself.
+- **The boot's second pass on company rows stops** (F3). It fills NULL
+  raceway facts on companies' own copies, and those feed fitting counts.
+- **"Export to seed"** writes the seed modules from live, and Track A
+  commits them, so a brand-new database starts where live is.
+- **Drift is shown**: "Seed files differ from live on N values". The same
+  check is `scripts/starterDrift.mts`, read-only.
+- **Test (C):** round trip — seed, change through `applyStarterChange`,
+  export, re-seed a fresh database, compare. Plus: a pinned company reads
+  every bid and recipe unchanged, and the boot changes no company row. Each
+  test must fail with its guard removed.
+
+---
+
+## 7. "My changes" and "Copy from my company" (owner Q9, Q11)
+
+- **"My changes" is a tab on Materials and a tab on Assemblies (Q9).** It
+  lists every price, labor hour and assembly hour the company typed that
+  differs from the starter, with the starter value beside it. **Pinned
+  copies are not "my changes"**, and `isPinnedCopy` is what keeps them out.
+- **"Copy from my company"** on the baseline screen reads ONLY the company
+  named in server settings (`STARTER_COPY_SOURCE_OWNER_ID`, Q11). It shows
+  the same list with tick boxes:
+  - hours ticked by default;
+  - material prices unticked, ticked one at a time;
+  - preview, then Confirm.
+
+  It is an ordinary starter change: new companies get it, existing
+  companies get an offer, and the owner's own company is unchanged.
+
+---
+
+## 8. Rule (c) — app releases that change the math
+
+**The rule (owner):** Active, Won, Lost and locked bids never move. A
+Draft whose total changes takes the fix and shows **"Total changed because…"**
+with the old number. (There is no "Sent" status: `BID_STATUSES` is Draft /
+Active / Won / Lost, `drizzle/schema.ts:2069`. Q14 asks whether Active means
+"sent".)
+
+### What exists to build on
+
+- **No total is stored anywhere.** Every screen, the proposal included,
+  re-prices live through `bidRollup` (`proposalsRouter.ts` 328–367).
+- **Past math changes froze a per-LINE flag** where NULL means the old
+  meaning (`snapshotLaborOnly`, `snapshotUnpricedParts`) and measured with
+  `scripts/bidTotals.mts`. **None of them told Draft apart from Won.**
+- **The only lock is `quantitiesLockedAt`**, set by a person, and it freezes
+  quantities only (`schema.ts` 2300–2313). Prices are frozen per line anyway.
+
+### The design: a math version per bid
+
+1. **`bids.mathVersion`**, NULL = version 0, the math before this system.
+   `shared/mathVersion.ts` holds `CURRENT_MATH_VERSION` and a registry, one
+   entry per math change: `{ version, date, reason }`, for example
+   `{ 1, "2026-10-12", "Remove and relocate marks now add labor" }`.
+2. **Each math change is written as a branch on the bid's version**:
+   `atLeast(bid, 1) ? newRule : oldRule`. This is the per-line "NULL = old
+   meaning" pattern, lifted to the bid. The old branch stays in the code for
+   as long as any bid sits on that version. That is the cost, and it is
+   paid on purpose.
+3. **New bids start at the current version.**
+4. **A release step (Track A, after the deploy):** `scripts/applyMathVersion.mts`.
+   For every bid below the current version:
+   - **Draft and not locked:** price it at its version and at the current
+     one, since both rules are in the code. Set it to current. If the total
+     moved, write a `bid_math_changes` row: from, to, total before, total
+     after, the registry's reason.
+   - **Anything else** (Active, Won, Lost, or locked): leave it alone. It
+     prices by its own version from then on.
+     It is dry-run first, and prints every moved Draft with old and new
+     totals for the owner to read before `--apply`.
+5. **The bid screen, Quick bid and the bid list** show a Draft's unread
+   math change as a strip: "Total changed from $4,210.00 to $4,465.00
+   because remove and relocate marks now add labor. [Got it]". It is never
+   shown on the customer's proposal.
+6. **`bidTotals.mts` becomes status-aware.** It records status, lock and
+   version. In `--compare`, a Draft may move only with a matching
+   `bid_math_changes` row, and every other bid must be identical.
+7. **A bid moved back to Draft** keeps its version. It gets an "Update to
+   the current math" button that shows old → new before applying (Q22).
+
+### Releases this applies to NOW
+
+- **Remove/relocate labor** (`d832e34`, on local-dev, not live) raises
+  totals on bids with remove/relocate marks. **Before it goes live it must
+  be wrapped as math version 1**, or an Active/Won bid with such marks moves.
+  Track A's release plan already counts those bids (handoff "FOR TRACK A").
+- **The twin fold** (`b-twin-fold`, queued) lowers totals on purpose. It is
+  version 2, or it waits.
+
+---
+
+## 9. AUDIT — what can move a customer's number without them choosing it
+
+Read-only, 2026-10-10. Three searches across `server/`, `shared/` and
+`client/src`. The two "bug" claims (F9, F10) were then re-read by hand. **No
+frozen snapshot field is ever written by a query, an effect or a startup
+pass**; only "Send again", which is a button, re-snapshots. The exposure is
+**quantities, which are live on any unlocked bid**, plus settings
+inherited live.
+
+### a. Does a bid line freeze everything when it is added?
+
+| Input                                                                       | Frozen?                                                                             | Where                                                    |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Material price                                                              | **Frozen** `snapshotMaterialCost`                                                   | `server/db.ts:7340`; run lines :14876                    |
+| Hours                                                                       | **Frozen** `snapshotLaborHours`                                                     | :7362, :14919                                            |
+| Labor rate                                                                  | **Frozen** `snapshotLaborRate`                                                      | :7367, :14827                                            |
+| Modifier %                                                                  | **Frozen** `snapshotModifierPct`                                                    | :7366                                                    |
+| Material markup                                                             | **Frozen** `snapshotMarkupPct`; re-apply is a button                                | :7371; `bidsRouter.ts` 1948                              |
+| Labor-only                                                                  | **Frozen** `snapshotLaborOnly`                                                      | :7381                                                    |
+| Parts list                                                                  | Only its sum is frozen. The not-priced COUNT is live on pre-0087 lines (live has 0) | :7410–7447                                               |
+| Unit                                                                        | Not stored; pricing never reads it (cost per unit is frozen)                        | `server/bidPricing.ts:209`                               |
+| **Count-linked quantity**                                                   | **Live** count of marks (bid data, not library)                                     | :6947                                                    |
+| **Run-type quantities** (pipe, wire, fittings, extras, verticals, homeruns) | **Live, from library values**, until quantities are locked                          | `withTracedFootage` :6599; `fittingRowsByRunType` :14392 |
+| **Waste %**                                                                 | **Live**: run → run type → company default → starter once accepted                  | `runTypeFootageCore.ts:372`                              |
+| **Overhead / profit / productivity**                                        | **Live** when the bid's own field is NULL — on Won bids too                         | `bidPricing.ts` 69–81                                    |
+| **Sales tax**                                                               | **Live** switches and rate, unless overridden on the bid                            | `bidPricing.ts` 91–184                                   |
+
+### b. Does opening, viewing or re-matching a bid change a number?
+
+- **Queries that write:** only settings rows created on first read
+  (`getPricingDefaults` `server/db.ts:4931`, branding, proposal settings)
+  with the values the read already used, and admin telemetry
+  (`pricing_problem_reports`). **No number moves.**
+- **Re-match homeruns, Send again, Re-apply markup, symbol linking:** all
+  buttons. Send again re-snapshots, and is refused on a locked bid.
+- **Viewing the Plans screen DOES write, without a click** (unlocked bids
+  only). These are F9–F11 and F17 below.
+
+### Findings — each with a fix, and whether the FIX changes a bid number
+
+| #       | What moves without anyone choosing it                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Fix                                                                                                                                                                                                                                      | Fix moves a number?                                               |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **F1**  | **Run-type quantities on every UNLOCKED bid, Won included, follow library values live**: waste %, raceway stick/strap spacing, bend settings, mounting heights, run-type parts (`server/db.ts` 6599–6737, 14392–14720, 15062–15101). A company editing its own waste % re-counts its old Won bids.                                                                                                                                                                                      | (1) BidRidge changes stop reaching companies (§ 2, § 6). (2) **Lock quantities automatically when a bid leaves Draft** (Q15), with Unlock one click away as today. (3) Library edit forms say "N draft bids use this and will re-count". | **No**: it freezes. Locking a Won bid freezes it where it stands. |
+| **F2**  | **Boot pass 1 re-stamps shared materials every start**: price, labor hours, raceway facts, example flags (`server/db.ts` 2384–2451). Unforked companies' items change on deploy, and changed raceway facts move fitting counts on open bids.                                                                                                                                                                                                                                            | § 6: the seed proposes, the owner confirms, and changes go through pin-then-offer.                                                                                                                                                       | No                                                                |
+| **F3**  | **Boot pass 2 writes companies' OWN copies**: fills NULL `stickLengthFeet`, `strapSpacingFeet`, `strapFromBoxFeet`, `stickJoint`, `defaultQty`, category, aliases (`server/db.ts` 2453–2517). A coupling or strap count can go from "not countable" to a number on an open bid.                                                                                                                                                                                                         | Stop filling number fields on company rows; offer them instead. Category and aliases may stay (finding fields).                                                                                                                          | No                                                                |
+| **F4**  | **`seedBaselineRunTypes` fills and re-points shipped run types' parts** (`swapBaselineRunTypeMaterials` `server/db.ts:2870`), adds extras (~2954) and archives types (~2907). Fitting counts on open bids follow the new raceway's facts.                                                                                                                                                                                                                                               | Pin, then offer (§ 2), like any run-type change.                                                                                                                                                                                         | No                                                                |
+| **F5**  | **`backfillLaborRateAmounts` re-stamps shipped labor rates** (`server/db.ts:3040`). Existing lines keep their frozen rate, but an unforked company's NEXT line uses the new rate, and the "stale rate" warning appears unasked.                                                                                                                                                                                                                                                         | Pin, then offer.                                                                                                                                                                                                                         | No                                                                |
+| **F6**  | **`seedBaselineAssemblies` writes shipped assemblies** (`laborRateId`, `laborOnly`, `mountHeightTypeKey` where NULL, hours, cleared hours, `server/db.ts` 4229–4249, 4565+). New lines change, and `mountHeightTypeKey` is read LIVE by drops and verticals, so draft vertical footage moves.                                                                                                                                                                                           | Pin, then offer.                                                                                                                                                                                                                         | No                                                                |
+| **F7**  | **Shipped defaults held in CODE are read live**: `SHIPPED_HEIGHT_TYPES` (`shared/takeoffHeights.ts:145`) and bend defaults where the company row is NULL (`takeoff_bend_defaults`, `schema.ts` ~3438). A release that changes one moves verticals and fittings on unlocked bids.                                                                                                                                                                                                        | Owner rework item 4 makes these OFFERS, so they become starter DATA (shared rows a company is pinned to, § 2) instead of code constants. Until then, a release that changes one counts as a math change (§ 8).                           | No                                                                |
+| **F8**  | **Overhead, profit, productivity and tax are inherited live on every bid, Won included** (`bidPricing.ts` 69–184). This is a standing decision (CLAUDE.md § "Settings are inherited, not copied"), but it means a company changing its own margin re-prices its Won bids.                                                                                                                                                                                                               | **Owner decides (Q16).** Suggested: when a bid leaves Draft, write the values in effect onto the bid as its own settings, so drafts still follow the company and sent bids stop.                                                         | No (it writes what is in effect)                                  |
+| **F9**  | **"Remove scale" is undone by looking.** `clearSheetScale` sets `scaleSource = "none"` (`bidPdfsRouter.ts` ~966). The next time the sheet is shown, detection runs on its own (`TakeoffPage.tsx` ~8866) and re-applies a high-confidence reading (`bidPdfsRouter.ts` ~1018), so traced footage jumps from 0 back to feet. Confirmed by reading; not yet reproduced.                                                                                                                     | A cleared scale is remembered: `scaleSource` gains `cleared`, which detection treats like `manual`. One enum value (BS-M8).                                                                                                              | No                                                                |
+| **F10** | **A hand-placed panel can re-match homeruns on a LATER sheet.** `placePanelSpot` arms `rematchOnNextSync` (`TakeoffPage.tsx:4744`), but the sync signature leaves out the panel spot (`client/src/lib/homerunSync.ts` ~47). If the circuits did not change, no sync fires and the flag stays armed, so the next sync — just opening another sheet — goes out with `rematch: true` and re-points that sheet's unconfirmed homeruns. **Plausible from reading; reproduce before fixing.** | Arm the flag per SHEET and clear it when that sheet's placement settles; or put the spot in the signature. Add a test in `client/src/lib`.                                                                                               | No                                                                |
+| **F11** | **Opening a sheet creates homerun circuits it has not seen** (`TakeoffPage.tsx` ~4889, `syncHomeruns`), which adds homerun feet to an unlocked bid. This is by design ("a visit only CREATES circuits"), but it is a number moving because someone looked.                                                                                                                                                                                                                              | Owner decides (Q19). Suggested: keep it on Draft only; with F1's auto-lock, sent bids are covered.                                                                                                                                       | No                                                                |
+| **F12** | **A run type re-pointed to a new part** prices the new part's quantity at the OLD part's frozen price until "Send again" (`takeoffRunTypesRouter.ts` 1176–1204).                                                                                                                                                                                                                                                                                                                        | The line shows "Part changed — Send again" as its fix-it, and the bid's warning strip counts it.                                                                                                                                         | No by itself; pressing Send again does, by choice                 |
+| **F13** | **The drops-not-priced warning ignores the lock** (`bidDropsNotPriced` `server/db.ts` 15199–15212) and reads the assembly's mount type live, so a locked bid's "N drops not priced" can change.                                                                                                                                                                                                                                                                                         | Honour `quantitiesLockedAt` there like everywhere else.                                                                                                                                                                                  | Count only, no dollars                                            |
+| **F14** | **Pre-0087 lines count not-priced parts from the recipe live** (known; live had 0 on 2026-10-07).                                                                                                                                                                                                                                                                                                                                                                                       | The planned one-time freeze (`todo.md`, "WRONG-NUMBER RISK"). Recount before every release.                                                                                                                                              | No                                                                |
+| **F15** | **Scale detection on the first view of an unscaled sheet applies a high-confidence scale**, so footage appears without a click (`bidPdfsRouter.ts` ~1018). A convenience by design.                                                                                                                                                                                                                                                                                                     | Owner decides (Q19, with F11). Suggested: keep it, but say so on the sheet: "Scale read from the drawing: 1/8" = 1'. Change".                                                                                                            | No                                                                |
+| **F16** | **Crash recovery re-sends queued marks on load** (`TakeoffPage.tsx` ~7147). These are the user's own clicks, but counts change on open with nothing said.                                                                                                                                                                                                                                                                                                                               | A toast: "3 marks from your last session were saved".                                                                                                                                                                                    | No                                                                |
+| **F17** | **No bid status freezes anything**, and there is no "Sent" status or sent-total record.                                                                                                                                                                                                                                                                                                                                                                                                 | § 8 (math version) + F1 (auto-lock) + F8 (settings) together make "sent" mean something. Q14 names which status is "sent".                                                                                                               | No                                                                |
+
+**The short version:** money on a line is safe. Quantities on unlocked bids,
+inherited settings, and the boot's writes to the starter are not. **F1, F2
+and F8 are the ones that matter most**, because they can move a Won bid's
+total silently.
+
+---
+
+## 10. Migrations — drafts for Track A, unnumbered
+
+The latest file on disk is `0143`; A assigns numbers. **All additive (step 1)**, safe before the code. **Step 3 is empty**: no backfill. In particular,
+pins are made when a starter change happens, never by a migration.
+
+| Draft     | What                                                                                                                                                                                                                                                                    |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **BS-M1** | `users.role` gains `starter_editor` (enum value appended)                                                                                                                                                                                                               |
+| **BS-M2** | `starter_editor_factors` (encrypted secret, last step, failed attempts, locked until) and `starter_editor_recovery_codes` (hashed)                                                                                                                                      |
+| **BS-M3** | `starter_change_batches` (editor, source enum `screen,sheet,copy,seed,undo`, file name, SHA-256, count, createdAt) and `starter_changes` (batch, `kind` enum `change,add,hide,unhide`, table, row id, field, old value, new value, version, note, undone-by)            |
+| **BS-M4** | `starter_change_pins` (change id, company owner id, fork id) — which copies a change created                                                                                                                                                                            |
+| **BS-M5** | `isPinnedCopy BOOLEAN NULL` on `materials`, `assemblies`, `labor_rates`, `modifiers`, `takeoff_run_types`, `kits`, `labor_steps` (NULL = a company's own copy, today's meaning); and `hiddenAt TIMESTAMP NULL`, `replacedById INT NULL` on the same tables' shared rows |
+| **BS-M6** | `companies.starterSeenAt TIMESTAMP NULL` (NULL = the company's creation date) and `starter_offer_answers` (company owner id, change id, answer enum `accepted,ignored`, answeredAt)                                                                                     |
+| **BS-M7** | `bids.mathVersion INT NULL` (NULL = version 0) and `bid_math_changes` (bid id, from, to, total before, total after, reason, createdAt, seenAt)                                                                                                                          |
+| **BS-M8** | `bid_pdf_sheets.scaleSource` gains `cleared` (F9; enum value appended)                                                                                                                                                                                                  |
+
+SQL drafts for BS-M1 to BS-M3 are in the first version of this file
+(`eddc870`, § 7). They are unchanged except that BS-M3 gains `kind` and
+`version`, and the old `forksUpdated` / `forksLeft` columns become
+`starter_change_pins`. **Hand-write every one** (CLAUDE.md: `drizzle-kit
+generate` re-emits hand-written migrations). Full SQL for BS-M4 to BS-M8 is
+written when a piece is scheduled, from this table, so it is not drafted
+twice.
 
 ```sql
-ALTER TABLE `users` MODIFY COLUMN `role`
-  enum('user','admin','contractor','starter_editor') NOT NULL DEFAULT 'user';
+-- BS-M5, the pattern, materials shown; same three columns on each listed table.
+ALTER TABLE `materials` ADD `isPinnedCopy` boolean NULL;
+ALTER TABLE `materials` ADD `hiddenAt` timestamp NULL;
+ALTER TABLE `materials` ADD `replacedById` int NULL;
+-- BS-M7
+ALTER TABLE `bids` ADD `mathVersion` int NULL;
+CREATE TABLE `bid_math_changes` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`bidId` int NOT NULL,
+	`fromVersion` int NULL,
+	`toVersion` int NOT NULL,
+	`totalBefore` decimal(14,4) NOT NULL,
+	`totalAfter` decimal(14,4) NOT NULL,
+	`reason` varchar(512) NOT NULL,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`seenAt` timestamp NULL,
+	CONSTRAINT `bid_math_changes_id` PRIMARY KEY(`id`),
+	CONSTRAINT `bid_math_changes_bidId_bids_id_fk` FOREIGN KEY (`bidId`) REFERENCES `bids`(`id`) ON DELETE cascade ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+CREATE INDEX `bid_math_changes_bidId_idx` ON `bid_math_changes` (`bidId`);
+-- BS-M8
+ALTER TABLE `bid_pdf_sheets` MODIFY COLUMN `scaleSource`
+  enum('detected','manual','none','cleared') NOT NULL DEFAULT 'none';
 ```
 
-**BS-M2: the second step.**
+---
 
-```sql
-CREATE TABLE `starter_editor_factors` (
-	`userId` int NOT NULL,
-	`totpSecretEnc` varchar(255) NOT NULL,
-	`enrolledAt` timestamp NULL,
-	`lastUsedStep` bigint NULL,
-	`failedAttempts` int NOT NULL DEFAULT 0,
-	`lockedUntil` timestamp NULL,
-	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `starter_editor_factors_userId` PRIMARY KEY(`userId`),
-	CONSTRAINT `starter_editor_factors_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
-) COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `starter_editor_recovery_codes` (
-	`id` int AUTO_INCREMENT NOT NULL,
-	`userId` int NOT NULL,
-	`codeHash` varchar(255) NOT NULL,
-	`usedAt` timestamp NULL,
-	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `starter_editor_recovery_codes_id` PRIMARY KEY(`id`),
-	CONSTRAINT `starter_editor_recovery_codes_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
-) COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX `starter_editor_recovery_codes_userId_idx` ON `starter_editor_recovery_codes` (`userId`);
-```
+## 11. Who builds what (owner Q12) and in what order
 
-**BS-M3: the change log.** `editorUserId` is NULL for the seed boot, and
-`ON DELETE set null` so the history outlives an account.
+**A: login + startup change. C: number rules + tests. B: screen.**
 
-```sql
-CREATE TABLE `starter_change_batches` (
-	`id` int AUTO_INCREMENT NOT NULL,
-	`editorUserId` int NULL,
-	`source` enum('screen','sheet','copy','seed','undo') NOT NULL,
-	`label` varchar(255) NULL,
-	`fileName` varchar(255) NULL,
-	`fileSha256` char(64) NULL,
-	`changeCount` int NOT NULL DEFAULT 0,
-	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `starter_change_batches_id` PRIMARY KEY(`id`),
-	CONSTRAINT `starter_change_batches_editorUserId_users_id_fk` FOREIGN KEY (`editorUserId`) REFERENCES `users`(`id`) ON DELETE set null ON UPDATE no action
-) COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE `starter_changes` (
-	`id` int AUTO_INCREMENT NOT NULL,
-	`batchId` int NOT NULL,
-	`targetTable` enum('materials','assemblies') NOT NULL,
-	`targetId` int NOT NULL,
-	`field` enum('costPerUnit','laborHours','fieldBendLaborHours','baseLaborHours','overheadLaborHours') NOT NULL,
-	`oldValue` decimal(10,4) NULL,
-	`newValue` decimal(10,4) NULL,
-	`oldExample` boolean NULL,
-	`note` text NULL,
-	`forksUpdated` int NOT NULL DEFAULT 0,
-	`forksLeft` int NOT NULL DEFAULT 0,
-	`undoneByChangeId` int NULL,
-	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `starter_changes_id` PRIMARY KEY(`id`),
-	CONSTRAINT `starter_changes_batchId_starter_change_batches_id_fk` FOREIGN KEY (`batchId`) REFERENCES `starter_change_batches`(`id`) ON DELETE cascade ON UPDATE no action
-) COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX `starter_changes_target_idx` ON `starter_changes` (`targetTable`,`targetId`,`field`);
-CREATE INDEX `starter_changes_batchId_idx` ON `starter_changes` (`batchId`);
-CREATE TABLE `starter_change_fork_writes` (
-	`id` int AUTO_INCREMENT NOT NULL,
-	`changeId` int NOT NULL,
-	`forkId` int NOT NULL,
-	`oldValue` decimal(10,4) NULL,
-	`oldExample` boolean NULL,
-	CONSTRAINT `starter_change_fork_writes_id` PRIMARY KEY(`id`),
-	CONSTRAINT `starter_change_fork_writes_changeId_starter_changes_id_fk` FOREIGN KEY (`changeId`) REFERENCES `starter_changes`(`id`) ON DELETE cascade ON UPDATE no action
-) COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX `starter_change_fork_writes_changeId_idx` ON `starter_change_fork_writes` (`changeId`);
-```
+| Track | Builds                                                                                                                                                                                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A** | BS-M1–M8; the `starter_editor` account, authenticator step and short sessions; the boot change (§ 6, F2–F6); `applyMathVersion.mts` and the release step (§ 8); the CLAUDE.md amendments                                                   |
+| **C** | `applyStarterChange` (pin, change, log), offers and accept, undo, hide-with-replacement, the unit refusal, the shared sheet checks, export and drift, `shared/mathVersion.ts` and the bid-version branching, F9, F10, F12, F13; every test |
+| **B** | The baseline screen; the Updates tabs and "N starter updates available"; the "New" badge; "My changes"; the "Total changed because…" strip; F16's toast                                                                                    |
 
-`forkId` has no foreign key on purpose: it points into `materials` or
-`assemblies` depending on `targetTable`. A deleted fork leaves a write
-record the undo skips.
+**Order:**
 
-**No migration** for: the example tags (0132–0134 exist), the snapshots
-(exist), "My changes" (§ 8 reads existing columns), the export (files).
+1. **§ 8 math version + F1 auto-lock (if Q15 is yes), BEFORE remove/relocate
+   labor goes live.** They protect bids that exist today, so they come first.
+2. F9 and F10, small and independent.
+3. Pinning + the boot change (F2–F6). After this, a deploy can no longer
+   reach a company's library.
+4. The master account and the screen, with single edits, the log and undo.
+5. Offers and the Updates tabs.
+6. Hide and add.
+7. Sheet upload. "Copy from my company" last.
 
-**Order:** BS-M1 to BS-M3 apply before the code, in any order.
-`drizzle-kit generate` must not be used for these (CLAUDE.md: it re-emits
-hand-written migrations). Hand-write them from the drafts above.
+**Proof per release:** `bidTotals.mts` (status-aware, § 8) before and after.
+Only Drafts with a `bid_math_changes` row may move.
 
 ---
 
-## 8. "My changes" in the owner's company, and "Copy from my company"
+## 12. Owner answers (2026-10-10) and the questions still open
 
-### "My changes" — in ANY company, not admin-only
+### Answered
 
-A tab on the Materials screen and the Assemblies screen (or one Settings
-panel; Q9): **every price, labor hour and assembly hour this company
-typed that differs from the shipped starter**, with the shipped value
-beside it.
+| Q   | Answer                                                                                   |
+| --- | ---------------------------------------------------------------------------------------- |
+| 1   | Authenticator app, not email                                                             |
+| 2   | QR code setup                                                                            |
+| 3   | The browser reads the sheet; the server re-checks every row                              |
+| 4   | Any bad row stops the whole upload, with every bad row listed                            |
+| 5   | **Superseded** by § 0: never auto-update; offer instead                                  |
+| 6   | Undo the rest, and list the ones edited since                                            |
+| 7   | **Superseded** by § 0: offer, never automatic                                            |
+| 8   | Labor rates and step minutes later; prices and hours first                               |
+| 9   | "My changes" is a tab on Materials and a tab on Assemblies                               |
+| 10  | Not this version, but leave room to add your own custom items to the starter later (§ 3) |
+| 11  | Copy reads only your company, set in server settings                                     |
+| 12  | A: login + startup change. C: number rules + tests. B: the screen                        |
+| 13  | No "re-price this bid" button for now                                                    |
 
-| Item              | Field       | Shipped (example) | Yours | Changed |
-| ----------------- | ----------- | ----------------- | ----- | ------- |
-| 12/2 NM-B Copper  | Price / ft  | $0.5520           | $0.48 | 3 Oct   |
-| Duplex receptacle | Labor hours | 0.30              | 0.25  | 5 Oct   |
-| 200A panel F&I    | Base hours  | 8.00              | 10.00 | 6 Oct   |
+### Open — each with a suggested answer
 
-- Read from the company's forks (`baselineId` set) whose field differs
-  from its shared row's current value. No migration.
-- **Items the company made itself** (no `baselineId`) have no shipped
-  value to compare, so they are not in this list (Q10).
-- Each row keeps the existing "Revert to shipped" (`revertMaterialToBaseline`).
-- Useful to every shop, not just the owner: "what have I changed from
-  BidRidge's numbers".
-
-### "Copy from my company" — on the baseline screen
-
-So the owner's own tested numbers can become the starter without retyping
-them.
-
-1. **Which company:** only ONE, the owner's, named in the environment
-   (`STARTER_COPY_SOURCE_OWNER_ID`), not picked on the screen. The master
-   account can never read any other company's numbers. Changing the
-   source is a deploy, not a click (Q11).
-2. **The list:** the same "My changes" rows for that company, with a tick
-   box per row.
-3. **Default ticks: labor hours and assembly hours ON; material prices
-   OFF**, ticked one by one. The owner's supply-house prices stay in his
-   company unless he chooses each one.
-4. **Preview, then Confirm**, exactly as § 4: current starter → new,
-   companies reached, forks left.
-5. **Same rules:** one `copy` batch through `applyStarterChange`, the tag
-   written TRUE, shops' own edits never overwritten, no bid moves,
-   History and undo as § 3.
-6. **The owner's company itself is unchanged.** His forks keep his
-   numbers, which now equal the starter's.
-
----
-
-## 9. Who builds what
-
-The checklist line says "A (schema) + B (screen)". Suggested split (Q12):
-
-| Track | Builds                                                                                                                                                                                                                                                    |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A** | BS-M1–M3; the `starter_editor` account script and the second step (sign-in, enrolment, recovery, short session, `starterEditorProcedure`); the boot-pass change (§ 5.2–5.3); the CLAUDE.md amendment; the pre-0087 recount; applying on staging then live |
-| **C** | `applyStarterChange`, the push guards, undo (`shared/starterPush.ts` + server), the overhead-tag fix, the shared sheet checks pulled out of `loadStarterSheets.mts`, export to seed, `starterDrift.mts`, "My changes", "Copy from my company", the tests  |
-| **B** | The baseline screen: the band, the list with search, edit-in-place by the § Editing-fields rules, History, sheet upload with preview, conflicts, the Export line                                                                                          |
-
-**Build order:**
-
-1. A: migrations and the account with its second step. Nothing else can be
-   tested without them.
-2. C: `applyStarterChange` + guards + undo + tests, and the overhead-tag
-   fix. This is where a wrong number would come from, so it lands first
-   and alone.
-3. A: the boot-pass change, then the export, in the same release as 2.
-4. B: the screen on top.
-5. C: "My changes", then "Copy from my company".
-6. Sheet upload last: it is the biggest write, and the screen must have
-   proved undo on single edits first.
-
-**Before any of it goes live:** the pre-0087 recount (must be 0), and the
-`bidTotals.mts` check in § 6.
-
----
-
-## 10. Questions for the owner — each with a suggested answer
-
-| Q   | Question                                                                                                              | Suggested answer                                                                                                                                   | Moves a bid number?                                 |
-| --- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1   | Second step: an authenticator app code, or a code emailed to you?                                                     | **Authenticator app.** This account changes every company's next bid; a stolen inbox must not be enough.                                           | No                                                  |
-| 2   | Enrolment: show a QR code (one small package), or type a setup key into the app by hand?                              | **QR code.** Typing a 32-letter key is error-prone, and it is done once.                                                                           | No                                                  |
-| 3   | Reading the .xlsx: in the browser (a library loaded only on this screen), or add a spreadsheet package to the server? | **In the browser**, with every row re-checked on the server. Keeps the live server's packages as they are.                                         | No                                                  |
-| 4   | A sheet with some bad rows: block the whole upload, or apply the good rows?                                           | **Block it** and list the bad rows. A half-applied sheet is hard to reason about; fix and re-upload.                                               | No                                                  |
-| 5   | A company's copy still tagged "Example" but on an OLD starter value (from before a re-stamp): bring it up to date?    | **Not by default.** Show the count, with a separate "Bring 3 old example copies up to date" button. Updating them changes those shops' next lines. | **Yes**, on those companies' new lines, if done     |
-| 6   | Undo a batch when a few items were changed again since: undo the rest, or refuse the whole undo?                      | **Undo the rest**, listing the ones left. Offer "refuse unless all" as a tick.                                                                     | **Yes**, on new lines (it changes the starter back) |
-| 7   | Does a starter change reach companies that copied the item for another reason (renamed it, changed the supplier)?     | **Yes, field by field**, under the double guard in § 2. Otherwise renaming a wire freezes its price forever.                                       | **Yes**, on those companies' new lines              |
-| 8   | Add labor rates and labor-step minutes to the screen now, or later?                                                   | **Later.** Prices and hours first; both fit the same log when wanted.                                                                              | Later, yes                                          |
-| 9   | "My changes": its own Settings panel, or a tab on Materials and on Assemblies?                                        | **A tab on each**, beside the rows it is about.                                                                                                    | No                                                  |
-| 10  | Items you made yourself (not from the starter): offer "Add to the starter" from the copy step?                        | **Not in this version.** A new shipped item needs a name, category and search words (CLAUDE.md § Materials), which is seed work.                   | No                                                  |
-| 11  | The copy source: fixed to your company in the server settings, or chosen on the screen?                               | **Fixed in the server settings.** The master account can then never read another contractor's prices.                                              | No                                                  |
-| 12  | Track split as § 9 (A account + boot, C rules, B screen), or fewer tracks?                                            | **As § 9.** The rules that can produce a wrong number stay in one track with their tests.                                                          | No                                                  |
-| 13  | Should open (unsent) bids be offered "re-price from the new starter"?                                                 | **No, not in this version.** Every line keeps what it was priced at; only new lines use the new value. A re-price button is its own plan.          | **Yes** if built                                    |
-
-**Questions 5, 6, 7 and 13 change bid numbers** (on new lines only; no
-existing line ever moves). The owner decides them.
-
----
-
-## 11. Short answer
-
-- A separate `starter_editor` login with no company, an authenticator code
-  at every sign-in, 8-hour sessions; the owner's own account cannot open
-  it.
-- One function writes the starter. It pushes field by field into
-  companies' copies only where the shop has not touched that number, tags
-  everything "Example", logs old and new, and can undo one change or a
-  batch.
-- The live database holds the starter for price and hours. The boot stops
-  overwriting screen changes, and "Export to seed" keeps new databases
-  identical, with any difference shown on the screen.
-- Excel still works: upload the same sheets, preview, confirm; the same
-  checks as the loader, shared.
-- "My changes" shows any company what it changed from the starter;
-  "Copy from my company" turns the owner's hours (prices one by one) into
-  the starter. Three additive migrations; no bid moves, proved with
-  `bidTotals.mts`.
+| Q   | Question                                                                                                   | Suggested                                                                                                                  | Moves a bid number?                                 |
+| --- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 14  | There is no "Sent" status. Which statuses must never move: Active, Won, Lost, and locked?                  | **Active, Won, Lost and any locked bid.** Only Draft takes math fixes.                                                     | **Yes**: it decides which bids take a math fix      |
+| 15  | Lock quantities automatically when a bid leaves Draft?                                                     | **Yes**, with Unlock one click away. Otherwise a Won bid's pipe and wire keep following library edits (F1).                | No: it stops future moves                           |
+| 16  | Freeze overhead, profit, productivity and tax onto a bid when it leaves Draft?                             | **Yes**: write the values in effect onto the bid. Drafts still follow the company. (Changes CLAUDE.md § Company defaults.) | No on the day; afterwards, sent bids stop following |
+| 17  | Starter NAME changes: offer, or reach everyone?                                                            | **Offer.** It is what a company sees on its screens.                                                                       | No                                                  |
+| 18  | "Accept all": include items you changed yourself?                                                          | **No.** Those are listed apart, one at a time, showing yours vs BidRidge's new value.                                      | No                                                  |
+| 19  | Viewing a sheet creates homerun circuits (F11) and applies a read scale (F15). Keep, or make them buttons? | **Keep on Drafts only**, and say so on screen. With Q15, sent bids are covered.                                            | **Yes**, on drafts, when the plans are viewed       |
+| 20  | Pinning cost (§ 2): fine until about 1,000 companies, then a rewrite. Accept for now?                      | **Yes.** Measure the row count at each release.                                                                            | No                                                  |
+| 21  | Search words, category shelf, description and sort order: reach everyone as app improvements?              | **Yes.** They change no number and no item.                                                                                | No                                                  |
+| 22  | A bid moved back to Draft keeps its old math. Offer "Update to the current math" with old → new shown?     | **Yes**, as a button. Never automatic.                                                                                     | **Yes**, if pressed                                 |

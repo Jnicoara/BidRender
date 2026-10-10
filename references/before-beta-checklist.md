@@ -208,8 +208,13 @@ prices ship without them.
       Needs the example-price / example-hours tags and the
       `snapshotUnpricedParts` freeze first · A (schema) + B (screen) ·
       large · **yes** · `starter-vs-company-plan.md` § 3. **Full plan:
-      `baseline-screen-plan.md`** (2026-10-10, plan only; 13 owner
-      questions, 4 move numbers on new lines)
+      `baseline-screen-plan.md`** (2026-10-10, plan only; reworked the
+      same night: starter changes reach NEW companies only, existing ones
+      get offers). Its § 9 audit lists what can move a customer's number
+      unasked; **F1 (live quantities on unlocked Won bids), F2 (boot
+      re-stamps the starter), F8 (inherited margins on Won bids)** matter
+      most, and § 8's math version must land before remove/relocate labor
+      goes live
 - [ ] **Seed-heavy tests time out when another worktree's suite is running.**
       The one-query fix is written and measured in `todo.md` § "Flaky
       tests", and waits on whoever owns `server/db.ts`. It also takes

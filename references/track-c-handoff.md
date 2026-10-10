@@ -13,7 +13,40 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-10, late night) — Quick bid phase 1 (job costs) on `c-quick-bid`; FOR TRACK A: Q-M5
+## START HERE (2026-10-10, latest) — baseline plan REWORKED to offers; audit of silent number moves
+
+**`references/baseline-screen-plan.md` rewritten (plan only, no code).** The
+owner answered § 10 and changed the rule: a starter change must NEVER reach
+an existing company, even one on the Example values. App updates still reach
+everyone; app MATH changes follow rule (c).
+
+- **Design:** pin (give each existing company a copy as it stands), then
+  change, then OFFER ("N starter updates available", accept one or all).
+  New companies get the latest because they have no copy. Units are never
+  changed. Hide is for new companies only, with a replacement when a
+  company's assemblies use the item. Adding shows "New" and moves nothing.
+- **Rule (c), § 8:** `bids.mathVersion` plus a `bid_math_changes` row and a
+  "Total changed because…" strip on Drafts. **Must land before
+  remove/relocate labor goes live** (it raises totals on Active/Won bids
+  with such marks otherwise).
+- **Audit, § 9, F1–F17.** Money on a line is always frozen. What moves
+  unasked:
+  - **F1:** quantities on any UNLOCKED bid, Won included, follow library
+    values live.
+  - **F2–F6:** the boot rewrites the starter on every deploy, and pass 2
+    writes companies' own copies.
+  - **F7:** shipped heights and bend defaults live in code.
+  - **F8:** inherited margin and tax on Won bids.
+  - **F9:** "Remove scale" is undone by viewing the sheet. **Confirmed by
+    reading.**
+  - **F10:** a hand-placed panel can re-match homeruns on a later sheet.
+    **Plausible; reproduce first.**
+- **Migrations BS-M1–M8** (additive; step 3 empty). Open owner questions
+  **Q14–Q22**; 14, 19 and 22 move numbers.
+- local-dev Gate 38079512981 (job costs merge): test job GREEN;
+  deploy-staging was still running when this was written.
+
+## EARLIER (2026-10-10, late night) — Quick bid phase 1 (job costs) on `c-quick-bid`; FOR TRACK A: Q-M5
 
 **Branch `c-quick-bid` (from local-dev `c649268`), commit `200e310`.**
 Built per `quick-bid-plan.md` § 6 with the owner's answers (§ 12, Q6: drive
