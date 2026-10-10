@@ -13,7 +13,58 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-10, later) — remove/relocate labor on `c-remove-relocate`: NOT MERGED; quick-bid plan written
+## START HERE (2026-10-10, evening) — remove/relocate MERGED to local-dev (`d832e34`); FOR TRACK A: recount bids with remove/relocate marks before it goes live
+
+**Both known gaps below are FIXED on `c-remove-relocate` `d832e34`**, and
+that commit is now local-dev (fast-forward push `07c7407..d832e34`;
+local-dev is checked out in A's folder, so C pushed the commit, it did not
+check the branch out). `track-c` has merged it (`d024c09`).
+
+- **Warning strip:** a remove / relocate line with no hours now has its own
+  entry per kind — "1 remove line has no hours — its labor is not in the
+  total above." — with a **Set remove hours** / **Set relocate hours**
+  button that scrolls to the first such line and focuses its hours box. It
+  is no longer counted in "N lines are not priced … type a price" or in
+  the hand-priced "no labor hours" entry (`missingEntryCounts` skips role
+  lines; `roleLinesWithoutHours`, `roleHoursStripText` in
+  `shared/roleLines.ts`). The "no labor hours" entry gained a **Set hours**
+  button (every warning gets a fix-it).
+- **"0 h" on a free count with no hours** now reads **"Hours not set"**,
+  tappable to focus the box. The hours-cell decision moved to
+  `client/src/lib/bidHoursCell.ts` so the suite reaches it.
+- **Tests:** red without the fixes (3 failed: noHours 4 vs 1; "hours" vs
+  "handHoursNotSet" twice), green with them — removeRelocateLabor 11,
+  bidHoursCell 4, freeCount, fixWalk: 45 passed. `pnpm check` clean.
+- **Looked at on screen**, tablet portrait 820×1180 (playwright, bid
+  **1728376 "Remove relocate check"** on `bidrender_local_c`, user 1 — a
+  fixture with an install, a remove, a relocate and a free-count line, all
+  without hours; leave it or delete it): no "0 h" cells, three "Hours not
+  set", all three buttons focus the right box, nothing sideways or below the
+  edge.
+- **Gates:** branch Gate 38069818821 on `d832e34` GREEN; local-dev Gate
+  38070648397 on `d832e34` GREEN.
+- **No numbers moved by this fix** — wording and buttons only.
+
+### FOR TRACK A — before remove/relocate goes LIVE
+
+**This code raises totals ONLY on bids that have remove or relocate marks**
+(a sent count gains a labor line per kind; with hours set, that labor is
+added to the total; with hours not set, the line is "Not priced" and the
+bid says "+ N not priced"). Bids with no such marks are unchanged
+(measured: all 4,235 on `bidrender_local_c` unchanged, 0 had such marks).
+**In the release plan, A must count the LIVE bids with remove/relocate
+marks** (`takeoff_stamps.status IN ('remove','relocate')`, grouped by bid)
+and recount those bids' totals before and after, so the owner knows which
+live bids move and by how much before it ships. No migration (0110 / 0111
+/ 0115 already exist).
+
+### Owner questions — explained in plain words (2026-10-10)
+
+Given to the owner in chat: quick-bid Q1, Q2, Q3, Q6, Q8 and
+status-and-scope Q10, each with what it means on a job, the suggested
+answer and what it does to the numbers. Answers still with the owner.
+
+## EARLIER (2026-10-10, later) — remove/relocate labor on `c-remove-relocate`; quick-bid plan written
 
 **JOB 1 — remove / relocate labor, built on `c-remove-relocate` (`a7fe812`,
 branched from `track-c`, pushed).** Owner answers are in
