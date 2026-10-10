@@ -100,8 +100,7 @@ for (const run of conduitRuns) {
     .limit(1);
   const measurability = sheet
     ? measurabilityOf({
-        scaleRatio:
-          sheet.scaleRatio === null ? null : Number(sheet.scaleRatio),
+        scaleRatio: sheet.scaleRatio === null ? null : Number(sheet.scaleRatio),
         scaleSource: sheet.scaleSource as "detected" | "manual" | "none",
         notToScale: sheet.notToScale,
       })

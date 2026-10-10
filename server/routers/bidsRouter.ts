@@ -81,6 +81,7 @@ import { extraFeetForRuns } from "../../shared/runExtrasPerFoot";
 import * as db from "../db";
 import { deleteBidWithFiles } from "../storedFiles";
 import { fixLine, fixLineOptions } from "../lineFix";
+import { buildFromParts } from "../buildFromParts";
 
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
@@ -1414,6 +1415,38 @@ export const bidsRouter = router({
       })
     )
     .mutation(({ input, ctx }) => fixLine(ctx, input)),
+
+  /**
+   * "Build it from parts here": the assembly search found nothing, so the
+   * person builds one from catalog parts and it goes straight on the bid.
+   * Saved to the library unless they untick it (then archived — see
+   * server/buildFromParts.ts, which says why it is never a lesser row).
+   */
+  buildFromParts: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        name: z.string().trim().min(1).max(255),
+        category: z.enum(ASSEMBLY_CATEGORIES),
+        parts: z
+          .array(
+            z.object({
+              materialId: z.number().int().positive(),
+              qty: z.number().positive().max(999999),
+            })
+          )
+          .min(1)
+          .max(200),
+        // NULL = hours not set (D1), never 0. Required, so a caller says which.
+        baseLaborHours: z.number().min(0).max(10000).nullable(),
+        laborRateId: z.number().int().positive().nullable(),
+        qty: qtySchema.default(1),
+        unitLabel: labelSchema.nullable().default(null),
+        saveToLibrary: z.boolean(),
+        merge: z.boolean().default(false),
+      })
+    )
+    .mutation(({ input, ctx }) => buildFromParts(ctx, input)),
 
   /**
    * Save a hand-priced line to the library as an assembly — optional, never

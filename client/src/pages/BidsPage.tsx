@@ -121,6 +121,9 @@ import { ExampleTags } from "@/components/ExampleTags";
 import { exampleSummary, exampleWarning } from "@shared/exampleTags";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { MostUsedRow } from "@/components/MostUsedRow";
+import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
+import { smartSearch } from "@/lib/smartSearch";
 import { TapExplain } from "@/components/TapExplain";
 import {
   lineHoursNotSet,
@@ -359,7 +362,8 @@ export default function BidsPage({
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
   const { data: homeruns } = trpc.homeruns.forBid.useQuery({ bidId });
-  const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
+  const { data: assemblies = [], isSuccess: assembliesReady } =
+    trpc.assemblies.list.useQuery();
   const { data: units = [] } = trpc.bids.units.useQuery({ bidId });
   const { data: unitStates = [] } = trpc.bids.unitStates.useQuery({ bidId });
   const { data: planSets = [] } = trpc.bidPdfs.list.useQuery({ bidId });
@@ -575,11 +579,41 @@ export default function BidsPage({
   /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
   const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
 
+  /*
+    The same search Quick bid uses (smartSearch), so "romex" or a typo finds
+    here what it finds there. This was a bare `includes` until the no-match
+    log arrived (2026-10-09): logging misses from a weaker search would have
+    recorded things the library actually has.
+  */
+  const assemblySearchable = useMemo(
+    () =>
+      assemblies.map(a => ({
+        id: String(a.id),
+        description: a.name,
+        category: a.category,
+      })),
+    [assemblies]
+  );
   const assemblyResults = useMemo(() => {
-    const q = assemblyQuery.trim().toLowerCase();
-    if (!q) return [];
-    return assemblies.filter(a => a.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [assemblies, assemblyQuery]);
+    if (!assemblyQuery.trim()) return [];
+    const byId = new Map(assemblies.map(a => [a.id, a]));
+    return smartSearch(assemblySearchable, assemblyQuery, 8)
+      .map(hit => byId.get(Number(hit.id)))
+      .filter((a): a is NonNullable<typeof a> => Boolean(a));
+  }, [assemblies, assemblySearchable, assemblyQuery]);
+
+  useNoMatchLog(
+    "assembly",
+    assemblyQuery,
+    assemblyResults.length,
+    assembliesReady
+  );
+  /** "Build it from parts here" — open, and the search it was opened from. */
+  const [buildingFrom, setBuildingFrom] = useState<string | null>(null);
+  const assemblyNothingFound =
+    assembliesReady &&
+    assemblyQuery.trim() !== "" &&
+    assemblyResults.length === 0;
 
   /**
    * Highlighted result, so the search box can be driven from the keyboard.
@@ -1154,6 +1188,45 @@ export default function BidsPage({
                   ))}
                 </div>
               )}
+              {buildingFrom !== null ? (
+                <BuildFromPartsPanel
+                  bidId={bidId}
+                  query={buildingFrom}
+                  qty={Number(addQty)}
+                  unitLabel={addUnit.trim() || null}
+                  onCancel={() => setBuildingFrom(null)}
+                  onBuilt={({ name, savedToLibrary }) => {
+                    toast.success(
+                      savedToLibrary
+                        ? `Added "${name}" to the bid and to your library.`
+                        : `Added "${name}" to the bid.`
+                    );
+                    setBuildingFrom(null);
+                    setAssemblyQuery("");
+                    void utils.assemblies.list.invalidate();
+                    refresh();
+                  }}
+                />
+              ) : assemblyNothingFound ? (
+                /*
+                  Never stuck (todo.md, "when the picker finds nothing"): a
+                  search that finds nothing offers to build it right here.
+                */
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm">
+                  <span className="flex-1 min-w-[12rem] text-muted-foreground">
+                    Nothing in your library matches “{assemblyQuery.trim()}”.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    onClick={() => setBuildingFrom(assemblyQuery)}
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    Build it from parts here
+                  </Button>
+                </div>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 Adding freezes that assembly’s costs onto the bid. Later library
                 edits will not change what is already here.

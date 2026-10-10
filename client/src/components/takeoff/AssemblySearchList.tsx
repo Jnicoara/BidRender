@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { Check, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { smartSearch } from "@/lib/smartSearch";
+import { useNoMatchLog } from "@/hooks/useNoMatchLog";
 
 export type SearchableAssembly = {
   id: number;
@@ -54,6 +55,10 @@ export function AssemblySearchList({
       .map(hit => byId.get(Number(hit.id)))
       .filter((a): a is SearchableAssembly => Boolean(a));
   }, [query, searchable, assemblies]);
+
+  // A search that settles on nothing goes in the no-match log. An empty list
+  // is a library still loading (or none at all), not a miss.
+  useNoMatchLog("assembly", query, results.length, assemblies.length > 0);
 
   return (
     <div className="space-y-2">

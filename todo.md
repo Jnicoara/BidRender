@@ -26,6 +26,39 @@ unchanged. Full record: `references/catalog-reality-check-build.md`.
 - [ ] Pricing sheets NOT rebuilt (owner). The next rebuild carries typed
       values over by key, renamed items included.
 
+## When the picker finds nothing — (a) and (b) BUILT 2026-10-09 (Track B)
+
+The two owner-approved before-beta items (track-c's todo.md § "Before beta:
+when the picker finds nothing", 2026-10-08). **Whoever merges track-c's
+todo.md: tick (a) and (b) there and point at this entry.**
+
+- [x] **(b) "Build it from parts here"** — bid screen's "Add an assembly"
+      and the counting screen (`/bids/:id/count`). `bids.buildFromParts`
+      (`server/buildFromParts.ts`) creates through `assemblies.create` (its
+      own capability check and name clash), adds the line with
+      `addAssemblyToBid`, and archives the assembly when "Save to my
+      library" is unticked (default ON). No migration. Tests:
+      `server/buildFromParts.test.ts`, `client/src/lib/buildFromPartsDraft.test.ts`.
+- [x] **(a) No-match search log — code BUILT, table WAITS ON TRACK A.**
+      `search_misses` needs a migration; the SQL is
+      `SEARCH_MISSES_CREATE_SQL` in `server/searchMissLog.ts` and in
+      track-b-handoff.md. Until it is applied the code records nothing and
+      the admin panel says "not set up" — safe in either order. Logged from:
+      the bid and counting screens' assembly search, the plan viewer's stamp
+      picker and link list, and every unshelved `MaterialPicker`. A search
+      counts after it has sat on no results for 2 s; one per picker opening;
+      the server folds the same words from one company inside 10 min.
+- [ ] **Not logged yet:** "Link to material or assembly" on a hand-priced
+      line (`HandPricedLineFields.tsx`) — its assembly tab is a bare
+      `includes` search, so a miss there may be something the library has.
+      Switch it to `smartSearch` first, then add `useNoMatchLog`.
+- [ ] **Not offered yet:** the builder in the plan viewer's pickers (stamp
+      picker, Legend/Runs link list). The stamp picker already counts
+      anything typed by hand (level 1), so it is less urgent there.
+- [ ] **A fast "type and Enter" never logs** (the 2 s settle). On the stamp
+      picker, "Count it anyway" is itself a strong miss signal — consider
+      recording on that click as well.
+
 ## Coverage-check starters — BUILT 2026-10-09 (Track B), 224 starters
 
 41 new starters from `references/coverage-check.md` (track-c): CK1–CK26
@@ -282,7 +315,39 @@ Not urgent if keys are created with no expiration, which is now the rule.
       `armFromLegend("CI SWITCH")` clicked the row and the pill stayed on
       "Counting ci duplex". The test's forced-race hook waits on the
       `bidridge:last-count:<bid>` write and timed out at 20 s. Passed in the
-      3 runs on either side. > **Cause:** the click DID arm — and the server handed back the DUPLEX > count. The Legend shows a link the moment it is picked, so the click > after "Link" can reach `takeoffGroups.forAssembly` before > `linkSymbol` has written. `forAssembly` then dropped the symbol as > unlinked, and with no symbol the assembly's ONE count (ci duplex, > linked in step 4) was taken: the pill relabelled to "ci duplex" and > the switch's marks would have gone into the duplex count, under its > name, with nothing said. The screenshot hid it: the mouse's hover > tint covers the armed row's yellow. **Fix:** a symbol linked to > NOTHING yet is still the click's own (`clickedFrom` in > `takeoffGroupsRouter.ts`); one linked to a different assembly is > still ignored. `server/sharedAssemblyCounts.test.ts` (2 new) — red > without it (the duplex count's id came back). **Forced in flow 5**: > `linkSymbol` is held until `forAssembly` has answered, so this order > happens every run; red without the fix locally with "the toolbar > says Counting ci duplex" — the CI picture exactly. With the fix, > local: flow 6 of 6, flow with +150 ms per request 2 of 2, touch on > both tablet sizes 2 of 2. (At +400 ms and 200 KB/s the dev server's > unbundled modules did not load test 1 inside 60 s, 3 of 3 — never > reached the Legend; a throttle too heavy for dev mode, not this.) > **LIVE (`24105ad`) has the race** (same line, same optimistic > link). Gate 37983875286 on `705e1c9` all green; a must-include for > the next release (`next-live-release-plan.md` § 5 items 2 and 4b). > Which bids it could have touched: `scripts/legendLinkRaceCandidates.mts` > (read only; candidates, since a mark does not record its symbol — > proved on a planted case). Not run against live. > **Also:** the Legend's one silent no-op (a linked symbol whose > assembly is not loaded) now says so in a toast. And a failed smoke > test keeps a Playwright trace, sealed before upload (`gate.yml`, > `deploying.md` § 12 says how to open one).
+      3 runs on either side.
+
+      > **Cause:** the click DID arm — and the server handed back the DUPLEX
+      > count. The Legend shows a link the moment it is picked, so the click
+      > after "Link" can reach `takeoffGroups.forAssembly` before
+      > `linkSymbol` has written. `forAssembly` then dropped the symbol as
+      > unlinked, and with no symbol the assembly's ONE count (ci duplex,
+      > linked in step 4) was taken: the pill relabelled to "ci duplex" and
+      > the switch's marks would have gone into the duplex count, under its
+      > name, with nothing said. The screenshot hid it: the mouse's hover
+      > tint covers the armed row's yellow. **Fix:** a symbol linked to
+      > NOTHING yet is still the click's own (`clickedFrom` in
+      > `takeoffGroupsRouter.ts`); one linked to a different assembly is
+      > still ignored. `server/sharedAssemblyCounts.test.ts` (2 new) — red
+      > without it (the duplex count's id came back). **Forced in flow 5**:
+      > `linkSymbol` is held until `forAssembly` has answered, so this order
+      > happens every run; red without the fix locally with "the toolbar
+      > says Counting ci duplex" — the CI picture exactly. With the fix,
+      > local: flow 6 of 6, flow with +150 ms per request 2 of 2, touch on
+      > both tablet sizes 2 of 2. (At +400 ms and 200 KB/s the dev server's
+      > unbundled modules did not load test 1 inside 60 s, 3 of 3 — never
+      > reached the Legend; a throttle too heavy for dev mode, not this.)
+      > **LIVE (`24105ad`) has the race** (same line, same optimistic
+      > link). Gate 37983875286 on `705e1c9` all green; a must-include for
+      > the next release (`next-live-release-plan.md` § 5 items 2 and 4b).
+      > Which bids it could have touched: `scripts/legendLinkRaceCandidates.mts`
+      > (read only; candidates, since a mark does not record its symbol —
+      > proved on a planted case). Not run against live.
+      > **Also:** the Legend's one silent no-op (a linked symbol whose
+      > assembly is not loaded) now says so in a toast. And a failed smoke
+      > test keeps a Playwright trace, sealed before upload (`gate.yml`,
+      > `deploying.md` § 12 says how to open one).
+
 - [x] **"Fix these" walk + gap 10, 2026-10-08 (Track B).** Six bid strips
       (not priced, labor but no material, parts, hours not set, traced labor
       not priced, no labor rate) get "Fix these N" / "Fix it": it opens the

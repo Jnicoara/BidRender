@@ -41,6 +41,7 @@ import { planCopilotRouter } from "./routers/planCopilotRouter";
 import { earlyAccessRouter } from "./routers/earlyAccessRouter";
 import { backupRouter } from "./routers/backupRouter";
 import { aiUsageRouter } from "./routers/aiUsageRouter";
+import { searchMissesRouter } from "./routers/searchMissesRouter";
 import { pricingProblemsRouter } from "./routers/pricingProblemsRouter";
 import { seatLimitsRouter } from "./routers/seatLimitsRouter";
 
@@ -110,6 +111,8 @@ export const appRouter = router({
   // scripts/backup.mts is the same job without needing the app to be up.
   backup: backupRouter,
   aiUsage: aiUsageRouter,
+  // Picker searches that found nothing: any member records, admin lists.
+  searchMisses: searchMissesRouter,
   // ERR- references from bids that could not be fully priced.
   pricingProblems: pricingProblemsRouter,
   // Admin-only. Seats per company, set by hand until billing exists.
