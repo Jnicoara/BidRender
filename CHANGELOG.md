@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Removing or moving a device now puts its labor on the bid (not live
+  yet).** A count with devices marked Remove or Relocate sends one labor line
+  per kind beside its install line — "Remove duplex receptacle × 4". Only new
+  devices carry material. The hours come from this bid's own setting, else
+  the assembly's; when neither is set the line says "Not priced" (never $0)
+  with a "Set remove hours" button right on it, and the count card offers
+  "Add remove labor to bid" if the labor is not on the bid yet. Bids without
+  removed or relocated devices are unchanged.
 - **The starter pricing sheets are rebuilt for the owner to fill — now with
   step times.** The prices workbook gains a "Steps" tab (type the minutes
   for each install step, with a suggested draft beside it) and a "Step

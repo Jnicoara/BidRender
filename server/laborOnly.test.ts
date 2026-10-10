@@ -65,6 +65,7 @@ const laborLine = (snapshotLaborOnly: boolean | null): PartsLineLike => ({
   snapshotMaterialCost: "0.0000",
   snapshotLaborHours: "2.0000",
   snapshotLaborOnly,
+  lineRole: "install",
   unpricedParts: 0,
 });
 

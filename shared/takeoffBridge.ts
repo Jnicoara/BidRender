@@ -40,6 +40,7 @@ import {
   type ExtraAppliesTo,
   type ExtraRun,
 } from "./runExtrasPerFoot";
+import { laborRolesToAdd, type LaborRole, type RoleCounts } from "./roleLines";
 
 /** A counted group, as the bridge needs it. */
 export type BridgeGroup = {
@@ -54,6 +55,12 @@ export type BridgeGroup = {
   unitCost: number | null;
   /** How many marks are on the drawing. Derived, never stored. */
   count: number;
+  /**
+   * Its REMOVE and RELOCATE marks (shared/roleLines.ts), each of which puts
+   * a labor line on the bid. Absent = none, for callers that only ask about
+   * the install line.
+   */
+  roleCounts?: RoleCounts;
 };
 
 /** A bid line, as the bridge needs it. */
@@ -64,6 +71,12 @@ export type BridgeLine = {
   takeoffGroupId: number | null;
   /** Provenance, and the key the hand-added collision is found on. */
   assemblyId: number | null;
+  /**
+   * install / remove / relocate (0115). REQUIRED: a count's remove line is
+   * not its install line, and reading it as one would refuse to send the
+   * new marks of a count whose removals went first.
+   */
+  lineRole: string;
 };
 
 /**
@@ -97,7 +110,13 @@ export function sendability(
   group: BridgeGroup,
   lines: readonly BridgeLine[]
 ): Sendability {
-  if (lines.some(line => line.takeoffGroupId === group.id)) {
+  // The INSTALL line. A count's remove / relocate labor lines are their own
+  // (`laborRolesWaiting`), and never stand in for this one.
+  if (
+    lines.some(
+      line => line.takeoffGroupId === group.id && line.lineRole === "install"
+    )
+  ) {
     return { sendable: false, reason: "already-on-bid" };
   }
   // Checked before the level, so "you have not marked anything" wins over
@@ -145,7 +164,37 @@ export function countsWaitingToSend(
   groups: readonly BridgeGroup[],
   lines: readonly BridgeLine[]
 ): number {
-  return groups.filter(group => sendability(group, lines).sendable).length;
+  return groups.filter(
+    group =>
+      sendability(group, lines).sendable ||
+      laborRolesWaiting(group, lines).length > 0
+  ).length;
+}
+
+/**
+ * The remove / relocate labor lines a count still needs on the bid: a kind
+ * with marks and no line of that role yet (shared/roleLines.ts). Only a count
+ * that can reach the bid at all — a free count, or one with its assembly — so
+ * a deleted assembly stays "no price" rather than half-sending.
+ */
+export function laborRolesWaiting(
+  group: BridgeGroup,
+  lines: readonly BridgeLine[]
+): LaborRole[] {
+  if (!group.roleCounts) return [];
+  if (
+    !(
+      group.kind === "plain" ||
+      (group.kind === "assembly" && group.assemblyId !== null)
+    )
+  )
+    return [];
+  const existing = new Set(
+    lines
+      .filter(line => line.takeoffGroupId === group.id)
+      .map(line => line.lineRole)
+  );
+  return laborRolesToAdd(group.roleCounts, existing);
 }
 
 /**

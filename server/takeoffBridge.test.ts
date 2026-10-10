@@ -54,6 +54,7 @@ function line(over: Partial<BridgeLine> = {}): BridgeLine {
     name: "Exit sign LED",
     takeoffGroupId: null,
     assemblyId: null,
+    lineRole: "install",
     ...over,
   };
 }

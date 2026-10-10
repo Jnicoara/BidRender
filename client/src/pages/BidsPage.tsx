@@ -132,6 +132,7 @@ import {
   lineNotPriced,
 } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
+import { isLaborRoleLine } from "@shared/roleLines";
 import {
   bidNotPricedCount,
   laborShare,
@@ -1593,6 +1594,14 @@ export default function BidsPage({
                                 >
                                   Not priced
                                 </FixableLabel>
+                              ) : isLaborRoleLine(line) &&
+                                line.snapshotLaborHours === null ? (
+                                /* A remove / relocate line with no hours
+                                   (shared/roleLines.ts): never "0 h". Its fix
+                                   is the hours box on the line itself. */
+                                <span className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]">
+                                  Hours not set
+                                </span>
                               ) : lineHoursNotSet(line) ? (
                                 /* An assembly whose hours were not set when
                                    this line was added (D1): never "0 h". */

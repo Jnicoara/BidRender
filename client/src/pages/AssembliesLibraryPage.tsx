@@ -197,6 +197,13 @@ type Draft = {
    * (rule 7): a save that dropped them would empty the list.
    */
   steps: DraftStep[];
+  /**
+   * Hours to take one out / move one (0110), as typed — blank is NOT SET,
+   * which makes a remove / relocate bid line "Not priced", never $0
+   * (shared/roleLines.ts). Round-trips (rule 7).
+   */
+  removeLaborHours: string;
+  relocateLaborHours: string;
 };
 
 const round = (value: number, places = 2) => {
@@ -224,6 +231,10 @@ const emptyDraft = (): Draft => ({
   // Never guessed from the name (overhaul § 6): "not said" until picked.
   mountHeightTypeKey: null,
   steps: [],
+  // Not set until somebody says — never a guessed number (CLAUDE.md §
+  // Starter content ships unpriced).
+  removeLaborHours: "",
+  relocateLaborHours: "",
 });
 
 // ─── Mounts at ────────────────────────────────────────────────────────────────
@@ -826,6 +837,20 @@ function AssemblyBuilder({
       toast.error("Every material needs a quantity of 0 or more.");
       return;
     }
+    // Remove / relocate hours (0110): blank is NOT SET and saves as such; a
+    // typo must be refused, never quietly saved as "not set".
+    for (const [word, value] of [
+      ["Remove", draft.removeLaborHours],
+      ["Relocate", draft.relocateLaborHours],
+    ] as const) {
+      const n = Number(value);
+      if (value.trim() !== "" && (Number.isNaN(n) || n < 0)) {
+        toast.error(
+          `${word} hours must be 0 or more, or left blank for not set.`
+        );
+        return;
+      }
+    }
     onSave({ ...draft, name: draft.name.trim() });
   };
 
@@ -1368,6 +1393,14 @@ function AssemblyBuilder({
                     ).length
                   }
                   onChange={steps => setDraft(d => ({ ...d, steps }))}
+                  removeHours={draft.removeLaborHours}
+                  relocateHours={draft.relocateLaborHours}
+                  onRemoveHours={value =>
+                    setDraft(d => ({ ...d, removeLaborHours: value }))
+                  }
+                  onRelocateHours={value =>
+                    setDraft(d => ({ ...d, relocateLaborHours: value }))
+                  }
                 />
               )}
             </div>
@@ -1620,6 +1653,15 @@ export default function AssembliesLibraryPage() {
       modifierIds: detail.modifierIds,
       laborOnly: detail.laborOnly === true,
       mountHeightTypeKey: detail.mountHeightTypeKey ?? null,
+      // NULL loads as a blank box — not set — never "0".
+      removeLaborHours:
+        assemblyHours(detail.removeLaborHours) === null
+          ? ""
+          : String(Number(detail.removeLaborHours)),
+      relocateLaborHours:
+        assemblyHours(detail.relocateLaborHours) === null
+          ? ""
+          : String(Number(detail.relocateLaborHours)),
       // The STORED step ids, so a save writes back what the list points at.
       steps: detail.steps.map(
         (s): DraftStep =>
@@ -1661,6 +1703,8 @@ export default function AssembliesLibraryPage() {
               modifierIds: draft.modifierIds,
               laborOnly: draft.laborOnly,
               mountHeightTypeKey: draft.mountHeightTypeKey,
+              removeLaborHours: hoursToSave(draft.removeLaborHours),
+              relocateLaborHours: hoursToSave(draft.relocateLaborHours),
               steps: draft.steps.map(s =>
                 s.kind === "cable"
                   ? { kind: "cable" as const, count: 1 as const }
