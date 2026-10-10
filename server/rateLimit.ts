@@ -34,6 +34,49 @@ export function createRateLimiter(options: { windowMs: number; max: number }) {
   };
 }
 
+/**
+ * Counts FAILURES only, and is asked before the attempt, so a key that has
+ * failed `max` times inside `windowMs` is refused even with the right answer —
+ * until the window that began with its first failure ends. Sign-in uses it
+ * (2026-10-09): a wrong password counts, a right one costs nothing, which
+ * `createRateLimiter` cannot express because every call to it is a hit.
+ *
+ * Same honesty note as above: in-memory, per instance.
+ */
+export function createFailureLimiter(options: {
+  windowMs: number;
+  max: number;
+}) {
+  const failures = new Map<string, { count: number; resetAt: number }>();
+  return {
+    /** Milliseconds until `key` may try again; 0 when it may try now. */
+    blockedFor(key: string, now: number): number {
+      const entry = failures.get(key);
+      if (!entry || now > entry.resetAt) return 0;
+      return entry.count >= options.max ? entry.resetAt - now : 0;
+    },
+    /** Record one failure. True when this one reached the limit. */
+    fail(key: string, now: number): boolean {
+      const entry = failures.get(key);
+      if (!entry || now > entry.resetAt) {
+        failures.set(key, { count: 1, resetAt: now + options.windowMs });
+        if (failures.size > 5000) {
+          failures.forEach((value, existing) => {
+            if (now > value.resetAt) failures.delete(existing);
+          });
+        }
+        return options.max <= 1;
+      }
+      entry.count += 1;
+      return entry.count === options.max;
+    },
+    /** Forget `key`'s failures (a right answer for that key). */
+    clear(key: string): void {
+      failures.delete(key);
+    },
+  };
+}
+
 /** Best-effort client identity for a limiter. Never stored. */
 export function clientKey(req: {
   ip?: string;

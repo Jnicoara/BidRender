@@ -31,7 +31,12 @@ import { eq } from "drizzle-orm";
 import type { Request } from "express";
 import { COOKIE_NAME } from "@shared/const";
 import { appRouter } from "./routers";
-import { completePasswordReset, getDb, getUserById } from "./db";
+import {
+  completePasswordReset,
+  getDb,
+  getUserById,
+  isResetTokenUsable,
+} from "./db";
 import { sdk } from "./_core/sdk";
 import { hashResetToken } from "./passwordReset";
 import { passwordResetTokens, users } from "../drizzle/schema";
@@ -384,6 +389,23 @@ withDb("(a) a reset link works once", () => {
     const second = await requestLink();
     expect(await completePasswordReset(hashResetToken(first), "x")).toBeNull();
     expect(await completePasswordReset(hashResetToken(second), "y")).toBe(USER);
+  });
+
+  it("refuses the CURRENT password, and uses nothing up (owner, 2026-10-06)", async () => {
+    const token = await requestLink();
+    await expect(
+      publicCaller().caller.auth.resetPassword({
+        token,
+        newPassword: OLD_PASSWORD,
+      })
+    ).rejects.toThrow("That is your current password. Choose a different one.");
+    expect(await isResetTokenUsable(hashResetToken(token))).toBe(true);
+    // The same link then takes a different one.
+    await publicCaller().caller.auth.resetPassword({
+      token,
+      newPassword: NEW_PASSWORD,
+    });
+    expect(await isResetTokenUsable(hashResetToken(token))).toBe(false);
   });
 
   it("refuses a password the rules refuse, and uses nothing up", async () => {

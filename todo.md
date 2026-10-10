@@ -69,7 +69,14 @@ todo.md: tick (a) and (b) there and point at this entry.**
       on nothing found, "Count …", and "Build it from parts here", in every
       picker that logs. Closing a picker on half-typed words still records
       nothing. Measured on screen: recorded 54–75 ms after Enter.
-- [ ] **Landscape: "Save and count" needs a scroll in the build-from-parts
+- [x] **DONE 2026-10-09 (B): the Save row is pinned** (`pinActions` on
+      `BuildFromPartsPanel`, set only by the plan viewer's Count popover).
+      Measured in Firefox (Gecko): at 1180x820 Save went from 856–900 (below
+      the 820 screen) to 718–762, inside the popover; at 820x1180 and
+      1440x900, 0 of 20 elements in the popover moved. `bottom-0` lifted the
+      row 8px even with nothing to scroll (sticky measures the CONTENT box);
+      it is `bottom-[-0.5rem]`. Was:
+      **Landscape: "Save and count" needs a scroll in the build-from-parts
       popover.** On the plan viewer at 1180x820 the builder (name, part,
       three recents, More options) is taller than the screen, so the
       button sits below the fold of the popover's own scroll area (80dvh).
@@ -1347,13 +1354,25 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       k-anonymity range check against Have I Been Pwned: only the first five
       characters of the SHA-1 leave the server). The refusal says plainly
       why. Never a silent rejection.
-- [ ] **Limit repeated wrong sign-in attempts**, per address and per sender,
+- [x] **DONE 2026-10-09 (B):** 10 wrong per address, 30 per sender, 15
+      minutes, counted for addresses with no account too
+      (`createFailureLimiter` in `server/rateLimit.ts`; a right password
+      costs nothing and clears its address). Tests in
+      `server/auth.email.test.ts`; the message seen on the sign-in form at
+      laptop and phone width. In-memory, per instance, like the reset limits.
+      Was: **Limit repeated wrong sign-in attempts**, per address and per sender,
       the same way password reset is already limited (`overResetRequestLimit`
       / `overResetAddressLimit` in `authRouter.ts`). The message names the
       wait and never says whether the address has an account. Log each lock
       with a reason, masked, like the reset stops (`deploying.md` § 11,
       "reset email blocked").
-- [ ] **Refuse a new password that matches the CURRENT one** (owner,
+- [x] **DONE 2026-10-09 (B):** change (`bcrypt.compare` against the stored
+      hash) and reset (`db.getResetTokenPasswordHash`, read BEFORE the link
+      is claimed); tests in `server/auth.email.test.ts` and
+      `server/passwordReset.test.ts` (the link still works after the
+      refusal). There is no change-password screen in the client today; the
+      server refuses it for when there is. Was:
+      **Refuse a new password that matches the CURRENT one** (owner,
       2026-10-06), at password change and at reset: compare the new
       password against the stored hash (`bcrypt.compare`) and refuse with a
       plain sentence ("That is your current password. Choose a different

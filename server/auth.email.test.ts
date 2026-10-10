@@ -240,6 +240,157 @@ describe("auth.login", () => {
   });
 });
 
+describe("auth.login — wrong attempts (todo.md, 2026-10-09)", () => {
+  let sender = 0;
+  /** A caller from its own address, so one test's sender count is its own. */
+  function callerFrom(ip = `10.9.0.${++sender}`) {
+    const { ctx } = makeCtx();
+    ctx.req = { ...ctx.req, ip } as TrpcContext["req"];
+    return appRouter.createCaller(ctx);
+  }
+  const account = (email: string) =>
+    userRow({
+      id: 7,
+      openId: "email_lock7",
+      email,
+      name: "Lock Fixture",
+      passwordHash: "hashed:Correct1!",
+      emailVerified: true,
+      loginMethod: "email_password",
+      role: "user",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+
+  it("locks an address after 10 wrong passwords, refuses even the right one, and names the wait", async () => {
+    const email = "locked-real@example.com";
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(account(email));
+    for (let i = 0; i < 10; i++)
+      await expect(
+        callerFrom().auth.login({ email, password: "WrongPass1!" })
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+
+    // From a NEW sender, with the RIGHT password: still refused.
+    const refused = callerFrom().auth.login({ email, password: "Correct1!" });
+    await expect(refused).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    await expect(refused).rejects.toThrow(
+      "Too many wrong sign-in attempts. Wait 15 minutes and try again."
+    );
+    // Logged once, masked — never the full address.
+    const logs = vi.mocked(console.warn).mock.calls.map(c => String(c[0]));
+    expect(logs).toEqual([
+      "[auth] sign-in locked for 15 min: too many wrong passwords for lo…@example.com",
+    ]);
+  });
+
+  it("answers an address with NO account exactly as one with an account", async () => {
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(undefined);
+    const email = "locked-nobody@example.com";
+    for (let i = 0; i < 10; i++)
+      await expect(
+        callerFrom().auth.login({ email, password: "anything1" })
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(
+      callerFrom().auth.login({ email, password: "anything1" })
+    ).rejects.toThrow(
+      "Too many wrong sign-in attempts. Wait 15 minutes and try again."
+    );
+  });
+
+  it("locks one sender walking many addresses", async () => {
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(undefined);
+    const ip = "10.9.9.9";
+    for (let i = 0; i < 30; i++)
+      await expect(
+        callerFrom(ip).auth.login({
+          email: `walk-${i}@example.com`,
+          password: "anything1",
+        })
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(
+      callerFrom(ip).auth.login({
+        email: "walk-fresh@example.com",
+        password: "anything1",
+      })
+    ).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+    // Another sender is untouched.
+    await expect(
+      callerFrom().auth.login({
+        email: "walk-fresh@example.com",
+        password: "anything1",
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("a right password clears its address's count", async () => {
+    const email = "clears@example.com";
+    vi.mocked(dbMod.getUserByEmail).mockResolvedValue(account(email));
+    vi.mocked(dbMod.upsertUser).mockResolvedValue(undefined);
+    const wrong9 = async () => {
+      for (let i = 0; i < 9; i++)
+        await expect(
+          callerFrom().auth.login({ email, password: "WrongPass1!" })
+        ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    };
+    await wrong9();
+    await callerFrom().auth.login({ email, password: "Correct1!" });
+    await wrong9();
+    const result = await callerFrom().auth.login({
+      email,
+      password: "Correct1!",
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("auth.changePassword — the current password again (owner, 2026-10-06)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("refuses it in a plain sentence and writes nothing", async () => {
+    const row = userRow({
+      id: 3,
+      openId: "email_user3",
+      email: "same@example.com",
+      name: "Same",
+      passwordHash: "hashed:Current1!",
+      emailVerified: true,
+      loginMethod: "email_password",
+      role: "user",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    });
+    vi.mocked(dbMod.getUserById).mockResolvedValue(row);
+    const { ctx } = makeCtx();
+    ctx.user = row;
+    const caller = appRouter.createCaller(ctx);
+
+    await expect(
+      caller.auth.changePassword({
+        currentPassword: "Current1!",
+        newPassword: "Current1!",
+      })
+    ).rejects.toThrow("That is your current password. Choose a different one.");
+    expect(dbMod.updateUserPassword).not.toHaveBeenCalled();
+
+    // A different one still goes through.
+    await caller.auth.changePassword({
+      currentPassword: "Current1!",
+      newPassword: "Different1!",
+    });
+    expect(dbMod.updateUserPassword).toHaveBeenCalledWith(
+      3,
+      "hashed:Different1!"
+    );
+  });
+});
+
 describe("auth.logout", () => {
   it("clears the session cookie", async () => {
     const { ctx, cleared } = makeCtx();
