@@ -567,6 +567,275 @@ ALTER TABLE `bid_pdf_sheets` MODIFY COLUMN `scaleSource`
   enum('detected','manual','none','cleared') NOT NULL DEFAULT 'none';
 ```
 
+### 10a. FINAL drafts for BS-M3 – BS-M6, and the `applyStarterChange` spec (Track C, 2026-10-12)
+
+**This replaces the BS-M3 – BS-M6 rows of the table above, the `eddc870`
+BS-M3 SQL, and the BS-M5 pattern block above.** It answers Track A's 14
+decisions (A's session-36 note, commit `b90ea3d2`, in `track-c-handoff.md`).
+Every call below was made by C because **none of them moves a bid number**:
+all four drafts are additive, step 1, nullable, and nothing reads them until
+C's code ships. The calls that touch a number later are listed for the owner
+at the end (§ 10a.5).
+
+Checked against the schema on `track-c` at `20a1166`:
+
+- `companies` has `id`, `ownerUserId`.
+- `kits` and `takeoff_run_types` carry `version` and `baselineVersion`.
+- **`labor_steps` has neither.**
+- `assembly_materials` keys a part by `materialId`, and `assembly_modifiers`
+  keys one by `modifierId`.
+
+#### 10a.1 The 14 answers
+
+| #   | A asked                                    | C's call                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Which tables                               | **FIVE in this build:** `materials`, `assemblies` (with their parts), `labor_rates`, `modifiers`, **`takeoff_run_types`**. Run types come in because their parts are COLUMNS on the row (`racewayMaterialId`, `couplingMaterialId`, … `conduitExtraPct`), so a field change covers them. They already have `version`, and `forkRunType` exists. **A run type's EXTRAS are child rows, so they wait with kits:** the boot's "adds extras" (F4) stays A's boot change until a later `part_*` `childTable` covers them. **`kits` and `labor_steps` wait** (Q8 put step minutes later; a kit adds lines only when dropped in, so it moves no existing bid). `targetTable` is **`varchar(64)`**, so adding them later is code, not a migration.                     |
+| 2   | `field`: enum or varchar                   | **`varchar(64)`**, checked in code by `starterFieldKind` (`shared/starterChange.ts`). `server/starterChange.test.ts` already fails on any column of the four classified tables that is left undecided. `takeoff_run_types` gets the same classification before C's code ships.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 3   | Old/new value type                         | **`json` with a wrapper: `{"v": <value>}`.** SQL `NULL` = not applicable (an `item_add`, `hide` or `unhide` has no field value). `{"v": null}` = the column WAS NULL. `{"v": "0.5000"}` = a decimal, stored as the column stores it (a string, exact). Names are strings, booleans are booleans. The wrapper is the point: a bare JSON `null` and SQL `NULL` both read back as `null` through the driver, and they mean opposite things. NULL, 0 and "" stay three different values, which is what `sameStarterValue` needs.                                                                                                                                                                                                                                   |
+| 4   | Parts: per child row or whole list as JSON | **One change per part.** `kind` = `part_add`, `part_remove` or `part_field`. `childTable` is `assembly_materials` or `assembly_modifiers`, and **`childRefId` is the PART's id (`materialId` / `modifierId`), not the child row's id.** A company's copy of the recipe has its own child rows, but its parts point at the same ids, which resolve through `resolveForkedRow`. So the offer compares "this company's line for material 812" with "the starter's line for material 812". For `part_field`, `field` is the child column (`qty`, `overrideLaborHours`, `isBranchWhip`). The parent's `version` is bumped. **Why not JSON:** a whole-list blob cannot be offered one line at a time, and it cannot tell a company's own extra part from BidRidge's. |
+| 5   | `version`                                  | **Confirmed:** the shared row's own `version` column after this change (the PARENT's for a part change). `applyStarterChange` bumps it by 1 and nothing else does.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 6   | `undoneByChangeId`, batch undo             | **Neither. The log is APPEND-ONLY:** a change row is written once and never updated. An undo is a NEW change in a NEW batch (`source = 'undo'`), carrying **`undoesChangeId`** (self-FK, `ON DELETE set null`, indexed) and the reversed old/new values. "Is this change undone?" is a query. A batch undo is one undo batch whose changes each point back at their own original.                                                                                                                                                                                                                                                                                                                                                                              |
+| 7   | Batch `editorUserId`                       | **Confirmed:** FK `users` `ON DELETE set null`, so history outlives the account. **NULL does NOT mean "the seed boot"**: it also means a deleted account. The `source` column says which (`seed` vs the rest).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 8   | Pins: FK on `forkId`; company key; unique  | **`forkId` has no FK.** It points into the table the change targets. **The company is the owner's `users.id`**, named `companyOwnerUserId`, FK `users` `ON DELETE cascade`. That is the key every forked row already carries (`userId` = owner, CLAUDE.md § Data model), so a pin and its fork can never disagree about whose they are. **Unique `(changeId, companyOwnerUserId)`**: one change pins at most one copy per company.                                                                                                                                                                                                                                                                                                                             |
+| 9   | BS-M5 tables                               | The five in #1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 10  | `labor_steps` has no version               | **Out of this build** (Q8: step minutes later). When it comes in, it needs `version` and `baselineVersion` first, in that migration.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 11  | `replacedById`                             | **A self-FK `ON DELETE set null`** on each of the five tables. **Legal only on a shared row (`userId IS NULL`), enforced in code** by `hideStarterItem`, which refuses a company row and refuses a replacement that is not shared and active. Rows are retired, never deleted, so the `set null` is a backstop.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 12  | Answers keyed how; unique; FK              | **By owner `users.id`** (`companyOwnerUserId`, FK `users` cascade), the same key as pins and every fork. **`starterSeenAt` stays on `companies`** (one value per company), found through `companies.ownerUserId`. Both halves resolve from `ctx.scope.dataUserId`, so they cannot drift. **Unique `(companyOwnerUserId, changeId)`. FK `changeId` → `starter_changes` `ON DELETE cascade`** (changes are never deleted; the cascade only keeps a test fixture tidy).                                                                                                                                                                                                                                                                                           |
+| 13  | Per change or per batch                    | **Per change.** "Accept all" writes one row per change it takes (`acceptAllTakes`), in one transaction. "Ignore" is a row; un-ignoring DELETES that row. Answers are state, not the log.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 14  | Undo and accepted answers                  | **The old answer stays.** The undo is a new change with its own offers, and `offerBucket` already sorts each company. One that ACCEPTED holds the change's new value, which is the undo's old value, so it is offered the undo. One that IGNORED holds the old value, which is the undo's new value, so it gets "nothing". No answer row is ever rewritten.                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+#### 10a.2 The SQL — hand-write, do not `drizzle-kit generate`; A numbers them
+
+```sql
+-- BS-M3 — the starter change log. APPEND-ONLY: rows are inserted, never updated.
+CREATE TABLE `starter_change_batches` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`editorUserId` int NULL,
+	`source` enum('screen','sheet','copy','seed','undo') NOT NULL,
+	`fileName` varchar(255) NULL,
+	`fileSha256` char(64) NULL,
+	`changeCount` int NOT NULL DEFAULT 0,
+	`note` varchar(512) NULL,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `starter_change_batches_id` PRIMARY KEY(`id`),
+	CONSTRAINT `starter_change_batches_editorUserId_users_id_fk` FOREIGN KEY (`editorUserId`) REFERENCES `users`(`id`) ON DELETE set null ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+--> statement-breakpoint
+CREATE TABLE `starter_changes` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`batchId` int NOT NULL,
+	`targetTable` varchar(64) NOT NULL,
+	`targetRowId` int NOT NULL,
+	`kind` enum('field','part_add','part_remove','part_field','item_add','hide','unhide') NOT NULL,
+	`field` varchar(64) NULL,
+	`childTable` varchar(64) NULL,
+	`childRefId` int NULL,
+	`oldValue` json NULL,
+	`newValue` json NULL,
+	`version` int NOT NULL,
+	`undoesChangeId` int NULL,
+	`note` varchar(512) NULL,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `starter_changes_id` PRIMARY KEY(`id`),
+	CONSTRAINT `starter_changes_batchId_starter_change_batches_id_fk` FOREIGN KEY (`batchId`) REFERENCES `starter_change_batches`(`id`) ON DELETE cascade ON UPDATE no action,
+	CONSTRAINT `starter_changes_undoesChangeId_starter_changes_id_fk` FOREIGN KEY (`undoesChangeId`) REFERENCES `starter_changes`(`id`) ON DELETE set null ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+--> statement-breakpoint
+CREATE INDEX `starter_changes_batchId_idx` ON `starter_changes` (`batchId`);
+--> statement-breakpoint
+CREATE INDEX `starter_changes_target_idx` ON `starter_changes` (`targetTable`,`targetRowId`);
+--> statement-breakpoint
+CREATE INDEX `starter_changes_undoesChangeId_idx` ON `starter_changes` (`undoesChangeId`);
+
+-- BS-M4 — which company copies a change created (so undo and the count know them).
+CREATE TABLE `starter_change_pins` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`changeId` int NOT NULL,
+	`companyOwnerUserId` int NOT NULL,
+	`forkId` int NOT NULL,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `starter_change_pins_id` PRIMARY KEY(`id`),
+	CONSTRAINT `starter_change_pins_change_company_uq` UNIQUE(`changeId`,`companyOwnerUserId`),
+	CONSTRAINT `starter_change_pins_changeId_starter_changes_id_fk` FOREIGN KEY (`changeId`) REFERENCES `starter_changes`(`id`) ON DELETE cascade ON UPDATE no action,
+	CONSTRAINT `starter_change_pins_companyOwnerUserId_users_id_fk` FOREIGN KEY (`companyOwnerUserId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+--> statement-breakpoint
+CREATE INDEX `starter_change_pins_company_idx` ON `starter_change_pins` (`companyOwnerUserId`);
+
+-- BS-M5 — on the FIVE tables. isPinnedCopy: NULL = a company's own copy (today's
+-- meaning, every existing row); TRUE = a pin, mirrors the starter as it was;
+-- FALSE = was a pin, then the company edited it. hiddenAt / replacedById: shared
+-- rows only, enforced in code (hideStarterItem).
+ALTER TABLE `materials` ADD `isPinnedCopy` boolean NULL;
+--> statement-breakpoint
+ALTER TABLE `materials` ADD `hiddenAt` timestamp NULL;
+--> statement-breakpoint
+ALTER TABLE `materials` ADD `replacedById` int NULL;
+--> statement-breakpoint
+ALTER TABLE `materials` ADD CONSTRAINT `materials_replacedById_materials_id_fk` FOREIGN KEY (`replacedById`) REFERENCES `materials`(`id`) ON DELETE set null ON UPDATE no action;
+--> statement-breakpoint
+-- …the same four statements for `assemblies`, `labor_rates`, `modifiers` and
+-- `takeoff_run_types`, each FK named `<table>_replacedById_<table>_id_fk` and
+-- pointing at its own table. Written out in full by A in the migration file.
+
+-- BS-M6 — offers: what a company has seen, and what it answered.
+ALTER TABLE `companies` ADD `starterSeenAt` timestamp NULL;
+--> statement-breakpoint
+CREATE TABLE `starter_offer_answers` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`companyOwnerUserId` int NOT NULL,
+	`changeId` int NOT NULL,
+	`answer` enum('accepted','ignored') NOT NULL,
+	`answeredByUserId` int NULL,
+	`answeredAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `starter_offer_answers_id` PRIMARY KEY(`id`),
+	CONSTRAINT `starter_offer_answers_company_change_uq` UNIQUE(`companyOwnerUserId`,`changeId`),
+	CONSTRAINT `starter_offer_answers_companyOwnerUserId_users_id_fk` FOREIGN KEY (`companyOwnerUserId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action,
+	CONSTRAINT `starter_offer_answers_changeId_starter_changes_id_fk` FOREIGN KEY (`changeId`) REFERENCES `starter_changes`(`id`) ON DELETE cascade ON UPDATE no action,
+	CONSTRAINT `starter_offer_answers_answeredByUserId_users_id_fk` FOREIGN KEY (`answeredByUserId`) REFERENCES `users`(`id`) ON DELETE set null ON UPDATE no action
+) COLLATE=utf8mb4_unicode_ci;
+```
+
+Notes for A:
+
+- **All four are step 1:** additive, safe before the code, and step 3 is
+  empty. No `UPDATE`.
+- The only defaults are the counter (`changeCount`) and the `createdAt` /
+  `answeredAt` stamps.
+- `answeredByUserId` is the PERSON who pressed it, for the audit. The company
+  is `companyOwnerUserId` (CLAUDE.md: actor vs data scope).
+- `companies.starterSeenAt` NULL = the company's `createdAt`. Do not
+  backfill it.
+- **The proof is `bidTotals` before and after: identical.** Nothing reads
+  these columns until C's code ships.
+
+#### 10a.3 `applyStarterChange` — how a change is stored, pinned and undone
+
+One server function (`server/starterChanges.ts`, C), called by the screen, the
+sheet upload, "Copy from my company", the boot's seed proposal (once A's boot
+change routes through it) and undo. **One batch per call, ONE transaction**:
+if any step fails, nothing is written, not the pins either.
+
+**Input:** `{ editorUserId | null, source, fileName?, fileSha256?, note?,
+changes: [{ table, rowId, kind, field?, childTable?, childRefId?, newValue }] }`
+
+**For each change, in order:**
+
+1. **Refuse** before writing anything:
+   - not one of the five tables;
+   - the row is not shared (`userId` is not NULL);
+   - `starterChangeRefusal(table, field)` says no (unit, not-editable or
+     unknown);
+   - the value fails `shared/starterSheetChecks.ts` (blank is not zero, no
+     number at or below 0 where the sheet refuses one);
+   - a `part_*` change names a part that is not shared and active.
+
+   Any refusal stops the WHOLE batch and lists every bad change (owner Q4).
+
+2. **Read** the shared row (and, for a part, its child row) inside the
+   transaction (`SELECT … FOR UPDATE`). If the new value equals the current
+   one by `sameStarterValue`, **skip it**: no log, no pin, no version bump.
+3. **Decide who sees it:** for a `field` change, `starterFieldKind`.
+   - **`everyone`** (finding fields): change the shared row and log it, with
+     **no pins**. Every company reads it (Q21).
+   - **`offer`** and every `part_*`: go on to step 4.
+4. **Pin.** For every row in `companies`, take its `ownerUserId`. **If that
+   company has no copy of this row**, fork it with the existing fork function
+   AS IT IS NOW: a fork with `baselineId` = this row, `baselineVersion` = its
+   CURRENT version, and **`isPinnedCopy = TRUE`**. Record a
+   `starter_change_pins` row. A company that already has a copy, its own or
+   an earlier pin, gets no new pin, because its copy already insulates it.
+   - **A part change pins the ASSEMBLY.** `forkAssembly` copies the recipe.
+   - **A company created after this change gets no pin.** It reads the
+     shared row, which is the latest. "New companies get the latest" is this,
+     with no code.
+5. **Change** the shared row, or the child row for a part. **Bump its
+   `version` by 1**: the parent's for a part. Example tags keep their meaning:
+   a BidRidge price is still an example price.
+6. **Log** the `starter_changes` row:
+   - `oldValue` and `newValue` as `{"v": …}`;
+   - `version` = the bumped version;
+   - `undoesChangeId` when `source = 'undo'`.
+
+   The batch's `changeCount` is set once at the end.
+
+**Undo one change.** Allowed only if the shared row (or part) STILL holds
+that change's `newValue`. Otherwise it refuses with "changed again since: …"
+(owner Q6). Undo is `applyStarterChange` with `source = 'undo'`, the values
+reversed and `undoesChangeId` set, so it pins any company created since,
+exactly like any change. **Pins already made are left in place** (§ 4).
+**Undo a batch:** a preview, then one undo batch of the changes still
+undoable, listing the rest (Q6).
+
+**Offers, read for one company** (owner `users.id` = `ctx.scope.dataUserId`):
+
+- **The candidates:** every logged `offer` / `part_*` change on a row this
+  company has a copy of, whose `version` is above the copy's
+  `baselineVersion`, with no answer row. A copy is a pin, or the company's
+  own fork.
+- **Each one is sorted by `offerBucket`**, comparing the copy's current
+  value with the change's old and new values:
+  - `offer`: listed, and in Accept all;
+  - `own-value`: listed apart, one at a time (Q18);
+  - `nothing`: hidden.
+- **Accept:**
+  - write `newValue` into the company's copy;
+  - raise its `baselineVersion` to the change's `version`;
+  - leave `isPinnedCopy` as it was (a pin that accepts still mirrors the
+    starter);
+  - add an `accepted` answer row.
+- **Ignore:** an `ignored` row only. Un-ignore deletes it.
+- **Hide offers:** "BidRidge retired X. Hide it in yours too?", and the
+  replacement swap in the company's OWN assemblies (§ 3). These are ordinary
+  fork edits, logged as answers.
+
+**Every path where a COMPANY edits its copy sets `isPinnedCopy = FALSE`**
+when it was TRUE: the materials, assemblies, labor-rate, modifier and
+run-type update routers. Without that, a company's real edit would still
+read as "not my change" and hide from "My changes". C adds it with the code,
+with a test that edits a pin through each router.
+
+**Proof C ships with it** (each red with its guard removed):
+
+- `starterPinning.test.ts` extended to go through `applyStarterChange`.
+- A company's bids and recipes read identical across a change and an undo.
+- A new company reads the latest.
+- Accept moves no existing bid.
+- An unknown field, a unit and a company row are refused.
+- A failed batch writes nothing.
+- `bidTotals` before and after.
+
+#### 10a.4 What this changes elsewhere in the plan
+
+- **§ 2** said BS-M5 goes on seven tables. Now five; kits and labor steps
+  come later, each with its own migration (labor steps first gains
+  `version` and `baselineVersion`).
+- **§ 4's "undone-by"** is now `undoesChangeId` on the undo's own row. The
+  log is append-only.
+- `isPinnedCopy` has three values, not two. FALSE = a pin the company has
+  since edited. It counts as "My changes", and § 7's "My changes" reads
+  `isPinnedCopy IS NOT TRUE` for a fork.
+
+#### 10a.5 For the owner — the calls here that can move a number later
+
+None of these drafts moves a number on its own. Two consequences touch
+numbers once the code is live, and both are by a person's choice or
+already true today:
+
+1. **Accepting an offer on a raceway fact or a run type re-counts UNLOCKED
+   Drafts that use it.** A Draft's pipe, fittings and wire follow the library
+   live (F1), and sent bids are locked since Q15. Pick: the Accept button
+   says "N draft bids use this and will re-count" (F1 fix 3) before it is
+   pressed. **Moves a number: yes, on Drafts, only when Accept is pressed.**
+2. **Kits and labor steps stay outside pin-and-offer in this build.** A
+   BidRidge change to a shipped kit, or to step minutes, still reaches every
+   company that never edited it, until they join.
+   - A kit only adds lines when it is dropped in, so no existing bid moves.
+   - Step minutes feed an assembly's hours only where that assembly uses
+     steps, and existing lines keep their frozen hours.
+   - **Pick: fine for now. Moves a number: no existing bid; a company's NEXT
+     lines, as today.**
+
 ---
 
 ## 11. Who builds what (owner Q12) and in what order

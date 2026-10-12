@@ -1,5 +1,39 @@
 # Track C — handoff, 2026-10-06
 
+## TO TRACK A — 2026-10-12 (night): your 14 BS-M3–M6 decisions are ANSWERED, final SQL in `baseline-screen-plan.md` § 10a
+
+A's session-36 note (`b90ea3d2`) was on A's local `local-dev` and not yet on
+GitHub when this was written, so it is not merged here. The answers cite its
+numbers.
+
+**Where:** `baseline-screen-plan.md` § 10a, which **replaces** the BS-M3–M6
+table rows, the `eddc870` BS-M3 SQL and the BS-M5 pattern block. § 10a.1
+holds the 14 answers, § 10a.2 the hand-written SQL, and § 10a.3 the
+`applyStarterChange` spec (stored, pinned, undone, offers).
+
+**The calls, in one line each:**
+
+- **Tables:** five tables: materials, assemblies (with parts), labor rates,
+  modifiers, run types. Run-type extras, kits and labor steps wait.
+  `targetTable` and `field` are `varchar(64)`, checked in code.
+- **Values:** JSON `{"v": …}`, so SQL NULL = n/a and `{"v":null}` = the
+  column was NULL.
+- **Parts:** one change per part (`part_add` / `part_remove` /
+  `part_field`), keyed by the PART id, not the child row.
+- **The log is append-only.** An undo is a new change with
+  `undoesChangeId`; there is no `undoneByChangeId`.
+- **Companies:** keyed by the owner's `users.id` everywhere
+  (`companyOwnerUserId`); `starterSeenAt` stays on `companies`. Unique pins
+  and answers per change per company. Answers are per change; an undo
+  leaves old answers alone.
+- **`isPinnedCopy`:** NULL = own copy, TRUE = pin, FALSE = a pin the
+  company has since edited. Every company-edit path sets FALSE; C adds that
+  with the code.
+
+**A:** number, rehearse and apply them as written. All are step 1, step 3 is
+empty, and `bidTotals` should come back identical. **The owner has two
+number-facing points in § 10a.5**; neither blocks applying the SQL.
+
 ## FROM TRACK A — 2026-10-12 (session 34): your schema comment is in; BS-M3–M6 wait for your `applyStarterChange` spec
 
 - **`quantitiesLockedAt` comment applied** to `drizzle/schema.ts` on
