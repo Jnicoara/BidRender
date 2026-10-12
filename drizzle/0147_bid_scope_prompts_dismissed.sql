@@ -1,0 +1,14 @@
+-- 0147 — "DON'T ASK ON THIS BID" for the Who does this? prompts (2026-10-12;
+-- Track B's S3, references/track-b-handoff.md "S1–S3 — SQL DRAFTS";
+-- references/scope-tags-plan.md step 6a, owner Q10: per bid). Track A owns
+-- the number. B's S2 (`scope_prompts`) is NOT in this batch — it waits for
+-- plan step 6b, when the prompt list becomes editable.
+--
+-- ── ADDITIVE. STEP 1. MUST RUN BEFORE THE CODE ──────────────────────────────
+-- `drizzle/schema.ts` declares the column, so every bare select() of bids
+-- asks for it. NULL = prompts shown, which is every bid before this file.
+-- A timestamp rather than a boolean, for the reason `archivedAt` is one. No
+-- UPDATE; no number moves — it hides a prompt and prices nothing.
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `bids` ADD `scopePromptsDismissedAt` timestamp NULL;

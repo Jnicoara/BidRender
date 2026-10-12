@@ -127,13 +127,22 @@ SQL in the handoff. NULL = not said = today. Applied before any code that
 selects the column (every line read is a bare `select()`).
 **Moves no number.** Measure: all bids unchanged.
 
+**DONE 2026-10-12 (Track A): `drizzle/0146_line_scope_tag.sql`, with S3 as
+`0147_bid_scope_prompts_dismissed.sql`.** On local-dev, local DBs and
+staging's DB; staging 1,196/1,196 bids unchanged (`deploying.md` §
+"Staging: migrations 0146–0147"). A ALSO declared both in
+`drizzle/schema.ts` — `LINE_SCOPE_TAGS` (exported, above `bidLineItems`),
+`bidLineItems.scopeTag`, `bids.scopePromptsDismissedAt` — so step 2 below
+does NOT redeclare them; import `LINE_SCOPE_TAGS` from the schema.
+
 ### Step 2 — the rule module and the money (TS + SQL together)
 
 - `shared/lineScope.ts` (new): `LINE_SCOPES`, `scopeOf(line)` (NULL →
   install), `scopePricesMaterial`, `scopePricesLabor`, `scopeOnMaterialsList`
   (`"buy" | "ownerFurnished" | "off"`), `scopeKeepsDrops`, `scopeLabel`,
   `scopeChoicesFor(line)` (no `ofci` on remove/relocate lines).
-- `drizzle/schema.ts`: declare `scopeTag` (`LINE_SCOPE_TAGS`).
+- `drizzle/schema.ts`: ~~declare `scopeTag` (`LINE_SCOPE_TAGS`)~~ — done
+  by A with 0146 (2026-10-12); nothing to add here.
 - `server/bidPricing.ts` `priceLine`: material 0 unless
   `scopePricesMaterial`; labor 0 unless `scopePricesLabor`. Markup rides on
   material, so it goes to 0 with it.

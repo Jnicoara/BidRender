@@ -10,6 +10,11 @@ This is the human-readable companion to the git history — read this to see wha
   priced", the same as on the bid.** The dashboard card could call such a
   line priced while the bid it opens said "Not priced". Both now follow one
   rule: on a remove or relocate line, the hours decide. No bid total moves.
+- **Groundwork for "who does this work?" on bid lines.** Two new empty
+  database fields: one on each bid line for We install / Owner furnishes /
+  By others / Excluded, and one on each bid for "don't ask on this bid".
+  Nothing reads them yet, so no screen and no price changes — measured on
+  every staging bid before and after. The screens come next (Track B).
 
 ## [2026-10-10]
 

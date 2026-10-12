@@ -1,10 +1,37 @@
-# Track A handoff — 2026-10-10, after the `371b2ab` live release
+# Track A handoff — 2026-10-12 (live is still `371b2ab`)
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-10, session 31: remove/relocate census, next-release plan, test DB
+## NOW — 2026-10-12, session 32: B's scope S1 + S3 applied (0146–0147)
+
+- **0146 `bid_line_items.scopeTag`** (B's S1, enum
+  install/ofci/by_others/excluded, NULL = We install) and **0147
+  `bids.scopePromptsDismissedAt`** (B's S3). Both additive, step 1, B's SQL
+  word for word. `schema.ts` declares both (`LINE_SCOPE_TAGS` exported
+  above `bidLineItems`) — B builds on these lines, so B's merge brings no
+  `drizzle/` diff. **S2 (`scope_prompts`) skipped** — waits for step 6b.
+- **Staging**: backup `staging-2026-10-12T17-18-13Z-before-0146-0147.sql`
+  (77/77 restore into `bidrender_scratch_staging_0146`); rehearsed there
+  (2 applied, 148, 180/180, 1,196/1,196 unchanged, old and new code);
+  staging DB: 2 applied, 148, matches, 180/180, **1,196/1,196 bids
+  unchanged**. Record: `deploying.md` § "Staging: migrations 0146–0147".
+- **Local**: `bidrender_local` (4,386/4,386 unchanged) and
+  `bidrender_test_localdev`, both 148. `pnpm check` clean.
+- **Code**: `c4b927c` on `local-dev` (Gate 38284188600). **NOT on the
+  `staging` branch** — the hand push was refused by the permission check,
+  so deploy-staging will refuse on `drizzle/` until the owner pushes
+  `staging` (or approves the push). Staging's DB is ahead of its code,
+  which is the safe direction.
+- **Live untouched.** Next release batch is now **0144–0147, expect 148 /
+  180** (`next-live-release-plan.md` queue table).
+- Scratch added: DB `bidrender_scratch_staging_0146`, worktree
+  `../bidrender-before-scope` (`a2569d7`, for "before" totals). Drop both
+  with the other scratch after the next live release.
+- Assembly cleanup STEP 2 still NOT approved — the xlsx was not opened.
+
+## (earlier) 2026-10-10, session 31: remove/relocate census, next-release plan, test DB
 
 - **Remove/relocate census** (`scripts/removeRelocateCensus.mts`, new, read
   only) on `bidrender_scratch_live` (dumped 19:36Z, after the release):
