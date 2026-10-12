@@ -4,7 +4,33 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-12, session 34: starter editor login (0150–0151); C's lock comment
+## NOW — 2026-10-12, session 35: pricing sheet — SER rename, pack labels, one rebuild
+
+- **Owner's sheet committed FIRST, as saved** (`bef6f7f3`, sha256
+  `9495e7c9…`). Its 54 typed prices were ALL in "Price per unit" (over the
+  formula), 0 in "Pack price"; the old carry-over read only Pack price and
+  would have dropped all 54. Fixed in `pricing/sheetCarryOver.ts`: a number
+  over the formula on a pack of 1 = the pack price (other packs STOP); CUT
+  notes (capitals — a description says "Cut to fit") carry; a carried
+  "per foot"/1 takes the new label. 7/7 new guards red when removed.
+- **One rebuild** (`--only prices`): 58 rows carried (54 prices + 4 CUT),
+  0 dropped, 0 stops; independent compare of `bef6f7f3` vs new: **54 → 54,
+  same value on the same item**; CUT 4 → 4; 1,717 rows; no filter criteria,
+  0 hidden rows. Labor, assembly-hours and brand sheets NOT rebuilt (brand
+  sheet's pack labels are the old ones until its next rebuild).
+- **CUT rows (not hidden yet):** 14/4, 8/4, 4/2 and 2/2 MC cable Copper.
+- **SER/SEU** (`references/ser-rename-plan.md`): five copper SER renamed in
+  place to the short form ("6/3 SER Copper") via
+  `shared/serRename20261012.ts` (followed last by `latestCatalogName`);
+  descriptions "3 wire + ground (full set)." / "2 wire + bare neutral (full
+  set)."; dash short forms added to aluminum SER and SEU. No starter or run
+  type names a copper SER. Next server start renames the shared rows.
+- **Pack labels** (`packFor`): per-foot wire/cable is a pack of 1 with a
+  label; conduit stays 10 ft stick / 10. Fixture wire #16/#18 got "250 ft
+  roll" (owner's list didn't name it); flex/liquidtight stay "10 ft stick"
+  as before.
+
+## (earlier) 2026-10-12, session 34: starter editor login (0150–0151); C's lock comment
 
 ### Job 1 — which baseline drafts are still needed (plan § 10 table)
 

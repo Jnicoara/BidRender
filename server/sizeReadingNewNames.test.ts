@@ -119,6 +119,23 @@ describe("SER with the full conductor set (owner, 2026-10-07)", () => {
       "SER Aluminum"
     );
     expect(materialTypeName("8-8-8-8 SER Copper")).toBe("SER Copper");
+    // The short form copper SER has shipped as since 2026-10-12.
+    expect(materialTypeName("8/3 SER Copper")).toBe("SER Copper");
+    expect(
+      sorted(
+        "1/3 SER Copper",
+        "6/3 SER Copper",
+        "8/3 SER Copper",
+        "2/3 SER Copper",
+        "4/3 SER Copper"
+      )
+    ).toEqual([
+      "8/3 SER Copper",
+      "6/3 SER Copper",
+      "4/3 SER Copper",
+      "2/3 SER Copper",
+      "1/3 SER Copper",
+    ]);
     expect(
       sorted(
         "2/0-2/0-2/0-1 SER Aluminum",

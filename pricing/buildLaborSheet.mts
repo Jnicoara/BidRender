@@ -129,8 +129,8 @@ const families: [string, [string, boolean?, string?][]][] = [
   [
     "SER / SEU",
     [
-      ["6-6-6-6 SER Copper", true],
-      ["2-2-2-4 SER Copper"],
+      ["6/3 SER Copper", true],
+      ["2/3 SER Copper"],
       ["2-2-2-4 SER Aluminum"],
       ["4/0-4/0-4/0-2/0 SER Aluminum", true],
       ["4-4-6 SEU Aluminum"],
