@@ -4,6 +4,13 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-12]
+
+- **Dashboard: a remove or relocate line with no hours now counts as "not
+  priced", the same as on the bid.** The dashboard card could call such a
+  line priced while the bid it opens said "Not priced". Both now follow one
+  rule: on a remove or relocate line, the hours decide. No bid total moves.
+
 ## [2026-10-10]
 
 - **Plans: check unconfirmed marks one at a time, and fix old

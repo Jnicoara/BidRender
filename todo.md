@@ -8,11 +8,14 @@ left as written rather than rewritten to match the rename.
 - [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
       answered all 12 questions on 2026-10-10 (plan § 6). Waits only on A
       applying S1 (SQL draft in `track-b-handoff.md`).
-- [ ] Noticed while planning, not fixed: the SQL `lineNotPricedSql`
-      (`server/db.ts` ~13060) has no `lineRole` branch, while the TS
-      `lineNotPriced` decides a remove / relocate line by its hours alone.
-      The Dashboard and the bid could disagree on such a line. Check with
-      `server/dashboardNotPriced.test.ts` before trusting either.
+- [x] **FIXED 2026-10-12 (`b-role-not-priced`):** the SQL `lineNotPricedSql`
+      had no `lineRole` branch, while the TS `lineNotPriced` decides a
+      remove / relocate line by its hours alone — so the Dashboard called a
+      role line with no hours priced while the bid said "Not priced". The
+      SQL now checks the role first, as the TS does; the "remove / relocate"
+      case in `server/dashboardNotPriced.test.ts` was red without it.
+      `bidTotals.mts` on bidrender_local_b_new: all 4306 bids unchanged
+      (no role lines exist there, so no card moved locally either).
 
 ## Catalog reality check — BUILT 2026-10-09 (Track A), NOT on staging
 

@@ -348,6 +348,35 @@ beforeAll(async () => {
     });
   });
 
+  /*
+    REMOVE / RELOCATE (0115, shared/roleLines.ts): labor and nothing else,
+    with a frozen $0 material on purpose, so the HOURS decide — NULL is not
+    priced, a set 0 is an answer. Shaped as `addLaborRoleLinesToBid` writes them:
+    no assembly, no run type, so the SQL's hand-priced branch read the $0 as
+    a typed answer and called a line with no hours priced (todo.md,
+    2026-10-10) while the bid screen said "Not priced".
+  */
+  await add(
+    "remove / relocate",
+    { lines: 2, parts: 0, hours: 0 },
+    async bidId => {
+      const role = (
+        lineRole: "remove" | "relocate",
+        snapshotLaborHours: string | null
+      ) =>
+        line(bidId, {
+          lineRole,
+          snapshotMaterialCost: "0.0000",
+          snapshotLaborHours,
+          snapshotLaborOnly: true,
+        });
+      await role("remove", null);
+      await role("relocate", null);
+      await role("remove", "0.2500");
+      await role("relocate", "0.0000");
+    }
+  );
+
   await add("no quantity", { lines: 0, parts: 0, hours: 0 }, async bidId => {
     await line(bidId, { qty: "0", snapshotMaterialCost: null });
     await line(bidId, {
@@ -428,6 +457,7 @@ withDb("the dashboard card's not-priced count", () => {
     "labor only, from before 0087",
     "hours not set",
     "labor only",
+    "remove / relocate",
     "no quantity",
     "broken lines",
     "archived lines",

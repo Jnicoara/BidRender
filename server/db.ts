@@ -13282,6 +13282,14 @@ function lineCentsSql(productivityPct: number) {
  * shared/lineNotPriced.ts, as SQL, branch for branch:
  *
  *   • no quantity           → never
+ *   • remove / relocate     → its hours are blank (its $0 material is on
+ *                             purpose) — checked FIRST, as `isLaborRoleLine`
+ *                             is, because such a line has no assembly and no
+ *                             run type and would otherwise fall into the
+ *                             hand-priced branch and read that $0 as a typed
+ *                             answer. Missing until 2026-10-12: the Dashboard
+ *                             called a role line with no hours priced while
+ *                             the bid said "Not priced".
  *   • priced by hand        → the price is blank (a typed 0 is an answer)
  *   • from a run type       → a field bend: its hours are blank;
  *                             anything else: its frozen material is $0
@@ -13299,6 +13307,8 @@ function lineCentsSql(productivityPct: number) {
 function lineNotPricedSql(productivityPct: number) {
   const { materialCents, laborCents } = lineCentsSql(productivityPct);
   return sql`COALESCE(${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND CASE
+    WHEN ${bidLineItems.lineRole} IN ('remove', 'relocate')
+      THEN ${bidLineItems.snapshotLaborHours} IS NULL
     WHEN ${bidLineItems.assemblyId} IS NULL AND ${bidLineItems.takeoffRunTypeId} IS NULL
       THEN ${bidLineItems.snapshotMaterialCost} IS NULL
     WHEN ${bidLineItems.takeoffRunTypeId} IS NOT NULL THEN
