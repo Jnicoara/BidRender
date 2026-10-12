@@ -182,6 +182,20 @@ export function computeJobCost(
 }
 
 /**
+ * The charge a computed tile puts on the bid. The working rides along as the
+ * charge's `notes` (drizzle/0145), so the bid screen can say how the amount
+ * was reached. It never goes in the NAME: names print on the customer's
+ * quote, and drive time's working carries the labor rate.
+ */
+export function jobCostCharge(result: Extract<JobCostResult, { ok: true }>): {
+  name: string;
+  amount: number;
+  notes: string | null;
+} {
+  return { name: result.name, amount: result.amount, notes: result.working };
+}
+
+/**
  * Tiles a search box query names, for the type → Enter loop. A word of the
  * query must START a word of the tile's label or aliases, so "per" finds
  * Permit and "dump" finds Dumpster, while "e" or "time" alone on a longer

@@ -44,6 +44,7 @@ import {
   computeJobCost,
   initialTileInputs,
   JOB_COST_TILES,
+  jobCostCharge,
   type JobCostTileKey,
   tileByKey,
 } from "@/lib/jobCostTiles";
@@ -189,8 +190,7 @@ export function BidExpensesSection({
     addExpense.mutate(
       {
         bidId,
-        name: result.name,
-        amount: result.amount,
+        ...jobCostCharge(result),
         taxable: expenseTaxable,
         markedUp: expenseMarkedUp,
       },
@@ -224,6 +224,15 @@ export function BidExpensesSection({
             <div key={row.id} className="flex items-center gap-2 group text-sm">
               <span className="flex-1 min-w-0">
                 <span className="block truncate">{row.name}</span>
+                {/* How a tile reached the amount. This screen and Quick bid
+                    only — the quote prints name and amount. */}
+                {row.notes && (
+                  // Wraps rather than truncates: cut at phone width it read
+                  // "6 trips × 1.5 h × $85.00…", losing the unit it states.
+                  <span className="block break-words text-xs text-muted-foreground">
+                    {row.notes}
+                  </span>
+                )}
                 {/* The two switches, per charge, editable in place. Shown as
                     words rather than icons because "taxed" and "marked up"
                     are the kind of thing an estimator wants to read back at

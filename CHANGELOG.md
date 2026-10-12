@@ -10,6 +10,12 @@ This is the human-readable companion to the git history — read this to see wha
   priced", the same as on the bid.** The dashboard card could call such a
   line priced while the bid it opens said "Not priced". Both now follow one
   rule: on a remove or relocate line, the hours decide. No bid total moves.
+- **Job costs remember how they were worked out.** Adding drive time (or a
+  lift rental) from its tile now keeps the working, such as "6 trips × 1.5 h
+  × $85.00/h", under the charge on the bid screen and Quick bid. It never
+  prints on the customer's quote, because it can show your labor rate.
+  Retyping the amount clears the old working, so it never states a sum the
+  charge no longer has.
 - **Groundwork for "who does this work?" on bid lines.** Two new empty
   database fields: one on each bid line for We install / Owner furnishes /
   By others / Excluded, and one on each bid for "don't ask on this bid".

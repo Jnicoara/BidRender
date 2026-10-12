@@ -13,7 +13,279 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## LATEST (2026-10-10) — step-based labor, code half on `c-step-labor`: NOT MERGED; FOR TRACK A: migration 0143
+## START HERE (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
+
+Both were found by the audit in `baseline-screen-plan.md` § 9. Both are
+fixed with no migration, a test that fails without the fix, and branch
+Gates green. They merged together, and the combined commit `8a593af` had
+its own green Gate before the push.
+
+**F9 — a removed scale came back when the sheet was viewed.** Branch
+`c-scale-cleared` (`67ee526`, Gate 38081790230 green; with local-dev
+merged, 38082668001).
+
+- `clearSheetScale` now stores `scaleSource = "manual"` with no ratio,
+  meaning "a person decided: no scale". It used to store "none". Detection
+  never overrides "manual", and the browser only asks for detection on
+  "none". Every footage path measures nothing without a ratio: all six
+  readers of `scaleSource` were read before choosing this.
+- **Test:** `server/sheetScalePersistence.test.ts` "a REMOVED scale stays
+  removed…" was red before the fix (1 failed) and green after.
+  `planSheets.test.ts` asserted `"none"` after a clear, which pinned the
+  fault; that line now says `"manual"` and explains why.
+- **Looked at on screen** (fixture bid 1164558 "Bar layout check", sheet
+  E0.01): after Clear, the control reads "Set scale", "0/5 scaled" and
+  "0 ft of runs (6 not measured)". The sheet still had no scale after
+  viewing it again. **Limit:** none of this fixture's five sheets reads a
+  CONFIDENT scale, so the screen check could not exercise detection
+  itself. The server test does that with the exact viewing call. Sheet
+  E0.01 was restored to its hand-set 3/16" scale, unchecked, and the bid
+  total is back at $378.15.
+
+**F10 — a hand-placed panel could re-match homeruns on the next sheet
+opened.** Branch `c-homerun-rematch` (`bbb5f85`, Gate 38082036734 green).
+
+- **REPRODUCED, at logic level, not in a browser.** No local bid has
+  circuit-tagged devices on two sheets (measured: one bid has circuits,
+  all on one sheet), so a two-sheet browser run could not be set up.
+  Steps taken:
+  1. Moved the page's sync decision, unchanged, into `homerunSyncStep`
+     (`client/src/lib/homerunSync.ts`).
+  2. Built the signatures with the real `syncSignature`.
+  3. Ran the sequence "sheet A synced → panel placed by hand, same leaving
+     devices → sheet B opened". On the OLD logic, sheet B's sync went out
+     with `rematch: true`, and the placement never re-matched sheet A at
+     all (2 tests red).
+- **Fix:** the re-match arm carries the SHEET id. Armed for this sheet:
+  send a re-match now, even if the report is unchanged. Any other sheet:
+  an ordinary visit (create only). Tests: 12 green.
+- **Still worth doing:** a browser check with a real two-sheet set that has
+  circuit tags, when one exists.
+
+**Local databases are BEHIND.** Track A added 0144 (`workTag`) and 0145
+(`bid_expenses.notes`), and `bidrender_test_c` and `bidrender_local_c` do
+not have them, so local DB-backed tests fail with "Unknown column
+'workTag'". Not applied here, because the owner said no migrations this
+session. Apply them (or reset from migrations) before the next local test
+run. GitHub's Gate is unaffected.
+
+**local-dev Gate 38083404900** on `95fb513` was pending when this was
+written. It deploys staging. Check it once.
+
+**Q-M5 is done by A** (0145, `bid_expenses.notes`). The job-cost tiles'
+working note can now be stored; that is C's next small piece
+(`quick-bid-plan.md` § 6).
+
+## EARLIER (2026-10-10, latest) — baseline plan REWORKED to offers; audit of silent number moves
+
+**`references/baseline-screen-plan.md` rewritten (plan only, no code).** The
+owner answered § 10 and changed the rule: a starter change must NEVER reach
+an existing company, even one on the Example values. App updates still reach
+everyone; app MATH changes follow rule (c).
+
+- **Design:** pin (give each existing company a copy as it stands), then
+  change, then OFFER ("N starter updates available", accept one or all).
+  New companies get the latest because they have no copy. Units are never
+  changed. Hide is for new companies only, with a replacement when a
+  company's assemblies use the item. Adding shows "New" and moves nothing.
+- **Rule (c), § 8:** `bids.mathVersion` plus a `bid_math_changes` row and a
+  "Total changed because…" strip on Drafts. **Must land before
+  remove/relocate labor goes live** (it raises totals on Active/Won bids
+  with such marks otherwise).
+- **Audit, § 9, F1–F17.** Money on a line is always frozen. What moves
+  unasked:
+  - **F1:** quantities on any UNLOCKED bid, Won included, follow library
+    values live.
+  - **F2–F6:** the boot rewrites the starter on every deploy, and pass 2
+    writes companies' own copies.
+  - **F7:** shipped heights and bend defaults live in code.
+  - **F8:** inherited margin and tax on Won bids.
+  - **F9:** "Remove scale" is undone by viewing the sheet. **Confirmed by
+    reading.**
+  - **F10:** a hand-placed panel can re-match homeruns on a later sheet.
+    **Plausible; reproduce first.**
+- **Migrations BS-M1–M8** (additive; step 3 empty). Open owner questions
+  **Q14–Q22**; 14, 19 and 22 move numbers.
+- local-dev Gate 38079512981 (job costs merge): **GREEN** — test,
+  deploy-staging and smoke all passed. Job costs are on staging.
+
+## EARLIER (2026-10-10, late night) — Quick bid phase 1 (job costs) on `c-quick-bid`; FOR TRACK A: Q-M5
+
+**Branch `c-quick-bid` (from local-dev `c649268`), commit `200e310`.**
+Built per `quick-bid-plan.md` § 6 with the owner's answers (§ 12, Q6: drive
+time is a flat cost):
+
+- **Quick bid gets ONE "More options" fold** under the counting box, closed
+  by default; its header says "Job costs: 4 · $2,430.00" when closed. The
+  basic loop (type → qty → Enter) is unchanged.
+- **Job costs inside it:** the bid's charges plus four tiles: Permit, Lift
+  rental (days × $/day), Dumpster, Drive time (trips × h/trip × $/h, a flat
+  `bid_expenses` amount, never hours). Blank or zero is refused, never $0.
+  A missing rate says "No labor rate — type one, or set a default rate in
+  Settings." The rate is prefilled from the company's DEFAULT labor rate.
+- **The search box finds the tiles** ("permit", "dump", "drive", "travel",
+  "scissor"); Enter opens the tile with its first box focused, and adding
+  sends focus back to the search.
+- **Quick bid totals** now show **Job costs** and **Total due** when there
+  are any. "Bid price" stays `workPrice`, as on the bid screen.
+- **One component, two screens:** `BidExpensesSection` is now the body of
+  the bid screen's "Additional expenses" too, so the bid screen gained the
+  same tiles. The rules live in `client/src/lib/jobCostTiles.ts`.
+- **Tests:** `jobCostTiles.test.ts` (10). Red with blank-as-0 (2 failed)
+  and with the rate left out of drive time (1 failed); green restored. The
+  touched-file tests (sourceHygiene, bidLineUndoWired, mostUsedRow) pass:
+  22 in all. `pnpm check` clean.
+- **Looked at on screen** (playwright, real viewports: phone 390,
+  iPad portrait 820, iPad landscape 1180, laptop 1536), fixture bid
+  **1728378 "Quick bid job costs check"** (user 1, `bidrender_local_c`;
+  leave it or delete it). No sideways scroll, no text below the edge, no
+  overlaps; tiles and boxes are 44 px on touch. **One fault found by
+  looking, and fixed:** typing "2 Enter 450" at machine speed put 450 into
+  the Days box (focus moved a frame late). Focus now moves at once inside an
+  open tile.
+- **Bid totals:** `bidTotals.mts` before vs after on `bidrender_local_c`:
+  all 4,236 existing bids unchanged. The only differences were the two
+  fixture bids the check created (1728377 deleted afterwards). No server,
+  shared or drizzle file changed.
+- **Gate:** run 38078650646 on `200e310` GREEN. **MERGED into local-dev**
+  (`f50e713`, after merging local-dev's two docs-only commits in;
+  fast-forward push `2e7de83..f50e713`). local-dev Gate 38079512981 was
+  pending when this was written: **check it once**; it also deploys
+  staging. `track-c` has merged local-dev.
+
+### FOR TRACK A — Q-M5 (additive, step 1, not urgent)
+
+The plan assumed `bid_expenses.notes`; **it does not exist**. The working
+("6 trips × 1.5 h × $85.00/h") cannot go in the name, because names print
+on the customer's proposal. So the working is shown, not stored, until:
+
+```sql
+ALTER TABLE `bid_expenses` ADD `notes` varchar(512) NULL;
+```
+
+Hand-written, NULL = no note, safe before the code. Then C writes and
+shows it (bid screen only, never the quote). `quick-bid-plan.md` § 6, § 9.
+
+## EARLIER (2026-10-10, night) — owner answers recorded; baseline screen PLANNED
+
+- **Owner answers recorded** (`d9d49b8`): quick-bid Q1/Q2/Q3/Q6/Q8 in
+  `quick-bid-plan.md` § 12, status-and-scope Q10 in § 8. All six took the
+  suggested answer.
+- **`references/baseline-screen-plan.md`, plan only, no code.** It covers
+  the admin screen on live for the shipped starter's prices, labor hours
+  and assembly hours: a `starter_editor` login with no company plus an
+  authenticator code; one `applyStarterChange` path with a field-by-field
+  push under a double guard (tag not FALSE AND value equals the old
+  starter); a change log with undo; sheet upload with preview; export to
+  seed plus a drift line; "My changes" and "Copy from my company". Three
+  additive migration drafts (BS-M1–M3) are for A. **13 owner questions;
+  5, 6, 7 and 13 move numbers on new lines.**
+- **Found while planning, not fixed:** editing an assembly's OVERHEAD
+  hours does not clear `isExampleHours` (`assembliesRouter.ts:316` clears
+  it on base hours only). The plan fixes it with the push code. Today it
+  only means a shop's edited overhead still shows "Example hours".
+
+## EARLIER (2026-10-10, evening) — remove/relocate MERGED to local-dev (`d832e34`); FOR TRACK A: recount bids with remove/relocate marks before it goes live
+
+**Both known gaps below are FIXED on `c-remove-relocate` `d832e34`**, and
+that commit is now local-dev (fast-forward push `07c7407..d832e34`;
+local-dev is checked out in A's folder, so C pushed the commit, it did not
+check the branch out). `track-c` has merged it (`d024c09`).
+
+- **Warning strip:** a remove / relocate line with no hours now has its own
+  entry per kind — "1 remove line has no hours — its labor is not in the
+  total above." — with a **Set remove hours** / **Set relocate hours**
+  button that scrolls to the first such line and focuses its hours box. It
+  is no longer counted in "N lines are not priced … type a price" or in
+  the hand-priced "no labor hours" entry (`missingEntryCounts` skips role
+  lines; `roleLinesWithoutHours`, `roleHoursStripText` in
+  `shared/roleLines.ts`). The "no labor hours" entry gained a **Set hours**
+  button (every warning gets a fix-it).
+- **"0 h" on a free count with no hours** now reads **"Hours not set"**,
+  tappable to focus the box. The hours-cell decision moved to
+  `client/src/lib/bidHoursCell.ts` so the suite reaches it.
+- **Tests:** red without the fixes (3 failed: noHours 4 vs 1; "hours" vs
+  "handHoursNotSet" twice), green with them — removeRelocateLabor 11,
+  bidHoursCell 4, freeCount, fixWalk: 45 passed. `pnpm check` clean.
+- **Looked at on screen**, tablet portrait 820×1180 (playwright, bid
+  **1728376 "Remove relocate check"** on `bidrender_local_c`, user 1 — a
+  fixture with an install, a remove, a relocate and a free-count line, all
+  without hours; leave it or delete it): no "0 h" cells, three "Hours not
+  set", all three buttons focus the right box, nothing sideways or below the
+  edge.
+- **Gates:** branch Gate 38069818821 on `d832e34` GREEN; local-dev Gate
+  38070648397 on `d832e34` GREEN.
+- **No numbers moved by this fix** — wording and buttons only.
+
+### FOR TRACK A — before remove/relocate goes LIVE
+
+**This code raises totals ONLY on bids that have remove or relocate marks**
+(a sent count gains a labor line per kind; with hours set, that labor is
+added to the total; with hours not set, the line is "Not priced" and the
+bid says "+ N not priced"). Bids with no such marks are unchanged
+(measured: all 4,235 on `bidrender_local_c` unchanged, 0 had such marks).
+**In the release plan, A must count the LIVE bids with remove/relocate
+marks** (`takeoff_stamps.status IN ('remove','relocate')`, grouped by bid)
+and recount those bids' totals before and after, so the owner knows which
+live bids move and by how much before it ships. No migration (0110 / 0111
+/ 0115 already exist).
+
+### Owner questions — explained in plain words (2026-10-10)
+
+Given to the owner in chat: quick-bid Q1, Q2, Q3, Q6, Q8 and
+status-and-scope Q10, each with what it means on a job, the suggested
+answer and what it does to the numbers. **ANSWERED the same evening — all
+six took the suggested answer.** Recorded in `quick-bid-plan.md` § 12 and
+`status-and-scope-plan.md` § 8 Q10.
+
+## EARLIER (2026-10-10, later) — remove/relocate labor on `c-remove-relocate`; quick-bid plan written
+
+**JOB 1 — remove / relocate labor, built on `c-remove-relocate` (`a7fe812`,
+branched from `track-c`, pushed).** Owner answers are in
+`status-and-scope-plan.md` § 8. What it does: a count with remove or relocate
+marks puts ONE labor line per kind beside its install line ("Remove duplex
+receptacle × 2"). The hours freeze at send: the count's per-bid override,
+else the assembly's, else NOT SET, which shows "Not priced" (never $0) with
+a "Set remove hours" / "Set relocate hours" fix-it on the line. Only NEW
+marks price material. A role line has no `assemblyId`, no material and is
+ticked labor-only. Rules: `shared/roleLines.ts`. Status in
+`remove-relocate-labor-plan.md`.
+
+- **No migration.** 0110 / 0111 / 0115 already exist. So the merge gate is
+  the CI Gate alone.
+- **Gate:** run 38024821205 on `a7fe812` was IN PROGRESS when this was
+  written (one-off check, no watcher). **Check it once. If it is green, pull
+  local-dev, merge `c-remove-relocate` into it, and push. If it is red, read
+  the failure first.**
+- **Measured:** `bidTotals.mts`, track-c vs c-remove-relocate on
+  `bidrender_local_c`: "ok all 4235 bid(s): totalDue unchanged; not-priced
+  and incomplete unchanged". 0 of 4,235 bids have remove/relocate marks,
+  and 0 role lines exist. The new test `server/removeRelocateLabor.test.ts`
+  is 9/9 green and red without the change (6 failed). The 8 touched test
+  files give 163 passed, 1 skipped. `pnpm check` is clean.
+- **Looked at on screen** (820×1180): the bid line shows "Hours not set",
+  "Not priced", and a "Set relocate hours" button that focuses the box. The
+  count card shows the split, "1 relocate — labor not on the bid", "Add
+  relocate labor to bid" and the "Hours…" fold. Nothing is below the edge.
+- **Known gaps, not fixed:** (1) the bid's warning strip text ("Type a
+  price on a line priced by hand") also counts role lines, whose fix is
+  hours, not a price. The wording wants a role-aware branch. (2) This one
+  is older: a free count with no hours shows "0 h" in the bid hours cell
+  (the role line was fixed to "Hours not set").
+
+**JOB 2 — `references/quick-bid-plan.md` (plan only).** It covers typed
+footage with no plans, homeruns by average, rooms with an ADDED difficulty
+factor, a status chip per line, job-type checklists, job costs in one spot,
+and phone walking. It lists four additive migration drafts for A (Q-M1 to
+Q-M4, unnumbered: A assigns the numbers) and nine owner questions. Q1, Q2,
+Q3, Q6 and Q8 change bid numbers. The suggested first build is job costs
+on Quick bid, which needs no migration.
+
+**Was still with the owner (answered 2026-10-10 evening — yes to both):** `status-and-scope-plan.md` § 8 **Q10** (does a
+"By others" / "Excluded" line leave the materials list and the drops?). It
+changes numbers on two screens, so it was sent back.
+
+## EARLIER (2026-10-10) — step-based labor, code half on `c-step-labor`: MERGED (see below); FOR TRACK A: migration 0143
 
 **Branch `c-step-labor`, from `origin/a-catalog-reality` `8f28a85`** — A's
 catalog merge was NOT on local-dev when this started (local-dev was
