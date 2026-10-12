@@ -39,6 +39,12 @@ import { needsPricing } from "./materialPricing";
 import { canPriceByHand, lineNeedsPrice } from "./handPricedLines";
 import { laborInRunRate } from "./runFittings";
 import { isLaborRoleLine } from "./roleLines";
+import {
+  scopeIsOffBid,
+  scopeOf,
+  scopePricesMaterial,
+  type LineScope,
+} from "./lineScope";
 
 export type NotPricedLineLike = {
   qty: string | number;
@@ -67,6 +73,13 @@ export type NotPricedLineLike = {
    * and call a line with no hours priced.
    */
   lineRole: string | null;
+  /**
+   * Who does the work (0146, shared/lineScope.ts). REQUIRED, the same
+   * forcing function as `lineRole`: a By others line has nothing of ours to
+   * price, and a caller that could leave this out would call it "Not priced"
+   * and hold the print for work that is not ours.
+   */
+  scopeTag: LineScope | null;
 };
 
 export function lineNotPriced(
@@ -77,6 +90,11 @@ export function lineNotPriced(
   const qty = Number(line.qty);
   if (!Number.isFinite(qty) || qty <= 0) return false;
   /*
+    BY OTHERS / EXCLUDED (0146): nothing on the line is ours, so nothing on
+    it can be missing a price — never "Not priced", whatever its snapshot.
+  */
+  if (scopeIsOffBid(line)) return false;
+  /*
     A REMOVE / RELOCATE line (shared/roleLines.ts) is labor and nothing else:
     its material is a frozen 0 on purpose ("only NEW marks price material"),
     so the HOURS decide, exactly as on a field bend. Checked before the
@@ -84,6 +102,21 @@ export function lineNotPriced(
     line with no hours priced (owner, 2026-10-05: unset = "not priced").
   */
   if (isLaborRoleLine(line)) return line.snapshotLaborHours === null;
+  /*
+    OWNER FURNISHES, WE INSTALL (0146) on a typed or run-type line: the
+    material is the owner's, so only the HOURS can be missing — decided as a
+    role line is. Never "Not priced" for a coupling, connector or strap,
+    whose labor the run's per-foot rate pays (`laborInRunRate`): nothing of
+    ours is missing from it. An ASSEMBLY line is never "Not priced" as a
+    whole here: its hours not set is said on its own (`lineHoursMissing`),
+    and a set 0 is an answer.
+  */
+  if (scopeOf(line) === "ofci") {
+    if (line.assemblyId !== null) return false;
+    return (
+      line.snapshotLaborHours === null && !laborInRunRate(line.runMaterialRole)
+    );
+  }
   if (canPriceByHand(line)) return lineNeedsPrice(line);
   if (line.takeoffRunTypeId !== null) {
     /*
@@ -196,6 +229,9 @@ export function lineMaterialNotPriced(
   // only" has no material ON PURPOSE, so its $0 material is an answer. Read
   // from the LINE's frozen tick, never the assembly live.
   if (line.snapshotLaborOnly === true) return false;
+  // OWNER FURNISHES (0146): the material is the owner's to supply, so its
+  // absence is an answer too — never "material not priced".
+  if (scopeOf(line) === "ofci") return false;
   return Number(line.snapshotMaterialCost ?? 0) === 0;
 }
 
@@ -240,6 +276,9 @@ export function linePartsNotPriced(
   const qty = Number(line.qty);
   if (!Number.isFinite(qty) || qty <= 0) return 0;
   if (line.assemblyId === null) return 0;
+  // A recipe's parts are MATERIAL: on a line whose material is not ours to
+  // buy (owner furnishes, by others, excluded) none of them is missing.
+  if (!scopePricesMaterial(line)) return 0;
   if (lineNotPriced(line, directCost)) return 0;
   const parts = Math.max(0, Math.floor(line.unpricedParts));
   // Material missing entirely counts once — not on top of $0 recipe parts,
@@ -258,7 +297,13 @@ export function lineHoursMissing(
   line: PartsLineLike,
   directCost: number | null
 ): boolean {
-  return lineHoursNotSet(line) && !lineNotPriced(line, directCost);
+  // Still asked of an owner-furnished line — we install it, so its hours are
+  // ours — and never of By others / Excluded, whose labor is not.
+  return (
+    lineHoursNotSet(line) &&
+    !scopeIsOffBid(line) &&
+    !lineNotPriced(line, directCost)
+  );
 }
 
 /**

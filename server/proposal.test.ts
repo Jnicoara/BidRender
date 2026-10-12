@@ -446,6 +446,7 @@ describe("what leaves the building", () => {
       snapshotLaborHours: 0,
       snapshotLaborOnly: null,
       lineRole: "install",
+      scopeTag: null,
       unpricedParts,
     });
     expect(

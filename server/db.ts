@@ -297,6 +297,7 @@ import {
   MC_STRAP_SPACING,
   isFittingRole,
   isStickJoint,
+  LABOR_IN_RUN_RATE,
   laborInRunRate,
   type FittingCount,
   type FittingKind,
@@ -13253,13 +13254,37 @@ const lineIsPriceable = sql`(${bidLineItems.qty} >= 0 AND ${bidLineItems.snapsho
  */
 const lineLaborQtySql = sql`COALESCE(${bidLineItems.laborQty}, ${bidLineItems.qty})`;
 
+/**
+ * WHO DOES THE WORK (0146) — `shared/lineScope.ts`, as SQL. Same three
+ * answers, same NULL reading: NULL is not said, and prices as We install.
+ * TRUE (never NULL) for the empty row a LEFT JOIN makes, so it can gate.
+ *
+ *   material ours  → NULL / install
+ *   labor ours     → NULL / install / ofci   (By others, Excluded: neither)
+ *
+ * `server/lineScopePricing.test.ts` prices a line under every tag both ways
+ * and asserts they agree; change the rule there and not here and it is red.
+ */
+const lineScopeSql = {
+  pricesMaterial: sql`(${bidLineItems.scopeTag} IS NULL OR ${bidLineItems.scopeTag} = 'install')`,
+  pricesLabor: sql`(${bidLineItems.scopeTag} IS NULL OR ${bidLineItems.scopeTag} IN ('install', 'ofci'))`,
+};
+
+/** `laborInRunRate`, as SQL: FALSE (never NULL) for a NULL role. */
+const laborInRunRateSql = sql`COALESCE(${bidLineItems.runMaterialRole} IN (${sql.join(
+  LABOR_IN_RUN_RATE.map(role => sql`${role}`),
+  sql`, `
+)}), FALSE)`;
+
 function lineCentsSql(productivityPct: number) {
-  const hours = lineHoursSql(productivityPct);
+  // Hours are labor: a line whose labor is not ours carries none, so the
+  // bid's hour total drops with its money (the engine reads 0 hours there).
+  const hours = sql`CASE WHEN ${lineScopeSql.pricesLabor} THEN ${lineHoursSql(productivityPct)} ELSE 0 END`;
   // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
   // must total as 0, not turn the whole line NULL and drop it from the sum.
   return {
     hours,
-    materialCents: sql`ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}`,
+    materialCents: sql`CASE WHEN ${lineScopeSql.pricesMaterial} THEN ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty} ELSE 0 END`,
     laborCents: sql`ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotLaborRate} * 100)`,
   };
 }
@@ -13283,6 +13308,11 @@ function lineCentsSql(productivityPct: number) {
  *   • from an assembly      → the engine can price it and its WHOLE direct
  *                             cost is $0 (a labor-only assembly is priced)
  *
+ * And, FIRST, who does the work (0146, `lineScopeSql`): By others / Excluded
+ * never; Owner furnishes — after the role check — only its hours on a typed
+ * or run-type line (never a coupling, connector or strap), never on an
+ * assembly line, whose missing hours are `hoursMissing`'s to say.
+ *
  * The same kind of duplication `costSums` is, kept honest the same way:
  * `server/dashboardNotPriced.test.ts` counts one bid per branch both ways and
  * asserts they agree. Change the rule there without changing it here and that
@@ -13294,8 +13324,11 @@ function lineCentsSql(productivityPct: number) {
 function lineNotPricedSql(productivityPct: number) {
   const { materialCents, laborCents } = lineCentsSql(productivityPct);
   return sql`COALESCE(${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND CASE
+    WHEN NOT ${lineScopeSql.pricesLabor} THEN FALSE
     WHEN ${bidLineItems.lineRole} IN ('remove', 'relocate')
       THEN ${bidLineItems.snapshotLaborHours} IS NULL
+    WHEN ${bidLineItems.scopeTag} <=> 'ofci' THEN
+      ${bidLineItems.assemblyId} IS NULL AND ${bidLineItems.snapshotLaborHours} IS NULL AND NOT ${laborInRunRateSql}
     WHEN ${bidLineItems.assemblyId} IS NULL AND ${bidLineItems.takeoffRunTypeId} IS NULL
       THEN ${bidLineItems.snapshotMaterialCost} IS NULL
     WHEN ${bidLineItems.takeoffRunTypeId} IS NOT NULL THEN
@@ -13313,7 +13346,18 @@ function lineNotPricedSql(productivityPct: number) {
  * "Not priced" as a whole (its parts are in that already).
  */
 function linePartsCountSql(productivityPct: number) {
-  return sql`(${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND ${bidLineItems.assemblyId} IS NOT NULL AND NOT ${lineNotPricedSql(productivityPct)})`;
+  // Never a By others / Excluded line (0146): nothing on it is ours, so
+  // neither its parts nor its hours are missing from anything.
+  return sql`(${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND ${bidLineItems.assemblyId} IS NOT NULL AND ${lineScopeSql.pricesLabor} AND NOT ${lineNotPricedSql(productivityPct)})`;
+}
+
+/**
+ * `linePartsCountSql` for the PARTS half only: a recipe's parts are
+ * material, so an owner-furnished line has none missing either (0146,
+ * `linePartsNotPriced`). Its hours still count (`hoursMissing`).
+ */
+function linePartsMaterialCountSql(productivityPct: number) {
+  return sql`(${linePartsCountSql(productivityPct)} AND ${lineScopeSql.pricesMaterial})`;
 }
 
 function costSums(productivityPct: number) {
@@ -13338,8 +13382,10 @@ function costSums(productivityPct: number) {
     NULL `snapshotMarkupPct` — a line from before markup rules — is 0%, the
     same reading `storedMarkupPct` gives it.
   */
+  // Markup rides on material: a line whose material is not ours (0146,
+  // `lineScopeSql`) carries none, as `materialCents` (already gated) does.
   const markupCents = ok(
-    sql`ROUND(ROUND(ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty}) * COALESCE(${bidLineItems.snapshotMarkupPct}, 0))`
+    sql`ROUND(ROUND(${cents.materialCents}) * COALESCE(${bidLineItems.snapshotMarkupPct}, 0))`
   );
   return {
     /**
@@ -13368,7 +13414,7 @@ function costSums(productivityPct: number) {
       only" (0106): its $0 material is an answer. `<=> TRUE`, so NULL and
       false both stay "not said". The live-recipe branch below says the same.
     */
-    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) ELSE 0 END), 0)`,
+    frozenParts: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsMaterialCountSql(productivityPct)} THEN (CASE WHEN ${bidLineItems.snapshotUnpricedParts} IS NOT NULL THEN GREATEST(0, ${bidLineItems.snapshotUnpricedParts}, CASE WHEN ${lineIsPriceable} AND COALESCE(${bidLineItems.snapshotMaterialCost}, 0) = 0 AND NOT (${bidLineItems.snapshotLaborOnly} <=> TRUE) THEN 1 ELSE 0 END) ELSE 0 END) ELSE 0 END), 0)`,
     /*
       Lines whose HOURS were not set (D1) — `lineHoursMissing`: an assembly
       line, not "Not priced" as a whole, with NULL frozen hours. Its OWN
@@ -13798,7 +13844,7 @@ export async function getDashboardBids(
   if (!db) return [];
 
   const sums = costSums(companyProductivityPct);
-  const partsCount = linePartsCountSql(companyProductivityPct);
+  const partsCount = linePartsMaterialCountSql(companyProductivityPct);
   const liveBids = and(eq(bids.userId, userId), isNull(bids.archivedAt));
   const liveLines = and(
     eq(bidLineItems.bidId, bids.id),
