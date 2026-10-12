@@ -24,6 +24,35 @@ release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 - **Local** `bidrender_local` 4,386/4,386 unchanged; `bidrender_test_localdev` 150. Next release batch: **0144–0149, expect 150 / 181**.
 - Scratch: `../bidrender-before-scope` moved to `4be57f8` (staging's code);
   DB `bidrender_scratch_staging_0148` added. Drop after the next release.
+- **Code**: `1091f7e` on `local-dev` AND pushed to the `staging` branch by
+  hand (fast-forward; it went through this time), so deploy-staging is not
+  blocked by the `drizzle/` guard.
+
+### Job 2 — a server start never writes a company's own rows
+
+- **Audited every boot pass** (`seedShippedLibrary`: materials, labor
+  rates, modifiers, assemblies, kits, run types + extras, labor steps). All
+  `userId IS NULL` only, except two:
+  1. `backfillMaterialMetadata` **pass 2** filled NULL category, aliases,
+     default qty and raceway facts on companies' forks — **deleted**.
+  2. `dedupeBaselineRows` deleted duplicate SHARED rows and the FKs
+     **cascaded to company recipe lines** — it now keeps any duplicate that
+     any FK (read from `information_schema`) or a fork's `baselineId`
+     points at, and warns.
+- Pass 1 (re-stamp SHARED rows from the seed files = the loader's path) is
+  unchanged.
+- **Test** `server/bootLeavesCompanyRows.test.ts`: fingerprints every
+  fixture-company row (8 library tables + recipe/kit children) before and
+  after two full `seedShippedLibrary` boots. **Red on the old code, both
+  cases** (fork blanks filled; the recipe line cascaded away); green after.
+  Three old tests that pinned the fill now assert the opposite, with the
+  history kept in their text.
+- **On real copies** (`scripts/companyRowsCheck.mts`, new, read only):
+  staging copy `bidrender_scratch_staging_0148` 19/19 company rows
+  unchanged over two boots; `bidrender_local` 16,043/16,043. Honest limit:
+  **no database today has a fork blank the old pass would fill** (0 on
+  local, the live copy and the staging copy), so a copy cannot tell old code
+  from new — the test is what does.
 
 ## (earlier) 2026-10-12, session 32: B's scope S1 + S3 applied (0146–0147)
 

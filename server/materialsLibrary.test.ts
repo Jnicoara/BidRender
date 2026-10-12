@@ -214,7 +214,10 @@ describe.skipIf(!hasDb)("material categories", () => {
     expect(after?.category).toBe("Conduit Fittings");
   });
 
-  it("backfills a fork that predates the column from the baseline it came from", async () => {
+  // Until 2026-10-12 this asserted the opposite: a start FILLED a fork's NULL
+  // category from its baseline. The owner's rule since then is that a start
+  // never writes a company's own row (server/bootLeavesCompanyRows.test.ts).
+  it("leaves a fork's NULL category alone on a restart", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
       r => r.userId === null && r.name === "15A 3-way switch"
@@ -231,7 +234,7 @@ describe.skipIf(!hasDb)("material categories", () => {
     await seedBaselineMaterials();
 
     const fork = await getMaterialById(forkId, USER);
-    expect(fork?.category).toBe("Switches");
+    expect(fork?.category).toBeNull();
   });
 
   it("does not overwrite a category the user chose for their own copy", async () => {
@@ -337,7 +340,10 @@ describe.skipIf(!hasDb)("material search aliases", () => {
     expect(after?.searchAliases).toContain("1900");
   });
 
-  it("backfills a fork that predates the column from its baseline", async () => {
+  // Until 2026-10-12 a start FILLED a fork's NULL aliases from its baseline;
+  // a start never writes a company's own row now
+  // (server/bootLeavesCompanyRows.test.ts).
+  it("leaves a fork's NULL aliases alone on a restart", async () => {
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(
       r => r.userId === null && r.name === "Wire nut, 22-8 AWG (tan/red)"
@@ -352,7 +358,7 @@ describe.skipIf(!hasDb)("material search aliases", () => {
     await seedBaselineMaterials();
 
     const fork = await getMaterialById(forkId, USER);
-    expect(fork?.searchAliases).toContain("marrette");
+    expect(fork?.searchAliases).toBeNull();
   });
 
   it("does not overwrite aliases the user wrote themselves", async () => {
@@ -370,10 +376,10 @@ describe.skipIf(!hasDb)("material search aliases", () => {
   });
 
   it("keeps aliases the user deliberately cleared cleared", async () => {
-    // The Materials editor stores a cleared field as "" rather than NULL for
-    // exactly this reason: NULL is the backfill's signal to inherit from the
-    // baseline, so saving a clear as NULL would put the starter's slang back
-    // the next time the server booted — a silent undo of a real edit.
+    // The Materials editor stores a cleared field as "" rather than NULL. That
+    // was because NULL used to be the boot's signal to refill the fork from
+    // its baseline; the boot no longer touches forks at all (2026-10-12), and
+    // this still pins that a clear survives a restart.
     const rows = await getLibraryMaterials(USER);
     const baseline = rows.find(r => r.userId === null && r.name === "Dimmer")!;
     const forkId = await forkMaterial(baseline.id, USER);

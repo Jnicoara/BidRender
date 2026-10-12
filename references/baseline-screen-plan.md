@@ -301,6 +301,15 @@ new, and the version it produced. Pins are recorded per change too
   starter by itself.
 - **The boot's second pass on company rows stops** (F3). It fills NULL
   raceway facts on companies' own copies, and those feed fitting counts.
+  **DONE 2026-10-12 (Track A)**, wider than F3's fix column: owner, "stop it
+  from ever touching a company's own rows", so category and aliases stop
+  too. Two writers removed: `backfillMaterialMetadata` pass 2 (deleted), and
+  `dedupeBaselineRows`, whose delete of a duplicate shared row CASCADED to
+  company recipe lines — it now keeps any duplicate something points at.
+  Every other boot pass was read and is `userId IS NULL` only.
+  `server/bootLeavesCompanyRows.test.ts` (red on the old code, both ways);
+  `scripts/companyRowsCheck.mts` measures it on a copy. Pass 1 (re-stamping
+  SHARED rows from the seed, F2) is unchanged: that is the loader's path.
 - **"Export to seed"** writes the seed modules from live, and Track A
   commits them, so a brand-new database starts where live is.
 - **Drift is shown**: "Seed files differ from live on N values". The same
