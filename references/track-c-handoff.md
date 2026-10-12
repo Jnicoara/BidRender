@@ -13,7 +13,87 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
+## START HERE (2026-10-12) — drive-time note MERGED to local-dev (`4be57f8`); Q14–Q22 recorded; bid methods PLANNED
+
+**Local databases: 148 migrations** (through A's 0147).
+`bidrender_local_c` and `bidrender_test_c` were both migrated by C:
+0144–0145 as the owner asked, then 0146–0147, which A put on local-dev
+mid-session. The local tests needed them, since `schema.ts` declares
+`scopeTag`. If `scripts/schemaDrift.mts` says otherwise, stop and find out
+why before going on.
+
+**1. Drive-time note: branch `c-drive-note`, MERGED (fast-forward
+`17e42c0..4be57f8`).**
+
+- A job-cost tile's working ("6 trips × 1.5 h × $85.00/h"; lift rental
+  has one too) goes into `bid_expenses.notes` (0145). It shows in small
+  grey text under the charge on the bid screen and Quick bid. That is one
+  component, `BidExpensesSection`.
+- `jobCostCharge()` in `client/src/lib/jobCostTiles.ts` builds the charge,
+  so the suite can reach it.
+- **Never on the quote:** `proposals.document` maps a charge to name and
+  amount by hand. A test scans the built document for the working and the
+  rate.
+- **A new amount without a new working clears the note**
+  (`updateOnBid`), so it can never state a sum the charge no longer has.
+  Blank is stored as NULL.
+- **Tests:** 4 in `server/bidExtras.test.ts` ("a charge's working note") and
+  1 in `jobCostTiles.test.ts`. **Red without the fix (3 failed), green
+  with it.** `pnpm check` is clean.
+- **Looked at on screen** (playwright, fixture bid 1728378 "Quick bid job
+  costs check", user 1):
+  - Laptop 1536: fine.
+  - Phone 390: **one fault found by looking, and fixed.** The note was
+    truncated to "… × $85.00…", which cut off the rate. It now wraps.
+    No sideways scroll.
+  - The fixture now has a Drive time charge with a note. Leave it or delete
+    it.
+- **Gates:** branch 38284042427 green; the merged commit 38285535698 green.
+  **local-dev Gate 38286657519 on `4be57f8` was pending when this was
+  written (it deploys staging). Check it once.**
+- No migration and no number change: a note is words. Existing charges
+  stay NULL.
+
+**2. Owner answers Q14–Q22 recorded** in `baseline-screen-plan.md` § 12.
+All are the suggested answers except **Q19**: reading the scale off the
+drawing (F15) and adding new homerun circuits (F11) become **one-tap OFFERS
+on Drafts, never automatic from viewing.** § 12 says what that changes in
+C's build. F15 needs **no migration**, because `detectedScaleText` already
+holds a suggestion. That was checked against `bidPdfsRouter.ts`
+`detectSheetScale`.
+
+**3. `references/bid-methods-plan.md` (plan only).**
+
+- The owner's no-stacking rule **overrides `material-markup.md` D1**. Both
+  files say so.
+- The engine enforces it with a union type. The owner's 0%/50% test is
+  specified.
+- Drafts BM-M1–M9 are below for A. There are 16 owner questions, one per
+  line.
+- Every existing bid stays on the old stacked math (`pricingMethod` NULL).
+  Only an accepted Draft offer moves one.
+
+### FOR TRACK A — bid methods drafts (not urgent; nothing is built on them yet)
+
+All add-only, step 1, nullable, NULL = old meaning; step 3 empty. Full SQL
+with comments: `bid-methods-plan.md` § 9. In short:
+
+```sql
+ALTER TABLE `bids` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;              -- BM-M1
+ALTER TABLE `pricing_defaults` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;  -- BM-M2
+ALTER TABLE `pricing_defaults` ADD `materialMarkupMode` enum('flat','brackets') NULL;   -- BM-M3
+ALTER TABLE `labor_rates` ADD `chargeRate` decimal(10,4) NULL;                          -- BM-M4
+ALTER TABLE `bid_line_items` ADD `snapshotChargeRate` decimal(10,4) NULL;               -- BM-M5
+-- BM-M6 CREATE TABLE wage_rate_sets; BM-M7 CREATE TABLE wage_rate_set_rates (see § 9)
+ALTER TABLE `bids` ADD `wageRateSetId` int NULL;                                        -- BM-M8 (+ FK)
+ALTER TABLE `bids` ADD `registeredApprentices` boolean NULL;                            -- BM-M8
+ALTER TABLE `bids` ADD `buildingSqFt` decimal(12,2) NULL;                               -- BM-M9
+```
+
+Hold until the owner answers the plan's questions. Q15 may add
+`wage_rate_sets.fringePaidAsCash`.
+
+## EARLIER (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
 
 Both were found by the audit in `baseline-screen-plan.md` § 9. Both are
 fixed with no migration, a test that fails without the fix, and branch
@@ -62,7 +142,7 @@ opened.** Branch `c-homerun-rematch` (`bbb5f85`, Gate 38082036734 green).
 - **Still worth doing:** a browser check with a real two-sheet set that has
   circuit tags, when one exists.
 
-**Local databases are BEHIND.** Track A added 0144 (`workTag`) and 0145
+**(Fixed 2026-10-12: both are at 148 now, see START HERE.)** **Local databases are BEHIND.** Track A added 0144 (`workTag`) and 0145
 (`bid_expenses.notes`), and `bidrender_test_c` and `bidrender_local_c` do
 not have them, so local DB-backed tests fail with "Unknown column
 'workTag'". Not applied here, because the owner said no migrations this
