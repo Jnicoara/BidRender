@@ -413,6 +413,13 @@ describe.skipIf(!hasDb)("fixing a line on the bid, end to end", () => {
 
   it("a Won bid asks first: without the answer NOTHING changes, with it the line does", async () => {
     await caller().bids.update({ id: bidId, status: "Won" });
+    // Leaving Draft LOCKS the bid since 2026-10-12 (owner Q15), and a locked
+    // bid refuses outright (the test below). This one is about the question
+    // a Won bid asks once it is UNLOCKED — one click, as a person would.
+    expect(
+      (await caller().bids.quantityLock({ bidId })).lockedAt
+    ).not.toBeNull();
+    await caller().bids.unlockQuantities({ bidId });
     const [line] = await linesOf(bidId);
     const options = await caller().bids.fixLineOptions({
       bidId,
@@ -456,6 +463,8 @@ describe.skipIf(!hasDb)("fixing a line on the bid, end to end", () => {
 
   it("a Lost bid asks too, and Continue changes only the line", async () => {
     await caller().bids.update({ id: bidId, status: "Lost" });
+    // Locked by leaving Draft (Q15); unlocked to reach the question.
+    await caller().bids.unlockQuantities({ bidId });
     const [line] = await linesOf(bidId);
     const fix = (changeClosedBid?: boolean) =>
       caller().bids.fixLine({

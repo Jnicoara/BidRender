@@ -115,7 +115,358 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
+## START HERE (2026-10-12, evening) — baseline screen, C's number rules: built on track-c, NOT merged (waits for the owner's go)
+
+**Merging: the owner fast-forwards local-dev by hand.** Claude Code's
+permission check refuses C's push to local-dev ("Modify Shared Resources").
+`71e84fb` stopped being a fast forward when A pushed `c54416c`. So track-c
+merged local-dev again: `f02e1b1`, with A's 0150–0151 (starter_editor) and
+the SER rename.
+
+- C's local databases have **152** migrations, and dependencies are
+  installed (`qrcode`).
+- The 12 test files C changed today pass: 236 tests.
+- Once track-c's Gate is green, the owner runs the one-line
+  `git push origin <track-c head>:refs/heads/local-dev`.
+- If local-dev has moved again, it is not a fast forward: merge again first.
+
+**What C built of the baseline screen on today's database** (owner Q12: C =
+number rules + tests; `baseline-screen-plan.md` § 11):
+
+- **`shared/starterChange.ts`, the field rules (§ 3).** EVERY column of
+  `materials`, `assemblies`, `labor_rates` and `modifiers` has a kind:
+  - `offer`: numbers and names (Q17);
+  - `everyone`: finding fields (Q21);
+  - `unit`: never changed (`unitOfSale`, `rateType`);
+  - `not-editable`: ids, versions, example tags, status, the company's own.
+  - `starterChangeRefusal` gives the reason. **The test fails on any column
+    left unclassified**, so a new column must be decided before the screen
+    can touch it.
+- **`offerBucket` / `acceptAllTakes` (§ 2, Q18):** a copy still on the old
+  value is offered and in Accept all. A company's own value is listed
+  apart and never in Accept all. "0.5000" equals 0.5, and null is not 0.
+- **`shared/starterSheetChecks.ts`, one copy of the sheet's row checks
+  (§ 5).** The price and hours rows of `pricing/loadStarterSheets.mts` now
+  go through it, and the screen's upload will too.
+  - Blank = no value. Bad numbers, units, duplicates, strangers and bend
+    hours off a raceway are refused.
+  - **The loader's dry run on the real sheets is byte-identical before and
+    after the refactor.** exceljs came from a scratch install, per
+    `pricing/README.md`.
+- **The pinning premise, MEASURED (§ 2 "To prove, not assume"):**
+  `server/starterPinning.test.ts`.
+  1. A company with a bid on a starter assembly reads its bid, every
+     assembly's price and recipe (with part prices), labor rates and run
+     types.
+  2. EVERY active starter material, rate, modifier and assembly is forked
+     for it, and its reads come back identical.
+  3. **Then the starter itself is changed** (part prices +$7, every
+     starter rate +$11, assembly hours +1), and the company still reads
+     identical. The shared rows are restored in a `finally`.
+  4. **It goes red with no pins, and red with fork resolution broken**
+     (`resolveForkedRow`).
+- **F15, the scale as an offer (Q19).** `detectSheetScale` never writes a
+  scale, on any bid. Every reading becomes `detectedScaleText`, and
+  `applied` is always false.
+  - `ScaleControl` shows a visible one-tap "Use 1/8" = 1'-0" — read off
+    the sheet" beside Set scale. It is hidden on a locked bid, and the tap
+    is the ordinary `setSheetScale`.
+  - Four tests that pinned auto-apply were rewritten and say so
+    (`planSheets` ×2, `lockedPlans`, `sheetScalePersistence`). With the old
+    router they fail: 3 failed.
+  - **Looked at:** laptop, iPad landscape and iPad portrait (44 px tall on
+    touch, no sideways scroll), on fixture "Bar layout check" sheet E1.00,
+    with a reading stored by hand and the viewer's detection request
+    blocked so it stayed. The tap applied it and the offer went. Sheet
+    E1.00 is restored (no scale, no reading).
+  - Old sheets keep their "Detected" badge.
+- **Proof:**
+  - `bidTotals.mts` on `bidrender_local_c`: 4,237 / 4,237 Total due
+    unchanged against the measurement taken before ALL of today's work
+    (bid protection, B's merge and this).
+  - 8 rule guards each red when removed, the pinning test red two ways, and
+    F15 red against the old router.
+  - Changed test files: `starterChange` 13, `starterPinning` 1, and
+    `planSheets` + `lockedPlans` + `sheetScalePersistence` 72, all green.
+  - `pnpm check` is clean.
+
+**Not built yet, and NOT waiting on A — C's next:**
+
+- **F11:** new homerun circuits as a one-tap offer on Drafts. Today a sheet
+  visit creates them (`TakeoffPage` `syncHomeruns`; `homerunSyncStep` needs
+  an "offer" outcome).
+- **F12:** "Part changed — Send again" as a run line's fix-it.
+- **F13:** a locked bid's "drops not priced" count still reads live
+  (`bidDropsNotPriced`). The open question: freeze it with no column, or
+  count only the drops the lock froze. Decide before building.
+
+### FOR TRACK A — what the baseline screen waits on (2026-10-12)
+
+C cannot build these on today's database. Each needs A's migration, and then
+C's code. **Corrected after A's note at the top of this file:** A will not
+apply BS-M3–M6 from the old drafts. `eddc870`'s BS-M3 cannot record a name or
+recipe change, and covers only materials and assemblies. **C owes A the
+final SQL for BS-M3–M5, together with the `applyStarterChange` spec** (what
+it logs, which tables it pins). That is C's next baseline task, so this list
+waits on C first and on A second.
+
+- **BS-M3:** `starter_change_batches` + `starter_changes` (with `kind`,
+  `version`). Needed by `applyStarterChange`'s log, undo and the sheet
+  upload's batch.
+- **BS-M4:** `starter_change_pins`. Needed to record which copies a change
+  created, so undo knows them.
+- **BS-M5:** `isPinnedCopy`, `hiddenAt`, `replacedById` on the seven tables.
+  Needed to mark a pin as "not my change", for Hide, and for the
+  replacement. **Until then a pin looks like the company's own edit.** The
+  numbers are proven unaffected (`starterPinning.test.ts`); the badges and
+  "My changes" are not.
+- **BS-M6:** `companies.starterSeenAt` + `starter_offer_answers`. Needed for
+  the "New" badge and for Accept / Ignore.
+- **BS-M1 / BS-M2:** the `starter_editor` login and its factors. These are
+  A's own piece, which A is building now.
+- **BS-M8:** not needed. F9 shipped without it (`scaleSource = "manual"`
+  with no ratio).
+- **The boot change (§ 6, F2, F4–F6)** is A's: the seed proposes and the
+  owner confirms. It needs BS-M3.
+- **The `quantitiesLockedAt` comment:** DONE by A (session 34), word for
+  word. Until track-c reaches local-dev, local-dev's comment names
+  `leaveDraft`, which is only on track-c.
+
+## EARLIER (2026-10-12, later) — BID PROTECTION built on track-c (math version, auto-lock, frozen settings)
+
+Built on A's 0148 / 0149 (local-dev `1091f7e`, `7561ab8`, pulled into
+track-c). **C's local databases: 150 migrations.** No migration written or
+applied by C.
+
+**What it does**
+
+- **Math version (0148).**
+  - `shared/mathVersion.ts`: `CURRENT_MATH_VERSION` and the registry
+    `MATH_CHANGES`, plus `atLeast`, `reasonsBetween` and `canUpdateMath`.
+  - New bids start at the current version. Both inserts into `bids` set it
+    (`db.createBid`, the sample bid).
+  - **Version 1 = remove/relocate labor:** `roleCountsOnBid`
+    (`shared/roleLines.ts`) gives a bid below 1 no role counts. Nothing is
+    waiting and Send adds no labor lines, which is what live does today.
+    Live has no role-line code at all, so this is the whole of the change.
+  - **Strip:** `bids.mathChanges` / `bids.dismissMathChanges`, shown on the
+    bid screen and Quick bid by `MathChangeStrip`, never on the proposal (a
+    test scans the document).
+  - **Button (Q22):** `bids.mathUpdatePreview` (old → new, writes nothing)
+    and `bids.updateMath`, for an unlocked Draft only.
+- **Auto-lock (Q15), no migration.** `bids.update` Draft → non-Draft and
+  `bids.create` non-Draft call `leaveDraft`, which uses `db.lockBidQuantities`
+  (the Lock button's path) unless the bid is already locked.
+  - Active → Won does not lock, and Unlock is unchanged.
+  - `offersLockOnStatusChange` no longer asks on a change from Draft.
+  - `shared/quantityLock.ts` and two router comments are rewritten. **The
+    schema comment marked REVERSED is NOT**: the Gate's `drizzle-guard`
+    refuses any track-branch commit touching `drizzle/`, a comment
+    included. Its replacement text is below, for A.
+- **Freeze (Q16, 0149).** `freezeBidSettings` fills NULL overhead / profit /
+  productivity groups with the values in effect, and keeps a person's own
+  override (filling only its inherited overhead mode).
+  - It writes the tax-switch group (only if `salesTaxEnabled` is NULL),
+    `taxRateFrozenPct` and `taxRateFrozenDetail`, and sets `settingsFrozenAt`.
+  - Pricing goes through `taxRateForBid` / `taxRulesForBid` in `billTheBid`,
+    the one place tax is applied. Order: typed rate, then frozen (only when
+    `settingsFrozenAt` is set), then live.
+  - Pinning another area or changing the address on a frozen bid re-freezes
+    the rate (`refreezeTaxRate`). Without that, the control would do nothing
+    visible.
+  - A bid moved back to Draft keeps what was frozen.
+  - CLAUDE.md § "Settings are inherited…" is amended and
+    `companyDefaults.test.ts` is extended, in the same commit.
+
+**FOR TRACK A — the release step's functions (`server/bidProtection.ts`)**
+
+- `priceBidAtVersion(bid, userId, version)`: one bid's `totalDue`,
+  `workPrice`, `notPriced` and `incomplete` at any version. Read-only.
+- `moveBidToMathVersion({ bid, userId, at, to?, seen, dryRun? })`: refuses
+  anything but an unlocked Draft. Prices from and to, sets the version, and
+  writes a `bid_math_changes` row only if Total due moved. Use `seen: false`
+  in the release step so the strip shows, and run `dryRun: true` first.
+  **Today, 0 → 1 moves no total**, because no pricing branch reads the
+  version yet. So the release step should write zero change rows. If it
+  writes any, stop.
+- `freezeBidSettings({ bid, userId, at, dryRun? })`: for bids already
+  Active / Won / Lost before this ships. `dryRun` returns the patch and
+  writes nothing.
+- `leaveDraft(bid, userId, at)`: lock + freeze, if A also wants existing
+  non-Draft bids locked (the owner's Q15 covers bids LEAVING Draft; locking
+  old ones is A's and the owner's call).
+
+**Proof**
+
+- `bidTotals.mts` on `bidrender_local_c`, before (the track-c code before
+  this work) and after: **all 4,237 bids, Total due unchanged; not-priced
+  and incomplete unchanged.**
+- **Every guard goes red with it removed: 13 removals, each with the file
+  restored byte-for-byte afterwards.**
+  - New-bid version: 2 failed.
+  - v1 gate: 2 failed.
+  - Leave Draft on update: 6 failed.
+  - Create outside Draft: 1 failed.
+  - Freeze in `leaveDraft`: 5 failed.
+  - Frozen rate read: 1 failed.
+  - Frozen switches: 1 failed.
+  - No lock offer from Draft: 1 failed.
+  - `updateMath` refusal: 1 failed.
+  - Unseen filter: 1 failed.
+  - Refreeze on pin: 1 failed.
+  - Math dry run: 1 failed.
+  - Freeze dry run: 1 failed.
+- **Changed test files:** `bidProtection.test.ts` (new),
+  `companyDefaults.test.ts` and `quantityLock.test.ts`: 66 passed.
+  `pnpm check` is clean.
+- **Looked at on screen** (playwright, fixture bid 1728378, phone 390 and
+  laptop 1536, no sideways scroll). The strip, the button, the preview,
+  Update and "Got it" all work. Draft → Won in the status menu showed the
+  locked banner, no "Lock this bid?" prompt, and no math strip.
+  - **Three wording faults found by looking, and fixed:**
+    - The preview said "$2,430.00 → $2,430.00" when nothing moved. It now
+      says "Total due stays…".
+    - "Total changed" now says "Total due changed".
+    - The reason said remove/relocate marks "now add" labor. They "can now
+      add" it: updating sends nothing by itself.
+  - The sentences live in `shared/mathVersion.ts` and are tested.
+  - The fixture was put back to a Draft (version NULL, unlocked, unfrozen),
+    and the after-measurement confirms its total.
+
+### FOR TRACK A — replace the `quantitiesLockedAt` comment in `drizzle/schema.ts`
+
+The code it describes is on local-dev. C cannot make this edit, because
+`drizzle-guard` fails any track-branch commit that touches `drizzle/`, a
+comment included. First tried in `15f5050`, then amended out. Comment only:
+no column changes and no migration. In the `quantitiesLockedAt` comment on
+`bids`, replace the section headed "── Independent of `status`, and never
+set by it — REVERSED 2026-10-12 ──" (both of its paragraphs, down to "Same
+column — no migration was needed for this.") with:
+
+```ts
+     * ── Set by a person, AND by the bid leaving Draft (owner Q15, 2026-10-12) ─
+     * Written by `bids.lockQuantities` / `bids.unlockQuantities`, which a person
+     * presses, and by `leaveDraft` (server/bidProtection.ts) when `bids.update`
+     * moves a bid out of Draft or `bids.create` makes one outside it — through
+     * the same `db.lockBidQuantities`, so a lock is one thing however it came.
+     * Unlock is one click away, as before.
+     *
+     * This paragraph said "independent of `status`, and never set by it" until
+     * 2026-10-12: a lock the app applied was "a number frozen at an instant the
+     * app chose". Q15 reversed that (baseline-screen-plan.md § 9 F1), because
+     * an unlocked Won bid re-counted whenever the library moved — the worse of
+     * the two. Same column; no migration was needed.
+```
+
+Until A does, that comment still says the paragraph "stays until the code
+that does it lands (Track C)". The code has landed, so the comment is stale.
+
+**The full suite found what the 3 changed files did not (Gate 38296979664,
+4 files red), and the fixes are in the next commit:**
+
+- `fixLine.test.ts` (2): its Won and Lost bids are now auto-locked, so the
+  fix was refused as locked. Those tests are about the question an UNLOCKED
+  closed bid asks, so they now assert the lock and then unlock, as a person
+  would.
+- `materialMarkup`, `materialMarkupAgreement` and `quoteAppPanel` (2
+  each): their bid fixtures are partial objects cast `as unknown as Bid`,
+  with no 0149 columns. A missing `settingsFrozenAt` is `undefined`, which
+  is `!== null`, so it read as "frozen with no rate" and dropped the tax.
+  The fixtures now carry the columns as NULL. Real rows come from full
+  `select()`s, so production was not affected.
+- `linePricingProblems.test.ts` has the same kind of fixture but no tax, and
+  is left alone.
+
+**Startup no longer fills blanks on company copies** (A's `7561ab8`). None
+of these tests expect a restart to fill one.
+
+**Earlier the same day:** C waited for A's migrations (below).
+
+**Local databases: 148 migrations** (through A's 0147).
+`bidrender_local_c` and `bidrender_test_c` were both migrated by C:
+0144–0145 as the owner asked, then 0146–0147, which A put on local-dev
+mid-session. The local tests needed them, since `schema.ts` declares
+`scopeTag`. If `scripts/schemaDrift.mts` says otherwise, stop and find out
+why before going on.
+
+**1. Drive-time note: branch `c-drive-note`, MERGED (fast-forward
+`17e42c0..4be57f8`).**
+
+- A job-cost tile's working ("6 trips × 1.5 h × $85.00/h"; lift rental
+  has one too) goes into `bid_expenses.notes` (0145). It shows in small
+  grey text under the charge on the bid screen and Quick bid. That is one
+  component, `BidExpensesSection`.
+- `jobCostCharge()` in `client/src/lib/jobCostTiles.ts` builds the charge,
+  so the suite can reach it.
+- **Never on the quote:** `proposals.document` maps a charge to name and
+  amount by hand. A test scans the built document for the working and the
+  rate.
+- **A new amount without a new working clears the note**
+  (`updateOnBid`), so it can never state a sum the charge no longer has.
+  Blank is stored as NULL.
+- **Tests:** 4 in `server/bidExtras.test.ts` ("a charge's working note") and
+  1 in `jobCostTiles.test.ts`. **Red without the fix (3 failed), green
+  with it.** `pnpm check` is clean.
+- **Looked at on screen** (playwright, fixture bid 1728378 "Quick bid job
+  costs check", user 1):
+  - Laptop 1536: fine.
+  - Phone 390: **one fault found by looking, and fixed.** The note was
+    truncated to "… × $85.00…", which cut off the rate. It now wraps.
+    No sideways scroll.
+  - The fixture now has a Drive time charge with a note. Leave it or delete
+    it.
+- **Gates:** branch 38284042427 green; the merged commit 38285535698 green.
+  **local-dev Gate 38286657519 on `4be57f8` was pending when this was
+  written (it deploys staging). Check it once.**
+- No migration and no number change: a note is words. Existing charges
+  stay NULL.
+
+**2. Owner answers Q14–Q22 recorded** in `baseline-screen-plan.md` § 12.
+All are the suggested answers except **Q19**: reading the scale off the
+drawing (F15) and adding new homerun circuits (F11) become **one-tap OFFERS
+on Drafts, never automatic from viewing.** § 12 says what that changes in
+C's build. F15 needs **no migration**, because `detectedScaleText` already
+holds a suggestion. That was checked against `bidPdfsRouter.ts`
+`detectSheetScale`.
+
+**3. `references/bid-methods-plan.md` (plan only).**
+
+- The owner's no-stacking rule **overrides `material-markup.md` D1**. Both
+  files say so.
+- The engine enforces it with a union type. The owner's 0%/50% test is
+  specified.
+- Drafts BM-M1–M10 are below for A.
+- **All 16 owner questions answered (2026-10-12): every pick approved.**
+  One addition to Q1: new-shop setup asks "How do you usually bid?"
+  (Cost + O&P / Markup + hourly rate), Cost + O&P preselected. It writes
+  `pricing_defaults.pricingMethod`, so no extra column. Q15's column is
+  BM-M10.
+- Every existing bid stays on the old stacked math (`pricingMethod` NULL).
+  Only an accepted Draft offer moves one.
+
+### FOR TRACK A — bid methods drafts (not urgent; nothing is built on them yet)
+
+All add-only, step 1, nullable, NULL = old meaning; step 3 empty. Full SQL
+with comments: `bid-methods-plan.md` § 9. In short:
+
+```sql
+ALTER TABLE `bids` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;              -- BM-M1
+ALTER TABLE `pricing_defaults` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;  -- BM-M2
+ALTER TABLE `pricing_defaults` ADD `materialMarkupMode` enum('flat','brackets') NULL;   -- BM-M3
+ALTER TABLE `labor_rates` ADD `chargeRate` decimal(10,4) NULL;                          -- BM-M4
+ALTER TABLE `bid_line_items` ADD `snapshotChargeRate` decimal(10,4) NULL;               -- BM-M5
+-- BM-M6 CREATE TABLE wage_rate_sets; BM-M7 CREATE TABLE wage_rate_set_rates (see § 9)
+ALTER TABLE `bids` ADD `wageRateSetId` int NULL;                                        -- BM-M8 (+ FK)
+ALTER TABLE `bids` ADD `registeredApprentices` boolean NULL;                            -- BM-M8
+ALTER TABLE `bids` ADD `buildingSqFt` decimal(12,2) NULL;                               -- BM-M9
+ALTER TABLE `wage_rate_sets` ADD `fringePaidAsCash` boolean NULL;                       -- BM-M10 (after BM-M6)
+```
+
+**The owner answered all 16 (2026-10-12), so the drafts are final, but they
+are NOT needed yet.** The build comes after scope tags and the baseline
+screen. Add them when C starts the bid-methods build, not before.
+
+## EARLIER (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
 
 Both were found by the audit in `baseline-screen-plan.md` § 9. Both are
 fixed with no migration, a test that fails without the fix, and branch
@@ -164,7 +515,7 @@ opened.** Branch `c-homerun-rematch` (`bbb5f85`, Gate 38082036734 green).
 - **Still worth doing:** a browser check with a real two-sheet set that has
   circuit tags, when one exists.
 
-**Local databases are BEHIND.** Track A added 0144 (`workTag`) and 0145
+**(Fixed 2026-10-12: both are at 148 now, see START HERE.)** **Local databases are BEHIND.** Track A added 0144 (`workTag`) and 0145
 (`bid_expenses.notes`), and `bidrender_test_c` and `bidrender_local_c` do
 not have them, so local DB-backed tests fail with "Unknown column
 'workTag'". Not applied here, because the owner said no migrations this

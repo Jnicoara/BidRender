@@ -33,8 +33,8 @@
  * 2. The outline is read and posted to `ensureSheets`, which creates the sheet
  *    rows once. Renames survive this — see the router.
  * 3. The visible page's text is extracted and posted to `detectSheetScale`,
- *    which applies a reading only when it is certain. Everything else becomes a
- *    suggestion on the scale control.
+ *    which never applies a reading (owner Q19, 2026-10-12): what it finds
+ *    becomes a one-tap "Use …" offer beside the scale control.
  *
  * Steps 2 and 3 are best-effort: a document with no outline and no legible
  * scale still opens, still lists every sheet, and still measures once the user

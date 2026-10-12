@@ -6,6 +6,25 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Viewing a plan sheet no longer sets its scale for you.** When the app
+  reads a scale printed on the drawing, it now shows a "Use 1/8" = 1'-0" —
+  read off the sheet" button beside Set scale, and nothing is measured
+  until you tap it. Before, a confident reading was applied the moment the
+  sheet was opened, so footage could appear on a bid without anyone
+  choosing it.
+- **A bid you have sent stops moving.** The moment a bid leaves Draft
+  (marked Active, Won or Lost), its quantities lock and its overhead,
+  profit, productivity and sales tax are written onto it, so changing your
+  company settings or a tax area no longer re-prices bids you already sent.
+  Drafts still follow your settings, Unlock is still one click, and a rate
+  you type on a bid still wins.
+- **App updates that change the math only reach Drafts.** Each bid now
+  remembers which version of the math it was priced by. If an update moves
+  a Draft's total, the bid screen and Quick bid say "Total due changed from
+  … to … because …" until you press Got it. A bid moved back to Draft
+  offers "Update to the current math" and shows old and new before
+  anything changes. Remove and relocate labor is the first such change:
+  only bids on the current math can add it.
 - **Copper service-entrance cable is now named the way supply houses list
   it.** "6-6-6-6 SER Copper" is now "6/3 SER Copper" (all five copper sizes);
   aluminum SER and SEU keep the full set ("2-2-2-4 SER Aluminum"). Every SER
@@ -18,7 +37,6 @@ This is the human-readable companion to the git history — read this to see wha
   any "CUT" note. Per-foot rows now say which pack the foot price is figured
   from ("per foot (from 250 ft roll)"), and the How to use tab explains
   per-foot pricing and CUT.
-
 - **A separate, locked-down sign-in for editing BidRidge's starter
   catalog (not live yet).** The account that will edit the shipped starter
   prices and assemblies now has its own sign-in: a password, then a
@@ -28,7 +46,6 @@ This is the human-readable companion to the git history — read this to see wha
   Sessions end after 30 idle minutes and always within 8 hours; five
   wrong codes lock it for 15 minutes. No such account exists yet, and the
   screen it opens is still to be built.
-
 - **Restarting or updating the app no longer touches your own library.**
   On every start the app used to fill in blank details (shelf, search
   words, conduit stick length and strap spacing) on materials you had

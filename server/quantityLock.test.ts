@@ -161,7 +161,10 @@ describe("the words, which are the feature as much as the column is", () => {
       followingLines: 4,
     };
     expect(offersLockOnStatusChange(won)).toBe(true);
-    expect(offersLockOnStatusChange({ ...won, from: "Draft" })).toBe(true);
+    // Leaving Draft LOCKS the bid itself since 2026-10-12 (owner Q15), so the
+    // change from Draft never asks — even while the panel's cached state
+    // still reads unlocked, the moment before its refetch lands.
+    expect(offersLockOnStatusChange({ ...won, from: "Draft" })).toBe(false);
     // Already Won (re-picking it), or not Won at all.
     expect(offersLockOnStatusChange({ ...won, from: "Won" })).toBe(false);
     expect(offersLockOnStatusChange({ ...won, to: "Lost" })).toBe(false);

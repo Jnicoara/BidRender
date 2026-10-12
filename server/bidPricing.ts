@@ -185,6 +185,73 @@ export function resolveTaxRate(
 }
 
 /**
+ * What `bids.taxRateFrozenDetail` holds (0149): the resolved rate's words,
+ * written by the freeze (server/bidProtection.ts) so a frozen bid shows the
+ * same source and area it was sent with. Display only — the number that
+ * prices is `taxRateFrozenPct`.
+ */
+export type FrozenTaxDetail = Omit<ResolvedTaxRate, "ratePct">;
+
+/**
+ * The rate a bid is billed at (owner Q16, 2026-10-12).
+ *
+ *   1. a rate TYPED on the bid wins, frozen or not — that is a person's
+ *      choice, and it says so on screen;
+ *   2. a bid whose settings were frozen when it left Draft (`settingsFrozenAt`)
+ *      bills at the rate frozen then, so editing a tax area or the company's
+ *      areas cannot re-price a sent bid;
+ *   3. otherwise the live answer, as before — every Draft, and every bid
+ *      frozen by nothing.
+ */
+export function taxRateForBid(
+  bid: Pick<
+    Bid,
+    | "taxJurisdictionId"
+    | "taxRateOverridePct"
+    | "siteAddress"
+    | "settingsFrozenAt"
+    | "taxRateFrozenPct"
+    | "taxRateFrozenDetail"
+  >,
+  jurisdictions: TaxJurisdiction[]
+): ResolvedTaxRate {
+  if (bid.taxRateOverridePct === null && bid.settingsFrozenAt !== null) {
+    const detail = (bid.taxRateFrozenDetail ?? null) as FrozenTaxDetail | null;
+    return {
+      source: detail?.source ?? "none",
+      components: detail?.components ?? [],
+      jurisdictionName: detail?.jurisdictionName ?? null,
+      matchedOn: detail?.matchedOn ?? [],
+      precision: detail?.precision ?? "none",
+      ratePct:
+        bid.taxRateFrozenPct === null ? null : Number(bid.taxRateFrozenPct),
+    };
+  }
+  return resolveTaxRate(bid, jurisdictions);
+}
+
+/**
+ * The tax switches a bid is billed under: its own group when it has one
+ * (written by the freeze; `salesTaxEnabled` NULL = the whole group follows
+ * the company), else the company's. One group, like overhead and profit.
+ */
+export function taxRulesForBid(
+  bid: Pick<
+    Bid,
+    "salesTaxEnabled" | "taxMaterials" | "taxLabor" | "taxApplyTo"
+  >,
+  company: TaxRules
+): TaxRules {
+  if (bid.salesTaxEnabled === null) return company;
+  return {
+    enabled: bid.salesTaxEnabled,
+    taxMaterials: bid.taxMaterials ?? company.taxMaterials,
+    taxLabor: bid.taxLabor ?? company.taxLabor,
+    applyTo: bid.taxApplyTo ?? company.applyTo,
+  };
+}
+
+/**
  * Price one snapshot line at its quantity, through the shared engine.
  *
  * ── What is frozen and what is not ───────────────────────────────────────────
@@ -736,7 +803,7 @@ export function billTheBid({
    * is not just embarrassing, it is a wrong amount of money collected.
    */
   const rate = tax
-    ? resolveTaxRate(bid, tax.jurisdictions)
+    ? taxRateForBid(bid, tax.jurisdictions)
     : ({
         ratePct: null,
         components: [],
@@ -784,7 +851,9 @@ export function billTheBid({
     // separately rather than blended into a figure taxed wholesale.
     finalPrice: workPrice,
     expenses: pricedExpenses.lines,
-    rules: tax?.rules ?? DEFAULT_TAX_RULES,
+    // `tax` undefined prices without tax, as it always has; a frozen group
+    // only replaces the company's switches when there is tax to apply.
+    rules: tax ? taxRulesForBid(bid, tax.rules) : DEFAULT_TAX_RULES,
     ratePct: rate.ratePct,
     components: rate.components,
     exempt: bid.taxExempt,

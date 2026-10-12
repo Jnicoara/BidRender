@@ -191,7 +191,13 @@ describe.skipIf(!hasDb)("a scale belongs to one sheet", () => {
       id: sheet.id,
       sheetText: `POWER PLAN\nSCALE: 1/4" = 1'-0"`,
     });
-    expect(first.applied).toBe(true);
+    // Since owner Q19 (2026-10-12) the reading is an OFFER; the person taps
+    // it, which is `setSheetScale` with the text read (ScaleControl `pick`).
+    expect(first.applied).toBe(false);
+    await caller().bidPdfs.setSheetScale({
+      id: sheet.id,
+      scaleText: first.sheet.detectedScaleText!,
+    });
 
     await caller().bidPdfs.clearSheetScale({ id: sheet.id });
     const viewedAgain = await caller().bidPdfs.detectSheetScale({

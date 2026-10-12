@@ -29,6 +29,7 @@ import {
   type StatusSplitRow,
 } from "../shared/markStatus";
 import { foldedStatus } from "../shared/twinFold";
+import { CURRENT_MATH_VERSION } from "../shared/mathVersion";
 import { mysqlConnection } from "./databaseConnection";
 import {
   InsertUser,
@@ -74,6 +75,9 @@ import {
   InsertBid,
   Bid,
   bids,
+  InsertBidMathChange,
+  BidMathChange,
+  bidMathChanges,
   InsertClient,
   Client,
   clients,
@@ -5765,10 +5769,17 @@ export async function getBidById(
   return row;
 }
 
+/**
+ * A new bid starts on the current math (shared/mathVersion.ts). Both inserts
+ * into `bids` — this and the sample bid below — say so, because a bid created
+ * with NULL would price by version 0 forever: the math before every change.
+ */
 export async function createBid(data: InsertBid): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(bids).values(data);
+  const [result] = await db
+    .insert(bids)
+    .values({ ...data, mathVersion: data.mathVersion ?? CURRENT_MATH_VERSION });
   return result.insertId;
 }
 
@@ -7110,6 +7121,44 @@ export async function unlockBidQuantities(bidId: number): Promise<void> {
     .update(bids)
     .set({ quantitiesLockedAt: null })
     .where(eq(bids.id, bidId));
+}
+
+// ─── Math versions (0148; shared/mathVersion.ts, server/bidProtection.ts) ──────
+
+/** A Draft's math moved: record from → to and both totals, for the strip. */
+export async function insertBidMathChange(
+  data: InsertBidMathChange
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(bidMathChanges).values(data);
+  return result.insertId;
+}
+
+/** Math changes on one bid nobody has dismissed yet, oldest first. */
+export async function getUnseenBidMathChanges(
+  bidId: number
+): Promise<BidMathChange[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(bidMathChanges)
+    .where(and(eq(bidMathChanges.bidId, bidId), isNull(bidMathChanges.seenAt)))
+    .orderBy(asc(bidMathChanges.id));
+}
+
+/** "Got it" on the strip. Scoped to the bid, so an id alone cannot reach another. */
+export async function markBidMathChangesSeen(
+  bidId: number,
+  at: Date
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(bidMathChanges)
+    .set({ seenAt: at })
+    .where(and(eq(bidMathChanges.bidId, bidId), isNull(bidMathChanges.seenAt)));
 }
 
 /** Groups on a bid, without the user filter — see `stampCountsForBid`. */
@@ -13035,6 +13084,8 @@ export async function seedSampleProject(
     status: "Draft",
     trades: ["electrical"],
     isSample: true,
+    // A new bid starts on the current math, as createBid's do.
+    mathVersion: CURRENT_MATH_VERSION,
     clientId: client.insertId,
     clientName: content.clientName,
     siteAddress: content.siteAddress,

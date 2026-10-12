@@ -46,11 +46,7 @@ import {
 } from "../r2Multipart";
 import { selectStorageBackend } from "../storageBackend";
 import { MAX_PARTS } from "../../shared/multipartPlan";
-import {
-  detectScaleFromText,
-  isAutoApplicable,
-  parseScaleText,
-} from "../../shared/planScale";
+import { detectScaleFromText, parseScaleText } from "../../shared/planScale";
 import { checkPdfUpload } from "../../shared/uploadLimits";
 import { sheetDisplay } from "../../shared/sheetIdentity";
 import { SHEET_WORK_TAGS } from "../../drizzle/schema";
@@ -1023,12 +1019,17 @@ export const bidPdfsRouter = router({
   /**
    * Report what auto-detection read off a sheet.
    *
-   * The confidence decision lives here rather than in the browser so one rule
-   * governs what gets applied. Only a HIGH-confidence reading is stored as the
-   * sheet's scale; anything less is kept as `detectedScaleText` and offered to
-   * the user as a suggestion, because a wrong scale applied silently makes
-   * every later measurement wrong by a constant factor with nothing on screen
-   * looking broken.
+   * ── An OFFER, never applied by viewing (owner Q19, 2026-10-12) ───────────
+   * Every reading, however confident, is kept as `detectedScaleText` and
+   * offered on the scale control as one tap ("Use 1/4" = 1'-0" — read off
+   * the sheet"). It is never written as the sheet's scale here. This call is
+   * made by the viewer whenever a sheet with no scale is SHOWN, so applying
+   * from it was a number moving because somebody looked: footage appearing
+   * on a Draft with no click (baseline-screen-plan.md § 9 F15).
+   *
+   * Until 2026-10-12 a HIGH-confidence reading was applied here and labelled
+   * "detected". `confidence` is still returned, so the offer can say how sure
+   * the reading is.
    *
    * Never touches a scale the user set by hand.
    */
@@ -1056,33 +1057,16 @@ export const bidPdfsRouter = router({
 
       const detection = detectScaleFromText(input.sheetText);
       const suggestion = detection.best;
-      /*
-        A locked bid's scales do not move — not even by detection, which runs
-        on its own whenever a sheet is shown. So on a locked bid a reading is
-        remembered as a suggestion and never applied, and no error is raised:
-        nobody pressed anything.
-      */
-      const locked = await planIsLocked(sheet.bidPdfId, ctx.scope.dataUserId);
-      const applies =
-        !locked && Boolean(suggestion) && isAutoApplicable(detection);
-
-      if (suggestion && applies) {
-        await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
-          scaleRatio: String(suggestion.ratio),
-          scaleText: suggestion.text,
-          scaleSource: "detected",
-          detectedScaleText: suggestion.text,
-        });
-      } else {
-        // Remember what was seen without acting on it.
-        await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
-          detectedScaleText: suggestion?.text ?? null,
-        });
-      }
+      // Remember what was seen without acting on it — on every bid, locked or
+      // not, since nobody pressed anything (Q19). The tap is `setSheetScale`.
+      await db.updateBidPdfSheet(input.id, ctx.scope.dataUserId, {
+        detectedScaleText: suggestion?.text ?? null,
+      });
 
       const updated = await db.getBidPdfSheet(input.id, ctx.scope.dataUserId);
       return {
-        applied: applies,
+        /** Always false since owner Q19: viewing never applies a scale. */
+        applied: false,
         confidence: detection.confidence,
         notToScale: detection.notToScale,
         candidates: detection.candidates.map(c => ({
