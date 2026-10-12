@@ -1736,8 +1736,12 @@ B's S2 (`scope_prompts`) is NOT in this batch (plan step 6b).
    `staging-totals-{before,after,after-…-new}-0146-2026-10-12.json`.
 4. **Local**: `bidrender_local` (4,386/4,386 unchanged) and
    `bidrender_test_localdev`, both 148.
-5. **Code**: pushed to `local-dev` after the database; the Gate deploys
-   staging.
+5. **Code**: `c4b927c` pushed to `local-dev` after the database (Gate
+   38284188600). Pushing it to the `staging` BRANCH by hand, as for
+   0144–0145, was refused by the session's permission check — so expect
+   the Gate's deploy-staging step to refuse on `drizzle/` (the guard) until
+   somebody pushes `staging`. Safe meanwhile: staging's code `a2569d7`
+   never reads the new columns, measured above.
 
 **Live**: 0146–0147 join the next release's batch, BEFORE the push of any
 code from this commit on (both additive). Expect 148, 180/180 — **if what it

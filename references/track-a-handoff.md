@@ -19,6 +19,11 @@ release record is `deploying.md` § 11 "LIVE: `371b2ab`".
   unchanged**. Record: `deploying.md` § "Staging: migrations 0146–0147".
 - **Local**: `bidrender_local` (4,386/4,386 unchanged) and
   `bidrender_test_localdev`, both 148. `pnpm check` clean.
+- **Code**: `c4b927c` on `local-dev` (Gate 38284188600). **NOT on the
+  `staging` branch** — the hand push was refused by the permission check,
+  so deploy-staging will refuse on `drizzle/` until the owner pushes
+  `staging` (or approves the push). Staging's DB is ahead of its code,
+  which is the safe direction.
 - **Live untouched.** Next release batch is now **0144–0147, expect 148 /
   180** (`next-live-release-plan.md` queue table).
 - Scratch added: DB `bidrender_scratch_staging_0146`, worktree
