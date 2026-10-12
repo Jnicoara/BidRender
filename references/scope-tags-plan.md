@@ -137,6 +137,17 @@ does NOT redeclare them; import `LINE_SCOPE_TAGS` from the schema.
 
 ### Step 2 — the rule module and the money (TS + SQL together)
 
+**DONE 2026-10-12 (Track B, `b-scope-tags`).** As below, plus two things
+the list did not say: hours leave the money with labor (the SQL `hours` is
+gated, so the card's hour total drops too), and an OFCI line's "not
+priced" is decided by its hours on a typed / run-type line (never a
+coupling, connector or strap — `laborInRunRate`) and never as a whole on an
+assembly line, whose missing hours are `lineHoursMissing`'s. Tests:
+`server/lineScopePricing.test.ts` (9 red on the old code; the 6 green are
+the NULL / install / switch-back / untagged controls) and the "tagged by
+scope" cases in `server/lineNotPriced.test.ts` (6 red). bidTotals on
+bidrender_local_b_new: 4,306/4,306 unchanged.
+
 - `shared/lineScope.ts` (new): `LINE_SCOPES`, `scopeOf(line)` (NULL →
   install), `scopePricesMaterial`, `scopePricesLabor`, `scopeOnMaterialsList`
   (`"buy" | "ownerFurnished" | "off"`), `scopeKeepsDrops`, `scopeLabel`,

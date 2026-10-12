@@ -1389,6 +1389,31 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
 
+### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
+
+A pack or bulk price stored as a per-unit price does not look broken. It
+gives a confident and hugely wrong bid. See
+`references/multi-supplier-plan.md` § 4.4 (the import's preview and undo)
+and § 4.5 (unit of sale), and `references/material-markup.md` D3 (price
+bands read the PACK price, and `materials` has no pack size yet).
+
+- [ ] **In-app price entry works like the pricing sheet: pack price + pack
+      qty, and the app works out the per-unit price.** Today the app has
+      no pack size, so a roll price typed into a per-foot box becomes a
+      per-foot price, and every foot on the bid is priced as a roll. The
+      same pack size is the one D3's price bands need, so build them as
+      one column, not two.
+- [ ] **The supplier CSV import understands "per M" (1,000) and "per C"
+      (100) and converts them, with a preview showing the per-unit price
+      before anything saves.** Today `importPrices` writes straight into
+      the catalog with no preview and no undo (§ 4.4 plans both).
+- [ ] **A sanity warning when a price looks like a per-M or per-roll
+      price**, e.g. #12 THHN at $480/ft. It applies to typed prices as
+      well as imported ones. It warns and never blocks or silently
+      changes the price, because a real price can be odd. § 4.5's "more
+      than 5x from your price" check is a starting point; the threshold is
+      not measured yet.
+
 ### Before beta: sign-in protection (owner, 2026-10-06)
 
 - [ ] **Block known-leaked passwords** at sign-up, password change and

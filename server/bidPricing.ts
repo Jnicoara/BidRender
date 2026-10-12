@@ -38,6 +38,7 @@ import {
 import { storedMarkupPct } from "../shared/materialMarkup";
 import { laborQtyOf } from "../shared/lineLaborQty";
 import { countNotPriced } from "../shared/lineNotPriced";
+import { scopePricesLabor, scopePricesMaterial } from "../shared/lineScope";
 
 /**
  * A bid line as the rollup needs it: the stored row, with its unpriced-part
@@ -269,11 +270,25 @@ export function taxRulesForBid(
  * override, and then nothing at company level reaches it.
  */
 export function priceLine(line: BidLineItem, productivityPct: number) {
+  /*
+    WHO DOES THE WORK (0146, shared/lineScope.ts). Owner-furnished: the
+    material is the owner's, so it leaves the money and its markup with it;
+    our labor stays. By others / Excluded: neither is ours. The snapshot is
+    untouched — only what it is priced AT changes — so switching the tag back
+    returns the line to exactly its frozen price. NULL prices as We install.
+  */
+  const pricesMaterial = scopePricesMaterial(line);
+  const pricesLabor = scopePricesLabor(line);
   return calculateLineItem({
     // The snapshot is already a single rolled-up material figure for one
     // assembly, so it enters as one material line at qty 1 and the bid
     // quantity scales the whole thing.
-    materials: [{ costPerUnit: Number(line.snapshotMaterialCost), qty: 1 }],
+    materials: [
+      {
+        costPerUnit: pricesMaterial ? Number(line.snapshotMaterialCost) : 0,
+        qty: 1,
+      },
+    ],
     /**
      * Already includes the assembly's overhead hours — they were added into
      * this figure when the line was snapshotted (see addAssemblyToBid).
@@ -289,7 +304,7 @@ export function priceLine(line: BidLineItem, productivityPct: number) {
     // read as priced for it: `lineHoursNotSet` (shared/lineNotPriced.ts)
     // counts its labor as not priced and its hours cell says so. That
     // predicate is the guard; this 0 is only the absence of money.
-    baseLaborHours: Number(line.snapshotLaborHours ?? 0),
+    baseLaborHours: pricesLabor ? Number(line.snapshotLaborHours ?? 0) : 0,
     modifiers: [{ laborAdjustmentPct: Number(line.snapshotModifierPct) }],
     laborRate: Number(line.snapshotLaborRate),
     quantity: Number(line.qty),

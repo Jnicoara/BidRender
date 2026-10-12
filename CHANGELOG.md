@@ -33,6 +33,11 @@ This is the human-readable companion to the git history — read this to see wha
   productivity and sales-tax settings that were in effect when a bid left
   Draft. Nothing uses them yet; no bid total moves.
 
+- **Bid prices now know who does each line's work.** A line marked "Owner
+  furnishes, we install" prices our labor only; "By others" and "Excluded"
+  price nothing and never read "not priced". The bid, the Dashboard card and
+  analytics all follow the same rule. Nothing can mark a line yet (that
+  screen comes next), so no bid moved — measured on all 4,306 local bids.
 - **Dashboard: a remove or relocate line with no hours now counts as "not
   priced", the same as on the bid.** The dashboard card could call such a
   line priced while the bid it opens said "Not priced". Both now follow one
