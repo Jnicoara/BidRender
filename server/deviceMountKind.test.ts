@@ -96,6 +96,7 @@ async function aBid(assemblyId: number) {
     sheetId: sheet.id,
   });
   await caller().homeruns.syncSheet({
+    create: true,
     bidId: bid.id,
     sheetId: sheet.id,
     circuits: [{ panel: "2B", circuits: [1], leavingStampId: mark.id }],

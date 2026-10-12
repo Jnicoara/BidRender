@@ -1,5 +1,77 @@
 # Track C — handoff, 2026-10-06
 
+## START HERE (2026-10-12, late night) — F11 and F12 built on track-c, NOT merged (waits for the owner's go)
+
+**Owner, this session:** both § 10a.5 picks are APPROVED and recorded in
+`baseline-screen-plan.md` § 10a.5: the Accept button warns "N draft bids
+use this and will re-count", and kits and labor steps stay outside offers
+for now. **A applies BS-M3 – M6 after the live release.** F13 waits for a
+design call.
+
+**F11: new homerun circuits are a one-tap offer, never added by viewing
+(Q19).**
+
+- `homeruns.syncSheet` gained **`create`, REQUIRED with no default**, so no
+  caller creates by omission. Both page callers failed the typecheck until
+  they said which.
+- With `create: false` (the visit, and Re-match) the bid gets no circuit and
+  no panel. The call returns `waiting`, the count of circuits the bid lacks.
+- The page keeps `waiting` per sheet and shows **"Add N new homerun
+  circuits"** on the Plans toolbar, beside Circuits and not inside it, so a
+  hidden offer cannot quietly leave feet off. The tap sends `create: true`.
+  The offer is hidden on a locked bid.
+- Tests: `homerunsRouter.test.ts` gains "a sheet visit adds nothing; the
+  offer adds" (3 tests). The 15 existing calls say `create: true`.
+  `homerunSync.test.ts` pins the wording.
+
+**F12: "Part changed — Send again" on a run line.**
+
+- The decision is NOT re-made on the bid screen. `bridgeForBid` (the Plans
+  screen's query) already carries Send again's plan per line
+  (`resendPlans`). `client/src/lib/partChanged.ts` only matches its SWAPS to
+  bid lines by run type and slot.
+- The bid screen reads it only when the bid has a run line, and its refresh
+  helper invalidates it.
+- Each line says "Part changed: set-screw coupling → compression coupling, 10. Still priced at the old part — press Send again on the Plans screen",
+  and the warning strip counts the lines. Nothing re-prices: R4 holds.
+- Tests: `partChanged.test.ts` (3).
+
+**Proof**
+
+- **bidTotals:** 4,237 / 4,237 Total due unchanged against the measurement
+  taken before ALL of 2026-10-12's work.
+- **Guards** (each red with it removed, file restored byte-for-byte):
+  - visit creates no circuit;
+  - visit creates no panel;
+  - `create` is required;
+  - offer hidden at 0;
+  - archived line ignored;
+  - matched by extra.
+
+  **One is not an independent guard:** F12's "swaps only" check. A refill
+  plan carries no `text`, so the `if (text)` filter excludes it either way.
+  It is belt and braces, not a tested guard.
+
+- 5 changed test files, 62 tests, green; `pnpm check` is clean.
+- **Looked at: laptop, iPad portrait and iPad landscape**, no sideways
+  scroll anywhere.
+  - **F12**, on "Bar layout check": user 1's copy (1667) of run type 31 was
+    switched to compression for the check. The strip and 2 line notes
+    showed: coupling and connector both swap with the style.
+  - **F11**, on "Sheet check (Claude, delete me)", sheet E111: 3 circuit
+    rows were saved and removed for the check. "Add 3 new homerun circuits"
+    showed (44 px on touch), and was gone after the tap.
+  - Both fixtures are restored: 38 circuits back by their ids, 1667 back to
+    set-screw, shared type 31 untouched.
+  - **Found by looking and fixed:** with 2 lines the strip said "the new
+    part"; it now says "parts".
+
+**Still writes on a visit, NOT in F11's scope:** a panel found by its
+"PANEL 2B" LABEL fills an existing panel's empty spot on view
+(`TakeoffPage`, the label `placePanel`). Measured footage can then appear
+for circuits already on the bid. It is the same class as F11 and F15;
+offering it is the owner's call.
+
 ## TO TRACK A — 2026-10-12 (night): your 14 BS-M3–M6 decisions are ANSWERED, final SQL in `baseline-screen-plan.md` § 10a
 
 A's session-36 note (`b90ea3d2`) was on A's local `local-dev` and not yet on

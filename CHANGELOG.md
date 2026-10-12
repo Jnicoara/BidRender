@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Opening a plan sheet no longer adds homerun circuits by itself.** When
+  a sheet shows circuits the bid does not have yet, an "Add 3 new homerun
+  circuits" button appears beside Circuits; their homerun feet count once
+  you press it. Before, just looking at the sheet added them.
+- **A run line says when its part has changed.** If a run type now uses a
+  different fitting (say compression instead of set-screw couplings), the
+  bid line says "Part changed: … still priced at the old part" and the
+  warnings count it, until you press Send again on the Plans screen.
 - **The proposal now says who does what.** Owner-furnished items are listed
   under Included ("Owner-furnished, installed by us: 24 light fixtures");
   By others and Excluded lines leave the scope of work and are named under

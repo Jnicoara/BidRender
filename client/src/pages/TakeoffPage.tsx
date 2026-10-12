@@ -120,6 +120,7 @@ import {
 } from "@/components/takeoff/HeightAreas";
 import {
   confirmableHomeruns,
+  homerunOfferLabel,
   homerunSyncPayload,
   homerunSyncStep,
   type HomerunSyncState,
@@ -4797,6 +4798,14 @@ export default function TakeoffPage({
     lastSignature: null,
     armedSheetId: null,
   });
+  /**
+   * Per sheet, how many circuits the last visit found that the bid does not
+   * have — the "Add N new homerun circuits" offer (owner Q19). Set from the
+   * server's own count on every visit sync, so it moves when the marks do.
+   */
+  const [homerunWaiting, setHomerunWaiting] = useState<Record<number, number>>(
+    {}
+  );
   const placePanelSpot = useCallback(
     (panel: string, spot: { x: number; y: number } | null) => {
       if (!activeSheet) return;
@@ -4935,6 +4944,8 @@ export default function TakeoffPage({
         sheetId: activeSheet.id,
         circuits: homerunSyncPayload(circuitReport),
         rematch: true,
+        // Re-match re-points what the bid has; adding is its own offer.
+        create: false,
       },
       {
         onSuccess: r =>
@@ -4943,6 +4954,32 @@ export default function TakeoffPage({
               ? "Every unconfirmed homerun already leaves from the closest device."
               : `${r.repointed} homerun${r.repointed === 1 ? "" : "s"} re-matched to the device now closest.`
           ),
+        onError: e => toast.error(e.message),
+      }
+    );
+  };
+  /**
+   * "Add N new homerun circuits" — the person's tap (owner Q19, 2026-10-12;
+   * baseline-screen-plan.md § 9 F11). The ONLY call that sends
+   * `create: true`; a visit never does.
+   */
+  const addWaitingHomeruns = () => {
+    if (!circuitReport || !activeSheet) return;
+    const sheetId = activeSheet.id;
+    syncHomeruns.mutate(
+      {
+        bidId,
+        sheetId,
+        circuits: homerunSyncPayload(circuitReport),
+        create: true,
+      },
+      {
+        onSuccess: r => {
+          setHomerunWaiting(prev => ({ ...prev, [sheetId]: 0 }));
+          toast.success(
+            `Added ${r.created} homerun circuit${r.created === 1 ? "" : "s"} to the bid.`
+          );
+        },
         onError: e => toast.error(e.message),
       }
     );
@@ -4972,21 +5009,31 @@ export default function TakeoffPage({
     const payload = homerunSyncPayload(circuitReport);
     const signature = syncSignature(sheetId, payload);
     /*
-      A visit only CREATES the circuits it has not seen; the server leaves
-      every existing homerun as it is. The one exception is the sync right
-      after a panel was placed by hand on THIS sheet — the decision, and
-      why it is per sheet, is `homerunSyncStep` (@/lib/homerunSync).
+      A visit CREATES NOTHING (owner Q19, 2026-10-12): circuits the bid does
+      not have come back as `waiting`, and the "Add N new homerun circuits"
+      button adds them. Until then a visit created them, adding homerun feet
+      to a Draft because somebody looked (baseline-screen-plan.md § 9 F11).
+      Existing homeruns are left as they are; the one exception is the sync
+      right after a panel was placed by hand on THIS sheet — the decision,
+      and why it is per sheet, is `homerunSyncStep` (@/lib/homerunSync).
     */
     const step = homerunSyncStep(homerunSync.current, sheetId, signature);
     if (!step.send) return;
     const timer = window.setTimeout(() => {
       homerunSync.current = step.next;
-      syncHomeruns.mutate({
-        bidId,
-        sheetId,
-        circuits: payload,
-        rematch: step.rematch,
-      });
+      syncHomeruns.mutate(
+        {
+          bidId,
+          sheetId,
+          circuits: payload,
+          rematch: step.rematch,
+          create: false,
+        },
+        {
+          onSuccess: r =>
+            setHomerunWaiting(prev => ({ ...prev, [sheetId]: r.waiting })),
+        }
+      );
     }, 600);
     return () => window.clearTimeout(timer);
     // Not the mutation objects: their state changes with every call, and an
@@ -10556,6 +10603,30 @@ export default function TakeoffPage({
                 }}
               />
             )}
+            {/*
+              THE HOMERUN OFFER (owner Q19, 2026-10-12): circuits read on this
+              sheet that the bid does not have are never added by looking.
+              One tap here adds them; it is on the toolbar, not inside the
+              Circuits panel, because circuits used to arrive on their own and
+              a hidden offer would quietly leave their feet off the bid. Not
+              on a locked bid, whose quantities do not move.
+            */}
+            {!phone &&
+              activeSheet &&
+              !homerunData?.locked &&
+              homerunOfferLabel(homerunWaiting[activeSheet.id] ?? 0) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-xs border-[#F5C518]/50"
+                  onClick={addWaitingHomeruns}
+                  disabled={syncHomeruns.isPending}
+                  title="Circuits read on this sheet that are not on the bid yet. Their homerun feet count once you add them."
+                >
+                  <Plus className="w-3 h-3" />
+                  {homerunOfferLabel(homerunWaiting[activeSheet.id] ?? 0)}
+                </Button>
+              )}
             {!phone && showCircuits && circuitReport && (
               <CircuitsPanel
                 homeruns={

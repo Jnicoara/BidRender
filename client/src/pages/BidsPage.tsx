@@ -149,6 +149,7 @@ import {
   roleLinesWithoutHours,
   setHoursLabel,
 } from "@shared/roleLines";
+import { partChangedByLine, partChangedStripText } from "@/lib/partChanged";
 import { bidHoursCell } from "@/lib/bidHoursCell";
 import { twinFlagText, twinLineFlags } from "@shared/twinFold";
 import {
@@ -530,6 +531,9 @@ export default function BidsPage({
     // The math strip offers "Update to the current math" only on an unlocked
     // Draft, so a status change or a lock moves it — same helper, same reason.
     void utils.bids.mathChanges.invalidate({ bidId });
+    // "Part changed — Send again" reads Send again's plan per line, so a
+    // line added, removed or unlocked here moves it (F12).
+    void utils.takeoffRunTypes.bridgeForBid.invalidate({ bidId });
     // What "Re-apply markup rules" would change depends on the lines, the
     // bid's status and its lock — all of which the mutations here move. Added
     // to this helper for the reason the lock query above was: a count of lines
@@ -607,6 +611,19 @@ export default function BidsPage({
 
   /** "Most used" — [] until the company has 3 bids (shared/mostUsed.ts). */
   const { data: mostUsed = [] } = trpc.assemblies.mostUsed.useQuery();
+
+  /*
+    "Part changed — Send again" (F12). The Plans screen's own query, which
+    already carries Send again's plan per line; read only when the bid has a
+    run line, since it derives footage. On a locked bid it plans nothing.
+  */
+  const hasRunLines = (detailQuery.data?.lines ?? []).some(
+    l => l.takeoffRunTypeId !== null
+  );
+  const { data: runBridge = [] } = trpc.takeoffRunTypes.bridgeForBid.useQuery(
+    { bidId },
+    { enabled: hasRunLines }
+  );
 
   /*
     The same search Quick bid uses (smartSearch), so "romex" or a typo finds
@@ -809,6 +826,8 @@ export default function BidsPage({
   );
   /** Remove / relocate lines with no hours — their own entry and fix-it. */
   const roleNoHours = roleLinesWithoutHours(lines);
+  /** Run lines whose type now names a different part (F12). */
+  const partChanged = partChangedByLine(runBridge, lines);
   /** Lines counting existing-to-remain devices (shared/twinFold.ts). */
   const twinFlags = twinLineFlags(lines, bid.quantitiesLockedAt !== null);
   /**
@@ -1493,6 +1512,16 @@ export default function BidsPage({
                                   {line.fittingNote}
                                 </div>
                               ) : null}
+                              {/* F12: its type now names another part, and
+                                this line is still priced at the old one. The
+                                strip says how many; only the line says which. */}
+                              {partChanged.get(line.id) ? (
+                                <div className="text-xs text-[#F5C518]">
+                                  Part changed: {partChanged.get(line.id)}.
+                                  Still priced at the old part — press Send
+                                  again on the <PlansLink bidId={bidId} />.
+                                </div>
+                              ) : null}
                               {/*
                               Where this line's MATERIAL MARKUP came from — "35%
                               markup from Wire & Cable category · +$12.97".
@@ -2064,6 +2093,25 @@ export default function BidsPage({
                     </p>
                   </div>
                 ) : null
+              )}
+
+              {/*
+                PART CHANGED (F12): run lines whose type now names a different
+                part, still priced at the old one until Send again
+                re-snapshots them. Counted here, named on each line.
+              */}
+              {partChanged.size > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {partChangedStripText(partChanged.size)}
+                    </span>{" "}
+                    Press Send again on the <PlansLink bidId={bidId} /> to price
+                    the new {partChanged.size === 1 ? "part" : "parts"}. Nothing
+                    changes until you do.
+                  </p>
+                </div>
               )}
 
               {/*

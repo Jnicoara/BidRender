@@ -16334,8 +16334,20 @@ export async function syncHomerunCircuit(
   circuitNumber: number,
   poles: number,
   leavingStampId: number | null,
-  repoint: boolean
-): Promise<{ id: number; created: boolean; repointed: boolean }> {
+  repoint: boolean,
+  /**
+   * Whether a circuit the bid does not have yet may be CREATED. False on a
+   * sheet visit (owner Q19, 2026-10-12: new homerun circuits are a one-tap
+   * offer, never added because somebody looked): a missing circuit is then
+   * reported as `waiting` and nothing is written.
+   */
+  create: boolean
+): Promise<{
+  id: number | null;
+  created: boolean;
+  repointed: boolean;
+  waiting: boolean;
+}> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const [existing] = await db
@@ -16354,6 +16366,8 @@ export async function syncHomerunCircuit(
     )
     .limit(1);
   if (!existing) {
+    if (!create)
+      return { id: null, created: false, repointed: false, waiting: true };
     const [result] = await db.insert(bidPanelCircuits).values({
       panelId,
       userId,
@@ -16361,13 +16375,19 @@ export async function syncHomerunCircuit(
       poles,
       homerunFromStampId: leavingStampId,
     });
-    return { id: result.insertId, created: true, repointed: false };
+    return {
+      id: result.insertId,
+      created: true,
+      repointed: false,
+      waiting: false,
+    };
   }
   const moves =
     repoint &&
     existing.confirmedAt === null &&
     existing.from !== leavingStampId;
-  if (!moves) return { id: existing.id, created: false, repointed: false };
+  if (!moves)
+    return { id: existing.id, created: false, repointed: false, waiting: false };
   await db
     .update(bidPanelCircuits)
     .set({ homerunFromStampId: leavingStampId, poles })
@@ -16378,7 +16398,7 @@ export async function syncHomerunCircuit(
         isNull(bidPanelCircuits.homerunConfirmedAt)
       )
     );
-  return { id: existing.id, created: false, repointed: true };
+  return { id: existing.id, created: false, repointed: true, waiting: false };
 }
 
 /** A homerun's own settings. Omitted leaves a field; NULL clears it. */

@@ -3,6 +3,7 @@ import {
   confirmableHomeruns,
   homerunKey,
   homerunKeyForCircuit,
+  homerunOfferLabel,
   homerunSyncPayload,
   homerunSyncStep,
   type HomerunSyncState,
@@ -188,5 +189,13 @@ describe("a hand-placed panel re-matches ITS sheet, never the next one", () => {
       send: true,
       rematch: false,
     });
+  });
+});
+
+describe("the homerun offer's words (F11, owner Q19)", () => {
+  it("shows nothing with nothing waiting, and counts what is", () => {
+    expect(homerunOfferLabel(0)).toBeNull();
+    expect(homerunOfferLabel(1)).toBe("Add 1 new homerun circuit");
+    expect(homerunOfferLabel(3)).toBe("Add 3 new homerun circuits");
   });
 });

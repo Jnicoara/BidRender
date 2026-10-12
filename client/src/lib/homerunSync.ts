@@ -104,6 +104,17 @@ export function homerunSyncStep(
 }
 
 /**
+ * The offer's words (owner Q19, 2026-10-12; baseline-screen-plan.md § 9 F11).
+ * A visit reports how many of this sheet's circuits the bid does not have
+ * yet and adds none; this button is how they are added. Null = nothing to
+ * offer, so nothing is shown.
+ */
+export function homerunOfferLabel(waiting: number): string | null {
+  if (waiting <= 0) return null;
+  return `Add ${waiting} new homerun circuit${waiting === 1 ? "" : "s"}`;
+}
+
+/**
  * The key a server homerun row matches a circuit on screen by. A two-pole
  * "2B-36,38" is stored on its FIRST circuit (the router keeps `min`), so a
  * circuit's key is its panel and its lowest number.

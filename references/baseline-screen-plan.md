@@ -818,6 +818,11 @@ with a test that edits a pin through each router.
 
 #### 10a.5 For the owner — the calls here that can move a number later
 
+**Both APPROVED by the owner, 2026-10-12:** (1) the Accept button warns "N
+draft bids use this and will re-count" before it is pressed; (2) kits and
+labor steps stay outside offers for now. A applies BS-M3 – BS-M6 after the
+next live release.
+
 None of these drafts moves a number on its own. Two consequences touch
 numbers once the code is live, and both are by a person's choice or
 already true today:
