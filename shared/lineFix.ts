@@ -29,6 +29,11 @@ import { lineHoursNotSet, lineHoursUnset } from "./lineNotPriced";
 import { lineHasUnpricedLabor } from "./laborRatePricing";
 import { needsPricing } from "./materialPricing";
 import { laborInRunRate } from "./runFittings";
+import {
+  scopeIsOffBid,
+  scopePricesMaterial,
+  type LineScope,
+} from "./lineScope";
 
 // ─── When the line may not change ────────────────────────────────────────────
 
@@ -86,6 +91,12 @@ export type FixableLineLike = {
   snapshotLaborOnly: boolean | null;
   /** The line's unpriced-part count, resolved (`withUnpricedParts`). */
   unpricedParts: number;
+  /**
+   * Who does the work (0146). REQUIRED: a line whose material is the
+   * owner's, or that is not ours at all, has nothing of ours to price, and a
+   * Fix button there would send the estimator to price somebody else's part.
+   */
+  scopeTag: LineScope | null;
 };
 
 /**
@@ -124,13 +135,18 @@ export function lineFixGaps(line: FixableLineLike): LineFixGaps {
   const qty = Number(line.qty);
   // Nothing on the line to price: $0 for nothing is true (lineNotPriced).
   if (!Number.isFinite(qty) || qty <= 0) return NO_GAPS;
+  // By others / Excluded (0146): nothing on the line is ours to fix.
+  if (scopeIsOffBid(line)) return NO_GAPS;
+  // Owner furnishes: the material is theirs — only our labor can be missing.
+  const oursToBuy = scopePricesMaterial(line);
 
   if (line.assemblyId !== null) {
-    const parts = Math.floor(line.unpricedParts) > 0;
+    const parts = oursToBuy && Math.floor(line.unpricedParts) > 0;
     return {
       ...NO_GAPS,
       parts,
       material:
+        oursToBuy &&
         !parts &&
         line.snapshotLaborOnly !== true &&
         Number(line.snapshotMaterialCost ?? 0) === 0,
@@ -144,6 +160,7 @@ export function lineFixGaps(line: FixableLineLike): LineFixGaps {
       ...NO_GAPS,
       // A field bend is labor on a part that is $0 by nature; never a price.
       runPrice:
+        oursToBuy &&
         line.runMaterialRole !== "fieldBend" &&
         needsPricing(line.snapshotMaterialCost),
       runHours: lineHoursUnset(line) && !laborInRunRate(line.runMaterialRole),

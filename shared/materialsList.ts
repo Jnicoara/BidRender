@@ -101,6 +101,78 @@ export type ForQuoteEntry = {
   unit: "each";
 };
 
+/**
+ * A line the owner furnishes (0146), by name and quantity — "each" for a
+ * device or fitting, "foot" for a wire or conduit line's footage.
+ */
+export type OwnerFurnishedEntry = {
+  name: string;
+  qty: number;
+  unit: MaterialUnit;
+};
+
+/** Run-type roles bought by the foot; every other role is a count of each. */
+export function runRoleIsFootage(role: string | null): boolean {
+  return (
+    role === "raceway" ||
+    role === "conductor" ||
+    role === "ground" ||
+    role === "extra"
+  );
+}
+
+/** The bought footage the measured section is built from. */
+export type BoughtFootage = {
+  conduitBoughtFeet: number;
+  cableBoughtFeet: number;
+  wireBoughtFeet: number;
+  /** The bare share OF wireBoughtFeet. */
+  wireGroundBoughtFeet: number;
+};
+
+/**
+ * The combined footage with the roles NOT OURS TO BUY taken out (0146).
+ *
+ * `parts` is one entry per run type that has such a role: that type's own
+ * totals (the same `totalQuantities`, over its runs, drops and homeruns
+ * only) and which of its roles are tagged By others / Excluded / owner
+ * furnished. Each role takes out exactly its share:
+ *
+ *   raceway    the type's conduit
+ *   conductor  the type's insulated wire — or, on a cable type, the cable
+ *              (the conductor link IS the cable, RUN_MATERIAL_ROLES)
+ *   ground     the type's bare ground, out of the wire and its bare share
+ *
+ * Never below zero: a rounding crumb must not print as "-0.01 ft".
+ */
+export function withoutNotToBuy<T extends BoughtFootage>(
+  all: T,
+  parts: readonly { roles: ReadonlySet<string>; totals: BoughtFootage }[]
+): T {
+  let conduit = all.conduitBoughtFeet;
+  let cable = all.cableBoughtFeet;
+  let wire = all.wireBoughtFeet;
+  let ground = all.wireGroundBoughtFeet;
+  for (const { roles, totals } of parts) {
+    if (roles.has("raceway")) conduit -= totals.conduitBoughtFeet;
+    if (roles.has("conductor")) {
+      cable -= totals.cableBoughtFeet;
+      wire -= totals.wireBoughtFeet - totals.wireGroundBoughtFeet;
+    }
+    if (roles.has("ground")) {
+      wire -= totals.wireGroundBoughtFeet;
+      ground -= totals.wireGroundBoughtFeet;
+    }
+  }
+  return {
+    ...all,
+    conduitBoughtFeet: Math.max(0, conduit),
+    cableBoughtFeet: Math.max(0, cable),
+    wireBoughtFeet: Math.max(0, wire),
+    wireGroundBoughtFeet: Math.max(0, ground),
+  };
+}
+
 /** The whole document, as both exporters consume it. */
 export type MaterialsListDoc = {
   bidName: string;
@@ -111,6 +183,18 @@ export type MaterialsListDoc = {
   measured: MeasuredEntry[];
   /** Counts with no assembly, for the supplier to price. */
   forQuote: ForQuoteEntry[];
+  /**
+   * Lines the OWNER furnishes and we install (0146) — listed by line, with
+   * quantity, under "Owner furnished — not to buy", never in the order
+   * above. Required, so no exporter can forget the section.
+   */
+  ownerFurnished: OwnerFurnishedEntry[];
+  /**
+   * Lines left off because the work is not ours (0146): By others and
+   * Excluded. Said in a footer (owner Q7) — a short list must say WHY it
+   * is short. Required, so no exporter can forget it.
+   */
+  leftOff: { byOthers: number; excluded: number };
   /** Anything the reader must know to read the list correctly. */
   notes: string[];
 };
@@ -327,6 +411,26 @@ export const SUPPLIER_TO_PRICE_HEADING = "Supplier to price";
 export const SUPPLIER_TO_PRICE_NOTE =
   "Counted on the drawings, with no parts list. Please quote as a package.";
 
+export const OWNER_FURNISHED_HEADING = "Owner furnished — not to buy";
+export const OWNER_FURNISHED_NOTE =
+  "The owner supplies these; we install them. Listed so the job is complete.";
+
+/**
+ * The footer for lines left off (owner Q7): "Left off: 3 lines by others,
+ * 1 excluded." Empty when nothing was left off — no footer then.
+ */
+export function leftOffWords(leftOff: MaterialsListDoc["leftOff"]): string {
+  const parts: string[] = [];
+  if (leftOff.byOthers > 0)
+    parts.push(
+      `${leftOff.byOthers} ${leftOff.byOthers === 1 ? "line" : "lines"} by others`
+    );
+  if (leftOff.excluded > 0) parts.push(`${leftOff.excluded} excluded`);
+  return parts.length === 0
+    ? ""
+    : `Left off: ${parts.join(", ")} — not ours to buy, and their drops are not counted.`;
+}
+
 /** Human unit label — "ft" reads better than "foot" against a number. */
 export function unitLabel(unit: MaterialUnit): string {
   return unit === "foot" ? "ft" : unit === "box" ? "box" : "ea";
@@ -337,7 +441,10 @@ export function isEmptyList(doc: MaterialsListDoc): boolean {
   return (
     doc.entries.length === 0 &&
     doc.measured.length === 0 &&
-    doc.forQuote.length === 0
+    doc.forQuote.length === 0 &&
+    // Not orderable, but on the document — a job whose fixtures are all
+    // owner furnished is not "nothing taken off".
+    doc.ownerFurnished.length === 0
   );
 }
 
@@ -411,10 +518,32 @@ export function toCsv(doc: MaterialsListDoc): string {
     }
   }
 
+  if (doc.ownerFurnished.length > 0) {
+    rows.push("");
+    rows.push(csvRow([OWNER_FURNISHED_HEADING]));
+    rows.push(csvRow(["Item", "Unit", "Quantity", "Note"]));
+    for (const entry of doc.ownerFurnished) {
+      rows.push(
+        csvRow([
+          entry.name,
+          unitLabel(entry.unit),
+          entry.qty,
+          OWNER_FURNISHED_NOTE,
+        ])
+      );
+    }
+  }
+
   if (doc.notes.length > 0) {
     rows.push("");
     rows.push(csvRow(["Notes"]));
     for (const note of doc.notes) rows.push(csvRow([note]));
+  }
+
+  const leftOff = leftOffWords(doc.leftOff);
+  if (leftOff) {
+    rows.push("");
+    rows.push(csvRow([leftOff]));
   }
 
   return rows.join("\r\n");

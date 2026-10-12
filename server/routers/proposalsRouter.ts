@@ -421,6 +421,7 @@ export const proposalsRouter = router({
           name: line.name,
           qty: Number(line.qty),
           unitLabel: line.unitLabel,
+          scopeTag: line.scopeTag,
         })),
         branding: toBrandingFields(brandingRow),
         design: {

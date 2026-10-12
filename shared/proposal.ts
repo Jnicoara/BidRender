@@ -35,6 +35,7 @@
 import { PROPOSAL_LAYOUTS, type ProposalLayout } from "../drizzle/schema";
 import { roundMoney } from "./pricing";
 import { tallyLeavesOut, type NotPricedTally } from "./lineNotPriced";
+import { scopeOf, type LineScope } from "./lineScope";
 import {
   groupScopeNotes,
   sectionAllowedInMode,
@@ -310,12 +311,61 @@ export type ProposalScopeLine = {
   qty: number;
   /** Which repeating unit it belongs to, e.g. "Room 101". Null for one-offs. */
   unitLabel: string | null;
+  /**
+   * Who does the work (0146). REQUIRED, so a mapping that forgets it does not
+   * compile rather than printing a By others line as work we do. See
+   * `scopeLinesForProposal`.
+   */
+  scopeTag: LineScope | null;
 };
+
+/**
+ * What the scope tags add to "Includes and excludes" (scope-tags-plan.md
+ * step 5, owner Q8). Owner-furnished lines are work we DO, so they stay in
+ * the scope of work and are also named under Includes with their quantity
+ * ("12 Light fixture"); By others and Excluded lines are not our work, so
+ * they leave the scope of work and are named under Excludes by name only.
+ * One entry per tag, after the hand-written notes, which stay exactly as
+ * typed and first. The same name across rooms is said once (quantities
+ * summed), so forty rooms of owner-furnished fans read as one entry.
+ */
+export function scopeLinesForProposal(lines: readonly ProposalScopeLine[]): {
+  includes: string[];
+  excludes: string[];
+} {
+  const ofci = new Map<string, number>();
+  const byOthers = new Set<string>();
+  const excluded = new Set<string>();
+  for (const line of lines) {
+    const name = line.name.trim();
+    if (name === "") continue;
+    const scope = scopeOf(line);
+    if (scope === "ofci") ofci.set(name, (ofci.get(name) ?? 0) + line.qty);
+    else if (scope === "by_others") byOthers.add(name);
+    else if (scope === "excluded") excluded.add(name);
+  }
+  const qty = (n: number) => String(Math.round(n * 100) / 100);
+  const includes =
+    ofci.size === 0
+      ? []
+      : [
+          `Owner-furnished, installed by us: ${Array.from(ofci)
+            .map(([name, n]) => `${qty(n)} ${name}`)
+            .join(", ")}`,
+        ];
+  const excludes: string[] = [];
+  if (byOthers.size > 0)
+    excludes.push(`By others: ${Array.from(byOthers).join(", ")}`);
+  if (excluded.size > 0)
+    excludes.push(`Excluded: ${Array.from(excluded).join(", ")}`);
+  return { includes, excludes };
+}
 
 export type ProposalScopeGroup = {
   /** Null for the lines that belong to no unit. */
   label: string | null;
-  lines: ProposalScopeLine[];
+  /** What the client sees: the tag stays on the estimator's side. */
+  lines: Omit<ProposalScopeLine, "scopeTag">[];
 };
 
 export type ProposalUnitPrice = {
@@ -675,11 +725,23 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
     notPriced,
   } = input;
 
-  const inclusions = groupScopeNotes(scopeNotes);
+  // Hand-written notes first and untouched; then what the line tags say.
+  const typed = groupScopeNotes(scopeNotes);
+  const tagged = scopeLinesForProposal(input.lines);
+  const inclusions = {
+    includes: [...typed.includes, ...tagged.includes],
+    excludes: [...typed.excludes, ...tagged.excludes],
+  };
+  // The scope of work is the work WE do: By others and Excluded lines are
+  // named under Excludes instead (scopeLinesForProposal).
+  const ourLines = input.lines.filter(
+    line => scopeOf(line) === "install" || scopeOf(line) === "ofci"
+  );
   // Scope-only prints no money, so nothing on it can be short. A bid with no
   // lines is pending too: its total is a true $0.00 for work nobody has added,
-  // which a client reads as a price.
-  const noWork = mode === "full" && input.lines.length === 0;
+  // which a client reads as a price — and so is one whose every line is By
+  // others or Excluded, whose $0.00 is just as much not a price.
+  const noWork = mode === "full" && ourLines.length === 0;
   const pricePending =
     // Lines, parts, hours AND drops with no material (owner, 2026-10-07).
     noWork || (mode === "full" && tallyLeavesOut(notPriced));
@@ -734,8 +796,11 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
   // proposal reads in the order the estimator built it.
   const scope: ProposalScopeGroup[] = [];
   if (visible("scope")) {
-    for (const line of input.lines) {
-      const label = line.unitLabel ?? null;
+    for (const { name, qty, unitLabel } of ourLines) {
+      // Listed by hand: what leaves the building is what, how many, where —
+      // the tag already said its piece under Includes / Excludes.
+      const line = { name, qty, unitLabel };
+      const label = unitLabel ?? null;
       const group = scope.find(g => g.label === label);
       if (group) group.lines.push(line);
       else scope.push({ label, lines: [line] });

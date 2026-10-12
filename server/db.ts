@@ -307,6 +307,7 @@ import {
   type FittingKind,
   type RacewayFittingSpec,
 } from "../shared/runFittings";
+import { scopeKeepsDrops, type LineScope } from "../shared/lineScope";
 import {
   placeAnswer,
   resolveBendSettings,
@@ -6294,6 +6295,62 @@ export async function searchSheetText(
 }
 
 /**
+ * The note finder's one pass (scope-tags-plan.md step 7): every page of these
+ * plans whose text could hold a "who does this" phrase — any of `likes`, ORed
+ * — capped like `searchSheetText`, with `truncated` saying so. The exact
+ * phrase test runs on what comes back (`shared/scopePhrases.ts`).
+ */
+export async function sheetTextMatchingAny(
+  bidPdfIds: number[],
+  userId: number,
+  likes: readonly string[]
+) {
+  const db = await getDb();
+  if (!db || bidPdfIds.length === 0 || likes.length === 0)
+    return { pages: [], truncated: false, perPlan: [] };
+  const scope = and(
+    inArray(bidPdfSheetText.bidPdfId, bidPdfIds),
+    eq(bidPdfSheetText.userId, userId)
+  );
+  const [pages, perPlan] = await Promise.all([
+    db
+      .select({
+        bidPdfId: bidPdfSheetText.bidPdfId,
+        pageNumber: bidPdfSheetText.pageNumber,
+        text: bidPdfSheetText.text,
+      })
+      .from(bidPdfSheetText)
+      .where(
+        and(
+          scope,
+          eq(bidPdfSheetText.hasTextLayer, true),
+          or(...likes.map(pattern => like(bidPdfSheetText.text, pattern)))
+        )
+      )
+      .orderBy(asc(bidPdfSheetText.bidPdfId), asc(bidPdfSheetText.pageNumber))
+      .limit(SEARCH_PAGE_LIMIT + 1),
+    db
+      .select({
+        bidPdfId: bidPdfSheetText.bidPdfId,
+        read: sql<number>`count(*)`,
+        scanned: sql<number>`sum(case when ${bidPdfSheetText.hasTextLayer} then 0 else 1 end)`,
+      })
+      .from(bidPdfSheetText)
+      .where(scope)
+      .groupBy(bidPdfSheetText.bidPdfId),
+  ]);
+  return {
+    pages: pages.slice(0, SEARCH_PAGE_LIMIT),
+    truncated: pages.length > SEARCH_PAGE_LIMIT,
+    perPlan: perPlan.map(p => ({
+      bidPdfId: p.bidPdfId,
+      read: Number(p.read),
+      scanned: Number(p.scanned ?? 0),
+    })),
+  };
+}
+
+/**
  * A field the reading pass found — or found nothing for, which is `value:
  * null` — for one page. Omitting a field leaves whatever is stored alone.
  */
@@ -7207,6 +7264,33 @@ export async function setLineExtraFeetPerFoot(
         eq(bidLineItems.runMaterialRole, "extra")
       )
     );
+}
+
+/**
+ * Who does each of these lines' work (0146, shared/lineScope.ts) — one tag
+ * per line, so Undo can put back a mixed set exactly as it was (NULL
+ * included: "not said" is a value, and Undo must restore it, not
+ * `install`). Scoped to the bid's live lines; the router checks the bid
+ * belongs to the company and is not locked before calling this.
+ */
+export async function setBidLineScopes(
+  bidId: number,
+  changes: readonly { id: number; scopeTag: LineScope | null }[]
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  for (const change of changes) {
+    await db
+      .update(bidLineItems)
+      .set({ scopeTag: change.scopeTag })
+      .where(
+        and(
+          eq(bidLineItems.id, change.id),
+          eq(bidLineItems.bidId, bidId),
+          isNull(bidLineItems.archivedAt)
+        )
+      );
+  }
 }
 
 export async function getBidLineItem(
@@ -8294,6 +8378,8 @@ export async function generateBidUnits(
           qty: line.qty,
           unitLabel: label,
           ...pricingSnapshotOf(line),
+          // Who does the work (0146): a copy of the room is the same room.
+          scopeTag: line.scopeTag,
           sortOrder: sortOrder++,
         });
       }
@@ -8449,8 +8535,20 @@ export async function getBidUnitStates(bidId: number): Promise<BidUnitState[]> {
  */
 export async function pushTemplateToLinkedCopies(
   bidId: number,
-  templateLabel: string
-): Promise<{ updated: string[]; skippedForked: string[] }> {
+  templateLabel: string,
+  /**
+   * The bid's quantities are locked (owner Q11, 2026-10-10): the push still
+   * carries every other field, but NOT a change of who does the work — a
+   * tag never moves on a locked bid. Required, so no caller can forget to
+   * ask.
+   */
+  locked: boolean
+): Promise<{
+  updated: string[];
+  skippedForked: string[];
+  /** Copies where the template's tag was NOT pushed because the bid is locked. */
+  scopeKept: string[];
+}> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
@@ -8477,7 +8575,36 @@ export async function pushTemplateToLinkedCopies(
     updated.push(link.unitLabel);
   }
 
-  if (updated.length === 0) return { updated, skippedForked };
+  if (updated.length === 0) return { updated, skippedForked, scopeKept: [] };
+
+  /*
+    ON A LOCKED BID, each rebuilt line keeps the tag of the copy line it
+    replaces. Lines have no identity across a copy, so "the line it
+    replaces" is the copy's next unclaimed line with the same assembly and
+    name, in order — two "Duplex receptacle" rows pair first-to-first. A
+    line with no partner is NEW to the copy, and takes the template's tag:
+    adding a line is not changing one.
+  */
+  const scopeKept: string[] = [];
+  const keptTags = new Map<string, (LineScope | null)[]>();
+  const pairKey = (label: string, line: BidLineItem) =>
+    JSON.stringify([label, line.assemblyId, line.name]);
+  if (locked) {
+    for (const row of all) {
+      if (row.unitLabel === null || !updated.includes(row.unitLabel)) continue;
+      const key = pairKey(row.unitLabel, row);
+      keptTags.set(key, [...(keptTags.get(key) ?? []), row.scopeTag]);
+    }
+  }
+  const tagFor = (label: string, line: BidLineItem): LineScope | null => {
+    if (!locked) return line.scopeTag;
+    const queue = keptTags.get(pairKey(label, line));
+    if (!queue || queue.length === 0) return line.scopeTag;
+    const kept = queue.shift()!;
+    if (kept !== line.scopeTag && !scopeKept.includes(label))
+      scopeKept.push(label);
+    return kept;
+  };
 
   // Drop and rebuild in place. Deleting directly rather than through
   // deleteBidLineItem is deliberate: that helper forks, and this write is the
@@ -8502,13 +8629,14 @@ export async function pushTemplateToLinkedCopies(
         qty: line.qty,
         unitLabel: label,
         ...pricingSnapshotOf(line),
+        scopeTag: tagFor(label, line),
         sortOrder: sortOrder++,
       });
     }
   }
   if (rows.length > 0) await db.insert(bidLineItems).values(rows);
 
-  return { updated, skippedForked };
+  return { updated, skippedForked, scopeKept };
 }
 
 /**
@@ -15594,6 +15722,36 @@ export async function dropsNotPricedForBids(
  * type is resolved through `heights.dropTypeFor`, which follows forks with
  * `resolveRunType`.
  */
+/**
+ * Counts on a bid whose install line says the device is not ours — By
+ * others / Excluded (0146, `scopeKeepsDrops`). Their drops are not bought.
+ * A remove / relocate line's tag says nothing about the new device's drop.
+ */
+export async function groupsWithoutDrops(bidId: number): Promise<Set<number>> {
+  const db = await getDb();
+  if (!db) return new Set();
+  const lines = await db
+    .select({
+      takeoffGroupId: bidLineItems.takeoffGroupId,
+      lineRole: bidLineItems.lineRole,
+      scopeTag: bidLineItems.scopeTag,
+    })
+    .from(bidLineItems)
+    .where(
+      and(
+        eq(bidLineItems.bidId, bidId),
+        isNull(bidLineItems.archivedAt),
+        isNotNull(bidLineItems.takeoffGroupId),
+        isNotNull(bidLineItems.scopeTag)
+      )
+    );
+  return new Set(
+    lines
+      .filter(l => !isLaborRoleLine(l) && !scopeKeepsDrops(l))
+      .map(l => l.takeoffGroupId!)
+  );
+}
+
 export async function loadGroupDrops(
   bidId: number,
   userId: number,
@@ -15610,7 +15768,18 @@ export async function loadGroupDrops(
     { scaleRatio: number | null; scaleSource: string; notToScale: boolean }
   >
 ): Promise<GroupDrop[]> {
-  const groups = await getGroupsForBid(bidId, userId);
+  /*
+    A count whose INSTALL line is By others / Excluded (0146) buys no drop:
+    the device is not ours, so neither is the pipe and wire to it (owner,
+    2026-10-10, Q10). Left out HERE, before `groupDrops`, so the readout,
+    the run-type footage priced from drops and the not-priced drops tally
+    all follow one answer. Owner furnishes keeps its drops — we still wire
+    it (Q3). The only link from a drop to a line is the count's group.
+  */
+  const offGroups = await groupsWithoutDrops(bidId);
+  const groups = (await getGroupsForBid(bidId, userId)).filter(
+    g => !offGroups.has(g.id)
+  );
   /*
     A count with no "Each drops to" of its own drops to its ITEM's "Mounts
     at" type (owner, 2026-10-07; `deviceKind`). The same resolution the

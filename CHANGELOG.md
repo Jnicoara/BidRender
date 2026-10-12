@@ -6,6 +6,27 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **The proposal now says who does what.** Owner-furnished items are listed
+  under Included ("Owner-furnished, installed by us: 24 light fixtures");
+  By others and Excluded lines leave the scope of work and are named under
+  Not included. On the bid, a "Who does what" line counts each kind and
+  filters the list to it. **New, under More options:** a note finder that
+  reads "BY OTHERS", "N.I.C.", "OWNER FURNISHED" and similar off the
+  drawings and offers to tag the lines they're about — nothing ticked until
+  you tick it, with Undo. No AI; no existing bid moved.
+- **Wire and conduit marked "By others" or "Excluded" now leave the
+  materials list too**, with their footage and fittings, and count in the
+  "left off" footer; owner-furnished wire or pipe is listed by the foot
+  under "not to buy". Pushing a room template on a locked bid now says when
+  it kept the copies' "who does this" answers. No existing bid moved.
+- **"Who does this?" on every bid line.** A small "…" beside each line
+  marks it We install, Owner furnishes (we install), By others, or
+  Excluded, with Undo. The price, the line's cost and the materials list
+  follow at once: owner-furnished lines keep our labor and move to their
+  own "not to buy" section; By others and Excluded lines price nothing,
+  leave the order (a footer says how many) and take their drops with them.
+  A locked bid refuses the change. Nothing is marked unless somebody picks
+  it, so no existing bid moved.
 - **Viewing a plan sheet no longer sets its scale for you.** When the app
   reads a scale printed on the drawing, it now shows a "Use 1/8" = 1'-0" —
   read off the sheet" button beside Set scale, and nothing is measured
