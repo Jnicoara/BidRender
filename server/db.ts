@@ -1496,7 +1496,8 @@ export async function withSeedLock(
 }
 
 /**
- * Drop duplicate baseline rows left by a pre-lock race, keeping the lowest id.
+ * Drop duplicate baseline rows left by a pre-lock race, keeping the lowest id
+ * — and keeping any duplicate that something still points at (see below).
  *
  * Self-healing rather than a migration: the duplicates are data damage, not a
  * schema change, and any database that ran the old seeder concurrently has them.
@@ -1552,9 +1553,9 @@ async function dedupeBaselineRows(
   // The keepers are found by the same GROUP BY, materialised first, so the
   // join is every baseline row against the few duplicated names rather than
   // against every other row.
-  await db.execute(
+  const [dupes] = (await db.execute(
     sql.raw(
-      `DELETE dupe FROM \`${table}\` dupe
+      `SELECT dupe.id AS id, dupe.name AS name FROM \`${table}\` dupe
      JOIN (
        SELECT BINARY name AS exactName, MIN(id) AS keepId FROM \`${table}\`
        WHERE userId IS NULL
@@ -1562,6 +1563,61 @@ async function dedupeBaselineRows(
      ) keeper
        ON BINARY dupe.name = keeper.exactName AND dupe.id > keeper.keepId
      WHERE dupe.userId IS NULL`
+    )
+  )) as unknown as [Array<{ id: number; name: string }>, unknown];
+
+  /*
+    ── A duplicate anything points at is KEPT, never deleted (2026-10-12) ──────
+    This used to delete every duplicate, and the foreign keys did the rest: a
+    company recipe line pointing at the duplicate was CASCADED away, by a boot
+    that never named a company row (owner: a start never touches a company's
+    own rows; server/bootLeavesCompanyRows.test.ts). So a duplicate is deleted
+    only when no row anywhere refers to it — every foreign key into this table,
+    read from the database rather than listed here so a new one cannot be
+    missed, plus `baselineId`, which forks use and which is not a foreign key.
+    A kept duplicate is a visible extra row, which is recoverable; a deleted
+    recipe line is not. Same choice `renameBaselineMaterials` makes.
+  */
+  const [refs] = (await db.execute(
+    sql.raw(
+      `SELECT TABLE_NAME AS tableName, COLUMN_NAME AS columnName
+     FROM information_schema.KEY_COLUMN_USAGE
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME = '${table}'
+       AND REFERENCED_COLUMN_NAME = 'id'`
+    )
+  )) as unknown as [Array<{ tableName: string; columnName: string }>, unknown];
+  const pointers = [
+    ...refs.map(r => ({ table: r.tableName, column: r.columnName })),
+    { table, column: "baselineId" },
+  ];
+
+  const removable: number[] = [];
+  for (const dupe of dupes) {
+    let used = false;
+    for (const p of pointers) {
+      const [hit] = (await db.execute(
+        sql.raw(
+          `SELECT 1 FROM \`${p.table}\` WHERE \`${p.column}\` = ${Number(dupe.id)} LIMIT 1`
+        )
+      )) as unknown as [unknown[], unknown];
+      if (hit.length > 0) {
+        used = true;
+        break;
+      }
+    }
+    if (used) {
+      console.warn(
+        `[seed] duplicate shared ${table} row ${dupe.id} ("${dupe.name}") is still referenced — kept.`
+      );
+    } else {
+      removable.push(Number(dupe.id));
+    }
+  }
+  if (removable.length === 0) return;
+  await db.execute(
+    sql.raw(
+      `DELETE FROM \`${table}\` WHERE userId IS NULL AND id IN (${removable.join(",")})`
     )
   );
 }
@@ -2289,23 +2345,22 @@ export async function seedBaselineMaterialsFrom(
  * Bring catalog metadata — `category` and `searchAliases` — up to date on rows
  * that predate those columns.
  *
- * Two passes, both idempotent and both cheap enough to run on every startup:
+ * ONE pass, idempotent and cheap enough to run on every startup: baseline rows
+ * are re-stamped from BASELINE_MATERIALS unconditionally. They are app-owned
+ * and read-only to users, so the seed file stays the authority — re-shelving a
+ * material or adding slang to it there fixes live databases for free, with no
+ * migration.
  *
- *  1. Baseline rows are re-stamped from BASELINE_MATERIALS unconditionally.
- *    They are app-owned and read-only to users, so the seed file stays the
- *    authority — re-shelving a material or adding slang to it there fixes live
- *    databases for free, with no migration.
- *  2. User forks that are still NULL inherit from the baseline they came from.
- *    Only NULL is touched: a value the user chose is theirs to keep, and a fork
- *    is allowed to sit on a different shelf than its original.
- *
- * NULL therefore means "never set, inherit it" — never "empty". Clearing the
- * aliases in the Materials editor stores an empty string on purpose, so the
- * clear survives the next startup; do not widen these NULL checks to cover
- * blank text, or a user who deletes a term will find it back tomorrow.
- *
- * Fully custom rows (no baselineId) are left alone — there is nothing to
- * inherit from, and guessing would be worse than leaving them blank.
+ * ── There used to be a second pass, over COMPANIES' forks. Removed 2026-10-12 ─
+ * It filled a fork's NULL category, aliases, default qty and raceway facts from
+ * its baseline, on the theory that NULL meant "never set, inherit it". A stick
+ * length going from NULL to 10 ft turns "not countable" into a coupling count
+ * on an open bid that nobody chose (baseline-screen-plan.md § 9 F3), and the
+ * owner's rule is that a start never writes a company's own row at all — the
+ * shared starter changes through the loader, and a company's copy only through
+ * the company. `server/bootLeavesCompanyRows.test.ts` goes red if it returns.
+ * A fork that wants the starter's values gets them through revert, which is a
+ * button.
  *
  * ── Price is re-stamped too, and THIS IS WHERE SHIPPED PRICES COME FROM ──────
  * The seed file is the source of truth for `costPerUnit` on a baseline row, so
@@ -2383,12 +2438,10 @@ async function backfillMaterialMetadata(
     .where(isNull(materials.userId));
 
   const seedByName = new Map(catalog.map(m => [m.name, m]));
-  const seedById = new Map<number, BaselineMaterial>();
 
   for (const row of baselines) {
     const intended = seedByName.get(row.name);
     if (!intended) continue; // a baseline row no longer in the seed file
-    seedById.set(row.id, intended);
 
     const patch: Partial<InsertMaterial> = {};
     if (row.category !== intended.category) patch.category = intended.category;
@@ -2451,72 +2504,6 @@ async function backfillMaterialMetadata(
 
     if (Object.keys(patch).length > 0) {
       await db.update(materials).set(patch).where(eq(materials.id, row.id));
-    }
-  }
-
-  const staleForks = await db
-    .select({
-      id: materials.id,
-      baselineId: materials.baselineId,
-      category: materials.category,
-      searchAliases: materials.searchAliases,
-      defaultQty: materials.defaultQty,
-      stickLengthFeet: materials.stickLengthFeet,
-      stickJoint: materials.stickJoint,
-      strapSpacingFeet: materials.strapSpacingFeet,
-      strapFromBoxFeet: materials.strapFromBoxFeet,
-    })
-    .from(materials)
-    .where(
-      and(
-        isNotNull(materials.userId),
-        isNotNull(materials.baselineId),
-        or(
-          isNull(materials.category),
-          isNull(materials.searchAliases),
-          isNull(materials.defaultQty),
-          isNull(materials.stickJoint),
-          isNull(materials.strapSpacingFeet)
-        )
-      )
-    );
-
-  // Note what is absent here: price, description and trade. Price is the
-  // user's whole reason for forking and must never be reached into. The other
-  // two are NOT NULL with defaults, so there is no "never set" state to detect
-  // — a fork that wants the baseline's copy of either gets it through revert,
-  // which is the explicit action for that.
-  for (const fork of staleForks) {
-    const source =
-      fork.baselineId != null ? seedById.get(fork.baselineId) : undefined;
-    if (!source) continue;
-
-    const patch: Partial<InsertMaterial> = {};
-    if (fork.category === null) patch.category = source.category;
-    if (fork.searchAliases === null) patch.searchAliases = source.searchAliases;
-    // A fork made before this column existed shows NULL, which the builder
-    // reads as "1" — so a forked box of wire nuts would lose its suggestion.
-    // Only NULL is filled; a material with no default legitimately stays NULL.
-    if (fork.defaultQty === null && source.defaultQty != null) {
-      patch.defaultQty = source.defaultQty.toFixed(4);
-    }
-    /*
-      A raceway forked before 0082 has no stick length or strap spacing — so
-      a contractor who priced their EMT would see "no stick length set" on
-      every run of it. NULL is "never set, inherit", the rule this whole pass
-      runs on; a value the contractor chose is left alone field by field.
-    */
-    if (source.raceway) {
-      const inherited = racewayColumns(source);
-      for (const key of RACEWAY_NUMBER_KEYS) {
-        if (fork[key] === null && inherited[key] !== null) {
-          patch[key] = inherited[key];
-        }
-      }
-      if (fork.stickJoint === null) patch.stickJoint = inherited.stickJoint;
-    }
-    if (Object.keys(patch).length > 0) {
-      await db.update(materials).set(patch).where(eq(materials.id, fork.id));
     }
   }
 }

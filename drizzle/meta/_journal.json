@@ -1037,6 +1037,20 @@
       "when": 1789963700000,
       "tag": "0147_bid_scope_prompts_dismissed",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "5",
+      "when": 1789963800000,
+      "tag": "0148_bid_math_version",
+      "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "5",
+      "when": 1789963900000,
+      "tag": "0149_bid_frozen_settings",
+      "breakpoints": true
     }
   ]
 }

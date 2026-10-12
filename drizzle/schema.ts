@@ -2306,11 +2306,17 @@ export const bids = mysqlTable(
      * A flag plus a date can disagree, and "locked since when" is the first
      * thing asked about a number that stopped moving. One column cannot drift.
      *
-     * ── Independent of `status`, and never set by it ──────────────────────────
+     * ── Independent of `status`, and never set by it — REVERSED 2026-10-12 ─────
      * A bid marked Won is often still being adjusted, and a lock the app applied
      * on a status change is a number frozen at an instant the app chose. This is
      * only ever written by `bids.lockQuantities` / `bids.unlockQuantities`,
      * which a person presses.
+     *
+     * Owner Q15 (2026-10-12, baseline-screen-plan.md § 9 F1) reverses that: a
+     * bid LEAVING Draft locks itself, with Unlock one click away as today,
+     * because an unlocked Won bid re-counts whenever the library moves. The
+     * paragraph above stays until the code that does it lands (Track C); that
+     * commit rewrites it. Same column — no migration was needed for this.
      *
      * ── It does NOT freeze money ─────────────────────────────────────────────
      * The four snapshot columns on a line already did that, at add time, and are
@@ -2348,6 +2354,42 @@ export const bids = mysqlTable(
      */
     scopePromptsDismissedAt: timestamp("scopePromptsDismissedAt"),
 
+    /**
+     * Which math this bid prices by (0148, Track C's BS-M7; baseline-screen-
+     * plan.md § 8, owner Q14/Q22). NULL = version 0, the math before the
+     * registry in shared/mathVersion.ts existed. Only Drafts are moved to a
+     * newer version, by a release step or a button — never by a migration.
+     */
+    mathVersion: int("mathVersion"),
+
+    /**
+     * Settings written onto the bid when it LEFT DRAFT (0149, owner Q16;
+     * baseline-screen-plan.md § 9 F8). NULL = never frozen: the bid's own
+     * overhead / profit / productivity / tax columns are a person's choices,
+     * as before. Set = they, and the tax columns below, hold the values that
+     * were in effect at that instant, so a sent bid stops following the
+     * company. Drafts still inherit.
+     */
+    settingsFrozenAt: timestamp("settingsFrozenAt"),
+    /**
+     * The company's tax switches, per bid (0149). ONE GROUP, like overhead and
+     * profit above: `salesTaxEnabled` NULL = the whole group follows
+     * `pricing_defaults`. Written by the freeze; nothing else today.
+     */
+    salesTaxEnabled: boolean("salesTaxEnabled"),
+    taxMaterials: boolean("taxMaterials"),
+    taxLabor: boolean("taxLabor"),
+    taxApplyTo: mysqlEnum("taxApplyTo", TAX_APPLY_TO),
+    /**
+     * The tax rate in effect when the bid was frozen, as a percent (0149).
+     * Read only when `settingsFrozenAt` is set; NULL then = no rate was in
+     * effect. NOT `taxRateOverridePct`, which means "typed on the bid" and
+     * labels itself that way on screen.
+     */
+    taxRateFrozenPct: decimal("taxRateFrozenPct", { precision: 7, scale: 4 }),
+    /** What is shown beside the frozen rate: source, area, components. Display only. */
+    taxRateFrozenDetail: json("taxRateFrozenDetail"),
+
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -2376,6 +2418,35 @@ export const bids = mysqlTable(
 
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = typeof bids.$inferInsert;
+
+/**
+ * A Draft whose total moved when it was brought to a newer math version
+ * (0148, Track C's BS-M7; baseline-screen-plan.md § 8). Written by the
+ * release step and by "Update to the current math" (owner Q22), and shown as
+ * "Total changed from … to … because …" until `seenAt`. Never on the
+ * customer's proposal.
+ */
+export const bidMathChanges = mysqlTable(
+  "bid_math_changes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    bidId: int("bidId")
+      .notNull()
+      .references(() => bids.id, { onDelete: "cascade" }),
+    /** NULL = version 0, as on `bids.mathVersion`. */
+    fromVersion: int("fromVersion"),
+    toVersion: int("toVersion").notNull(),
+    totalBefore: decimal("totalBefore", { precision: 14, scale: 4 }).notNull(),
+    totalAfter: decimal("totalAfter", { precision: 14, scale: 4 }).notNull(),
+    reason: varchar("reason", { length: 512 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    seenAt: timestamp("seenAt"),
+  },
+  t => [index("bid_math_changes_bidId_idx").on(t.bidId)]
+);
+
+export type BidMathChange = typeof bidMathChanges.$inferSelect;
+export type InsertBidMathChange = typeof bidMathChanges.$inferInsert;
 
 // ─── Bid PDFs (plan sheets) ───────────────────────────────────────────────────
 /**

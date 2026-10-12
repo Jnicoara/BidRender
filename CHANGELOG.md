@@ -19,6 +19,21 @@ This is the human-readable companion to the git history — read this to see wha
   leave the order (a footer says how many) and take their drops with them.
   A locked bid refuses the change. Nothing is marked unless somebody picks
   it, so no existing bid moved.
+
+- **Restarting or updating the app no longer touches your own library.**
+  On every start the app used to fill in blank details (shelf, search
+  words, conduit stick length and strap spacing) on materials you had
+  edited, and a rare clean-up could delete a line from one of your own
+  assemblies. Now a start only ever updates BidRidge's shared starter
+  items; anything your company owns is left exactly as you saved it.
+
+- **Groundwork so a bid you've sent stops changing on its own.** New empty
+  database fields let the app remember which version of the pricing math
+  each bid uses (so a future fix only reaches Drafts, with a note saying
+  why the total moved) and keep a copy of the overhead, profit,
+  productivity and sales-tax settings that were in effect when a bid left
+  Draft. Nothing uses them yet; no bid total moves.
+
 - **Bid prices now know who does each line's work.** A line marked "Owner
   furnishes, we install" prices our labor only; "By others" and "Excluded"
   price nothing and never read "not priced". The bid, the Dashboard card and

@@ -10,7 +10,14 @@
 Live is `371b2ab` / 144 migrations / 180 FKs. Updated 2026-10-10 (Track A,
 session 31). Owner's yes is still needed before `main` is pushed.
 
-### What is queued (as of 2026-10-10)
+### What is queued (as of 2026-10-12)
+
+**Gate check, one-off, 2026-10-12 ~18:55 UTC:** the run for `7561ab8` (the
+startup fix) was **pending, not green yet**, queued behind `1091f7e`'s
+(test and deploy-staging green, smoke still running). The run before them,
+`2111afc8`, failed in smoke only (flow-13 got HTML where it expected JSON,
+18:39 UTC, while staging was being redeployed); not yet looked into. Check
+these again before naming a candidate.
 
 | Item                                                                                                | Where now                                             | Moves a total?                                                                        |
 | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------- |
@@ -18,22 +25,81 @@ session 31). Owner's yes is still needed before `main` is pushed.
 | **0145** `bid_expenses.notes` (C's Q-M5)                                                            | same                                                  | No — additive, step 1, before the push                                                |
 | **0146** `bid_line_items.scopeTag` (B's S1)                                                         | local-dev; staging DB (2026-10-12)                    | No — additive, step 1, before the push (staging 1,196/1,196 unchanged)                |
 | **0147** `bids.scopePromptsDismissedAt` (B's S3)                                                    | same                                                  | No — additive, step 1, before the push                                                |
+| **0148** `bids.mathVersion` + `bid_math_changes` (C's BS-M7)                                        | local-dev; staging DB (2026-10-12)                    | No — additive, step 1, before the push (staging 1,212/1,212 unchanged)                |
+| **0149** `bids.settingsFrozenAt` + six frozen-tax columns (A, owner Q16)                            | same                                                  | No — additive, step 1, before the push                                                |
+| **C's bid-protection code** (math version, auto-lock, settings freeze)                              | NOT built yet — the release WAITS for it              | Only Drafts may move, each with a `bid_math_changes` row (steps below)                |
+| A's startup fix (`7561ab8`): a start never writes a company's own rows                              | local-dev                                             | No — measured 16,043 / 16,043 company rows unchanged on local                         |
 | **B's twin fold** (`b-twin-fold`, `24843fd`)                                                        | branch, NOT yet merged to local-dev                   | Lowers twin bids on purpose — live has 0 twins, so none                               |
 | **B's status view** (`b-status-view`, after the fold)                                               | branch, NOT yet merged; needs 0144                    | No (screens only)                                                                     |
-| **C's remove / relocate labor** (`a7fe812` → `d832e34`)                                             | local-dev, staging                                    | **RAISES** bids with remove/relocate marks — see the gate below                       |
+| **C's remove / relocate labor** (`a7fe812` → `d832e34`)                                             | local-dev, staging                                    | **RAISES** — must ship as math version 1; release WAITS for C (below)                 |
 | **C's job costs** (Quick bid phase 1, `200e310`)                                                    | local-dev, staging; the drive-time note waits on 0145 | Only bids with job-cost rows; live has **0** `bid_expenses` rows (measured)           |
 | B's `b72188d` (undo removed line, "+ N drops not priced")                                           | local-dev, staging                                    | No — what screens SAY; check on staging, not a bidTotals item                         |
 | C's F9 / F10 (`67ee526` cleared scale stays cleared; `bbb5f85` homerun re-match stays on its sheet) | local-dev (merged during session 31), no migration    | No stored total; stops footage coming back unasked — bidTotals before/after covers it |
 
-Live migrations for this release: **0144–0147, 4 files, expect 148 / 180**
-(`deploying.md` § "Staging: migrations 0144–0145" and § "Staging: migrations
-0146–0147" are the staging records). B's S2 (`scope_prompts`) is NOT in it —
+Live migrations for this release: **0144–0149, 6 files, expect 150 / 181**
+(`deploying.md` § "Staging: migrations 0144–0145", § "Staging: migrations
+0146–0147" and § "Staging: migrations 0148–0149" are the staging records).
+The FK count is 181, not 180, because 0148's new table has one. B's S2 (`scope_prompts`) is NOT in it —
 it waits for scope-tags plan step 6b.
 If `git diff 371b2ab origin/local-dev -- drizzle server/seed` shows anything
 else on the day, **stop and find out why before going on** — this table is
 stale or local-dev changed, and those want opposite responses.
 
-### The remove / relocate gate — measured 2026-10-10: NOT BLOCKING TODAY
+### THIS RELEASE WAITS FOR C's MATH-VERSION CODE — decided 2026-10-12
+
+**Do not release while remove/relocate labor (`d832e34`) is on local-dev
+without C's bid-protection code merged.** Remove/relocate raises totals, so
+it must ship as **math version 1** (`baseline-screen-plan.md` § 8): only
+Drafts take it, and Active / Won / Lost / locked bids price by version 0.
+Until C's code is on local-dev that wrapping does not exist. The 0 found by
+the census below was a reason the release was not blocked on 2026-10-10;
+it is no longer the test. **The release waits for C's merge either way.**
+
+C builds, on 0148–0149 (`1091f7e`): `shared/mathVersion.ts` and the
+version branch around remove/relocate; auto-lock when a bid leaves Draft
+(Q15, `quantitiesLockedAt`); the settings freeze when a bid leaves Draft
+(Q16, 0149's columns), exported as a function. Track A builds
+`scripts/applyMathVersion.mts` on C's exported pricing-by-version function.
+Check C's merge has a green Gate (test, deploy-staging, smoke) before it
+becomes a candidate.
+
+### Release steps AFTER C's bid-protection code merges
+
+In this order, inside the `live-release-plan.md` § 4 sequence. Every step
+runs FIRST on the release's fresh copy of live, then on live. **Dry run
+first, every time**, and the owner reads the dry-run output before
+`--apply`.
+
+1. **Migrations 0144–0149 before the push** (all additive, step 1).
+   Expect **150 migrations, 181/181 foreign keys** — if `schemaDrift`
+   prints anything else, **stop and find out why before going on.**
+2. **`bidTotals` BEFORE** with live's code, as always.
+3. **Push `main`**, check `/api/version` (`builtAt`, `commit`).
+4. **Freeze the bids that are ALREADY non-Draft** (C's freeze function,
+   called from a one-off script A writes; never SQL). For every Active /
+   Won / Lost bid with `settingsFrozenAt` NULL: write the overhead / profit
+   / productivity / tax values in effect onto it, and lock its quantities
+   if unlocked (Q15). Dry run prints each bid with status, what it would
+   write and whether it would lock. **No total may move**: it writes what is
+   already in effect, so `bidTotals` before vs after the step must be
+   identical for every bid. If one moves, **stop** — the freeze is not
+   writing what pricing was reading.
+5. **`applyMathVersion.mts`** (plan § 8 item 4). Dry run: every bid below
+   the current version, its status, lock, and old and new total. Only
+   **Draft and unlocked** bids are moved to the current version; each one
+   whose total moved gets a `bid_math_changes` row. Everything else stays
+   on its version and must not move. `--apply` only after the owner has
+   read the dry run.
+6. **`bidTotals` AFTER, then `--compare`.** Every non-Draft or locked bid
+   identical. A Draft may differ only if it has a matching
+   `bid_math_changes` row with the same before/after totals. Any other
+   difference: **stop**.
+
+Steps 4 and 5 come AFTER the push because they call the new code. Step 4
+comes before step 5, so a bid that is non-Draft on the day is frozen and
+locked before any math version is applied.
+
+### The remove / relocate gate — measured 2026-10-10 (superseded 2026-10-12, see above)
 
 Track C's rule (c) (`baseline-screen-plan.md` § 8 on `track-c`, "a math
 version per bid"): remove/relocate labor must not reach live before the

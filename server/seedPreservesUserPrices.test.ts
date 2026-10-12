@@ -192,11 +192,14 @@ describe.skipIf(!hasDb)("a restart never touches a user's own price", () => {
 describe.skipIf(!hasDb)("a raceway's fitting facts (0082)", () => {
   /*
     A contractor who priced their EMT before 0082 holds a FORK with no stick
-    length and no strap spacing — and the fitting count would say "no stick
-    length set" on every run of it. So a NULL on a fork inherits, like every
-    other never-set field. A value the contractor chose stays, field by field.
+    length and no strap spacing. Until 2026-10-12 a start FILLED those NULLs
+    from the baseline — which turned "not countable" into a coupling count on
+    open bids with nobody choosing it (baseline-screen-plan.md § 9 F3). The
+    owner's rule now: a start never writes a company's own row. The fork
+    keeps its blanks, and the fitting count keeps saying so, until the
+    contractor fills them or reverts.
   */
-  it("fills a pre-0082 fork's NULLs and keeps what the contractor chose", async () => {
+  it("leaves a pre-0082 fork's NULLs alone and keeps what the contractor chose", async () => {
     const shipped = (await caller().materials.list()).find(
       m => m.name === '1/2" EMT'
     )!;
@@ -225,9 +228,9 @@ describe.skipIf(!hasDb)("a raceway's fitting facts (0082)", () => {
       .from(materials)
       .where(eq(materials.id, fork.id));
     expect(Number(after.stickLengthFeet)).toBe(20);
-    expect(after.stickJoint).toBe("coupling");
-    expect(Number(after.strapSpacingFeet)).toBe(10);
-    expect(Number(after.strapFromBoxFeet)).toBe(3);
+    expect(after.stickJoint).toBeNull();
+    expect(after.strapSpacingFeet).toBeNull();
+    expect(after.strapFromBoxFeet).toBeNull();
     expect(Number(after.costPerUnit)).toBeCloseTo(0.62, 4);
   });
 });

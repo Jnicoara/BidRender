@@ -4,7 +4,57 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-12, session 32: B's scope S1 + S3 applied (0146–0147)
+## NOW — 2026-10-12, session 33: bid protections' columns (0148–0149); startup fix
+
+### Job 1 — 0148–0149 applied (local, test, staging DB). Live untouched.
+
+- **0148 `bid_math_version`** = C's BS-M7 word for word (`bids.mathVersion`,
+  `bid_math_changes`, 1 FK). **0149 `bid_frozen_settings`** is A's, NOT a
+  BS draft: the tax switches have no per-bid columns, so Q16's "freeze tax"
+  needed `settingsFrozenAt` + `salesTaxEnabled`/`taxMaterials`/`taxLabor`/
+  `taxApplyTo` (one group) + `taxRateFrozenPct` + `taxRateFrozenDetail`.
+  **Q15 auto-lock: no migration** (`quantitiesLockedAt`). BS-M1–6, M8 not
+  applied. Recorded in `baseline-screen-plan.md` § 10 and `todo.md`
+  (Q15 overrides the 2026-10-08 "never auto-lock").
+- **Staging**: backup `staging-2026-10-12T18-27-05Z-before-0148-0149.sql`
+  (77/77 restore into `bidrender_scratch_staging_0148`); rehearsed (2
+  applied, 150, re-run nothing, 181/181, 1,212/1,212 unchanged with
+  `4be57f8` and new code); staging DB: 150, matches, 181/181, **1,212/1,212
+  unchanged**. Record: `deploying.md` § "Staging: migrations 0148–0149".
+- **Local** `bidrender_local` 4,386/4,386 unchanged; `bidrender_test_localdev` 150. Next release batch: **0144–0149, expect 150 / 181**.
+- Scratch: `../bidrender-before-scope` moved to `4be57f8` (staging's code);
+  DB `bidrender_scratch_staging_0148` added. Drop after the next release.
+- **Code**: `1091f7e` on `local-dev` AND pushed to the `staging` branch by
+  hand (fast-forward; it went through this time), so deploy-staging is not
+  blocked by the `drizzle/` guard.
+
+### Job 2 — a server start never writes a company's own rows
+
+- **Audited every boot pass** (`seedShippedLibrary`: materials, labor
+  rates, modifiers, assemblies, kits, run types + extras, labor steps). All
+  `userId IS NULL` only, except two:
+  1. `backfillMaterialMetadata` **pass 2** filled NULL category, aliases,
+     default qty and raceway facts on companies' forks — **deleted**.
+  2. `dedupeBaselineRows` deleted duplicate SHARED rows and the FKs
+     **cascaded to company recipe lines** — it now keeps any duplicate that
+     any FK (read from `information_schema`) or a fork's `baselineId`
+     points at, and warns.
+- Pass 1 (re-stamp SHARED rows from the seed files = the loader's path) is
+  unchanged.
+- **Test** `server/bootLeavesCompanyRows.test.ts`: fingerprints every
+  fixture-company row (8 library tables + recipe/kit children) before and
+  after two full `seedShippedLibrary` boots. **Red on the old code, both
+  cases** (fork blanks filled; the recipe line cascaded away); green after.
+  Three old tests that pinned the fill now assert the opposite, with the
+  history kept in their text.
+- **On real copies** (`scripts/companyRowsCheck.mts`, new, read only):
+  staging copy `bidrender_scratch_staging_0148` 19/19 company rows
+  unchanged over two boots; `bidrender_local` 16,043/16,043. Honest limit:
+  **no database today has a fork blank the old pass would fill** (0 on
+  local, the live copy and the staging copy), so a copy cannot tell old code
+  from new — the test is what does.
+
+## (earlier) 2026-10-12, session 32: B's scope S1 + S3 applied (0146–0147)
 
 - **0146 `bid_line_items.scopeTag`** (B's S1, enum
   install/ofci/by_others/excluded, NULL = We install) and **0147

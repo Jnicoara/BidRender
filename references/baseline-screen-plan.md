@@ -301,6 +301,15 @@ new, and the version it produced. Pins are recorded per change too
   starter by itself.
 - **The boot's second pass on company rows stops** (F3). It fills NULL
   raceway facts on companies' own copies, and those feed fitting counts.
+  **DONE 2026-10-12 (Track A)**, wider than F3's fix column: owner, "stop it
+  from ever touching a company's own rows", so category and aliases stop
+  too. Two writers removed: `backfillMaterialMetadata` pass 2 (deleted), and
+  `dedupeBaselineRows`, whose delete of a duplicate shared row CASCADED to
+  company recipe lines — it now keeps any duplicate something points at.
+  Every other boot pass was read and is `userId IS NULL` only.
+  `server/bootLeavesCompanyRows.test.ts` (red on the old code, both ways);
+  `scripts/companyRowsCheck.mts` measures it on a copy. Pass 1 (re-stamping
+  SHARED rows from the seed, F2) is unchanged: that is the loader's path.
 - **"Export to seed"** writes the seed modules from live, and Track A
   commits them, so a brand-new database starts where live is.
 - **Drift is shown**: "Seed files differ from live on N values". The same
@@ -473,6 +482,21 @@ pins are made when a starter change happens, never by a migration.
 | **BS-M6** | `companies.starterSeenAt TIMESTAMP NULL` (NULL = the company's creation date) and `starter_offer_answers` (company owner id, change id, answer enum `accepted,ignored`, answeredAt)                                                                                     |
 | **BS-M7** | `bids.mathVersion INT NULL` (NULL = version 0) and `bid_math_changes` (bid id, from, to, total before, total after, reason, createdAt, seenAt)                                                                                                                          |
 | **BS-M8** | `bid_pdf_sheets.scaleSource` gains `cleared` (F9; enum value appended)                                                                                                                                                                                                  |
+
+**Applied 2026-10-12 (Track A), the bid protections only** — local, test
+and staging databases; live with the next release:
+
+- **BS-M7 → `0148_bid_math_version`**, word for word.
+- **Q15 auto-lock: no migration** — it sets the existing `quantitiesLockedAt`.
+- **Q16 frozen settings → `0149_bid_frozen_settings`, NOT one of these
+  drafts.** Overhead, profit and productivity already have per-bid columns,
+  but tax does not: its four switches live only on `pricing_defaults`, and a
+  matched or pinned area's rate is read live. 0149 adds
+  `bids.settingsFrozenAt` (NULL = never frozen; set = the bid's settings
+  columns were written by the freeze, not typed), the tax-switch group
+  (`salesTaxEnabled` NULL = the group inherits), `taxRateFrozenPct` (read
+  only when frozen; NULL then = no rate) and `taxRateFrozenDetail` (display).
+- BS-M1–M6 and BS-M8 are NOT applied; each waits for its piece.
 
 SQL drafts for BS-M1 to BS-M3 are in the first version of this file
 (`eddc870`, § 7). They are unchanged except that BS-M3 gains `kind` and
