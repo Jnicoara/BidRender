@@ -4,7 +4,16 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-12, session 35: pricing sheet — SER rename, pack labels, one rebuild
+## NOW — 2026-10-12, session 36: BS-M3–M6 settled — NOT applied, waits on C's answers
+
+C's handoff said BS-M3–M6 wait on A's "drafts in § 10". There are none, only
+one-line summaries (plus superseded `eddc870` BS-M3 SQL). 14 decisions are
+listed for C in `track-c-handoff.md` "FROM TRACK A … session 36". The big
+ones: 4 tables in `StarterTable` vs 7 in BS-M5; the value type (names are
+offers); recipe parts as rows vs JSON; `labor_steps` has no
+`version`/`baselineVersion`. **Nothing applied anywhere; databases still 152.** Committed locally, NOT pushed (owner: C and B land first).
+
+## (earlier) 2026-10-12, session 35: pricing sheet — SER rename, pack labels, one rebuild
 
 - **Owner's sheet committed FIRST, as saved** (`bef6f7f3`, sha256
   `9495e7c9…`). Its 54 typed prices were ALL in "Price per unit" (over the
