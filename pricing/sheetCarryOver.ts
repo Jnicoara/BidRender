@@ -53,6 +53,8 @@ export type TypedRow = {
   values: TypedValues;
   /** The row's "Unit of sale" / "Hours per", where the sheet has one. */
   unit?: string;
+  /** Why this row's typed value cannot be carried as it stands: a STOP. */
+  problem?: string;
 };
 
 /** Where an old row's item is in the NEW catalog. */
@@ -100,7 +102,9 @@ export function planCarryOver(
   };
   const from = new Map<string, TypedRow>();
   for (const r of previous) {
-    if (Object.keys(r.values).length === 0) continue;
+    // A problem first: its value is NOT in `values`, so the empty-row skip
+    // below would otherwise drop it without a word.
+    if (Object.keys(r.values).length === 0 && !r.problem) continue;
     const issue = (why: string): CarryIssue => ({
       sheet,
       row: r.row,
@@ -108,6 +112,10 @@ export function planCarryOver(
       values: r.values,
       why,
     });
+    if (r.problem) {
+      plan.stops.push(issue(r.problem));
+      continue;
+    }
     const at = resolve(r.label);
     if ("gone" in at) {
       plan.dropped.push(issue(at.gone));
@@ -248,7 +256,70 @@ export type SheetSpec = {
   typed: readonly string[];
   /** …and then these ride along with it (a pack price means per that pack). */
   with?: readonly string[];
+  /**
+   * A number TYPED over the per-unit formula is a price too (2026-10-12: the
+   * owner's first 54 prices were all typed into "Price per unit", none into
+   * "Pack price", and this reader saw none of them). Read as the pack price
+   * when the pack is 1 — the same number. Any other pack: the rebuild STOPS
+   * (`perUnitProblem`), because turning it into a pack price is arithmetic
+   * on the owner's number, not carrying it.
+   */
+  perUnit?: { column: string; packPrice: string; packQty: string };
+  /**
+   * A note the owner typed that must survive a rebuild — "CUT" (2026-10-12).
+   * Every other note in that column is the catalog's description, rewritten
+   * by each build.
+   */
+  keepNote?: { column: string; pattern: RegExp };
 };
+
+/**
+ * Per-foot pack LABELS (owner, 2026-10-12): a carried "per foot" pack of 1
+ * takes the rebuilt row's new label — "per foot (from 250 ft roll)" — when
+ * that row is a pack of 1 too. Label only: Pack qty, and so the price, is
+ * untouched. Any other carried pack (one the owner chose) is kept as typed.
+ * Applied to the PLAN, so the read-back check verifies the label written.
+ */
+export function relabelPerFoot(
+  plan: CarryPlan,
+  packFor: (key: string) => readonly [string, number] | undefined
+): number {
+  let relabelled = 0;
+  for (const [key, values] of Array.from(plan.carried)) {
+    const now = packFor(key);
+    const size = values["Pack size"];
+    if (
+      now &&
+      now[1] === 1 &&
+      Number(values["Pack qty"]) === 1 &&
+      typeof size === "string" &&
+      /^per foot\b/i.test(size) &&
+      size !== now[0]
+    ) {
+      plan.carried.set(key, { ...values, "Pack size": now[0] });
+      relabelled += 1;
+    }
+  }
+  return relabelled;
+}
+
+/** A typed per-unit price that cannot be carried as it stands, or null. */
+export function perUnitProblem(
+  perUnit: unknown,
+  packPrice: unknown,
+  packQty: unknown
+): string | null {
+  if (typeof perUnit !== "number") return null;
+  const qty =
+    packQty === undefined || packQty === null || packQty === ""
+      ? 1
+      : Number(packQty);
+  if (qty !== 1)
+    return `a price was typed into "Price per unit" (${perUnit}) on a pack of ${String(packQty)} — type it as the pack price, or set the pack to 1`;
+  if (typeof packPrice === "number" && packPrice !== perUnit)
+    return `"Pack price" ${packPrice} and a typed "Price per unit" ${perUnit} disagree on a pack of 1`;
+  return null;
+}
 
 export const SHEET_SPECS: Readonly<Record<SheetKind, SheetSpec>> = {
   prices: {
@@ -257,6 +328,12 @@ export const SHEET_SPECS: Readonly<Record<SheetKind, SheetSpec>> = {
     unit: "Unit of sale",
     typed: ["Pack price"],
     with: ["Pack size", "Pack qty"],
+    perUnit: {
+      column: "Price per unit",
+      packPrice: "Pack price",
+      packQty: "Pack qty",
+    },
+    keepNote: { column: "Notes", pattern: /\bCUT\b/ },
   },
   brands: {
     sheet: "brands",
@@ -374,11 +451,28 @@ export function readTypedRows(
       const v = cellValue(row.getCell(c).value);
       if (v !== undefined) values[n] = v;
     }
+    // A number typed over the per-unit FORMULA. The raw cell, not
+    // cellValue: a formula's cached result is a number too, and is not typed.
+    let problem: string | undefined;
+    if (spec.perUnit) {
+      const raw = row.getCell(col(spec.perUnit.column)).value;
+      const qty = cellValue(row.getCell(col(spec.perUnit.packQty)).value);
+      problem =
+        perUnitProblem(raw, values[spec.perUnit.packPrice], qty) ?? undefined;
+      if (!problem && typeof raw === "number")
+        values[spec.perUnit.packPrice] = raw;
+    }
     if (Object.keys(values).length)
       for (const [n, c] of along) {
         const v = cellValue(row.getCell(c).value);
         if (v !== undefined) values[n] = v;
       }
+    // A sheet with no Notes column has no note to keep.
+    if (spec.keepNote && header.indexOf(spec.keepNote.column) >= 1) {
+      const note = cellValue(row.getCell(col(spec.keepNote.column)).value);
+      if (typeof note === "string" && spec.keepNote.pattern.test(note))
+        values[spec.keepNote.column] = note;
+    }
     if (cName >= 1) {
       const name = cellValue(row.getCell(cName).value);
       if (name !== undefined)
@@ -390,6 +484,7 @@ export function readTypedRows(
       label: String(label),
       values,
       ...(unit !== undefined ? { unit: String(unit) } : {}),
+      ...(problem ? { problem } : {}),
     });
   }
   return { rows, extra };

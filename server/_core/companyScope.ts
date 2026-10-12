@@ -57,6 +57,7 @@ import {
 } from "../../shared/permissions";
 import { getDb } from "../db";
 import { AI_FEATURE_IDS, aiFeaturesEnabled } from "../aiFeatures";
+import { isStarterEditor } from "../starterEditor/role";
 
 /**
  * Everything a request is allowed to do, resolved from the session alone.
@@ -192,6 +193,16 @@ async function createPersonalCompany(user: User) {
  * passes an id it merely believes is authenticated.
  */
 export async function resolveScope(user: User): Promise<RequestScope> {
+  // The starter editor never works inside a company. Without this it would
+  // be PROVISIONED one below (it has never belonged anywhere), which is the
+  // opposite of failing closed. Asked first, before any query.
+  if (isStarterEditor(user)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "The starter editor account has no company.",
+    });
+  }
+
   let membership = await findMembership(user.id);
 
   // Only provision for someone who has never belonged anywhere. A suspended

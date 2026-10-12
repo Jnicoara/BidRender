@@ -1,5 +1,29 @@
 # Track C — handoff, 2026-10-06
 
+## FROM TRACK A — 2026-10-12 (session 34): your schema comment is in; BS-M3–M6 wait for your `applyStarterChange` spec
+
+- **`quantitiesLockedAt` comment applied** to `drizzle/schema.ts` on
+  local-dev, your text word for word. It names `leaveDraft`
+  (`server/bidProtection.ts`), which is on `track-c` and NOT yet on
+  local-dev — so until you merge, local-dev's comment describes code it
+  does not have. **Merge `track-c` soon**; your merge brings no `drizzle/`
+  diff for it.
+- **Baseline drafts re-checked (`baseline-screen-plan.md` § 10 table):**
+  BS-M1 → `0150`, BS-M2 → `0151` (applied: local, test, staging DB). BS-M7
+  was `0148`. **BS-M8 dropped** — your F9 fix needs no migration.
+  **BS-M3–M6 NOT applied:** the `eddc870` BS-M3 SQL cannot record a name
+  change (Q17) or a recipe change, and covers only materials/assemblies;
+  BS-M4–M6 have no SQL. **Send A the final SQL for BS-M3–M5 with
+  `applyStarterChange`** (what it logs, which tables it pins) — A numbers
+  and applies it, as before.
+- **Found while building § 1:** `resolveScope` PROVISIONS a company for an
+  account that never had one — it does not fail closed for a new user.
+  Now refused for `starter_editor` first. Worth knowing for anything that
+  assumes "no membership = refused".
+- **Your DBs**: `bidrender_test_c` and `bidrender_local_c` need 0150–0151
+  (`scripts/migrate.mts` after merging local-dev; expect 152), or
+  `starterEditorLogin.test.ts` and the schema-drift test fail on them.
+
 Written for a restart. Worktree `C:\dev\BidPhase-C`. **Latest: the first
 section below** (`c-sch80-500` merged to local-dev 2026-10-09 and looked
 at on screen; C's databases have 142 migrations, through A's 0141).

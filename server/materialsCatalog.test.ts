@@ -361,28 +361,45 @@ describe("alias hygiene across the whole catalog", () => {
     expect(unfindable).toEqual([]);
   });
 
-  it("names every SER cable by its full conductor set, never '-3' shorthand", () => {
-    // The shorthand hides the ground size, which is the number that tells two
-    // similar cables apart; it is how 4/0-3 and 4/0-4/0-4/0-2/0 once shipped as
-    // two rows for one cable (owner's decision 2026-09-25, wireAndCable.ts;
-    // re-confirmed 2026-10-07 when the review sheet proposed "/3" back).
-    const shorthand = BASELINE_MATERIALS.filter(m =>
-      /^[\d/]+-\d (SER|SEU)\b/.test(m.name)
-    ).map(m => m.name);
-    expect(shorthand).toEqual([]);
-    const slashShort = BASELINE_MATERIALS.filter(m =>
-      /^\d+\/\d (SER|SEU)\b/.test(m.name)
-    ).map(m => m.name);
-    expect(slashShort).toEqual([]);
-    // ...and the old spelling still finds the row.
-    const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
-    for (const [full, short] of [
-      ["8-8-8-8 SER Copper", "8-3"],
-      ["1-1-1-3 SER Copper", "1-3"],
-      ["3/0-3/0-3/0-1/0 SER Aluminum", "3/0-3"],
-      ["4/0-4/0-4/0-2/0 SER Aluminum", "4/0-3"],
-    ]) {
-      expect(byName.get(full)?.searchAliases.split(" "), full).toContain(short);
+  it("names SER and SEU the way stores list them, and keeps both styles findable", () => {
+    // Owner, 2026-10-12 (references/ser-rename-plan.md): copper SER by the
+    // SHORT form ("6/3 SER Copper"), aluminum SER and SEU by the FULL set.
+    // Until then every SER was full-set only (owner 2026-09-25, re-confirmed
+    // 2026-10-07): the short form hid the ground size. That is now said by
+    // the description, "3 wire + ground (full set)", on every SER row.
+    const se = BASELINE_MATERIALS.filter(m => /\bSE[RU]\b/.test(m.name));
+    const copper = se.filter(m => / SER Copper$/.test(m.name));
+    expect(copper.map(m => m.name).sort()).toEqual(
+      ["1/3", "2/3", "4/3", "6/3", "8/3"].map(s => `${s} SER Copper`).sort()
+    );
+    const fullSet = /^[\d/]+(-[\d/]+){2,3} SE[RU] Aluminum$/;
+    expect(
+      se.filter(m => !/Copper$/.test(m.name) && !fullSet.test(m.name))
+    ).toEqual([]);
+    // "-3" shorthand as a NAME is still never shipped: it is how 4/0-3 and
+    // 4/0-4/0-4/0-2/0 once shipped as two rows for one cable.
+    expect(se.filter(m => /^[\d/]+-\d SE[RU]\b/.test(m.name))).toEqual([]);
+
+    for (const m of se) {
+      const set = / SEU /.test(m.name)
+        ? "2 wire + bare neutral (full set)."
+        : "3 wire + ground (full set).";
+      expect(m.description?.startsWith(set), m.name).toBe(true);
+    }
+
+    // Both styles, and the old name, still find each row.
+    const byName = new Map(se.map(m => [m.name, m]));
+    for (const [name, words] of [
+      ["8/3 SER Copper", ["8-8-8-8", "8/8/8/8", "8-3"]],
+      ["1/3 SER Copper", ["1-1-1-3", "1-3"]],
+      ["2-2-2-4 SER Aluminum", ["2-3"]],
+      ["3/0-3/0-3/0-1/0 SER Aluminum", ["3/0-3"]],
+      ["4/0-4/0-4/0-2/0 SER Aluminum", ["4/0-3"]],
+      ["4/0-4/0-2/0 SEU Aluminum", ["4/0-2"]],
+      ["4-4-6 SEU Aluminum", ["4-2"]],
+    ] as const) {
+      const have = byName.get(name)?.searchAliases.split(" ") ?? [];
+      for (const w of words) expect(have, `${name}: ${w}`).toContain(w);
     }
   });
 

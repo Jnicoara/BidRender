@@ -38,6 +38,14 @@ name**:
   HELD; two old rows landing on one item with different values). Fix the
   cause — usually a missing rename entry — and run it again.
 
+**What counts as typed on the prices sheet (2026-10-12):** "Pack price";
+a number typed over the "Price per unit" formula on a pack of 1 (the owner's
+first 54 prices were all typed there, and the reader used to see none of
+them — on a bigger pack the rebuild STOPS rather than do arithmetic on it);
+and a Notes cell containing **CUT** in capitals (the rest of Notes is the
+catalog's description). A carried "per foot" pack of 1 takes the rebuilt
+row's label ("per foot (from 250 ft roll)"); the price is untouched.
+
 **How it is enforced, not just written down:** `buildStarterSheets.mts`
 reads the file it is about to replace, plans the carry-over
 (`sheetCarryOver.ts`), writes each new sheet under a temporary name, reads

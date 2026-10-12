@@ -17,6 +17,7 @@ import {
   REALITY_RENAMES,
   REALITY_RETIRED_INTO,
 } from "./catalogRealityCheck20261009";
+import { SER_RENAMES_2026_10_12 } from "./serRename20261012";
 
 /**
  * Baseline rows to rename in place, old name -> new name.
@@ -240,7 +241,9 @@ const AFTER_FREEZE: Record<string, string> = {
 export const latestCatalogName = (name: string): string => {
   const afterFreeze = AFTER_FREEZE[name] ?? name;
   const reviewed = CATALOG_REVIEW_RENAMES[afterFreeze] ?? afterFreeze;
-  return REALITY_RENAMES[reviewed] ?? reviewed;
+  const checked = REALITY_RENAMES[reviewed] ?? reviewed;
+  // The SER naming change (2026-10-12, shared/serRename20261012.ts).
+  return SER_RENAMES_2026_10_12[checked] ?? checked;
 };
 const latest = latestCatalogName;
 
@@ -276,7 +279,10 @@ export const RENAMED_BASELINE_MATERIALS: Record<string, string> =
         latest(to),
       ])
     ),
-    ...REALITY_RENAMES,
+    ...Object.fromEntries(
+      Object.entries(REALITY_RENAMES).map(([from, to]) => [from, latest(to)])
+    ),
+    ...SER_RENAMES_2026_10_12,
   });
 
 /**

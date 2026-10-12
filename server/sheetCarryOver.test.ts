@@ -27,10 +27,18 @@ import {
   materialResolver,
   planCarryOver,
   readTypedRows,
+  relabelPerFoot,
   stepResolver,
   stepTotalsResolver,
 } from "../pricing/sheetCarryOver";
 import { startersWithSteps } from "../pricing/starterSteps";
+import {
+  PER_FOOT_BOX,
+  PER_FOOT_CUT,
+  PER_FOOT_ROLL,
+  PER_FOOT_SPOOL,
+  packFor,
+} from "../pricing/starterSheetLayout";
 import { STARTER_LABOR_STEPS } from "./seed/starterLaborSteps";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 
@@ -238,6 +246,108 @@ describe("readTypedRows — reads by column NAME", () => {
     expect(rows[0].unit).toBe("each");
   });
 
+  // 2026-10-12: the owner's first 54 prices were typed into "Price per unit"
+  // over its formula, none into "Pack price" — and this reader saw none.
+  const OWNER_HEADER = [
+    "Name",
+    "Unit of sale",
+    "Pack size",
+    "Pack qty",
+    "Pack price",
+    "Price per unit",
+    "Notes",
+  ];
+  it("a price typed over the per-unit FORMULA on a pack of 1 is the pack price", () => {
+    const ws = sheet(
+      [
+        ["14/2 NM-B Copper", "foot", "per foot", 1, null, 0.5, ""],
+        // A formula's cached number is NOT typed.
+        [
+          "Rope",
+          "foot",
+          "per foot",
+          1,
+          null,
+          { formula: "x", result: 0.4 },
+          "",
+        ],
+      ],
+      OWNER_HEADER
+    );
+    const { rows } = readTypedRows(ws, SHEET_SPECS.prices, 2, 3);
+    expect(keyed(rows).get("14/2 NM-B Copper")).toEqual({
+      "Pack price": 0.5,
+      "Pack size": "per foot",
+      "Pack qty": 1,
+    });
+    expect(keyed(rows).get("Rope")).toEqual({});
+  });
+
+  it("STOPS on a per-unit price typed on a bigger pack — never does the arithmetic", () => {
+    const ws = sheet(
+      [["Gadget", "each", "box of 25", 25, null, 0.4, ""]],
+      OWNER_HEADER
+    );
+    const { rows } = readTypedRows(ws, SHEET_SPECS.prices, 2, 3);
+    const p = planCarryOver("prices", rows, resolve);
+    expect(p.stops).toHaveLength(1);
+    expect(p.stops[0].why).toMatch(/Price per unit/);
+    expect(p.carried.size).toBe(0);
+  });
+
+  it("keeps a CUT note (capitals), and never a description that says 'Cut to fit'", () => {
+    const ws = sheet(
+      [
+        ["Gadget", "each", "each", 1, null, null, "CUT"],
+        [
+          "Rope",
+          "foot",
+          "per foot",
+          1,
+          null,
+          null,
+          "Seals a roof. Cut to fit.",
+        ],
+      ],
+      OWNER_HEADER
+    );
+    const { rows } = readTypedRows(ws, SHEET_SPECS.prices, 2, 3);
+    expect(keyed(rows).get("Gadget")).toEqual({ Notes: "CUT" });
+    expect(keyed(rows).get("Rope")).toEqual({});
+    const p = planCarryOver("prices", rows, resolve);
+    expect(p.carried.get("Gadget")).toEqual({ Notes: "CUT" });
+  });
+
+  it("a carried 'per foot' pack of 1 takes the new label — the price is untouched", () => {
+    const p = planCarryOver(
+      "prices",
+      [
+        row(
+          "Rope",
+          { "Pack price": 0.5, "Pack size": "per foot", "Pack qty": 1 },
+          "foot"
+        ),
+        row("Gadget", {
+          "Pack price": 9,
+          "Pack size": "box of 10",
+          "Pack qty": 10,
+        }),
+      ],
+      resolve
+    );
+    const n = relabelPerFoot(p, key =>
+      key === "Rope" ? ["per foot (from 250 ft roll)", 1] : ["box of 25", 25]
+    );
+    expect(n).toBe(1);
+    expect(p.carried.get("Rope")).toEqual({
+      "Pack price": 0.5,
+      "Pack size": "per foot (from 250 ft roll)",
+      "Pack qty": 1,
+    });
+    // A pack the owner chose is kept as typed.
+    expect(p.carried.get("Gadget")?.["Pack size"]).toBe("box of 10");
+  });
+
   it("refuses a sheet missing a typed column rather than reading nothing", () => {
     const ws = sheet([], ["Name", "Unit of sale", "Pack size", "Pack qty"]);
     expect(() => readTypedRows(ws, SHEET_SPECS.prices, 2, 3)).toThrow(
@@ -350,5 +460,36 @@ describe("the Steps and Step totals tabs — the same rule, by Key and by Ref", 
     );
     expect(p.stops.map(s => s.label)).toEqual([noSteps]);
     expect(p.dropped.map(d => d.label)).toEqual(["ZZ99"]);
+  });
+});
+
+describe("per-foot pack labels (owner, 2026-10-12) — label only, no math", () => {
+  const byName = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
+  const pack = (name: string) => {
+    const m = byName.get(name);
+    if (!m) throw new Error(`not shipped: ${name}`);
+    return packFor(m);
+  };
+
+  it("labels each family the owner named", () => {
+    expect(pack("14/2 NM-B Copper")).toEqual([PER_FOOT_ROLL, 1]);
+    expect(pack("10/3 MC cable Copper")).toEqual([PER_FOOT_ROLL, 1]);
+    expect(pack("#12 THHN solid Copper")).toEqual([PER_FOOT_SPOOL, 1]);
+    expect(pack("#8 THHN Copper")).toEqual([PER_FOOT_CUT, 1]);
+    expect(pack("6/3 NM-B Copper")).toEqual([PER_FOOT_CUT, 1]);
+    expect(pack("8/3 MC cable Copper")).toEqual([PER_FOOT_CUT, 1]);
+    expect(pack("6/3 SER Copper")).toEqual([PER_FOOT_CUT, 1]);
+    expect(pack("4-4-6 SEU Aluminum")).toEqual([PER_FOOT_CUT, 1]);
+    expect(pack("4/0 XHHW Aluminum")).toEqual([PER_FOOT_CUT, 1]);
+    expect(pack("Cat6 cable Copper")).toEqual([PER_FOOT_BOX, 1]);
+    expect(pack('1/2" EMT')).toEqual(["10 ft stick", 10]);
+    expect(pack("Surface raceway, 500 series")).toEqual(["per foot", 1]);
+  });
+
+  it("every per-foot row is a pack of 1, except conduit's 10 ft stick", () => {
+    const notOne = BASELINE_MATERIALS.filter(m => m.unitOfSale === "foot")
+      .map(m => [m.name, ...packFor(m)] as const)
+      .filter(([, label, qty]) => qty !== 1 && label !== "10 ft stick");
+    expect(notOne).toEqual([]);
   });
 });
