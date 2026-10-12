@@ -474,6 +474,21 @@ pins are made when a starter change happens, never by a migration.
 | **BS-M7** | `bids.mathVersion INT NULL` (NULL = version 0) and `bid_math_changes` (bid id, from, to, total before, total after, reason, createdAt, seenAt)                                                                                                                          |
 | **BS-M8** | `bid_pdf_sheets.scaleSource` gains `cleared` (F9; enum value appended)                                                                                                                                                                                                  |
 
+**Applied 2026-10-12 (Track A), the bid protections only** — local, test
+and staging databases; live with the next release:
+
+- **BS-M7 → `0148_bid_math_version`**, word for word.
+- **Q15 auto-lock: no migration** — it sets the existing `quantitiesLockedAt`.
+- **Q16 frozen settings → `0149_bid_frozen_settings`, NOT one of these
+  drafts.** Overhead, profit and productivity already have per-bid columns,
+  but tax does not: its four switches live only on `pricing_defaults`, and a
+  matched or pinned area's rate is read live. 0149 adds
+  `bids.settingsFrozenAt` (NULL = never frozen; set = the bid's settings
+  columns were written by the freeze, not typed), the tax-switch group
+  (`salesTaxEnabled` NULL = the group inherits), `taxRateFrozenPct` (read
+  only when frozen; NULL then = no rate) and `taxRateFrozenDetail` (display).
+- BS-M1–M6 and BS-M8 are NOT applied; each waits for its piece.
+
 SQL drafts for BS-M1 to BS-M3 are in the first version of this file
 (`eddc870`, § 7). They are unchanged except that BS-M3 gains `kind` and
 `version`, and the old `forksUpdated` / `forksLeft` columns become

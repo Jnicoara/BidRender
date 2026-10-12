@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Groundwork so a bid you've sent stops changing on its own.** New empty
+  database fields let the app remember which version of the pricing math
+  each bid uses (so a future fix only reaches Drafts, with a note saying
+  why the total moved) and keep a copy of the overhead, profit,
+  productivity and sales-tax settings that were in effect when a bid left
+  Draft. Nothing uses them yet; no bid total moves.
+
 - **Dashboard: a remove or relocate line with no hours now counts as "not
   priced", the same as on the bid.** The dashboard card could call such a
   line priced while the bid it opens said "Not priced". Both now follow one

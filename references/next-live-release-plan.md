@@ -18,6 +18,8 @@ session 31). Owner's yes is still needed before `main` is pushed.
 | **0145** `bid_expenses.notes` (C's Q-M5)                                                            | same                                                  | No — additive, step 1, before the push                                                |
 | **0146** `bid_line_items.scopeTag` (B's S1)                                                         | local-dev; staging DB (2026-10-12)                    | No — additive, step 1, before the push (staging 1,196/1,196 unchanged)                |
 | **0147** `bids.scopePromptsDismissedAt` (B's S3)                                                    | same                                                  | No — additive, step 1, before the push                                                |
+| **0148** `bids.mathVersion` + `bid_math_changes` (C's BS-M7)                                        | local-dev; staging DB (2026-10-12)                    | No — additive, step 1, before the push (staging 1,212/1,212 unchanged)                |
+| **0149** `bids.settingsFrozenAt` + six frozen-tax columns (A, owner Q16)                            | same                                                  | No — additive, step 1, before the push                                                |
 | **B's twin fold** (`b-twin-fold`, `24843fd`)                                                        | branch, NOT yet merged to local-dev                   | Lowers twin bids on purpose — live has 0 twins, so none                               |
 | **B's status view** (`b-status-view`, after the fold)                                               | branch, NOT yet merged; needs 0144                    | No (screens only)                                                                     |
 | **C's remove / relocate labor** (`a7fe812` → `d832e34`)                                             | local-dev, staging                                    | **RAISES** bids with remove/relocate marks — see the gate below                       |
@@ -25,9 +27,10 @@ session 31). Owner's yes is still needed before `main` is pushed.
 | B's `b72188d` (undo removed line, "+ N drops not priced")                                           | local-dev, staging                                    | No — what screens SAY; check on staging, not a bidTotals item                         |
 | C's F9 / F10 (`67ee526` cleared scale stays cleared; `bbb5f85` homerun re-match stays on its sheet) | local-dev (merged during session 31), no migration    | No stored total; stops footage coming back unasked — bidTotals before/after covers it |
 
-Live migrations for this release: **0144–0147, 4 files, expect 148 / 180**
-(`deploying.md` § "Staging: migrations 0144–0145" and § "Staging: migrations
-0146–0147" are the staging records). B's S2 (`scope_prompts`) is NOT in it —
+Live migrations for this release: **0144–0149, 6 files, expect 150 / 181**
+(`deploying.md` § "Staging: migrations 0144–0145", § "Staging: migrations
+0146–0147" and § "Staging: migrations 0148–0149" are the staging records).
+The FK count is 181, not 180, because 0148's new table has one. B's S2 (`scope_prompts`) is NOT in it —
 it waits for scope-tags plan step 6b.
 If `git diff 371b2ab origin/local-dev -- drizzle server/seed` shows anything
 else on the day, **stop and find out why before going on** — this table is

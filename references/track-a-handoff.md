@@ -4,7 +4,28 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-12, session 32: B's scope S1 + S3 applied (0146–0147)
+## NOW — 2026-10-12, session 33: bid protections' columns (0148–0149); startup fix
+
+### Job 1 — 0148–0149 applied (local, test, staging DB). Live untouched.
+
+- **0148 `bid_math_version`** = C's BS-M7 word for word (`bids.mathVersion`,
+  `bid_math_changes`, 1 FK). **0149 `bid_frozen_settings`** is A's, NOT a
+  BS draft: the tax switches have no per-bid columns, so Q16's "freeze tax"
+  needed `settingsFrozenAt` + `salesTaxEnabled`/`taxMaterials`/`taxLabor`/
+  `taxApplyTo` (one group) + `taxRateFrozenPct` + `taxRateFrozenDetail`.
+  **Q15 auto-lock: no migration** (`quantitiesLockedAt`). BS-M1–6, M8 not
+  applied. Recorded in `baseline-screen-plan.md` § 10 and `todo.md`
+  (Q15 overrides the 2026-10-08 "never auto-lock").
+- **Staging**: backup `staging-2026-10-12T18-27-05Z-before-0148-0149.sql`
+  (77/77 restore into `bidrender_scratch_staging_0148`); rehearsed (2
+  applied, 150, re-run nothing, 181/181, 1,212/1,212 unchanged with
+  `4be57f8` and new code); staging DB: 150, matches, 181/181, **1,212/1,212
+  unchanged**. Record: `deploying.md` § "Staging: migrations 0148–0149".
+- **Local** `bidrender_local` 4,386/4,386 unchanged; `bidrender_test_localdev` 150. Next release batch: **0144–0149, expect 150 / 181**.
+- Scratch: `../bidrender-before-scope` moved to `4be57f8` (staging's code);
+  DB `bidrender_scratch_staging_0148` added. Drop after the next release.
+
+## (earlier) 2026-10-12, session 32: B's scope S1 + S3 applied (0146–0147)
 
 - **0146 `bid_line_items.scopeTag`** (B's S1, enum
   install/ofci/by_others/excluded, NULL = We install) and **0147
