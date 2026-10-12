@@ -39,15 +39,18 @@ this file is stale or the state moved.
 
 ## START HERE (2026-10-12, evening) — baseline screen, C's number rules: built on track-c, NOT merged (waits for the owner's go)
 
-**Bid protection: Gate green, and the local-dev push is blocked.** The merged
-commit `71e84fb` (track-c with local-dev's scope-tag money in it) passed
-Gate 38308498102: test and drizzle-guard. Pushing it to local-dev, a fast
-forward, was **refused by Claude Code's permission check**
-("Modify Shared Resources"), so **local-dev does not have bid protection
-yet.** The owner approves or runs it:
-`git push origin 71e84fb5:refs/heads/local-dev`.
-`git merge-base --is-ancestor origin/local-dev 71e84fb5` was true when
-written. Check it again first.
+**Merging: the owner fast-forwards local-dev by hand.** Claude Code's
+permission check refuses C's push to local-dev ("Modify Shared Resources").
+`71e84fb` stopped being a fast forward when A pushed `c54416c`. So track-c
+merged local-dev again: `f02e1b1`, with A's 0150–0151 (starter_editor) and
+the SER rename.
+
+- C's local databases have **152** migrations, and dependencies are
+  installed (`qrcode`).
+- The 12 test files C changed today pass: 236 tests.
+- Once track-c's Gate is green, the owner runs the one-line
+  `git push origin <track-c head>:refs/heads/local-dev`.
+- If local-dev has moved again, it is not a fast forward: merge again first.
 
 **What C built of the baseline screen on today's database** (owner Q12: C =
 number rules + tests; `baseline-screen-plan.md` § 11):
@@ -121,8 +124,13 @@ number rules + tests; `baseline-screen-plan.md` § 11):
 
 ### FOR TRACK A — what the baseline screen waits on (2026-10-12)
 
-C cannot build these on today's database. Each needs A's migration (drafts in
-`baseline-screen-plan.md` § 10), and then C's code:
+C cannot build these on today's database. Each needs A's migration, and then
+C's code. **Corrected after A's note at the top of this file:** A will not
+apply BS-M3–M6 from the old drafts. `eddc870`'s BS-M3 cannot record a name or
+recipe change, and covers only materials and assemblies. **C owes A the
+final SQL for BS-M3–M5, together with the `applyStarterChange` spec** (what
+it logs, which tables it pins). That is C's next baseline task, so this list
+waits on C first and on A second.
 
 - **BS-M3:** `starter_change_batches` + `starter_changes` (with `kind`,
   `version`). Needed by `applyStarterChange`'s log, undo and the sheet
@@ -142,8 +150,9 @@ C cannot build these on today's database. Each needs A's migration (drafts in
   with no ratio).
 - **The boot change (§ 6, F2, F4–F6)** is A's: the seed proposes and the
   owner confirms. It needs BS-M3.
-- **The `quantitiesLockedAt` comment** in `drizzle/schema.ts`: replacement
-  text below ("FOR TRACK A — replace the `quantitiesLockedAt` comment").
+- **The `quantitiesLockedAt` comment:** DONE by A (session 34), word for
+  word. Until track-c reaches local-dev, local-dev's comment names
+  `leaveDraft`, which is only on track-c.
 
 ## EARLIER (2026-10-12, later) — BID PROTECTION built on track-c (math version, auto-lock, frozen settings)
 
