@@ -1051,6 +1051,20 @@
       "when": 1789963900000,
       "tag": "0149_bid_frozen_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "5",
+      "when": 1789964000000,
+      "tag": "0150_starter_editor_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "5",
+      "when": 1789964100000,
+      "tag": "0151_starter_editor_factors",
+      "breakpoints": true
     }
   ]
 }

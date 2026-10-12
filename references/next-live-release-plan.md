@@ -27,6 +27,9 @@ these again before naming a candidate.
 | **0147** `bids.scopePromptsDismissedAt` (B's S3)                                                    | same                                                  | No — additive, step 1, before the push                                                |
 | **0148** `bids.mathVersion` + `bid_math_changes` (C's BS-M7)                                        | local-dev; staging DB (2026-10-12)                    | No — additive, step 1, before the push (staging 1,212/1,212 unchanged)                |
 | **0149** `bids.settingsFrozenAt` + six frozen-tax columns (A, owner Q16)                            | same                                                  | No — additive, step 1, before the push                                                |
+| **0150** `users.role` + `starter_editor` (C's BS-M1)                                                | local-dev; staging DB (2026-10-12, session 34)        | No — additive, step 1, before the push                                                |
+| **0151** `starter_editor_factors` + `starter_editor_recovery_codes` (C's BS-M2)                     | same                                                  | No — additive, step 1, before the push                                                |
+| A's starter-editor login (server only; no account exists anywhere; needs `STARTER_TOTP_KEY`)        | local-dev                                             | No — no bid code touched; refuses to sign in without the key                          |
 | **C's bid-protection code** (math version, auto-lock, settings freeze)                              | NOT built yet — the release WAITS for it              | Only Drafts may move, each with a `bid_math_changes` row (steps below)                |
 | A's startup fix (`7561ab8`): a start never writes a company's own rows                              | local-dev                                             | No — measured 16,043 / 16,043 company rows unchanged on local                         |
 | **B's twin fold** (`b-twin-fold`, `24843fd`)                                                        | branch, NOT yet merged to local-dev                   | Lowers twin bids on purpose — live has 0 twins, so none                               |
@@ -36,10 +39,12 @@ these again before naming a candidate.
 | B's `b72188d` (undo removed line, "+ N drops not priced")                                           | local-dev, staging                                    | No — what screens SAY; check on staging, not a bidTotals item                         |
 | C's F9 / F10 (`67ee526` cleared scale stays cleared; `bbb5f85` homerun re-match stays on its sheet) | local-dev (merged during session 31), no migration    | No stored total; stops footage coming back unasked — bidTotals before/after covers it |
 
-Live migrations for this release: **0144–0149, 6 files, expect 150 / 181**
+Live migrations for this release: **0144–0151, 8 files, expect 152 / 183**
 (`deploying.md` § "Staging: migrations 0144–0145", § "Staging: migrations
-0146–0147" and § "Staging: migrations 0148–0149" are the staging records).
-The FK count is 181, not 180, because 0148's new table has one. B's S2 (`scope_prompts`) is NOT in it —
+0146–0147", § "Staging: migrations 0148–0149" and § "Staging: migrations
+0150–0151" are the staging records). It was 0144–0149, expect 150 / 181,
+until session 34 added 0150–0151 (two FKs, one per new table).
+The FK count is 181 after 0148 (its new table has one) and 183 after 0151. B's S2 (`scope_prompts`) is NOT in it —
 it waits for scope-tags plan step 6b.
 If `git diff 371b2ab origin/local-dev -- drizzle server/seed` shows anything
 else on the day, **stop and find out why before going on** — this table is
@@ -70,8 +75,8 @@ runs FIRST on the release's fresh copy of live, then on live. **Dry run
 first, every time**, and the owner reads the dry-run output before
 `--apply`.
 
-1. **Migrations 0144–0149 before the push** (all additive, step 1).
-   Expect **150 migrations, 181/181 foreign keys** — if `schemaDrift`
+1. **Migrations 0144–0151 before the push** (all additive, step 1).
+   Expect **152 migrations, 183/183 foreign keys** — if `schemaDrift`
    prints anything else, **stop and find out why before going on.**
 2. **`bidTotals` BEFORE** with live's code, as always.
 3. **Push `main`**, check `/api/version` (`builtAt`, `commit`).

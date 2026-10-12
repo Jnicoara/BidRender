@@ -1,6 +1,7 @@
 import { systemRouter } from "./_core/systemRouter";
 import { router } from "./_core/trpc";
 import { authRouter } from "./routers/authRouter";
+import { starterAuthRouter } from "./routers/starterAuthRouter";
 import { projectsRouter } from "./routers/projectsRouter";
 import { masterItemsRouter } from "./routers/masterItemsRouter";
 import { masterAssembliesRouter } from "./routers/masterAssembliesRouter";
@@ -49,6 +50,7 @@ import { seatLimitsRouter } from "./routers/seatLimitsRouter";
 export const appRouter = router({
   system: systemRouter,
   auth: authRouter,
+  starterAuth: starterAuthRouter,
   projects: projectsRouter,
   masterItems: masterItemsRouter,
   masterAssemblies: masterAssembliesRouter,

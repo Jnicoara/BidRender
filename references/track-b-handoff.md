@@ -1,5 +1,49 @@
 # Track B handoff — 2026-10-05
 
+## FROM TRACK A — 2026-10-12 (session 34): the starter editor's login is built; the SIGN-IN PAGE is yours
+
+For the baseline screen (`baseline-screen-plan.md` § 1, § 11: A = login,
+B = screen). Server only, on local-dev; no account exists anywhere yet.
+
+- **Build every baseline-screen procedure on `starterEditorProcedure`**
+  (`server/routers/starterAuthRouter.ts`), never on `protectedProcedure`,
+  `companyProcedure` or `adminProcedure`. A starter editor has NO ordinary
+  session and NO company: `auth.login`, `sdk.authenticateRequest` and
+  `resolveScope` all refuse it, so `ctx.user` is null for it and
+  `ctx.scope` cannot exist. The procedure gives you `ctx.starterEditor`
+  (`user`, `authAt`, `sessionEndsAt`). Do not read `ctx.user`.
+  **Add your router to `STARTER_ONLY` in `server/scopeDiscipline.test.ts`**
+  — that test fails a listed router that uses any company or admin builder,
+  and fails an unlisted one that has no capability pair.
+- **The sign-in page** (yours, own route, not inside the company shell):
+  1. `starterAuth.signIn({ email, password })` → `{ next: "code" }`; sets
+     the `bidridge_starter_session` cookie for 5 minutes, good for step 2
+     only.
+  2. `starterAuth.verifyCode({ code })` takes the 6-digit authenticator
+     code OR a recovery code (`XXXX-XXXX-XXXX-XXXX`, case / spaces /
+     dashes ignored) → `{ signedIn, via, sessionEndsAt }`.
+  3. `starterAuth.me()` → `{ id, name, email, sessionEndsAt }`;
+     `starterAuth.signOut()`.
+  - Errors to word: `UNAUTHORIZED` "Invalid email or password." / "That
+    code is not right." / "Sign in again."; `TOO_MANY_REQUESTS` (five wrong
+    passwords per address, or five wrong codes → 15-minute lock, message
+    names the minutes); `PRECONDITION_FAILED` "Starter sign-in is not set up
+    on this server." (no `STARTER_TOTP_KEY`).
+  - Session: 30 minutes idle (every `starterEditorProcedure` call slides
+    it), never past 8 hours from the password step. Show `sessionEndsAt`.
+  - Plan § 1: the band "STARTER: changes reach NEW companies; existing ones
+    get an offer", and "use a separate browser profile".
+- **QR enrollment is NOT a page.** `scripts/createStarterEditor.mts`
+  prints the QR code in the terminal (owner Q2) when Track A makes the
+  account; the first accepted code completes enrollment. Do not build an
+  enroll screen — a web enroll step would let anyone with the password
+  enrol their own phone.
+- **Migrations**: 0150 (role) and 0151 (factors) are on local-dev and
+  staging's DB. Your DBs need them before tests: `bidrender_test_b` and
+  `bidrender_local_b_new` → `scripts/migrate.mts` after merging local-dev
+  (expect 152). Local testing needs `STARTER_TOTP_KEY` (64 hex) in your
+  `.env`; `server/starterEditorLogin.test.ts` sets its own.
+
 ## WHERE B STANDS — 2026-10-12, role lines' "not priced" fixed on the Dashboard
 
 `b-role-not-priced`: `lineNotPricedSql` (`server/db.ts`) now checks
