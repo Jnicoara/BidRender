@@ -4,7 +4,91 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-12, session 33: bid protections' columns (0148–0149); startup fix
+## NOW — 2026-10-12, session 35: pricing sheet — SER rename, pack labels, one rebuild
+
+- **Owner's sheet committed FIRST, as saved** (`bef6f7f3`, sha256
+  `9495e7c9…`). Its 54 typed prices were ALL in "Price per unit" (over the
+  formula), 0 in "Pack price"; the old carry-over read only Pack price and
+  would have dropped all 54. Fixed in `pricing/sheetCarryOver.ts`: a number
+  over the formula on a pack of 1 = the pack price (other packs STOP); CUT
+  notes (capitals — a description says "Cut to fit") carry; a carried
+  "per foot"/1 takes the new label. 7/7 new guards red when removed.
+- **One rebuild** (`--only prices`): 58 rows carried (54 prices + 4 CUT),
+  0 dropped, 0 stops; independent compare of `bef6f7f3` vs new: **54 → 54,
+  same value on the same item**; CUT 4 → 4; 1,717 rows; no filter criteria,
+  0 hidden rows. Labor, assembly-hours and brand sheets NOT rebuilt (brand
+  sheet's pack labels are the old ones until its next rebuild).
+- **CUT rows (not hidden yet):** 14/4, 8/4, 4/2 and 2/2 MC cable Copper.
+- **SER/SEU** (`references/ser-rename-plan.md`): five copper SER renamed in
+  place to the short form ("6/3 SER Copper") via
+  `shared/serRename20261012.ts` (followed last by `latestCatalogName`);
+  descriptions "3 wire + ground (full set)." / "2 wire + bare neutral (full
+  set)."; dash short forms added to aluminum SER and SEU. No starter or run
+  type names a copper SER. Next server start renames the shared rows.
+- **Pack labels** (`packFor`): per-foot wire/cable is a pack of 1 with a
+  label; conduit stays 10 ft stick / 10. Fixture wire #16/#18 got "250 ft
+  roll" (owner's list didn't name it); flex/liquidtight stay "10 ft stick"
+  as before.
+
+## (earlier) 2026-10-12, session 34: starter editor login (0150–0151); C's lock comment
+
+### Job 1 — which baseline drafts are still needed (plan § 10 table)
+
+- **BS-M1 → `0150_starter_editor_role`, BS-M2 → `0151_starter_editor_factors`**,
+  word for word, additive step 1. **BS-M3–M6 still needed but NOT
+  applied**: BS-M3's `eddc870` SQL can't hold a name or recipe change (Q17)
+  and covers two tables; M4–M6 have no SQL. They wait for C's
+  `applyStarterChange` spec. **BS-M8 dropped** (C's F9 fix needs none).
+  BM-\* not applied (owner).
+- **Local**: `bidrender_local` 152, **4,386/4,386 unchanged**;
+  `bidrender_test_localdev` 152, matches, 183/183.
+- **Staging**: backup `staging-2026-10-12T20-51-12Z-before-0150-0151.sql`
+  (78/78 restore into `bidrender_scratch_staging_0150`); rehearsed (2
+  applied, 152, re-run nothing, 183/183, 1,252/1,252 unchanged with
+  `c40350a` and new code); staging DB: 152, matches, 183/183, **1,252/1,252
+  unchanged**. Record: `deploying.md` § "Staging: migrations 0150–0151".
+- Scratch added: DB `bidrender_scratch_staging_0150`, worktree
+  `../bidrender-before-starter` (`c40350a`, node_modules is a JUNCTION —
+  remove the junction before `git worktree remove`). Drop after the release.
+- Next release batch: **0144–0151, expect 152 / 183**
+  (`next-live-release-plan.md`).
+
+### Job 2 — the starter editor's own login (server only; nothing live)
+
+- `server/starterEditor/` — `totp.ts` (RFC 6238, vectors pass), `secretBox.ts`
+  (AES-256-GCM secret + HMAC recovery codes under `STARTER_TOTP_KEY`),
+  `session.ts` (own cookie `bidridge_starter_session`, own derived key, own
+  audience; 5-min password stage; 30 min idle, 8 h cap), `store.ts`,
+  `role.ts`. `server/routers/starterAuthRouter.ts`: `starterAuth.signIn` →
+  `verifyCode` → `me` / `signOut`, and `starterEditorProcedure` for B.
+- **Refused as a company login, three places, each on its own:**
+  `auth.login`, `sdk.authenticateRequest` (+ `verifySession` refuses the
+  starter audience), `resolveScope` — which, it turned out, PROVISIONS a
+  company for an account with none (plan § 1 said "fails closed"; corrected
+  there). Email reset sends it nothing.
+- **Bug found by the tests:** the wrong-code counter locked on the 4th miss —
+  drizzle writes `SET` in table column order, so one UPDATE reading its own
+  columns saw the new count. Rewritten as a row-locked read then write.
+- **Every guard red when removed: 26 of 26**, one at a time, each file
+  restored byte-for-byte (login, reset, authenticateRequest, audience,
+  resolveScope, role filter, stages, session account, sessionsValidAfter,
+  cookie slide, no key, race claim, used step, lock, recovery once, address,
+  sealing, both 8 h caps, derived key, audience required, rate limit, fifth
+  miss, reset ends sessions, reset replaces codes).
+- `scripts/createStarterEditor.mts` (create / `--reset-2fa` /
+  `--reset-password`, prints the QR in the terminal; `qrcode` added as a dev
+  dependency). **Never run against staging or live yet** — needs the
+  owner's go, and `STARTER_TOTP_KEY` set on that server first
+  (`deploying.md` secrets table).
+- Tests: `server/starterEditorPure.test.ts` (22), `server/starterEditorLogin.test.ts` (18).
+
+### Job 3 — C's `quantitiesLockedAt` comment applied (comment only)
+
+Word for word from `track-c-handoff.md` (on `origin/track-c`). It names
+`leaveDraft` in `server/bidProtection.ts`, which reaches local-dev only when
+C merges `track-c` — told C to merge soon.
+
+## (earlier) 2026-10-12, session 33: bid protections' columns (0148–0149); startup fix
 
 ### Job 1 — 0148–0149 applied (local, test, staging DB). Live untouched.
 

@@ -1156,13 +1156,14 @@ Relevant when anyone proposes hosting this elsewhere. **The app no longer
 depends on any Manus service** — the move completed in September 2026, and
 nothing here is a platform lock-in any more. What it does depend on:
 
-| Service               | Env                                    | What breaks without it                                                                                       |
-| --------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| MySQL database        | `DATABASE_URL`, `DATABASE_CA_CERT`     | Everything.                                                                                                  |
-| Cloudflare R2, plans  | `R2_PLANS_*` (4) + `PLAN_STORAGE=r2`   | Plan upload and viewing. Logos too — they ride the same pipe.                                                |
-| Cloudflare R2, backup | `R2_*` (4) + `R2_PLANS_READONLY_*` (2) | Backups. Missing the read-only pair makes the backup **refuse to start** rather than silently skip files.    |
-| Anthropic             | `ANTHROPIC_API_KEY`                    | The plan reader, navigation helper and alias suggester. All three degrade gracefully, so this fails quietly. |
-| Cloudflare Worker     | `CRON_SECRET`, matching the Worker's   | Both scheduled jobs (§ 7).                                                                                   |
+| Service               | Env                                    | What breaks without it                                                                                                                                                                                                                                                     |
+| --------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MySQL database        | `DATABASE_URL`, `DATABASE_CA_CERT`     | Everything.                                                                                                                                                                                                                                                                |
+| Cloudflare R2, plans  | `R2_PLANS_*` (4) + `PLAN_STORAGE=r2`   | Plan upload and viewing. Logos too — they ride the same pipe.                                                                                                                                                                                                              |
+| Cloudflare R2, backup | `R2_*` (4) + `R2_PLANS_READONLY_*` (2) | Backups. Missing the read-only pair makes the backup **refuse to start** rather than silently skip files.                                                                                                                                                                  |
+| Anthropic             | `ANTHROPIC_API_KEY`                    | The plan reader, navigation helper and alias suggester. All three degrade gracefully, so this fails quietly.                                                                                                                                                               |
+| Cloudflare Worker     | `CRON_SECRET`, matching the Worker's   | Both scheduled jobs (§ 7).                                                                                                                                                                                                                                                 |
+| (none — a setting)    | `STARTER_TOTP_KEY`, 64 hex characters  | The starter editor's sign-in only (baseline-screen-plan.md § 1): it REFUSES without it. Must be the value `scripts/createStarterEditor.mts` ran with — it seals the authenticator secret, so changing it means `--reset-2fa`. Not set on staging or live as of 2026-10-12. |
 
 **Sign-in is not on this list, and that is the point.** Email and password with
 bcrypt, in our own `users` table (`server/routers/authRouter.ts` — `signup`,
@@ -1712,6 +1713,34 @@ link were refused.
   cause. Read the log line before changing settings.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
+
+### Staging: migrations 0150–0151 — the starter editor's role and authenticator (2026-10-12 UTC) — NOT on live
+
+`0150_starter_editor_role` (C's BS-M1: `users.role` gains `starter_editor`,
+appended) and `0151_starter_editor_factors` (C's BS-M2: two new tables,
+one FK each). No `UPDATE`, no existing column changes meaning — additive,
+step 1, step 3 empty. `schema.ts` declares both, so they MUST be on a
+database before code from this commit on reaches it. No account is made.
+
+1. **Backup**: `staging-2026-10-12T20-51-12Z-before-0150-0151.sql` (78
+   tables, 15,667 rows), restored to `bidrender_scratch_staging_0150`:
+   **78/78 counts equal**.
+2. **Rehearsal** on that restore: drift before = exactly the two tables,
+   the enum and the two FKs; **2 applied**, 152; re-run "Nothing to apply";
+   "matches", 183/183. Totals before (staging's code `c40350a`, worktree
+   `../bidrender-before-starter`) vs after with that code AND the new code:
+   **1,252/1,252 unchanged** both ways.
+3. **Staging database**: drift before = the same; **2 applied**, 152;
+   "matches", 183/183; **all 1,252 bids unchanged** (old and new code).
+   JSONs `staging-totals-{before,after,after-…-new}-0150-2026-10-12.json`.
+4. **Local**: `bidrender_local` (4,386/4,386 unchanged) and
+   `bidrender_test_localdev`, both 152.
+5. **`STARTER_TOTP_KEY` is NOT set on staging**, so its starter sign-in
+   refuses ("not set up") — by design until the owner says go.
+
+**Live**: 0150–0151 join the next release's batch, BEFORE the push of any
+code from this commit on (both additive). Expect 152, 183/183 — **if what it
+prints does not match, stop and find out why before going on.**
 
 ### Staging: migrations 0148–0149 — math version + settings frozen when a bid leaves Draft (2026-10-12 UTC) — NOT on live
 

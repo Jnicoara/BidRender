@@ -23,6 +23,7 @@ import {
   resetLink,
 } from "../passwordReset";
 import { RESET_LINK_UNUSABLE } from "@shared/resetLinkMessages";
+import { isStarterEditor } from "../starterEditor/role";
 import {
   clientKey,
   createFailureLimiter,
@@ -213,6 +214,10 @@ export const authRouter = router({
 
       const valid = await bcrypt.compare(input.password, user.passwordHash);
       if (!valid) throw wrong();
+      // The starter editor signs in only at starterAuth, with its second
+      // step. Refused here with the same words as a wrong password, so this
+      // form says nothing about which kind of account the address is.
+      if (isStarterEditor(user)) throw wrong();
       wrongSignInsForAddress.clear(email);
 
       // Update lastSignedIn
@@ -362,6 +367,10 @@ export const authRouter = router({
         console.warn(
           `[auth] password reset: no account uses ${maskAddress(email)} — nothing sent`
         );
+      else if (isStarterEditor(user))
+        console.warn(
+          `[auth] password reset: account ${user.id} is the starter editor, reset only by scripts/createStarterEditor.mts — nothing sent`
+        );
       else if (!user.passwordHash || !user.email)
         console.warn(
           `[auth] password reset: account ${user.id} has ${
@@ -370,7 +379,9 @@ export const authRouter = router({
               : "no password (signs in another way)"
           } — nothing sent`
         );
-      if (user?.passwordHash && user.email) {
+      // Never for the starter editor: an emailed link would let whoever reads
+      // that inbox replace its password. Its password is reset by the script.
+      if (user?.passwordHash && user.email && !isStarterEditor(user)) {
         const token = newResetToken();
         await db.createPasswordResetToken(
           user.id,

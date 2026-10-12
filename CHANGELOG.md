@@ -27,6 +27,28 @@ This is the human-readable companion to the git history — read this to see wha
   leave the order (a footer says how many) and take their drops with them.
   A locked bid refuses the change. Nothing is marked unless somebody picks
   it, so no existing bid moved.
+- **Copper service-entrance cable is now named the way supply houses list
+  it.** "6-6-6-6 SER Copper" is now "6/3 SER Copper" (all five copper sizes);
+  aluminum SER and SEU keep the full set ("2-2-2-4 SER Aluminum"). Every SER
+  says "3 wire + ground (full set)" and every SEU "2 wire + bare neutral
+  (full set)", and both naming styles plus the old name still find each row.
+  Searching "6/3" still lists the NM-B and MC cable first.
+- **The starter pricing sheet keeps the prices typed so far.** A rebuild used
+  to read prices only from "Pack price", and the first 54 had been typed into
+  "Price per unit" — it would have dropped every one. It now keeps those, and
+  any "CUT" note. Per-foot rows now say which pack the foot price is figured
+  from ("per foot (from 250 ft roll)"), and the How to use tab explains
+  per-foot pricing and CUT.
+
+- **A separate, locked-down sign-in for editing BidRidge's starter
+  catalog (not live yet).** The account that will edit the shipped starter
+  prices and assemblies now has its own sign-in: a password, then a
+  6-digit code from an authenticator app set up by scanning a QR code,
+  with ten one-time recovery codes. It can never sign in as a company,
+  never be given a company, and cannot reset its password by email.
+  Sessions end after 30 idle minutes and always within 8 hours; five
+  wrong codes lock it for 15 minutes. No such account exists yet, and the
+  screen it opens is still to be built.
 
 - **Restarting or updating the app no longer touches your own library.**
   On every start the app used to fill in blank details (shelf, search

@@ -8,6 +8,8 @@ import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { sessionStillValid } from "@shared/sessionValidity";
 import { ENV } from "./env";
+import { isStarterEditor } from "../starterEditor/role";
+import { STARTER_AUDIENCE } from "../starterEditor/session";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -224,6 +226,14 @@ class SDKServer {
       });
       const { openId, appId, name } = payload as Record<string, unknown>;
 
+      // A starter editor's token is never an ordinary session, whatever it
+      // carries — even one signed with this key (server/starterEditor/session.ts).
+      const audience = [payload.aud ?? []].flat();
+      if (audience.includes(STARTER_AUDIENCE)) {
+        console.warn("[Auth] Starter editor token refused as a session");
+        return null;
+      }
+
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId) ||
@@ -323,6 +333,13 @@ class SDKServer {
 
     if (!user) {
       throw ForbiddenError("User not found");
+    }
+
+    // The starter editor has no ordinary session, however a token for it was
+    // made (a minted dev session, an old cookie): it signs in only at
+    // starterAuth. Refused here so no protectedProcedure ever sees it.
+    if (isStarterEditor(user)) {
+      throw ForbiddenError("Starter editor has no company session");
     }
 
     // A password reset or change ended every session issued before it.

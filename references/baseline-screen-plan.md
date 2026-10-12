@@ -83,8 +83,11 @@ Unchanged from the first version except where marked. Answers recorded:
 settings.**
 
 - **A new role, `starter_editor`, on its own login, with no company.**
-  `companyScope` fails closed (`server/_core/companyScope.ts`), so every
-  company screen refuses it. The owner's own `admin` account cannot open the
+  ~~`companyScope` fails closed (`server/_core/companyScope.ts`), so every
+  company screen refuses it.~~ **Wrong, found at build (2026-10-12):**
+  `resolveScope` creates a company for an account that never had one, so
+  it would have provisioned one. It now refuses `starter_editor` first, and
+  `auth.login` and `sdk.authenticateRequest` refuse it too (§ 10). The owner's own `admin` account cannot open the
   baseline screen. The two roles never overlap.
 - **Made only by a script** (`scripts/createStarterEditor.mts`, behind
   `ALLOW_REMOTE_DATABASE=yes`). Signup can never produce it.
@@ -497,6 +500,38 @@ and staging databases; live with the next release:
   (`salesTaxEnabled` NULL = the group inherits), `taxRateFrozenPct` (read
   only when frozen; NULL then = no rate) and `taxRateFrozenDetail` (display).
 - BS-M1–M6 and BS-M8 are NOT applied; each waits for its piece.
+
+**Re-checked 2026-10-12, later (Track A, session 34), now that 0148–0149
+are in:**
+
+| Draft     | Still needed?                                                                                                                                                                                                                                                                                                                                                                       | Done                                             |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **BS-M1** | Yes — the login (§ 1)                                                                                                                                                                                                                                                                                                                                                               | **`0150_starter_editor_role`**, word for word    |
+| **BS-M2** | Yes — the login (§ 1)                                                                                                                                                                                                                                                                                                                                                               | **`0151_starter_editor_factors`**, word for word |
+| **BS-M3** | Yes, but **NOT applied**: the `eddc870` SQL cannot hold what § 3 now asks of it. `targetTable` is `materials`/`assemblies` only (§ 3 adds labor rates, modifiers, run types, kits, labor steps), `field` is five number columns, and `oldValue`/`newValue` are `decimal` — a NAME change (Q17: an offer) or a recipe change has nowhere to go. Rewrite it with `applyStarterChange` | waits for C's `applyStarterChange` spec          |
+| **BS-M4** | Yes, NOT applied: no SQL exists yet (this section: "written when a piece is scheduled"), and it hangs off BS-M3's `starter_changes`                                                                                                                                                                                                                                                 | with BS-M3                                       |
+| **BS-M5** | Yes, NOT applied: same — no SQL, and which tables carry `isPinnedCopy` is decided by what `applyStarterChange` pins                                                                                                                                                                                                                                                                 | with BS-M3                                       |
+| **BS-M6** | Yes, NOT applied: the offers piece (§ 11 order step 5), after pinning                                                                                                                                                                                                                                                                                                               | with the offers                                  |
+| **BS-M7** | Done                                                                                                                                                                                                                                                                                                                                                                                | `0148`                                           |
+| **BS-M8** | **No longer needed.** C fixed F9 with no migration (`67ee526`): "Remove scale" stores `scaleSource = "manual"` with no ratio, which detection never overrides                                                                                                                                                                                                                       | nothing to apply                                 |
+
+0150–0151 on local, the test DB and staging; live with the next release
+(`next-live-release-plan.md`). The bid-methods drafts (BM-M1–M10) are NOT
+applied (owner, 2026-10-12).
+
+**§ 1 corrected by the build: `companyScope` did NOT fail closed for this
+account.** `resolveScope` PROVISIONS a company for any account that has
+never belonged to one — which a starter editor never has — so as written
+§ 1 would have handed the master login a fresh company of its own on its
+first request. It now refuses `starter_editor` before any query
+(`server/_core/companyScope.ts`), and so do `auth.login` and
+`sdk.authenticateRequest`, each on its own. **What was built (Track A):**
+`server/starterEditor/` (TOTP, sealed secret, session, store),
+`server/routers/starterAuthRouter.ts` (`starterAuth.signIn` →
+`verifyCode` → `me` / `signOut`, and `starterEditorProcedure` for the
+screen), `scripts/createStarterEditor.mts` (create, `--reset-2fa`,
+`--reset-password`; prints the QR code in the terminal). The SIGN-IN PAGE is
+Track B's, with the screen.
 
 SQL drafts for BS-M1 to BS-M3 are in the first version of this file
 (`eddc870`, § 7). They are unchanged except that BS-M3 gains `kind` and

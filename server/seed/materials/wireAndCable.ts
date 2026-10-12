@@ -581,9 +581,25 @@ const SE_SLANG = "service entrance seu se cable feeder";
  * (1/0-1/0-1/0-2, 2/0-2/0-2/0-1, 3/0-3/0-3/0-1/0); Southwire makes no #8
  * copper SER, and 8-8-8-8 is the set other makers sell (checked 2026-09-25).
  * A ground size is not arithmetic — look it up before adding a size.
+ *
+ * ── CHANGED 2026-10-12 (owner): name each the way STORES list it ──────────────
+ * Copper SER by the SHORT form ("6/3 SER Copper"); aluminum SER and SEU keep
+ * the full set ("2-2-2-4 SER Aluminum", "4-4-6 SEU Aluminum"). This reverses
+ * the full-set rule above for COPPER only — the two paragraphs above are kept
+ * as the history. What the full set guarded against (the ground hidden) is
+ * now carried by the description, "3 wire + ground (full set)", and by the
+ * full set staying a search word on every row. Every row keeps BOTH styles
+ * plus its old name as search words; the slash short form is added only
+ * where it is the name, because the 2026-10-09 reality check took "8/3" off
+ * these rows so "8/3" finds NM-B and MC first. Record:
+ * references/ser-rename-plan.md; renames: shared/serRename20261012.ts.
  */
 const shorthandAliases = (shorthand?: string) =>
   shorthand ? `${shorthand} ${shorthand.replace(/-/g, "/")}` : "";
+
+/** What a full set means, said once (owner, 2026-10-12). */
+const SER_SET = "3 wire + ground (full set).";
+const SEU_SET = "2 wire + bare neutral (full set).";
 
 const serCopper: BaselineMaterial[] = [
   { size: "8-8-8-8", shorthand: "8-3" },
@@ -592,25 +608,30 @@ const serCopper: BaselineMaterial[] = [
   { size: "2-2-2-4", shorthand: "2-3" },
   { size: "1-1-1-3", shorthand: "1-3" },
 ].map(({ size, shorthand }) => ({
-  name: `${size} SER Copper`,
+  name: `${shorthand.replace("-", "/")} SER Copper`,
   unitOfSale: "foot",
   costPerUnit: UNPRICED,
   category: "Wire & Cable",
   searchAliases: aliases(
     CU_WORDS,
+    // The full set, both spellings — the old name ("8-8-8-8 SER Copper").
+    size,
     size.replace(/-/g, "/"),
     shorthandAliases(shorthand),
     SE_SLANG,
     "range dryer subpanel"
   ),
+  description: SER_SET,
 }));
 
 const serAluminum: BaselineMaterial[] = [
   // Three insulated conductors and the reduced ground; see serCopper above.
   // The 60A and 100A subpanel feeders came from the pricing sheet already
   // written out, and have no shorthand in the catalog's history.
-  { size: "4-4-4-6", note: undefined },
-  { size: "2-2-2-4", note: undefined },
+  // The dash short form only, added 2026-10-12 so each row keeps both styles;
+  // the slash form ("4/3") is the name of a copper SER, NM-B and MC row.
+  { size: "4-4-4-6", shorthand: "4-3", slash: false, note: undefined },
+  { size: "2-2-2-4", shorthand: "2-3", slash: false, note: undefined },
   { size: "1/0-1/0-1/0-2", shorthand: "1/0-3", note: undefined },
   { size: "2/0-2/0-2/0-1", shorthand: "2/0-3", note: undefined },
   { size: "3/0-3/0-3/0-1/0", shorthand: "3/0-3", note: undefined },
@@ -640,16 +661,20 @@ const serAluminum: BaselineMaterial[] = [
     shorthand: "4/0-3",
     note: "Four conductors — three insulated and a 2/0 ground; the 200A subpanel feeder.",
   },
-  // Three conductors, no separate ground: a set, not shorthand.
-  { size: "250-250-250", note: undefined },
+  // Three conductors, no separate ground: a set, not shorthand. Renamed
+  // "250-250-250-3/0 SER Aluminum" (four wires) by the 2026-10-09 reality
+  // check, so the SER short form is "250-3" (2026-10-12).
+  { size: "250-250-250", shorthand: "250-3", slash: false, note: undefined },
 ].map(
   ({
     size,
     shorthand,
+    slash = true,
     note,
   }: {
     size: string;
     shorthand?: string;
+    slash?: boolean;
     note?: string;
   }) => ({
     name: `${size} SER Aluminum`,
@@ -658,14 +683,25 @@ const serAluminum: BaselineMaterial[] = [
     category: "Wire & Cable" as const,
     searchAliases: aliases(
       size.replace(/-/g, "/"),
-      shorthandAliases(shorthand),
+      slash ? shorthandAliases(shorthand) : (shorthand ?? ""),
+      // The three-wire 4/0 ships as SEU (2026-10-09): its short form is the
+      // SEU one, "4/0-2" — never a "3", which is the four-wire cable's.
+      size === "4/0-4/0-2/0" ? "4/0-2" : "",
       AL_WORDS,
       SE_SLANG,
       "mast riser",
       size === "4/0-4/0-2/0" ? "200a service" : "",
       size === "4/0-4/0-4/0-2/0" ? "subpanel" : ""
     ),
-    description: note ? `${note} ${ALUMINUM_NOTE}` : ALUMINUM_NOTE,
+    // The set first (owner, 2026-10-12). The three-wire 4/0 is SEU by its
+    // shipped name (REALITY_RENAMES), so it says what an SEU is.
+    description: [
+      size === "4/0-4/0-2/0" ? SEU_SET : SER_SET,
+      note,
+      ALUMINUM_NOTE,
+    ]
+      .filter(Boolean)
+      .join(" "),
   })
 );
 
@@ -681,10 +717,12 @@ const seuAluminum: BaselineMaterial[] = ["4-4-6", "2-2-4"].map(size => ({
   category: "Wire & Cable" as const,
   searchAliases: aliases(
     size.replace(/-/g, "/"),
+    // The short form, dash style (2026-10-12): "4-2" for 4-4-6.
+    `${size.split("-")[0]}-2`,
     AL_WORDS,
     "service entrance se cable flat concentric"
   ),
-  description: ALUMINUM_NOTE,
+  description: `${SEU_SET} ${ALUMINUM_NOTE}`,
 }));
 
 /**

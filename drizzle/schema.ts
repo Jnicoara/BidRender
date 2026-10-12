@@ -31,7 +31,15 @@ export const users = mysqlTable("users", {
   passwordHash: text("passwordHash"),
   loginMethod: varchar("loginMethod", { length: 64 }),
   emailVerified: boolean("emailVerified").default(false).notNull(),
-  role: mysqlEnum("role", ["user", "admin", "contractor"])
+  /**
+   * `starter_editor` (0150) is the master account that edits the shipped
+   * starter (baseline-screen-plan.md § 1). It is NOT a stronger admin: it has
+   * no company and no ordinary session. `auth.login` refuses it,
+   * `sdk.authenticateRequest` refuses it and `resolveScope` refuses it, each
+   * on its own, and only `server/starterEditor/` signs it in — password, then
+   * an authenticator code. Only `scripts/createStarterEditor.mts` writes it.
+   */
+  role: mysqlEnum("role", ["user", "admin", "contractor", "starter_editor"])
     .default("user")
     .notNull(),
 
@@ -138,6 +146,49 @@ export const passwordResetTokens = mysqlTable(
     unique("password_reset_tokens_tokenHash_uq").on(t.tokenHash),
     index("password_reset_tokens_userId_idx").on(t.userId),
   ]
+);
+
+/**
+ * The starter editor's authenticator (0151, baseline-screen-plan.md § 1).
+ * One row per `starter_editor` account, made by
+ * `scripts/createStarterEditor.mts`.
+ *
+ * `totpSecretEnc` is AES-256-GCM under `STARTER_TOTP_KEY`
+ * (`server/starterEditor/secretBox.ts`), so a copy of this table does not
+ * give anyone the codes. `lastUsedStep` makes a code good once: a code is
+ * accepted only for a 30-second step AFTER this one, claimed with one
+ * conditional UPDATE. Five wrong codes set `lockedUntil` 15 minutes ahead.
+ */
+export const starterEditorFactors = mysqlTable("starter_editor_factors", {
+  userId: int("userId")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  totpSecretEnc: varchar("totpSecretEnc", { length: 255 }).notNull(),
+  /** NULL until the first code is accepted at sign-in. */
+  enrolledAt: timestamp("enrolledAt"),
+  lastUsedStep: bigint("lastUsedStep", { mode: "number" }),
+  failedAttempts: int("failedAttempts").default(0).notNull(),
+  lockedUntil: timestamp("lockedUntil"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
+ * Ten recovery codes per starter editor (0151), shown once by the script.
+ * `codeHash` is HMAC-SHA256 under `STARTER_TOTP_KEY`, never the code; a used
+ * code (`usedAt`) is refused.
+ */
+export const starterEditorRecoveryCodes = mysqlTable(
+  "starter_editor_recovery_codes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    codeHash: varchar("codeHash", { length: 255 }).notNull(),
+    usedAt: timestamp("usedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [index("starter_editor_recovery_codes_userId_idx").on(t.userId)]
 );
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -2306,17 +2357,18 @@ export const bids = mysqlTable(
      * A flag plus a date can disagree, and "locked since when" is the first
      * thing asked about a number that stopped moving. One column cannot drift.
      *
-     * ── Independent of `status`, and never set by it — REVERSED 2026-10-12 ─────
-     * A bid marked Won is often still being adjusted, and a lock the app applied
-     * on a status change is a number frozen at an instant the app chose. This is
-     * only ever written by `bids.lockQuantities` / `bids.unlockQuantities`,
-     * which a person presses.
+     * ── Set by a person, AND by the bid leaving Draft (owner Q15, 2026-10-12) ─
+     * Written by `bids.lockQuantities` / `bids.unlockQuantities`, which a person
+     * presses, and by `leaveDraft` (server/bidProtection.ts) when `bids.update`
+     * moves a bid out of Draft or `bids.create` makes one outside it — through
+     * the same `db.lockBidQuantities`, so a lock is one thing however it came.
+     * Unlock is one click away, as before.
      *
-     * Owner Q15 (2026-10-12, baseline-screen-plan.md § 9 F1) reverses that: a
-     * bid LEAVING Draft locks itself, with Unlock one click away as today,
-     * because an unlocked Won bid re-counts whenever the library moves. The
-     * paragraph above stays until the code that does it lands (Track C); that
-     * commit rewrites it. Same column — no migration was needed for this.
+     * This paragraph said "independent of `status`, and never set by it" until
+     * 2026-10-12: a lock the app applied was "a number frozen at an instant the
+     * app chose". Q15 reversed that (baseline-screen-plan.md § 9 F1), because
+     * an unlocked Won bid re-counted whenever the library moved — the worse of
+     * the two. Same column; no migration was needed.
      *
      * ── It does NOT freeze money ─────────────────────────────────────────────
      * The four snapshot columns on a line already did that, at add time, and are

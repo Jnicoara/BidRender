@@ -1026,7 +1026,9 @@ everywhere else in the catalog, and it is the only form the size parser reads.
 **The same 2026-10-07 rename spelled every wire's metal out at the end**
 (`#12 THHN Copper`, `12/2 NM-B Copper`, `4/0 XHHW Aluminum`), wrote cable
 specs with a slash and aughts without the `#`, and gave SER its full
-conductor set with the metal spelled out. 151 rows, renamed in place; every
+conductor set with the metal spelled out (copper SER moved to the store's
+short form, "6/3 SER Copper", on 2026-10-12 — `references/ser-rename-plan.md`;
+aluminum SER and SEU keep the full set). 151 rows, renamed in place; every
 older spelling points STRAIGHT at the final name in
 `RENAMED_BASELINE_MATERIALS` (no chains — search and the price import follow
 one hop). `server/frozenMaterialNames.test.ts` fails if the seed drifts from

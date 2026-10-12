@@ -75,6 +75,21 @@ const ADMIN_ONLY: Record<string, string> = {
     "Reads and sets each company's seat limit — a platform decision until billing makes it one, never a company role's. Reads counts only, no contractor data.",
 };
 
+/**
+ * Routers for the STARTER EDITOR (baseline-screen-plan.md § 1) — the master
+ * account with no company. They edit the shipped starter, not a company's
+ * data, so they have no company scope to use; they are gated by
+ * `starterEditorProcedure` (password + authenticator, its own session).
+ *
+ * Such a router may use NO company or admin builder at all: a mixed router
+ * would have a route a company login could reach hiding behind this list.
+ * The baseline screen's router (Track B) goes here too.
+ */
+const STARTER_ONLY: Record<string, string> = {
+  "starterAuthRouter.ts":
+    "The starter editor's own sign-in. signIn / verifyCode / signOut are public by nature (they ARE the sign-in); everything else is starterEditorProcedure.",
+};
+
 describe("every data router is company-scoped", () => {
   it("has routers to check at all", () => {
     // Guards against the whole suite passing because a path went stale.
@@ -105,6 +120,17 @@ describe("every data router is company-scoped", () => {
     for (const file of files) {
       const src = read(file);
       if (UNGATED[file]) continue;
+      if (STARTER_ONLY[file]) {
+        expect({
+          file,
+          mixed:
+            /\b(protectedProcedure|companyProcedure|adminProcedure|internalProcedure|scoped|requireCapability)\b/.test(
+              src
+            ),
+          starterGated: /\bstarterEditorProcedure\b/.test(src),
+        }).toEqual({ file, mixed: false, starterGated: true });
+        continue;
+      }
       if (ADMIN_ONLY[file]) {
         // Admin-gated routers must use ONLY adminProcedure — a mixed router
         // would have unguarded routes hiding behind this exemption.
@@ -126,6 +152,7 @@ describe("every data router is company-scoped", () => {
       ...Object.keys(ACTOR_SCOPED),
       ...Object.keys(UNGATED),
       ...Object.keys(ADMIN_ONLY),
+      ...Object.keys(STARTER_ONLY),
     ]) {
       expect({ file, present: files.includes(file) }).toEqual({
         file,

@@ -67,6 +67,7 @@ import {
   materialResolver,
   planCarryOver,
   readTypedRows,
+  relabelPerFoot,
   stepResolver,
   stepTotalsResolver,
 } from "./sheetCarryOver";
@@ -225,6 +226,19 @@ if (stops.length) {
       `  - ${s.sheet} row ${s.row} (${s.label}) ${JSON.stringify(s.values)}: ${s.why}`
     );
   process.exit(1);
+}
+{
+  const pricePlan = plans.get("prices");
+  if (pricePlan) {
+    const byName = new Map(rows.map(m => [m.name, m]));
+    const relabelled = relabelPerFoot(pricePlan, key => {
+      const m = byName.get(key);
+      return m ? packFor(m) : undefined;
+    });
+    console.log(
+      `per-foot labels: ${relabelled} carried "per foot" pack(s) take the new label (label only)`
+    );
+  }
 }
 for (const p of plans.values())
   console.log(
@@ -484,6 +498,18 @@ if (want("prices")) {
     [
       "What you type",
       "Pack price only (yellow). Leave a row blank to keep it unpriced. Change Pack size and Pack qty if you buy a different pack — Price per unit is Pack price ÷ Pack qty.",
+    ],
+    [
+      "Per-foot prices",
+      "Figure per-foot prices from the standard contractor size (250 ft roll, 500 ft spool, 1000 ft box), not small rolls. If a supplier shows a price per M (1,000 ft), divide by 1,000. Conduit: type the price of one 10 ft stick. Surface raceway: stick price divided by its length.",
+    ],
+    [
+      "Can't find a part?",
+      "Can't find a part? Leave the price blank and type CUT in Notes. Never delete a row.",
+    ],
+    [
+      "Kept through a rebuild",
+      'Every price you type, by item (never by row, so sorting and filters are fine). On a pack of 1 a price typed straight into "Price per unit" is kept too, as the pack price. In Notes, only a note with CUT in CAPITALS is kept — the rest of Notes is the catalog\'s description and is rewritten each time.',
     ],
     [
       "Order",

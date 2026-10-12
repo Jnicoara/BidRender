@@ -983,6 +983,7 @@ from the seed.
 - `#3 3-conductor` / `#3 4-conductor MC cable Copper` → `3/3` / `3/4 MC cable Copper` (old names as search words).
 - `16/2 fire alarm cable Copper` → `16/2 fire alarm cable, FPLR, unshielded Copper`; aliases to match.
 - SER Copper aliases → drop the `N-3 N/3` names that belong to NM-B and MC rows; every SER row → drop "seu".
+  **Partly overridden 2026-10-12 (owner):** copper SER is now NAMED by the short form ("6/3 SER Copper"), so "N/3" is in the name; "6/3" and "8/3" still list NM-B and MC first (measured). `references/ser-rename-plan.md`.
 - `12/2 MC cable healthcare (HCF)` aliases → drop "ac-hcf".
 - `Fiber optic cable` → `…, 12-strand OM4 multimode, plenum` and/or `…, OS2 single-mode`.
 - `Surface raceway (wire mold), low voltage` → `Surface raceway, low voltage` ("wiremold" stays an alias).

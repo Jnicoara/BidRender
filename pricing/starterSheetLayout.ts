@@ -379,22 +379,57 @@ export function assembliesInSheetOrder(): {
  * divides by. A STARTING POINT the owner overwrites when he buys another
  * pack. Ported from pricing/writeWorkbook.cjs (packFor) with patterns for the
  * names frozen 2026-10-07 ("… Copper", "SER Aluminum", "bare stranded").
+ *
+ * ── Per-foot rows: the price is PER FOOT, the pack is only a label ───────────
+ * Owner, 2026-10-12: wire and cable are typed per foot (Pack qty 1), figured
+ * from the standard contractor pack, and the label says which:
+ *   #14–#10 wire, NM, UF and small MC   "per foot (from 250 ft roll)"
+ *   THHN #14–#10                        "per foot (from 500 ft spool)"
+ *   #8 and bigger, big MC, SER/SEU,
+ *   feeder wire                         "per foot (cut to length)"
+ *   low voltage                         "per foot (from 1000 ft box)"
+ * Conduit stays a 10 ft stick (Pack qty 10); surface raceway stays per foot.
+ * Until then wire was a 250 / 500 / 1000 pack the price divided by; the
+ * owner had already set 120 of those rows to per foot / 1 by hand.
  */
+export const PER_FOOT_ROLL = "per foot (from 250 ft roll)";
+export const PER_FOOT_SPOOL = "per foot (from 500 ft spool)";
+export const PER_FOOT_CUT = "per foot (cut to length)";
+export const PER_FOOT_BOX = "per foot (from 1000 ft box)";
+
+/** #18–#10: the leading gauge of "14/2 …", "#12 …", "10/3 …". Not 1/0. */
+const smallGauge = (name: string): boolean => {
+  const g = /^#?(\d+)(?=[\/\s-])/.exec(name);
+  if (!g || /^#?\d+\/0\b/.test(name)) return false;
+  const n = Number(g[1]);
+  return n >= 10 && n <= 18;
+};
+
 export function packFor(m: BaselineMaterial): [string, number] {
   const n = m.name;
   if (m.unitOfSale === "foot") {
-    if (/NM-B|UF-B|\bSE[RU]\b/i.test(n)) return ["250 ft roll", 250];
-    if (/THHN|XHHW|USE-2|\bbare (solid|stranded)\b|tracer wire/i.test(n))
-      return ["500 ft spool", 500];
-    if (/MC(-AP)? cable|AC cable/i.test(n)) return ["250 ft coil", 250];
+    if (/\bSE[RU]\b|URD/i.test(n)) return [PER_FOOT_CUT, 1];
     if (
-      /Cat5e|Cat6|coax|speaker|thermostat|security|control wire|fire alarm/i.test(
+      /Cat5e|Cat6|coax|speaker|thermostat|security|control wire|fire alarm|fiber optic/i.test(
         n
       )
     )
-      return ["1000 ft box", 1000];
+      return [PER_FOOT_BOX, 1];
+    // Not wire, though the name says "cable".
+    if (/^Cable tray/i.test(n)) return ["per foot", 1];
+    // Locate wire is #14 single conductor; its name carries no gauge.
+    if (/^Tracer wire$/i.test(n)) return [PER_FOOT_ROLL, 1];
     if (/EMT|rigid|PVC|IMC|flex|FMC|liquidtight/i.test(n))
       return ["10 ft stick", 10];
+    if (/THHN/i.test(n))
+      return [smallGauge(n) ? PER_FOOT_SPOOL : PER_FOOT_CUT, 1];
+    if (/XHHW|USE-2/i.test(n)) return [PER_FOOT_CUT, 1]; // feeder wire
+    if (
+      /NM-B|UF-B|MC(-AP)? cable|AC cable|\bbare (solid|stranded)\b|wire|cable/i.test(
+        n
+      )
+    )
+      return [smallGauge(n) ? PER_FOOT_ROLL : PER_FOOT_CUT, 1];
     return ["per foot", 1];
   }
   if (
