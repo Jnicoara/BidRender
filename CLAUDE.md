@@ -1169,13 +1169,29 @@ the bottom of, and a warning that is not read is not being given. The per-bid ov
 ordinary local edit, and repeating the warning there teaches people to read past
 it in the one place it matters.
 
-**Settings are inherited, not copied.** A bid stores NULL to mean "follow the
-company default", so a later change to that default does re-price it. What a
-change can never touch is a line's SNAPSHOT — the material cost, hours, rate and
-modifier total frozen when the line was added. That boundary is the point, and
-`server/companyDefaults.test.ts` asserts both halves of it; do not "fix" the
-inheritance into a copy, which would silently freeze every bid at whatever
-settings it happened to be created under.
+**Settings are inherited WHILE A BID IS A DRAFT, and copied the moment it
+leaves Draft.** A Draft stores NULL to mean "follow the company default", so a
+later change to that default does re-price it. What a change can never touch
+is a line's SNAPSHOT — the material cost, hours, rate and modifier total
+frozen when the line was added.
+
+> **Amended 2026-10-12 by the owner (Q16, `baseline-screen-plan.md` § 9 F8).**
+> This said "inherited, not copied" with no exception, and that let a company
+> changing its own margin re-price its Won bids. Now, when a bid LEAVES DRAFT
+> (`bids.update`, or `bids.create` outside Draft), `freezeBidSettings`
+> (`server/bidProtection.ts`) writes the values in effect into the bid's own
+> overhead, profit and productivity groups where they are NULL — a person's
+> own override is kept — plus the tax switches as one group, the tax rate in
+> effect (`taxRateFrozenPct`) and `settingsFrozenAt`. Pricing reads the frozen
+> rate only when `settingsFrozenAt` is set, and a rate TYPED on the bid
+> (`taxRateOverridePct`) still wins. **Drafts still inherit**, and that half is
+> still the point: do not freeze at creation, which would pin every Draft to
+> whatever the settings were the day it was started. A bid moved back to Draft
+> keeps what was frozen; nothing un-freezes on its own.
+
+`server/companyDefaults.test.ts` asserts all three: a Draft follows the
+company, a bid that left Draft does not (overhead, profit, productivity and
+tax), and no settings change ever reaches a line's snapshot.
 
 **The productivity factor is not a modifier.** Job-condition modifiers ADD to
 each other and describe one job; the productivity factor is applied afterwards

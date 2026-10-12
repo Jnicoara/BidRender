@@ -78,6 +78,14 @@ import {
   heldNote,
   hoursPer,
 } from "./starterSheetLayout";
+import {
+  cellNumber,
+  cellText,
+  checkHoursRow,
+  checkPriceRow,
+  toStored4,
+  type HoursEntry,
+} from "../shared/starterSheetChecks";
 
 const require = createRequire(import.meta.url);
 type Cell = { value: unknown };
@@ -114,29 +122,12 @@ if (!pricesPath && !laborPath && !brandsPath && !assemblyHoursPath) {
 const catalog = new Map(BASELINE_MATERIALS.map(m => [m.name, m]));
 const problems: string[] = [];
 
-/** A cell's value, a formula's cached result taken where exceljs gives one. */
-function plain(v: unknown): unknown {
-  if (v && typeof v === "object" && "result" in (v as object))
-    return (v as { result: unknown }).result;
-  if (v && typeof v === "object" && "richText" in (v as object))
-    return (v as { richText: { text: string }[] }).richText
-      .map(t => t.text)
-      .join("");
-  return v;
-}
-const text = (v: unknown) => {
-  const p = plain(v);
-  return p === null || p === undefined ? "" : String(p).trim();
-};
-/** Blank -> null; a number -> it; anything else -> NaN (refused). */
-function num(v: unknown): number | null {
-  const p = plain(v);
-  if (p === null || p === undefined || String(p).trim() === "") return null;
-  const n = typeof p === "number" ? p : Number(String(p).replace(/[$,]/g, ""));
-  return Number.isFinite(n) ? n : NaN;
-}
-/** Four decimals, as the columns store them. */
-const dec = (n: number) => n.toFixed(4);
+// The cell readers and the price / hours row checks live in
+// shared/starterSheetChecks.ts, so the baseline screen's upload re-checks
+// rows with the same code (baseline-screen-plan.md § 5).
+const text = cellText;
+const num = cellNumber;
+const dec = toStored4;
 
 async function open(file: string, sheet: string) {
   const wb = new ExcelJS.Workbook();
@@ -170,36 +161,22 @@ if (pricesPath) {
     const row = ws.getRow(r);
     const name = text(row.getCell(cName).value);
     if (!name) continue;
-    const at = `prices row ${r} (${name})`;
-    const m = catalog.get(name);
-    if (!m) {
-      problems.push(`${at}: not a shipped name`);
-      continue;
-    }
-    if (seen.has(name)) problems.push(`${at}: listed twice`);
-    seen.add(name);
-    const unit = text(row.getCell(cUnit).value);
-    if (unit !== m.unitOfSale)
-      problems.push(
-        `${at}: unit "${unit}", the catalog sells it by "${m.unitOfSale}"`
-      );
-    const price = num(row.getCell(cPrice).value);
-    if (price === null) continue; // blank: stays unpriced
-    const qty = num(row.getCell(cQty).value);
-    if (Number.isNaN(price) || price <= 0) {
-      problems.push(`${at}: pack price is not a number above 0`);
-      continue;
-    }
-    if (qty === null || Number.isNaN(qty) || qty <= 0) {
-      problems.push(`${at}: pack qty is not a number above 0`);
-      continue;
-    }
-    nextPrices[name] = dec(price / qty);
+    const checked = checkPriceRow({
+      at: `prices row ${r} (${name})`,
+      name,
+      item: catalog.get(name),
+      unit: text(row.getCell(cUnit).value),
+      packQty: num(row.getCell(cQty).value),
+      packPrice: num(row.getCell(cPrice).value),
+      seen,
+    });
+    problems.push(...checked.problems);
+    if (checked.value !== null) nextPrices[name] = checked.value;
   }
 }
 
 // ── Labor units ─────────────────────────────────────────────────────────────
-type Hours = { laborHours?: string; fieldBendLaborHours?: string };
+type Hours = HoursEntry;
 let nextLabor: Record<string, Hours> | null = null;
 if (laborPath) {
   const { ws, col } = await open(laborPath, LABOR_SHEET);
@@ -215,40 +192,19 @@ if (laborPath) {
     const row = ws.getRow(r);
     const name = text(row.getCell(cName).value);
     if (!name) continue;
-    const at = `labor row ${r} (${name})`;
     const m = catalog.get(name);
-    if (!m) {
-      problems.push(`${at}: not a shipped name`);
-      continue;
-    }
-    if (seen.has(name)) problems.push(`${at}: listed twice`);
-    seen.add(name);
-    const per = text(row.getCell(cPer).value);
-    if (per !== hoursPer(m))
-      problems.push(
-        `${at}: "Hours per" says "${per}", the catalog needs "${hoursPer(m)}"`
-      );
-    const hours = num(row.getCell(cHours).value);
-    const bend = num(row.getCell(cBend).value);
-    const entry: Hours = {};
-    if (hours !== null) {
-      if (Number.isNaN(hours) || hours <= 0)
-        problems.push(
-          `${at}: MY HOURS is not a number above 0 (blank = not set)`
-        );
-      // "per 100 ft" on the sheet; the column is hours per foot.
-      else entry.laborHours = dec(per === "100 ft" ? hours / 100 : hours);
-    }
-    if (bend !== null) {
-      if (!m.raceway)
-        problems.push(`${at}: bend hours on a row that is not a raceway`);
-      else if (Number.isNaN(bend) || bend <= 0)
-        problems.push(
-          `${at}: bend hours is not a number above 0 (blank = not set)`
-        );
-      else entry.fieldBendLaborHours = dec(bend);
-    }
-    if (Object.keys(entry).length) nextLabor[name] = entry;
+    const checked = checkHoursRow({
+      at: `labor row ${r} (${name})`,
+      name,
+      item: m,
+      expectedPer: m ? hoursPer(m) : "",
+      per: text(row.getCell(cPer).value),
+      hours: num(row.getCell(cHours).value),
+      bend: num(row.getCell(cBend).value),
+      seen,
+    });
+    problems.push(...checked.problems);
+    if (checked.value !== null) nextLabor[name] = checked.value;
   }
 }
 

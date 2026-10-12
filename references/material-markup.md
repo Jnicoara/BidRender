@@ -125,6 +125,14 @@ setting (Piece 4) is what prevents accidental doubling:
   margin **in numbers**, not a warning (Piece 4).
 - The owner's own company default will be Route B.
 
+> **OVERRIDDEN 2026-10-12 by the owner: NO STACKING.** Each bid uses ONE
+> method, Markup + charge rate (Route A) or Cost + O&P (Route B), and only
+> that method's settings. Material and quoted-gear markup never apply on a
+> Cost + O&P bid, and overhead and profit never apply on Markup + charge
+> rate. "Both can be on together" no longer exists. Bids made before stay
+> on the stacked math until a Draft is moved to a method. The plan that
+> replaces Piece 4 is `references/bid-methods-plan.md`.
+
 **D2. Starter price bands are Route A only, as round midpoints.** (2026-09-25)
 
 | Pack / purchase price | Starter markup |

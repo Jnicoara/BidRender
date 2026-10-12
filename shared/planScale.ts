@@ -310,7 +310,15 @@ export function detectScaleFromText(sheetText: string): ScaleDetection {
   return { best, confidence, candidates, notToScale };
 }
 
-/** Whether a detection may be stored without the user confirming it. */
+/**
+ * Whether a detection was CONFIDENT: one labelled scale, nothing competing.
+ *
+ * The name is from when a confident reading was stored without asking. Since
+ * owner Q19 (2026-10-12) nothing is: every reading is an offer the person
+ * taps (`bidPdfs.detectSheetScale`). No caller applies a scale on this any
+ * more; it is kept because its tests pin what "confident" means, which the
+ * offer can use to say how clearly the sheet states it.
+ */
 export function isAutoApplicable(detection: ScaleDetection): boolean {
   return detection.confidence === "high" && detection.best !== null;
 }

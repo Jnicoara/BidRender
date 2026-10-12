@@ -23,15 +23,18 @@
  * drawing's answer into the column that was always there, and the timestamp
  * says to stop re-deriving it.
  *
- * ── Why it is never automatic ────────────────────────────────────────────────
- * Not on a status change, not on a proposal being printed, not on a due date
- * passing. A bid marked Won is often still being adjusted, and a lock the app
- * applied is a number frozen at an instant the app chose — the same reason
- * sending a count to the bid is a button rather than a side effect (§ 5f.0
- * OVERRIDE 2). One person, one deliberate act, reversible.
+ * ── Automatic ONCE: when a bid leaves Draft (REVERSED 2026-10-12) ───────────
+ * This section used to say "never automatic — not on a status change". Owner
+ * Q15 (2026-10-12, baseline-screen-plan.md § 9 F1) reversed it: an unlocked
+ * Won bid re-counted whenever the library moved, so a bid LEAVING Draft now
+ * locks itself, through the same `db.lockBidQuantities` the button uses
+ * (`leaveDraft`, server/bidProtection.ts). Still not on a proposal being
+ * printed or a due date passing, and Unlock is one click, as before.
  *
- * Marking a bid Won does now ASK (owner, 2026-10-08 — `offersLockOnStatusChange`
- * below). It asks; it never locks.
+ * Marking a bid Won from Active (owner, 2026-10-08 —
+ * `offersLockOnStatusChange` below) still ASKS: that bid left Draft before
+ * the auto-lock existed, or was unlocked by hand. A change from Draft never
+ * asks, because the lock already happened.
  *
  * ── What the lock does NOT touch, and the sentence every screen must carry ───
  * **Prices were already frozen, separately, when each line was added.** The
@@ -194,12 +197,13 @@ export function unlockedNoticeCopy(followingLines: number): string {
 /**
  * Whether marking a bid Won OFFERS the lock (owner, 2026-10-08, Gap 3).
  *
- * An offer, never the lock itself — § "Why it is never automatic" above still
- * holds word for word: a Won bid is often still being adjusted, so the answer
- * is the estimator's, and "Not now" is exactly as easy as "Lock". Offered on
- * the CHANGE to Won only, so it asks once rather than every time the bid
- * opens; not at all when there is nothing a lock would hold, or the bid is
- * already locked.
+ * An offer, never the lock itself: "Not now" is exactly as easy as "Lock".
+ * Offered on the CHANGE to Won only, so it asks once rather than every time
+ * the bid opens; not at all when there is nothing a lock would hold, or the
+ * bid is already locked — and never on a change FROM Draft, which locked the
+ * bid itself (owner Q15, 2026-10-12). Checked here rather than left to
+ * `lockedAt`, because the panel reads `lockedAt` from a cached query that can
+ * still say "unlocked" for the instant before its refetch lands.
  */
 export function offersLockOnStatusChange(change: {
   from: string;
@@ -210,6 +214,7 @@ export function offersLockOnStatusChange(change: {
   return (
     change.to === "Won" &&
     change.from !== "Won" &&
+    change.from !== "Draft" &&
     change.lockedAt === null &&
     change.followingLines > 0
   );

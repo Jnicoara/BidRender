@@ -548,16 +548,24 @@ describe.skipIf(!hasDb)("detection writing to a sheet", () => {
     return sheets;
   }
 
-  it("applies a confident reading and labels it as detected", async () => {
+  /*
+    Owner Q19 (2026-10-12): reading the scale off the drawing is a one-tap
+    OFFER, never applied just from viewing. This test said "applies a
+    confident reading and labels it as detected" until then.
+  */
+  it("OFFERS even a confident reading — viewing never applies a scale (Q19)", async () => {
     const sheets = await oneSheet();
     const result = await caller().bidPdfs.detectSheetScale({
       id: sheets[0].id,
       sheetText: `POWER PLAN\nSCALE: 1/4" = 1'-0"`,
     });
 
-    expect(result.applied).toBe(true);
-    expect(result.sheet.scaleRatio).toBe(48);
-    expect(result.sheet.scaleSource).toBe("detected");
+    expect(result.applied).toBe(false);
+    expect(result.confidence).toBe("high");
+    expect(result.sheet.scaleRatio).toBeNull();
+    expect(result.sheet.scaleSource).toBe("none");
+    // The offer: one tap on the scale control applies it.
+    expect(result.sheet.detectedScaleText).toBe(`1/4" = 1'-0"`);
   });
 
   it("does NOT apply an ambiguous reading, but remembers what it saw", async () => {
@@ -636,8 +644,10 @@ describe.skipIf(!hasDb)("detection writing to a sheet", () => {
     });
 
     const all = await caller().bidPdfs.sheets({ bidPdfId: sheets[0].bidPdfId });
-    expect(all[0].scaleRatio).toBe(48);
-    expect(all[1].scaleRatio).toBeNull();
+    // Offered on its own sheet only (Q19: never applied by viewing).
+    expect(all[0].detectedScaleText).toBe(`1/4" = 1'-0"`);
+    expect(all[1].detectedScaleText).toBeNull();
+    expect(all[0].scaleRatio).toBeNull();
   });
 
   it("refuses another user's sheet", async () => {

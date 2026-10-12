@@ -32,6 +32,7 @@ import {
   bids,
   laborRates,
   pricingDefaults,
+  taxJurisdictions,
   users,
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
@@ -210,6 +211,7 @@ describe.skipIf(!hasDb)("changing a company default", () => {
     await db!.delete(assemblies).where(eq(assemblies.userId, USER));
     await db!.delete(laborRates).where(eq(laborRates.userId, USER));
     await db!.delete(pricingDefaults).where(eq(pricingDefaults.userId, USER));
+    await db!.delete(taxJurisdictions).where(eq(taxJurisdictions.userId, USER));
 
     // A priced material and a real rate, so the numbers below are not all zero.
     const material = await caller().materials.create({
@@ -370,5 +372,129 @@ describe.skipIf(!hasDb)("changing a company default", () => {
     expect(after.totals.costWithOverhead).toBeGreaterThan(
       before.totals.costWithOverhead
     );
+  });
+
+  /*
+    Owner Q16 (2026-10-12): settings are inherited while a bid is a DRAFT and
+    frozen onto it when it LEAVES Draft (server/bidProtection.ts
+    `freezeBidSettings`). The Draft half is the test above; these are the
+    other half. Each goes red with the freeze removed from `leaveDraft`.
+  */
+  it("freezes overhead, profit and productivity when the bid leaves Draft", async () => {
+    await caller().bids.setPricingDefaults({
+      overheadEnabled: true,
+      overheadMode: "percentage",
+      overheadValue: 0.1,
+      profitMethod: "markup",
+      profitValue: 0.2,
+      productivityPct: 0.25,
+    });
+    const bid = await bidWithOneLine();
+    const draft = await caller().bids.get({ id: bid.id });
+
+    await caller().bids.update({ id: bid.id, status: "Active" });
+    const sent = await caller().bids.get({ id: bid.id });
+    // Freezing writes what was already in effect: nothing moves.
+    expect(sent.totals.totalDue).toBe(draft.totals.totalDue);
+    expect(sent.settings.overheadSource).toBe("bid");
+    expect(sent.settings.profitSource).toBe("bid");
+    expect(sent.settings.productivitySource).toBe("bid");
+
+    await caller().bids.setPricingDefaults({
+      overheadValue: 0.4,
+      profitValue: 0.5,
+      productivityPct: 0,
+    });
+    const after = await caller().bids.get({ id: bid.id });
+    expect(after.totals.totalDue).toBe(draft.totals.totalDue);
+  });
+
+  it("keeps a person's own override when it freezes", async () => {
+    await caller().bids.setPricingDefaults({ productivityPct: 0.25 });
+    const bid = await bidWithOneLine();
+    // Their own: 10% productivity on this bid, set while it was a Draft.
+    await caller().bids.update({ id: bid.id, productivityPct: 0.1 });
+    await caller().bids.update({ id: bid.id, status: "Won" });
+    const row = (await caller().bids.get({ id: bid.id })).bid;
+    expect(Number(row.productivityPct)).toBeCloseTo(0.1, 6);
+    expect(row.settingsFrozenAt).not.toBeNull();
+  });
+
+  it("a Draft beside a frozen bid still follows the company", async () => {
+    const draftBid = await bidWithOneLine();
+    const sentBid = await bidWithOneLine();
+    await caller().bids.update({ id: sentBid.id, status: "Active" });
+    const draftBefore = await caller().bids.get({ id: draftBid.id });
+    const sentBefore = await caller().bids.get({ id: sentBid.id });
+
+    await caller().bids.setPricingDefaults({ productivityPct: 0.5 });
+
+    const draftAfter = await caller().bids.get({ id: draftBid.id });
+    const sentAfter = await caller().bids.get({ id: sentBid.id });
+    expect(draftAfter.totals.totalDue).toBeGreaterThan(
+      draftBefore.totals.totalDue
+    );
+    expect(sentAfter.totals.totalDue).toBe(sentBefore.totals.totalDue);
+  });
+
+  it("freezes the tax switches and the rate in effect", async () => {
+    await caller().salesTax.setRules({ enabled: true, taxMaterials: true });
+    const area = (await caller().salesTax.create({
+      name: `Freeze area ${Date.now()}${Math.random()}`,
+      state: "IL",
+      components: [{ label: "State", ratePct: 10 }],
+    }))!;
+    const bid = await bidWithOneLine();
+    await caller().bids.update({ id: bid.id, siteAddress: "Springfield, IL" });
+    const draft = await caller().bids.get({ id: bid.id });
+    expect(draft.salesTax.amount).toBeGreaterThan(0);
+
+    await caller().bids.update({ id: bid.id, status: "Active" });
+    const sent = await caller().bids.get({ id: bid.id });
+    expect(sent.totals.totalDue).toBe(draft.totals.totalDue);
+    expect(Number(sent.bid.taxRateFrozenPct)).toBeCloseTo(10, 4);
+
+    // The area's rate changes, and the company turns tax off: a sent bid
+    // bills what it was sent with.
+    await caller().salesTax.update({
+      id: area.id,
+      components: [{ label: "State", ratePct: 12 }],
+    });
+    await caller().salesTax.setRules({ enabled: false });
+    const after = await caller().bids.get({ id: bid.id });
+    expect(after.salesTax.amount).toBe(draft.salesTax.amount);
+    expect(after.totals.totalDue).toBe(draft.totals.totalDue);
+
+    // A rate TYPED on the bid still wins: that is a person's choice.
+    await caller().bids.update({ id: bid.id, taxRateOverridePct: 0 });
+    const typed = await caller().bids.get({ id: bid.id });
+    expect(typed.salesTax.amount).toBe(0);
+  });
+
+  it("a person pinning another tax area on a frozen bid moves the rate with it", async () => {
+    // Otherwise the control would do nothing visible on a sent bid.
+    await caller().salesTax.setRules({ enabled: true, taxMaterials: true });
+    await caller().salesTax.create({
+      name: `Ten ${Date.now()}${Math.random()}`,
+      state: "IL",
+      components: [{ label: "State", ratePct: 10 }],
+    });
+    const five = (await caller().salesTax.create({
+      name: `Five ${Date.now()}${Math.random()}`,
+      state: "WI",
+      components: [{ label: "State", ratePct: 5 }],
+    }))!;
+    const bid = await bidWithOneLine();
+    await caller().bids.update({ id: bid.id, siteAddress: "Springfield, IL" });
+    await caller().bids.update({ id: bid.id, status: "Active" });
+    expect(
+      Number((await caller().bids.get({ id: bid.id })).bid.taxRateFrozenPct)
+    ).toBeCloseTo(10, 4);
+
+    await caller().bids.update({ id: bid.id, taxJurisdictionId: five.id });
+    const pinned = await caller().bids.get({ id: bid.id });
+    expect(Number(pinned.bid.taxRateFrozenPct)).toBeCloseTo(5, 4);
+    // What the bid bills at, not just what the column holds.
+    expect(pinned.salesTax.ratePct).toBeCloseTo(5, 4);
   });
 });

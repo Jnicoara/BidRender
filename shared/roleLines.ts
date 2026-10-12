@@ -24,6 +24,7 @@
  *
  * Pure, so the server and the screen read one rule and the suite reaches it.
  */
+import { atLeast } from "./mathVersion";
 
 export const LINE_ROLES = ["install", "remove", "relocate"] as const;
 export type LineRole = (typeof LINE_ROLES)[number];
@@ -102,6 +103,23 @@ export function roleHoursStripText(role: LaborRole, lines: number): string {
 
 /** How many marks of each status a count has (the display split). */
 export type RoleCounts = { remove: number; relocate: number };
+
+/**
+ * A count's remove / relocate marks as they reach the bid — or `undefined`,
+ * which means "none", on a bid below math version 1 (shared/mathVersion.ts).
+ *
+ * Version 1 IS this feature: before it, a remove or relocate mark put no
+ * labor on a bid, and that is what Active, Won, Lost and locked bids keep
+ * (owner Q14). Every place that builds a count for the bridge goes through
+ * here, so `laborRolesWaiting` and the send agree.
+ */
+export function roleCountsOnBid(
+  bid: { mathVersion: number | null },
+  split: { remove: number; relocate: number } | undefined
+): RoleCounts | undefined {
+  if (!atLeast(bid, 1)) return undefined;
+  return { remove: split?.remove ?? 0, relocate: split?.relocate ?? 0 };
+}
 
 /**
  * Which role lines a count still needs: a kind with marks and no line yet.

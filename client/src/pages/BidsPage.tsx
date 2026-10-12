@@ -90,6 +90,7 @@ import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
 import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
+import { MathChangeStrip } from "@/components/MathChangeStrip";
 import {
   countUnpricedLaborLines,
   groupStaleRates,
@@ -526,6 +527,9 @@ export default function BidsPage({
     // added to the helper every mutation already invalidates through, not to the
     // one mutation this was noticed on.
     void utils.bids.quantityLock.invalidate({ bidId });
+    // The math strip offers "Update to the current math" only on an unlocked
+    // Draft, so a status change or a lock moves it — same helper, same reason.
+    void utils.bids.mathChanges.invalidate({ bidId });
     // What "Re-apply markup rules" would change depends on the lines, the
     // bid's status and its lock — all of which the mutations here move. Added
     // to this helper for the reason the lock query above was: a count of lines
@@ -1156,6 +1160,9 @@ export default function BidsPage({
           statusChange={statusChange}
           onStatusChangeSeen={clearStatusChange}
         />
+        {/* "Total changed because…" and "Update to the current math" (owner
+            Q14, Q22). Here and on Quick bid; never on the proposal. */}
+        <MathChangeStrip bidId={bidId} />
         {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
             track is as wide as its widest child's longest unbreakable line,
             which made the whole bid 445 px wide on a 390 px phone. */}

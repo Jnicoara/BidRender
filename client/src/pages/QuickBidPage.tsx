@@ -57,6 +57,7 @@ import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { otherPercentCaption } from "@/lib/percentKind";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { BidExpensesSection } from "@/components/BidExpensesSection";
+import { MathChangeStrip } from "@/components/MathChangeStrip";
 import { matchJobCostTiles, type JobCostTileKey } from "@/lib/jobCostTiles";
 
 const round = (value: number, places = 2) => {
@@ -335,6 +336,8 @@ export default function QuickBidPage({
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-4xl space-y-4">
+          {/* Same strip as the bid screen (owner Q14, Q22). */}
+          <MathChangeStrip bidId={bidId} />
           {/* The loop: type, arrow, Enter */}
           <div className="rounded-xl border border-border bg-card p-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
