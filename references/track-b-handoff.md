@@ -1,22 +1,21 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-12 (evening), SCOPE TAGS steps 2–4 BUILT
+## WHERE B STANDS — 2026-10-12 (night), SCOPE TAGS steps 2–4 DONE
 
 Branch `b-scope-tags` (off track-b). Details per step are in
-`references/scope-tags-plan.md` § 3, each marked DONE / PARTLY DONE.
+`references/scope-tags-plan.md` § 3, each marked DONE.
 
 - **Step 2 (the money, TS + SQL)** — on local-dev (6c59a05b), Gate green.
-- **Steps 3 (menu, chip, Undo, lock) and 4 (materials list, drops)** —
-  committed on b-scope-tags and track-b; merged to local-dev once the Gate
-  is green (see the commit log).
-- **bidTotals, bidrender_local_b_new:** 4,306/4,306 unchanged after step 2
-  and again after steps 3–4 (no row tagged; the on-screen probes put every
-  tag back to NULL and the count was checked: 0 tagged).
-- **Left to do:** step 4's RUN-TYPE half (traced footage / fittings /
-  extras of a wire or conduit line tagged off still reach the materials
-  list); the unit push's `scopeKept` is not said in its toast; steps 5
-  (proposal, summary), 6a (prompts), 6b (needs S2 from A), 7 (note
-  finder).
+- **Steps 3–4** — on track-b (539f5787, Gate green) plus the follow-up
+  commit: wire / conduit lines tagged off leave the materials list with
+  their footage (`withoutNotToBuy`), the push toast names copies whose tags
+  a locked bid kept, and the lock tests are shown to have teeth.
+  **NOT merged into local-dev — the owner holds that until they say go.**
+- **bidTotals, bidrender_local_b_new:** 4,306/4,306 unchanged after step 2,
+  after steps 3–4, and after the follow-up (539f5787 vs now). On-screen
+  probes reset every tag they set; 0 tagged lines anywhere afterwards.
+- **Left to do:** steps 5 (proposal, summary), 6a (prompts), 6b (needs S2
+  from A), 7 (note finder).
 - **Before B next pulls local-dev into its branch:** local-dev now carries
   A's 0148 / 0149 (`bids` columns). B's DBs (`bidrender_test_b`,
   `bidrender_local_b_new`) are at 148, and every `bids` read is a bare

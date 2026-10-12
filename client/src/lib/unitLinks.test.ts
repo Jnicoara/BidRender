@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import {
   archiveCopiesConfirmCopy,
   pushConfirmCopy,
+  pushDoneCopy,
   templateActionsEnabled,
   unitBadge,
   type UnitState,
@@ -140,5 +141,29 @@ describe("archiveCopiesConfirmCopy", () => {
     expect(archiveCopiesConfirmCopy("Standard Room", 38, 2).body).toContain(
       "2 copies you edited separately are kept"
     );
+  });
+});
+
+describe("what a finished push says", () => {
+  const result = {
+    updated: ["Room 101", "Room 102"],
+    skippedForked: [] as string[],
+    scopeKept: [] as string[],
+  };
+
+  it("says how many copies moved, as before", () => {
+    expect(pushDoneCopy(result)).toBe("Updated 2 copies.");
+    expect(pushDoneCopy({ ...result, skippedForked: ["Room 103"] })).toBe(
+      "Updated 2 copies, left 1 edited one alone."
+    );
+  });
+
+  it("on a locked bid, names the copies whose tags were kept (0146)", () => {
+    expect(pushDoneCopy({ ...result, scopeKept: ["Room 101"] })).toBe(
+      "Updated 2 copies. The bid is locked, so who does the work did not change on Room 101 — unlock it to push that too."
+    );
+    expect(
+      pushDoneCopy({ ...result, scopeKept: ["Room 101", "Room 102"] })
+    ).toContain("did not change on 2 copies");
   });
 });

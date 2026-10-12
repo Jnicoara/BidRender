@@ -178,8 +178,11 @@ bidrender_local_b_new: 4,306/4,306 unchanged.
 `client/src/hooks/useSetLineScope.ts`; `client/src/components/bid/LineScopeMenu.tsx`
 (the "…" and the chip). Generated unit copies carry the tag; a push on a
 locked bid keeps each copy's own tag, pairing old and new lines by
-(assembly, name) in order, and returns `scopeKept`. **Not yet said on
-screen**: the push toast does not mention `scopeKept`. Found on screen and
+(assembly, name) in order, and returns `scopeKept`, which the push toast
+names (`pushDoneCopy`, @/lib/unitLinks, 2026-10-12 later). Lock proof
+without touching the guard: `lineScopeSet.test.ts` runs the same change
+through the layer under it (`db.setBidLineScopes`; the push told "not
+locked") on a locked bid and asserts the lock check then FAILS. Found on screen and
 fixed in the same step: the hours cell read "0 h · Example rate" on a By
 others line (`bidHoursCell` now has `notOurs`), and the Fix walk still
 offered to price an owner-furnished line's parts (`lineFixGaps` now reads
@@ -222,7 +225,7 @@ scopeTag }[]` so Undo can put each back (NULL included). Many ids so the
 
 ### Step 4 — materials list and drops follow the tag
 
-**PARTLY DONE 2026-10-12 (Track B, `b-scope-tags`).** Done: assembly and
+**DONE 2026-10-12 (Track B, `b-scope-tags`).** Done: assembly and
 count lines — off lines leave the order and are counted in `leftOff`
 (footer in the dialog, CSV and PDF, `leftOffWords`); owner-furnished lines
 are listed by line with quantity under "Owner furnished — not to buy"
@@ -232,11 +235,21 @@ counts at the top of `loadGroupDrops`. Test:
 `server/lineScopeMaterials.test.ts` (red on the old code with the tag
 written to the row: the part stays on the order, drops stay 2). Looked at
 1536x864 and 820x1180.
-**NOT DONE — RUN-TYPE LINES:** a wire / conduit line tagged By others /
-Excluded is off the money (step 2) but its traced footage, fittings and
-extras are still on the materials list, because that section reads the
-runs, not the lines (~486–498 and the fittings / extras loops). Until it
-is done, the menu's "off your materials list" overstates for those lines.
+**RUN-TYPE LINES — DONE 2026-10-12 (later).** Until then a wire / conduit
+line tagged off was off the money but its traced footage, fittings and
+extras stayed on the list (the section reads the runs, not the lines). Now
+each run type with a role tagged off or owner-furnished is totalled on its
+own by the same `totalQuantities` (its runs, drops and homeruns) and that
+ROLE's share subtracted (`withoutNotToBuy`, shared/materialsList.ts:
+raceway → conduit; conductor → insulated wire, or the cable on a cable
+type; ground → bare). Fittings skip a tagged role; an extra skips its
+tagged line. Off lines count in the footer; owner-furnished ones are listed
+by the foot. Tests: `server/lineScopeRunLines.test.ts` (5 red on 539f5787:
+100 ft of conduit and 200 ft of wire stayed on the order) and the
+`withoutNotToBuy` cases in `server/materialsList.test.ts`. Looked at on
+"Bar layout check" at 1536x864, 820x1180, 1180x820: Conduit 246.92 →
+135.8 ft with the 1/2" EMT By others, insulated wire 222.24 ft moved to
+Owner furnished, footer "1 line by others"; tags reset to NULL after.
 
 - `server/routers/materialsListRouter.ts`: per-line loop — `off` skips,
   `ownerFurnished` goes to a new `ownerFurnished` section (kept qty, no

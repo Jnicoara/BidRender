@@ -57,10 +57,12 @@ import { markDropEntries } from "../../shared/groupDrops";
 import {
   aggregateMaterials,
   measuredEntries,
+  runRoleIsFootage,
+  withoutNotToBuy,
   type AssemblyMaterialQty,
   type CountedAssemblySource,
-  type ForQuoteEntry,
   type MaterialsListDoc,
+  type OwnerFurnishedEntry,
 } from "../../shared/materialsList";
 import { scopeOf, scopeOnMaterialsList } from "../../shared/lineScope";
 import * as db from "../db";
@@ -187,31 +189,57 @@ export const materialsListRouter = router({
         because the owner supplies it and we still install it. Either way
         the line's count stays in `countedOnBid` below, so its marks are not
         added back from the plans.
+
+        WIRE AND CONDUIT LINES too (owner Q12): a run-type line tagged off
+        or owner-furnished takes its PART off the order — the measured
+        footage of its role, the fittings it stands for, its extra —
+        through `notToBuy` below, since those sections read the runs rather
+        than the lines. Keyed by the stored run type and the line's role,
+        because a line IS one role of one type: wire by others with the
+        pipe ours is a real split.
       */
-      const ownerFurnished: ForQuoteEntry[] = [];
+      const ownerFurnished: OwnerFurnishedEntry[] = [];
       const leftOff = { byOthers: 0, excluded: 0 };
+      const notToBuy = new Map<number, Set<string>>();
+      const sayNotOurs = (line: (typeof liveLines)[number]): boolean => {
+        const onList = scopeOnMaterialsList(line);
+        if (onList === "buy") return false;
+        if (onList === "off") {
+          if (scopeOf(line) === "by_others") leftOff.byOthers++;
+          else leftOff.excluded++;
+        } else {
+          ownerFurnished.push({
+            name: line.name,
+            qty: Number(line.qty),
+            unit: runRoleIsFootage(line.runMaterialRole) ? "foot" : "each",
+          });
+        }
+        return true;
+      };
 
       for (const line of liveLines) {
         // Pipe, wire and fittings from traced runs are read from the runs
         // themselves below; listing the line too would count them twice.
-        if (line.takeoffRunTypeId !== null) continue;
+        // Its scope is still said, and what it stands for leaves the runs'
+        // sections (`notToBuy`).
+        if (line.takeoffRunTypeId !== null) {
+          // An EXTRA is one of several on its type, told apart by its key,
+          // so the extras loop asks the line itself rather than this map.
+          if (
+            line.runMaterialRole !== null &&
+            sayNotOurs(line) &&
+            line.runMaterialRole !== "extra"
+          ) {
+            const roles = notToBuy.get(line.takeoffRunTypeId) ?? new Set();
+            roles.add(line.runMaterialRole);
+            notToBuy.set(line.takeoffRunTypeId, roles);
+          }
+          continue;
+        }
         // A remove / relocate line is labor only — nothing to buy
         // (shared/roleLines.ts: "only NEW marks price material").
         if (isLaborRoleLine(line)) continue;
-        const onList = scopeOnMaterialsList(line);
-        if (onList === "off") {
-          if (scopeOf(line) === "by_others") leftOff.byOthers++;
-          else leftOff.excluded++;
-          continue;
-        }
-        if (onList === "ownerFurnished") {
-          ownerFurnished.push({
-            name: line.name,
-            qty: Number(line.qty),
-            unit: "each",
-          });
-          continue;
-        }
+        if (sayNotOurs(line)) continue;
         if (
           line.assemblyId === null &&
           line.takeoffGroupId !== null &&
@@ -352,6 +380,8 @@ export const materialsListRouter = router({
               the each, on top of the pipe already listed by the foot.
             */
             if (row.role === "fieldBend") continue;
+            // Its line is By others / Excluded / owner furnished (0146).
+            if (notToBuy.get(runTypeId)?.has(row.role)) continue;
             // Used only on lines with no part matched — "90° bends", not
             // "elbows", beside a type that may buy sweeps (runFittings.ts).
             const kind = unmatchedKindWords(row.role).many;
@@ -441,6 +471,9 @@ export const materialsListRouter = router({
           const line = extraLines.find(
             l => l.takeoffRunTypeId === storedId && l.runExtraKey === extra.key
           );
+          // Not ours to buy (0146): already said in the footer or the
+          // owner-furnished section by the line loop.
+          if (line && scopeOnMaterialsList(line) !== "buy") continue;
           const total = extraFeetForRuns(
             f.extraRuns,
             extra,
@@ -522,30 +555,51 @@ export const materialsListRouter = router({
         (n, d) => n + d.notPricedDrops,
         0
       );
-      const totals = totalQuantities(
-        realRuns.map(run => {
-          const sheet = scales.get(run.sheetId);
-          const usable =
-            sheet && !(sheet.notToScale && sheet.scaleSource !== "manual")
-              ? sheet.scaleRatio
-              : null;
-          return {
-            run: tracedRunOf(run),
-            circuits: wireCounts.has(run.id)
-              ? (circuitsByRun.get(run.id) ?? []).map(circuitWire)
-              : [],
-            ratio: usable,
-            verticals: verticalsForRunRow(run, heights),
-            extras: extrasForRunRow(run, heights),
-            // A branched run is several rows and ONE run in the notes (D20).
-            runKey: rootOf(run),
-          };
-        }),
-        markDrops,
-        // Homeruns, as the bid prices them — and as `footage` above already
-        // counts their couplings, connectors and straps.
+      const runRow = (run: (typeof realRuns)[number]) => {
+        const sheet = scales.get(run.sheetId);
+        const usable =
+          sheet && !(sheet.notToScale && sheet.scaleSource !== "manual")
+            ? sheet.scaleRatio
+            : null;
+        return {
+          run: tracedRunOf(run),
+          circuits: wireCounts.has(run.id)
+            ? (circuitsByRun.get(run.id) ?? []).map(circuitWire)
+            : [],
+          ratio: usable,
+          verticals: verticalsForRunRow(run, heights),
+          extras: extrasForRunRow(run, heights),
+          // A branched run is several rows and ONE run in the notes (D20).
+          runKey: rootOf(run),
+        };
+      };
+      // Homeruns, as the bid prices them — and as `footage` above already
+      // counts their couplings, connectors and straps.
+      const homerunEntries =
         (await db.loadBidHomeruns(input.bidId, ctx.scope.dataUserId, heights))
-          ?.entries ?? []
+          ?.entries ?? [];
+      const allTotals = totalQuantities(
+        realRuns.map(runRow),
+        markDrops,
+        homerunEntries
+      );
+      /*
+        NOT OURS TO BUY (0146): each run type with a role tagged off or
+        owner-furnished is totalled ON ITS OWN, by the same function, and
+        that role's share taken out of the combined figures. Subtracting
+        rather than filtering, because one run carries the pipe, the wire
+        and the ground at once — a filter could only drop all three.
+      */
+      const totals = withoutNotToBuy(
+        allTotals,
+        Array.from(notToBuy, ([runTypeId, roles]) => ({
+          roles,
+          totals: totalQuantities(
+            realRuns.filter(run => run.runTypeId === runTypeId).map(runRow),
+            markDrops.filter(drop => drop.runTypeId === runTypeId),
+            homerunEntries.filter(entry => entry.runTypeId === runTypeId)
+          ),
+        }))
       );
 
       // ── Notes: everything the reader needs to read the list correctly ──────

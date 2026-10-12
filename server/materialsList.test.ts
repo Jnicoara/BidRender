@@ -39,6 +39,7 @@ import {
   measuredEntries,
   toCsv,
   unitLabel,
+  withoutNotToBuy,
   type MaterialsListDoc,
 } from "../shared/materialsList";
 import type { TrpcContext } from "./_core/context";
@@ -1194,5 +1195,67 @@ describe("the per-job whip dial reaches branch wire and nothing else", () => {
     // somebody else's count. Same floor totalBranchWireFeet applies.
     const entries = aggregateMaterials([source], -3);
     expect(feetOf(entries, "12-2 NM-B")).toBeUndefined();
+  });
+});
+
+// ── Footage not ours to buy (0146) ───────────────────────────────────────────
+
+describe("withoutNotToBuy — each role takes out exactly its share", () => {
+  // Two types on one job; the second is the one with a role tagged off.
+  const all = {
+    conduitBoughtFeet: 300,
+    cableBoughtFeet: 500,
+    wireBoughtFeet: 900,
+    wireGroundBoughtFeet: 200,
+  };
+  const pipeType = {
+    conduitBoughtFeet: 100,
+    cableBoughtFeet: 0,
+    wireBoughtFeet: 400,
+    wireGroundBoughtFeet: 100,
+  };
+  const cableType = {
+    conduitBoughtFeet: 0,
+    cableBoughtFeet: 250,
+    wireBoughtFeet: 0,
+    wireGroundBoughtFeet: 0,
+  };
+  const off = (roles: string[], totals: typeof all) => [
+    { roles: new Set(roles), totals },
+  ];
+
+  it("the pipe: conduit only", () => {
+    expect(withoutNotToBuy(all, off(["raceway"], pipeType))).toEqual({
+      ...all,
+      conduitBoughtFeet: 200,
+    });
+  });
+  it("the wire: insulated only — the bare ground stays", () => {
+    expect(withoutNotToBuy(all, off(["conductor"], pipeType))).toEqual({
+      ...all,
+      wireBoughtFeet: 600,
+    });
+  });
+  it("the ground: out of the wire AND its bare share", () => {
+    expect(withoutNotToBuy(all, off(["ground"], pipeType))).toEqual({
+      ...all,
+      wireBoughtFeet: 800,
+      wireGroundBoughtFeet: 100,
+    });
+  });
+  it("a cable type's conductor IS the cable", () => {
+    expect(withoutNotToBuy(all, off(["conductor"], cableType))).toEqual({
+      ...all,
+      cableBoughtFeet: 250,
+    });
+  });
+  it("a fitting role moves no footage; nothing goes below zero", () => {
+    expect(withoutNotToBuy(all, off(["coupling"], pipeType))).toEqual(all);
+    expect(
+      withoutNotToBuy(
+        all,
+        off(["raceway"], { ...pipeType, conduitBoughtFeet: 301 })
+      ).conduitBoughtFeet
+    ).toBe(0);
   });
 });

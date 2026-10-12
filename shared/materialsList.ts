@@ -101,6 +101,78 @@ export type ForQuoteEntry = {
   unit: "each";
 };
 
+/**
+ * A line the owner furnishes (0146), by name and quantity — "each" for a
+ * device or fitting, "foot" for a wire or conduit line's footage.
+ */
+export type OwnerFurnishedEntry = {
+  name: string;
+  qty: number;
+  unit: MaterialUnit;
+};
+
+/** Run-type roles bought by the foot; every other role is a count of each. */
+export function runRoleIsFootage(role: string | null): boolean {
+  return (
+    role === "raceway" ||
+    role === "conductor" ||
+    role === "ground" ||
+    role === "extra"
+  );
+}
+
+/** The bought footage the measured section is built from. */
+export type BoughtFootage = {
+  conduitBoughtFeet: number;
+  cableBoughtFeet: number;
+  wireBoughtFeet: number;
+  /** The bare share OF wireBoughtFeet. */
+  wireGroundBoughtFeet: number;
+};
+
+/**
+ * The combined footage with the roles NOT OURS TO BUY taken out (0146).
+ *
+ * `parts` is one entry per run type that has such a role: that type's own
+ * totals (the same `totalQuantities`, over its runs, drops and homeruns
+ * only) and which of its roles are tagged By others / Excluded / owner
+ * furnished. Each role takes out exactly its share:
+ *
+ *   raceway    the type's conduit
+ *   conductor  the type's insulated wire — or, on a cable type, the cable
+ *              (the conductor link IS the cable, RUN_MATERIAL_ROLES)
+ *   ground     the type's bare ground, out of the wire and its bare share
+ *
+ * Never below zero: a rounding crumb must not print as "-0.01 ft".
+ */
+export function withoutNotToBuy<T extends BoughtFootage>(
+  all: T,
+  parts: readonly { roles: ReadonlySet<string>; totals: BoughtFootage }[]
+): T {
+  let conduit = all.conduitBoughtFeet;
+  let cable = all.cableBoughtFeet;
+  let wire = all.wireBoughtFeet;
+  let ground = all.wireGroundBoughtFeet;
+  for (const { roles, totals } of parts) {
+    if (roles.has("raceway")) conduit -= totals.conduitBoughtFeet;
+    if (roles.has("conductor")) {
+      cable -= totals.cableBoughtFeet;
+      wire -= totals.wireBoughtFeet - totals.wireGroundBoughtFeet;
+    }
+    if (roles.has("ground")) {
+      wire -= totals.wireGroundBoughtFeet;
+      ground -= totals.wireGroundBoughtFeet;
+    }
+  }
+  return {
+    ...all,
+    conduitBoughtFeet: Math.max(0, conduit),
+    cableBoughtFeet: Math.max(0, cable),
+    wireBoughtFeet: Math.max(0, wire),
+    wireGroundBoughtFeet: Math.max(0, ground),
+  };
+}
+
 /** The whole document, as both exporters consume it. */
 export type MaterialsListDoc = {
   bidName: string;
@@ -116,7 +188,7 @@ export type MaterialsListDoc = {
    * quantity, under "Owner furnished — not to buy", never in the order
    * above. Required, so no exporter can forget the section.
    */
-  ownerFurnished: ForQuoteEntry[];
+  ownerFurnished: OwnerFurnishedEntry[];
   /**
    * Lines left off because the work is not ours (0146): By others and
    * Excluded. Said in a footer (owner Q7) — a short list must say WHY it

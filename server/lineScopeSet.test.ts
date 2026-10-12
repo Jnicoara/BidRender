@@ -16,7 +16,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
-import { getDb } from "./db";
+import { getDb, pushTemplateToLinkedCopies, setBidLineScopes } from "./db";
 import { bidLineItems, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
@@ -77,6 +77,15 @@ async function tags(bidId: number) {
 
 const direct = async (bidId: number) =>
   (await caller().bids.get({ id: bidId })).totals.directCost;
+
+/**
+ * What the lock tests assert, as ONE check so the teeth test below runs the
+ * same one: the bid's single $200 line is still untagged and still $200.
+ */
+async function lockHeld(bidId: number): Promise<boolean> {
+  const now = (await tags(bidId)).map(t => t[2]);
+  return now.length === 1 && now[0] === null && (await direct(bidId)) === 200;
+}
 
 async function lock(bidId: number) {
   const database = (await getDb())!;
@@ -159,8 +168,27 @@ withDb("setting who does a line's work", () => {
         changes: [{ id: a, scopeTag: "excluded" }],
       })
     ).rejects.toThrow(/locked/);
-    expect((await tags(bidId)).map(t => t[2])).toEqual([null]);
-    expect(await direct(bidId)).toBe(200);
+    expect(await lockHeld(bidId)).toBe(true);
+  });
+
+  /*
+    THE LOCK TEST HAS TEETH. The test above would also pass if the change
+    simply never reached the row, so this runs the SAME change through the
+    layer beneath the guard — `db.setBidLineScopes`, which the procedure
+    calls only after its lock check — on the same locked bid, and asserts
+    the very check above now FAILS: the tag and the total both move. So
+    `lockHeld` is true above only because the guard refused. (The guard
+    itself is not edited or bypassed in app code; this is the unguarded
+    path, called on purpose, in a test.)
+  */
+  it("the lock check has teeth: the same change WITHOUT the guard moves the tag and the total", async () => {
+    const bidId = await aBid();
+    const a = await line(bidId);
+    await lock(bidId);
+    await setBidLineScopes(bidId, [{ id: a, scopeTag: "excluded" }]);
+    expect(await lockHeld(bidId)).toBe(false);
+    expect((await tags(bidId)).map(t => t[2])).toEqual(["excluded"]);
+    expect(await direct(bidId)).toBe(0);
   });
 
   it("refuses another company's bid, and leaves its lines alone", async () => {
@@ -285,5 +313,31 @@ withDb("unit copies and who does the work", () => {
     expect(b.updated).toEqual(["Room 101"]);
     expect(b.scopeKept).toEqual(["Room 101"]);
     expect(await tagOf(locked, "Room 101", "Fixture")).toBe(null);
+  });
+
+  /*
+    TEETH for the push: the same locked bid, the same push, but through
+    `db.pushTemplateToLinkedCopies` told the bid is NOT locked — the one
+    argument the router derives from the lock. The copy's tag then moves,
+    so the `toBe(null)` above holds only because the lock was passed in.
+  */
+  it("the push check has teeth: told 'not locked', the copy's tag moves", async () => {
+    const bidId = await aBid();
+    await template(bidId);
+    await caller().bids.generateUnits({
+      bidId,
+      baseName: "Room",
+      startNumber: 101,
+      groups: [{ sourceUnitLabel: "Room A", count: 1 }],
+    });
+    await caller().bids.setLineScope({
+      bidId,
+      lineIds: [await templateLine(bidId, "Fixture")],
+      scopeTag: "by_others",
+    });
+    await lock(bidId);
+    const result = await pushTemplateToLinkedCopies(bidId, "Room A", false);
+    expect(result.scopeKept).toEqual([]);
+    expect(await tagOf(bidId, "Room 101", "Fixture")).toBe("by_others");
   });
 });
