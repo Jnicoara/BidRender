@@ -425,6 +425,87 @@ describe.skipIf(!hasDb)("one-offs stay off the list", () => {
   });
 });
 
+// The working a job-cost tile adds (drizzle/0145, quick-bid-plan § 6). It can
+// carry the labor rate, so it is the bid screen's and never the customer's.
+describe.skipIf(!hasDb)("a charge's working note", () => {
+  const WORKING = "6 trips × 1.5 h × $85.00/h";
+
+  it("is stored with the charge and read back on the bid", async () => {
+    const bid = await pricedBid();
+    await caller().bidExtras.expenses.addToBid({
+      bidId: bid.id,
+      name: "Drive time",
+      amount: 765,
+      notes: WORKING,
+    });
+    const [row] = await caller().bidExtras.expenses.onBid({ bidId: bid.id });
+    expect(row.notes).toBe(WORKING);
+    expect(row.amount).toBe(765);
+  });
+
+  it("never reaches the quote — not in any form", async () => {
+    const bid = await pricedBid();
+    await caller().bidExtras.expenses.addToBid({
+      bidId: bid.id,
+      name: "Drive time",
+      amount: 765,
+      notes: WORKING,
+    });
+    const { document } = await caller().proposals.document({ bidId: bid.id });
+    expect(document.investment.expenses!.lines.map(l => l.name)).toEqual([
+      "Drive time",
+    ]);
+    // Scanned, not trusted: neither the working nor the rate it carries.
+    const printed = JSON.stringify(document);
+    expect(printed).not.toContain("trips");
+    expect(printed).not.toContain("85.00/h");
+  });
+
+  it("stores blank as no note, and a typed one-off has none", async () => {
+    const bid = await pricedBid();
+    await caller().bidExtras.expenses.addToBid({
+      bidId: bid.id,
+      name: "Permit",
+      amount: 340,
+      notes: "   ",
+    });
+    await caller().bidExtras.expenses.addToBid({
+      bidId: bid.id,
+      name: "Inspection",
+      amount: 95,
+    });
+    const rows = await caller().bidExtras.expenses.onBid({ bidId: bid.id });
+    expect(rows.map(r => r.notes)).toEqual([null, null]);
+  });
+
+  it("is cleared by a new amount, and kept by anything else", async () => {
+    const bid = await pricedBid();
+    const added = await caller().bidExtras.expenses.addToBid({
+      bidId: bid.id,
+      name: "Drive time",
+      amount: 765,
+      notes: WORKING,
+    });
+    const notes = async () =>
+      (await caller().bidExtras.expenses.onBid({ bidId: bid.id }))[0].notes;
+
+    await caller().bidExtras.expenses.updateOnBid({
+      bidId: bid.id,
+      id: added.id,
+      taxable: true,
+    });
+    expect(await notes()).toBe(WORKING);
+
+    // "6 trips × 1.5 h × $85.00/h" beside $900 would state the wrong sum.
+    await caller().bidExtras.expenses.updateOnBid({
+      bidId: bid.id,
+      id: added.id,
+      amount: 900,
+    });
+    expect(await notes()).toBeNull();
+  });
+});
+
 describe.skipIf(!hasDb)("expenses on the price", () => {
   it("adds as a pass-through, on top of the bid price", async () => {
     const bid = await pricedBid();

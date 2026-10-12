@@ -3,6 +3,7 @@ import {
   computeJobCost,
   initialTileInputs,
   JOB_COST_TILES,
+  jobCostCharge,
   matchJobCostTiles,
 } from "./jobCostTiles";
 
@@ -108,5 +109,24 @@ describe("job cost tiles (quick-bid-plan § 6, owner answers § 12)", () => {
     expect(keys("pe")).toEqual([]);
     expect(keys("receptacle")).toEqual([]);
     expect(keys("")).toEqual([]);
+  });
+
+  it("the charge a tile adds carries its working as the note, never in the name (0145)", () => {
+    const drive = computeJobCost("drive", {
+      trips: "6",
+      hoursPerTrip: "1.5",
+      rate: "85",
+    });
+    if (!drive.ok) throw new Error(drive.message);
+    expect(jobCostCharge(drive)).toEqual({
+      name: "Drive time",
+      amount: 765,
+      notes: "6 trips × 1.5 h × $85.00/h",
+    });
+
+    // A tile with no arithmetic adds no note rather than an empty one.
+    const permit = computeJobCost("permit", { amount: "340" });
+    if (!permit.ok) throw new Error(permit.message);
+    expect(jobCostCharge(permit).notes).toBeNull();
   });
 });

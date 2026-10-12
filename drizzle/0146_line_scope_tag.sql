@@ -1,0 +1,15 @@
+-- 0146 — LINE SCOPE TAG: who does this line's work — We install / Owner
+-- furnishes, we install / By others / Excluded (2026-10-12; Track B's S1,
+-- references/track-b-handoff.md "S1–S3 — SQL DRAFTS"; references/
+-- scope-tags-plan.md step 1). Track A owns the number.
+--
+-- ── ADDITIVE. STEP 1. MUST RUN BEFORE THE CODE ──────────────────────────────
+-- `drizzle/schema.ts` declares the column, so every bare select() of
+-- bid_line_items asks for it: a database without this file fails every bid
+-- line read with `Unknown column 'scopeTag'`. NULL = not said = "We install",
+-- exactly today's pricing; 'install' = somebody answered "We install". No
+-- default, so "not said" is a value nothing else produces. No UPDATE; no
+-- number moves (the rule that reads it is plan step 2, not this file).
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `bid_line_items` ADD `scopeTag` enum('install','ofci','by_others','excluded') NULL;

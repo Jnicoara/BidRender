@@ -2341,6 +2341,12 @@ export const bids = mysqlTable(
      * counted as 1 and shown "not confirmed" (server/homerunsCore.ts).
      */
     homerunExtraBends: int("homerunExtraBends"),
+    /**
+     * "Don't ask on this bid" for the Who does this? prompts (0147, Track B's
+     * S3; scope-tags-plan.md step 6a, owner Q10: per bid). NULL = prompts
+     * shown. Hides a prompt; prices nothing.
+     */
+    scopePromptsDismissedAt: timestamp("scopePromptsDismissedAt"),
 
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -4504,6 +4510,17 @@ export type InsertMarkupRule = typeof markupRules.$inferInsert;
 
 // ─── Bid Line Items ───────────────────────────────────────────────────────────
 /**
+ * Who does a line's work (0146; scope-tags-plan.md): We install, Owner
+ * furnishes / we install, By others, Excluded. NULL on the column = not said.
+ */
+export const LINE_SCOPE_TAGS = [
+  "install",
+  "ofci",
+  "by_others",
+  "excluded",
+] as const;
+
+/**
  * One assembly placed into a bid, at a quantity, with its cost SNAPSHOT.
  *
  * The snapshot is the point of this table (ASSEMBLIES_PLAN.md § PROJECT
@@ -4797,6 +4814,13 @@ export const bidLineItems = mysqlTable(
     quoteShare: decimal("quoteShare", { precision: 12, scale: 2 }),
     quoteItemKey: varchar("quoteItemKey", { length: 255 }),
     quoteNote: varchar("quoteNote", { length: 500 }),
+    /**
+     * Who does this line's work (0146, Track B's S1; scope-tags-plan.md).
+     * NULL = not said = We install, exactly as before the column; 'install'
+     * = somebody answered "We install". The rule that reads it lives in
+     * shared/lineScope.ts (plan step 2) — never read this raw.
+     */
+    scopeTag: mysqlEnum("scopeTag", LINE_SCOPE_TAGS),
 
     sortOrder: int("sortOrder").default(0).notNull(),
 
