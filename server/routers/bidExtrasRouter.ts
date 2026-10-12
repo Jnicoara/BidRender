@@ -37,6 +37,18 @@ const nameSchema = z.string().trim().min(1).max(255);
 const textSchema = z.string().trim().min(1).max(512);
 /** A flat charge. Bounded well above any real fee and below absurdity. */
 const amountSchema = z.number().min(0).max(1_000_000);
+/**
+ * A charge's working, e.g. "6 trips × 1.5 h × $85.00/h" (drizzle/0145).
+ * Blank is stored as NULL. Shown on the bid screen and Quick bid only, never
+ * on the quote — `proposals.document` maps a charge to name and amount by
+ * hand, and `bidExtras.test.ts` pins that.
+ */
+const notesSchema = z
+  .string()
+  .trim()
+  .max(512)
+  .transform(s => (s === "" ? null : s))
+  .nullable();
 
 const toDecimal4 = (value: number) => value.toFixed(4);
 
@@ -172,6 +184,8 @@ const expenses = router({
          */
         taxable: z.boolean().optional(),
         markedUp: z.boolean().optional(),
+        /** The working from a job-cost tile. Never copied from a saved entry. */
+        notes: notesSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -214,6 +228,7 @@ const expenses = router({
         amount: toDecimal4(amount),
         taxable: taxable ?? false,
         markedUp: markedUp ?? false,
+        notes: input.notes ?? null,
         sortOrder: await db.nextBidExpenseSortOrder(input.bidId),
       });
       const rows = await db.getBidExpenses(input.bidId);
@@ -231,6 +246,7 @@ const expenses = router({
         amount: amountSchema.optional(),
         taxable: z.boolean().optional(),
         markedUp: z.boolean().optional(),
+        notes: notesSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -238,6 +254,10 @@ const expenses = router({
       const patch: Record<string, unknown> = {};
       if (input.name !== undefined) patch.name = input.name;
       if (input.amount !== undefined) patch.amount = toDecimal4(input.amount);
+      // A new amount without a new working clears the old one: "6 trips ×
+      // 1.5 h × $85.00/h" beside a retyped $900 would state the wrong sum.
+      if (input.notes !== undefined) patch.notes = input.notes;
+      else if (input.amount !== undefined) patch.notes = null;
       if (input.taxable !== undefined) patch.taxable = input.taxable;
       if (input.markedUp !== undefined) patch.markedUp = input.markedUp;
       if (Object.keys(patch).length > 0)

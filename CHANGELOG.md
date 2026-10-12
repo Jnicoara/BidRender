@@ -4,6 +4,15 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-12]
+
+- **Job costs remember how they were worked out.** Adding drive time (or a
+  lift rental) from its tile now keeps the working, such as "6 trips × 1.5 h
+  × $85.00/h", under the charge on the bid screen and Quick bid. It never
+  prints on the customer's quote, because it can show your labor rate.
+  Retyping the amount clears the old working, so it never states a sum the
+  charge no longer has.
+
 ## [2026-10-10]
 
 - **Plans: check unconfirmed marks one at a time, and fix old
