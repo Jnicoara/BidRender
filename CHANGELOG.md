@@ -12,6 +12,11 @@ This is the human-readable companion to the git history — read this to see wha
   prints on the customer's quote, because it can show your labor rate.
   Retyping the amount clears the old working, so it never states a sum the
   charge no longer has.
+- **Groundwork for "who does this work?" on bid lines.** Two new empty
+  database fields: one on each bid line for We install / Owner furnishes /
+  By others / Excluded, and one on each bid for "don't ask on this bid".
+  Nothing reads them yet, so no screen and no price changes — measured on
+  every staging bid before and after. The screens come next (Track B).
 
 ## [2026-10-10]
 
