@@ -13,7 +13,14 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-12) — drive-time note MERGED to local-dev (`4be57f8`); Q14–Q22 recorded; bid methods PLANNED
+## START HERE (2026-10-12) — drive-time note MERGED to local-dev (`4be57f8`); Q14–Q22 recorded; bid methods PLANNED and ANSWERED
+
+**WHAT C DOES NEXT: nothing, until Track A lands the bid-protection
+migrations** (math version, quantity lock, frozen O&P/tax) **and the
+startup fix.** Then C builds the bid-protection code
+(`baseline-screen-plan.md` § 8, F1, F8; owner Q14–Q16, Q22). Bid methods
+is built later, after scope tags and the baseline screen. Owner,
+2026-10-12.
 
 **Local databases: 148 migrations** (through A's 0147).
 `bidrender_local_c` and `bidrender_test_c` were both migrated by C:
@@ -68,8 +75,12 @@ holds a suggestion. That was checked against `bidPdfsRouter.ts`
   files say so.
 - The engine enforces it with a union type. The owner's 0%/50% test is
   specified.
-- Drafts BM-M1–M9 are below for A. There are 16 owner questions, one per
-  line.
+- Drafts BM-M1–M10 are below for A.
+- **All 16 owner questions answered (2026-10-12): every pick approved.**
+  One addition to Q1: new-shop setup asks "How do you usually bid?"
+  (Cost + O&P / Markup + hourly rate), Cost + O&P preselected. It writes
+  `pricing_defaults.pricingMethod`, so no extra column. Q15's column is
+  BM-M10.
 - Every existing bid stays on the old stacked math (`pricingMethod` NULL).
   Only an accepted Draft offer moves one.
 
@@ -88,10 +99,12 @@ ALTER TABLE `bid_line_items` ADD `snapshotChargeRate` decimal(10,4) NULL;       
 ALTER TABLE `bids` ADD `wageRateSetId` int NULL;                                        -- BM-M8 (+ FK)
 ALTER TABLE `bids` ADD `registeredApprentices` boolean NULL;                            -- BM-M8
 ALTER TABLE `bids` ADD `buildingSqFt` decimal(12,2) NULL;                               -- BM-M9
+ALTER TABLE `wage_rate_sets` ADD `fringePaidAsCash` boolean NULL;                       -- BM-M10 (after BM-M6)
 ```
 
-Hold until the owner answers the plan's questions. Q15 may add
-`wage_rate_sets.fringePaidAsCash`.
+**The owner answered all 16 (2026-10-12), so the drafts are final, but they
+are NOT needed yet.** The build comes after scope tags and the baseline
+screen. Add them when C starts the bid-methods build, not before.
 
 ## EARLIER (2026-10-10, night) — F9 scale fix and F10 homerun fix MERGED to local-dev (`95fb513`)
 

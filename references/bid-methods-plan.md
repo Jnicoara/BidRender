@@ -4,6 +4,12 @@ Track C, 2026-10-12. **Plan only: no app code, no migration.** Facts are
 cited by file and line from `track-c` at `5974626`. Where a fact was not
 found, it says what was searched.
 
+**2026-10-12: the owner APPROVED every pick in § 10**, adding one thing to
+Q1: new-shop setup asks "How do you usually bid?", with Cost + O&P
+preselected. The Q15 column is BM-M10 (§ 9). **Build order: after scope tags
+and the baseline screen**, and after the bid-protection work (math version,
+quantity lock, frozen O&P/tax) that this plan's § 7 relies on.
+
 **The owner's request, in one line:** each bid picks ONE way of pricing.
 **(A) Markup + charge rate** prices material at cost plus a markup and labor
 at an hourly charge rate. **(B) Cost + O&P** prices material and labor at
@@ -242,7 +248,8 @@ One line under the bid total, on both methods:
   before this priced, and it stays in the engine as `priceLegacyStacked()`
   for as long as any bid holds NULL (`baseline-screen-plan.md` § 8, point 2).
 - **New bids** take the company's method (`pricing_defaults.pricingMethod`,
-  NULL = `cost_op`, the owner's own default per D1).
+  NULL = `cost_op`, the owner's own default per D1). A new shop sets it in
+  setup: "How do you usually bid?", Cost + O&P preselected (owner Q1).
 - **A Draft still on the old math** shows an OFFER, never automatic (owner
   Q19/Q22 spirit): "This bid uses markup AND overhead and profit together.
   Choose one method → Markup + charge rate $24,100.00 · Cost + O&P
@@ -358,30 +365,38 @@ ALTER TABLE `bids` ADD CONSTRAINT `bids_wageRateSetId_fk`
 
 -- BM-M9  building area for the $/sq ft sanity line; NULL = not given
 ALTER TABLE `bids` ADD `buildingSqFt` decimal(12,2) NULL;
+
+-- BM-M10 (owner Q15, 2026-10-12) fringe paid as cash wages, so payroll tax
+--        applies to it too; NULL = not ticked = fringe is not taxed
+ALTER TABLE `wage_rate_sets` ADD `fringePaidAsCash` boolean NULL;
 ```
 
 **Note for A:** `bids.wageRateSetId` uses `ON DELETE SET NULL`, but a set is
 archived, never deleted (CLAUDE.md § Retire, never delete). The constraint
-is a backstop only. BS-M7 (`bids.mathVersion`) is a prerequisite of § 7's
-band wiring, not of BM-M1–M9.
+is a backstop only. BM-M10 needs BM-M6's table, so it runs after it (or fold
+the column into BM-M6's CREATE TABLE if both ship together). BS-M7
+(`bids.mathVersion`) is a prerequisite of § 7's band wiring, not of
+BM-M1–M10.
 
 ---
 
-## 10. Questions for the owner — one per line: my pick · moves a bid number?
+## 10. Owner answers (2026-10-12) — ALL PICKS APPROVED, one addition to Q1
 
-- **Q1** Default method for a brand-new company? · Pick: **Cost + O&P** (D1 said your own default is Route B) · Moves a number: no, new bids only.
-- **Q2** Existing bids stay on the old stacked math and get an OFFER on Drafts to pick a method? · Pick: **yes** · Moves: only when a Draft's offer is accepted.
-- **Q3** Switching a Draft's method re-reads markup and charge rate onto its lines (the one snapshot rewrite)? · Pick: **yes, Draft only, old → new shown** · Moves: yes, when the toggle is used.
-- **Q4** Charge rate per ROLE, or one company charge rate? · Pick: **per role** (T&M needs it) · Moves: no.
-- **Q5** A bid on Markup + charge rate whose role has no charge rate: "Not priced", or fall back to cost? · Pick: **Not priced, never cost** · Moves: no (nothing is priced A yet).
-- **Q6** On Markup + charge rate, a "Marked up" expense takes the company material markup %? · Pick: **yes** · Moves: yes, on A bids with marked-up expenses.
-- **Q7** Quoted gear on Markup + charge rate uses its own % (`quotedMarkupPct`), never the material rules? · Pick: **yes** · Moves: yes, on A bids with quoted lines.
-- **Q8** Brackets key on the item's unit price until pack prices exist? · Pick: **yes, switch later as a math version** · Moves: yes, on A Drafts whose company sets brackets.
-- **Q9** Brackets: allow gaps, falling to the company %; refuse overlaps? · Pick: **yes** · Moves: no.
-- **Q10** Effective margin counts expenses as cost and leaves tax out? · Pick: **yes** · Moves: no (display only).
-- **Q11** A charge rate below the prevailing-wage cost: warning or block? · Pick: **warning** · Moves: no.
-- **Q12** Re-check reminder at 6 months and before print: warning, not a block? · Pick: **warning** · Moves: no.
-- **Q13** With a wage set, skip the role's benefits % because fringe replaces it, but keep payroll tax, comp and insurance on base? · Pick: **yes** · Moves: yes, on bids that pick a set.
-- **Q14** Picking or changing a wage set is offered on Drafts only, with old → new? · Pick: **yes** · Moves: yes, when pressed.
-- **Q15** Payroll tax on a fringe paid in CASH (it is taxable when paid as wages)? · Pick: **ask per set: "fringe paid as cash" checkbox, off by default** (if yes, one more nullable column `wage_rate_sets.fringePaidAsCash`) · Moves: yes, on sets that tick it.
-- **Q16** The "$/sq ft · $/point" sanity line on the bid screen only, never the quote? · Pick: **yes** · Moves: no.
+Each line: the question · the answer · whether it moves a bid number.
+
+- **Q1** Default method for a brand-new company? · **Answer: Cost + O&P, AND new-shop setup asks "How do you usually bid?" (Cost + O&P / Markup + hourly rate) with Cost + O&P preselected.** The answer is written to `pricing_defaults.pricingMethod` (BM-M2), so it needs no extra column. Per CLAUDE.md § Onboarding, the setup step counts as done from that row being set, never from the screen being opened. An existing company (NULL) reads as Cost + O&P and is not shown the setup question · Moves a number: no, new bids only.
+- **Q2** Existing bids stay on the old stacked math and get an OFFER on Drafts to pick a method? · Answer (approved pick): **yes** · Moves: only when a Draft's offer is accepted.
+- **Q3** Switching a Draft's method re-reads markup and charge rate onto its lines (the one snapshot rewrite)? · Answer (approved pick): **yes, Draft only, old → new shown** · Moves: yes, when the toggle is used.
+- **Q4** Charge rate per ROLE, or one company charge rate? · Answer (approved pick): **per role** (T&M needs it) · Moves: no.
+- **Q5** A bid on Markup + charge rate whose role has no charge rate: "Not priced", or fall back to cost? · Answer (approved pick): **Not priced, never cost** · Moves: no (nothing is priced A yet).
+- **Q6** On Markup + charge rate, a "Marked up" expense takes the company material markup %? · Answer (approved pick): **yes** · Moves: yes, on A bids with marked-up expenses.
+- **Q7** Quoted gear on Markup + charge rate uses its own % (`quotedMarkupPct`), never the material rules? · Answer (approved pick): **yes** · Moves: yes, on A bids with quoted lines.
+- **Q8** Brackets key on the item's unit price until pack prices exist? · Answer (approved pick): **yes, switch later as a math version** · Moves: yes, on A Drafts whose company sets brackets.
+- **Q9** Brackets: allow gaps, falling to the company %; refuse overlaps? · Answer (approved pick): **yes** · Moves: no.
+- **Q10** Effective margin counts expenses as cost and leaves tax out? · Answer (approved pick): **yes** · Moves: no (display only).
+- **Q11** A charge rate below the prevailing-wage cost: warning or block? · Answer (approved pick): **warning** · Moves: no.
+- **Q12** Re-check reminder at 6 months and before print: warning, not a block? · Answer (approved pick): **warning** · Moves: no.
+- **Q13** With a wage set, skip the role's benefits % because fringe replaces it, but keep payroll tax, comp and insurance on base? · Answer (approved pick): **yes** · Moves: yes, on bids that pick a set.
+- **Q14** Picking or changing a wage set is offered on Drafts only, with old → new? · Answer (approved pick): **yes** · Moves: yes, when pressed.
+- **Q15** Payroll tax on a fringe paid in CASH (it is taxable when paid as wages)? · Answer (approved pick): **ask per set: "fringe paid as cash" checkbox, off by default** (column `wage_rate_sets.fringePaidAsCash`, BM-M10) · Moves: yes, on sets that tick it.
+- **Q16** The "$/sq ft · $/point" sanity line on the bid screen only, never the quote? · Answer (approved pick): **yes** · Moves: no.
