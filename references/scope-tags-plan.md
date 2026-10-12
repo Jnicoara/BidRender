@@ -173,6 +173,25 @@ bidrender_local_b_new: 4,306/4,306 unchanged.
 
 ### Step 3 — setting a tag, per line, with Undo, refused when locked
 
+**DONE 2026-10-12 (Track B, `b-scope-tags`).** `bids.setLineScope` takes
+`lineIds` + `scopeTag` or `changes` (Undo); `db.setBidLineScopes`;
+`client/src/hooks/useSetLineScope.ts`; `client/src/components/bid/LineScopeMenu.tsx`
+(the "…" and the chip). Generated unit copies carry the tag; a push on a
+locked bid keeps each copy's own tag, pairing old and new lines by
+(assembly, name) in order, and returns `scopeKept`, which the push toast
+names (`pushDoneCopy`, @/lib/unitLinks, 2026-10-12 later). Lock proof
+without touching the guard: `lineScopeSet.test.ts` runs the same change
+through the layer under it (`db.setBidLineScopes`; the push told "not
+locked") on a locked bid and asserts the lock check then FAILS. Found on screen and
+fixed in the same step: the hours cell read "0 h · Example rate" on a By
+others line (`bidHoursCell` now has `notOurs`), and the Fix walk still
+offered to price an owner-furnished line's parts (`lineFixGaps` now reads
+the tag), so the strip said "1 part" beside "Fix these 2". Tests:
+`server/lineScopeSet.test.ts`, `client/src/lib/lineScopeWired.test.ts`,
+new cases in `bidHoursCell.test.ts` and `fixLine.test.ts`. Looked at
+1536x864, 820x1180, 1180x820: $127.48 → $83.32 (By others) → Undo
+$127.48; → $122.48 (Owner furnishes) → Undo $127.48; no sideways scroll.
+
 - `server/routers/bidsRouter.ts`: `setLineScope({ bidId, lineIds[],
 scopeTag | null })` — company-scoped (`ctx.scope.dataUserId`),
   **refused on a locked bid** (`lockedEditRefusal("scope cannot change")`),
@@ -205,6 +224,32 @@ scopeTag }[]` so Undo can put each back (NULL included). Many ids so the
   list move, Undo, watch them move back.
 
 ### Step 4 — materials list and drops follow the tag
+
+**DONE 2026-10-12 (Track B, `b-scope-tags`).** Done: assembly and
+count lines — off lines leave the order and are counted in `leftOff`
+(footer in the dialog, CSV and PDF, `leftOffWords`); owner-furnished lines
+are listed by line with quantity under "Owner furnished — not to buy"
+(`ownerFurnished`); an off line still claims its count, so its marks are
+not added back. Drops: `db.groupsWithoutDrops` filters By others / Excluded
+counts at the top of `loadGroupDrops`. Test:
+`server/lineScopeMaterials.test.ts` (red on the old code with the tag
+written to the row: the part stays on the order, drops stay 2). Looked at
+1536x864 and 820x1180.
+**RUN-TYPE LINES — DONE 2026-10-12 (later).** Until then a wire / conduit
+line tagged off was off the money but its traced footage, fittings and
+extras stayed on the list (the section reads the runs, not the lines). Now
+each run type with a role tagged off or owner-furnished is totalled on its
+own by the same `totalQuantities` (its runs, drops and homeruns) and that
+ROLE's share subtracted (`withoutNotToBuy`, shared/materialsList.ts:
+raceway → conduit; conductor → insulated wire, or the cable on a cable
+type; ground → bare). Fittings skip a tagged role; an extra skips its
+tagged line. Off lines count in the footer; owner-furnished ones are listed
+by the foot. Tests: `server/lineScopeRunLines.test.ts` (5 red on 539f5787:
+100 ft of conduit and 200 ft of wire stayed on the order) and the
+`withoutNotToBuy` cases in `server/materialsList.test.ts`. Looked at on
+"Bar layout check" at 1536x864, 820x1180, 1180x820: Conduit 246.92 →
+135.8 ft with the 1/2" EMT By others, insulated wire 222.24 ft moved to
+Owner furnished, footer "1 line by others"; tags reset to NULL after.
 
 - `server/routers/materialsListRouter.ts`: per-line loop — `off` skips,
   `ownerFurnished` goes to a new `ownerFurnished` section (kept qty, no
@@ -242,6 +287,22 @@ scopeTag }[]` so Undo can put each back (NULL included). Many ids so the
   filter the lines to it (view only).
 - **Moves no number.** Tests: `shared/proposal` grouping cases; LOOK at the
   printed proposal at letter size.
+
+**DONE 2026-10-12 (Track B).** `scopeLinesForProposal` in `shared/proposal.ts`:
+one Includes entry "Owner-furnished, installed by us: 24 Light fixture, …"
+(same name across rooms summed), Excludes "By others: …" / "Excluded: …" by
+name, after the typed notes. By others / Excluded leave the scope of work;
+ofci stays in it (we install it). The client document's scope lines carry
+name / qty / unit only — `scopeTag` stays on our side (`proposal.test.ts`
+"what leaves the building" caught it). A bid with no line of ours is
+`noWork` ("No work added yet"), never $0.00. **Two departures, said here:**
+(1) the summary sits above the LINE LIST, not the totals — its words filter
+that list, and a filter belongs beside what it filters; the filter hides
+rows only, unit subtotals still sum every line. (2) "Hidden on the basic
+path" holds for the counts; the card still shows a closed "More options"
+row when the bid has plans, because that is where the note finder lives.
+Tests: `server/lineScopeProposal.test.ts` (5 red on a40eb6f4),
+`client/src/lib/scopeSummary.test.ts`. Looked at the letter-size sheet.
 
 ### Step 6 — "Who does this?" prompts
 
@@ -286,6 +347,20 @@ scopeTag }[]` so Undo can put each back (NULL included). Many ids so the
 - Tests: phrase cases including "NIC" inside "MECHANICAL" (no hit), a
   sentence split over two text pieces; the procedure refuses another
   company's bid.
+
+**DONE 2026-10-12 (Track B).** `shared/scopePhrases.ts` (phrases longest
+first, so FURNISHED BY OWNER is one note; whole-word matching; the dots of
+G.C. / N.I.C. do not end a sentence unless the next note's number follows);
+`db.sheetTextMatchingAny` (LIKE narrowing, a test checks every example
+passes one) → `bidPdfs.scopePhrases` (a note printed on several sheets is
+one note listing them; says how many sheets it could not read);
+`ScopeNoteFinder.tsx` under the summary's "More options". Suggestions are
+unticked; tagging is `useSetLineScope`, same Undo / refusals; none on a
+locked bid. Phrase → suggested tag: by others / OFOI / by G.C. / by Div
+23-27-28 / by owner → By others; furnished by owner / owner furnished /
+OFCI → Owner furnishes; N.I.C. / not in contract → Excluded; CFCI → We
+install. Seen on screen: "SITE LIGHTING N.I.C. 5." took the next note's
+number — fixed, with a test. Tests: `server/scopePhrases.test.ts`.
 
 ## 4. Migrations (drafts in the handoff; Track A numbers and runs them)
 

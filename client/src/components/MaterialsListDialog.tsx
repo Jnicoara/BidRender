@@ -35,9 +35,12 @@ import {
   Ruler,
 } from "lucide-react";
 import {
+  OWNER_FURNISHED_HEADING,
+  OWNER_FURNISHED_NOTE,
   SUPPLIER_TO_PRICE_HEADING,
   SUPPLIER_TO_PRICE_NOTE,
   exportFilename,
+  leftOffWords,
   isEmptyList,
   toCsv,
   unitLabel,
@@ -234,12 +237,45 @@ export function MaterialsListDialog({
                 </div>
               )}
 
+              {/* Owner furnished (0146): on the document, never in the order. */}
+              {doc!.ownerFurnished.length > 0 && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <Package className="w-3.5 h-3.5 text-muted-foreground" />
+                    {OWNER_FURNISHED_HEADING}
+                  </div>
+                  <p className="text-[0.7rem] text-muted-foreground mb-2">
+                    {OWNER_FURNISHED_NOTE}
+                  </p>
+                  {doc!.ownerFurnished.map(entry => (
+                    <div
+                      key={entry.name}
+                      className="flex items-baseline justify-between gap-3 py-1 text-muted-foreground"
+                    >
+                      <div className="text-sm min-w-0 truncate">
+                        {entry.name}
+                      </div>
+                      <div className="font-mono tabular-nums text-sm shrink-0">
+                        {entry.qty} {unitLabel(entry.unit)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {doc!.notes.length > 0 && (
                 <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
                   {doc!.notes.map(note => (
                     <li key={note}>{note}</li>
                   ))}
                 </ul>
+              )}
+
+              {/* Lines left off — a short list says why it is short (Q7). */}
+              {leftOffWords(doc!.leftOff) && (
+                <p className="text-xs text-muted-foreground">
+                  {leftOffWords(doc!.leftOff)}
+                </p>
               )}
             </div>
           )}

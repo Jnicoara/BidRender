@@ -101,6 +101,7 @@ describe("what a line is missing", () => {
     snapshotLaborRate: "50",
     snapshotLaborOnly: null,
     unpricedParts: 0,
+    scopeTag: null,
     ...over,
   });
   it("names parts, hours and rate on an assembly line", () => {
@@ -144,6 +145,37 @@ describe("what a line is missing", () => {
     expect(lineFixGaps(line({ ...run, runMaterialRole: "fieldBend" }))).toEqual(
       expect.objectContaining({ runHours: true, runPrice: false })
     );
+  });
+  it("never offers to price material that is not ours (0146)", () => {
+    const gaps = (over: Record<string, unknown>) =>
+      Object.values(lineFixGaps(line(over))).some(Boolean);
+    // By others / Excluded: nothing at all, however much is missing.
+    for (const scopeTag of ["by_others", "excluded"]) {
+      expect(
+        gaps({ scopeTag, unpricedParts: 2, snapshotLaborHours: null })
+      ).toBe(false);
+    }
+    // Owner furnishes: no parts or material, but our hours still.
+    expect(
+      lineFixGaps(
+        line({ scopeTag: "ofci", unpricedParts: 2, snapshotMaterialCost: "0" })
+      )
+    ).toEqual(expect.objectContaining({ parts: false, material: false }));
+    expect(
+      lineFixGaps(line({ scopeTag: "ofci", snapshotLaborHours: null })).hours
+    ).toBe(true);
+    expect(
+      lineFixGaps(
+        line({
+          scopeTag: "ofci",
+          assemblyId: null,
+          takeoffRunTypeId: 3,
+          runMaterialId: 7,
+          runMaterialRole: "raceway",
+          snapshotMaterialCost: "0",
+        })
+      ).runPrice
+    ).toBe(false);
   });
 });
 

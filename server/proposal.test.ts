@@ -126,8 +126,8 @@ function input(
     },
     units: [],
     lines: [
-      { name: "Duplex receptacle", qty: 24, unitLabel: null },
-      { name: "Recessed can", qty: 12, unitLabel: null },
+      { name: "Duplex receptacle", qty: 24, unitLabel: null, scopeTag: null },
+      { name: "Recessed can", qty: 12, unitLabel: null, scopeTag: null },
     ],
     branding: { ...FILLED_BRANDING },
     design: {
@@ -519,10 +519,10 @@ describe("what leaves the building", () => {
     const doc = buildProposal(
       input({
         lines: [
-          { name: "Receptacle", qty: 4, unitLabel: "Room 101" },
-          { name: "Switch", qty: 2, unitLabel: "Room 101" },
-          { name: "Panel feed", qty: 1, unitLabel: null },
-          { name: "Receptacle", qty: 4, unitLabel: "Room 102" },
+          { name: "Receptacle", qty: 4, unitLabel: "Room 101", scopeTag: null },
+          { name: "Switch", qty: 2, unitLabel: "Room 101", scopeTag: null },
+          { name: "Panel feed", qty: 1, unitLabel: null, scopeTag: null },
+          { name: "Receptacle", qty: 4, unitLabel: "Room 102", scopeTag: null },
         ],
       })
     );

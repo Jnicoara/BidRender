@@ -10,6 +10,7 @@ const freeCount = {
   runMaterialRole: null,
   snapshotMaterialCost: "12.50",
   snapshotLaborHours: null,
+  scopeTag: null,
 };
 
 describe("bidHoursCell — unset hours never read 0 h", () => {
@@ -45,5 +46,19 @@ describe("bidHoursCell — unset hours never read 0 h", () => {
         snapshotLaborHours: "0",
       })
     ).toBe("inRunRate");
+  });
+
+  it("By others / Excluded say no hours at all — the labor is not ours (0146)", () => {
+    // Even with hours unset: nothing of ours is missing.
+    expect(bidHoursCell({ ...freeCount, scopeTag: "by_others" })).toBe(
+      "notOurs"
+    );
+    expect(
+      bidHoursCell({ ...freeCount, assemblyId: 7, scopeTag: "excluded" })
+    ).toBe("notOurs");
+    // Owner furnishes: we install it, so our hours are still asked for.
+    expect(bidHoursCell({ ...freeCount, scopeTag: "ofci" })).toBe(
+      "handHoursNotSet"
+    );
   });
 });

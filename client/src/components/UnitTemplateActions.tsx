@@ -27,6 +27,7 @@ import { trpc } from "@/lib/trpc";
 import {
   archiveCopiesConfirmCopy,
   pushConfirmCopy,
+  pushDoneCopy,
   templateActionsEnabled,
   type ConfirmCopy,
   type UnitState,
@@ -48,12 +49,7 @@ export function UnitTemplateActions({
   const push = trpc.bids.pushToLinkedCopies.useMutation({
     onError: error => toast.error(error.message),
     onSuccess: result => {
-      toast.success(
-        `Updated ${result.updated.length} cop${result.updated.length === 1 ? "y" : "ies"}` +
-          (result.skippedForked.length
-            ? `, left ${result.skippedForked.length} edited one${result.skippedForked.length === 1 ? "" : "s"} alone`
-            : "")
-      );
+      toast.success(pushDoneCopy(result));
       onDone();
     },
   });

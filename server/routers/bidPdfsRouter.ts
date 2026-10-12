@@ -57,6 +57,13 @@ import {
   likePattern,
   normaliseForSearch,
 } from "../../shared/planTextSearch";
+import {
+  SCOPE_PHRASE_LIKES,
+  collapseSpaces,
+  findScopePhrases,
+  sentenceAround,
+} from "../../shared/scopePhrases";
+import type { LineScope } from "../../shared/lineScope";
 import * as db from "../db";
 import { deleteBidPdfWithFile } from "../storedFiles";
 
@@ -681,6 +688,100 @@ export const bidPdfsRouter = router({
               (planOrder.get(b.bidPdfId) ?? 0) || a.pageNumber - b.pageNumber
         );
       return { hits, truncated: found.truncated, coverage };
+    }),
+
+  /**
+   * The note finder (scope-tags-plan.md step 7): every "who does this"
+   * phrase on the bid's drawings — BY OTHERS, N.I.C., OWNER FURNISHED … —
+   * with the sentence around it and the tag it suggests. Plain text, no AI,
+   * nothing stored, nothing tagged: the screen offers the lines and a person
+   * picks (bids.setLineScope, with Undo).
+   *
+   * The same sentence printed on several sheets (general notes repeated on
+   * every sheet) is ONE note listing each sheet, so a 40-sheet set does not
+   * say the same thing forty times.
+   */
+  scopePhrases: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const { plans, sheets, reads } = await db.getSheetJumpRows(
+        input.bidId,
+        ctx.scope.dataUserId
+      );
+      const found = await db.sheetTextMatchingAny(
+        plans.map(p => p.id),
+        ctx.scope.dataUserId,
+        SCOPE_PHRASE_LIKES
+      );
+      const key = (pdf: number, page: number) => `${pdf}:${page}`;
+      const sheetAt = new Map(
+        sheets.map(s => [key(s.bidPdfId, s.pageNumber), s])
+      );
+      const readAt = new Map(
+        reads.map(r => [key(r.bidPdfId, r.pageNumber), r])
+      );
+
+      type Note = {
+        phrase: string;
+        suggests: LineScope;
+        sentence: string;
+        sheets: {
+          bidPdfId: number;
+          pageNumber: number;
+          number: string | null;
+          title: string;
+        }[];
+      };
+      const notes = new Map<string, Note>();
+      for (const page of found.pages) {
+        const text = collapseSpaces(page.text);
+        const display = sheetDisplay(
+          sheetAt.get(key(page.bidPdfId, page.pageNumber)) ?? {
+            name: `Sheet ${page.pageNumber}`,
+            nameSource: "default",
+          },
+          readAt.get(key(page.bidPdfId, page.pageNumber))
+        );
+        for (const hit of findScopePhrases(text)) {
+          const sentence = sentenceAround(text, hit);
+          const id = `${hit.phrase.label}|${sentence.toLowerCase()}`;
+          const note = notes.get(id) ?? {
+            phrase: hit.phrase.label,
+            suggests: hit.phrase.suggests,
+            sentence,
+            sheets: [],
+          };
+          if (
+            !note.sheets.some(
+              s =>
+                s.bidPdfId === page.bidPdfId && s.pageNumber === page.pageNumber
+            )
+          )
+            note.sheets.push({
+              bidPdfId: page.bidPdfId,
+              pageNumber: page.pageNumber,
+              number: display.number,
+              title: display.title,
+            });
+          notes.set(id, note);
+        }
+      }
+      // What could not be read, so "no notes found" never claims more than
+      // was searched (the same count searchText gives).
+      let notSearched = 0;
+      for (const plan of plans) {
+        const counts = found.perPlan.find(c => c.bidPdfId === plan.id);
+        const pages =
+          plan.pageCount ?? sheets.filter(s => s.bidPdfId === plan.id).length;
+        notSearched +=
+          (counts?.scanned ?? 0) + Math.max(0, pages - (counts?.read ?? 0));
+      }
+      return {
+        notes: Array.from(notes.values()),
+        truncated: found.truncated,
+        notSearched,
+      };
     }),
 
   /**

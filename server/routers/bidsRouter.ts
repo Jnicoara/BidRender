@@ -20,8 +20,10 @@ import { requireCapability, router, scoped } from "../_core/trpc";
 import {
   ASSEMBLY_CATEGORIES,
   BID_STATUSES,
+  LINE_SCOPE_TAGS,
   type Bid,
 } from "../../drizzle/schema";
+import { scopeChoicesFor, scopeLabel } from "../../shared/lineScope";
 import {
   bidRollup,
   billTheBid,
@@ -1208,6 +1210,83 @@ export const bidsRouter = router({
       return { lineId: line.id, shared: input.shared };
     }),
 
+  /**
+   * "Who does this?" — We install / Owner furnishes / By others / Excluded,
+   * on one or more lines (0146; scope-tags-plan.md step 3).
+   *
+   * A tag moves money (shared/lineScope.ts), so it is a person's answer on
+   * one bid, and it comes back undoable: `previous` is each line's tag as it
+   * was — NULL included — and Undo sends it straight back as `changes`.
+   *
+   * Two shapes, one call: `lineIds` + `scopeTag` (one answer, many lines —
+   * the menu, and later the prompts and the note finder), or `changes`
+   * (each line its own tag — Undo).
+   *
+   * REFUSED ON A LOCKED BID, for every line, typed ones too (owner Q1,
+   * 2026-10-10) — stricter than the quantity lock, on purpose: a locked bid
+   * is one whose numbers must not move. "Owner furnishes" is refused on a
+   * remove / relocate line, which has no material to furnish (Q4).
+   */
+  setLineScope: procedure
+    .input(
+      z.union([
+        z.object({
+          bidId: z.number().int().positive(),
+          lineIds: z.array(z.number().int().positive()).min(1).max(500),
+          scopeTag: z.enum(LINE_SCOPE_TAGS).nullable(),
+        }),
+        z.object({
+          bidId: z.number().int().positive(),
+          changes: z
+            .array(
+              z.object({
+                id: z.number().int().positive(),
+                scopeTag: z.enum(LINE_SCOPE_TAGS).nullable(),
+              })
+            )
+            .min(1)
+            .max(500),
+        }),
+      ])
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("who does the work cannot change"),
+        });
+      const changes =
+        "changes" in input
+          ? input.changes
+          : input.lineIds.map(id => ({ id, scopeTag: input.scopeTag }));
+      const lines = new Map(
+        (await db.getBidLineItems(input.bidId)).map(l => [l.id, l])
+      );
+      for (const change of changes) {
+        const line = lines.get(change.id);
+        if (!line)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Line not found.",
+          });
+        if (
+          change.scopeTag !== null &&
+          !scopeChoicesFor(line).includes(change.scopeTag)
+        )
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `"${scopeLabel(change.scopeTag)}" does not apply to ${line.name}: it is labor only, with no material to furnish.`,
+          });
+      }
+      const previous = changes.map(change => ({
+        id: change.id,
+        scopeTag: lines.get(change.id)!.scopeTag,
+      }));
+      await db.setBidLineScopes(input.bidId, changes);
+      return { previous, changes };
+    }),
+
   /** Add an assembly to the bid, freezing its costs as they are right now. */
   addAssembly: procedure
     .input(
@@ -1847,11 +1926,13 @@ export const bidsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
       try {
         return await db.pushTemplateToLinkedCopies(
           input.bidId,
-          input.templateLabel
+          input.templateLabel,
+          // A locked bid's copies keep who does their work (owner Q11).
+          bid.quantitiesLockedAt !== null
         );
       } catch (error) {
         throw new TRPCError({

@@ -14,11 +14,14 @@
  *                   until 2026-10-10: the branch existed for role lines only.
  *   assemblyHoursNotSet an assembly whose hours were not set when added
  *   inRunRate       a coupling, connector or strap — the run's rate pays it
+ *   notOurs         By others / Excluded (0146): the labor is not ours, so
+ *                   no hours figure and no "not set" either
  *   hours           a real figure, a typed 0 included
  */
 import { canPriceByHand, lineNeedsHours } from "@shared/handPricedLines";
 import { lineHoursNotSet, lineHoursUnset } from "@shared/lineNotPriced";
 import { laborInRunRate } from "@shared/runFittings";
+import { scopeIsOffBid, type LineScope } from "@shared/lineScope";
 
 export type BidHoursCell =
   | "cannotPrice"
@@ -26,6 +29,7 @@ export type BidHoursCell =
   | "handHoursNotSet"
   | "assemblyHoursNotSet"
   | "inRunRate"
+  | "notOurs"
   | "hours";
 
 export function bidHoursCell(line: {
@@ -36,8 +40,11 @@ export function bidHoursCell(line: {
   runMaterialRole: string | null;
   snapshotMaterialCost: string | number | null;
   snapshotLaborHours: string | number | null;
+  /** Required: a By others line must never ask for hours (0146). */
+  scopeTag: LineScope | null;
 }): BidHoursCell {
   if (line.breakdown === null) return "cannotPrice";
+  if (scopeIsOffBid(line)) return "notOurs";
   if (lineHoursUnset(line)) return "runLaborUnset";
   if (canPriceByHand(line) && lineNeedsHours(line)) return "handHoursNotSet";
   if (lineHoursNotSet(line)) return "assemblyHoursNotSet";

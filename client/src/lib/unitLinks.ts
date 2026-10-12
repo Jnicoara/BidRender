@@ -142,6 +142,30 @@ export function templateActionsEnabled(state: UnitState): boolean {
   return state.role === "template" && state.linkedCount > 0;
 }
 
+/**
+ * What a finished push says. On a LOCKED bid a push carries everything but
+ * who does the work (0146, owner Q11), and the copies it kept back are named
+ * — a template showing "By others" beside copies still priced as ours must
+ * not look like a push that silently half-worked.
+ */
+export function pushDoneCopy(result: {
+  updated: readonly string[];
+  skippedForked: readonly string[];
+  scopeKept: readonly string[];
+}): string {
+  let text = `Updated ${plural(result.updated.length, "copy", "copies")}`;
+  if (result.skippedForked.length > 0)
+    text += `, left ${plural(result.skippedForked.length, "edited one", "edited ones")} alone`;
+  text += ".";
+  if (result.scopeKept.length > 0)
+    text += ` The bid is locked, so who does the work did not change on ${
+      result.scopeKept.length === 1
+        ? result.scopeKept[0]
+        : plural(result.scopeKept.length, "copy", "copies")
+    } — unlock it to push that too.`;
+  return text;
+}
+
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
