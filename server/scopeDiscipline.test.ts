@@ -84,11 +84,18 @@ const ADMIN_ONLY: Record<string, string> = {
  * Such a router may use NO company or admin builder at all: a mixed router
  * would have a route a company login could reach hiding behind this list.
  * The baseline screen's router (Track B) goes here too.
+ *
+ * Nor may it use `publicProcedure`, except the sign-in itself
+ * (STARTER_SIGN_IN): a public route beside starterEditorProcedure ones passes
+ * the "is it starter-gated" check while being open to anybody.
  */
 const STARTER_ONLY: Record<string, string> = {
   "starterAuthRouter.ts":
     "The starter editor's own sign-in. signIn / verifyCode / signOut are public by nature (they ARE the sign-in); everything else is starterEditorProcedure.",
+  "starterLibraryRouter.ts":
+    "The baseline screen's reads of the shipped starter (shared rows only). Every route is starterEditorProcedure; no company exists to scope to.",
 };
+const STARTER_SIGN_IN = new Set(["starterAuthRouter.ts"]);
 
 describe("every data router is company-scoped", () => {
   it("has routers to check at all", () => {
@@ -126,7 +133,8 @@ describe("every data router is company-scoped", () => {
           mixed:
             /\b(protectedProcedure|companyProcedure|adminProcedure|internalProcedure|scoped|requireCapability)\b/.test(
               src
-            ),
+            ) ||
+            (!STARTER_SIGN_IN.has(file) && /\bpublicProcedure\b/.test(src)),
           starterGated: /\bstarterEditorProcedure\b/.test(src),
         }).toEqual({ file, mixed: false, starterGated: true });
         continue;

@@ -1,10 +1,61 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-12 (latest), BASELINE SCREEN: SIGN-IN + READ-ONLY SCREEN
+
+On `track-b`, NOT merged to local-dev (owner's go). No migration; works on 152. Built on A's login (§ "FROM TRACK A" below).
+
+- **`/starter`** — its own page, decided by PATHNAME in `App.tsx` before
+  AuthGuard (`client/src/lib/starterAddress.ts`), so the company app never
+  mounts for it. `pages/starter/`: `StarterSignInPage` (password → 6-digit
+  code, or "Use a recovery code instead"; A's error wording shown as is; a
+  password stage older than 5 minutes sends it back to step 1), `StarterApp`
+  (signed in = `starterAuth.me`; any "Sign in again." returns to the sign-in
+  with "Your session ended"), `StarterScreen` (the plan § 1 band word for
+  word, "Signs out at … if idle", Sign out; tabs Materials / Assemblies /
+  Labor rates / Run types; materials search = the app's own pipeline with no
+  usage, i.e. a brand-new company's search). No enrol page (A's note).
+- **`starterLibrary` router** (`server/routers/starterLibraryRouter.ts`),
+  every route `starterEditorProcedure`, READ ONLY: `materials`,
+  `assemblies`, `assembly({id})` (parts), `laborRates`, `runTypes`. db reads
+  in `server/db.ts` § "The starter, as the baseline screen reads it" are
+  `userId IS NULL` only. Registered in `STARTER_ONLY`; that check now also
+  fails a starter router using the public builder (except the sign-in).
+- **Tests:** `server/starterLibrary.test.ts` (every route refuses no
+  session, a password-only one and a company login; no company row in the
+  lists; a company assembly id is NOT_FOUND; unset hours stay NULL),
+  `client/src/lib/starterAddress.test.ts`. **NOT YET SHOWN RED** — running
+  the suite with the guards removed was refused by the session's permission
+  classifier; the four breakages were reverted unrun. Owner to allow, or
+  run by hand.
+- **Looked at** laptop 1536, iPad 820×1180 and 1180×820 (playwright,
+  throwaway starter account made and deleted in bidrender_local_b_new):
+  layout audit clean at both iPad sizes; "romex" lists NM-B first. Fixed
+  from looking: $0 roles now say "rate not set". Note: that DB's 1,717
+  shared materials really are $0 with no hours (measured), so the screen
+  shows them all flagged.
+- **Local:** `.env` now has a `STARTER_TOTP_KEY` (local only).
+
+### Waits on A's BS-M3..M6 (and C's `applyStarterChange`)
+
+- **Every edit** — number fields (offer), finding fields, names: needs the
+  log (BS-M3), pins (BS-M4), `isPinnedCopy` (BS-M5) and C's function.
+- **Undo one / undo a batch**, the change log view, pending/accepted counts
+  (§ 4) — BS-M3/M4.
+- **Hide with replacement, "New" badge, Add** (§ 3) — BS-M5, BS-M6
+  (`starterSeenAt`).
+- **Updates tabs, "N starter updates available", accept / ignore** (§ 2) —
+  BS-M6 (`starter_offer_answers`).
+- **"My changes"** (§ 7) — needs `isPinnedCopy` (BS-M5) to keep pinned
+  copies out.
+- **Sheet upload, Download current values, Copy from my company, seed
+  drift / export** (§ 5–7) — C's shared checks and BS-M3.
+- Not dependent, not asked this round: the "Total changed because…" strip
+  (0148 is in) and F16's toast.
+
 ## WHERE B STANDS — 2026-10-12 (late), SCOPE TAGS steps 5 and 7 DONE
 
 - **On track-b, not on local-dev yet**: steps 2–7 (less 6) with local-dev
-  c54416cc (A's 0150/0151, SER rename) merged in; B's two DBs migrated to
-  152. Gate green on 9beb9d95. The owner says when it goes to local-dev
+  c54416cc (A's 0150/0151, SER rename) merged in; B's two DBs migrated to 152. Gate green on 9beb9d95. The owner says when it goes to local-dev
   (C lands first).
 - **Step 5** — proposal: owner-furnished lines stay in the scope of work and
   are named with quantity under Includes; By others / Excluded leave the

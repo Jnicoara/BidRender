@@ -8,6 +8,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { AppProvider } from "./contexts/AppContext";
 import { useTheme } from "./contexts/ThemeContext";
 import AuthGuard from "./components/AuthGuard";
+import { isStarterAddress } from "./lib/starterAddress";
 
 /**
  * The estimating app, split out of the first download.
@@ -23,6 +24,13 @@ import AuthGuard from "./components/AuthGuard";
  * to show a loading state while auth resolved.
  */
 const BidRenderShell = lazy(() => import("./pages/BidRenderShell"));
+
+/**
+ * The starter editor's sign-in and baseline screen, at `/starter` — its own
+ * login with no company, so it is decided BEFORE AuthGuard and never mounts
+ * the company app (@/lib/starterAddress). Its own chunk: nobody else needs it.
+ */
+const StarterApp = lazy(() => import("./pages/starter/StarterApp"));
 
 // Toaster that follows the active theme
 function ToasterWithTheme() {
@@ -59,6 +67,12 @@ function AppChunkFallback() {
  * the same way a retired address heals itself.
  */
 function Router() {
+  if (isStarterAddress(window.location.pathname))
+    return (
+      <Suspense fallback={<AppChunkFallback />}>
+        <StarterApp />
+      </Suspense>
+    );
   return (
     <AuthGuard>
       <Suspense fallback={<AppChunkFallback />}>

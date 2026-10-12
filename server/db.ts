@@ -16766,3 +16766,101 @@ export async function loadBidHomeruns(
     heights,
   });
 }
+
+// ── The starter, as the baseline screen reads it (baseline-screen-plan.md) ──
+//
+// SHARED ROWS ONLY — `userId IS NULL` on every read. The starter editor has
+// no company (starterAuthRouter.ts), so there is no fork to merge and no
+// company row it may see: a company's own copy is that company's data. Each
+// read also says what it leaves out, so the screen's counts can be checked.
+
+/** Every shared material still in the catalog (retired rows left out). */
+export async function getStarterMaterials(): Promise<Material[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(materials)
+    .where(and(isNull(materials.userId), eq(materials.isActive, true)));
+}
+
+/** Every shared assembly still in the library. */
+export async function getStarterAssemblies(): Promise<Assembly[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(assemblies)
+    .where(and(isNull(assemblies.userId), eq(assemblies.isActive, true)))
+    .orderBy(asc(assemblies.name));
+}
+
+/** One SHARED assembly by id; a company's row answers undefined. */
+export async function getStarterAssemblyById(
+  id: number
+): Promise<Assembly | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(assemblies)
+    .where(and(eq(assemblies.id, id), isNull(assemblies.userId)))
+    .limit(1);
+  return row;
+}
+
+/**
+ * A shared assembly's parts, joined to the material each line STORES. A
+ * shared recipe points at shared materials, so there is no fork to follow;
+ * the join is still limited to shared rows, so a line pointing anywhere else
+ * shows as a missing part rather than a company's item.
+ */
+export async function getStarterAssemblyParts(assemblyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      lineId: assemblyMaterials.id,
+      materialId: assemblyMaterials.materialId,
+      qty: assemblyMaterials.qty,
+      overrideLaborHours: assemblyMaterials.overrideLaborHours,
+      name: materials.name,
+      unitOfSale: materials.unitOfSale,
+      costPerUnit: materials.costPerUnit,
+      isExamplePrice: materials.isExamplePrice,
+    })
+    .from(assemblyMaterials)
+    .leftJoin(
+      materials,
+      and(
+        eq(materials.id, assemblyMaterials.materialId),
+        isNull(materials.userId)
+      )
+    )
+    .where(eq(assemblyMaterials.assemblyId, assemblyId))
+    .orderBy(asc(assemblyMaterials.id));
+}
+
+/** Every shared labor rate still in use. */
+export async function getStarterLaborRates(): Promise<LaborRate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(laborRates)
+    .where(and(isNull(laborRates.userId), eq(laborRates.isActive, true)))
+    .orderBy(asc(laborRates.name));
+}
+
+/** Every shared run type in the active list. */
+export async function getStarterRunTypes() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(takeoffRunTypes)
+    .where(
+      and(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes.status, "active"))
+    )
+    .orderBy(asc(takeoffRunTypes.label));
+}

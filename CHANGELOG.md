@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **The starter editor's sign-in page and a first, read-only baseline
+  screen**, at `/starter` (outside the company app). Sign in with the
+  password, then the authenticator code or a recovery code. The screen
+  shows the shipped starter as a new company gets it — materials (with the
+  same search estimators use), assemblies with their parts, labor rates and
+  run types — under the band "STARTER: changes reach NEW companies;
+  existing ones get an offer". Nothing can be edited yet: that waits for
+  the change log, so no company's prices or bids can move.
+
 - **The proposal now says who does what.** Owner-furnished items are listed
   under Included ("Owner-furnished, installed by us: 24 light fixtures");
   By others and Excluded lines leave the scope of work and are named under
