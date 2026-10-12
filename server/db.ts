@@ -6284,6 +6284,62 @@ export async function searchSheetText(
 }
 
 /**
+ * The note finder's one pass (scope-tags-plan.md step 7): every page of these
+ * plans whose text could hold a "who does this" phrase — any of `likes`, ORed
+ * — capped like `searchSheetText`, with `truncated` saying so. The exact
+ * phrase test runs on what comes back (`shared/scopePhrases.ts`).
+ */
+export async function sheetTextMatchingAny(
+  bidPdfIds: number[],
+  userId: number,
+  likes: readonly string[]
+) {
+  const db = await getDb();
+  if (!db || bidPdfIds.length === 0 || likes.length === 0)
+    return { pages: [], truncated: false, perPlan: [] };
+  const scope = and(
+    inArray(bidPdfSheetText.bidPdfId, bidPdfIds),
+    eq(bidPdfSheetText.userId, userId)
+  );
+  const [pages, perPlan] = await Promise.all([
+    db
+      .select({
+        bidPdfId: bidPdfSheetText.bidPdfId,
+        pageNumber: bidPdfSheetText.pageNumber,
+        text: bidPdfSheetText.text,
+      })
+      .from(bidPdfSheetText)
+      .where(
+        and(
+          scope,
+          eq(bidPdfSheetText.hasTextLayer, true),
+          or(...likes.map(pattern => like(bidPdfSheetText.text, pattern)))
+        )
+      )
+      .orderBy(asc(bidPdfSheetText.bidPdfId), asc(bidPdfSheetText.pageNumber))
+      .limit(SEARCH_PAGE_LIMIT + 1),
+    db
+      .select({
+        bidPdfId: bidPdfSheetText.bidPdfId,
+        read: sql<number>`count(*)`,
+        scanned: sql<number>`sum(case when ${bidPdfSheetText.hasTextLayer} then 0 else 1 end)`,
+      })
+      .from(bidPdfSheetText)
+      .where(scope)
+      .groupBy(bidPdfSheetText.bidPdfId),
+  ]);
+  return {
+    pages: pages.slice(0, SEARCH_PAGE_LIMIT),
+    truncated: pages.length > SEARCH_PAGE_LIMIT,
+    perPlan: perPlan.map(p => ({
+      bidPdfId: p.bidPdfId,
+      read: Number(p.read),
+      scanned: Number(p.scanned ?? 0),
+    })),
+  };
+}
+
+/**
  * A field the reading pass found — or found nothing for, which is `value:
  * null` — for one page. Omitting a field leaves whatever is stored alone.
  */

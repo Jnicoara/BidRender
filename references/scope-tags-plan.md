@@ -288,6 +288,22 @@ Owner furnished, footer "1 line by others"; tags reset to NULL after.
 - **Moves no number.** Tests: `shared/proposal` grouping cases; LOOK at the
   printed proposal at letter size.
 
+**DONE 2026-10-12 (Track B).** `scopeLinesForProposal` in `shared/proposal.ts`:
+one Includes entry "Owner-furnished, installed by us: 24 Light fixture, …"
+(same name across rooms summed), Excludes "By others: …" / "Excluded: …" by
+name, after the typed notes. By others / Excluded leave the scope of work;
+ofci stays in it (we install it). The client document's scope lines carry
+name / qty / unit only — `scopeTag` stays on our side (`proposal.test.ts`
+"what leaves the building" caught it). A bid with no line of ours is
+`noWork` ("No work added yet"), never $0.00. **Two departures, said here:**
+(1) the summary sits above the LINE LIST, not the totals — its words filter
+that list, and a filter belongs beside what it filters; the filter hides
+rows only, unit subtotals still sum every line. (2) "Hidden on the basic
+path" holds for the counts; the card still shows a closed "More options"
+row when the bid has plans, because that is where the note finder lives.
+Tests: `server/lineScopeProposal.test.ts` (5 red on a40eb6f4),
+`client/src/lib/scopeSummary.test.ts`. Looked at the letter-size sheet.
+
 ### Step 6 — "Who does this?" prompts
 
 - **6a, no migration:** `shared/scopePrompts.ts` — the eight shipped
@@ -331,6 +347,20 @@ Owner furnished, footer "1 line by others"; tags reset to NULL after.
 - Tests: phrase cases including "NIC" inside "MECHANICAL" (no hit), a
   sentence split over two text pieces; the procedure refuses another
   company's bid.
+
+**DONE 2026-10-12 (Track B).** `shared/scopePhrases.ts` (phrases longest
+first, so FURNISHED BY OWNER is one note; whole-word matching; the dots of
+G.C. / N.I.C. do not end a sentence unless the next note's number follows);
+`db.sheetTextMatchingAny` (LIKE narrowing, a test checks every example
+passes one) → `bidPdfs.scopePhrases` (a note printed on several sheets is
+one note listing them; says how many sheets it could not read);
+`ScopeNoteFinder.tsx` under the summary's "More options". Suggestions are
+unticked; tagging is `useSetLineScope`, same Undo / refusals; none on a
+locked bid. Phrase → suggested tag: by others / OFOI / by G.C. / by Div
+23-27-28 / by owner → By others; furnished by owner / owner furnished /
+OFCI → Owner furnishes; N.I.C. / not in contract → Excluded; CFCI → We
+install. Seen on screen: "SITE LIGHTING N.I.C. 5." took the next note's
+number — fixed, with a test. Tests: `server/scopePhrases.test.ts`.
 
 ## 4. Migrations (drafts in the handoff; Track A numbers and runs them)
 

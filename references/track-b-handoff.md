@@ -1,6 +1,26 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-12 (night), SCOPE TAGS steps 2–4 DONE
+## WHERE B STANDS — 2026-10-12 (late), SCOPE TAGS steps 5 and 7 DONE
+
+- **Steps 2–4 + follow-up are on local-dev's line**: track-b a40eb6f4 is
+  local-dev (c40350ad, A's 0148/0149) merged in, Gate green on 66601686.
+  The fast-forward push of local-dev to a40eb6f4 was blocked by the tool's
+  safety check — the owner pushes it, or says how.
+- **Step 5** — proposal: owner-furnished lines stay in the scope of work and
+  are named with quantity under Includes; By others / Excluded leave the
+  scope and are named under Excludes; a bid with no line of ours says "No
+  work added yet". Bid screen: "Who does what" counts above the line list,
+  each a view filter (unit subtotals unchanged).
+- **Step 7** — note finder under that card's "More options" (shown when the
+  bid has plans): `bidPdfs.scopePhrases`, plain text, nothing ticked by
+  default, tagging through `bids.setLineScope` with Undo.
+- **Step 6a not built** (not asked this round); **6b waits for S2 — final
+  draft below, § "S1–S3".**
+- bidTotals 4,306/4,306 unchanged (a40eb6f4 vs now). Tests red on the old
+  code: `lineScopeProposal` (5), `scopePhrases` and `scopeSummary` (modules
+  new). Looked at laptop + both iPad sizes on a temporary bid (deleted).
+
+## WHERE B STOOD — 2026-10-12 (night), SCOPE TAGS steps 2–4 DONE
 
 Branch `b-scope-tags` (off track-b). Details per step are in
 `references/scope-tags-plan.md` § 3, each marked DONE.
@@ -83,32 +103,40 @@ ALTER TABLE `bid_line_items`
 -- S3 (plan step 6a) — "Don't ask on this bid" for the Who does this? prompts.
 ALTER TABLE `bids` ADD `scopePromptsDismissedAt` timestamp NULL;
 
--- S2 (plan step 6b, only when the prompt list becomes editable) —
--- the modifiers pattern: shipped rows have userId NULL and a baselineId,
--- re-stamped from server/seed/baselineScopePrompts.ts; a shop's edit forks.
+-- S2 (plan step 6b) — FINAL DRAFT FOR A, 2026-10-12. Checked against
+-- `modifiers` (drizzle/schema.ts ~1000, created in 0007): same fork columns,
+-- same types. Shipped rows: userId NULL, matched BY NAME by the seeder
+-- (as seedBaselineModifiers does), re-stamped from
+-- server/seed/baselineScopePrompts.ts. A shop's edit FORKS: a new row with
+-- its userId and baselineId = the shipped row's id (shared/forkedRows.ts).
+-- matchWords / matchCategories: comma-separated, lower case (6a's constant
+-- in shared/scopePrompts.ts becomes the seed). New table: nothing existing
+-- is reinterpreted, no default on an existing table — additive, step 1.
 CREATE TABLE `scope_prompts` (
-  `id` int AUTO_INCREMENT NOT NULL,
-  `userId` int NULL,
-  `baselineId` varchar(64) NULL,
-  `baselineVersion` int NULL,
-  `name` varchar(128) NOT NULL,
-  `matchWords` varchar(512) NOT NULL,
-  `matchCategories` varchar(512) NULL,
-  `isActive` boolean NOT NULL DEFAULT true,
-  `createdAt` timestamp NOT NULL DEFAULT (now()),
-  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT `scope_prompts_id` PRIMARY KEY(`id`),
-  CONSTRAINT `scope_prompts_userId_users_id_fk` FOREIGN KEY (`userId`)
-    REFERENCES `users`(`id`) ON DELETE cascade
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int,
+	`baselineId` int,
+	`baselineVersion` int,
+	`version` int NOT NULL DEFAULT 1,
+	`name` varchar(255) NOT NULL,
+	`matchWords` varchar(1024) NOT NULL,
+	`matchCategories` varchar(1024),
+	`isActive` boolean NOT NULL DEFAULT true,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `scope_prompts_id` PRIMARY KEY(`id`)
 );
+ALTER TABLE `scope_prompts` ADD CONSTRAINT `scope_prompts_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action;
 CREATE INDEX `scope_prompts_userId_idx` ON `scope_prompts` (`userId`);
 CREATE INDEX `scope_prompts_baselineId_idx` ON `scope_prompts` (`baselineId`);
 ```
 
-Before writing S2, check `modifiers`' exact baseline columns in
-`drizzle/schema.ts` (~1040–1085) and match them; the names above are the
-pattern, not a copy. S2 is a new table, so no existing row is reinterpreted.
-S1 and S3 can go in any release; S2 only with step 6b.
+S2 is final as written above (it replaces a 2026-10-10 sketch that guessed
+`baselineId varchar(64)`; `modifiers` uses `int`, the shipped row's id).
+The `drizzle/schema.ts` declaration is A's, as for S1 / S3. Measure: a new
+empty table, so bidTotals must read every bid unchanged — **if any moved,
+stop and find out why before going on.** S2 goes with step 6b only; nothing
+reads it before then.
 
 ### Scope tags — questions for the owner (one per line)
 

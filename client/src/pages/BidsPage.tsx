@@ -29,7 +29,9 @@ import {
   LineScopeChip,
   LineScopeMenuButton,
 } from "@/components/bid/LineScopeMenu";
-import { scopeIsOffBid } from "@shared/lineScope";
+import { scopeIsOffBid, type LineScope } from "@shared/lineScope";
+import { ScopeSummary } from "@/components/bid/ScopeSummary";
+import { effectiveScopeFilter, filterByScope } from "@/lib/scopeSummary";
 import { useFoldTwin } from "@/hooks/useFoldTwin";
 import { cn } from "@/lib/utils";
 import {
@@ -372,6 +374,10 @@ export default function BidsPage({
   const [addUnit, setAddUnit] = useState("");
   const [materialsListOpen, setMaterialsListOpen] = useState(false);
   const [accountingOpen, setAccountingOpen] = useState(false);
+  /** The "who does what" filter on the line list — a view, never a write. */
+  const [scopeFilterPick, setScopeFilterPick] = useState<LineScope | null>(
+    null
+  );
   const [quoteAppOpen, setQuoteAppOpen] = useState(false);
   const access = useCompany();
   const [takeoffExportOpen, setTakeoffExportOpen] = useState(false);
@@ -897,6 +903,11 @@ export default function BidsPage({
     : [];
 
   const groups = groupLines(lines);
+  /*
+    The filter hides ROWS only. Each unit's subtotal still sums all its lines
+    (group.lines), so no number on the screen shrinks because of a view.
+  */
+  const scopeFilter = effectiveScopeFilter(scopeFilterPick, lines);
   /** How many lines each strip's "Fix these" would open. */
   const walkItems = fixWalkItems(lines);
   const fixCount = (kind: FixWalkKind) => walkCount(kind, walkItems);
@@ -1281,6 +1292,16 @@ export default function BidsPage({
 
             <DuplicateUnitPanel bidId={bidId} units={units} onDone={refresh} />
 
+            <ScopeSummary
+              bidId={bidId}
+              lines={lines}
+              locked={bid.quantitiesLockedAt !== null}
+              hasPlans={planSets.length > 0}
+              filter={scopeFilter}
+              onFilter={setScopeFilterPick}
+              refresh={refresh}
+            />
+
             {/* Line items */}
             <div className="rounded-xl border border-border bg-card overflow-hidden">
               {/* Column heads on a laptop or tablet only: on a phone each line
@@ -1300,43 +1321,50 @@ export default function BidsPage({
                   the first one.
                 </div>
               ) : (
-                groups.map(group => (
-                  <div key={group.label ?? "__loose__"}>
-                    {group.label && (
-                      <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/40 border-b border-border">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {group.label}
-                        </span>
-                        {unitStateFor(group.label) && (
-                          <>
-                            <UnitLinkBadge state={unitStateFor(group.label)!} />
-                            <UnitTemplateActions
-                              bidId={bidId}
-                              state={unitStateFor(group.label)!}
-                              onDone={refresh}
-                            />
-                          </>
-                        )}
-                        {/* A unit holding a line that cannot be priced says
+                groups
+                  .filter(
+                    group => filterByScope(group.lines, scopeFilter).length > 0
+                  )
+                  .map(group => (
+                    <div key={group.label ?? "__loose__"}>
+                      {group.label && (
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/40 border-b border-border">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {group.label}
+                          </span>
+                          {unitStateFor(group.label) && (
+                            <>
+                              <UnitLinkBadge
+                                state={unitStateFor(group.label)!}
+                              />
+                              <UnitTemplateActions
+                                bidId={bidId}
+                                state={unitStateFor(group.label)!}
+                                onDone={refresh}
+                              />
+                            </>
+                          )}
+                          {/* A unit holding a line that cannot be priced says
                             its subtotal is short, rather than showing the sum
                             of the rest as if it were the unit's cost. */}
-                        <span className="text-xs text-muted-foreground/70 ml-auto font-mono">
-                          {group.lines.some(l => l.breakdown === null) && (
-                            <span className="text-red-500 font-sans mr-1.5">
-                              incomplete
-                            </span>
-                          )}
-                          {money(
-                            group.lines.reduce(
-                              (sum, l) => sum + (l.breakdown?.directCost ?? 0),
-                              0
-                            )
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    {group.lines.map(line => {
-                      /*
+                          <span className="text-xs text-muted-foreground/70 ml-auto font-mono">
+                            {group.lines.some(l => l.breakdown === null) && (
+                              <span className="text-red-500 font-sans mr-1.5">
+                                incomplete
+                              </span>
+                            )}
+                            {money(
+                              group.lines.reduce(
+                                (sum, l) =>
+                                  sum + (l.breakdown?.directCost ?? 0),
+                                0
+                              )
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {filterByScope(group.lines, scopeFilter).map(line => {
+                        /*
                         Where this line's quantity comes from, asked ONCE.
 
                         "typed" is a hand-added line, "drawing" follows the
@@ -1348,67 +1376,67 @@ export default function BidsPage({
                         decision is @shared/quantityLock, which the server reads
                         too.
                       */
-                      const source = quantitySource(
-                        line,
-                        bid.quantitiesLockedAt
-                      );
-                      /*
+                        const source = quantitySource(
+                          line,
+                          bid.quantitiesLockedAt
+                        );
+                        /*
                         An assembly or run line with something missing gets
                         "Fix", and its amber labels open the same panel — the
                         fix is ON the line, never "go to the Library and add
                         it again" (never-stuck-plan.md, gap 11). `fixGapsOf`
                         decides which lines, for the strips' walk too.
                       */
-                      const fixable = hasLineFixGap(fixGapsOf(line));
-                      // A click on ONE line ends any walk: that is the person
-                      // choosing a line, not the next step of a strip's.
-                      const openFix = fixable
-                        ? () => {
-                            setWalk(null);
-                            setFixingLineId(line.id);
-                          }
-                        : undefined;
-                      return (
-                        <div
-                          key={line.id}
-                          id={`bid-line-${line.id}`}
-                          // A CARD on a phone: the name takes the first line
-                          // and the numbers wrap beneath it. A row from md up.
-                          // Outlined for a moment when the print block sent
-                          // the person to a line fixed in its own boxes.
-                          className={cn(
-                            "flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group",
-                            outlinedLineId === line.id &&
-                              "ring-2 ring-inset ring-[#F5C518] bg-[#F5C518]/5"
-                          )}
-                        >
-                          <div className="flex-1 min-w-0 basis-full md:basis-0">
-                            {/* `block`: truncate on an inline span only stops
+                        const fixable = hasLineFixGap(fixGapsOf(line));
+                        // A click on ONE line ends any walk: that is the person
+                        // choosing a line, not the next step of a strip's.
+                        const openFix = fixable
+                          ? () => {
+                              setWalk(null);
+                              setFixingLineId(line.id);
+                            }
+                          : undefined;
+                        return (
+                          <div
+                            key={line.id}
+                            id={`bid-line-${line.id}`}
+                            // A CARD on a phone: the name takes the first line
+                            // and the numbers wrap beneath it. A row from md up.
+                            // Outlined for a moment when the print block sent
+                            // the person to a line fixed in its own boxes.
+                            className={cn(
+                              "flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 border-b border-border last:border-0 hover:bg-muted/20 transition-colors group",
+                              outlinedLineId === line.id &&
+                                "ring-2 ring-inset ring-[#F5C518] bg-[#F5C518]/5"
+                            )}
+                          >
+                            <div className="flex-1 min-w-0 basis-full md:basis-0">
+                              {/* `block`: truncate on an inline span only stops
                                 the wrap and never clips, so on a sideways
                                 tablet a long name ran under the quantity. On
                                 a phone's card it wraps whole instead. */}
-                            <span
-                              className={cn(
-                                "block text-sm break-words md:truncate",
-                                // Not our work: greyed, never hidden, so it
-                                // can be switched back (scope-tags-plan § 2).
-                                scopeIsOffBid(line) && "text-muted-foreground"
-                              )}
-                            >
-                              {line.name}
-                            </span>
-                            <LineScopeChip
-                              line={line}
-                              locked={bid.quantitiesLockedAt !== null}
-                              onPick={scopeTag =>
-                                setLineScope.mutate({
-                                  bidId,
-                                  lineIds: [line.id],
-                                  scopeTag,
-                                })
-                              }
-                            />
-                            {/*
+                              <span
+                                className={cn(
+                                  "block text-sm break-words md:truncate",
+                                  // Not our work: greyed, never hidden, so it
+                                  // can be switched back (scope-tags-plan § 2).
+                                  scopeIsOffBid(line) && "text-muted-foreground"
+                                )}
+                              >
+                                {line.name}
+                              </span>
+                              <LineScopeChip
+                                line={line}
+                                locked={bid.quantitiesLockedAt !== null}
+                                onPick={scopeTag =>
+                                  setLineScope.mutate({
+                                    bidId,
+                                    lineIds: [line.id],
+                                    scopeTag,
+                                  })
+                                }
+                              />
+                              {/*
                             Where this line came from, and whether it is still
                             listening.
 
@@ -1430,35 +1458,35 @@ export default function BidsPage({
                             prices froze per line at add time (R4) and are not
                             what this is about.
                           */}
-                            {source !== "typed" ? (
-                              <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                                {source === "locked" ? (
-                                  <>
-                                    <Lock className="w-3 h-3 shrink-0" />
-                                    Locked — frozen from your plans
-                                  </>
-                                ) : line.takeoffGroupId !== null ? (
-                                  "From plans — counts your marks"
-                                ) : line.fittingNote !== null ? (
-                                  "From plans — counted from what you traced"
-                                ) : (
-                                  "From plans — follows what you traced"
-                                )}
-                              </div>
-                            ) : null}
-                            {/*
+                              {source !== "typed" ? (
+                                <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                  {source === "locked" ? (
+                                    <>
+                                      <Lock className="w-3 h-3 shrink-0" />
+                                      Locked — frozen from your plans
+                                    </>
+                                  ) : line.takeoffGroupId !== null ? (
+                                    "From plans — counts your marks"
+                                  ) : line.fittingNote !== null ? (
+                                    "From plans — counted from what you traced"
+                                  ) : (
+                                    "From plans — follows what you traced"
+                                  )}
+                                </div>
+                              ) : null}
+                              {/*
                               HOW THIS FITTING WAS COUNTED — "9 couplings: 10
                               sticks of 10 ft over 94.2 ft". Not truncated: it
                               is the explanation, and a clipped explanation is a
                               number with half its reason. Null on every line
                               that is not a fitting.
                             */}
-                            {line.fittingNote !== null ? (
-                              <div className="text-xs text-muted-foreground">
-                                {line.fittingNote}
-                              </div>
-                            ) : null}
-                            {/*
+                              {line.fittingNote !== null ? (
+                                <div className="text-xs text-muted-foreground">
+                                  {line.fittingNote}
+                                </div>
+                              ) : null}
+                              {/*
                               Where this line's MATERIAL MARKUP came from — "35%
                               markup from Wire & Cable category · +$12.97".
 
@@ -1470,28 +1498,29 @@ export default function BidsPage({
                               with no markup at all it would be one grey
                               sentence saying nothing on every line, forever.
                             */}
-                            {showMarkupNotes ? (
-                              <div className="text-xs text-muted-foreground truncate">
-                                {describeLineMarkup(line)}
-                                {line.breakdown &&
-                                line.breakdown.materialMarkup > 0
-                                  ? ` · +${money(line.breakdown.materialMarkup)}`
-                                  : ""}
-                              </div>
-                            ) : null}
-                            {line.snapshotModifierNames?.length ? (
-                              <div className="text-xs text-muted-foreground truncate">
-                                {line.snapshotModifierNames.join(", ")} · frozen{" "}
-                                {new Date(line.snapshotAt).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                  }
-                                )}
-                              </div>
-                            ) : null}
-                            {/*
+                              {showMarkupNotes ? (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {describeLineMarkup(line)}
+                                  {line.breakdown &&
+                                  line.breakdown.materialMarkup > 0
+                                    ? ` · +${money(line.breakdown.materialMarkup)}`
+                                    : ""}
+                                </div>
+                              ) : null}
+                              {line.snapshotModifierNames?.length ? (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {line.snapshotModifierNames.join(", ")} ·
+                                  frozen{" "}
+                                  {new Date(line.snapshotAt).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      month: "short",
+                                      day: "numeric",
+                                    }
+                                  )}
+                                </div>
+                              ) : null}
+                              {/*
                               A line priced BY HAND carries its own price and
                               hours fields — a free count sent from the plans,
                               or any line with no library source. What is blank
@@ -1499,67 +1528,67 @@ export default function BidsPage({
                               the strip, because the strip says HOW MANY and
                               only the line can say WHICH.
                             */}
-                            {canPriceByHand(line) ? (
-                              <>
-                                {handPricedGap(line) ? (
-                                  <div className="text-xs text-[#F5C518]">
-                                    {handPricedGap(line)}
-                                  </div>
-                                ) : null}
-                                <HandPricedLineFields
-                                  bidId={bidId}
-                                  line={line}
-                                  onChanged={refresh}
-                                />
-                              </>
-                            ) : null}
-                            {/* Why it cannot be priced and what to do — the
+                              {canPriceByHand(line) ? (
+                                <>
+                                  {handPricedGap(line) ? (
+                                    <div className="text-xs text-[#F5C518]">
+                                      {handPricedGap(line)}
+                                    </div>
+                                  ) : null}
+                                  <HandPricedLineFields
+                                    bidId={bidId}
+                                    line={line}
+                                    onChanged={refresh}
+                                  />
+                                </>
+                              ) : null}
+                              {/* Why it cannot be priced and what to do — the
                                 strip says HOW MANY, only the line says WHICH. */}
-                            {line.problem ? (
-                              <div className="text-xs text-red-500">
-                                {line.problem.message}{" "}
-                                {problemFixHint(line.problem.code, {
-                                  quantityTypeable: source === "typed",
-                                  pricedByHand: canPriceByHand(line),
-                                })}
-                              </div>
-                            ) : null}
-                            {fixable && fixingLineId !== line.id ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="mt-1 h-7 px-2 text-xs border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518]"
-                                onClick={openFix}
-                              >
-                                <Wrench className="w-3.5 h-3.5 mr-1" />
-                                Fix this line
-                              </Button>
-                            ) : null}
-                            {/* Open decides, not `fixable`: the save that
+                              {line.problem ? (
+                                <div className="text-xs text-red-500">
+                                  {line.problem.message}{" "}
+                                  {problemFixHint(line.problem.code, {
+                                    quantityTypeable: source === "typed",
+                                    pricedByHand: canPriceByHand(line),
+                                  })}
+                                </div>
+                              ) : null}
+                              {fixable && fixingLineId !== line.id ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-1 h-7 px-2 text-xs border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518]"
+                                  onClick={openFix}
+                                >
+                                  <Wrench className="w-3.5 h-3.5 mr-1" />
+                                  Fix this line
+                                </Button>
+                              ) : null}
+                              {/* Open decides, not `fixable`: the save that
                                 fixes the line makes it unfixable, and the
                                 panel still has "Update N other lines?" to
                                 ask (seen on screen 2026-10-08 — the offer
                                 vanished with the panel). */}
-                            {fixingLineId === line.id &&
-                            !canPriceByHand(line) ? (
-                              <FixLinePanel
-                                bidId={bidId}
-                                line={line}
-                                onChanged={refresh}
-                                onClose={closeFix}
-                                walk={
-                                  walk && walkLineId(walk) === line.id
-                                    ? {
-                                        position: walkPosition(walk),
-                                        onSkip: () =>
-                                          void advanceWalk(walk, false),
-                                      }
-                                    : undefined
-                                }
-                              />
-                            ) : null}
-                          </div>
-                          {/*
+                              {fixingLineId === line.id &&
+                              !canPriceByHand(line) ? (
+                                <FixLinePanel
+                                  bidId={bidId}
+                                  line={line}
+                                  onChanged={refresh}
+                                  onClose={closeFix}
+                                  walk={
+                                    walk && walkLineId(walk) === line.id
+                                      ? {
+                                          position: walkPosition(walk),
+                                          onSkip: () =>
+                                            void advanceWalk(walk, false),
+                                        }
+                                      : undefined
+                                  }
+                                />
+                              ) : null}
+                            </div>
+                            {/*
                           A from-plans line's quantity is not typeable, because
                           it is not a number anybody typed — it is how many
                           marks are on the drawing, or how far the runs go.
@@ -1579,215 +1608,220 @@ export default function BidsPage({
                           `bidsRouter.updateLine` refuses with the same
                           sentence, from the same module.
                         */}
-                          {/* On a phone's card the quantity is not under a
+                            {/* On a phone's card the quantity is not under a
                               "Qty" column head, so it carries its own. */}
-                          <span className="md:hidden text-xs text-muted-foreground">
-                            Qty
-                          </span>
-                          {source !== "typed" ? (
-                            <span
-                              className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
-                              title={
-                                source === "locked"
-                                  ? "Frozen when you locked this bid's quantities. Unlock it to follow your plans again."
-                                  : line.takeoffGroupId !== null
-                                    ? "Counted from the marks on your plans. Change it on the Plans screen."
-                                    : "Measured from the runs you traced. Change it on the Plans screen."
-                              }
-                            >
-                              {Number(line.qty)}
+                            <span className="md:hidden text-xs text-muted-foreground">
+                              Qty
                             </span>
-                          ) : (
-                            <InlineNumberField
-                              value={Number(line.qty)}
-                              onSave={qty =>
-                                updateLine.mutate({ bidId, id: line.id, qty })
-                              }
-                              rules={{ min: 0, max: 999999 }}
-                              className="h-7 w-16 text-sm"
-                              ariaLabel={`Quantity of ${line.name}`}
-                            />
-                          )}
-                          {/*
+                            {source !== "typed" ? (
+                              <span
+                                className="font-mono text-sm w-16 text-center shrink-0 tabular-nums"
+                                title={
+                                  source === "locked"
+                                    ? "Frozen when you locked this bid's quantities. Unlock it to follow your plans again."
+                                    : line.takeoffGroupId !== null
+                                      ? "Counted from the marks on your plans. Change it on the Plans screen."
+                                      : "Measured from the runs you traced. Change it on the Plans screen."
+                                }
+                              >
+                                {Number(line.qty)}
+                              </span>
+                            ) : (
+                              <InlineNumberField
+                                value={Number(line.qty)}
+                                onSave={qty =>
+                                  updateLine.mutate({ bidId, id: line.id, qty })
+                                }
+                                rules={{ min: 0, max: 999999 }}
+                                className="h-7 w-16 text-sm"
+                                ariaLabel={`Quantity of ${line.name}`}
+                              />
+                            )}
+                            {/*
                             A line the engine could not price shows THAT, in
                             the columns where its hours and money would be —
                             never "0 h" and "$0.00", which read as a line that
                             genuinely costs nothing. The reference is what
                             somebody quotes to get it looked at.
                           */}
-                          {line.breakdown === null ? (
-                            <span
-                              className="w-48 text-right shrink-0 text-xs text-red-500"
-                              title={line.problem?.message ?? undefined}
-                            >
-                              Can't price
-                              {line.problem?.ref ? (
-                                <span className="font-mono">
-                                  {" "}
-                                  · {line.problem.ref}
-                                </span>
-                              ) : null}
-                            </span>
-                          ) : (
-                            <>
-                              {/* Unset labor is not zero labor: a traced line
+                            {line.breakdown === null ? (
+                              <span
+                                className="w-48 text-right shrink-0 text-xs text-red-500"
+                                title={line.problem?.message ?? undefined}
+                              >
+                                Can't price
+                                {line.problem?.ref ? (
+                                  <span className="font-mono">
+                                    {" "}
+                                    · {line.problem.ref}
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : (
+                              <>
+                                {/* Unset labor is not zero labor: a traced line
                                   whose part has no labor unit reads "Not
                                   priced", never "0 h" (owner, 2026-09-26) —
                                   the same words and colour as the cost cell. */}
-                              {bidHoursCell(line) === "runLaborUnset" ? (
-                                <FixableLabel
-                                  onFix={openFix}
-                                  className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
-                                >
-                                  Not priced
-                                </FixableLabel>
-                              ) : bidHoursCell(line) === "handHoursNotSet" ? (
-                                /* A line priced by hand — a free count, or a
+                                {bidHoursCell(line) === "runLaborUnset" ? (
+                                  <FixableLabel
+                                    onFix={openFix}
+                                    className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
+                                  >
+                                    Not priced
+                                  </FixableLabel>
+                                ) : bidHoursCell(line) === "handHoursNotSet" ? (
+                                  /* A line priced by hand — a free count, or a
                                    remove / relocate line — with no hours
                                    typed: never "0 h" (@/lib/bidHoursCell).
                                    Its fix is the hours box on the line
                                    itself, so the label puts the cursor
                                    there. */
-                                <FixableLabel
-                                  onFix={() => focusLineHours(line.id)}
-                                  className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
-                                >
-                                  Hours not set
-                                </FixableLabel>
-                              ) : bidHoursCell(line) ===
-                                "assemblyHoursNotSet" ? (
-                                /* An assembly whose hours were not set when
+                                  <FixableLabel
+                                    onFix={() => focusLineHours(line.id)}
+                                    className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
+                                  >
+                                    Hours not set
+                                  </FixableLabel>
+                                ) : bidHoursCell(line) ===
+                                  "assemblyHoursNotSet" ? (
+                                  /* An assembly whose hours were not set when
                                    this line was added (D1): never "0 h". */
-                                <FixableLabel
-                                  onFix={openFix}
-                                  className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
-                                >
-                                  Hours not set
-                                </FixableLabel>
-                              ) : bidHoursCell(line) === "notOurs" ? (
-                                /* By others / Excluded (0146): the labor is
+                                  <FixableLabel
+                                    onFix={openFix}
+                                    className="text-xs md:w-24 text-right shrink-0 text-[#F5C518]"
+                                  >
+                                    Hours not set
+                                  </FixableLabel>
+                                ) : bidHoursCell(line) === "notOurs" ? (
+                                  /* By others / Excluded (0146): the labor is
                                    not ours, so no "0 h" and no example-rate
                                    tag beside a figure that is not in the
                                    price. */
-                                <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
-                                  —
-                                </span>
-                              ) : bidHoursCell(line) === "inRunRate" ? (
-                                /* A coupling, connector or strap: its labor is
+                                  <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                    —
+                                  </span>
+                                ) : bidHoursCell(line) === "inRunRate" ? (
+                                  /* A coupling, connector or strap: its labor is
                                    in the run's per-foot rate (owner,
                                    2026-09-29). Said in words, because "0 h"
                                    beside a counted fitting reads as a figure
                                    somebody chose — the unset-is-not-zero rule
                                    from the other side. */
-                                <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
-                                  <TapExplain explanation="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own.">
-                                    in run rate
-                                  </TapExplain>
-                                </span>
-                              ) : (
-                                <span className="font-mono text-xs md:w-24 text-right shrink-0 text-muted-foreground">
-                                  {(() => {
-                                    const hours = (
-                                      <>
-                                        {round(
-                                          line.breakdown.totalLaborHours,
-                                          2
-                                        )}{" "}
-                                        h
-                                        {/* Only when there ARE hours: "0 h on 111 ft"
+                                  <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                    <TapExplain explanation="The run's hours per foot pay for couplings, connectors and straps, so they carry no hours of their own.">
+                                      in run rate
+                                    </TapExplain>
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                    {(() => {
+                                      const hours = (
+                                        <>
+                                          {round(
+                                            line.breakdown.totalLaborHours,
+                                            2
+                                          )}{" "}
+                                          h
+                                          {/* Only when there ARE hours: "0 h on 111 ft"
                                             said where nothing sits (seen on screen). */}
-                                        {line.laborQty !== null &&
-                                          line.breakdown.totalLaborHours > 0 &&
-                                          Number(line.laborQty) !==
-                                            Number(line.qty) && (
-                                            <span className="block font-sans text-[0.65rem]">
-                                              on{" "}
-                                              {round(Number(line.laborQty), 2)}{" "}
-                                              ft
-                                            </span>
-                                          )}
-                                      </>
-                                    );
-                                    /* Traced footage bought with extra: the
+                                          {line.laborQty !== null &&
+                                            line.breakdown.totalLaborHours >
+                                              0 &&
+                                            Number(line.laborQty) !==
+                                              Number(line.qty) && (
+                                              <span className="block font-sans text-[0.65rem]">
+                                                on{" "}
+                                                {round(
+                                                  Number(line.laborQty),
+                                                  2
+                                                )}{" "}
+                                                ft
+                                              </span>
+                                            )}
+                                        </>
+                                      );
+                                      /* Traced footage bought with extra: the
                                        hours are on what is INSTALLED, and the
                                        extra is material only (Q5). Said here,
                                        where a reader would notice the hours
                                        not following the quantity — and as a
                                        tap as well as a hover, since a title
                                        does not exist for a finger. */
-                                    if (
-                                      line.laborQty === null ||
-                                      Number(line.laborQty) === Number(line.qty)
-                                    )
-                                      return hours;
-                                    return (
-                                      <TapExplain
-                                        className="text-right"
-                                        explanation={`Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`}
-                                      >
-                                        {hours}
-                                      </TapExplain>
-                                    );
-                                  })()}
-                                  {/* "Example hours" / "Example rate"
+                                      if (
+                                        line.laborQty === null ||
+                                        Number(line.laborQty) ===
+                                          Number(line.qty)
+                                      )
+                                        return hours;
+                                      return (
+                                        <TapExplain
+                                          className="text-right"
+                                          explanation={`Labor on ${round(Number(line.laborQty), 2)} ft installed. The other ${round(Number(line.qty) - Number(line.laborQty), 2)} ft is extra — material only, no install hours.`}
+                                        >
+                                          {hours}
+                                        </TapExplain>
+                                      );
+                                    })()}
+                                    {/* "Example hours" / "Example rate"
                                       (0133 / 0134): beside the hours they
                                       priced — the bid screen only, never
                                       the customer quote. */}
-                                  <ExampleTags
-                                    line={line}
-                                    only={["hours", "rate"]}
-                                    className="justify-end font-sans"
-                                  />
-                                </span>
-                              )}
-                              {/*
+                                    <ExampleTags
+                                      line={line}
+                                      only={["hours", "rate"]}
+                                      className="justify-end font-sans"
+                                    />
+                                  </span>
+                                )}
+                                {/*
                                 "Not priced" rather than $0.00 on a line
                                 nobody priced (owner, 2026-09-26) — see
                                 LineCost and shared/lineNotPriced.
                               */}
-                              <LineCost
-                                line={line}
-                                onFix={openFix}
-                                className="md:w-24 text-right shrink-0"
-                              />
-                            </>
-                          )}
-                          {/*
+                                <LineCost
+                                  line={line}
+                                  onFix={openFix}
+                                  className="md:w-24 text-right shrink-0"
+                                />
+                              </>
+                            )}
+                            {/*
                             A locked line from the plans cannot be removed
                             (server: bids.removeLine). The slot stays so the
                             row keeps its shape; a hand-typed line keeps its X.
                           */}
-                          <LineScopeMenuButton
-                            line={line}
-                            locked={bid.quantitiesLockedAt !== null}
-                            onPick={scopeTag =>
-                              setLineScope.mutate({
-                                bidId,
-                                lineIds: [line.id],
-                                scopeTag,
-                              })
-                            }
-                          />
-                          {source === "locked" ? (
-                            <span className="w-7 shrink-0" aria-hidden />
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 shrink-0 ml-auto md:ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                              onClick={() =>
-                                removeLine.mutate({ bidId, id: line.id })
+                            <LineScopeMenuButton
+                              line={line}
+                              locked={bid.quantitiesLockedAt !== null}
+                              onPick={scopeTag =>
+                                setLineScope.mutate({
+                                  bidId,
+                                  lineIds: [line.id],
+                                  scopeTag,
+                                })
                               }
-                              aria-label={`Remove ${line.name}`}
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))
+                            />
+                            {source === "locked" ? (
+                              <span className="w-7 shrink-0" aria-hidden />
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 shrink-0 ml-auto md:ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                onClick={() =>
+                                  removeLine.mutate({ bidId, id: line.id })
+                                }
+                                aria-label={`Remove ${line.name}`}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))
               )}
             </div>
           </div>

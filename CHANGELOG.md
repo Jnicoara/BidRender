@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **The proposal now says who does what.** Owner-furnished items are listed
+  under Included ("Owner-furnished, installed by us: 24 light fixtures");
+  By others and Excluded lines leave the scope of work and are named under
+  Not included. On the bid, a "Who does what" line counts each kind and
+  filters the list to it. **New, under More options:** a note finder that
+  reads "BY OTHERS", "N.I.C.", "OWNER FURNISHED" and similar off the
+  drawings and offers to tag the lines they're about — nothing ticked until
+  you tick it, with Undo. No AI; no existing bid moved.
 - **Wire and conduit marked "By others" or "Excluded" now leave the
   materials list too**, with their footage and fittings, and count in the
   "left off" footer; owner-furnished wire or pipe is listed by the foot
