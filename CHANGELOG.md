@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Viewing a plan sheet no longer sets its scale for you.** When the app
+  reads a scale printed on the drawing, it now shows a "Use 1/8" = 1'-0" —
+  read off the sheet" button beside Set scale, and nothing is measured
+  until you tap it. Before, a confident reading was applied the moment the
+  sheet was opened, so footage could appear on a bid without anyone
+  choosing it.
 - **A bid you have sent stops moving.** The moment a bid leaves Draft
   (marked Active, Won or Lost), its quantities lock and its overhead,
   profit, productivity and sales tax are written onto it, so changing your

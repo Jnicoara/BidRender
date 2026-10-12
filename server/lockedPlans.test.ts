@@ -307,7 +307,10 @@ withDb("a locked bid's scales", () => {
       id: f.unscaledId,
       sheetText: `POWER PLAN\nSCALE: 1/4" = 1'-0"`,
     });
-    expect(detected.applied).toBe(true);
+    // Since owner Q19 (2026-10-12) a reading is OFFERED, never applied by
+    // viewing — on any bid. Unlocked, the offer is there to tap.
+    expect(detected.applied).toBe(false);
+    expect(detected.sheet.detectedScaleText).toBe(`1/4" = 1'-0"`);
   });
 });
 

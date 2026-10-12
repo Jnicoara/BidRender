@@ -13,7 +13,115 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-12, later) — BID PROTECTION built on track-c (math version, auto-lock, frozen settings)
+## START HERE (2026-10-12, evening) — baseline screen, C's number rules: built on track-c, NOT merged (waits for the owner's go)
+
+**Bid protection: Gate green, and the local-dev push is blocked.** The merged
+commit `71e84fb` (track-c with local-dev's scope-tag money in it) passed
+Gate 38308498102: test and drizzle-guard. Pushing it to local-dev, a fast
+forward, was **refused by Claude Code's permission check**
+("Modify Shared Resources"), so **local-dev does not have bid protection
+yet.** The owner approves or runs it:
+`git push origin 71e84fb5:refs/heads/local-dev`.
+`git merge-base --is-ancestor origin/local-dev 71e84fb5` was true when
+written. Check it again first.
+
+**What C built of the baseline screen on today's database** (owner Q12: C =
+number rules + tests; `baseline-screen-plan.md` § 11):
+
+- **`shared/starterChange.ts`, the field rules (§ 3).** EVERY column of
+  `materials`, `assemblies`, `labor_rates` and `modifiers` has a kind:
+  - `offer`: numbers and names (Q17);
+  - `everyone`: finding fields (Q21);
+  - `unit`: never changed (`unitOfSale`, `rateType`);
+  - `not-editable`: ids, versions, example tags, status, the company's own.
+  - `starterChangeRefusal` gives the reason. **The test fails on any column
+    left unclassified**, so a new column must be decided before the screen
+    can touch it.
+- **`offerBucket` / `acceptAllTakes` (§ 2, Q18):** a copy still on the old
+  value is offered and in Accept all. A company's own value is listed
+  apart and never in Accept all. "0.5000" equals 0.5, and null is not 0.
+- **`shared/starterSheetChecks.ts`, one copy of the sheet's row checks
+  (§ 5).** The price and hours rows of `pricing/loadStarterSheets.mts` now
+  go through it, and the screen's upload will too.
+  - Blank = no value. Bad numbers, units, duplicates, strangers and bend
+    hours off a raceway are refused.
+  - **The loader's dry run on the real sheets is byte-identical before and
+    after the refactor.** exceljs came from a scratch install, per
+    `pricing/README.md`.
+- **The pinning premise, MEASURED (§ 2 "To prove, not assume"):**
+  `server/starterPinning.test.ts`.
+  1. A company with a bid on a starter assembly reads its bid, every
+     assembly's price and recipe (with part prices), labor rates and run
+     types.
+  2. EVERY active starter material, rate, modifier and assembly is forked
+     for it, and its reads come back identical.
+  3. **Then the starter itself is changed** (part prices +$7, every
+     starter rate +$11, assembly hours +1), and the company still reads
+     identical. The shared rows are restored in a `finally`.
+  4. **It goes red with no pins, and red with fork resolution broken**
+     (`resolveForkedRow`).
+- **F15, the scale as an offer (Q19).** `detectSheetScale` never writes a
+  scale, on any bid. Every reading becomes `detectedScaleText`, and
+  `applied` is always false.
+  - `ScaleControl` shows a visible one-tap "Use 1/8" = 1'-0" — read off
+    the sheet" beside Set scale. It is hidden on a locked bid, and the tap
+    is the ordinary `setSheetScale`.
+  - Four tests that pinned auto-apply were rewritten and say so
+    (`planSheets` ×2, `lockedPlans`, `sheetScalePersistence`). With the old
+    router they fail: 3 failed.
+  - **Looked at:** laptop, iPad landscape and iPad portrait (44 px tall on
+    touch, no sideways scroll), on fixture "Bar layout check" sheet E1.00,
+    with a reading stored by hand and the viewer's detection request
+    blocked so it stayed. The tap applied it and the offer went. Sheet
+    E1.00 is restored (no scale, no reading).
+  - Old sheets keep their "Detected" badge.
+- **Proof:**
+  - `bidTotals.mts` on `bidrender_local_c`: 4,237 / 4,237 Total due
+    unchanged against the measurement taken before ALL of today's work
+    (bid protection, B's merge and this).
+  - 8 rule guards each red when removed, the pinning test red two ways, and
+    F15 red against the old router.
+  - Changed test files: `starterChange` 13, `starterPinning` 1, and
+    `planSheets` + `lockedPlans` + `sheetScalePersistence` 72, all green.
+  - `pnpm check` is clean.
+
+**Not built yet, and NOT waiting on A — C's next:**
+
+- **F11:** new homerun circuits as a one-tap offer on Drafts. Today a sheet
+  visit creates them (`TakeoffPage` `syncHomeruns`; `homerunSyncStep` needs
+  an "offer" outcome).
+- **F12:** "Part changed — Send again" as a run line's fix-it.
+- **F13:** a locked bid's "drops not priced" count still reads live
+  (`bidDropsNotPriced`). The open question: freeze it with no column, or
+  count only the drops the lock froze. Decide before building.
+
+### FOR TRACK A — what the baseline screen waits on (2026-10-12)
+
+C cannot build these on today's database. Each needs A's migration (drafts in
+`baseline-screen-plan.md` § 10), and then C's code:
+
+- **BS-M3:** `starter_change_batches` + `starter_changes` (with `kind`,
+  `version`). Needed by `applyStarterChange`'s log, undo and the sheet
+  upload's batch.
+- **BS-M4:** `starter_change_pins`. Needed to record which copies a change
+  created, so undo knows them.
+- **BS-M5:** `isPinnedCopy`, `hiddenAt`, `replacedById` on the seven tables.
+  Needed to mark a pin as "not my change", for Hide, and for the
+  replacement. **Until then a pin looks like the company's own edit.** The
+  numbers are proven unaffected (`starterPinning.test.ts`); the badges and
+  "My changes" are not.
+- **BS-M6:** `companies.starterSeenAt` + `starter_offer_answers`. Needed for
+  the "New" badge and for Accept / Ignore.
+- **BS-M1 / BS-M2:** the `starter_editor` login and its factors. These are
+  A's own piece, which A is building now.
+- **BS-M8:** not needed. F9 shipped without it (`scaleSource = "manual"`
+  with no ratio).
+- **The boot change (§ 6, F2, F4–F6)** is A's: the seed proposes and the
+  owner confirms. It needs BS-M3.
+- **The `quantitiesLockedAt` comment** in `drizzle/schema.ts`: replacement
+  text below ("FOR TRACK A — replace the `quantitiesLockedAt` comment").
+
+## EARLIER (2026-10-12, later) — BID PROTECTION built on track-c (math version, auto-lock, frozen settings)
 
 Built on A's 0148 / 0149 (local-dev `1091f7e`, `7561ab8`, pulled into
 track-c). **C's local databases: 150 migrations.** No migration written or

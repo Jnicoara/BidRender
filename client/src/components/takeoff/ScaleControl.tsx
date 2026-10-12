@@ -615,11 +615,34 @@ export function ScaleControl({
       </Popover>
 
       {/*
+        THE OFFER (owner Q19, 2026-10-12): a scale read off the drawing is
+        never applied by viewing the sheet — it waits here, one tap, outside
+        the popover so it is seen without opening anything. Not on a locked
+        bid, whose scales do not move (`onRefused` is set exactly then). The
+        tap is the same `pick` as the list inside, so it is `setSheetScale`,
+        flashes, and can be undone like any other scale.
+      */}
+      {!isSet && sheet.detectedScaleText && !onRefused && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5 text-xs border-[#F5C518]/50"
+          onClick={() => void pick(sheet.detectedScaleText!)}
+          title="This scale is printed on the sheet. Nothing is measured until you use it."
+        >
+          <Check className="w-3 h-3" />
+          Use <span className="font-mono">{sheet.detectedScaleText}</span>
+          <span className="text-muted-foreground">— read off the sheet</span>
+        </Button>
+      )}
+
+      {/*
         Labelled, so a scale the app read is never mistaken for one chosen.
-        AMBER until somebody checks it (audit #10, 2026-10-06): a detected
-        scale applies itself, and a sheet with details at several scales can
-        read the wrong one. It was a quiet grey badge, which reads as "fine".
-        Once checked it goes back to grey — a fact, not a warning.
+        AMBER until somebody checks it (audit #10, 2026-10-06): a sheet with
+        details at several scales can read the wrong one. It was a quiet grey
+        badge, which reads as "fine". Once checked it goes back to grey — a
+        fact, not a warning. Since owner Q19 (2026-10-12) a reading is only
+        ever applied by a tap; "detected" stays on sheets scaled before then.
       */}
       {isSet && sheet.scaleSource === "detected" && (
         <Badge
