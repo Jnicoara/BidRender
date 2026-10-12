@@ -52,6 +52,7 @@ describe("counting unpriced parts", () => {
     snapshotLaborHours: "0.5",
     snapshotLaborOnly: null,
     lineRole: "install",
+    scopeTag: null,
     unpricedParts: 0,
     ...over,
   });

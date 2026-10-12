@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countNotPriced,
+  lineHoursMissing,
   lineHoursUnset,
   lineMaterialNotPriced,
   lineNotPriced,
@@ -21,6 +22,7 @@ const base = {
   snapshotLaborHours: null as string | null,
   snapshotLaborOnly: null,
   lineRole: "install",
+  scopeTag: null,
 };
 
 describe("a line priced by hand", () => {
@@ -170,6 +172,7 @@ describe("a line from an assembly", () => {
       snapshotLaborHours: "6",
       snapshotLaborOnly: null,
       lineRole: "install",
+      scopeTag: null,
       unpricedParts: 0,
     };
     expect(lineMaterialNotPriced(line, 552)).toBe(false);
@@ -204,4 +207,101 @@ it("counts the lines a total leaves out", () => {
       },
     ])
   ).toEqual({ lines: 2, parts: 0, hours: 0 });
+});
+
+/*
+  WHO DOES THE WORK (0146, shared/lineScope.ts). By others / Excluded: no
+  part of the line is ours, so nothing is missing from it. Owner furnishes:
+  the material is the owner's, so only our HOURS can be missing.
+*/
+describe("a line tagged by scope", () => {
+  const hoursMissingOn = (line: Parameters<typeof lineHoursMissing>[0]) =>
+    lineHoursMissing(line, 100);
+
+  it.each(["by_others", "excluded"] as const)(
+    "%s: never 'not priced', whatever kind of line it is",
+    scopeTag => {
+      // Blank typed price, $0 run-type part, $0 assembly, role line, no hours.
+      expect(lineNotPriced({ ...base, scopeTag }, 0)).toBe(false);
+      expect(
+        lineNotPriced(
+          {
+            ...base,
+            scopeTag,
+            takeoffRunTypeId: 7,
+            snapshotMaterialCost: "0",
+          },
+          0
+        )
+      ).toBe(false);
+      expect(
+        lineNotPriced(
+          { ...base, scopeTag, assemblyId: 1, snapshotMaterialCost: "0" },
+          0
+        )
+      ).toBe(false);
+      expect(lineNotPriced({ ...base, scopeTag, lineRole: "remove" }, 0)).toBe(
+        false
+      );
+      const assemblyLine = {
+        ...base,
+        scopeTag,
+        assemblyId: 1,
+        snapshotMaterialCost: "0",
+        unpricedParts: 3,
+      };
+      expect(linePartsNotPriced(assemblyLine, 0)).toBe(0);
+      expect(hoursMissingOn(assemblyLine)).toBe(false);
+    }
+  );
+
+  it("ofci: a typed line with no price but hours set is priced", () => {
+    expect(
+      lineNotPriced({ ...base, scopeTag: "ofci", snapshotLaborHours: "1" }, 50)
+    ).toBe(false);
+  });
+  it("ofci: a typed line with no hours is not priced — our labor is missing", () => {
+    expect(lineNotPriced({ ...base, scopeTag: "ofci" }, 0)).toBe(true);
+  });
+  it("ofci: a coupling is never not priced — the run rate pays its labor", () => {
+    expect(
+      lineNotPriced(
+        {
+          ...base,
+          scopeTag: "ofci",
+          takeoffRunTypeId: 7,
+          runMaterialRole: "coupling",
+          snapshotMaterialCost: "0",
+        },
+        0
+      )
+    ).toBe(false);
+  });
+  it("ofci: an assembly line never says material or parts are missing", () => {
+    const line = {
+      ...base,
+      scopeTag: "ofci" as const,
+      assemblyId: 1,
+      snapshotMaterialCost: "0",
+      snapshotLaborHours: "1",
+      unpricedParts: 2,
+    };
+    expect(lineNotPriced(line, 50)).toBe(false);
+    expect(lineMaterialNotPriced(line, 50)).toBe(false);
+    expect(linePartsNotPriced(line, 50)).toBe(0);
+    // The same line untagged says both.
+    expect(lineMaterialNotPriced({ ...line, scopeTag: null }, 50)).toBe(true);
+    expect(linePartsNotPriced({ ...line, scopeTag: null }, 50)).toBe(2);
+  });
+  it("ofci: an assembly line with no hours says its hours, as ours", () => {
+    const line = {
+      ...base,
+      scopeTag: "ofci" as const,
+      assemblyId: 1,
+      snapshotMaterialCost: "0",
+      unpricedParts: 0,
+    };
+    expect(lineNotPriced(line, 0)).toBe(false);
+    expect(hoursMissingOn(line)).toBe(true);
+  });
 });

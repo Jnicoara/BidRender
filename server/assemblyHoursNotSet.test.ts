@@ -53,6 +53,7 @@ function aLine(fields: Partial<PartsLineLike> = {}): PartsLineLike {
     snapshotLaborHours: "0.5000",
     snapshotLaborOnly: null,
     lineRole: "install",
+    scopeTag: null,
     unpricedParts: 0,
     ...fields,
   };
@@ -135,6 +136,7 @@ describe("a bid line whose assembly hours were not set", () => {
       snapshotLaborHours: null,
       snapshotLaborOnly: null,
       lineRole: "install",
+      scopeTag: null,
       snapshotMaterialCost: "0.0000",
     });
     expect(lineNotPriced(nothing, 0)).toBe(true);
@@ -155,6 +157,7 @@ describe("a bid line whose assembly hours were not set", () => {
           snapshotLaborHours: null,
           snapshotLaborOnly: null,
           lineRole: "install",
+          scopeTag: null,
         })
       )
     ).toBe(false);
