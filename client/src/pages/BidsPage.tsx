@@ -24,6 +24,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
+import { useSetLineScope } from "@/hooks/useSetLineScope";
+import {
+  LineScopeChip,
+  LineScopeMenuButton,
+} from "@/components/bid/LineScopeMenu";
+import { scopeIsOffBid } from "@shared/lineScope";
 import { useFoldTwin } from "@/hooks/useFoldTwin";
 import { cn } from "@/lib/utils";
 import {
@@ -567,6 +573,8 @@ export default function BidsPage({
 
   // Undo puts back the exact line, frozen prices included.
   const removeLine = useRemoveBidLine(bidId, refresh);
+  // "Who does this?" — through the same refresh, with Undo (0146).
+  const setLineScope = useSetLineScope(bidId, refresh);
 
   /*
     "Count these as existing" on a line from an old "- EXISTING TO REMAIN"
@@ -1379,9 +1387,27 @@ export default function BidsPage({
                                 the wrap and never clips, so on a sideways
                                 tablet a long name ran under the quantity. On
                                 a phone's card it wraps whole instead. */}
-                            <span className="block text-sm break-words md:truncate">
+                            <span
+                              className={cn(
+                                "block text-sm break-words md:truncate",
+                                // Not our work: greyed, never hidden, so it
+                                // can be switched back (scope-tags-plan § 2).
+                                scopeIsOffBid(line) && "text-muted-foreground"
+                              )}
+                            >
                               {line.name}
                             </span>
+                            <LineScopeChip
+                              line={line}
+                              locked={bid.quantitiesLockedAt !== null}
+                              onPick={scopeTag =>
+                                setLineScope.mutate({
+                                  bidId,
+                                  lineIds: [line.id],
+                                  scopeTag,
+                                })
+                              }
+                            />
                             {/*
                             Where this line came from, and whether it is still
                             listening.
@@ -1638,6 +1664,14 @@ export default function BidsPage({
                                 >
                                   Hours not set
                                 </FixableLabel>
+                              ) : bidHoursCell(line) === "notOurs" ? (
+                                /* By others / Excluded (0146): the labor is
+                                   not ours, so no "0 h" and no example-rate
+                                   tag beside a figure that is not in the
+                                   price. */
+                                <span className="text-xs md:w-24 text-right shrink-0 text-muted-foreground">
+                                  —
+                                </span>
                               ) : bidHoursCell(line) === "inRunRate" ? (
                                 /* A coupling, connector or strap: its labor is
                                    in the run's per-foot rate (owner,
@@ -1723,6 +1757,17 @@ export default function BidsPage({
                             (server: bids.removeLine). The slot stays so the
                             row keeps its shape; a hand-typed line keeps its X.
                           */}
+                          <LineScopeMenuButton
+                            line={line}
+                            locked={bid.quantitiesLockedAt !== null}
+                            onPick={scopeTag =>
+                              setLineScope.mutate({
+                                bidId,
+                                lineIds: [line.id],
+                                scopeTag,
+                              })
+                            }
+                          />
                           {source === "locked" ? (
                             <span className="w-7 shrink-0" aria-hidden />
                           ) : (

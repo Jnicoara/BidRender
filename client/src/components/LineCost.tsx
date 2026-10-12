@@ -1,10 +1,12 @@
 /**
  * The cost cell of a bid line — the one place that decides what it says.
  *
- * Three states, and none of them is a $0 nobody chose:
+ * Four states, and none of them is a $0 nobody chose:
  *   • "Can't price" — the engine refused the line (shared/linePricingProblems)
+ *   • "By others" / "Excluded" — not our work (shared/lineScope, 0146)
  *   • "Not priced"  — nothing priced it yet (shared/lineNotPriced)
- *   • the money     — everything else, including a typed $0
+ *   • the money     — everything else, including a typed $0; on an
+ *     owner-furnished line it is our labor, and says "owner furnished"
  *
  * Shared by the bid screen and the Count screen, because two copies of this
  * cell is two chances for one of them to print $0.00 on an unpriced line
@@ -19,6 +21,7 @@ import {
   type PartsLineLike,
 } from "@shared/lineNotPriced";
 import { lineShortfallWords } from "@/lib/notPricedTotal";
+import { scopeIsOffBid, scopeLabel, scopeOf } from "@shared/lineScope";
 import type { LineExampleFlags } from "@shared/exampleTags";
 import { ExampleTags } from "./ExampleTags";
 import { TapExplain } from "./TapExplain";
@@ -64,6 +67,32 @@ export function LineCost({
     );
   }
   const cost = line.breakdown.directCost;
+  /*
+    WHO DOES THE WORK (0146, shared/lineScope.ts). By others / Excluded add
+    nothing, and the cell says WHY rather than "$0.00" — the line stays on
+    the bid, greyed, so it can be switched back. Checked before "Not
+    priced", which never applies to them.
+  */
+  const scope = scopeOf(line);
+  if (scopeIsOffBid(line)) {
+    return (
+      <TapExplain
+        explanation={`${scopeLabel(scope)}: this work is not in your price, and its material is off your materials list. Switch it back from the line's "Who does this?" menu.`}
+        className={cn("text-xs text-muted-foreground", className)}
+      >
+        {scopeLabel(scope)}
+      </TapExplain>
+    );
+  }
+  const ownerFurnished =
+    scope === "ofci" ? (
+      <TapExplain
+        explanation="Owner furnishes the material, so only your labor is in this figure."
+        className="text-[11px] text-muted-foreground whitespace-nowrap"
+      >
+        owner furnished
+      </TapExplain>
+    ) : null;
   if (lineNotPriced(line, cost)) {
     if (onFix)
       return (
@@ -139,7 +168,23 @@ export function LineCost({
             + {parts}
           </TapExplain>
         )}
+        {ownerFurnished}
         <ExampleTags line={line} only={["price"]} />
+      </span>
+    );
+  }
+  if (ownerFurnished) {
+    // The material is the owner's, so an "Example price" tag on it would
+    // describe a number that is not in this figure: left off.
+    return (
+      <span
+        className={cn(
+          "inline-flex flex-wrap items-baseline justify-end gap-x-1",
+          className
+        )}
+      >
+        <span className="font-mono text-sm">{money(cost)}</span>
+        {ownerFurnished}
       </span>
     );
   }

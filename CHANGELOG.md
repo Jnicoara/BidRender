@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **"Who does this?" on every bid line.** A small "…" beside each line
+  marks it We install, Owner furnishes (we install), By others, or
+  Excluded, with Undo. The price, the line's cost and the materials list
+  follow at once: owner-furnished lines keep our labor and move to their
+  own "not to buy" section; By others and Excluded lines price nothing,
+  leave the order (a footer says how many) and take their drops with them.
+  A locked bid refuses the change. Nothing is marked unless somebody picks
+  it, so no existing bid moved. Wire and conduit lines marked off still
+  appear on the materials list for now.
 - **Bid prices now know who does each line's work.** A line marked "Owner
   furnishes, we install" prices our labor only; "By others" and "Excluded"
   price nothing and never read "not priced". The bid, the Dashboard card and

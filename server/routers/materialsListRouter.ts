@@ -59,8 +59,10 @@ import {
   measuredEntries,
   type AssemblyMaterialQty,
   type CountedAssemblySource,
+  type ForQuoteEntry,
   type MaterialsListDoc,
 } from "../../shared/materialsList";
+import { scopeOf, scopeOnMaterialsList } from "../../shared/lineScope";
 import * as db from "../db";
 import { footageByRunType } from "../runTypeFootage";
 import { resolveRunType } from "../../shared/runTypeLookup";
@@ -178,6 +180,16 @@ export const materialsListRouter = router({
       */
       const noAssembly = new Set<string>();
       const noParts = new Set<string>();
+      /*
+        WHO DOES THE WORK (0146, `scopeOnMaterialsList`). By others /
+        Excluded: off the order, counted for the footer. Owner furnishes:
+        off the order, listed by line under its own heading with quantity,
+        because the owner supplies it and we still install it. Either way
+        the line's count stays in `countedOnBid` below, so its marks are not
+        added back from the plans.
+      */
+      const ownerFurnished: ForQuoteEntry[] = [];
+      const leftOff = { byOthers: 0, excluded: 0 };
 
       for (const line of liveLines) {
         // Pipe, wire and fittings from traced runs are read from the runs
@@ -186,6 +198,20 @@ export const materialsListRouter = router({
         // A remove / relocate line is labor only — nothing to buy
         // (shared/roleLines.ts: "only NEW marks price material").
         if (isLaborRoleLine(line)) continue;
+        const onList = scopeOnMaterialsList(line);
+        if (onList === "off") {
+          if (scopeOf(line) === "by_others") leftOff.byOthers++;
+          else leftOff.excluded++;
+          continue;
+        }
+        if (onList === "ownerFurnished") {
+          ownerFurnished.push({
+            name: line.name,
+            qty: Number(line.qty),
+            unit: "each",
+          });
+          continue;
+        }
         if (
           line.assemblyId === null &&
           line.takeoffGroupId !== null &&
@@ -713,6 +739,8 @@ export const materialsListRouter = router({
         entries,
         measured: measuredEntries(totals),
         forQuote,
+        ownerFurnished,
+        leftOff,
         notes,
       };
     }),

@@ -173,6 +173,22 @@ bidrender_local_b_new: 4,306/4,306 unchanged.
 
 ### Step 3 — setting a tag, per line, with Undo, refused when locked
 
+**DONE 2026-10-12 (Track B, `b-scope-tags`).** `bids.setLineScope` takes
+`lineIds` + `scopeTag` or `changes` (Undo); `db.setBidLineScopes`;
+`client/src/hooks/useSetLineScope.ts`; `client/src/components/bid/LineScopeMenu.tsx`
+(the "…" and the chip). Generated unit copies carry the tag; a push on a
+locked bid keeps each copy's own tag, pairing old and new lines by
+(assembly, name) in order, and returns `scopeKept`. **Not yet said on
+screen**: the push toast does not mention `scopeKept`. Found on screen and
+fixed in the same step: the hours cell read "0 h · Example rate" on a By
+others line (`bidHoursCell` now has `notOurs`), and the Fix walk still
+offered to price an owner-furnished line's parts (`lineFixGaps` now reads
+the tag), so the strip said "1 part" beside "Fix these 2". Tests:
+`server/lineScopeSet.test.ts`, `client/src/lib/lineScopeWired.test.ts`,
+new cases in `bidHoursCell.test.ts` and `fixLine.test.ts`. Looked at
+1536x864, 820x1180, 1180x820: $127.48 → $83.32 (By others) → Undo
+$127.48; → $122.48 (Owner furnishes) → Undo $127.48; no sideways scroll.
+
 - `server/routers/bidsRouter.ts`: `setLineScope({ bidId, lineIds[],
 scopeTag | null })` — company-scoped (`ctx.scope.dataUserId`),
   **refused on a locked bid** (`lockedEditRefusal("scope cannot change")`),
@@ -205,6 +221,22 @@ scopeTag }[]` so Undo can put each back (NULL included). Many ids so the
   list move, Undo, watch them move back.
 
 ### Step 4 — materials list and drops follow the tag
+
+**PARTLY DONE 2026-10-12 (Track B, `b-scope-tags`).** Done: assembly and
+count lines — off lines leave the order and are counted in `leftOff`
+(footer in the dialog, CSV and PDF, `leftOffWords`); owner-furnished lines
+are listed by line with quantity under "Owner furnished — not to buy"
+(`ownerFurnished`); an off line still claims its count, so its marks are
+not added back. Drops: `db.groupsWithoutDrops` filters By others / Excluded
+counts at the top of `loadGroupDrops`. Test:
+`server/lineScopeMaterials.test.ts` (red on the old code with the tag
+written to the row: the part stays on the order, drops stay 2). Looked at
+1536x864 and 820x1180.
+**NOT DONE — RUN-TYPE LINES:** a wire / conduit line tagged By others /
+Excluded is off the money (step 2) but its traced footage, fittings and
+extras are still on the materials list, because that section reads the
+runs, not the lines (~486–498 and the fittings / extras loops). Until it
+is done, the menu's "off your materials list" overstates for those lines.
 
 - `server/routers/materialsListRouter.ts`: per-line loop — `off` skips,
   `ownerFurnished` goes to a new `ownerFurnished` section (kept qty, no

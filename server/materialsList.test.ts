@@ -422,6 +422,8 @@ const docFixture = (
   ],
   measured: [{ label: "Conduit", feet: 340, note: "Traced length." }],
   forQuote: [],
+  ownerFurnished: [],
+  leftOff: { byOthers: 0, excluded: 0 },
   notes: ["A note."],
   ...over,
 });

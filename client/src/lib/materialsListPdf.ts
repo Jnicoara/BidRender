@@ -18,9 +18,12 @@
  */
 import { jsPDF } from "jspdf";
 import {
+  OWNER_FURNISHED_HEADING,
+  OWNER_FURNISHED_NOTE,
   SUPPLIER_TO_PRICE_HEADING,
   SUPPLIER_TO_PRICE_NOTE,
   isEmptyList,
+  leftOffWords,
   unitLabel,
   type MaterialsListDoc,
 } from "@shared/materialsList";
@@ -221,6 +224,27 @@ export function buildMaterialsListPdf(doc: MaterialsListDoc): jsPDF {
     }
   }
 
+  // ── Owner furnished (0146): on the document, never in the order ──────────
+  if (doc.ownerFurnished.length > 0) {
+    room(50);
+    y += 10;
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(...INK);
+    pdf.text(OWNER_FURNISHED_HEADING, ML, y);
+    y += 6;
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(...MUTED);
+    y += 10;
+    pdf.text(OWNER_FURNISHED_NOTE, ML, y);
+    y += 16;
+    tableHead("Counted");
+    for (const entry of doc.ownerFurnished) {
+      row(entry.name, String(entry.qty), unitLabel(entry.unit));
+    }
+  }
+
   if (isEmptyList(doc)) {
     pdf.setFontSize(10);
     pdf.setTextColor(...MUTED);
@@ -248,6 +272,21 @@ export function buildMaterialsListPdf(doc: MaterialsListDoc): jsPDF {
         y += 11;
       }
       y += 3;
+    }
+  }
+
+  // Lines left off — a short list says why it is short (owner Q7).
+  const leftOff = leftOffWords(doc.leftOff);
+  if (leftOff) {
+    room(24);
+    y += 8;
+    pdf.setFontSize(8.5);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(...MUTED);
+    for (const line of pdf.splitTextToSize(leftOff, CW) as string[]) {
+      room(12);
+      pdf.text(line, ML, y);
+      y += 11;
     }
   }
 

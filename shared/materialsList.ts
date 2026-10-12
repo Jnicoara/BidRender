@@ -111,6 +111,18 @@ export type MaterialsListDoc = {
   measured: MeasuredEntry[];
   /** Counts with no assembly, for the supplier to price. */
   forQuote: ForQuoteEntry[];
+  /**
+   * Lines the OWNER furnishes and we install (0146) — listed by line, with
+   * quantity, under "Owner furnished — not to buy", never in the order
+   * above. Required, so no exporter can forget the section.
+   */
+  ownerFurnished: ForQuoteEntry[];
+  /**
+   * Lines left off because the work is not ours (0146): By others and
+   * Excluded. Said in a footer (owner Q7) — a short list must say WHY it
+   * is short. Required, so no exporter can forget it.
+   */
+  leftOff: { byOthers: number; excluded: number };
   /** Anything the reader must know to read the list correctly. */
   notes: string[];
 };
@@ -327,6 +339,26 @@ export const SUPPLIER_TO_PRICE_HEADING = "Supplier to price";
 export const SUPPLIER_TO_PRICE_NOTE =
   "Counted on the drawings, with no parts list. Please quote as a package.";
 
+export const OWNER_FURNISHED_HEADING = "Owner furnished — not to buy";
+export const OWNER_FURNISHED_NOTE =
+  "The owner supplies these; we install them. Listed so the job is complete.";
+
+/**
+ * The footer for lines left off (owner Q7): "Left off: 3 lines by others,
+ * 1 excluded." Empty when nothing was left off — no footer then.
+ */
+export function leftOffWords(leftOff: MaterialsListDoc["leftOff"]): string {
+  const parts: string[] = [];
+  if (leftOff.byOthers > 0)
+    parts.push(
+      `${leftOff.byOthers} ${leftOff.byOthers === 1 ? "line" : "lines"} by others`
+    );
+  if (leftOff.excluded > 0) parts.push(`${leftOff.excluded} excluded`);
+  return parts.length === 0
+    ? ""
+    : `Left off: ${parts.join(", ")} — not ours to buy, and their drops are not counted.`;
+}
+
 /** Human unit label — "ft" reads better than "foot" against a number. */
 export function unitLabel(unit: MaterialUnit): string {
   return unit === "foot" ? "ft" : unit === "box" ? "box" : "ea";
@@ -337,7 +369,10 @@ export function isEmptyList(doc: MaterialsListDoc): boolean {
   return (
     doc.entries.length === 0 &&
     doc.measured.length === 0 &&
-    doc.forQuote.length === 0
+    doc.forQuote.length === 0 &&
+    // Not orderable, but on the document — a job whose fixtures are all
+    // owner furnished is not "nothing taken off".
+    doc.ownerFurnished.length === 0
   );
 }
 
@@ -411,10 +446,32 @@ export function toCsv(doc: MaterialsListDoc): string {
     }
   }
 
+  if (doc.ownerFurnished.length > 0) {
+    rows.push("");
+    rows.push(csvRow([OWNER_FURNISHED_HEADING]));
+    rows.push(csvRow(["Item", "Unit", "Quantity", "Note"]));
+    for (const entry of doc.ownerFurnished) {
+      rows.push(
+        csvRow([
+          entry.name,
+          unitLabel(entry.unit),
+          entry.qty,
+          OWNER_FURNISHED_NOTE,
+        ])
+      );
+    }
+  }
+
   if (doc.notes.length > 0) {
     rows.push("");
     rows.push(csvRow(["Notes"]));
     for (const note of doc.notes) rows.push(csvRow([note]));
+  }
+
+  const leftOff = leftOffWords(doc.leftOff);
+  if (leftOff) {
+    rows.push("");
+    rows.push(csvRow([leftOff]));
   }
 
   return rows.join("\r\n");
