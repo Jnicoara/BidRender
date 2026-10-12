@@ -142,6 +142,22 @@ column — no migration was needed for this.") with:
 Until A does, that comment still says the paragraph "stays until the code
 that does it lands (Track C)". The code has landed, so the comment is stale.
 
+**The full suite found what the 3 changed files did not (Gate 38296979664,
+4 files red), and the fixes are in the next commit:**
+
+- `fixLine.test.ts` (2): its Won and Lost bids are now auto-locked, so the
+  fix was refused as locked. Those tests are about the question an UNLOCKED
+  closed bid asks, so they now assert the lock and then unlock, as a person
+  would.
+- `materialMarkup`, `materialMarkupAgreement` and `quoteAppPanel` (2
+  each): their bid fixtures are partial objects cast `as unknown as Bid`,
+  with no 0149 columns. A missing `settingsFrozenAt` is `undefined`, which
+  is `!== null`, so it read as "frozen with no rate" and dropped the tax.
+  The fixtures now carry the columns as NULL. Real rows come from full
+  `select()`s, so production was not affected.
+- `linePricingProblems.test.ts` has the same kind of fixture but no tax, and
+  is left alone.
+
 **Startup no longer fills blanks on company copies** (A's `7561ab8`). None
 of these tests expect a restart to fill one.
 

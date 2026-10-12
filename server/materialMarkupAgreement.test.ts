@@ -71,6 +71,15 @@ const bid = {
   taxJurisdictionId: null,
   siteAddress: null,
   taxExempt: false,
+  // Never frozen (0149): what every bid that has not left Draft holds. A
+  // missing field read as "frozen" and dropped the tax (2026-10-12).
+  settingsFrozenAt: null,
+  salesTaxEnabled: null,
+  taxMaterials: null,
+  taxLabor: null,
+  taxApplyTo: null,
+  taxRateFrozenPct: null,
+  taxRateFrozenDetail: null,
 } as unknown as Bid;
 
 const line = (
