@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **A bid you have sent stops moving.** The moment a bid leaves Draft
+  (marked Active, Won or Lost), its quantities lock and its overhead,
+  profit, productivity and sales tax are written onto it, so changing your
+  company settings or a tax area no longer re-prices bids you already sent.
+  Drafts still follow your settings, Unlock is still one click, and a rate
+  you type on a bid still wins.
+- **App updates that change the math only reach Drafts.** Each bid now
+  remembers which version of the math it was priced by. If an update moves
+  a Draft's total, the bid screen and Quick bid say "Total due changed from
+  … to … because …" until you press Got it. A bid moved back to Draft
+  offers "Update to the current math" and shows old and new before
+  anything changes. Remove and relocate labor is the first such change:
+  only bids on the current math can add it.
 - **Restarting or updating the app no longer touches your own library.**
   On every start the app used to fill in blank details (shelf, search
   words, conduit stick length and strap spacing) on materials you had

@@ -67,6 +67,12 @@ import {
   saveAsAssemblyRefusal,
 } from "../../shared/handPricedLines";
 import { isLaborRoleLine } from "../../shared/roleLines";
+import { canUpdateMath, reasonsBetween } from "../../shared/mathVersion";
+import {
+  leaveDraft,
+  moveBidToMathVersion,
+  refreezeTaxRate,
+} from "../bidProtection";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { resolveForkedRow } from "../../shared/forkedRows";
 import {
@@ -461,6 +467,13 @@ export const bidsRouter = router({
         trades: input.trades,
         dueDate: input.dueDate,
       });
+      // Born outside Draft: locked and frozen at once, exactly as a Draft
+      // that leaves (owner Q15, Q16; server/bidProtection.ts).
+      if (input.status !== "Draft") {
+        const created = await db.getBidById(id, ctx.scope.dataUserId);
+        if (created)
+          await leaveDraft(created, ctx.scope.dataUserId, new Date());
+      }
       return db.getBidById(id, ctx.scope.dataUserId);
     }),
 
@@ -525,7 +538,7 @@ export const bidsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const { id, ...rest } = input;
-      await requireBid(id, ctx.scope.dataUserId);
+      const before = await requireBid(id, ctx.scope.dataUserId);
 
       const patch: Record<string, unknown> = {};
       if (rest.name !== undefined) patch.name = rest.name;
@@ -613,7 +626,108 @@ export const bidsRouter = router({
 
       if (Object.keys(patch).length > 0)
         await db.updateBid(id, ctx.scope.dataUserId, patch);
+
+      /*
+        LEAVING DRAFT locks the quantities and freezes the settings (owner Q15,
+        Q16). After the person's own patch, so an override typed in the same
+        save is theirs and is kept; the freeze only fills what still inherits.
+        Draft → Draft, Active → Won and the like do nothing here: the bid was
+        locked and frozen the moment it first left Draft.
+      */
+      const leaving =
+        before.status === "Draft" &&
+        rest.status !== undefined &&
+        rest.status !== "Draft";
+      if (leaving) {
+        const after = await requireBid(id, ctx.scope.dataUserId);
+        await leaveDraft(after, ctx.scope.dataUserId, new Date());
+      } else if (
+        before.settingsFrozenAt !== null &&
+        (rest.taxJurisdictionId !== undefined || rest.siteAddress !== undefined)
+      ) {
+        // A person moved a frozen bid's tax area or address: the frozen rate
+        // follows their choice, or the control would do nothing visible.
+        await refreezeTaxRate(
+          await requireBid(id, ctx.scope.dataUserId),
+          ctx.scope.dataUserId
+        );
+      }
       return db.getBidById(id, ctx.scope.dataUserId);
+    }),
+
+  /**
+   * The "Total changed because…" strip (owner Q14; baseline-screen-plan.md
+   * § 8 item 5): this bid's math changes nobody has dismissed. The bid
+   * screen and Quick bid show it; the proposal never reads it.
+   */
+  mathChanges: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      const rows = await db.getUnseenBidMathChanges(bid.id);
+      return {
+        changes: rows.map(row => ({
+          id: row.id,
+          totalBefore: Number(row.totalBefore),
+          totalAfter: Number(row.totalAfter),
+          reason: row.reason,
+        })),
+        /** "Update to the current math" is offered (owner Q22) — a button only. */
+        canUpdate: canUpdateMath(bid),
+      };
+    }),
+
+  /** "Got it" on the strip. */
+  dismissMathChanges: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      await db.markBidMathChangesSeen(input.bidId, new Date());
+      return { success: true };
+    }),
+
+  /**
+   * "Update to the current math" (owner Q22): what pressing it would do,
+   * old → new, before anything is applied. Writes nothing.
+   */
+  mathUpdatePreview: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (!canUpdateMath(bid)) return null;
+      const result = await moveBidToMathVersion({
+        bid,
+        userId: ctx.scope.dataUserId,
+        at: new Date(),
+        seen: true,
+        dryRun: true,
+      });
+      if (!result.moved) return null;
+      return {
+        totalBefore: result.totalBefore,
+        totalAfter: result.totalAfter,
+        reason: reasonsBetween(result.from, result.to),
+      };
+    }),
+
+  /** Apply it. Refused on anything but an unlocked Draft below the current math. */
+  updateMath: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      if (!canUpdateMath(bid))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Only an unlocked Draft on older math can be updated. Sent, won, lost and locked bids keep the math they were priced by.",
+        });
+      return moveBidToMathVersion({
+        bid,
+        userId: ctx.scope.dataUserId,
+        at: new Date(),
+        // The person was shown old → new before pressing (mathUpdatePreview).
+        seen: true,
+      });
     }),
 
   /**
@@ -1008,10 +1122,12 @@ export const bidsRouter = router({
   /**
    * Freeze the quantities — the estimator saying "this bid is what I sent".
    *
-   * ── Never automatic, and never on a status change ─────────────────────────
-   * A bid marked Won is often still being adjusted, and a lock the app applied
-   * is a number frozen at an instant the app chose. Same reasoning as sending a
-   * count to the bid being a button (§ 5f.0 OVERRIDE 2). One deliberate act.
+   * ── Also automatic, once: when the bid leaves Draft (owner Q15, 2026-10-12) ─
+   * This used to say "never automatic, and never on a status change". Q15
+   * reversed it: `update` and `create` call `leaveDraft`
+   * (server/bidProtection.ts), which locks through the same
+   * `db.lockBidQuantities` as this button. The button is still how a Draft is
+   * locked by hand, and Unlock is unchanged.
    *
    * ── Locking a bid twice is not an error ───────────────────────────────────
    * It re-reads the drawing and re-stamps the time, which is what somebody who
@@ -1055,8 +1171,9 @@ export const bidsRouter = router({
    * on the line, not the type.
    *
    * Refused on a LOCKED bid, like every other change to a line from the
-   * plans: the lock is what freezes a bid (there is no automatic freeze on a
-   * status, shared/quantityLock.ts). Refused on any line that is not an extra
+   * plans: the lock is what freezes a bid's quantities (set by a person, or
+   * since 2026-10-12 by the bid leaving Draft — shared/quantityLock.ts).
+   * Refused on any line that is not an extra
    * — a 0 there would be a quantity nobody could see the reason for.
    */
   setExtraShared: procedure

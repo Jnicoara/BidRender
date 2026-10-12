@@ -13,14 +13,139 @@ origin/local-dev` or `scripts/schemaDrift.mts` says
 otherwise when you read this, stop and find out why before going on — either
 this file is stale or the state moved.
 
-## START HERE (2026-10-12) — drive-time note MERGED to local-dev (`4be57f8`); Q14–Q22 recorded; bid methods PLANNED and ANSWERED
+## START HERE (2026-10-12, later) — BID PROTECTION built on track-c (math version, auto-lock, frozen settings)
 
-**WHAT C DOES NEXT: nothing, until Track A lands the bid-protection
-migrations** (math version, quantity lock, frozen O&P/tax) **and the
-startup fix.** Then C builds the bid-protection code
-(`baseline-screen-plan.md` § 8, F1, F8; owner Q14–Q16, Q22). Bid methods
-is built later, after scope tags and the baseline screen. Owner,
-2026-10-12.
+Built on A's 0148 / 0149 (local-dev `1091f7e`, `7561ab8`, pulled into
+track-c). **C's local databases: 150 migrations.** No migration written or
+applied by C.
+
+**What it does**
+
+- **Math version (0148).**
+  - `shared/mathVersion.ts`: `CURRENT_MATH_VERSION` and the registry
+    `MATH_CHANGES`, plus `atLeast`, `reasonsBetween` and `canUpdateMath`.
+  - New bids start at the current version. Both inserts into `bids` set it
+    (`db.createBid`, the sample bid).
+  - **Version 1 = remove/relocate labor:** `roleCountsOnBid`
+    (`shared/roleLines.ts`) gives a bid below 1 no role counts. Nothing is
+    waiting and Send adds no labor lines, which is what live does today.
+    Live has no role-line code at all, so this is the whole of the change.
+  - **Strip:** `bids.mathChanges` / `bids.dismissMathChanges`, shown on the
+    bid screen and Quick bid by `MathChangeStrip`, never on the proposal (a
+    test scans the document).
+  - **Button (Q22):** `bids.mathUpdatePreview` (old → new, writes nothing)
+    and `bids.updateMath`, for an unlocked Draft only.
+- **Auto-lock (Q15), no migration.** `bids.update` Draft → non-Draft and
+  `bids.create` non-Draft call `leaveDraft`, which uses `db.lockBidQuantities`
+  (the Lock button's path) unless the bid is already locked.
+  - Active → Won does not lock, and Unlock is unchanged.
+  - `offersLockOnStatusChange` no longer asks on a change from Draft.
+  - `shared/quantityLock.ts` and two router comments are rewritten. **The
+    schema comment marked REVERSED is NOT**: the Gate's `drizzle-guard`
+    refuses any track-branch commit touching `drizzle/`, a comment
+    included. Its replacement text is below, for A.
+- **Freeze (Q16, 0149).** `freezeBidSettings` fills NULL overhead / profit /
+  productivity groups with the values in effect, and keeps a person's own
+  override (filling only its inherited overhead mode).
+  - It writes the tax-switch group (only if `salesTaxEnabled` is NULL),
+    `taxRateFrozenPct` and `taxRateFrozenDetail`, and sets `settingsFrozenAt`.
+  - Pricing goes through `taxRateForBid` / `taxRulesForBid` in `billTheBid`,
+    the one place tax is applied. Order: typed rate, then frozen (only when
+    `settingsFrozenAt` is set), then live.
+  - Pinning another area or changing the address on a frozen bid re-freezes
+    the rate (`refreezeTaxRate`). Without that, the control would do nothing
+    visible.
+  - A bid moved back to Draft keeps what was frozen.
+  - CLAUDE.md § "Settings are inherited…" is amended and
+    `companyDefaults.test.ts` is extended, in the same commit.
+
+**FOR TRACK A — the release step's functions (`server/bidProtection.ts`)**
+
+- `priceBidAtVersion(bid, userId, version)`: one bid's `totalDue`,
+  `workPrice`, `notPriced` and `incomplete` at any version. Read-only.
+- `moveBidToMathVersion({ bid, userId, at, to?, seen, dryRun? })`: refuses
+  anything but an unlocked Draft. Prices from and to, sets the version, and
+  writes a `bid_math_changes` row only if Total due moved. Use `seen: false`
+  in the release step so the strip shows, and run `dryRun: true` first.
+  **Today, 0 → 1 moves no total**, because no pricing branch reads the
+  version yet. So the release step should write zero change rows. If it
+  writes any, stop.
+- `freezeBidSettings({ bid, userId, at, dryRun? })`: for bids already
+  Active / Won / Lost before this ships. `dryRun` returns the patch and
+  writes nothing.
+- `leaveDraft(bid, userId, at)`: lock + freeze, if A also wants existing
+  non-Draft bids locked (the owner's Q15 covers bids LEAVING Draft; locking
+  old ones is A's and the owner's call).
+
+**Proof**
+
+- `bidTotals.mts` on `bidrender_local_c`, before (the track-c code before
+  this work) and after: **all 4,237 bids, Total due unchanged; not-priced
+  and incomplete unchanged.**
+- **Every guard goes red with it removed: 13 removals, each with the file
+  restored byte-for-byte afterwards.**
+  - New-bid version: 2 failed.
+  - v1 gate: 2 failed.
+  - Leave Draft on update: 6 failed.
+  - Create outside Draft: 1 failed.
+  - Freeze in `leaveDraft`: 5 failed.
+  - Frozen rate read: 1 failed.
+  - Frozen switches: 1 failed.
+  - No lock offer from Draft: 1 failed.
+  - `updateMath` refusal: 1 failed.
+  - Unseen filter: 1 failed.
+  - Refreeze on pin: 1 failed.
+  - Math dry run: 1 failed.
+  - Freeze dry run: 1 failed.
+- **Changed test files:** `bidProtection.test.ts` (new),
+  `companyDefaults.test.ts` and `quantityLock.test.ts`: 66 passed.
+  `pnpm check` is clean.
+- **Looked at on screen** (playwright, fixture bid 1728378, phone 390 and
+  laptop 1536, no sideways scroll). The strip, the button, the preview,
+  Update and "Got it" all work. Draft → Won in the status menu showed the
+  locked banner, no "Lock this bid?" prompt, and no math strip.
+  - **Three wording faults found by looking, and fixed:**
+    - The preview said "$2,430.00 → $2,430.00" when nothing moved. It now
+      says "Total due stays…".
+    - "Total changed" now says "Total due changed".
+    - The reason said remove/relocate marks "now add" labor. They "can now
+      add" it: updating sends nothing by itself.
+  - The sentences live in `shared/mathVersion.ts` and are tested.
+  - The fixture was put back to a Draft (version NULL, unlocked, unfrozen),
+    and the after-measurement confirms its total.
+
+### FOR TRACK A — replace the `quantitiesLockedAt` comment in `drizzle/schema.ts`
+
+The code it describes is on local-dev. C cannot make this edit, because
+`drizzle-guard` fails any track-branch commit that touches `drizzle/`, a
+comment included. First tried in `15f5050`, then amended out. Comment only:
+no column changes and no migration. In the `quantitiesLockedAt` comment on
+`bids`, replace the section headed "── Independent of `status`, and never
+set by it — REVERSED 2026-10-12 ──" (both of its paragraphs, down to "Same
+column — no migration was needed for this.") with:
+
+```ts
+     * ── Set by a person, AND by the bid leaving Draft (owner Q15, 2026-10-12) ─
+     * Written by `bids.lockQuantities` / `bids.unlockQuantities`, which a person
+     * presses, and by `leaveDraft` (server/bidProtection.ts) when `bids.update`
+     * moves a bid out of Draft or `bids.create` makes one outside it — through
+     * the same `db.lockBidQuantities`, so a lock is one thing however it came.
+     * Unlock is one click away, as before.
+     *
+     * This paragraph said "independent of `status`, and never set by it" until
+     * 2026-10-12: a lock the app applied was "a number frozen at an instant the
+     * app chose". Q15 reversed that (baseline-screen-plan.md § 9 F1), because
+     * an unlocked Won bid re-counted whenever the library moved — the worse of
+     * the two. Same column; no migration was needed.
+```
+
+Until A does, that comment still says the paragraph "stays until the code
+that does it lands (Track C)". The code has landed, so the comment is stale.
+
+**Startup no longer fills blanks on company copies** (A's `7561ab8`). None
+of these tests expect a restart to fill one.
+
+**Earlier the same day:** C waited for A's migrations (below).
 
 **Local databases: 148 migrations** (through A's 0147).
 `bidrender_local_c` and `bidrender_test_c` were both migrated by C:

@@ -55,6 +55,7 @@ import {
   splitsBySheet,
 } from "../../shared/markStatus";
 import { planTwinFold } from "../../shared/twinFold";
+import { roleCountsOnBid } from "../../shared/roleLines";
 import {
   countsWaitingToSend,
   countsWithNoPrice,
@@ -245,10 +246,7 @@ export const takeoffGroupsRouter = router({
         /** Every mark by status — "12 new · 4 existing". Display only. */
         split: splits.get(group.id) ?? emptySplit(),
         /** Remove / relocate marks — each kind puts a labor line on the bid. */
-        roleCounts: {
-          remove: splits.get(group.id)?.remove ?? 0,
-          relocate: splits.get(group.id)?.relocate ?? 0,
-        },
+        roleCounts: roleCountsOnBid(bid, splits.get(group.id)),
         /** This bid's own remove / relocate hours; NULL = the assembly's. */
         removeLaborHours: group.removeLaborHours,
         relocateLaborHours: group.relocateLaborHours,
@@ -815,7 +813,7 @@ export const takeoffGroupsRouter = router({
         allowed on purpose — the line arrived frozen at the number it crossed
         with — but a locked bid must not change, and a new line is a change.
       */
-      await refuseSendIfLocked(group.bidId, ctx.scope.dataUserId);
+      const bid = await refuseSendIfLocked(group.bidId, ctx.scope.dataUserId);
       const [counts, splits, lines] = await Promise.all([
         db.countStampsByGroup(group.bidId, ctx.scope.dataUserId),
         db.statusSplitByGroup(group.bidId, ctx.scope.dataUserId),
@@ -832,10 +830,7 @@ export const takeoffGroupsRouter = router({
         materialId: group.materialId,
         unitCost: group.unitCost === null ? null : Number(group.unitCost),
         count,
-        roleCounts: {
-          remove: split?.remove ?? 0,
-          relocate: split?.relocate ?? 0,
-        },
+        roleCounts: roleCountsOnBid(bid, split),
       };
 
       /*
@@ -882,7 +877,12 @@ export const takeoffGroupsRouter = router({
         ctx.scope.dataUserId,
         group,
         roles,
-        row.roleCounts
+        // Undefined only below math version 1, and then `roles` is empty:
+        // `laborRolesWaiting` returns [] without roleCounts
+        // (shared/takeoffBridge.ts, its first line), and
+        // `addLaborRoleLinesToBid` inserts nothing for [] (its first line).
+        // server/mathVersion.test.ts sends on a version-0 bid to prove it.
+        row.roleCounts ?? { remove: 0, relocate: 0 }
       );
       return {
         lineId: lineId ?? roleLineIds[0],
