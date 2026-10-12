@@ -1,5 +1,16 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-12, role lines' "not priced" fixed on the Dashboard
+
+`b-role-not-priced`: `lineNotPricedSql` (`server/db.ts`) now checks
+`lineRole` first, as `lineNotPriced` does, so a remove / relocate line with
+no hours is "not priced" on the Dashboard card as on the bid. Test: the
+"remove / relocate" case in `server/dashboardNotPriced.test.ts` (red before).
+`bidTotals.mts` on bidrender_local_b_new: 4306 bids unchanged. No migration.
+A has since applied S1 and S3 (0146, 0147 — merged into track-b with this;
+bidrender_test_b and bidrender_local_b_new are at 148). Next: the
+scope-tags build, when the owner sends it.
+
 ## WHERE B STANDS — 2026-10-10 (last), SCOPE TAGS PLANNED (plan only, READ FIRST)
 
 **`b-twin-fold` and `b-status-view` were merged 2026-10-10, on A's word**

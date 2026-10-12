@@ -1713,6 +1713,35 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0148–0149 — math version + settings frozen when a bid leaves Draft (2026-10-12 UTC) — NOT on live
+
+`0148_bid_math_version` (C's BS-M7 word for word: `bids.mathVersion` and the
+`bid_math_changes` table, one FK) and `0149_bid_frozen_settings` (written by
+A for owner Q16: `bids.settingsFrozenAt` plus the tax switches
+`salesTaxEnabled` / `taxMaterials` / `taxLabor` / `taxApplyTo`, and
+`taxRateFrozenPct` / `taxRateFrozenDetail`). All nullable, no default, no
+`UPDATE` — additive, step 1, step 3 empty. The Q15 auto-lock needs no
+migration (`quantitiesLockedAt`). `schema.ts` declares everything, so both
+MUST be on a database before code from this commit on reaches it.
+
+1. **Backup**: `staging-2026-10-12T18-27-05Z-before-0148-0149.sql` (77
+   tables, 15,276 rows), restored to `bidrender_scratch_staging_0148`:
+   **77/77 counts equal**.
+2. **Rehearsal** on that restore: drift before = exactly the new table, the
+   eight columns and the one FK; **2 applied**, 150; re-run nothing;
+   "matches", 181/181. Totals before (staging's code `4be57f8`, worktree
+   `../bidrender-before-scope`) vs after with that code AND the new schema:
+   **1,212/1,212 unchanged** both ways.
+3. **Staging database**: drift before = the same; **2 applied**, 150;
+   "matches", 181/181; **all 1,212 bids unchanged** (staging's code and the
+   new code). JSONs `staging-totals-{before,after,after-…-new}-0148-2026-10-12.json`.
+4. **Local**: `bidrender_local` (4,386/4,386 unchanged) and
+   `bidrender_test_localdev`, both 150.
+
+**Live**: 0148–0149 join the next release's batch, BEFORE the push of any
+code from this commit on (both additive). Expect 150, 181/181 — **if what it
+prints does not match, stop and find out why before going on.**
+
 ### Staging: migrations 0146–0147 — line scope tag + "don't ask" (2026-10-12 UTC) — NOT on live
 
 `0146_line_scope_tag` (B's S1, `bid_line_items.scopeTag` enum

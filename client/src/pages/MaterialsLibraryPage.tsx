@@ -1279,15 +1279,13 @@ export default function MaterialsLibraryPage() {
           // would quietly keep the old terms and make the clear look like it
           // failed.
           //
-          // Cleared stores "" and NOT null, which matters more than it looks.
-          // `backfillMaterialMetadata` (server/db.ts) refills any fork whose
-          // aliases are NULL from its baseline on every startup — NULL there
-          // means "predates the column, inherit it". Saving a deliberate clear
-          // as NULL would put the starter's slang back the next time the server
-          // booted, and search failures of that kind are invisible until someone
-          // notices their results are wrong. Empty text says "the user says this
-          // has none", and reads identically to NULL everywhere else: smartSearch
-          // coalesces both to "".
+          // Cleared stores "" and NOT null. Until 2026-10-12 that mattered:
+          // `backfillMaterialMetadata` (server/db.ts) refilled any fork whose
+          // aliases were NULL from its baseline on every startup, so a clear
+          // saved as NULL came back. The boot no longer touches a company's
+          // rows, but "" still says "the user says this has none" rather than
+          // "never set", and reads identically to NULL everywhere else:
+          // smartSearch coalesces both to "".
           searchAliases: draft.searchAliases.trim(),
           brandNote: draft.brandNote.trim() || null,
           // Only a raceway's editor carries these, so every other save omits

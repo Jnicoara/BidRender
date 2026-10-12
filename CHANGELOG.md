@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Restarting or updating the app no longer touches your own library.**
+  On every start the app used to fill in blank details (shelf, search
+  words, conduit stick length and strap spacing) on materials you had
+  edited, and a rare clean-up could delete a line from one of your own
+  assemblies. Now a start only ever updates BidRidge's shared starter
+  items; anything your company owns is left exactly as you saved it.
+
+- **Groundwork so a bid you've sent stops changing on its own.** New empty
+  database fields let the app remember which version of the pricing math
+  each bid uses (so a future fix only reaches Drafts, with a note saying
+  why the total moved) and keep a copy of the overhead, profit,
+  productivity and sales-tax settings that were in effect when a bid left
+  Draft. Nothing uses them yet; no bid total moves.
+
+- **Dashboard: a remove or relocate line with no hours now counts as "not
+  priced", the same as on the bid.** The dashboard card could call such a
+  line priced while the bid it opens said "Not priced". Both now follow one
+  rule: on a remove or relocate line, the hours decide. No bid total moves.
 - **Job costs remember how they were worked out.** Adding drive time (or a
   lift rental) from its tile now keeps the working, such as "6 trips × 1.5 h
   × $85.00/h", under the charge on the bid screen and Quick bid. It never
