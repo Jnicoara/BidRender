@@ -69,6 +69,7 @@ describe("the rules (shared/roleLines.ts)", () => {
       snapshotLaborHours: null,
       snapshotLaborOnly: true,
       lineRole: "remove",
+      scopeTag: null,
     };
     expect(lineNotPriced(roleLine, 0)).toBe(true);
     expect(lineNotPriced({ ...roleLine, snapshotLaborHours: "0.25" }, 30)).toBe(
