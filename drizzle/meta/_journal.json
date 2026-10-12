@@ -1023,6 +1023,20 @@
       "when": 1789963500000,
       "tag": "0145_bid_expense_notes",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "5",
+      "when": 1789963600000,
+      "tag": "0146_line_scope_tag",
+      "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "5",
+      "when": 1789963700000,
+      "tag": "0147_bid_scope_prompts_dismissed",
+      "breakpoints": true
     }
   ]
 }

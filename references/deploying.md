@@ -1713,6 +1713,36 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0146–0147 — line scope tag + "don't ask" (2026-10-12 UTC) — NOT on live
+
+`0146_line_scope_tag` (B's S1, `bid_line_items.scopeTag` enum
+install/ofci/by_others/excluded) and `0147_bid_scope_prompts_dismissed`
+(B's S3, `bids.scopePromptsDismissedAt`): one nullable column each, no
+default, no `UPDATE` — additive, step 1, step 3 empty. NULL = not said =
+We install / prompts shown. `schema.ts` declares both (`LINE_SCOPE_TAGS`),
+so they MUST be on a database before code from this commit on reaches it.
+B's S2 (`scope_prompts`) is NOT in this batch (plan step 6b).
+
+1. **Backup**: `staging-2026-10-12T17-18-13Z-before-0146-0147.sql` (77
+   tables, 15,112 rows), restored to `bidrender_scratch_staging_0146`:
+   **77/77 counts equal**.
+2. **Rehearsal** on that restore: drift before = exactly the two columns;
+   **2 applied**, 148; re-run nothing; "matches", 180/180. Totals before
+   (staging's code `a2569d7`, worktree) vs after with that code AND with
+   the new schema: **1,196/1,196 unchanged** both ways.
+3. **Staging database**: drift before = the two columns; **2 applied**,
+   148; "matches", 180/180; **all 1,196 bids unchanged** (`bidTotals`,
+   staging's code and the new code). JSONs
+   `staging-totals-{before,after,after-…-new}-0146-2026-10-12.json`.
+4. **Local**: `bidrender_local` (4,386/4,386 unchanged) and
+   `bidrender_test_localdev`, both 148.
+5. **Code**: pushed to `local-dev` after the database; the Gate deploys
+   staging.
+
+**Live**: 0146–0147 join the next release's batch, BEFORE the push of any
+code from this commit on (both additive). Expect 148, 180/180 — **if what it
+prints does not match, stop and find out why before going on.**
+
 ### Staging: migrations 0144–0145 — sheet work tag + expense notes (2026-10-10 UTC) — NOT on live
 
 `0144_sheet_work_tag` (B's M2, `bid_pdf_sheets.workTag`, needed before

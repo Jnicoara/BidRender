@@ -24,7 +24,13 @@ with the files each touches. track-b was fast-forwarded to local-dev
 - **Next step:** A applies S1, then step 2 of the plan (the owner's answers
   are in, below).
 
-### S1–S3 — SQL DRAFTS FOR TRACK A (NOT APPLIED; all additive, step 1)
+### S1–S3 — SQL DRAFTS FOR TRACK A (all additive, step 1)
+
+**S1 and S3 APPLIED by A, 2026-10-12** as `0146_line_scope_tag` and
+`0147_bid_scope_prompts_dismissed` — local-dev, local DBs, staging's DB
+(1,196/1,196 unchanged). `drizzle/schema.ts` already declares them
+(`LINE_SCOPE_TAGS`, `bidLineItems.scopeTag`, `bids.scopePromptsDismissedAt`);
+do not add them again. **S2 NOT applied** — still waits for plan step 6b.
 
 All three are add-only. NULL = not said = today's behaviour, no defaults on
 existing tables, so each can go in ahead of its code and moves no number.
