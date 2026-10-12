@@ -61,6 +61,7 @@ const KNOWN_KINDS: Record<UndoOp["kind"], true> = {
   restoreGroup: true,
   removeGroup: true,
   moveMarks: true,
+  markStatus: true,
   runEdit: true,
   restoreRunEdit: true,
 };

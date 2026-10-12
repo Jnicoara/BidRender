@@ -75,6 +75,7 @@ import {
   MARK_STATUS_LABEL,
   USER_MARK_STATUSES,
   isUserMarkStatus,
+  markFocusOpacity,
   type MarkStatus,
   type UserMarkStatus,
 } from "@shared/markStatus";
@@ -284,6 +285,7 @@ export function TraceLayer({
   stamping,
   armedGroupName,
   stamps,
+  statusFocus = null,
   proposals,
   onDropStamp,
   selectedStampIds,
@@ -401,6 +403,12 @@ export function TraceLayer({
   stamping: boolean;
   armedGroupName: string | null;
   stamps: PlacedStamp[];
+  /**
+   * The status bar's pick (status-and-scope-plan § 1a): marks of any other
+   * status are DIMMED, never hidden — still clickable, still counted. Null
+   * or absent = every mark at full strength.
+   */
+  statusFocus?: MarkStatus | null;
   /** Awaiting the user's decision. Never counted, never priced. */
   proposals?: ProposedStamp[];
   onDropStamp: (at: { x: number; y: number }) => void;
@@ -1461,6 +1469,7 @@ export function TraceLayer({
           return (
             <g
               key={`${placed.pending ? "pending" : "stamp"}-${placed.id}`}
+              opacity={markFocusOpacity(status.status, statusFocus)}
               className={
                 tracing || placed.pending
                   ? ""

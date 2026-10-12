@@ -285,6 +285,12 @@ after every migration and every deploy, and every moved total explained.
 M2–M6 are additive. The code reads NULL as today's behaviour, so each
 can go ahead of its code. M1 is the only meaning migration.
 
+**M2 narrowed, 2026-10-10 (Track B, `b-status-view`):** `workTag` only.
+`workTagSuggested` is dropped: the suggestion is read from the sheet's
+title each time the menu opens (`shared/sheetWorkTag.ts`
+`suggestedWorkTag`), so there is nothing to store. The SQL draft is in
+`references/track-b-handoff.md` § "M2 — SQL DRAFT".
+
 ## 6. Build order
 
 1. **1d remove / relocate labor** (Track C code; columns exist). It moves
@@ -361,3 +367,11 @@ quantity also leave the **materials list** (what to buy) and the **drops**
 (the vertical footage for that device)? **The owner said yes to both**, the
 suggested answer, because it is not ours to buy or wire. No existing bid
 moves: `scopeTag` (M5) does not exist yet, so no line carries either tag.
+A "By others" or "Excluded" line never prices. Build plan:
+`references/scope-tags-plan.md`.
+
+**§ 3d narrowed, 2026-10-10 (`scope-tags-plan.md` § 0):** the note finder
+does not search "EXISTING TO REMAIN" / "E.T.R." — that is a mark status
+(§ 1 and A's fold), not a who-does-it answer. **§ 5's M5 / M6 are replaced**
+by drafts S1–S3 in `references/track-b-handoff.md`: no `bid_scope_answers`
+table, because the answer is the line's own tag (NULL vs `install`).

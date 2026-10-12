@@ -1,6 +1,411 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-10, the owner's 3 held items BUILT (READ FIRST)
+## WHERE B STANDS — 2026-10-10 (last), SCOPE TAGS PLANNED (plan only, READ FIRST)
+
+**`b-twin-fold` and `b-status-view` were merged 2026-10-10, on A's word**
+(local-dev 1251518 carries A's 0144 `bid_pdf_sheets.workTag` and 0145).
+M1: done by A — dropped (twin census 0 everywhere). M2: done by A, 0144.
+Neither was added to `drizzle/` by B.
+
+This session wrote a plan and no app code: `references/scope-tags-plan.md`,
+the SCOPE part of `status-and-scope-plan.md` (§ 3), as seven build steps
+with the files each touches. track-b was fast-forwarded to local-dev
+(37c52c3) first, so the plan reads current code (c-remove-relocate is in it).
+
+- **Owner, 2026-10-10 (in the request):** By others / Excluded never price
+  and come off the materials list AND the drops. That answers plan § 8
+  Q10; recorded there.
+- **Found while planning:** `snapshotLaborOnly` changes no money (it only
+  silences "material not priced"), so "Owner furnishes" needs its own
+  branch in `priceLine`. Drops have no link to a bid line except the
+  count's group, so "off the drops" filters groups in `loadGroupDrops`.
+  The SQL `lineNotPricedSql` has no `lineRole` branch where the TS one
+  does (todo.md).
+- **Next step:** A applies S1, then step 2 of the plan (the owner's answers
+  are in, below).
+
+### S1–S3 — SQL DRAFTS FOR TRACK A (NOT APPLIED; all additive, step 1)
+
+All three are add-only. NULL = not said = today's behaviour, no defaults on
+existing tables, so each can go in ahead of its code and moves no number.
+Measure with `scripts/bidTotals.mts` before and after: expect every bid
+unchanged; **if any moved, stop and find out why before going on.** They
+replace the plan's M5 / M6 (`bid_scope_answers` is not needed: the answer IS
+the line's tag).
+
+```sql
+-- S1 (plan step 1) — needed before ANY scope code: every line read is a bare select().
+-- NULL = not said = We install. 'install' = somebody answered "We install".
+ALTER TABLE `bid_line_items`
+  ADD `scopeTag` enum('install','ofci','by_others','excluded') NULL;
+
+-- S3 (plan step 6a) — "Don't ask on this bid" for the Who does this? prompts.
+ALTER TABLE `bids` ADD `scopePromptsDismissedAt` timestamp NULL;
+
+-- S2 (plan step 6b, only when the prompt list becomes editable) —
+-- the modifiers pattern: shipped rows have userId NULL and a baselineId,
+-- re-stamped from server/seed/baselineScopePrompts.ts; a shop's edit forks.
+CREATE TABLE `scope_prompts` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `userId` int NULL,
+  `baselineId` varchar(64) NULL,
+  `baselineVersion` int NULL,
+  `name` varchar(128) NOT NULL,
+  `matchWords` varchar(512) NOT NULL,
+  `matchCategories` varchar(512) NULL,
+  `isActive` boolean NOT NULL DEFAULT true,
+  `createdAt` timestamp NOT NULL DEFAULT (now()),
+  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `scope_prompts_id` PRIMARY KEY(`id`),
+  CONSTRAINT `scope_prompts_userId_users_id_fk` FOREIGN KEY (`userId`)
+    REFERENCES `users`(`id`) ON DELETE cascade
+);
+CREATE INDEX `scope_prompts_userId_idx` ON `scope_prompts` (`userId`);
+CREATE INDEX `scope_prompts_baselineId_idx` ON `scope_prompts` (`baselineId`);
+```
+
+Before writing S2, check `modifiers`' exact baseline columns in
+`drizzle/schema.ts` (~1040–1085) and match them; the names above are the
+pattern, not a copy. S2 is a new table, so no existing row is reinterpreted.
+S1 and S3 can go in any release; S2 only with step 6b.
+
+### Scope tags — questions for the owner (one per line)
+
+**ANSWERED by the owner, 2026-10-10:** 1 yes · 2 yes · 3 keep drops on
+owner-furnished lines · 4 separate · 5 yes · 6 no for now · 7 yes · 8 yes ·
+9 leave out · 10 per bid · 11 yes, but never onto locked bids · 12 yes.
+Every recommendation below was taken; Q11 adds the lock. Recorded in
+`references/scope-tags-plan.md` § 6. The plan is ready to build once A
+applies S1.
+
+1. Changing a tag on a locked bid: refuse for every line, typed ones too? — **Recommend: yes, refuse.** Number: no (it stops numbers moving).
+2. Where the control lives: a "…" per line, and a chip only on tagged lines (We install shows nothing)? — **Recommend: yes.** Number: no.
+3. "Owner furnishes" line: keep its drops (we still wire it)? — **Recommend: keep.** Number: yes vs the alternative (keeping leaves drop footage as today).
+4. Remove / relocate lines get their own tag, separate from the install line? — **Recommend: separate.** Number: only when someone picks one.
+5. Tag many lines at once only from the prompts and the note finder for now (no general line multi-select)? — **Recommend: yes.** Number: no.
+6. Should an assembly carry a default tag (e.g. "fixture, owner furnished")? — **Recommend: no, not now.** Number: yes if built (new lines would start tagged).
+7. By others / Excluded lines on the materials list: leave them off with a footer "left off: 3 by others"? — **Recommend: yes, footer.** Number: list quantities only (already decided), not totals.
+8. Proposal wording: owner-furnished lines with quantity ("12 light fixtures"), by-others / excluded by name only? — **Recommend: yes.** Number: no.
+9. Note finder leaves out "EXISTING TO REMAIN" / E.T.R. (a mark status, not who-does-it)? — **Recommend: leave out.** Number: no.
+10. "Don't ask" on the Who does this? prompts: per bid only (the shop edits the list itself in Settings)? — **Recommend: per bid.** Number: no.
+11. Pushing a unit template to its linked copies also pushes its tags? — **Recommend: yes, like every other field.** Number: yes, on the copies, when pushed.
+12. Wire / conduit (run-type) lines can be tagged too, all four tags? — **Recommend: yes.** Number: only when picked (footage leaves the money and the list).
+
+## MERGE ORDER — b-twin-fold FIRST, then b-status-view — DONE 2026-10-10
+
+Both merged in this order, through track-b → local-dev with the Gate green
+at each step.
+
+1. **A:** M1 — **done by A: dropped** (twin census 0 on live, staging and
+   local; nothing to fold). M2 — **done by A, 0144**
+   (`bid_pdf_sheets.workTag`; on staging since local-dev 1251518). Neither
+   was added to `drizzle/` by B.
+2. **`b-twin-fold`** → track-b → local-dev. Done.
+3. **`b-status-view`** → track-b → local-dev. Done.
+4. ~~M1 after both are live~~ — dropped (step 1). Before the release that
+   carries b-twin-fold, A re-runs the census on live (todo.md).
+
+**For the release:** 0144 must be on live BEFORE this code deploys — every
+`bid_pdf_sheets` read selects `workTag` (step 1 of three; A's).
+
+## WHERE B STOOD — 2026-10-10 (late night), the two leftovers BUILT on `b-status-view`
+
+Same branch, a second commit; merged 2026-10-10 (above).
+
+- **"Check them" (plan § 1c):** a "Check them" button beside "N
+  unconfirmed". The walk shows one unconfirmed mark at a time: its sheet
+  opens, the view centres and zooms on it, it is selected (so the
+  selection bar's Delete is there for a misplaced mark), and the card in
+  the bar reads "Checking 1 of 2 · Single pole switch on E-200 · New ·
+  Staying · Remove · Relocate · Skip · Done".
+  - Each answer is `setStatus` — the same call as "Mark as…", so an Undo
+    step with Undo in its toast.
+  - Order and skipping: `shared/markStatus.ts` `nextMarkToCheck` (by
+    sheet, then down and across, wrapping).
+  - List: new `takeoffStamps.unconfirmedForBid`, in MARK_QUERIES, so every
+    mark change refreshes it.
+  - Locked bid: the walk still opens (looking), with Next / Done only and
+    "the bid is locked; unlock it to change marks".
+  - **Fault found on screen and fixed:** after an Undo the walk still
+    treated the put-back mark as answered, and its closing toast said "1
+    skipped mark stays unconfirmed" while 2 did. A fresh list now drops
+    put-back marks from the answered set.
+- **Twin warning on the bar:** each "… - EXISTING TO REMAIN" count still
+  holding NEW marks gets a row: "“Duplex receptacle - EXISTING TO REMAIN”: 2
+  marks count as NEW devices." + "Count these as existing on Duplex
+  receptacle". Rule: `shared/twinFold.ts` `twinCountWarnings`.
+  - The button is the bid screen's own fold AND Undo, now ONE hook,
+    `client/src/hooks/useFoldTwin.ts`, used by BidsPage and the Plans
+    screen. BidsPage's copy is gone; `twinFoldWired.test.ts` now reads the
+    hook for the invalidations.
+  - Undo shows exactly when the twin was on a bid line (`twinKept`), which
+    is exactly when the fold moves a number. A twin on no line prices
+    nothing, and the toast says "Nothing on the bid moved — that count was
+    not on it."
+  - On the Plans undo arrow it is noted (`notUndoable("twinFold")`); its
+    Undo is in the toast.
+  - Locked bid: warning shown, no button, "the bid is locked; unlock it to
+    fix".
+- **Demo-sheet pairing (§ 2b) and "same device?" (§ 2c):** not built, in
+  todo.md § "Separate demo sheets".
+- **Tests (red without the change, worktree at 163907e + the test files):**
+  - `server/statusChecks.test.ts` 14: 13 red (the green one is the guard
+    "another company cannot read it").
+  - `client/src/lib/statusStrip.test.ts`: the 3 new tests red.
+  - `client/src/lib/statusViewWired.test.ts`: the 3 new tests red; a 4th
+    pins the put-back fix.
+  - `twinFoldWired.test.ts`: the moved check red until the hook exists.
+  - Also run, green: statusView, notUndoableWired, undoStack, twinFold,
+    sourceHygiene. `pnpm check` clean. All on a scratch
+    `bidrender_test_b_m2` (migrations + M2), dropped after.
+- **On screen** (headless Chrome, 1536x864, 820x1180, 1180x820, scratch copy
+  of `bidrender_local_b_new` + M2, dropped after; bid 1728350, E-200, its 2
+  switch marks set unconfirmed and a 2-mark twin count seeded):
+  - All three sizes: the bar, the twin row, and the walk card; no sideways
+    scroll.
+  - Answer "Staying": 1 → 2 staying, 2 → 1 unconfirmed, "1 of 1"; Undo:
+    back to 2 unconfirmed; Skip then returns to the put-back mark.
+  - Fold: the twin row goes; 3 new → 1 new, 1 → 3 staying.
+  - Locked: no fold button, no answer buttons.
+  - This bid has no priced lines, so its total stays $0. The money is in
+    the server test: $80 → $50 after the fold → $80 after Undo; one answer
+    moves $30 → $40 and Undo puts it back to $30.
+- **Bid totals (`scripts/bidTotals.mts`):** 163907e vs this commit on the
+  same clean copy: **all 4,306 bids unchanged** (totalDue, not-priced,
+  incomplete). Nothing here moves a number until a person answers a mark
+  or presses the fold; each of those is on one bid, with Undo.
+- **Leftovers:** none. No dev server, scratch DBs dropped, probe scripts
+  deleted.
+
+## WHERE B STOOD — 2026-10-10 (night), STATUS VIEW on `b-status-view`
+
+**Branch `b-status-view`, off `b-twin-fold` (24843fd), MERGED 2026-10-10.**
+M2 below: done by A, 0144. (It used to wait on A's twin-fold step and M2.) Plan:
+`references/status-and-scope-plan.md` § 1a/1b, § 2a, owner answers § 8.
+
+- **Status bar** (`StatusStrip.tsx`; rules in `client/src/lib/statusStrip.ts`
+  and `shared/markStatus.ts`): "3 new · 1 staying · 1 removed · 1
+  relocated", "unconfirmed" only when any. **Hidden on the basic path**
+  (only new marks, sheet untagged). Tap = dim the other marks (opacity
+  0.18, nothing hidden or filtered) + "1 on this sheet · also on E-102 · 5"
+  jump buttons.
+  - Numbers come from `takeoffGroups.list`: each card's `split` summed, plus
+    a new `statusBySheet` built from the SAME grouped rows
+    (`db.statusSplitRows`). Refreshed by construction (MARK_QUERIES).
+  - `sheetJumpList` entries now carry `sheetId`.
+- **A status change is now an Undo step** (was `notUndoable("markStatus")`).
+  `setStatus` returns `previous`; new `takeoffStamps.restoreStatus` puts
+  any stored status back (`unconfirmed` too) and returns what it
+  overwrote (redo). Refused on a locked bid. Toast has Undo.
+- **Sheet work tag** (Demo / New work / Demo and new / Not said): the sheet
+  "…" menu, under "More options — this sheet shows". The title's suggestion
+  shows as "title says so" and is never applied by itself
+  (`suggestedWorkTag`). `bidPdfs.setSheetWorkTag`; moves no number; noted
+  not undoable (`sheetWorkTag`), like a sheet's name.
+  - Demo: banner, "Placing as" starts at **Remove** (a third button, only on
+    demo / both sheets), and "N placed as new here · Make them Remove"
+    (through `setStatus`, so Undo; never on a locked bid).
+  - Both: banner asks "Placing as New / Remove" while a count is armed.
+  - Leaving a demo sheet puts New back (`placingOnSheet`, `fromSheet`); a
+    person's own choice stays sticky.
+- **Not built:** § 1c warnings' "Check them" step-through for unconfirmed,
+  the twin-count warning on the bar (the bid screen has it, b-twin-fold),
+  § 2b pairing/overlay, § 2c "same device?" (needs M4).
+- **Dropped from M2 on purpose:** `workTagSuggested`. The suggestion is read
+  from the title each time, so there is nothing to store. Plan § 5 says so.
+- **Tests (red without the fix, checked in a worktree at 24843fd with only
+  the test files copied in):**
+  - `server/statusView.test.ts` 10: 8 red (the 2 green are guards that must
+    pass both ways: "reading moves no number", "cannot reach another
+    company's marks").
+  - `server/sheetWorkTag.test.ts` 14, `client/src/lib/statusStrip.test.ts` 7:
+    whole files red (modules missing).
+  - `client/src/lib/statusViewWired.test.ts` 6 of 6 red.
+  - Also run: `notUndoableWired`, `undoStack` (one fixture moved from
+    `markStatus` to `markHeight`), `undoPersist`, `markStatusPricing`,
+    `twinFold`, `schemaDrift`. All green. `pnpm check` clean.
+  - **They ran on a SCRATCH database** (`bidrender_test_b_m2`: migrations
+    0000–0143 + M2), dropped afterwards. **On a DB without M2 every
+    `bid_pdf_sheets` read fails** (`Unknown column 'workTag'`) — and so will
+    CI until M2 is in `drizzle/`. That is the order: M2 first (additive,
+    step 1), then this code.
+- **On screen** (headless Chrome, 1536x864, 820x1180, 1180x820) on
+  `bidrender_local_b_m2` (a copy of `bidrender_local_b_new` + M2, dropped
+  after), bid 1728350, E-200:
+  - Bar reads "3 new · 1 staying · 1 removed · 1 relocated" at all three;
+    no sideways scroll (scrollWidth = innerWidth).
+  - "1 removed": 1 mark at full opacity, 5 dimmed, "1 on this sheet".
+  - Tagged Demo: banner + "3 placed as new here · Make them Remove";
+    arming a count shows New / Existing / **Remove\*** at all three sizes.
+  - Make them Remove: bar 3 new → 0 new, 1 → 4 removed; Undo from the
+    toast: back to 3 new · 1 removed. The bar moved both ways.
+  - Fixed after looking: "None remove on this sheet" → "None removed".
+- **Bid totals (`scripts/bidTotals.mts`):** base code on
+  `bidrender_local_b_new` vs this branch on its M2 copy: **0 of 4,306 bids
+  differ.** Expected: viewing, the tag and M2 move nothing. Numbers move only
+  when a person changes a status (Make them Remove, "Mark as…"), and then
+  only on that bid: those marks stop pricing as new devices (their remove
+  labor follows the count's remove line, if one is on the bid), with Undo.
+  The server test pins it: 7 new receptacles at $10 = $70 → $40 after 3
+  are made Remove → $70 after Undo.
+- **Leftovers:** none. No dev server; scratch DBs dropped; probe scripts
+  deleted.
+
+### M2 — DONE BY A, 0144 (`drizzle/0144_sheet_work_tag.sql`)
+
+Kept as history. Original note: must be applied BEFORE `b-status-view` deploys (its code selects the column
+on every sheet read). NULL = not said = today's behaviour, no default.
+
+```sql
+ALTER TABLE `bid_pdf_sheets` ADD `workTag` enum('demo','new','both') NULL;
+```
+
+`drizzle/schema.ts` already declares it (`SHEET_WORK_TAGS`). The drizzle
+snapshot is A's to regenerate; read what `generate` emits before using it
+(CLAUDE.md: it re-emits hand-written migrations).
+
+## WHERE B STOOD — 2026-10-10 (late), twin fold CODE HALF on `b-twin-fold`
+
+**Branch `b-twin-fold`, MERGED as plain code (2026-10-10).** M1: **done by
+A — dropped**, not written into `drizzle/`: A's twin census
+(`scripts/twinCountCensus.mts`) found 0 twin counts on live, staging and
+local, so there is nothing to fold. The rehearsal note below is history.
+Plan: `references/status-and-scope-plan.md` § 1 "A's part" and § 8 Q1.
+
+- **The rules, in one place:** `shared/twinFold.ts`.
+  - A twin already on the bid is FLAGGED, never removed. After the fold its
+    line reads 0 and the bid offers "Remove this line" (with Undo).
+  - A locked bid never moves. The fold is refused and the strip says
+    "locked … nothing here changes until you unlock them", no button.
+  - A twin mark that was new (NULL / `new`) becomes `existing`. A status a
+    person chose (remove, relocate, existing, unconfirmed) is kept.
+  - Base count = same bid, `symbolLookupKey` match, oldest first. None and no
+    line: the twin is RENAMED into the base (plain, look and drop kept).
+    None and a line: a plain base is MADE beside the kept twin.
+- **Server:** `takeoffGroups.foldExistingTwin({ id })` (one count, on
+  demand) → `db.foldTwinGroup` (one transaction). Returns `previous` statuses
+  for Undo.
+- **Bid screen:** a strip entry per kind (`pricedAsNew` / `foldedAway` /
+  `byHand`), with "Count these as existing" or "Remove this line" per line.
+  The fold invalidates the Plans screen's counts and marks too.
+- **Find all matching:** "Count as existing" now puts the mark on the SAME
+  count with status `existing`. It no longer makes or uses a twin. Not
+  offered when the search is itself for a twin count.
+- **Tests (red without the fix, checked by swapping in local-dev's files):**
+  - `server/twinFold.test.ts`, 14: 9 red with only the server code reverted
+    (the 5 that stay green don't call the fold); the whole file is red
+    without `shared/twinFold.ts`.
+  - `client/src/lib/twinFoldWired.test.ts`, 6 of 6 red.
+  - Run locally: those two, `notUndoableWired`, `existingToRemain`,
+    `moveMarksToCount` (21 passed, `bidrender_test_b`). `pnpm check` clean.
+- **On screen** (headless Chrome, laptop 1536x864, iPad 820x1180 and
+  1180x820), probe bids 1728443 (open) and 1728444 (locked):
+  - Fault found and fixed: the button labels truncated in the ~320 px
+    totals column (394 px of text in a 226 px box), so two buttons looked
+    the same. They now wrap and name the base count ("Count as existing on
+    Exit sign"). Re-measured: no truncation, no sideways scroll, all sizes.
+  - Clicked the fold: toast "3 marks now count as existing to remain on
+    Duplex receptacle." with Undo; total $270.00 → $232.50 (3 × $12.50);
+    the twin line stays at 0 with "Remove this line".
+- **Local bid totals (`scripts/bidTotals.mts`, `bidrender_local_b_new`):**
+  - **0 of the 4,304 existing bids move.** No local database (b_new, c,
+    local) holds a single twin COUNT; `bidrender_local_c` has 7 twin
+    ASSEMBLIES, none counted. So the real fold has nothing to do locally.
+  - Probe only: 1728443 moved $270.00 → $232.50 when folded on screen,
+    on purpose (existing devices stop pricing as new). 1728444 (locked)
+    did not move.
+  - **Live may also be "0 → 0"** (the 0098 plan said so). A must count twin
+    groups on the live copy first.
+- **Leftovers (user 1):** the two "B twin fold probe" bids. No dev server.
+  No migration written into `drizzle/`, nothing applied.
+
+### M1 — DONE BY A: DROPPED (census 0 everywhere; never written into `drizzle/`)
+
+Kept as history only — **do not apply.** If a re-run of A's census on live
+before the release that carries `b-twin-fold` is not 0, the bid screen's
+per-count fold handles each twin, or a one-off script calling
+`planTwinFold` + `db.foldTwinGroup` (todo.md). Original note: runs only
+AFTER `b-twin-fold` is live. Mirrors `shared/twinFold.ts`; where
+they differ, the TS has the test. Rehearse on a restored live copy with
+`bidTotals.mts` before and after: **only bids holding a twin may move, and
+only DOWN by the twin's priced marks.** If anything else moves, stop.
+
+Two things A must check rather than trust:
+
+- the base match uses `LOWER(TRIM(label))`; `symbolLookupKey` also folds
+  runs of spaces to one. Close, not identical.
+- retiring an assembly here is `status='archived'` (the path at
+  `server/db.ts` ~3262). Confirm that is the retire A wants for twins.
+
+A safer option worth weighing: a one-off step-3 SCRIPT that calls
+`db.foldTwinGroup` per twin through `planTwinFold` (the tested code), with
+the same `bidTotals` before/after.
+
+```sql
+-- 0. Twins on UNLOCKED bids. A locked bid is never touched.
+CREATE TEMPORARY TABLE twin_fold AS
+SELECT t.id AS twinId, t.bidId, t.userId,
+  TRIM(REGEXP_REPLACE(t.label,
+    '[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$',
+    '', 1, 0, 'i')) AS baseLabel,
+  EXISTS (SELECT 1 FROM bid_line_items l WHERE l.takeoffGroupId = t.id) AS onLine,
+  CAST(NULL AS SIGNED) AS baseId
+FROM takeoff_groups t
+JOIN bids b ON b.id = t.bidId
+WHERE b.quantitiesLockedAt IS NULL
+  AND t.label REGEXP '(?i)[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$';
+
+-- 1. The base count on the same bid, oldest first.
+UPDATE twin_fold f SET baseId = (
+  SELECT MIN(g.id) FROM takeoff_groups g
+  WHERE g.bidId = f.bidId AND g.id <> f.twinId
+    AND LOWER(TRIM(g.label)) = LOWER(f.baseLabel));
+
+-- 2. No base, no line: the twin BECOMES the base (plain).
+UPDATE takeoff_groups g JOIN twin_fold f
+  ON f.twinId = g.id AND f.baseId IS NULL AND f.onLine = 0
+SET g.label = f.baseLabel, g.kind = 'plain', g.assemblyId = NULL,
+    g.materialId = NULL, g.unitCost = NULL, g.unitHours = NULL,
+    g.laborRateId = NULL, g.updatedAt = NOW();
+UPDATE twin_fold SET baseId = twinId WHERE baseId IS NULL AND onLine = 0;
+
+-- 3. No base, a line holds the twin: make a plain base beside it.
+INSERT INTO takeoff_groups (bidId, userId, label, kind)
+SELECT bidId, userId, baseLabel, 'plain' FROM twin_fold WHERE baseId IS NULL;
+UPDATE twin_fold f SET baseId = (
+  SELECT MAX(g.id) FROM takeoff_groups g
+  WHERE g.bidId = f.bidId AND g.label = f.baseLabel AND g.kind = 'plain')
+WHERE baseId IS NULL;
+
+-- 4. Every twin mark moves; new -> existing, a chosen status stays.
+UPDATE takeoff_stamps s
+JOIN twin_fold f ON s.groupId = f.twinId
+JOIN takeoff_groups base ON base.id = f.baseId
+LEFT JOIN assemblies a ON a.id = base.assemblyId
+SET s.groupId = base.id,
+    s.assemblyId = base.assemblyId,
+    s.assemblyName = IF(base.kind = 'assembly', base.label, NULL),
+    s.assemblyCategory = a.category,
+    s.status = IF(s.status IS NULL OR s.status = 'new', 'existing', s.status),
+    s.updatedAt = NOW();
+
+-- 5. An emptied twin with NO line goes. A twin with a line STAYS (it reads 0,
+--    and the bid flags it with "Remove this line" — never removed here).
+DELETE g FROM takeoff_groups g JOIN twin_fold f ON f.twinId = g.id
+WHERE f.onLine = 0 AND f.baseId <> f.twinId;
+
+-- 6. Twin ASSEMBLIES are retired, not deleted (CLAUDE.md § "Retire, never delete").
+UPDATE assemblies SET status = 'archived', archivedAt = NOW(), updatedAt = NOW()
+WHERE name REGEXP '(?i)[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$'
+  AND status = 'active';
+
+-- Report: twins on LOCKED bids are left as they are; list them.
+SELECT t.bidId, t.id, t.label FROM takeoff_groups t JOIN bids b ON b.id = t.bidId
+WHERE b.quantitiesLockedAt IS NOT NULL
+  AND t.label REGEXP '(?i)[[:space:]]*[-–—][[:space:]]*existing[[:space:]]+to[[:space:]]+remain[[:space:]]*$';
+```
+
+## WHERE B STOOD — 2026-10-10, the owner's 3 held items BUILT
 
 - **1. Undo for removing a circuit.** The remove shows "Removed circuit X."
   with an Undo button, like every other Plans delete (`deletedToast`, and

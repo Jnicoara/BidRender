@@ -6,6 +6,23 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-10]
 
+- **Plans: check unconfirmed marks one at a time, and fix old
+  "existing to remain" counts from the same bar.** "Check them" steps
+  through every mark nobody has confirmed. It opens the sheet, zooms to
+  the mark and lets you say New, Staying, Remove or Relocate right there,
+  with Undo. An old "… - EXISTING TO REMAIN" count still counting its
+  devices as new now shows a warning with the same "Count these as
+  existing" fix the bid screen has. On a locked bid you can look but
+  nothing changes.
+- **Plans: see at a glance what is new, staying, removed and relocated.**
+  Once a bid has any mark that is not new, a bar above the drawing reads
+  "3 new · 1 staying · 1 removed · 1 relocated". Tap one to show only those
+  marks (the rest dim; nothing leaves the bid) and jump to the other sheets
+  that have them. Changing a mark's status can now be undone, from the
+  toast or the undo arrow. A sheet can be tagged Demo, New work or both from
+  its "…" menu; on a demo sheet new marks start as Remove and the bar offers
+  "Make them Remove" for marks already placed. The sheet tag's column is
+  Track A's migration 0144, which must be on a database before this runs.
 - **Opening a sheet no longer re-matches its homeruns.** Placing a panel by
   hand could leave a "re-match" request waiting when nothing on that sheet
   changed, and the next sheet opened, just to look at it, then had its
@@ -18,6 +35,15 @@ This is the human-readable companion to the git history — read this to see wha
   that sheet came back onto the bid without anyone choosing it. Removing a
   scale is now remembered as a person's decision, and the sheet keeps
   asking for a scale until one is set by hand.
+- **Existing-to-remain devices stop being priced as new work.** The old
+  "… - EXISTING TO REMAIN" counts priced their devices as new once sent to
+  a bid. The bid now flags such a line and offers "Count these as
+  existing", which moves those marks onto their own count as existing (they
+  price nothing). The emptied line is flagged with "Remove this line" — it
+  is never removed for you — and a locked bid never changes. Find all
+  matching's "Count as existing" now marks the device existing on the same
+  count instead of making a new twin count. A bid total drops when this is
+  used, on purpose: it stops charging for devices already on the wall.
 - **Two new empty database columns, ready for work waiting to merge.** A
   plan sheet can now record whether it shows demolition, new work or both
   (for Track B's status view), and a job cost can carry a short working

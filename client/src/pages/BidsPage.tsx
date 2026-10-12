@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
+import { useFoldTwin } from "@/hooks/useFoldTwin";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -140,6 +141,7 @@ import {
   setHoursLabel,
 } from "@shared/roleLines";
 import { bidHoursCell } from "@/lib/bidHoursCell";
+import { twinFlagText, twinLineFlags } from "@shared/twinFold";
 import {
   bidNotPricedCount,
   laborShare,
@@ -566,6 +568,13 @@ export default function BidsPage({
   // Undo puts back the exact line, frozen prices included.
   const removeLine = useRemoveBidLine(bidId, refresh);
 
+  /*
+    "Count these as existing" on a line from an old "- EXISTING TO REMAIN"
+    twin count — one hook with the Plans screen's status bar, so the fold and
+    its Undo are the same in both places (@/hooks/useFoldTwin).
+  */
+  const foldTwin = useFoldTwin(bidId, refresh);
+
   const updateBid = trpc.bids.update.useMutation({
     onError: error => toast.error(error.message),
     onSettled: refresh,
@@ -782,6 +791,8 @@ export default function BidsPage({
   );
   /** Remove / relocate lines with no hours — their own entry and fix-it. */
   const roleNoHours = roleLinesWithoutHours(lines);
+  /** Lines counting existing-to-remain devices (shared/twinFold.ts). */
+  const twinFlags = twinLineFlags(lines, bid.quantitiesLockedAt !== null);
   /**
    * Lines priced from BidRidge's EXAMPLE numbers (0132–0134), from their
    * frozen flags — the same count the warning before printing gives.
@@ -1968,6 +1979,97 @@ export default function BidsPage({
                   </div>
                 ) : null
               )}
+
+              {/*
+                EXISTING TO REMAIN, counted the old way — a "- EXISTING TO
+                REMAIN" twin count on the bid (shared/twinFold.ts; owner,
+                2026-10-10). One entry per kind, a fix-it per line:
+                - priced as new → "Count these as existing" (the fold);
+                - folded, counting nothing → "Remove this line" (with Undo).
+                Never removed for them. On a locked bid nothing moves, so the
+                entry says so and offers nothing that would be refused.
+              */}
+              {(["pricedAsNew", "foldedAway", "byHand"] as const).map(kind => {
+                const flags = twinFlags.filter(f => f.kind === kind);
+                if (flags.length === 0) return null;
+                const locked = flags[0].locked;
+                return (
+                  <div
+                    key={`twin-${kind}`}
+                    data-twin-flag={kind}
+                    className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                    <div className="text-[11px] leading-snug text-muted-foreground min-w-0">
+                      <span className="text-foreground font-medium">
+                        {twinFlagText(kind, flags.length)}
+                      </span>
+                      {locked ? (
+                        <span>
+                          {" "}
+                          This bid&rsquo;s quantities are locked, so nothing
+                          here changes until you unlock them.
+                        </span>
+                      ) : (
+                        <span className="flex flex-wrap gap-1.5 mt-1.5">
+                          {flags.map(flag => {
+                            /*
+                              Several lines: each button names its BASE
+                              count, which is short and is what the marks
+                              move to. The labels WRAP — the totals column
+                              is ~320 px wide, and a truncated label left
+                              two identical-looking buttons (measured
+                              2026-10-10: 394 px of text in a 226 px box).
+                            */
+                            const several = flags.length > 1;
+                            const buttonClass =
+                              "h-auto min-h-7 py-1 px-2 text-xs text-left whitespace-normal border-[#F5C518]/50 text-[#F5C518] hover:text-[#F5C518] max-w-full";
+                            return kind === "pricedAsNew" &&
+                              flag.groupId !== null ? (
+                              <Button
+                                key={flag.lineId}
+                                size="sm"
+                                variant="outline"
+                                className={buttonClass}
+                                title={`Moves these marks to ${flag.baseLabel} as existing to remain. The line stays until you remove it.`}
+                                disabled={foldTwin.isPending}
+                                onClick={() =>
+                                  foldTwin.mutate({ id: flag.groupId! })
+                                }
+                              >
+                                <Wrench className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                <span>
+                                  {several
+                                    ? `Count as existing on ${flag.baseLabel}`
+                                    : "Count these as existing"}
+                                </span>
+                              </Button>
+                            ) : (
+                              <Button
+                                key={flag.lineId}
+                                size="sm"
+                                variant="outline"
+                                className={buttonClass}
+                                disabled={removeLine.isPending}
+                                onClick={() =>
+                                  removeLine.mutate({ bidId, id: flag.lineId })
+                                }
+                              >
+                                <X className="w-3.5 h-3.5 mr-1 shrink-0" />
+                                <span>
+                                  {several
+                                    ? `Remove the ${flag.baseLabel} (existing) line`
+                                    : "Remove this line"}
+                                </span>
+                              </Button>
+                            );
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/*
                 $0 PARTS inside lines that are otherwise priced (0087). Their

@@ -21,12 +21,14 @@ import { createPool } from "mysql2/promise";
 import { timePool } from "./slowRequests";
 import {
   QUANTITY_MARK_STATUSES,
-  emptySplit,
   isPricedMark,
   markStatusOf,
+  splitsByGroup,
   type MarkStatus,
   type StatusSplit,
+  type StatusSplitRow,
 } from "../shared/markStatus";
+import { foldedStatus } from "../shared/twinFold";
 import { mysqlConnection } from "./databaseConnection";
 import {
   InsertUser,
@@ -10684,11 +10686,25 @@ export async function statusSplitByGroup(
   bidId: number,
   userId: number
 ): Promise<Map<number, StatusSplit>> {
+  return splitsByGroup(await statusSplitRows(bidId, userId));
+}
+
+/**
+ * The marks grouped by count, SHEET and status — the one read behind the
+ * count cards (`splitsByGroup`) and the bid's status bar (`splitsBySheet`,
+ * status-and-scope-plan § 1b), so the two cannot disagree. Display only, like
+ * `statusSplitByGroup`.
+ */
+export async function statusSplitRows(
+  bidId: number,
+  userId: number
+): Promise<StatusSplitRow[]> {
   const db = await getDb();
-  if (!db) return new Map();
+  if (!db) return [];
   const rows = await db
     .select({
       groupId: takeoffStamps.groupId,
+      sheetId: takeoffStamps.sheetId,
       status: takeoffStamps.status,
       total: sql<number>`count(*)`,
     })
@@ -10700,15 +10716,89 @@ export async function statusSplitByGroup(
         onLivePlanSheet(takeoffStamps.sheetId, bidId)
       )
     )
-    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
-  const splits = new Map<number, StatusSplit>();
+    .groupBy(
+      takeoffStamps.groupId,
+      takeoffStamps.sheetId,
+      takeoffStamps.status
+    );
+  return rows.map(row => ({ ...row, total: Number(row.total) }));
+}
+
+/**
+ * Every UNCONFIRMED mark on the bid, for "Check them" (status-and-scope-plan
+ * § 1c): by sheet, then down and across the drawing, so the walk moves the
+ * way an eye reads a sheet. Live plan sheets only, like every other read.
+ */
+export async function unconfirmedStampsForBid(
+  bidId: number,
+  userId: number
+): Promise<
+  {
+    id: number;
+    sheetId: number;
+    groupId: number | null;
+    x: number;
+    y: number;
+  }[]
+> {
+  const database = await getDb();
+  if (!database) return [];
+  const rows = await database
+    .select({
+      id: takeoffStamps.id,
+      sheetId: takeoffStamps.sheetId,
+      groupId: takeoffStamps.groupId,
+      x: takeoffStamps.x,
+      y: takeoffStamps.y,
+    })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.status, "unconfirmed"),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
+      )
+    )
+    .orderBy(
+      asc(takeoffStamps.sheetId),
+      asc(takeoffStamps.y),
+      asc(takeoffStamps.x),
+      asc(takeoffStamps.id)
+    );
+  return rows.map(r => ({ ...r, x: Number(r.x), y: Number(r.y) }));
+}
+
+/**
+ * What these marks' statuses ARE, before a change — so "Mark as…" can be
+ * undone (status-and-scope-plan: "only a toggle changes numbers, with
+ * Undo"). Grouped by status, NULL kept as NULL, because that is what the
+ * undo writes back. Scoped exactly as `setStampStatus` is.
+ */
+export async function stampStatusesOf(
+  bidId: number,
+  userId: number,
+  ids: number[]
+): Promise<{ status: MarkStatus | null; ids: number[] }[]> {
+  const database = await getDb();
+  if (!database || ids.length === 0) return [];
+  const rows = await database
+    .select({ id: takeoffStamps.id, status: takeoffStamps.status })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffStamps.userId, userId),
+        inArray(takeoffStamps.id, ids)
+      )
+    );
+  const byStatus = new Map<MarkStatus | null, number[]>();
   for (const row of rows) {
-    if (row.groupId === null) continue;
-    const split = splits.get(row.groupId) ?? emptySplit();
-    split[markStatusOf(row.status)] += Number(row.total);
-    splits.set(row.groupId, split);
+    const status = row.status === null ? null : markStatusOf(row.status);
+    byStatus.set(status, [...(byStatus.get(status) ?? []), row.id]);
   }
-  return splits;
+  return Array.from(byStatus, ([status, ids]) => ({ status, ids }));
 }
 
 /**
@@ -10976,6 +11066,155 @@ export async function moveStampsToGroup(
       )
     );
   return result.affectedRows;
+}
+
+/**
+ * Fold an "- EXISTING TO REMAIN" twin count into its base count, in ONE
+ * transaction (shared/twinFold.ts decides what `plan` says; this applies it).
+ *
+ * Every mark of the twin — on any sheet, live or not, so the twin is left
+ * truly empty — moves to the base with `status` per `foldedStatus`: new
+ * becomes existing, anything a person chose stays. Provenance is rewritten
+ * from the base, as `moveStampsToGroup` does. The twin is deleted only when
+ * `plan.keepTwin` is false; a line holding it keeps it, and reads 0.
+ *
+ * `previous` is each moved mark's status before, for Undo.
+ */
+export async function foldTwinGroup(
+  bidId: number,
+  userId: number,
+  plan: {
+    twinId: number;
+    baseLabel: string;
+    target:
+      | { kind: "group"; id: number }
+      | { kind: "rename" }
+      | { kind: "create" };
+    keepTwin: boolean;
+  }
+): Promise<{
+  moved: number;
+  baseGroupId: number;
+  previous: { id: number; status: MarkStatus | null }[];
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.transaction(async tx => {
+    let baseGroupId: number;
+    if (plan.target.kind === "group") {
+      baseGroupId = plan.target.id;
+    } else if (plan.target.kind === "rename") {
+      baseGroupId = plan.twinId;
+      // The twin's assembly is the empty "- EXISTING TO REMAIN" one; a base
+      // pointing at it would price new marks from an empty recipe. Plain, so
+      // the next new mark is priced the way any free count is.
+      await tx
+        .update(takeoffGroups)
+        .set({
+          label: plan.baseLabel,
+          kind: "plain",
+          assemblyId: null,
+          materialId: null,
+          unitCost: null,
+          unitHours: null,
+          laborRateId: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(takeoffGroups.id, plan.twinId),
+            eq(takeoffGroups.userId, userId)
+          )
+        );
+    } else {
+      const [made] = await tx
+        .insert(takeoffGroups)
+        .values({ bidId, userId, label: plan.baseLabel, kind: "plain" });
+      baseGroupId = made.insertId;
+    }
+
+    const [base] = await tx
+      .select()
+      .from(takeoffGroups)
+      .where(
+        and(eq(takeoffGroups.id, baseGroupId), eq(takeoffGroups.userId, userId))
+      )
+      .limit(1);
+    if (!base || base.bidId !== bidId)
+      throw new Error("The base count is not on this bid.");
+    let assemblyCategory: string | null = null;
+    if (base.assemblyId !== null) {
+      const [assembly] = await tx
+        .select({ category: assemblies.category })
+        .from(assemblies)
+        .where(eq(assemblies.id, base.assemblyId))
+        .limit(1);
+      assemblyCategory = assembly?.category ?? null;
+    }
+
+    // Every mark OF THE TWIN, on any sheet, live or not (see above) — so this
+    // is read by the twin count, not bid-wide, and does not go through
+    // onLivePlanSheet. The twin is checked onto this bid here rather than by
+    // filtering marks on bidId, which would read like a bid-wide quantity
+    // read (server/quantitiesIgnoreDeletedPlans.test.ts).
+    const [twin] = await tx
+      .select({ bidId: takeoffGroups.bidId })
+      .from(takeoffGroups)
+      .where(
+        and(eq(takeoffGroups.id, plan.twinId), eq(takeoffGroups.userId, userId))
+      )
+      .limit(1);
+    if (!twin || twin.bidId !== bidId)
+      throw new Error("The twin count is not on this bid.");
+    const marks = await tx
+      .select({ id: takeoffStamps.id, status: takeoffStamps.status })
+      .from(takeoffStamps)
+      .where(
+        and(
+          eq(takeoffStamps.groupId, plan.twinId),
+          eq(takeoffStamps.userId, userId)
+        )
+      );
+    // Grouped by status before, so each update writes one folded status.
+    for (const status of [
+      null,
+      "new",
+      "existing",
+      "remove",
+      "relocate",
+      "unconfirmed",
+    ] as const) {
+      const ids = marks.filter(m => m.status === status).map(m => m.id);
+      if (ids.length === 0) continue;
+      await tx
+        .update(takeoffStamps)
+        .set({
+          groupId: base.id,
+          assemblyId: base.assemblyId,
+          assemblyName: base.kind === "assembly" ? base.label : null,
+          assemblyCategory,
+          status: foldedStatus(status),
+          updatedAt: new Date(),
+        })
+        .where(inArray(takeoffStamps.id, ids));
+    }
+
+    if (!plan.keepTwin && plan.target.kind !== "rename")
+      await tx
+        .delete(takeoffGroups)
+        .where(
+          and(
+            eq(takeoffGroups.id, plan.twinId),
+            eq(takeoffGroups.userId, userId)
+          )
+        );
+
+    return {
+      moved: marks.length,
+      baseGroupId: base.id,
+      previous: marks.map(m => ({ id: m.id, status: m.status })),
+    };
+  });
 }
 
 /**

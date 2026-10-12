@@ -37,6 +37,7 @@ export type TakeoffQuery =
   | "takeoffRuns.typeColors"
   | "takeoffRunTypes.bridgeForBid"
   | "takeoffGroups.list"
+  | "takeoffStamps.unconfirmedForBid"
   | "takeoffSummary.forBid"
   | "takeoffHeights.forBid"
   | "homeruns.forBid"
@@ -106,6 +107,13 @@ const MARK_QUERIES = [
     number that will actually go over, and marks on another sheet move it.
   */
   "takeoffGroups.list",
+  /*
+    ADDED 2026-10-10 with the status bar's "Check them": the list of
+    unconfirmed marks it walks. A mark answered, deleted, moved, put back by
+    Undo or placed by the reader changes it, and every one of those already
+    refreshes this list — so it is here, not beside the walk's own buttons.
+  */
+  "takeoffStamps.unconfirmedForBid",
 ] as const satisfies readonly TakeoffQuery[];
 
 const SHEET_QUERIES = [
@@ -274,6 +282,8 @@ export function sheetsAnUndoMoves(
     case "clearSheet":
     // Marks moved between counts are a selection on the step's sheet.
     case "moveMarks":
+    // A status is set on a selection, or by the demo offer, on one sheet.
+    case "markStatus":
     // A run's type, length, circuits and legs (Gap 4c) are on its own sheet;
     // the bid-wide figures they move are refreshed whichever sheet it is.
     case "runEdit":

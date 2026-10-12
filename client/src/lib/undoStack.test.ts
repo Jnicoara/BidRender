@@ -163,7 +163,7 @@ describe("a change undo does not cover", () => {
 
   it("is cleared by that press, so the second press reaches the older step", () => {
     const s = acknowledgeNotUndoable(
-      noteNotUndoable(twoPlaced(), "markStatus")
+      noteNotUndoable(twoPlaced(), "markHeight")
     );
     expect(notUndoableMessage(s)).toBeNull();
     expect(undoTitle(s)).toBe("Undo: 2 marks placed (Ctrl+Z)");

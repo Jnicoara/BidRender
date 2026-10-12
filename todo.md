@@ -3,6 +3,17 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
+
+- [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
+      answered all 12 questions on 2026-10-10 (plan § 6). Waits only on A
+      applying S1 (SQL draft in `track-b-handoff.md`).
+- [ ] Noticed while planning, not fixed: the SQL `lineNotPricedSql`
+      (`server/db.ts` ~13060) has no `lineRole` branch, while the TS
+      `lineNotPriced` decides a remove / relocate line by its hours alone.
+      The Dashboard and the bid could disagree on such a line. Check with
+      `server/dashboardNotPriced.test.ts` before trusting either.
+
 ## Catalog reality check — BUILT 2026-10-09 (Track A), NOT on staging
 
 Batch 1 + batch 2 (owner's calls), the panel table (56 rows), the box
@@ -802,6 +813,23 @@ deliberately absent (`sw.js` header, `pwa.test.ts`) for the reason in step 1.
 
 ## Pending / Future
 
+### Separate demo sheets: pairing, overlay and "same device?" — LATER (Track B, 2026-10-10)
+
+Owner's answer (status-and-scope-plan § 8 Q5): demo and new on ONE sheet
+first, which `b-status-view` covers (the sheet tag, the Remove default, and
+the status bar's "removed" view as the overlay on a shared sheet). Left for
+when a real job arrives with SEPARATE demo sheets — use it as the test set:
+
+- [ ] § 2b: pair a Demo sheet with its New-work sheet and line them up by
+      two matching points (the calibrate interaction); "Show demo marks"
+      under More options draws the paired sheet's Remove marks as ghosts.
+      Needs M3 (`bid_sheet_alignments`). Marks only, never the drawing
+      (`code-first-ceiling.md`: a real pair shared 15% of its line work).
+- [ ] § 2c: "Same device?" card when a New mark lands within 2 ft (sheet
+      scale, same item) of a Remove mark — Staying / Relocated / No, both
+      (default). Needs M4 (`takeoff_stamps.sameAsStampId`). Never automatic;
+      moves a number only when accepted, with Undo.
+
 ### Staging deploy guard: let a push through once staging's DATABASE has its migrations — build AFTER the live release (Track A, 2026-10-10)
 
 **Today:** the Gate's deploy-staging step refuses every local-dev push whose
@@ -1564,6 +1592,14 @@ Design: `references/homerun-footage-plan.md` § 4.
       a scratch bid with 7 items. Time it (server ms and the panel's first
       paint) on a real 500-sheet set with marks and runs spread across it, and
       write the numbers next to the code. No number is claimed here yet.
+- [ ] **Stress test (B, 2026-10-10): time the DASHBOARD for a company with
+      50+ bids that have marks.** Since "N drops not priced" reached the
+      lists (`db.dropsNotPricedForBids`), every bid card with a mark loads
+      that bid's takeoff on each read (4 bids at a time). Only looked at on a
+      handful of bids. Measure server ms for `bids.list` / the dashboard
+      query and the cards' first paint with 50, 100 and 200 marked bids, and
+      write the numbers next to the code. Do it with the 500-sheet item
+      above. No number is claimed here yet.
 - [x] **DONE 2026-10-10 (Track B):** the remove gets the same
       "Removed circuit X." toast with Undo as every other delete
       (`notUndoableWired.test.ts`). Was:
@@ -3234,6 +3270,14 @@ path is ever revived, give it the same treatment first.
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
       header this is a separate step-3 migration, now unblocked.
+      **CODE HALF BUILT 2026-10-10 (Track B, branch `b-twin-fold`, merged
+      2026-10-10 as plain code):** `shared/twinFold.ts` (the rules),
+      `takeoffGroups.foldExistingTwin` (one count, on demand), the bid screen's flags with
+      "Count these as existing" / "Remove this line", and "Count as
+      existing" in Find all matching no longer makes twins. **Left for A:**
+      M1, the SQL draft in `references/track-b-handoff.md`, and a live-copy
+      rehearsal with `bidTotals.mts` before merging. (Superseded by A's
+      note below: M1 dropped, the code merges as plain code.)
       **2026-10-10 (A): NO step-3 pass is needed — there is nothing to fold.**
       `scripts/twinCountCensus.mts` (read-only) on fresh copies: live 0,
       staging 0, local 0 twin counts / marks / lines / assemblies (the only
