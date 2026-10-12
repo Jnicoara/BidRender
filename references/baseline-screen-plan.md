@@ -11,6 +11,12 @@ starter change into every company that had not touched that number. **The
 owner ruled that out.** A starter change now reaches only brand-new
 companies; existing companies get it as an **offer** they accept or ignore.
 
+**2026-10-12: the owner answered Q14–Q22 (§ 12). Nothing is open.** All
+took the suggested answer except **Q19**: reading the scale off the drawing
+(F15) and adding new homerun circuits (F11) become one-tap OFFERS on
+Drafts, never automatic from viewing. That adds F11 and F15 to C's list
+(§ 11).
+
 **Builds on, and overrides:**
 
 - `before-beta-checklist.md` § 3, "An admin 'baseline' screen" (owner,
@@ -25,7 +31,7 @@ companies; existing companies get it as an **offer** they accept or ignore.
   is the truth and the seed files become an export of it (§ 6). CLAUDE.md is
   changed in the same commit as the boot change, not before.
 - **CLAUDE.md § "Settings are inherited, not copied"** is questioned by
-  finding F8 (§ 9). It is not overridden here. Q16 asks the owner.
+  finding F8 (§ 9). **Owner Q16 (2026-10-12): yes**: values are written onto a bid when it leaves Draft; Drafts still inherit. CLAUDE.md is amended in the commit that builds it.
 - The "Example price" / "Example hours" rule (owner, 2026-10-07,
   `shared/exampleTags.ts`) is unchanged, and the tag still clears only when
   the shop edits.
@@ -180,10 +186,10 @@ every amount. Run type: its parts, waste %, fitting style, extras. Modifier
 
 Search aliases, category shelf, description, sort order, the Specialty tag.
 They help a person FIND an item and change nothing on a bid, so they are
-app improvements (§ 0). Q21 confirms this split.
+app improvements (§ 0). Owner Q21 (2026-10-12): yes.
 
 **Names** sit between the two. A name is what a company sees on its bid
-screen, but bid lines freeze their own name. Suggested: **an offer** (Q17).
+screen, but bid lines freeze their own name. **Owner Q17 (2026-10-12): an offer.**
 
 ### Units — NEVER changed (owner, rework item 3)
 
@@ -329,7 +335,7 @@ new, and the version it produced. Pins are recorded per change too
 **The rule (owner):** Active, Won, Lost and locked bids never move. A
 Draft whose total changes takes the fix and shows **"Total changed because…"**
 with the old number. (There is no "Sent" status: `BID_STATUSES` is Draft /
-Active / Won / Lost, `drizzle/schema.ts:2069`. Q14 asks whether Active means
+Active / Won / Lost, `drizzle/schema.ts:2069`. Owner Q14 (2026-10-12): Active, Won, Lost and locked are protected; only Drafts take fixes. (It asked whether Active means
 "sent".)
 
 ### What exists to build on
@@ -372,7 +378,7 @@ Active / Won / Lost, `drizzle/schema.ts:2069`. Q14 asks whether Active means
    version. In `--compare`, a Draft may move only with a matching
    `bid_math_changes` row, and every other bid must be identical.
 7. **A bid moved back to Draft** keeps its version. It gets an "Update to
-   the current math" button that shows old → new before applying (Q22).
+   the current math" button that shows old → new before applying. **Owner Q22 (2026-10-12): a button only, never automatic.**
 
 ### Releases this applies to NOW
 
@@ -434,16 +440,16 @@ inherited live.
 | **F5**  | **`backfillLaborRateAmounts` re-stamps shipped labor rates** (`server/db.ts:3040`). Existing lines keep their frozen rate, but an unforked company's NEXT line uses the new rate, and the "stale rate" warning appears unasked.                                                                                                                                                                                                                                                         | Pin, then offer.                                                                                                                                                                                                                         | No                                                                |
 | **F6**  | **`seedBaselineAssemblies` writes shipped assemblies** (`laborRateId`, `laborOnly`, `mountHeightTypeKey` where NULL, hours, cleared hours, `server/db.ts` 4229–4249, 4565+). New lines change, and `mountHeightTypeKey` is read LIVE by drops and verticals, so draft vertical footage moves.                                                                                                                                                                                           | Pin, then offer.                                                                                                                                                                                                                         | No                                                                |
 | **F7**  | **Shipped defaults held in CODE are read live**: `SHIPPED_HEIGHT_TYPES` (`shared/takeoffHeights.ts:145`) and bend defaults where the company row is NULL (`takeoff_bend_defaults`, `schema.ts` ~3438). A release that changes one moves verticals and fittings on unlocked bids.                                                                                                                                                                                                        | Owner rework item 4 makes these OFFERS, so they become starter DATA (shared rows a company is pinned to, § 2) instead of code constants. Until then, a release that changes one counts as a math change (§ 8).                           | No                                                                |
-| **F8**  | **Overhead, profit, productivity and tax are inherited live on every bid, Won included** (`bidPricing.ts` 69–184). This is a standing decision (CLAUDE.md § "Settings are inherited, not copied"), but it means a company changing its own margin re-prices its Won bids.                                                                                                                                                                                                               | **Owner decides (Q16).** Suggested: when a bid leaves Draft, write the values in effect onto the bid as its own settings, so drafts still follow the company and sent bids stop.                                                         | No (it writes what is in effect)                                  |
+| **F8**  | **Overhead, profit, productivity and tax are inherited live on every bid, Won included** (`bidPricing.ts` 69–184). This is a standing decision (CLAUDE.md § "Settings are inherited, not copied"), but it means a company changing its own margin re-prices its Won bids.                                                                                                                                                                                                               | **Owner Q16: yes.** When a bid leaves Draft, write the values in effect onto the bid as its own settings, so drafts still follow the company and sent bids stop.                                                                         | No (it writes what is in effect)                                  |
 | **F9**  | **"Remove scale" is undone by looking.** `clearSheetScale` sets `scaleSource = "none"` (`bidPdfsRouter.ts` ~966). The next time the sheet is shown, detection runs on its own (`TakeoffPage.tsx` ~8866) and re-applies a high-confidence reading (`bidPdfsRouter.ts` ~1018), so traced footage jumps from 0 back to feet. Confirmed by reading; not yet reproduced.                                                                                                                     | A cleared scale is remembered: `scaleSource` gains `cleared`, which detection treats like `manual`. One enum value (BS-M8).                                                                                                              | No                                                                |
 | **F10** | **A hand-placed panel can re-match homeruns on a LATER sheet.** `placePanelSpot` arms `rematchOnNextSync` (`TakeoffPage.tsx:4744`), but the sync signature leaves out the panel spot (`client/src/lib/homerunSync.ts` ~47). If the circuits did not change, no sync fires and the flag stays armed, so the next sync — just opening another sheet — goes out with `rematch: true` and re-points that sheet's unconfirmed homeruns. **Plausible from reading; reproduce before fixing.** | Arm the flag per SHEET and clear it when that sheet's placement settles; or put the spot in the signature. Add a test in `client/src/lib`.                                                                                               | No                                                                |
-| **F11** | **Opening a sheet creates homerun circuits it has not seen** (`TakeoffPage.tsx` ~4889, `syncHomeruns`), which adds homerun feet to an unlocked bid. This is by design ("a visit only CREATES circuits"), but it is a number moving because someone looked.                                                                                                                                                                                                                              | Owner decides (Q19). Suggested: keep it on Draft only; with F1's auto-lock, sent bids are covered.                                                                                                                                       | No                                                                |
+| **F11** | **Opening a sheet creates homerun circuits it has not seen** (`TakeoffPage.tsx` ~4889, `syncHomeruns`), which adds homerun feet to an unlocked bid. This is by design ("a visit only CREATES circuits"), but it is a number moving because someone looked.                                                                                                                                                                                                                              | **Owner Q19: a one-tap OFFER on Drafts**, never created by viewing (§ 12).                                                                                                                                                               | No                                                                |
 | **F12** | **A run type re-pointed to a new part** prices the new part's quantity at the OLD part's frozen price until "Send again" (`takeoffRunTypesRouter.ts` 1176–1204).                                                                                                                                                                                                                                                                                                                        | The line shows "Part changed — Send again" as its fix-it, and the bid's warning strip counts it.                                                                                                                                         | No by itself; pressing Send again does, by choice                 |
 | **F13** | **The drops-not-priced warning ignores the lock** (`bidDropsNotPriced` `server/db.ts` 15199–15212) and reads the assembly's mount type live, so a locked bid's "N drops not priced" can change.                                                                                                                                                                                                                                                                                         | Honour `quantitiesLockedAt` there like everywhere else.                                                                                                                                                                                  | Count only, no dollars                                            |
 | **F14** | **Pre-0087 lines count not-priced parts from the recipe live** (known; live had 0 on 2026-10-07).                                                                                                                                                                                                                                                                                                                                                                                       | The planned one-time freeze (`todo.md`, "WRONG-NUMBER RISK"). Recount before every release.                                                                                                                                              | No                                                                |
-| **F15** | **Scale detection on the first view of an unscaled sheet applies a high-confidence scale**, so footage appears without a click (`bidPdfsRouter.ts` ~1018). A convenience by design.                                                                                                                                                                                                                                                                                                     | Owner decides (Q19, with F11). Suggested: keep it, but say so on the sheet: "Scale read from the drawing: 1/8" = 1'. Change".                                                                                                            | No                                                                |
+| **F15** | **Scale detection on the first view of an unscaled sheet applies a high-confidence scale**, so footage appears without a click (`bidPdfsRouter.ts` ~1018). A convenience by design.                                                                                                                                                                                                                                                                                                     | **Owner Q19: a one-tap OFFER on Drafts**, never applied by viewing (§ 12). No migration.                                                                                                                                                 | No                                                                |
 | **F16** | **Crash recovery re-sends queued marks on load** (`TakeoffPage.tsx` ~7147). These are the user's own clicks, but counts change on open with nothing said.                                                                                                                                                                                                                                                                                                                               | A toast: "3 marks from your last session were saved".                                                                                                                                                                                    | No                                                                |
-| **F17** | **No bid status freezes anything**, and there is no "Sent" status or sent-total record.                                                                                                                                                                                                                                                                                                                                                                                                 | § 8 (math version) + F1 (auto-lock) + F8 (settings) together make "sent" mean something. Q14 names which status is "sent".                                                                                                               | No                                                                |
+| **F17** | **No bid status freezes anything**, and there is no "Sent" status or sent-total record.                                                                                                                                                                                                                                                                                                                                                                                                 | § 8 (math version) + F1 (auto-lock) + F8 (settings) together make "sent" mean something. Q14: Active, Won and Lost count as sent.                                                                                                        | No                                                                |
 
 **The short version:** money on a line is safe. Quantities on unlocked bids,
 inherited settings, and the boot's writes to the starter are not. **F1, F2
@@ -508,15 +514,15 @@ ALTER TABLE `bid_pdf_sheets` MODIFY COLUMN `scaleSource`
 
 **A: login + startup change. C: number rules + tests. B: screen.**
 
-| Track | Builds                                                                                                                                                                                                                                     |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **A** | BS-M1–M8; the `starter_editor` account, authenticator step and short sessions; the boot change (§ 6, F2–F6); `applyMathVersion.mts` and the release step (§ 8); the CLAUDE.md amendments                                                   |
-| **C** | `applyStarterChange` (pin, change, log), offers and accept, undo, hide-with-replacement, the unit refusal, the shared sheet checks, export and drift, `shared/mathVersion.ts` and the bid-version branching, F9, F10, F12, F13; every test |
-| **B** | The baseline screen; the Updates tabs and "N starter updates available"; the "New" badge; "My changes"; the "Total changed because…" strip; F16's toast                                                                                    |
+| Track | Builds                                                                                                                                                                                                                                                                  |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A** | BS-M1–M8; the `starter_editor` account, authenticator step and short sessions; the boot change (§ 6, F2–F6); `applyMathVersion.mts` and the release step (§ 8); the CLAUDE.md amendments                                                                                |
+| **C** | `applyStarterChange` (pin, change, log), offers and accept, undo, hide-with-replacement, the unit refusal, the shared sheet checks, export and drift, `shared/mathVersion.ts` and the bid-version branching, F9, F10, F11 and F15 as offers (Q19), F12, F13; every test |
+| **B** | The baseline screen; the Updates tabs and "N starter updates available"; the "New" badge; "My changes"; the "Total changed because…" strip; F16's toast                                                                                                                 |
 
 **Order:**
 
-1. **§ 8 math version + F1 auto-lock (if Q15 is yes), BEFORE remove/relocate
+1. **§ 8 math version + F1 auto-lock (Q15: yes), BEFORE remove/relocate
    labor goes live.** They protect bids that exist today, so they come first.
 2. F9 and F10, small and independent.
 3. Pinning + the boot change (F2–F6). After this, a deploy can no longer
@@ -551,16 +557,39 @@ Only Drafts with a `bid_math_changes` row may move.
 | 12  | A: login + startup change. C: number rules + tests. B: the screen                        |
 | 13  | No "re-price this bid" button for now                                                    |
 
-### Open — each with a suggested answer
+### Answered 2026-10-12 (owner) — Q14 to Q22
 
-| Q   | Question                                                                                                   | Suggested                                                                                                                  | Moves a bid number?                                 |
-| --- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 14  | There is no "Sent" status. Which statuses must never move: Active, Won, Lost, and locked?                  | **Active, Won, Lost and any locked bid.** Only Draft takes math fixes.                                                     | **Yes**: it decides which bids take a math fix      |
-| 15  | Lock quantities automatically when a bid leaves Draft?                                                     | **Yes**, with Unlock one click away. Otherwise a Won bid's pipe and wire keep following library edits (F1).                | No: it stops future moves                           |
-| 16  | Freeze overhead, profit, productivity and tax onto a bid when it leaves Draft?                             | **Yes**: write the values in effect onto the bid. Drafts still follow the company. (Changes CLAUDE.md § Company defaults.) | No on the day; afterwards, sent bids stop following |
-| 17  | Starter NAME changes: offer, or reach everyone?                                                            | **Offer.** It is what a company sees on its screens.                                                                       | No                                                  |
-| 18  | "Accept all": include items you changed yourself?                                                          | **No.** Those are listed apart, one at a time, showing yours vs BidRidge's new value.                                      | No                                                  |
-| 19  | Viewing a sheet creates homerun circuits (F11) and applies a read scale (F15). Keep, or make them buttons? | **Keep on Drafts only**, and say so on screen. With Q15, sent bids are covered.                                            | **Yes**, on drafts, when the plans are viewed       |
-| 20  | Pinning cost (§ 2): fine until about 1,000 companies, then a rewrite. Accept for now?                      | **Yes.** Measure the row count at each release.                                                                            | No                                                  |
-| 21  | Search words, category shelf, description and sort order: reach everyone as app improvements?              | **Yes.** They change no number and no item.                                                                                | No                                                  |
-| 22  | A bid moved back to Draft keeps its old math. Offer "Update to the current math" with old → new shown?     | **Yes**, as a button. Never automatic.                                                                                     | **Yes**, if pressed                                 |
+| Q   | Answer                                                                                                                                                                                                                                                                  | Moves a bid number?                                                             |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 14  | **Protect Active, Won, Lost and any locked bid. Only Drafts take math fixes.** (The suggested answer.)                                                                                                                                                                  | Yes: it decides which bids take a math fix (§ 8)                                |
+| 15  | **Yes**: lock quantities automatically when a bid leaves Draft, Unlock one click away (F1).                                                                                                                                                                             | No: it stops future moves                                                       |
+| 16  | **Yes**: write overhead, profit, productivity and tax in effect onto the bid when it leaves Draft. Drafts still follow the company (F8).                                                                                                                                | No on the day; afterwards sent bids stop following                              |
+| 17  | **Offer.** A starter name change is an offer, like a number.                                                                                                                                                                                                            | No                                                                              |
+| 18  | **No.** "Accept all" never includes items the company changed itself; those are one at a time.                                                                                                                                                                          | No                                                                              |
+| 19  | **Neither stays automatic. Reading the scale off the drawing (F15) and adding new homerun circuits (F11) become one-tap OFFERS on Drafts, never automatic just from viewing.** This is NOT the suggested answer (which kept both automatic on Drafts). See § 9 F11/F15. | Yes, but only when the offer is tapped. Viewing alone moves nothing on any bid. |
+| 20  | **Yes**: accept the pinning cost for now; measure companies × pinned rows at each release.                                                                                                                                                                              | No                                                                              |
+| 21  | **Yes**: search words, category shelf, description and sort order reach everyone as app improvements.                                                                                                                                                                   | No                                                                              |
+| 22  | **Yes, a button only, never automatic**: a bid moved back to Draft offers "Update to the current math" with old → new shown.                                                                                                                                            | Yes, only if pressed                                                            |
+
+**No questions are open in this plan.**
+
+**What Q19 changes in the build (C):**
+
+- **F15 (scale):** the first view of an unscaled sheet still RUNS detection
+  (`detectScaleFromText` parses the sheet's text; no AI call), but stores
+  its answer as a suggestion only, in the existing `detectedScaleText` —
+  the column a low-confidence read already uses
+  (`bidPdfsRouter.ts` `detectSheetScale`, ~1035–1080). The
+  `isAutoApplicable` arm stops writing `scaleRatio`. The sheet shows "Scale
+  read from the drawing: 1/8" = 1'. **Use it**" on a Draft; footage appears
+  only after the tap. On a non-Draft bid the suggestion shows without the
+  button (§ 8). `scaleSource` stays "none" until the tap, so F9's "manual =
+  a person decided" is untouched. **No migration** (checked 2026-10-12).
+- **F11 (homeruns):** a sheet visit still COMPUTES which circuits are new,
+  but creates nothing. The panel shows "3 new homerun circuits found on this
+  sheet. **Add them**" on a Draft. `homerunSyncStep` (F10's helper) gets a
+  third outcome, "offer", and the visit path stops calling create. Existing
+  circuits keep their footage; nothing already created is removed.
+- **Proof:** `bidTotals.mts` before and after viewing every sheet of a
+  fixture bid — identical. Then tap each offer — the Draft moves, nothing
+  else does.
