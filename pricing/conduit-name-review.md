@@ -297,3 +297,88 @@ go in A's **end-of-pricing job**, with the owner's yes on the final list.
   ships with its trade slang (CLAUDE.md § Materials).
 - Any rename of a name the takeoff builds is a code and seed pair, never one
   without the other.
+
+## Owner's answers — 2026-10-12
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter.
+
+### The rule from Q5: descriptions, never names
+
+**The missing words go in each row's DESCRIPTION (the sheet's Notes column),
+NOT in its name.** That applies to every row in this review, the 164, 210,
+533–535, 584–590 and 592–597 rows included, even though those could have
+been renamed. So:
+
+- these answers put nothing into `RENAMED_BASELINE_MATERIALS`;
+- they make no change to `shared/runFittingMaterials.ts`;
+- traced runs keep finding their fittings by the names they use today.
+
+The counter names the owner gave become **search words** on the rows they
+describe, so a search finds the row by what the counter calls it.
+
+### The answers, and what the job does
+
+| What                                                       | Answer                                                                       | Description (Notes) the job writes                                          | Search words the job adds                             |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Q1 — EMT set-screw and compression (rows 192–210, 266–283) | **Zinc die-cast**                                                            | "Zinc die-cast." Row 210 already says "insulated" in its name               | "set screw connector" on the set-screw connector rows |
+| Q2 — Rigid conduit bodies (rows 470–478, 488–523)          | **Malleable iron, Form 7**                                                   | "Malleable iron, Form 7. Priced with its cover and gasket."                 | "Form 7"                                              |
+| Q3 — Flex connectors (rows 548–551)                        | **Squeeze**                                                                  | "Squeeze type, straight."                                                   | "squeeze connector"                                   |
+| Q4 — Metal weatherheads (rows 584–590)                     | **Clamp-on**                                                                 | "Clamp-on; fits rigid, IMC or EMT."                                         | "entrance cap", "service head"                        |
+| Q6 — PVC expansion fittings (rows 592–597)                 | **Standard 8" travel only** (the Carlon E945 style). No 2" or 6" travel rows | "Standard expansion coupling, 8" travel."                                   | —                                                     |
+| Flex metal conduit (rows 160–164)                          | **Steel**                                                                    | "Steel, reduced wall."                                                      | —                                                     |
+| Raintight EMT connector (rows 248–256)                     | **Insulated**                                                                | "Steel, insulated throat."                                                  | —                                                     |
+| Liquidtight connector (rows 536–539)                       | **Straight, insulated, steel**                                               | "Straight, insulated throat, steel."                                        | —                                                     |
+| EMT conduit bodies (rows 183–191, 211–237, 284–292)        | Set-screw (the review's words, under the Q5 rule)                            | "Set-screw hubs. Priced with its cover and gasket." (keeps the C1 sentence) | —                                                     |
+| Liquidtight 90 (rows 533–535)                              | Insulated, to match the straight one (under the Q5 rule)                     | "Insulated throat, steel."                                                  | —                                                     |
+| Flex coupling (rows 552–555)                               | Screw-in (under the Q5 rule)                                                 | "Screw-in."                                                                 | —                                                     |
+
+**Check before shipping.** A search word must surface its own row and never
+outrank the product a query names (CLAUDE.md § Materials). "Entrance cap"
+sits next to row 960, `Service entrance cap` (the SE-cable cap), so check
+that each still answers its own search. Run `scripts/searchSpotCheck.mts`
+with "entrance cap", "service head", "squeeze connector", "set screw
+connector" and "form 7".
+
+### PG2 (Service upgrade 200A, overhead)
+
+- **Drop the separate `2" rigid conduit coupling` × 1 line.** The 10 ft
+  stick ships with one coupling on it.
+- **`Service mast, 2", 10 ft` (row 962) folds into the 2" rigid stick**
+  (owner's yes). Retire it into `2" rigid conduit` through
+  `RETIRED_BASELINE_MATERIALS`, with `Service mast, 2", 10 ft` kept as a
+  search word on the 2" rigid row. No shipped starter uses row 962. A bid
+  line priced from it keeps its frozen snapshot.
+  - **Watch the unit.** The mast was sold "each" (one 10 ft stick), while
+    2" rigid is "foot". A company's own assembly that used the mast at
+    quantity 1 still points at the retired row and keeps working, but it
+    does not convert to 10 ft on its own.
+  - **Only the 2" mast was answered.** The 2-1/2" and 3" mast rows (963–964)
+    stay as they are until the owner says otherwise.
+- If the recount at the job finds the coupling line already gone, or a
+  second starter using row 962, stop and find out why before changing
+  anything.
+
+### The 6 missing items: add all of them
+
+Use the names and sizes in "Common items that are MISSING" (X1–X6). Each
+ships with its trade slang:
+
+| #   | Search words to include                                    |
+| --- | ---------------------------------------------------------- |
+| X1  | "close nipple", "nipple", "threaded", "rigid"              |
+| X2  | "chase nipple", "chase"                                    |
+| X3  | "myers", "myers hub", "watertight hub", "hub", "insulated" |
+| X4  | "end bell", "bell end", "underground", "stub"              |
+| X5  | "3/8 flex connector", "screw in", "greenfield", "whip"     |
+| X6  | "two hole strap", "2 hole", "minerallac"                   |
+
+X3's "myers" is the word batch 2 took off the grounding bushing. Here it
+names the right part.
+
+### Flex packs: A relabels them as coils
+
+Rows 156–159 and 161–164 get a coil pack size and pack qty in the
+end-of-pricing job: 100 ft coil and 100, or 50 ft and 50 at 1-1/4"
+liquidtight. Confirm each one against the listing. **The owner leaves those
+rows blank until then.**

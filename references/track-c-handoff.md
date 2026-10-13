@@ -21,6 +21,28 @@ products in one.
 Workbook read from a copy only. Waits for A's end-of-pricing job and the
 owner's answers.
 
+**Owner's answers, same day: all recorded in the review's "Owner's answers"
+section. A's end-of-pricing job applies them; nothing is applied on
+track-c.**
+
+- **Q1–Q4:**
+  - Q1: zinc die-cast for EMT set-screw and compression.
+  - Q2: malleable iron, Form 7, for rigid conduit bodies.
+  - Q3: squeeze flex connectors.
+  - Q4: clamp-on weatherheads.
+- **Q5: the missing words go in DESCRIPTIONS, not names.** No renames and no
+  `runFittingMaterials.ts` change.
+- **Q6:** 8" travel only.
+- **Other answers:** flex is steel; the raintight connector is insulated; the
+  liquidtight connector is straight, insulated, steel.
+- **Search words:** "set screw connector", "Form 7", "squeeze connector",
+  "entrance cap", "service head".
+- **PG2:** drop the 2" rigid coupling line. `Service mast, 2", 10 ft` retires
+  into `2" rigid conduit`, with its old name kept as a search word.
+- **Add all 6 missing items (X1–X6).**
+- **Flex rows 156–159 and 161–164 get coil packs;** the owner leaves them
+  blank until then.
+
 ## (newest) 2026-10-12 — step-times DRAFT for the owner; nothing built
 
 `references/step-times-draft.md`: minutes for the 47 steps already in the
