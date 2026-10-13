@@ -173,7 +173,8 @@ said nothing. Sources, in order:
    `Per`, `Price unit`, `Unit`): `E`/`EA` = 1, `C` = 100, `M` = 1,000,
    `FT`/`LF` = 1, `RL`/`ROLL`/`BX`/`BOX`/`PK`/`SPL` = "pack". This is the
    distributor convention (E / C / M) on Platt-, Graybar- and Rexel-style
-   exports. **Needs one real export to confirm** — Q4.
+   exports. **Needs one real export to confirm** — Q4 (approved: the owner
+   is getting one from his Platt rep).
 2. **A suffix on the price cell**: `/M`, `per M`, `/1000`, `/MFT` = 1,000;
    `/C`, `per C`, `/100`, `/CFT` = 100; `/ea`, `/ft` = 1; `/roll`, `/box`,
    `/pk`, `/spool` = "pack".
@@ -407,8 +408,9 @@ these values; there is no "not yet" state (multi-supplier § 6's argument).
    refuses M/C/pack.
 3. `shared/priceSanity.ts` + the § 4.3 measurement, committed with T.
 4. `shared/priceImportPlan.ts`; `importPrices` gains `apply`; preview
-   screen; undo. **The import button stays hidden (review-sheet Q5) until
-   this step ships**, and comes back with it.
+   screen; undo. **The import button stays hidden (review-sheet Q5; Q10 —
+   Track A hiding it on local-dev, 2026-10-12) until this step ships**, and
+   comes back with it.
 5. Pack pair in the Materials editor and Supplier pricing; warning on
    every typed-price surface in § 4.2.
 6. Seed `packQty`/`packLabel` from `packFor`; `backfillMaterialMetadata`
@@ -417,15 +419,17 @@ these values; there is no "not yet" state (multi-supplier § 6's argument).
 Each step: bidTotals unchanged on the fixture set (nothing here moves a
 stored number), and seen at laptop + iPad before it is called done.
 
-## 8. Questions for the owner — recommended pick first
+## 8. Questions for the owner — ALL ANSWERED 2026-10-12: every recommended pick approved
 
-- **Q1** Pack size under the editor's "More options", single price box until one is set? · **Recommend: yes.**
-- **Q2** Store wire's REAL pack (250 ft roll, 500 ft spool) even though the sheet types wire per foot with Pack qty 1? · **Recommend: yes — the sheet stays as is; the app reads the pack from its label.**
-- **Q3** Round a pack-to-unit conversion UP at the fourth decimal (worst case under 1¢ per 100 ft)? · **Recommend: yes.**
-- **Q4** Can you send one real supplier price export (any house) so the UOM codes E / C / M are confirmed, not assumed? · **Recommend: yes, before step 2 ships.**
-- **Q5** A price cell saying "/roll" or "/box" on a material with no pack size: hold the row for a tap, never guess? · **Recommend: hold it.**
-- **Q6** Import rows that "look off": skipped until you tap a fix (vs applied as read and listed first)? · **Recommend: skipped until tapped.**
-- **Q7** Undo: the last import per supplier only (vs any import in the last 30 days)? · **Recommend: last per supplier.**
-- **Q8** Warning threshold: pick it by measuring on your sheet and one real export (start at 5×), and warn on LOW as well as high? · **Recommend: yes to both.**
-- **Q9** On a Draft bid, a line priced from a price that looks off: show it on the attention strip with "Fix the price" (fixes the material) AND "Use the fixed price on this line" (a new one-line re-price, Draft only)? · **Recommend: yes; never on a bid past Draft.**
-- **Q10** Keep the supplier-import button hidden until the preview and undo ship (review-sheet Q5 again — it is still showing today)? · **Recommend: yes, hide it now in a one-line change.**
+- **Q1** Pack size under the editor's "More options", single price box until one is set? · **Answer: yes.**
+- **Q2** Store wire's REAL pack (250 ft roll, 500 ft spool) even though the sheet types wire per foot with Pack qty 1? · **Answer: yes — the sheet stays as is; the app reads the pack from its label.**
+- **Q3** Round a pack-to-unit conversion UP at the fourth decimal (worst case under 1¢ per 100 ft)? · **Answer: yes.**
+- **Q4** Can you send one real supplier price export so the UOM codes E / C / M are confirmed, not assumed? · **Answer: yes, before step 2 ships. The owner is asking his Platt rep for a real price export and will send it when he has it.** Until it arrives, step 2's UOM-column reading is NOT built on the assumed codes; the export is also one of the two data sets Q8's measurement needs.
+- **Q5** A price cell saying "/roll" or "/box" on a material with no pack size: hold the row for a tap, never guess? · **Answer: hold it.**
+- **Q6** Import rows that "look off": skipped until you tap a fix (vs applied as read and listed first)? · **Answer: skipped until tapped.**
+- **Q7** Undo: the last import per supplier only (vs any import in the last 30 days)? · **Answer: last per supplier.**
+- **Q8** Warning threshold: pick it by measuring on your sheet and one real export (start at 5×), and warn on LOW as well as high? · **Answer: yes to both.**
+- **Q9** On a Draft bid, a line priced from a price that looks off: show it on the attention strip with "Fix the price" (fixes the material) AND "Use the fixed price on this line" (a new one-line re-price, Draft only)? · **Answer: yes; never on a bid past Draft.**
+- **Q10** Keep the supplier-import button hidden until the preview and undo ship (review-sheet Q5 again)? · **Answer: yes. Track A is hiding it on local-dev now** (2026-10-12); step 4 brings it back with the preview and undo.
+
+**Still waiting on before building:** A's columns (§ 6), and the Platt export (Q4) for step 2's UOM reading and step 3's measurement. Steps 1, 5 and 6 need only the columns.

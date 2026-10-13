@@ -8,7 +8,10 @@ preview and undo, and the sanity warning. **For A: SQL drafts PS-M1–M6**
 (§ 6, all additive, step 1). **For the owner: Q1–Q10** (§ 8). Pointers added
 in multi-supplier § 4.4 / § 4.5 / § 6 and material-markup D3. **Live fault
 found:** the price parser drops "/M" and "/C" today, and a test pins it
-(plan § 1.1). Build waits on the owner's answers and A's columns.
+(plan § 1.1). **Q1–Q10 all approved as picked (owner, same day).** A is
+hiding the import button on local-dev (Q10). Build waits on A's columns
+and, for the UOM reading and the threshold measurement, the Platt export
+the owner is getting (Q4). Do not build or merge until told.
 
 ## START HERE (2026-10-13) — panel-label offer built; F13 rule built, WIRING WAITS ON ONE COLUMN FROM A; NOT merged (live release first)
 

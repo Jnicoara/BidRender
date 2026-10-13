@@ -1398,7 +1398,9 @@ and § 4.5 (unit of sale), and `references/material-markup.md` D3 (price
 bands read the PACK price, and `materials` has no pack size yet).
 
 **PLANNED 2026-10-12 (C): `references/pricing-safety-plan.md`** — all three
-items, SQL drafts PS-M1–M6 for A, questions Q1–Q10. Found while planning:
+items, SQL drafts PS-M1–M6 for A, questions Q1–Q10 (ALL picks approved by
+the owner 2026-10-12; A hiding the import button on local-dev; Platt export
+coming from the owner for Q4). Found while planning:
 the import parser today DROPS "/M" and "/C" and keeps the number
 (`shared/priceListParse.ts` `UNIT_SUFFIX`), so "$480/M" lands as $480/ft —
 and `server/priceListParse.test.ts:202` pins that.
