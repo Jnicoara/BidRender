@@ -26,7 +26,7 @@ F13-M1 first. No migration, none needed.
 - **`bidrender_test_b` rebuilt** (drop, create utf8mb4_unicode_ci, 152
   migrations, `scripts/seedBaseline.mts` — the Gate's own recipe):
   `starterAssembliesSeed.test.ts` passes, twice in a row.
-- **Gate:** pending on this commit.
+- **Gate green on e330f675** (run 38465706051: test + drizzle-guard).
 - **Dev servers stopped.**
 - **Next:** step 5a/5b — closed-square tags + notes parser (the legend
   plan's steps 3–4), timed on the largest sheet before running on open.

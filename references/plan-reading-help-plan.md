@@ -409,13 +409,13 @@ from the real sheets via a script, not hand-typed.
      left, right of the control, then a corner, and takes the first that is
      inside the window and clear of the middle.
    - More options gained **Show tips again / Turn tips off** (from step 6).
-   Tests: `client/src/lib/planTips.test.ts` (15; "No more tips" guard shown
-   red). Looked at: laptop, iPad both ways, phone 375/390/425 on "Sheet
-   numbers check" E-200 — sequence notes → line → look up where the line
-   shows, notes → look up where it does not; every card inside the window,
-   none over the drawing's middle off the phone; Copy text in hand hides
-   the card and putting it down brings it back; × ends the visit; No more
-   tips survives a reload.
+     Tests: `client/src/lib/planTips.test.ts` (15; "No more tips" guard shown
+     red). Looked at: laptop, iPad both ways, phone 375/390/425 on "Sheet
+     numbers check" E-200 — sequence notes → line → look up where the line
+     shows, notes → look up where it does not; every card inside the window,
+     none over the drawing's middle off the phone; Copy text in hand hides
+     the card and putting it down brings it back; × ends the visit; No more
+     tips survives a reload.
 5. **Taps on the drawing:** 5a closed-square tags + 5b notes parser
    (the legend plan's steps 3–4), then 5c keyed-note popover, then 5d detail
    links and Back.
