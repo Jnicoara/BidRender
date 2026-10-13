@@ -4,7 +4,33 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-13, session 38: `60479773` + 0144–0151 ARE LIVE
+## NOW — 2026-10-13, session 39: 0152–0156 on local-dev + STAGING (not live)
+
+- **Migrations** (all additive, step 1, step 3 empty; C's SQL word for
+  word): 0152 change log (BS-M3), 0153 pins (BS-M4), 0154
+  `isPinnedCopy`/`hiddenAt`/`replacedById` on the five tables (BS-M5),
+  0155 `companies.starterSeenAt` + offer answers (BS-M6), 0156
+  `bids.lockedWarnings` (F13-M1). Expect **157, 196/196**.
+- **Proof** (`deploying.md` § 11 "Staging: migrations 0152–0156"):
+  throwaway copy of local 5 applied / re-run nothing / 4,386 unchanged old
+  and new code; staging backup
+  `staging-2026-10-13T20-51-43Z-before-0152-0156.sql` 80/80 restored,
+  rehearsed 1,305 unchanged; **staging DB** 157, matches, 196/196, all
+  1,306 pre-existing bids unchanged (3 new bids appeared while measuring);
+  local + `bidrender_test_localdev` 157.
+- Guards decided: `starterChange.ts` NOT_EDITABLE_COMMON += the three
+  columns; `forkableReferences` five `replacedById` unreviewed (7 → 11).
+- **Live stays at 152.** At the next release 0152–0156 go on live BEFORE
+  any push of this code to `main`. Expect 157, 196/196.
+- C told F13 can be finished; B told it may merge (both handoffs).
+- **Scratch DB drop NOT done — blocked by the permission classifier.**
+  Script for the owner: `node <scratchpad>/dbdrop.mjs` (the nine from
+  session 38 plus this session's `bidrender_scratch_0152` and
+  `bidrender_scratch_staging_0152`). Session 38's four worktrees ARE
+  removed (two empty `node_modules` husks remain in
+  `../bidrender-before-scope` / `-twin`, 1.6 MB each).
+
+## (earlier) 2026-10-13, session 38: `60479773` + 0144–0151 ARE LIVE
 
 - Owner approvals A–D. Backup `2026-10-13T05-09-10Z` verified (77 / 5,539);
   fresh rehearsal on its restore matched 2026-10-12 exactly.

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **Database groundwork for starter updates and for locked bids' warnings
+  (staging only, nothing switched on).** New empty tables record changes to
+  the shipped starter library, which company copies they affect, and how
+  each company answered the offer; shipped items gain "hidden" and "replaced
+  by" markers; and a locked bid gains a place to keep the warning counts it
+  had when it locked. Nothing reads any of it yet, and every bid total on the
+  practice site was checked before and after: none moved. Not on
+  bidridge.com yet.
 - **Released to bidridge.com.** Bids now protect themselves once sent: a bid
   that leaves Draft locks its counts and keeps the overhead, profit and tax it
   was priced with, and later pricing changes reach only Drafts. Also live:

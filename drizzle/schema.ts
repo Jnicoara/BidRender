@@ -191,6 +191,134 @@ export const starterEditorRecoveryCodes = mysqlTable(
   t => [index("starter_editor_recovery_codes_userId_idx").on(t.userId)]
 );
 
+/**
+ * The starter change log (0152, Track C's BS-M3, baseline-screen-plan.md
+ * § 10a). One batch per save from the starter screen, a sheet, a copy, the
+ * seed boot or an undo. `editorUserId` NULL is a deleted account OR the seed
+ * boot — `source` says which.
+ */
+export const starterChangeBatches = mysqlTable("starter_change_batches", {
+  id: int("id").autoincrement().primaryKey(),
+  editorUserId: int("editorUserId").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  source: mysqlEnum("source", [
+    "screen",
+    "sheet",
+    "copy",
+    "seed",
+    "undo",
+  ]).notNull(),
+  fileName: varchar("fileName", { length: 255 }),
+  fileSha256: char("fileSha256", { length: 64 }),
+  changeCount: int("changeCount").default(0).notNull(),
+  note: varchar("note", { length: 512 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/**
+ * One starter change (0152). APPEND-ONLY: written once, never updated; an
+ * undo is a new change in a new batch pointing back through
+ * `undoesChangeId`. `oldValue` / `newValue` are wrapped `{"v": <value>}` so
+ * SQL NULL (not applicable) and `{"v": null}` (the column WAS NULL) stay
+ * apart. A part change keys `childRefId` by the PART's id (materialId /
+ * modifierId), not the child row's. `version` is the shared row's own version
+ * after the change (the parent's for a part change).
+ */
+export const starterChanges = mysqlTable(
+  "starter_changes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    batchId: int("batchId")
+      .notNull()
+      .references(() => starterChangeBatches.id, { onDelete: "cascade" }),
+    targetTable: varchar("targetTable", { length: 64 }).notNull(),
+    targetRowId: int("targetRowId").notNull(),
+    kind: mysqlEnum("kind", [
+      "field",
+      "part_add",
+      "part_remove",
+      "part_field",
+      "item_add",
+      "hide",
+      "unhide",
+    ]).notNull(),
+    field: varchar("field", { length: 64 }),
+    childTable: varchar("childTable", { length: 64 }),
+    childRefId: int("childRefId"),
+    oldValue: json("oldValue"),
+    newValue: json("newValue"),
+    version: int("version").notNull(),
+    undoesChangeId: int("undoesChangeId").references(
+      (): AnyMySqlColumn => starterChanges.id,
+      { onDelete: "set null" }
+    ),
+    note: varchar("note", { length: 512 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    index("starter_changes_batchId_idx").on(t.batchId),
+    index("starter_changes_target_idx").on(t.targetTable, t.targetRowId),
+    index("starter_changes_undoesChangeId_idx").on(t.undoesChangeId),
+  ]
+);
+
+/**
+ * Which company copy a starter change pinned (0153, BS-M4). The company is
+ * its owner's `users.id`, the key every fork carries. `forkId` has no FK: it
+ * points into whichever table the change targets.
+ */
+export const starterChangePins = mysqlTable(
+  "starter_change_pins",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    changeId: int("changeId")
+      .notNull()
+      .references(() => starterChanges.id, { onDelete: "cascade" }),
+    companyOwnerUserId: int("companyOwnerUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    forkId: int("forkId").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("starter_change_pins_change_company_uq").on(
+      t.changeId,
+      t.companyOwnerUserId
+    ),
+    index("starter_change_pins_company_idx").on(t.companyOwnerUserId),
+  ]
+);
+
+/**
+ * A company's answer to one starter change offer (0155, BS-M6). State, not
+ * the log: un-ignoring deletes the row, and an undo never rewrites one.
+ * `answeredByUserId` is the person who pressed it, for the audit only.
+ */
+export const starterOfferAnswers = mysqlTable(
+  "starter_offer_answers",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    companyOwnerUserId: int("companyOwnerUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    changeId: int("changeId")
+      .notNull()
+      .references(() => starterChanges.id, { onDelete: "cascade" }),
+    answer: mysqlEnum("answer", ["accepted", "ignored"]).notNull(),
+    answeredByUserId: int("answeredByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    answeredAt: timestamp("answeredAt").defaultNow().notNull(),
+  },
+  t => [
+    unique("starter_offer_answers_company_change_uq").on(
+      t.companyOwnerUserId,
+      t.changeId
+    ),
+  ]
+);
+
 // ─── Projects ─────────────────────────────────────────────────────────────────
 export const projects = mysqlTable(
   "projects",
@@ -941,6 +1069,22 @@ export const materials = mysqlTable(
     /** When it was archived. Shown in the archive; nothing expires from it. */
     archivedAt: timestamp("archivedAt"),
 
+    /**
+     * Starter change offers (0154, baseline-screen-plan.md § 10a). The same
+     * three columns sit on assemblies, labor_rates, modifiers and
+     * takeoff_run_types. `isPinnedCopy`: NULL = a company's own copy (every
+     * existing row), TRUE = a pin mirroring the starter as it was, FALSE = a
+     * pin the company then edited. `hiddenAt` and `replacedById` are for
+     * shared rows only, enforced in code (`hideStarterItem`). Nothing reads
+     * them until Track C's `applyStarterChange` ships.
+     */
+    isPinnedCopy: boolean("isPinnedCopy"),
+    hiddenAt: timestamp("hiddenAt"),
+    replacedById: int("replacedById").references(
+      (): AnyMySqlColumn => materials.id,
+      { onDelete: "set null" }
+    ),
+
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1030,6 +1174,14 @@ export const laborRates = mysqlTable(
     insurancePct: decimal("insurancePct", { precision: 6, scale: 4 }),
     benefitsPct: decimal("benefitsPct", { precision: 6, scale: 4 }),
 
+    /** Starter change offers (0154) — see `materials.isPinnedCopy`. */
+    isPinnedCopy: boolean("isPinnedCopy"),
+    hiddenAt: timestamp("hiddenAt"),
+    replacedById: int("replacedById").references(
+      (): AnyMySqlColumn => laborRates.id,
+      { onDelete: "set null" }
+    ),
+
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -1077,6 +1229,14 @@ export const modifiers = mysqlTable(
     status: mysqlEnum("status", MODIFIER_STATUSES).default("active").notNull(),
     /** When it left the active list. Orders the Archived view, newest first. */
     archivedAt: timestamp("archivedAt"),
+
+    /** Starter change offers (0154) — see `materials.isPinnedCopy`. */
+    isPinnedCopy: boolean("isPinnedCopy"),
+    hiddenAt: timestamp("hiddenAt"),
+    replacedById: int("replacedById").references(
+      (): AnyMySqlColumn => modifiers.id,
+      { onDelete: "set null" }
+    ),
 
     isActive: boolean("isActive").default(true).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -1203,6 +1363,14 @@ export const assemblies = mysqlTable(
     markShape: varchar("markShape", { length: 16 }),
     markLetter: varchar("markLetter", { length: 4 }),
     markColor: varchar("markColor", { length: 7 }),
+
+    /** Starter change offers (0154) — see `materials.isPinnedCopy`. */
+    isPinnedCopy: boolean("isPinnedCopy"),
+    hiddenAt: timestamp("hiddenAt"),
+    replacedById: int("replacedById").references(
+      (): AnyMySqlColumn => assemblies.id,
+      { onDelete: "set null" }
+    ),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -2441,6 +2609,13 @@ export const bids = mysqlTable(
     taxRateFrozenPct: decimal("taxRateFrozenPct", { precision: 7, scale: 4 }),
     /** What is shown beside the frozen rate: source, area, components. Display only. */
     taxRateFrozenDetail: json("taxRateFrozenDetail"),
+    /**
+     * A locked bid's server-side warning counts, frozen at the lock (0156,
+     * Track C's F13; `shared/lockedWarnings.ts` FrozenWarnings `{at, counts}`).
+     * NULL = never frozen — unlocked, or locked before this column — and both
+     * show live counts. Nothing writes or reads it until C wires F13.
+     */
+    lockedWarnings: json("lockedWarnings"),
 
     archivedAt: timestamp("archivedAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -3023,6 +3198,14 @@ export const takeoffRunTypes = mysqlTable(
     /** active / archived / deleted. See materials.status — same lifecycle. */
     status: mysqlEnum("status", LIBRARY_STATUSES).default("active").notNull(),
     archivedAt: timestamp("archivedAt"),
+
+    /** Starter change offers (0154) — see `materials.isPinnedCopy`. */
+    isPinnedCopy: boolean("isPinnedCopy"),
+    hiddenAt: timestamp("hiddenAt"),
+    replacedById: int("replacedById").references(
+      (): AnyMySqlColumn => takeoffRunTypes.id,
+      { onDelete: "set null" }
+    ),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -5294,6 +5477,12 @@ export const companies = mysqlTable(
      * raised every existing company to at least what it was already using.
      */
     seatLimit: int("seatLimit").default(1).notNull(),
+    /**
+     * When this company last looked at starter change offers (0155,
+     * baseline-screen-plan.md § 10a). NULL = its `createdAt`; never
+     * backfilled. Answers are in `starter_offer_answers`.
+     */
+    starterSeenAt: timestamp("starterSeenAt"),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
