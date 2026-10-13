@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Opening a plan sheet no longer places panels from their labels.** When
+  a sheet names a panel ("PANEL 2B") that has no spot on the bid yet, an
+  "Assign 1 panel from labels" button appears beside Circuits; measured
+  homerun lengths use the spot only once you press it. Before, just looking
+  at the sheet placed it.
 - **Opening a plan sheet no longer adds homerun circuits by itself.** When
   a sheet shows circuits the bid does not have yet, an "Add 3 new homerun
   circuits" button appears beside Circuits; their homerun feet count once

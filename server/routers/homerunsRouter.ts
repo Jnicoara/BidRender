@@ -272,6 +272,16 @@ export const homerunsRouter = router({
             y: z.number().min(0).max(100000),
           })
           .nullable(),
+        /**
+         * WHO is placing it, REQUIRED with no default (owner, 2026-10-12, the
+         * Q19 rule): `"hand"`, a person tapping the panel's spot on the
+         * drawing; `"label"`, a person pressing "Assign N panels from labels".
+         * There is no value for "the page read a label while showing the
+         * sheet". That used to fill an empty spot on every visit, and
+         * Measured footage then appeared on a Draft because somebody looked.
+         * A caller that does not say is refused.
+         */
+        by: z.enum(["hand", "label"]),
       })
     )
     .mutation(async ({ ctx, input }) => {

@@ -102,6 +102,7 @@ async function aBid(assemblyId: number) {
     circuits: [{ panel: "2B", circuits: [1], leavingStampId: mark.id }],
   });
   await caller().homeruns.placePanel({
+    by: "hand",
     bidId: bid.id,
     panel: "2B",
     spot: { sheetId: sheet.id, x: 0, y: ft(10) },

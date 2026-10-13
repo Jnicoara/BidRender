@@ -121,6 +121,8 @@ import {
 import {
   confirmableHomeruns,
   homerunOfferLabel,
+  labelPanelsToAssign,
+  panelOfferLabel,
   homerunSyncPayload,
   homerunSyncStep,
   type HomerunSyncState,
@@ -4817,6 +4819,7 @@ export default function TakeoffPage({
         bidId,
         panel,
         spot: spot ? { sheetId: activeSheet.id, ...spot } : null,
+        by: "hand",
       });
     },
     [activeSheet, bidId, placePanel]
@@ -4959,6 +4962,27 @@ export default function TakeoffPage({
     );
   };
   /**
+   * "Assign N panels from labels" — the person's tap (owner, 2026-10-12).
+   * Places each label-found panel that has no saved spot, at its label.
+   */
+  const labelPanels =
+    circuitReport && homerunData
+      ? labelPanelsToAssign(circuitReport.panels, homerunData.panels)
+      : [];
+  const assignLabelPanels = () => {
+    if (!activeSheet) return;
+    for (const p of labelPanels)
+      placePanel.mutate({
+        bidId,
+        panel: p.name,
+        spot: { sheetId: activeSheet.id, x: p.x, y: p.y },
+        by: "label",
+      });
+    toast.success(
+      `Placed ${labelPanels.length} panel${labelPanels.length === 1 ? "" : "s"} at ${labelPanels.length === 1 ? "its label" : "their labels"}.`
+    );
+  };
+  /**
    * "Add N new homerun circuits" — the person's tap (owner Q19, 2026-10-12;
    * baseline-screen-plan.md § 9 F11). The ONLY call that sends
    * `create: true`; a visit never does.
@@ -4988,24 +5012,15 @@ export default function TakeoffPage({
     if (!circuitReport || !activeSheet || !homerunData || homerunData.locked)
       return;
     const sheetId = activeSheet.id;
-    for (const p of circuitReport.panels) {
-      if (p.spot?.source !== "label") continue;
-      const saved = homerunData.panels.find(
-        s => (s.name ?? "").toUpperCase() === p.name.toUpperCase()
-      );
-      /*
-        A label FILLS a panel with no spot; it never moves a saved one
-        (owner, 2026-10-07: viewing must never change a saved number). It
-        used to re-save whenever the two differed, so a panel moved by hand
-        went back to the label on the next visit — and every homerun with it.
-      */
-      if (saved?.planSheetId != null) continue;
-      placePanel.mutate({
-        bidId,
-        panel: p.name,
-        spot: { sheetId, x: p.spot.x, y: p.spot.y },
-      });
-    }
+    /*
+      A panel found by its "PANEL 2B" LABEL is NOT placed here (owner,
+      2026-10-12, the Q19 rule: viewing never changes a number). It is
+      offered: "Assign N panels from labels" on the toolbar
+      (`labelPanelsToAssign`, `assignLabelPanels`). Until then this loop
+      filled every empty spot on every visit, and Measured footage appeared
+      for circuits already on the bid. `homeruns.placePanel` now refuses a
+      call that does not say who is placing.
+    */
     const payload = homerunSyncPayload(circuitReport);
     const signature = syncSignature(sheetId, payload);
     /*
@@ -10625,6 +10640,27 @@ export default function TakeoffPage({
                 >
                   <Plus className="w-3 h-3" />
                   {homerunOfferLabel(homerunWaiting[activeSheet.id] ?? 0)}
+                </Button>
+              )}
+            {/*
+              THE PANEL OFFER (owner, 2026-10-12, the Q19 rule): panels read
+              from a "PANEL 2B" label are never placed by looking. Beside the
+              homerun offer, for the same reason it is on the toolbar.
+            */}
+            {!phone &&
+              activeSheet &&
+              !homerunData?.locked &&
+              panelOfferLabel(labelPanels.length) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-xs border-[#F5C518]/50"
+                  onClick={assignLabelPanels}
+                  disabled={placePanel.isPending}
+                  title="Panels named by a label on this sheet that have no spot on the bid yet. Measured homeruns use the spot once you assign it."
+                >
+                  <MapPin className="w-3 h-3" />
+                  {panelOfferLabel(labelPanels.length)}
                 </Button>
               )}
             {!phone && showCircuits && circuitReport && (

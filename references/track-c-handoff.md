@@ -1,6 +1,77 @@
 # Track C — handoff, 2026-10-06
 
-## START HERE (2026-10-12, late night) — F11 and F12 built on track-c, NOT merged (waits for the owner's go)
+## START HERE (2026-10-13) — panel-label offer built; F13 rule built, WIRING WAITS ON ONE COLUMN FROM A; NOT merged (live release first)
+
+**Owner: build on track-c, do not merge; the live release goes first.**
+Track-c has local-dev merged in at `00a2702` (A's `applyMathVersion.mts` and
+`freezeSentBids.mts` came with it). Actions run 38324733231 (`9291c70`):
+attempt 2 was in progress past the image pull when checked. See the end of
+the session for its result.
+
+**(a) Panel-label fill is a one-tap offer (the Q19 rule).**
+
+- The page no longer places a "PANEL 2B"-labelled panel while showing the
+  sheet. `labelPanelsToAssign` (`client/src/lib/homerunSync.ts`) lists
+  label-found panels with NO saved spot.
+- **"Assign N panels from labels"** on the Plans toolbar, beside the homerun
+  offer, places them. It is hidden on a locked bid.
+- `homeruns.placePanel` takes **`by: "hand" | "label"`, required with no
+  default**, so a call that does not say is refused. Both page callers
+  failed the typecheck until they said.
+- **Seen:** laptop, iPad portrait and landscape, on the scratch bid's E111
+  with panel 2B's spot cleared for the check. **Viewing left the spot empty
+  in the database at all three sizes.**
+- **The button itself was NOT seen.** No local sheet with circuits has a
+  readable "PANEL 2B" label: E111's 2B was placed by hand, and a label
+  wins over a hand spot (`circuitGroups` `spotOf`). The markup is the F11
+  offer's, which was seen at all three sizes. The spot is restored
+  (234295, 443, 186).
+
+**(b) F13: a locked bid's warning counts frozen at the lock.**
+
+- **Which counts:** the SERVER-side ones that read the library live on a
+  locked bid. These are `dropsNotPriced` (assembly mount type, company
+  heights) and `planAttentionFor` (counts not sent, counted with no price,
+  double-counted, runs with no wire, runs not on the bid). The bid screen's
+  line-derived strips read frozen line snapshots and already hold still.
+- **Built:** `shared/lockedWarnings.ts`, the rule:
+  - `freezeAt(counts, at)` returns a deep copy;
+  - `shownWarningCounts(bid, live)` gives frozen when locked with a frozen
+    value, live when unlocked, and live for a bid locked before freezing
+    existed (never frozen by a read).
+  - Tests: `server/lockedWarnings.test.ts` (5).
+- **NOT wired, because it needs a column and C cannot add one.** The
+  drizzle-guard fails a track branch on any `drizzle/` change, the schema
+  declaration included. **For A, F13-M1** (additive, step 1, nullable, step
+  3 empty; nothing reads it until C wires it):
+
+  ```sql
+  -- F13-M1: a locked bid's server-side warning counts, frozen at the lock
+  -- (shared/lockedWarnings.ts FrozenWarnings: {at, counts}). NULL = never
+  -- frozen: unlocked, or locked before this column — both show live counts.
+  ALTER TABLE `bids` ADD `lockedWarnings` json NULL;
+  ```
+
+- **C's wiring once it exists** (three call sites, one commit):
+  1. `db.lockBidQuantities` (the button AND `leaveDraft`) computes the live
+     counts and writes `freezeAt(...)`.
+  2. `db.unlockBidQuantities` writes NULL.
+  3. `bids.get`, the proposal, the quote panel and the dashboard cards
+     (`dropsNotPricedForBids`) read through `shownWarningCounts`. The strip
+     then says "as at lock, Oct 12".
+- A's `freezeSentBids.mts` may want to fill it for bids already locked. That
+  is a write of the values in effect, so no number moves.
+
+**Proof**
+
+- **bidTotals:** 4,237 / 4,237 Total due unchanged, against a fresh
+  measurement taken on this session's starting code (`before4`).
+- **8 guards each red when removed:** `by` required; only label spots
+  offered; a saved spot never offered; offer hidden at 0; locked shows
+  frozen; unlocked shows live; frozen is a copy; a foreign value is ignored.
+- 5 changed test files, 68 tests, green; `pnpm check` is clean.
+
+## EARLIER (2026-10-12, late night) — F11 and F12 built on track-c, NOT merged (waits for the owner's go)
 
 **Owner, this session:** both § 10a.5 picks are APPROVED and recorded in
 `baseline-screen-plan.md` § 10a.5: the Accept button warns "N draft bids

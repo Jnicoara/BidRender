@@ -189,6 +189,23 @@ describeDb("a sheet visit adds nothing; the offer adds (F11)", () => {
     expect((await homeruns(bidId)).rows).toHaveLength(1);
   });
 
+  it("refuses a panel placement that does not say who is placing it", async () => {
+    // Owner, 2026-10-12 (the Q19 rule): a visit used to fill an empty panel
+    // spot from a "PANEL 2B" label. `by` has no default, so nothing places
+    // a panel without saying it is a person's hand or their "Assign" tap.
+    const { bidId, sheetId } = await aBid();
+    await expect(
+      caller().homeruns.placePanel({
+        bidId,
+        panel: "2B",
+        spot: { sheetId, x: 0, y: ft(10) },
+      } as unknown as Parameters<
+        ReturnType<typeof caller>["homeruns"]["placePanel"]
+      >[0])
+    ).rejects.toThrow();
+    expect((await homeruns(bidId)).panels).toHaveLength(0);
+  });
+
   it("refuses a sync that does not say whether it creates", async () => {
     const { bidId, sheetId, near } = await aBid();
     await expect(
@@ -220,6 +237,7 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
     });
 
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -256,6 +274,7 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
       });
     await sync(near);
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -340,6 +359,7 @@ describeDb("homerun rows: confirm and override (step 3)", () => {
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId: b.bidId,
       panel: "2B",
       spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
@@ -423,6 +443,7 @@ describeDb(
         circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
       });
       await caller().homeruns.placePanel({
+        by: "hand",
         bidId,
         panel: "2B",
         spot: { sheetId, x: 0, y: ft(10) },
@@ -504,6 +525,7 @@ describeDb("extra bends per homerun (0131, owner 2026-10-07)", () => {
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId: b.bidId,
       panel: "2B",
       spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
@@ -612,6 +634,7 @@ describeDb("every total the bid line agrees with includes homeruns", () => {
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -645,6 +668,7 @@ describeDb("the bid line (step 4)", () => {
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -699,6 +723,7 @@ describeDb("height areas inside a sheet (0130)", () => {
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId: b.bidId,
       panel: "2B",
       spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
