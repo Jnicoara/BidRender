@@ -1,5 +1,26 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-12 — Conduit name review for the owner; nothing applied
+
+`pricing/conduit-name-review.md`, in the same format as A's Boxes review.
+It covers rows 118–635 (Conduit + Conduit Fittings, 518 rows): 349 are OK
+and 169 need a word or two. No row is a non-product, and none is two
+products in one.
+
+- **Weightiest:** liquidtight connector (10 starters), flex connector and
+  flex conduit (5 each), raintight EMT connector (4).
+- **Missing items:** 6, X1–X6 (nipples, chase nipples, watertight hubs, PVC
+  end bells, the 3/8" FMC connector, larger EMT two-hole straps).
+- **Owner questions:** Q1–Q6.
+- **For A:**
+  - Most of these names are BUILT by `shared/runFittingMaterials.ts`. A
+    rename there is a code + seed pair; Q5 suggests the description route.
+  - Flex pack labels say "10 ft stick" on coils (rows 156–159, 161–164).
+  - PG2 may double-count the 2" rigid coupling.
+
+Workbook read from a copy only. Waits for A's end-of-pricing job and the
+owner's answers.
+
 ## (newest) 2026-10-12 — step-times DRAFT for the owner; nothing built
 
 `references/step-times-draft.md`: minutes for the 47 steps already in the
