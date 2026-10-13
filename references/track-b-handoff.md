@@ -26,7 +26,7 @@ finishes F13 and merges, THEN B merges. **No migration, none needed.**
   "Sheet numbers check" E-200 (set 648560, page 5): no sideways scroll at
   any size; rings on the boxed numbers, not the boxed room numbers; note 7
   jump works on each. Nothing written to the fixture bid.
-- **Gate:** see the handoff-only commit after this one.
+- **Gate green on ff1b7b98** (run 38469894328: test + drizzle-guard).
 - **Dev servers stopped** (none left with `BidPhase-B` in the command line).
 - **Next:** 5c — tap a tag (no tool in hand) → popover with the note; tip
   3 switches on then.
