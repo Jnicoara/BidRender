@@ -717,6 +717,16 @@ Notes for A:
 
 #### 10a.3 `applyStarterChange` — how a change is stored, pinned and undone
 
+> **Built 2026-10-13 (track-c `1ac7487f`)** in `server/starterChanges.ts`:
+> store, pin, change, log, undo one and undo a batch, for `field` and the
+> `part_*` kinds; `takeoff_run_types` classified (#1). Offers / Accept,
+> `hideStarterItem` and run-type extras are NOT built. Two additions to the
+> spec below: a batch that changes the same thing twice is refused, and
+> `isPinnedCopy` / `hiddenAt` / `replacedById` are never copied by a fork.
+> **No caller may be wired on a shared database before A's boot change**:
+> the seed's re-stamp would write over a logged change. See
+> `track-c-handoff.md`, 2026-10-13 night.
+
 One server function (`server/starterChanges.ts`, C), called by the screen, the
 sheet upload, "Copy from my company", the boot's seed proposal (once A's boot
 change routes through it) and undo. **One batch per call, ONE transaction**:

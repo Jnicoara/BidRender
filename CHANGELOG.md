@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **The engine behind changing the shipped starter library (not switched on
+  yet).** When BidRidge changes a starter price, recipe or rate, every
+  existing company first gets its own copy of the old one, so nothing on
+  its bids or in its library moves; companies that join later get the new
+  one. Every change is recorded and can be undone. Nothing in the app uses
+  it until the starter editor's screen arrives.
+
 - **A locked bid's warnings now hold what they said when it was locked.**
   "2 drops not priced", "counts not on the bid" and the other plan warnings
   used to re-count from the library every time a locked bid was opened, so

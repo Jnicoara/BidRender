@@ -1,6 +1,136 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-13 — Receptacles answers recorded; Switches name review; nothing applied
+## START HERE (2026-10-13, night) — F13 finished; applyStarterChange built; Switches answers recorded
+
+**State.** track-c merged local-dev at `dc08f1a2` (A's 0152–0156) as
+`4ebff8d6`. C's databases migrated: `bidrender_test_c` and
+`bidrender_local_c` both record **157**. `schemaDrift.mts`:
+**test_c matches, 196/196.** **local_c does NOT**: 191/196 FKs (5 missing,
+first `assemblies(laborRateId)`) and 7 columns on `utf8mb4_0900_ai_ci` in
+`ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`. None
+of it is from 0152–0156 (they applied clean); local_c was not built from
+migrations. It is C's scratch copy and nothing deploys from it; rebuild it
+from migrations if a check ever needs it exact.
+
+**1. Switches answers** — `pricing/switches-name-review.md` "Owner's answers":
+Q1–Q11 all yes as suggested. Q3: 829 hidden into 837, "3-way dimmer" kept as
+a search word, DV15 moves to 837 (the job's ONE starter edit). Q9: 861
+becomes W2 (the cover), old name kept as a search word, moves to Wall Plates
+& Misc. Q10: 846 hidden. Q11: W1 and W3 added. Nothing applied; for A's
+end-of-pricing job.
+
+**2. F13 — finished** (`734c8258`). A locked bid's server-side warning
+counts are frozen at the lock in `bids.lockedWarnings`.
+
+- `db.lockBidQuantities(bidId, at, countWarnings)`: the callback is
+  **required**, so no caller can lock without freezing. It runs after the
+  quantities are written; its answer goes in the same statement as
+  `quantitiesLockedAt`. `unlockBidQuantities` clears both in one statement.
+- `server/bidWarnings.ts` is the ONE live computation (`planAttentionFor` +
+  `bidDropsNotPriced`) and `lockBid`. The Lock button, `leaveDraft` and
+  A's `scripts/freezeSentBids.mts` all lock through `lockBid` (that script
+  is A's: its one line changed, same behaviour plus the freeze).
+- Readers: `bids.get` (`fromPlans`, `dropsNotPriced`, new
+  `warningsFrozenAt`), the quote panel, the proposal
+  (`dropsNotPricedShown`), and every list through `dropsNotPricedForBids`,
+  which answers a locked-frozen bid from its frozen counts without
+  recounting.
+- **On screen:** "These warnings are as counted when this bid was locked,
+  Oct 13. Unlock it to count them again." under the strip, only when a
+  frozen count is showing. **Looked at** on "Bar layout check" at laptop
+  (1536x864) and iPad portrait (820x1180): it locked, the note sat under
+  the four warnings at both sizes, and Unlock put it back (lock column and
+  `lockedWarnings` both NULL again, read back from the row).
+- **For B:** `bids.get` has a new field `warningsFrozenAt`; the note is in
+  `BidsPage.tsx` beside the strip.
+- Bids locked before today have `lockedWarnings` NULL and show live counts
+  (never frozen by a read). If A wants them frozen, `freezeSentBids.mts`'s
+  lock does it only for bids it locks; an unlock-and-relock freezes any.
+
+**3. applyStarterChange — built** (`1ac7487f`), `server/starterChanges.ts`,
+per `baseline-screen-plan.md` § 10a.3.
+
+- **One transaction:** new `db.inOneTransaction(work)`. While it runs,
+  `getDb()` hands out the transaction (AsyncLocalStorage), so every
+  existing fork function joins it unchanged; an inner `db.transaction`
+  nests as a savepoint.
+- **Kinds built:** `field`; `part_add` / `part_remove` / `part_field` on
+  `assembly_materials` (keyed by material id; line fields qty,
+  overrideLaborHours, isBranchWhip, as `assemblyMaterialLine`);
+  `part_add` / `part_remove` on `assembly_modifiers`.
+- **Refusals** (all listed, whole batch refused): table, row not shared,
+  `starterChangeRefusal`, the column's own type and nullability (blank is
+  never 0), the sheet's above-zero fields (`ABOVE_ZERO_FIELDS` in
+  `shared/starterSheetChecks.ts`: costPerUnit, laborHours,
+  fieldBendLaborHours), references and parts must be shared + active +
+  not hidden (`STARTER_REFERENCES`), the same thing twice in one batch.
+- **Pins:** every company with no copy is forked as it is now,
+  `isPinnedCopy = TRUE`, one `starter_change_pins` row. "Has a copy" is
+  the table's own fork function (it returns an existing copy), so the rule
+  is not restated; run types reuse only an ACTIVE fork, as `forkRunType`
+  already does. An `everyone` field pins nobody.
+- **Undo:** `undoStarterChange` (refused "changed again since …" unless
+  the row still holds the change's new value) and `undoStarterBatch`
+  (`preview: true` writes nothing). Both write a new `undo` batch with
+  `undoesChangeId`; pins already made stay.
+- **`takeoff_run_types` classified** (`StarterTable` "runTypes"): `label`
+  and every part column / count / extra % / makeup are offers, `color` is
+  everyone, `pathType` is a UNIT, `trade`/`status`/`archivedAt` app-kept.
+  `isActive` moved from the common list to the four tables that have it.
+- **Company edits set a pin FALSE:** `updateMaterial`, `updateLaborRate`,
+  `updateModifier`, `updateAssembly`, `updateRunType`, and the recipe
+  setters (`setAssemblyMaterials` / `Modifiers` / `Steps`, because a
+  recipe-only save never calls `updateAssembly`).
+- **NOT built yet:** offers / Accept / Ignore, `hideStarterItem`
+  (hide / unhide / item_add), run-type EXTRAS (and editing a pin's extras
+  does not unpin it yet), kits, labor steps, any router. **Nothing calls
+  `applyStarterChange` from a screen.**
+- **For A — do not wire a caller on a shared database before the boot
+  change (§ 6, F2–F6).** `seedBaselineMaterials` re-stamps shared rows from
+  the seed on every start, so a logged change to a seeded field (a price)
+  would be written back over by the next boot with no log. Pinned
+  companies would keep the old value; everyone else would read the seed's.
+
+**4. A's two guard decisions — CONFIRMED, with one addition.**
+
+- `isPinnedCopy`, `hiddenAt`, `replacedById` as internal (`NOT_EDITABLE_COMMON`):
+  **right.** C went one step further: they are now also in
+  `LIBRARY_OWNERSHIP_FIELDS` (and `forkRunType`'s exclusions), so a fork
+  never COPIES them and a company patch cannot set them. Before this, a
+  fork of a hidden shared row would have carried its `hiddenAt` and
+  `replacedById` onto the company's copy. Test: "a fork never copies the
+  starter's hiding".
+- The five `replacedById` as `unreviewed` in `forkableReferences.test.ts`:
+  **right, and they stay unreviewed.** Nothing C built today reads or
+  writes `replacedById`. They become `resolver` entries when
+  `hideStarterItem` and the replacement swap read them.
+
+**Proof**
+
+- **Tests that go red when the guard is removed** (each removed, run, and
+  restored; 11 of 11 red): no pin on an offer field (5 fail); no
+  transaction (1); refusals ignored (3); a material edit keeps its pin (1);
+  a recipe-only save keeps it (1); a fork copies `hiddenAt` (1); the lock
+  does not freeze (3); unlock keeps the frozen value (1); the lists ignore
+  frozen (1); the proposal reads live (1); the bid page reads live (2).
+- **Totals unchanged:** `bidTotals.mts` on `bidrender_local_c`, the
+  starting code (`4ebff8d6`, its own worktree) against this code: **all
+  4,237 bids, totalDue, not-priced and incomplete unchanged.**
+- **Locked bids refuse change:** a locked bid's totals, warnings, drops and
+  frozen date read identical across a starter price + hours change and its
+  batch undo (`starterChanges.test.ts`, the last test).
+- New tests: `starterChanges.test.ts` (11, on its OWN shared probe rows,
+  deleted with every copy at the end), `lockedWarningsFrozen.test.ts` (4),
+  `frozenWarnings.test.ts` (2); `starterChange.test.ts` now checks run
+  types' columns too. `pnpm check` clean. On `bidrender_test_c`: 175 files,
+  **2,212 passed, 1 skipped, 1 failed** — the one below.
+- **Not caused here, found on the way:** `starterAssembliesSeed.test.ts`
+  "gets every starter…" fails on `bidrender_test_c` (DV33 holds the retired
+  "Floor box cover", 1605, not "Floor box cover, duplex"). It fails
+  identically on the starting code, so it is that database's state; the
+  Gate runs on a fresh one.
+
+## (earlier) 2026-10-13 — Receptacles answers recorded; Switches name review; nothing applied
 
 **Receptacles, owner's answers** (review's "Owner's answers" section), for
 A's end-of-pricing job: **Q1–Q13 all yes, as suggested.**
@@ -411,6 +541,7 @@ holds the 14 answers, § 10a.2 the hand-written SQL, and § 10a.3 the
 **A:** number, rehearse and apply them as written. All are step 1, step 3 is
 empty, and `bidTotals` should come back identical. **The owner has two
 number-facing points in § 10a.5**; neither blocks applying the SQL.
+
 ## FROM TRACK A — 2026-10-13 (session 39): BS-M3–M6 and F13-M1 ARE APPLIED — F13 can be finished
 
 Your § 10a.2 SQL and F13-M1, word for word, on `local-dev`, its test DB
