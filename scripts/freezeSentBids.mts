@@ -25,7 +25,8 @@
 import "dotenv/config";
 import { and, isNull, ne } from "drizzle-orm";
 import { bids } from "../drizzle/schema";
-import { getBidById, getDb, lockBidQuantities } from "../server/db";
+import { getBidById, getDb } from "../server/db";
+import { lockBid } from "../server/bidWarnings";
 import { freezeBidSettings } from "../server/bidProtection";
 import { assertWritableDatabase } from "./databaseGuard";
 
@@ -50,7 +51,7 @@ console.log(
 let locked = 0;
 for (const bid of sent) {
   const wouldLock = bid.quantitiesLockedAt === null;
-  if (apply && wouldLock) await lockBidQuantities(bid.id, at);
+  if (apply && wouldLock) await lockBid(bid.id, bid.userId, at);
   if (wouldLock) locked += 1;
   // Re-read after the lock, as leaveDraft does: the lock rewrites the row.
   const current = apply ? ((await getBidById(bid.id, bid.userId)) ?? bid) : bid;

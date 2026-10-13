@@ -19,13 +19,15 @@
  * without help. `partChanged` is empty on a locked bid by construction
  * (`bridgeForBid` plans nothing there).
  *
- * ── Where the frozen value lives: WAITS ON TRACK A ───────────────────────────
- * One nullable JSON column, `bids.lockedWarnings` (draft "F13-M1" in
- * references/track-c-handoff.md). Until it exists, nothing calls `freezeAt` or
- * reads a frozen value, and every bid shows live counts, as today. This
- * module is the rule, tested, so the wiring is three call sites once the
- * column lands.
+ * ── Where the frozen value lives ─────────────────────────────────────────────
+ * `bids.lockedWarnings` (0156, F13-M1), one nullable JSON column. The lock
+ * writes it in the same statement as `quantitiesLockedAt`
+ * (`db.lockBidQuantities`, whose `countWarnings` argument is required, so no
+ * caller can lock without freezing); unlock clears it in the statement that
+ * clears the lock. Readers: `bids.get`, the quote panel, and every list of
+ * bids through `db.dropsNotPricedForBids` — see server/bidWarnings.ts.
  */
+import type { RunsNotOnBid } from "./runsNotOnBid";
 
 /** The server-side warning counts a bid screen shows. */
 export type WarningCounts = {
@@ -35,7 +37,7 @@ export type WarningCounts = {
   doubleCounted: string[];
   runsWithNoWire: number;
   /** `runsNotOnBid` as the strip reads it (shared/runsNotOnBid.ts). */
-  runsNotOnBid: unknown;
+  runsNotOnBid: RunsNotOnBid;
 };
 
 /** What `bids.lockedWarnings` holds: the counts, and when they were taken. */
@@ -62,11 +64,23 @@ export function shownWarningCounts(
   bid: { quantitiesLockedAt: Date | string | null; lockedWarnings: unknown },
   live: WarningCounts
 ): { counts: WarningCounts; frozenAt: string | null } {
-  if (bid.quantitiesLockedAt === null) return { counts: live, frozenAt: null };
-  const frozen = asFrozen(bid.lockedWarnings);
+  const frozen = frozenWarningsShown(bid);
   return frozen
     ? { counts: frozen.counts, frozenAt: frozen.at }
     : { counts: live, frozenAt: null };
+}
+
+/**
+ * The frozen counts this bid shows, or null when it shows live ones. The same
+ * rule as `shownWarningCounts`, for a caller that skips computing live counts
+ * it would not show (a list of bids, `bids.get` on a locked bid).
+ */
+export function frozenWarningsShown(bid: {
+  quantitiesLockedAt: Date | string | null;
+  lockedWarnings: unknown;
+}): FrozenWarnings | null {
+  if (bid.quantitiesLockedAt === null) return null;
+  return asFrozen(bid.lockedWarnings);
 }
 
 /** A stored value read back, or null if it is not one this module wrote. */

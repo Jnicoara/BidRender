@@ -48,6 +48,7 @@ import { notPricedLines, withDropsNotPriced } from "../../shared/lineNotPriced";
 import { exampleSummary } from "../../shared/exampleTags";
 import { storagePresignPut } from "../storage";
 import * as db from "../db";
+import { dropsNotPricedShown } from "../bidWarnings";
 import { setLogoReleasingOld } from "../storedFiles";
 import { storageUrl } from "../storageTokens";
 
@@ -373,7 +374,8 @@ export const proposalsRouter = router({
       */
       const notPriced = withDropsNotPriced(
         linesNotPriced,
-        await db.bidDropsNotPriced(bid.id, ctx.scope.dataUserId)
+        // Frozen on a locked bid, as its bid page shows it (F13).
+        await dropsNotPricedShown(bid, ctx.scope.dataUserId)
       );
 
       // A proposal built on a total that leaves a line out is a wrong price

@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **A locked bid's warnings now hold what they said when it was locked.**
+  "2 drops not priced", "counts not on the bid" and the other plan warnings
+  used to re-count from the library every time a locked bid was opened, so
+  editing an assembly could change what a sent bid warned about with nothing
+  on the bid having changed. Now they are counted once at the lock (by hand,
+  or when the bid leaves Draft), and the bid page, the dashboard card, "Find
+  a bid", the quote panel and the proposal all show those counts, with a
+  line saying they are from the lock. Unlocking counts them live again.
+
 - **Database groundwork for starter updates and for locked bids' warnings
   (staging only, nothing switched on).** New empty tables record changes to
   the shipped starter library, which company copies they affect, and how

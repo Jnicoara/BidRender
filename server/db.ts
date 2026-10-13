@@ -386,6 +386,11 @@ import {
 } from "../shared/takeoffBridge";
 import { extraFeetForRuns, extraKeyOf } from "../shared/runExtrasPerFoot";
 import { followsDrawing } from "../shared/quantityLock";
+import {
+  freezeAt,
+  frozenWarningsShown,
+  type WarningCounts,
+} from "../shared/lockedWarnings";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
 import {
   quantityCircuit,
@@ -7120,10 +7125,19 @@ export async function compareBidQuantitiesWithPlans(bidId: number): Promise<{
  * ── The clock is a parameter ─────────────────────────────────────────────────
  * So a test can say when. Nothing on a path that decides what a screen says
  * about a date may read `Date.now()` for itself (CLAUDE.md § Scheduled work).
+ *
+ * ── The warning counts freeze with it (F13, shared/lockedWarnings.ts) ────────
+ * `countWarnings` is REQUIRED, so no caller can lock a bid without freezing
+ * what its warnings say. It is a callback because the counts live in
+ * server/bidWarnings.ts, which imports this file. It runs AFTER the
+ * quantities are written, so the counts describe the bid as locked, and its
+ * answer goes in the same statement as the timestamp: a bid is never locked
+ * with no frozen counts, nor holds counts while unlocked.
  */
 export async function lockBidQuantities(
   bidId: number,
-  at: Date
+  at: Date,
+  countWarnings: () => Promise<WarningCounts>
 ): Promise<{ lockedAt: Date; frozen: number; moved: number }> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -7154,9 +7168,10 @@ export async function lockBidQuantities(
       .where(and(eq(bidLineItems.id, line.id), eq(bidLineItems.bidId, bidId)));
   }
 
+  const warnings = freezeAt(await countWarnings(), at);
   await db
     .update(bids)
-    .set({ quantitiesLockedAt: at })
+    .set({ quantitiesLockedAt: at, lockedWarnings: warnings })
     .where(eq(bids.id, bidId));
 
   /*
@@ -7170,13 +7185,17 @@ export async function lockBidQuantities(
   return { lockedAt: at, frozen, moved };
 }
 
-/** Let the quantities follow the plans again. One column, back to NULL. */
+/**
+ * Let the quantities follow the plans again: the lock and the warning counts
+ * frozen with it (F13) go back to NULL in one statement, so the strip shows
+ * live counts from this moment.
+ */
 export async function unlockBidQuantities(bidId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db
     .update(bids)
-    .set({ quantitiesLockedAt: null })
+    .set({ quantitiesLockedAt: null, lockedWarnings: null })
     .where(eq(bids.id, bidId));
 }
 
@@ -15680,6 +15699,10 @@ export async function bidDropsNotPriced(
  * bid page's own function, so a card and the bid it opens cannot disagree.
  * The filter can only let too many through, never too few. A few at a time,
  * so a long history does not open one connection per bid.
+ *
+ * A LOCKED bid with frozen counts (F13) answers from them, as its bid page
+ * does (server/bidWarnings.ts), and is not recounted: a library edit since
+ * the lock must not move its card.
  */
 export async function dropsNotPricedForBids(
   bidIds: readonly number[],
@@ -15689,6 +15712,27 @@ export async function dropsNotPricedForBids(
   if (bidIds.length === 0) return out;
   const db = await getDb();
   if (!db) return out;
+  const frozenIds = new Set<number>();
+  for (const bid of await db
+    .select({
+      id: bids.id,
+      quantitiesLockedAt: bids.quantitiesLockedAt,
+      lockedWarnings: bids.lockedWarnings,
+    })
+    .from(bids)
+    .where(
+      and(
+        eq(bids.userId, userId),
+        inArray(bids.id, Array.from(new Set(bidIds))),
+        isNotNull(bids.lockedWarnings)
+      )
+    )) {
+    const frozen = frozenWarningsShown(bid);
+    if (!frozen) continue;
+    frozenIds.add(bid.id);
+    if (frozen.counts.dropsNotPriced > 0)
+      out.set(bid.id, frozen.counts.dropsNotPriced);
+  }
   const withMarks = (
     await db
       .selectDistinct({ bidId: takeoffStamps.bidId })
@@ -15699,7 +15743,9 @@ export async function dropsNotPricedForBids(
           inArray(takeoffStamps.bidId, Array.from(new Set(bidIds)))
         )
       )
-  ).map(r => r.bidId);
+  )
+    .map(r => r.bidId)
+    .filter(id => !frozenIds.has(id));
   for (let i = 0; i < withMarks.length; i += 4) {
     const batch = withMarks.slice(i, i + 4);
     const counts = await Promise.all(
@@ -16387,7 +16433,12 @@ export async function syncHomerunCircuit(
     existing.confirmedAt === null &&
     existing.from !== leavingStampId;
   if (!moves)
-    return { id: existing.id, created: false, repointed: false, waiting: false };
+    return {
+      id: existing.id,
+      created: false,
+      repointed: false,
+      waiting: false,
+    };
   await db
     .update(bidPanelCircuits)
     .set({ homerunFromStampId: leavingStampId, poles })

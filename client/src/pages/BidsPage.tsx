@@ -164,6 +164,7 @@ import {
   resolveHomerunMethod,
 } from "@shared/homerunFootage";
 import { homerunSummaryLine } from "@/lib/homerunText";
+import { frozenWarningsNote } from "@/lib/frozenWarnings";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -783,7 +784,12 @@ export default function BidsPage({
     problems,
     staleRates,
     dropsNotPriced,
+    warningsFrozenAt,
   } = detailQuery.data;
+  const lockedWarningsNote = frozenWarningsNote(warningsFrozenAt, {
+    ...fromPlans,
+    dropsNotPriced,
+  });
 
   /**
    * Lines frozen at a labor rate their role no longer has, grouped by the
@@ -2530,6 +2536,12 @@ export default function BidsPage({
                     whichever is the duplicate.
                   </p>
                 </div>
+              )}
+              {/* F13: on a locked bid the counts above are the lock's. */}
+              {lockedWarningsNote && (
+                <p className="text-[11px] leading-snug text-muted-foreground/80 pl-3 my-1">
+                  {lockedWarningsNote}
+                </p>
               )}
 
               {/*

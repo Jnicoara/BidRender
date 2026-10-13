@@ -1,7 +1,7 @@
 /**
  * F13: a locked bid's warning counts hold what they said at the lock
- * (shared/lockedWarnings.ts). The rule only — the column it reads
- * (`bids.lockedWarnings`) waits on Track A; see the track-c handoff.
+ * (shared/lockedWarnings.ts). The rule only; the column (`bids.lockedWarnings`,
+ * 0156) and every surface reading it are server/lockedWarningsFrozen.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -16,7 +16,7 @@ const counts = (dropsNotPriced: number): WarningCounts => ({
   countedWithNoPrice: 0,
   doubleCounted: [],
   runsWithNoWire: 2,
-  runsNotOnBid: { runs: 0 },
+  runsNotOnBid: { notSent: 0, noType: 0 },
 });
 
 const LOCKED = new Date("2026-10-12T20:00:00Z");

@@ -38,6 +38,7 @@ import {
   type FrozenTaxDetail,
 } from "./bidPricing";
 import * as db from "./db";
+import { lockBid } from "./bidWarnings";
 
 const toDecimal4 = (value: number) => value.toFixed(4);
 
@@ -295,9 +296,7 @@ export async function refreezeTaxRate(bid: Bid, userId: number): Promise<void> {
  */
 export async function leaveDraft(bid: Bid, userId: number, at: Date) {
   const locked =
-    bid.quantitiesLockedAt === null
-      ? await db.lockBidQuantities(bid.id, at)
-      : null;
+    bid.quantitiesLockedAt === null ? await lockBid(bid.id, userId, at) : null;
   // Read again: the lock may have rewritten the bid's row.
   const current = (await db.getBidById(bid.id, userId)) ?? bid;
   const frozen = await freezeBidSettings({ bid: current, userId, at });
