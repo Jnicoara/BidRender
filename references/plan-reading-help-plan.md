@@ -1,8 +1,8 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: PLAN ONLY, ALL 11 ANSWERS IN (owner, 2026-10-12).** Every pick in
-§ 9 is approved. No app code, no migration, nothing merged. Build waits
-until the live release has gone; the owner says when.
+**Status: STEP 1 BUILT on track-b (2026-10-12, owner's go); steps 2–6 not
+started.** All 11 picks in § 9 approved. No migration. Not merged to
+local-dev (frozen until the live release). Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
 without any AI: an abbreviation lookup (WP, AFF, EM, GFI, HR…), a symbol
@@ -312,6 +312,20 @@ from the real sheets via a script, not hand-typed.
 
 1. **Abbreviations + Look up** in the Legend tab, plus the Copy text line.
    Content and one search; nothing reads the drawing.
+   **DONE 2026-10-12 (track-b).** `shared/planHelp/abbreviations.ts` (136
+   entries, `ABBREVIATIONS_REVIEW.status = "draft"` until the owner has
+   read it — Q5), `shared/planHelp/lookUp.ts` (search, this set's legend
+   first, abbreviations in Copy text's words), `PlanLookUp.tsx` (box at the
+   top of the Legend tab; the tab's ONE "More options" fold at the bottom,
+   holding "All abbreviations" today). Differences from the text above,
+   on purpose: the test is `server/planHelpLookUp.test.ts`, because vitest
+   does not run `shared/**` tests; the normalising is `planWordKey` in
+   `lookUp.ts`, not smartSearch's (shared code cannot import the client
+   lib); "for the bid" forbids ANY digit, `$` or `%`, stricter than the
+   unit list; legend answers are shown, not clickable — help never counts
+   (the legend row below still does). In Copy text, an abbreviation is
+   only taken when printed in capitals, and a one-letter one only in
+   brackets (`(E)`, never a bare `C` or `F`).
 2. **Symbol guide** inside Look up, with "Count these".
 3. **Sheet-kind line + cards.**
 4. **Tips** (needs 1–3 to point at).

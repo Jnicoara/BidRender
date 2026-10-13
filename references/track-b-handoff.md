@@ -1,6 +1,31 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-12 (plan only), PLAN-READING HELP PLANNED
+## WHERE B STANDS — 2026-10-12 (latest), PLAN-READING HELP STEP 1 BUILT
+
+On `track-b` only. **NOT merged to local-dev — frozen until the live
+release.** No migration.
+
+- **Look up** (`plan-reading-help-plan.md` § 7 step 1, marked DONE with the
+  details): "Look up a word or symbol" at the top of the Plans screen's
+  Legend tab; this set's captured legend first, then "Usually means" from
+  `shared/planHelp/abbreviations.ts`; the Legend tab's one "More options"
+  fold (closed) holds "All abbreviations"; Copy text's result names the
+  abbreviations in its words. No model, no server call, nothing saved.
+- **The list is a DRAFT — owner reviews before beta (Q5).** 136 entries;
+  `ABBREVIATIONS_REVIEW.status` stays `"draft"` (a test pins it) until he
+  has read it. Ambiguous ones list every meaning with its clue (HR, EM, AC,
+  DP, SP, CU, (R), REF…). No digits in "for the bid".
+- **Proof:** `server/planHelpLookUp.test.ts` (21; module new, so red
+  without the change). Guards removed one at a time and shown red: a
+  digit in "for the bid", a duplicate spelling, the brackets-only rule
+  for one letter, the capitals-only rule (that one needed a mixed-case
+  case added to go red — "Ex. cable. Hp motor."). Looked at laptop 1536,
+  iPad 820×1180 and 1180×820 via playwright on "Bar layout check": no
+  sideways scroll, box 44 px tall on iPad; Copy text line seen on laptop
+  and iPad landscape.
+- **Next:** step 2, symbol guide inside Look up with "Count these".
+
+## WHERE B STOOD — 2026-10-12 (plan only), PLAN-READING HELP PLANNED
 
 `references/plan-reading-help-plan.md`: abbreviation lookup, symbol guide,
 "What is this sheet?" cards, tips, keyed-note taps and detail links — no

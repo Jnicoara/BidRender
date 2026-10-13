@@ -45,6 +45,10 @@ import {
   type SearchableCatalogRow,
 } from "@/hooks/useMaterialSearch";
 import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
+import {
+  abbreviationsInText,
+  meaningsInOneLine,
+} from "@shared/planHelp/lookUp";
 
 type LayerState =
   | { status: "loading" }
@@ -56,6 +60,9 @@ type CatalogRow = SearchableCatalogRow & { unitOfSale?: string | null };
 
 /** How many catalog matches the result card shows. */
 const MATCHES_SHOWN = 5;
+
+/** How many abbreviations the result card names before "and N more". */
+const ABBREVIATIONS_SHOWN = 4;
 
 export function TextSelectLayer({
   width,
@@ -323,6 +330,7 @@ function ResultCard({
     () => (searching && query ? search(query, MATCHES_SHOWN) : null),
     [searching, query, search]
   );
+  const abbreviations = useMemo(() => abbreviationsInText(draft), [draft]);
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Selected on arrival, so Ctrl+C works even if the clipboard is refused.
@@ -350,6 +358,29 @@ function ResultCard({
           <p className="text-[0.7rem] text-muted-foreground">
             Read from the sheet&apos;s text layer. Check it against the drawing.
           </p>
+          {/* One more line under the words it already read
+              (plan-reading-help-plan.md § 1): what the abbreviations in
+              them usually mean. Read from the box, so an edit moves it. */}
+          {abbreviations.length > 0 && (
+            <ul
+              className="space-y-0.5 text-[0.7rem]"
+              aria-label="Abbreviations in this text"
+            >
+              {abbreviations.slice(0, ABBREVIATIONS_SHOWN).map(a => (
+                <li key={a.entry.abbr}>
+                  <span className="font-semibold">{a.printed}</span>
+                  <span className="text-muted-foreground"> usually means </span>
+                  {meaningsInOneLine(a.entry)}
+                </li>
+              ))}
+              {abbreviations.length > ABBREVIATIONS_SHOWN && (
+                <li className="text-muted-foreground">
+                  and {abbreviations.length - ABBREVIATIONS_SHOWN} more — Look
+                  up in the Legend tab
+                </li>
+              )}
+            </ul>
+          )}
           <div className="flex items-center gap-1.5">
             <Button
               size="sm"

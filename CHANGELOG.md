@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **Look up a plan abbreviation, with no AI.** The Plans screen's Legend tab
+  has a "Look up a word or symbol" box: type WP, AFF, HR, gfi or "home run"
+  and it says what it usually means in plain words, every meaning when
+  there is more than one (HR is a home run on a floor plan and an hour on a
+  fire-rated wall), and what it changes on the bid — in words, never hours
+  or prices. Anything in this set's own captured legend shows first. The
+  full list (136 abbreviations) is under "More options", and Copy text now
+  names the abbreviations in the words it read. The list is a DRAFT for the
+  owner's review before beta.
 - **"Who does this?" on the bid.** When a bid has lines for work that is
   often someone else's — light fixtures, appliances, data, fire alarm
   devices, HVAC controls, EV chargers, permits, trenching and patching —

@@ -495,6 +495,7 @@ import {
 } from "@/lib/legSnap";
 import type { TraceMode } from "@shared/traceMode";
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
+import { LegendMoreOptions, PlanLookUp } from "@/components/takeoff/PlanLookUp";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
 import { snapshotPage } from "@/lib/planSnapshot";
 import {
@@ -12274,6 +12275,9 @@ export default function TakeoffPage({
                 }
                 legend={
                   <>
+                    {/* Look up at the top, More options at the bottom
+                        (plan-reading-help-plan.md § 1). */}
+                    <PlanLookUp symbols={symbols} />
                     <LegendPanel
                       symbols={symbols}
                       buildBidId={bidId}
@@ -12408,6 +12412,7 @@ export default function TakeoffPage({
                         );
                       }}
                     />
+                    <LegendMoreOptions />
                   </>
                 }
                 totals={totals}
