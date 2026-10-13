@@ -411,6 +411,55 @@ holds the 14 answers, § 10a.2 the hand-written SQL, and § 10a.3 the
 **A:** number, rehearse and apply them as written. All are step 1, step 3 is
 empty, and `bidTotals` should come back identical. **The owner has two
 number-facing points in § 10a.5**; neither blocks applying the SQL.
+## FROM TRACK A — 2026-10-13 (session 39): BS-M3–M6 and F13-M1 ARE APPLIED — F13 can be finished
+
+Your § 10a.2 SQL and F13-M1, word for word, on `local-dev`, its test DB
+and the **staging database** (NOT live — live is 152 and stays there until
+the next release). Numbers:
+
+| File                         | Yours  | What                                                          |
+| ---------------------------- | ------ | ------------------------------------------------------------- |
+| `0152_starter_change_log`    | BS-M3  | `starter_change_batches`, `starter_changes`                   |
+| `0153_starter_change_pins`   | BS-M4  | `starter_change_pins`                                         |
+| `0154_starter_pinned_hidden` | BS-M5  | `isPinnedCopy`, `hiddenAt`, `replacedById` on the FIVE tables |
+| `0155_starter_offer_answers` | BS-M6  | `companies.starterSeenAt`, `starter_offer_answers`            |
+| `0156_bid_locked_warnings`   | F13-M1 | `bids.lockedWarnings json NULL`                               |
+
+`drizzle/schema.ts` declares all of it: `starterChangeBatches`,
+`starterChanges`, `starterChangePins`, `starterOfferAnswers`,
+`bids.lockedWarnings`, `companies.starterSeenAt`, and the three columns on
+`materials`, `assemblies`, `laborRates`, `modifiers`, `takeoffRunTypes`.
+Expect **157 migrations, 196/196 FKs** — if a database you test on prints
+anything else, stop and find out why before going on.
+
+**What you can do now:**
+
+1. **Merge `local-dev` into `track-c`**, then migrate `bidrender_test_c`
+   (and `bidrender_local_c` if you run on it) with `scripts/migrate.mts`;
+   `schemaDrift.mts` should say "matches", 196/196.
+2. **F13 can be finished**: the three call sites in your F13 note
+   (`lockBidQuantities` writes `freezeAt(...)`, `unlockBidQuantities` writes
+   NULL, the readers go through `shownWarningCounts`). Nothing writes the
+   column today, so every bid reads NULL = live counts, as before.
+3. **`applyStarterChange`** can be built against real tables.
+
+**Two guards made me decide something on your files — check you agree:**
+
+- `shared/starterChange.ts`: `isPinnedCopy`, `hiddenAt`, `replacedById`
+  added to `NOT_EDITABLE_COMMON` (machinery, written only by
+  `applyStarterChange` / `hideStarterItem` — your header already said
+  "hiding"). The header's "not applied yet" now says 0152–0155 exist and
+  nothing reads them. `takeoff_run_types` is still not in `StarterTable`;
+  your § 10a.1 #2 says you classify it before your code ships.
+- `server/forkableReferences.test.ts`: the five `replacedById` are
+  **`unreviewed`** (since 2026-10-13), like `materials.parentId`, ceiling
+  7 → 11 (it was really 6 + 5). Each entry says what is owed: anything that
+  FOLLOWS a `replacedById` (to show "replaced by …" or swap an item) must go
+  through the table's resolver, because a company may have forked the
+  replacement. Turn them into `resolver` entries when your code reads them.
+
+**Live:** 0152–0156 go on live BEFORE any code from local-dev `≥` this
+commit is pushed to `main` (step 1). That is A's job at the next release.
 
 ## FROM TRACK A — 2026-10-12 (session 37): smoke steps when F11 and the panel-label offer merge
 

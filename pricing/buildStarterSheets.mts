@@ -9,8 +9,10 @@
  * exceljs is not a dependency of this repo (pricing/writeWorkbook.cjs says
  * why); it is loaded through NODE_PATH.
  *
- * Rows: every material the catalog ships, most-used first (starters and run
- * types that price from it), then by category and size — `starterSheetLayout`.
+ * Rows: every material the catalog ships. The PRICES sheet is in the app's
+ * order — category, item type, real size (`catalogInAppOrder`, owner
+ * 2026-10-12). The labor sheet stays most-used first (starters and run types
+ * that price from it), then by category and size — `starterSheetLayout`.
  * No store, no date: a shipped price is "Example price", nothing more (owner,
  * 2026-10-07). What the owner types goes back through
  * pricing/loadStarterSheets.mts into the SEED (every shop), never through the
@@ -100,6 +102,7 @@ import {
   assembliesInSheetOrder,
   assemblyKind,
   brandVariants,
+  catalogInAppOrder,
   catalogInSheetOrder,
   hoursPer,
   materialKind,
@@ -121,7 +124,9 @@ const GREY = {
   pattern: "solid",
   fgColor: { argb: "FFE7E6E6" },
 };
+// Labor sheet: most-used first. Prices sheet: the app's order (`priceRows`).
 const rows = catalogInSheetOrder();
+const priceRows = catalogInAppOrder();
 
 const SHEETS = ["prices", "labor", "brands", "assembly-hours"] as const;
 const only = process.argv.flatMap((a, i, all) =>
@@ -446,12 +451,12 @@ if (want("prices")) {
     wb,
     PRICE_SHEET,
     C,
-    `STARTER PRICES — every item BidRidge ships to every shop (${rows.length} rows). Type the YELLOW 'Pack price' only; 'Price per unit' works itself out. Change 'Pack size' / 'Pack qty' if you buy a different pack. Most-used items first. Send the file back to Track A — do NOT import it in the app (that would price your company only).`,
+    `STARTER PRICES — every item BidRidge ships to every shop (${priceRows.length} rows). Type the YELLOW 'Pack price' only; 'Price per unit' works itself out. Change 'Pack size' / 'Pack qty' if you buy a different pack. In the app's order: category, then item type, then size. Send the file back to Track A — do NOT import it in the app (that would price your company only).`,
     [6, 18, 18, 22, 52, 12, 16, 10, 12, 14, 50]
   );
   const packPrice = letter(col(C, "Pack price"));
   const packQty = letter(col(C, "Pack qty"));
-  rows.forEach((m, i) => {
+  priceRows.forEach((m, i) => {
     const r = FIRST_DATA_ROW + i;
     const [packText, qty] = packFor(m);
     const row = ws.getRow(r);
@@ -513,7 +518,7 @@ if (want("prices")) {
     ],
     [
       "Order",
-      "Items used by the most shipped starters and run types first, then by category and size. Price the top and the shipped recipes start pricing.",
+      'Rows are in the same order as the app\'s Materials screen: by category, then item type (all EMT together, then PVC Sch 40, Sch 80, rigid, IMC, liquidtight, flex), then size smallest to largest. They are no longer most-used first — "Used by" still says how many starters use each item. # is that order, so sorting by # puts the sheet back.',
     ],
     [
       `"${STEPS_TAB}" tab`,
@@ -539,7 +544,7 @@ if (want("prices")) {
   const out = path.join(HERE, PRICES_FILE);
   await stage("prices", wb, out);
   console.log(
-    `wrote ${path.relative(process.cwd(), out)}: ${rows.length} rows`
+    `wrote ${path.relative(process.cwd(), out)}: ${priceRows.length} rows`
   );
 }
 

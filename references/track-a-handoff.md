@@ -1,8 +1,56 @@
-# Track A handoff — 2026-10-12 (live is still `371b2ab`)
+# Track A handoff — 2026-10-13 (live is `60479773` / 152)
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
-release record is `deploying.md` § 11 "LIVE: `371b2ab`".
+release record is `deploying.md` § 11 "LIVE: `60479773`".
+
+## NOW — 2026-10-13, session 39: 0152–0156 on local-dev + STAGING (not live)
+
+- **Migrations** (all additive, step 1, step 3 empty; C's SQL word for
+  word): 0152 change log (BS-M3), 0153 pins (BS-M4), 0154
+  `isPinnedCopy`/`hiddenAt`/`replacedById` on the five tables (BS-M5),
+  0155 `companies.starterSeenAt` + offer answers (BS-M6), 0156
+  `bids.lockedWarnings` (F13-M1). Expect **157, 196/196**.
+- **Proof** (`deploying.md` § 11 "Staging: migrations 0152–0156"):
+  throwaway copy of local 5 applied / re-run nothing / 4,386 unchanged old
+  and new code; staging backup
+  `staging-2026-10-13T20-51-43Z-before-0152-0156.sql` 80/80 restored,
+  rehearsed 1,305 unchanged; **staging DB** 157, matches, 196/196, all
+  1,306 pre-existing bids unchanged (3 new bids appeared while measuring);
+  local + `bidrender_test_localdev` 157.
+- Guards decided: `starterChange.ts` NOT_EDITABLE_COMMON += the three
+  columns; `forkableReferences` five `replacedById` unreviewed (7 → 11).
+- **Live stays at 152.** At the next release 0152–0156 go on live BEFORE
+  any push of this code to `main`. Expect 157, 196/196.
+- C told F13 can be finished; B told it may merge (both handoffs).
+- **Scratch DBs dropped** (by the owner, after the classifier refused it to
+  Claude): the nine from session 38 plus this session's
+  `bidrender_scratch_0152` and `bidrender_scratch_staging_0152`. Session
+  38's four worktrees and this session's `../bidrender-before-0152` are
+  removed (two empty `node_modules` husks remain in
+  `../bidrender-before-scope` / `-twin`, 1.6 MB each).
+- **Staging app** serves `e689b918`, built 21:02:50 UTC. **Gate run
+  `38467520710` on `e689b918` GREEN**: test, deploy-staging, smoke 96
+  passed / 2 planned skips. B may merge.
+
+## (earlier) 2026-10-13, session 38: `60479773` + 0144–0151 ARE LIVE
+
+- Owner approvals A–D. Backup `2026-10-13T05-09-10Z` verified (77 / 5,539);
+  fresh rehearsal on its restore matched 2026-10-12 exactly.
+- Live: 8 applied (05:54) → 152, 183/183; push 16:31, `/api/version`
+  `60479773` built 16:32:35; first boot CLEAN (5 SER renames); freeze 0;
+  math 2 Drafts → v1, 0 moved; **2/2 totals unchanged**; owner opened both
+  bids and plans.
+- **Not done:** `STARTER_TOTP_KEY` on live / any starter-editor account
+  (owner's go).
+- **Scratch to drop now the release is out:** DBs `bidrender_backup_verify`
+  (today's restore, migrated), `bidrender_scratch_live_rehearsal`,
+  `bidrender_scratch_local_freeze`, `bidrender_scratch_staging_0146/0148/0150`,
+  `bidrender_scratch_live`, `bidrender_scratch_staging(_0144)`; worktrees
+  `../bidrender-live-code`, `../bidrender-before-scope`, `-starter`, `-twin`
+  (junction node_modules — remove the junction before `git worktree remove`).
+  Not dropped this session.
+- `scripts/_tmpCopyDb.mts` stays untracked (owner).
 
 ## NOW — 2026-10-12, session 37: next release REHEARSED on a fresh copy of live — PASSED
 

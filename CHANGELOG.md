@@ -4,6 +4,24 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-13]
+
+- **Database groundwork for starter updates and for locked bids' warnings
+  (staging only, nothing switched on).** New empty tables record changes to
+  the shipped starter library, which company copies they affect, and how
+  each company answered the offer; shipped items gain "hidden" and "replaced
+  by" markers; and a locked bid gains a place to keep the warning counts it
+  had when it locked. Nothing reads any of it yet, and every bid total on the
+  practice site was checked before and after: none moved. Not on
+  bidridge.com yet.
+- **Released to bidridge.com.** Bids now protect themselves once sent: a bid
+  that leaves Draft locks its counts and keeps the overhead, profit and tax it
+  was priced with, and later pricing changes reach only Drafts. Also live:
+  who-does-what scope tags on bid lines, remove/relocate labor, job costs in
+  Quick bid, and the database groundwork for the starter editor's own login
+  (not switched on). Both live bids were checked before and after: no total
+  moved.
+
 ## [2026-10-12]
 
 - **Opening a plan sheet no longer places panels from their labels.** When
@@ -19,6 +37,16 @@ This is the human-readable companion to the git history — read this to see wha
   different fitting (say compression instead of set-screw couplings), the
   bid line says "Part changed: … still priced at the old part" and the
   warnings count it, until you press Send again on the Plans screen.
+- **"Import price list" is hidden for now.** It read a supply house's
+  "$480.00/M" (per thousand feet) as $480 per foot, and saved row by row with
+  no preview and no undo, so one import could put wire on a bid at a thousand
+  times its cost. The button comes back once the import understands per M and
+  per C and shows a preview with undo. Prices a shop already imported are not
+  touched; "Import labor sheet" is unchanged.
+- **The starter pricing sheet stays in the app's order when it is rebuilt**
+  (category, then item type, then real size), instead of going back to
+  most-used first.
+
 - **The proposal now says who does what.** Owner-furnished items are listed
   under Included ("Owner-furnished, installed by us: 24 light fixtures");
   By others and Excluded lines leave the scope of work and are named under

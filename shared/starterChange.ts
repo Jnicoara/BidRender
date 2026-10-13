@@ -5,8 +5,9 @@
  *
  * Track C's half of the screen (owner Q12: "C = number rules + tests"). Pure,
  * so `applyStarterChange`, the sheet upload and the screen read one answer.
- * The tables that record pins, changes and offers (BS-M3 – BS-M6) are not
- * applied yet; this is the part that does not need them.
+ * The tables that record pins, changes and offers (BS-M3 – BS-M6) exist since
+ * 0152–0155 (2026-10-13) but nothing reads or writes them yet; this is the
+ * part that does not need them.
  *
  * ── The four kinds ───────────────────────────────────────────────────────────
  *   offer         a number, or a name, a company sees. An existing company
@@ -44,6 +45,11 @@ const NOT_EDITABLE_COMMON = [
   "createdAt",
   "updatedAt",
   "isActive",
+  // Starter hiding and pins (0154, BS-M5) — machinery, written only by
+  // applyStarterChange / hideStarterItem, never as a field.
+  "isPinnedCopy",
+  "hiddenAt",
+  "replacedById",
 ] as const;
 
 function kinds(

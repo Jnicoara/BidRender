@@ -1,5 +1,13 @@
 # Next live release — PLAN ONLY (Track A, 2026-10-08)
 
+> **RELEASED 2026-10-13: `60479773` + 0144–0151 are LIVE** (owner approvals
+> A–D). Live is now **`60479773` / 152 migrations / 183 FKs**. What printed:
+> `deploying.md` § 11 "LIVE: `60479773`". Every figure matched the
+> 2026-10-12 rehearsal below and that day's fresh re-rehearsal: 8 applied,
+> first boot 5 SER renames, freeze 0, math 2 Drafts → v1 with 0 moved, both
+> bids unchanged. "For the NEXT release" below is now the record of that
+> release; the release after it starts from 152.
+
 > **RELEASED 2026-10-10: `371b2ab` + 0105–0143 are LIVE** (owner approvals
 > A–D). What printed: `deploying.md` § 11 "LIVE: `371b2ab`". Every figure
 > matched § 5g. The rest of this file is the record of that release; the

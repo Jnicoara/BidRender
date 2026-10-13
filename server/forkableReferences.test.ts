@@ -234,6 +234,34 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-10-06",
     why: "Migration 0119/0120: a brand variant's parent. NOTHING writes it yet (every row NULL), so there is nothing to resolve today. It IS this file's bug shape the day variants ship: a company forking a parent gets a new id while its variants still name the shipped one. The variant code (Batch 5, CLAUDE.md § Brands) must answer it with a resolver before it writes a single parentId.",
   },
+  // ── Starter hiding (0154, Track C's BS-M5, baseline-screen-plan.md § 10a).
+  //    Registered 'unreviewed' by Track A before its code existed, as
+  //    materials.parentId was. ─────────────────────────────────────────────
+  "materials.replacedById": {
+    kind: "unreviewed",
+    since: "2026-10-13",
+    why: "Migration 0154: a hidden SHARED row names the shared row that replaces it (set only by hideStarterItem, shared rows only). NOTHING writes it yet (every row NULL). The question for Track C's applyStarterChange / offer code before it writes one: a company that forked the replacement should be pointed at its fork, so whatever follows this id to show 'replaced by …' or to swap an item must go through resolveMaterial.",
+  },
+  "assemblies.replacedById": {
+    kind: "unreviewed",
+    since: "2026-10-13",
+    why: "Migration 0154, exactly as materials.replacedById — the follow must go through the assembly resolver.",
+  },
+  "labor_rates.replacedById": {
+    kind: "unreviewed",
+    since: "2026-10-13",
+    why: "Migration 0154, exactly as materials.replacedById — the follow must go through the labor rate resolver.",
+  },
+  "modifiers.replacedById": {
+    kind: "unreviewed",
+    since: "2026-10-13",
+    why: "Migration 0154, exactly as materials.replacedById — the follow must go through the modifier resolver.",
+  },
+  "takeoff_run_types.replacedById": {
+    kind: "unreviewed",
+    since: "2026-10-13",
+    why: "Migration 0154, exactly as materials.replacedById — the follow must go through resolveRunType.",
+  },
   "bid_line_items.assemblyId": {
     kind: "resolver",
     resolver: "getAssemblyFamilies",
@@ -423,7 +451,11 @@ describe("every stored id into a forkable row is accounted for", () => {
     // 6 → 7 on 2026-10-08 (Track A): takeoff_run_type_extras.materialId
     // (0135), added before anything prices from it; its entry says what the
     // per-foot plan's server half owes.
-    expect(unreviewed.length).toBeLessThanOrEqual(7);
+    // 6 → 11 on 2026-10-13 (Track A): the five `replacedById` columns (0154,
+    // BS-M5), added before applyStarterChange exists; each entry says what
+    // C's starter code owes before it writes one. (The count was 6 before
+    // this, not 7: the ceiling had not been lowered after the extras resolved.)
+    expect(unreviewed.length).toBeLessThanOrEqual(11);
   });
 
   it("unused group labor rate: nothing on the server reads takeoff_groups.laborRateId", () => {
