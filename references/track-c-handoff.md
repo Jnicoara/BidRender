@@ -21,11 +21,22 @@ the session for its result.
 - **Seen:** laptop, iPad portrait and landscape, on the scratch bid's E111
   with panel 2B's spot cleared for the check. **Viewing left the spot empty
   in the database at all three sizes.**
-- **The button itself was NOT seen.** No local sheet with circuits has a
-  readable "PANEL 2B" label: E111's 2B was placed by hand, and a label
-  wins over a hand spot (`circuitGroups` `spotOf`). The markup is the F11
-  offer's, which was seen at all three sizes. The spot is restored
-  (234295, 443, 186).
+- ~~The button itself was NOT seen.~~ **Seen 2026-10-13**, on a throwaway
+  one-sheet plan built for the check: a "PANEL 2B" label and three duplexes
+  tagged 2B-1/3/5, scale 1/4". Run as a throwaway Playwright script at
+  laptop (1536x864), iPad landscape (1180x820) and iPad portrait (820x1180),
+  with the iPad sizes tapped by touch, one throwaway bid per size. At each
+  size, **viewing** showed "Add 3 new homerun circuits" and "Assign 1 panel
+  from labels". It left the panel with no row, added no circuits and moved
+  no bid total. **The Add tap** put 3 circuits on the bid, with panel 2B
+  made but given no spot. **The Assign tap** gave 2B a spot at its label and
+  removed the offer. **A second visit** moved nothing and offered nothing.
+  All three sizes ended on the same 226.62 ft of homerun conduit and labor
+  and the same bid totals. Those were $0 because the homerun type was never
+  sent: the check is that the numbers matched, not that they were priced.
+  The bids (deleted forever, plan files with them) and the script are gone.
+  Before that the button was only reasoned about: E111's 2B was placed by
+  hand, and a label wins over a hand spot (`circuitGroups` `spotOf`).
 
 **(b) F13: a locked bid's warning counts frozen at the lock.**
 
@@ -176,6 +187,31 @@ holds the 14 answers, § 10a.2 the hand-written SQL, and § 10a.3 the
 **A:** number, rehearse and apply them as written. All are step 1, step 3 is
 empty, and `bidTotals` should come back identical. **The owner has two
 number-facing points in § 10a.5**; neither blocks applying the SQL.
+
+## FROM TRACK A — 2026-10-12 (session 37): smoke steps when F11 and the panel-label offer merge
+
+F15 (scale is a one-tap offer, Q19) broke smoke step 2 on local-dev: it
+waited for "1/2 scaled" that no longer arrives by viewing. A fixed it in
+`e2e/smoke/flow.spec.ts` — step 2 now taps "Use … — read off the sheet",
+and step 11's 77.78 ft depends on that tap.
+
+**When F11 (homerun offer, `9291c708`) and the panel-label offer
+(`540ac344`) merge to local-dev, C updates any smoke step that expects
+circuits or panels to fill in on their own** — tap "Add N new homerun
+circuits" / "Assign N panels from labels" first. Checked 2026-10-12: no
+step in `e2e/smoke/` does this today, but grep again at merge time
+(`homerun|circuit|panel`) — a step added in between would fail the same
+way step 2 did, on staging, after the Gate's test job passed.
+
+**C's answer, 2026-10-13, after merging local-dev (`c8df3f6`) into
+track-c:** no change was needed. A grep for
+`homerun|circuit|panel|syncSheet|placePanel` across `e2e/smoke/*`,
+`.claude/skills/run-bidrender/smoke.mjs`, `scripts/deviceTouch.mts` and
+`scripts/deviceAudit.mts` found nothing that expects circuits or panels to
+fill in. The smoke plan (`e2e/smoke/fixturePlan.ts`) has no circuit tags and
+no "PANEL" label, so neither offer can appear on it. Every "panel" hit is the
+plan viewer's side panel. **Grep again** if a step or a fixture with circuit
+tags is added before the merge.
 
 ## FROM TRACK A — 2026-10-12 (session 36): BS-M3–M6 — NOT applied; this is exactly what A needs from C
 
