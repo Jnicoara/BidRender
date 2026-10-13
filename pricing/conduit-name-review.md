@@ -353,8 +353,13 @@ connector" and "form 7".
     2" rigid is "foot". A company's own assembly that used the mast at
     quantity 1 still points at the retired row and keeps working, but it
     does not convert to 10 ft on its own.
-  - **Only the 2" mast was answered.** The 2-1/2" and 3" mast rows (963–964)
-    stay as they are until the owner says otherwise.
+  - **The 2-1/2" and 3" masts go the same way (owner's yes, 2026-10-13).**
+    `Service mast, 2-1/2", 10 ft` (row 963) retires into
+    `2-1/2" rigid conduit` (row 151), and `Service mast, 3", 10 ft` (row 964) into `3" rigid conduit` (row 152). Each old name is kept as a
+    search word on its rigid row, exactly as for the 2". The same "each" versus "foot" note
+    applies to both. No shipped starter uses row 963 or 964 (the sheet's
+    "Used by" is empty on both, read 2026-10-13); if the job finds one that
+    does, stop and find out why first.
 - If the recount at the job finds the coupling line already gone, or a
   second starter using row 962, stop and find out why before changing
   anything.

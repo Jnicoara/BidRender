@@ -1,5 +1,33 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-13 — mast answer recorded; Surface raceway name review; nothing applied
+
+**Mast answer, for A's end-of-pricing job.** The owner said yes: the
+2-1/2" and 3" `Service mast, …, 10 ft` rows (963, 964) retire into
+`2-1/2" rigid conduit` and `3" rigid conduit`, the same way as the 2". Each
+old name stays as a search word on its rigid row. It is recorded in
+`pricing/conduit-name-review.md` under "Owner's answers", PG2.
+
+**`pricing/surface-raceway-name-review.md`** covers rows 636–659, the next
+shelf in app order after Conduit Fittings. It uses the same format.
+
+- **Counts:** 13 OK; 6 need words; 4 are not real products or not Wiremold
+  ones (the 2400D divider clip, the end cap, and both device plates, since
+  the box takes a standard NEMA plate); 1 row holds two products (2400D
+  base + 5 ft cover).
+- **Could price wrong:**
+  - **P1:** raceway packs say per foot / 1, but HD sells 700WH at $17.25
+    per 10 ft. That price typed as a pack gives 10× per foot.
+  - **P2:** DV34's box depth is unnamed (V5747 $8.44 vs V5748 $12.73).
+  - **P3:** coupling packs say 25; the real pack is 10.
+- **Q2 is a code + seed pair:** one V5785 entrance end for 500 and 700
+  (`SHARED_500_700_PARTS`).
+- **Missing items:** S1–S4 (flush extension adapter, round extension box,
+  blank cover, and the 2400D coupling).
+- **Owner questions:** Q1–Q8, each with a suggested answer.
+
+The workbook was read from a copy. **Next shelf: Underground (660–669).**
+
 ## (newest) 2026-10-12 — Conduit name review for the owner; nothing applied
 
 `pricing/conduit-name-review.md`, in the same format as A's Boxes review.
