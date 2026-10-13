@@ -133,3 +133,35 @@ Not a change, listed so the next reader does not re-check them:
   (surface raceway P1).
 - If the recount finds a row this scan missed, the search above says what was
   and was not read. Extend it rather than trusting it as complete.
+
+## Owner's answers — 2026-10-13
+
+**Nothing below is applied yet.** A relabels **every row in this scan in ONE
+pass** (sections A–D, `packFor` and the seed's pack), during the
+end-of-pricing job and **before the owner types any of these prices**. A
+price typed against an old label is the exact mistake this scan exists to
+stop, so the labels go first.
+
+| Pick                                    | Answer                                       | What the pass does                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T8 tubes (1230–1233, 1241)              | **Case of 25**                               | `case of 25` / 25 on all five rows. The owner types the case price.                                                                                                                                                                                                                                                                           |
+| Spade terminals (1505–1507)             | **Bag of 100**                               | `bag of 100` / 100 on all three colours.                                                                                                                                                                                                                                                                                                      |
+| Tape light channel (1288)               | **1 m (3.3 ft)**                             | The name gains the length through `RENAMED_BASELINE_MATERIALS`: `Tape light channel, 1 m (3.3 ft)`, old name a search word. Pack stays `each` / 1, one 1 m piece. Not the 5-pack.                                                                                                                                                             |
+| Surface raceway lengths (658, 659, 657) | **10 ft lengths for 500/700, 5 ft for 2400** | 658 and 659 `10 ft length` / 10, like conduit's `10 ft stick`. 657 (2400D) `5 ft length` / 5: still per foot underneath, so surface raceway Q6 (one row, base plus cover) stands, and the price typed is 5 ft of base plus one 5 ft cover. Its description changes to say so (Q6 had "price both per foot"). This answers surface raceway P1. |
+
+**The rest of the scan goes as suggested** in the pass: 669, 664, 665 and
+666 as recorded in `underground-name-review.md` Q3; 636 `10 ft length` / 10;
+1234 `per foot (from 16.4 ft reel)`; 68–70 `per foot (cut to length)`; 1322
+`bag of 50`; 1693 `pack of 5`; 1310 `box of 10`; 1580 `box of 50`; 772 `bag
+of 100`; 1568 `bundle of 100`; 1432–1434 and 1491–1493 at the pack the
+listing shows **for each colour**. 1414 (low-voltage raceway) still needs the
+product checked before a length is chosen, and 1651 and 1656 stay as
+placeholders. Surface raceway **P3** (coupling packs say 25, real pack 10) is
+the same pass.
+
+**Check after the pass:** every row in A–D shows its new label in the sheet,
+and the count of pack-qty-1 rows moves by exactly the rows whose qty changed
+(658, 659, 636, 657, 1230–1233, 1241, 1505–1507, 1322, 1693, 1310, 1580, 772,
+1568, the butt and ring terminals). Count it before and after the pass, not
+just after. If the number that moved does not match that list, stop and find
+out why before the owner types prices.

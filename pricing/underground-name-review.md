@@ -187,3 +187,32 @@ shop is asked for.
 - If a recount finds a starter using any of rows 660–669, or a run type using
   one other than the warning tape, stop and find out why before changing
   anything.
+
+## Owner's answers — 2026-10-13
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed, run type or starter.
+
+| Q   | Answer                                                                             | What the job does                                                                                                                                                                                                                                                                                                                                                          |
+| --- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | **Yes: names.** The warning tape is renamed in the SAME commit as its 18 run types | Rename all nine "Needs words" rows through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row. The warning tape's rename edits `WARNING_TAPE.materialName` (`server/seed/baselineRunTypes.ts`) in the same commit, so no run type ever names a material that is not there (U-B). `frozenMaterialNames.test.ts` checks the run types.             |
+| Q2  | **Yes**                                                                            | 669 becomes `Underground warning tape, 3", red, non-detectable` (Dottie UT8D class, "Caution buried electric line below", 1000 ft roll). "detectable" comes OFF this row's search words; it goes on U2.                                                                                                                                                                    |
+| Q3  | **Yes: per foot, labelled with the real reel size**                                | Pack stays `1`; the label names the reel, and the owner types the PER-FOOT price, as for wire. 664 `per foot (from 3000 ft reel)`, 665 `per foot (from 1000 ft reel)`, 666 `per foot (from 500 ft roll)` (was 250 ft), 669 `per foot (from 1000 ft roll)`. The same labels are in `pack-label-scan.md` A and D, so this is the same pass, not a second one.                |
+| Q4  | **Yes**                                                                            | 660 `Conduit spacer, 2", base, 3" separation`; 661 `Conduit spacer, 4", base, 3" separation`. Add U1 (Q10). "duct bank" stays on all four.                                                                                                                                                                                                                                 |
+| Q5  | **Yes**                                                                            | 663 becomes `Handhole, polymer concrete, 13" x 24" x 12", Tier 15, "ELECTRIC" cover`, priced as box plus cover. Description: "Box and cover are bought separately; price both. Tier 22 for driveways." "quazite", "pull box" and "with lid" become search words.                                                                                                           |
+| Q6  | **Yes**                                                                            | 666 becomes `Tracer wire, #14 solid copper, red, direct burial`. Add "locate wire" and "14 awg" as search words; drop "pvc conduit utility".                                                                                                                                                                                                                               |
+| Q7  | **Yes**                                                                            | 667 becomes `Tracer wire access box, grade level, light duty`, red lid. Driveway-rated is not added.                                                                                                                                                                                                                                                                       |
+| Q8  | **Yes. "trench marker post" stays a search word**                                  | 668 becomes `Utility marker post, 66", "buried electric"`.                                                                                                                                                                                                                                                                                                                 |
+| Q9  | **Yes**                                                                            | 662 becomes `Direct burial wire nut, #22–#8` (DryConn Large class). Pack `box of 100` / 100 if the row is priced from the box.                                                                                                                                                                                                                                             |
+| Q10 | **Add U1, U2 and U3. U2 is its own optional row**                                  | Add the 2" and 4" intermediate spacers (U1; **check the 2" part number**), `Underground warning tape, 3", red, detectable` as a separate row that no run type prices (U2; label `per foot (from 1000 ft roll)`), and `{size} PVC conduit end cap` 1/2"–4" (U3; **check the pack before pricing**, ABB lists packs of 120–200). Search words as in the missing-items table. |
+
+**U-A is still A's first step**, whatever the answers: `usedBy` must count
+run-type extras so the warning tape shows its 18 users and sorts first.
+
+**Check before shipping.** Run `scripts/searchSpotCheck.mts` for "warning
+tape", "caution tape", "detectable", "tracer", "locate wire", "mule tape",
+"pull rope", "spacer", "intermediate", "handhole", "quazite", "dbr" and "pvc
+cap". Each must surface its own row first, and "warning tape" must surface
+the non-detectable row (the one the run types price) above U2. If a recount
+finds a starter or a run type using any of rows 660–669 other than the
+warning tape, stop and find out why first.

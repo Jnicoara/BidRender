@@ -1,5 +1,46 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-13 — Underground + pack-scan answers recorded; Receptacles name review; nothing applied
+
+**Underground, owner's answers** (review's "Owner's answers" section), for
+A's end-of-pricing job:
+
+- **Q1:** names. The warning tape is renamed in the SAME commit as its 18
+  run types (`WARNING_TAPE.materialName`).
+- **Q2–Q9:** yes, as suggested. Q3: per foot, labelled with the real reel
+  (3000 ft, 1000 ft, 500 ft, 1000 ft). Q8: "trench marker post" stays a
+  search word.
+- **Q10:** add U1, U2 (detectable tape, its own optional row) and U3.
+
+**Pack scan, owner's picks** (`pack-label-scan.md` "Owner's answers"): T8
+tubes case of 25; spade terminals bag of 100; tape light channel 1 m (3.3 ft),
+each; surface raceway 10 ft lengths for 500/700, 5 ft for 2400. **A relabels
+every row in the scan in ONE pass, before the owner types those prices.** The
+2400 5 ft length sits on top of surface raceway Q6 (still per foot, base plus
+cover); its description changes to say a 5 ft price.
+
+**`pricing/receptacles-name-review.md`** — rows 788–827, 40 rows, the shelf
+after Boxes. Workbook read from a fresh copy.
+
+- **Counts:** 10 OK, 27 need words, 2 owner picks (quads), 1 two-in-one
+  (floor receptacle assembly).
+- **Could price wrong:** P1 DV11 prices one quad device ($32) where DV22
+  prices two duplexes; P2 the EV starter (RS13) prices a $10 flush 14-50R,
+  EV-rated is $70–$126; P3 standard vs decorator is 2× on the two most-used
+  rows (18 starters, all on duplex plates); P4 pop-up countertop $50–$300;
+  **P5 CS7/CS8 (30A locking) use the 15/20A single-receptacle cover**, and a
+  30A locking device needs the 1.719" opening (Raco 811C) — a Boxes-shelf
+  row A's review did not raise; P6 DV3 "Dedicated 20A receptacle" prices the
+  15A duplex.
+- **Missing:** R1 decorator TR duplexes, R2 industrial 14-50R (EV), R3 30A
+  locking raised cover.
+- **Owner questions:** Q1–Q13, each with a suggested answer.
+
+**Next shelf: Switches (828–861).**
+
+**F13 waits:** when A's handoff says BS-M3..M6 and F13-M1 are on local-dev
+and staging, F13 wiring is next (a separate prompt). See START HERE (b).
+
 ## (newest) 2026-10-13 — Surface raceway answers recorded; pack-label scan; nothing applied
 
 **Surface raceway, owner's answers, for A's end-of-pricing job.** They are
