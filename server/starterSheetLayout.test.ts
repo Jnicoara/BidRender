@@ -9,8 +9,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
+import { BASELINE_MATERIALS } from "./seed/materials";
+import { compareMaterials } from "../shared/materialOrder";
 import {
   assembliesInSheetOrder,
+  catalogInAppOrder,
+  catalogInSheetOrder,
   heldNote,
 } from "../pricing/starterSheetLayout";
 
@@ -51,5 +55,37 @@ describe("assembly-hours sheet rows", () => {
     const firstPlain = rows.findIndex(r => !r.top);
     expect(firstPlain).toBeGreaterThan(0);
     expect(rows.slice(firstPlain).every(r => !r.top)).toBe(true);
+  });
+});
+
+/**
+ * The PRICES sheet is in the app's order (owner, 2026-10-12): category, then
+ * item type, then real size — the Materials screen's `compareMaterials`, not
+ * most-used first. A rebuild of a hand-sorted sheet must not undo the sort.
+ */
+describe("prices sheet order", () => {
+  const names = catalogInAppOrder().map(m => m.name);
+
+  it("lists every shipped material once", () => {
+    expect(new Set(names).size).toBe(BASELINE_MATERIALS.length);
+  });
+
+  it("is the app's order, not most-used", () => {
+    expect(names).toEqual(
+      [...BASELINE_MATERIALS].sort(compareMaterials).map(m => m.name)
+    );
+    expect(names).not.toEqual(catalogInSheetOrder().map(m => m.name));
+  });
+
+  it("keeps one product together and walks its sizes up", () => {
+    const at = (n: string) => names.indexOf(n);
+    for (const n of ['1/2" EMT', '3/4" EMT', '4" EMT', '1/2" PVC Sch 40'])
+      expect(at(n), n).toBeGreaterThan(-1);
+    // Real size, not text: 3/4" before 1", 1" before 1-1/4".
+    expect(at('1/2" EMT')).toBeLessThan(at('3/4" EMT'));
+    expect(at('3/4" EMT')).toBeLessThan(at('1" EMT'));
+    expect(at('1" EMT')).toBeLessThan(at('1-1/4" EMT'));
+    // All EMT before any PVC Sch 40.
+    expect(at('4" EMT')).toBeLessThan(at('1/2" PVC Sch 40'));
   });
 });

@@ -174,25 +174,25 @@ rename map.
 Each was checked against a real listing (2026-10-12). The prices are listing
 prices, for scale only.
 
-| #   | Item                                                                            | Listing                                                                          | Why it is needed                                                                                             |
-| --- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| M1  | Single-gang new work box, plastic, adjustable side bracket, 21 cu in            | HD: Carlon B121ADJ, $4.42–4.94                                                   | A standard residential box where drywall thickness varies. The catalog has only nail-on boxes.               |
-| M2  | Single-gang gangable switch box, steel, 2-1/2" deep, with side bracket (clamps) | HD: Steel City LXV-25R, $4.98. Raco 504 at Platt                                 | The steel device box as mounted on wood studs. Row 737 has no bracket.                                       |
-| M3  | 4" square box, steel, 1-1/2" deep, with FM/FS side bracket                      | HD: Raco 8218 (with AC/MC clamps), $82.22 per 25. Platt: Raco 223/199 FS bracket | The commercial box as actually hung on a stud. Row 743, priced by 46 starters, has nothing to mount it with. |
-| M4  | 4" square box, steel, 2-1/8" deep, with side bracket                            | HD: Southwire 52171-FBX, $8.56. Raco 8241 (TS bracket)                           | Deep version of M3.                                                                                          |
-| M5  | Fan-rated ceiling box, new work, plastic, adjustable bar hanger, 20 cu in       | HD: Carlon B620KR-CFB, $10.57 (35 lb fan / 50 lb fixture)                        | A fan centred between joists. Today row 683 is the only fan box.                                             |
-| M6  | 4-11/16" square box, steel, 1-1/2" deep                                         | Rexel: Steel City 72151 (29.5 cu in). Raco 247                                   | Only the 2-1/8" deep 4-11/16" box exists today. Not at HD or Platt online; a distributor item.               |
-| M7  | 4" octagon box, steel, 1-1/2" deep, adjustable bar hanger                       | Rexel: Steel City 54151-NF. Raco 324, about $95 per 25                           | The commercial fixture box between joists or in a T-bar ceiling. Distributor item.                           |
-| M8  | Single-gang old work box, steel, 2-1/2" deep                                    | HD: Steel City LXOWC-25R $5.98; LXWOWC-20R $9.58                                 | Remodel work in commercial MC jobs. All old-work boxes today are plastic.                                    |
-| M9  | Old work round ceiling box, plastic, fan-rated (swing clamp)                    | Stanion: Carlon B618RR (70 lb fan)                                               | A retrofit fan without a brace. Today the only old-work fan option is the brace kit (row 673). Not at HD.    |
-| M10 | Pancake box, plastic, 1/2" deep, 8 cu in                                        | Stoneway: Carlon B708-SHK                                                        | A residential smoke detector on a plastic box. Not at HD.                                                    |
-| M11 | Handy box, 2-1/8" deep                                                          | True Value / Southwire G19282. Raco 8670                                         | The deep handy box (about 16.5 cu in) for a GFCI in a utility box. Not at HD online.                         |
-| M12 | Single-gang gangable switch box, steel, 3-1/2" deep                             | HD: Raco 8590, $4.52 (18 cu in)                                                  | The deep steel device box. Row 737 is 2-1/2" only.                                                           |
-| M13 | Airtight (vapor) new work box, single-gang, nail-on, about 23 cu in             | Ace: Cantex EZ23SN-RG $6.99. Arlington FN101FLGC                                 | Energy-code houses need a sealed box. Not at HD online.                                                      |
-| M14 | Weatherproof box, double-gang, nonmetallic                                      | HD: Commercial Electric WDB750PG, $12.76 (27.5 cu in)                            | Only PVC single-gang is in the catalog. No 3-gang nonmetallic box was found, so do not add one.              |
-| M15 | Low-voltage mounting bracket, new work (nail-on), 1-gang                        | HD: Carlon SC100A (case of 24). SupplyHouse: Arlington LVN1 $1.19                | The data/TV drop in new construction. Today every LV starter uses the old-work ring (row 706).               |
-| M16 | 4" square box, plastic                                                          | True Value: Carlon B249B, 48 cu in, $4.99. Cantex EZ48DN                         | Residential 4" square in PVC. Not at HD online — lower priority.                                             |
-| M17 | Weatherproof extension ring, single-gang, 1" deep                               | HD: Bell 5406-0, $4.93                                                           | Deepens a cast weatherproof box (siding, GFCI fill).                                                         |
+| #   | Item                                                                            | Listing                                                                          | Why it is needed                                                                                                               |
+| --- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| M1  | Single-gang new work box, plastic, adjustable side bracket, 21 cu in            | HD: Carlon B121ADJ, $4.42–4.94                                                   | A standard residential box where drywall thickness varies. The catalog has only nail-on boxes.                                 |
+| M2  | Single-gang gangable switch box, steel, 2-1/2" deep, with side bracket (clamps) | HD: Steel City LXV-25R, $4.98. Raco 504 at Platt                                 | The steel device box as mounted on wood studs. Row 737 has no bracket.                                                         |
+| M3  | 4" square box, steel, 1-1/2" deep, with FM/FS side bracket                      | HD: Raco 8218 (with AC/MC clamps), $82.22 per 25. Platt: Raco 223/199 FS bracket | The commercial box as actually hung on a stud. Row 743 is priced by 46 starters, and 44 of them have nothing to mount it with. |
+| M4  | 4" square box, steel, 2-1/8" deep, with side bracket                            | HD: Southwire 52171-FBX, $8.56. Raco 8241 (TS bracket)                           | Deep version of M3.                                                                                                            |
+| M5  | Fan-rated ceiling box, new work, plastic, adjustable bar hanger, 20 cu in       | HD: Carlon B620KR-CFB, $10.57 (35 lb fan / 50 lb fixture)                        | A fan centred between joists. Today row 683 is the only fan box.                                                               |
+| M6  | 4-11/16" square box, steel, 1-1/2" deep                                         | Rexel: Steel City 72151 (29.5 cu in). Raco 247                                   | Only the 2-1/8" deep 4-11/16" box exists today. Not at HD or Platt online; a distributor item.                                 |
+| M7  | 4" octagon box, steel, 1-1/2" deep, adjustable bar hanger                       | Rexel: Steel City 54151-NF. Raco 324, about $95 per 25                           | The commercial fixture box between joists or in a T-bar ceiling. Distributor item.                                             |
+| M8  | Single-gang old work box, steel, 2-1/2" deep                                    | HD: Steel City LXOWC-25R $5.98; LXWOWC-20R $9.58                                 | Remodel work in commercial MC jobs. All old-work boxes today are plastic.                                                      |
+| M9  | Old work round ceiling box, plastic, fan-rated (swing clamp)                    | Stanion: Carlon B618RR (70 lb fan)                                               | A retrofit fan without a brace. Today the only old-work fan option is the brace kit (row 673). Not at HD.                      |
+| M10 | Pancake box, plastic, 1/2" deep, 8 cu in                                        | Stoneway: Carlon B708-SHK                                                        | A residential smoke detector on a plastic box. Not at HD.                                                                      |
+| M11 | Handy box, 2-1/8" deep                                                          | True Value / Southwire G19282. Raco 8670                                         | The deep handy box (about 16.5 cu in) for a GFCI in a utility box. Not at HD online.                                           |
+| M12 | Single-gang gangable switch box, steel, 3-1/2" deep                             | HD: Raco 8590, $4.52 (18 cu in)                                                  | The deep steel device box. Row 737 is 2-1/2" only.                                                                             |
+| M13 | Airtight (vapor) new work box, single-gang, nail-on, about 23 cu in             | Ace: Cantex EZ23SN-RG $6.99. Arlington FN101FLGC                                 | Energy-code houses need a sealed box. Not at HD online.                                                                        |
+| M14 | Weatherproof box, double-gang, nonmetallic                                      | HD: Commercial Electric WDB750PG, $12.76 (27.5 cu in)                            | Only PVC single-gang is in the catalog. No 3-gang nonmetallic box was found, so do not add one.                                |
+| M15 | Low-voltage mounting bracket, new work (nail-on), 1-gang                        | HD: Carlon SC100A (case of 24). SupplyHouse: Arlington LVN1 $1.19                | The data/TV drop in new construction. Today every LV starter uses the old-work ring (row 706).                                 |
+| M16 | 4" square box, plastic                                                          | True Value: Carlon B249B, 48 cu in, $4.99. Cantex EZ48DN                         | Residential 4" square in PVC. Not at HD online — lower priority.                                                               |
+| M17 | Weatherproof extension ring, single-gang, 1" deep                               | HD: Bell 5406-0, $4.93                                                           | Deepens a cast weatherproof box (siding, GFCI fill).                                                                           |
 
 **Checked and NOT missing:** in-use and flip covers (Wall Plates & Misc),
 T-bar box hanger (Strut & Supports), recessed TV box (Receptacles), floor
@@ -201,10 +201,138 @@ bracket", Devices). **Checked and not worth adding:** a 3-gang nonmetallic
 weatherproof box (none found); a separate "pancake with bar hanger" (not
 distinct from M7).
 
-## A side note, not a name question
+## Owner's answers — 2026-10-12
 
-Row 743's 46 commercial starters price a 4" square box with no bracket and
-no support. Whatever M3 becomes, it is worth asking whether those starters
-should price the bracket version or add a support (row 672, or the T-bar
-hanger). Today, every MC device in the catalog is bid without a way to hang
-its box.
+**Nothing below is applied yet.** Names, new rows and starter changes all go
+in the **end-of-pricing job**, with the owner's yes on the final list. Every
+rename goes through `RENAMED_BASELINE_MATERIALS`, and every new row ships with
+its trade slang (CLAUDE.md § Materials).
+
+| Question                                                       | Answer               | What the end-of-pricing job does                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Floor box covers (rows 688–693): plastic or brass?             | **Both**             | Each of the 6 covers becomes a plastic row and a brass row, so there are 12 in all. The existing row is renamed to one material, and the other is added. Which one keeps the existing row (and so the "Floor box receptacle (slab)" starter) is still to pick. Plastic matches the nonmetallic box in row 694. |
+| Weatherproof boxes (rows 778–781, 784, 786–787): 3 or 5 holes? | **Both**             | Each becomes a 3-hole row and a 5-hole row, for 14 in all. The existing row becomes 3-hole, since 3-hole is the plain box and its starters do not feed through. The 5-hole rows are new.                                                                                                                       |
+| Fan box (row 683): nail-on or bar hanger?                      | **Both**             | Row 683 becomes "Fan-rated ceiling box, new work, plastic, nail-on, 20 cu in" and keeps "Ceiling fan standard". The bar-hanger box is added as M5: "Fan-rated ceiling box, new work, plastic, adjustable bar hanger, 20 cu in".                                                                                |
+| The 17 missing items (M1–M17)                                  | **Yes**              | Add all 17, with the names in the table above.                                                                                                                                                                                                                                                                 |
+| The 4" square box starters with no support                     | List only (below)    | Add the support each one is given below.                                                                                                                                                                                                                                                                       |
+| Row 735, two products in one                                   | Proposed names below |                                                                                                                                                                                                                                                                                                                |
+| Row 730, no real product                                       | Proposed name below  |                                                                                                                                                                                                                                                                                                                |
+
+### Row 735 — split into two
+
+Arlington sells these as two products, and each one has a box built in:
+
+| New name                                                           | Real product                | Starter                               |
+| ------------------------------------------------------------------ | --------------------------- | ------------------------------------- |
+| Vinyl siding mounting block, light fixture, round (box built in)   | Arlington 8141 (6.8 cu in)  | Exterior porch light                  |
+| Vinyl siding box kit, 1-gang receptacle, GFCI depth (box built in) | Arlington 8081 (15.5 cu in) | Outdoor GFCI receptacle, in-use cover |
+
+**What the split exposes:** both starters ALSO price a separate box today.
+"Exterior porch light" adds a round ceiling box, and the GFCI starter adds a
+single-gang new-work box. With a box built into the block, that box is
+counted twice. At the end-of-pricing job, take the separate box out of those
+two starters, or keep it and name the blocks "block only (no box)" if the
+owner buys the plain blocks. **Owner pick.** Keeping both overstates the cost
+slightly, by one cheap box per starter, which is the safe direction while
+undecided.
+
+### Row 730 — replace with the real product
+
+**Adjustable bar hanger, steel, 16–24" (for a 4" octagon or square box)**,
+rated 50 lb on 16" centres. This is a real stocked item: Topaz BHA1 at
+[Gexpro](https://www.gexpro.com/p/637155/topaz/bar-hanger-adjustable-16-to-24-steel/785592983510/bha1c),
+about $2.15 at [Dale Electric](https://dale-electric.com/products/BHA1),
+Southwire at [Ace](https://www.acehardware.com/departments/lighting-and-electrical/boxes-fittings-and-conduit/boxes/3016073),
+and [Raco 920](https://www.hubbell.com/raco/es-mx/products/adjustable-bar-hanger/p/2178006)
+(14-1/4 to 22-1/2"). It is the bar that a plain box screws to between
+joists. It is not a retrofit brace: that is row 673, which already exists.
+Rename row 730 in place (no starter uses it) and drop the "can recessed"
+aliases, which belong to a recessed-can accessory.
+
+## The 4" square box starters — the support each one needs (LIST ONLY)
+
+**46 starters use row 743. Two already carry a support** (DV30: T-bar box
+hanger; MS2: T-grid independent support clip + 12 ga hanger wire), **so 44
+are bare.** Each has been given the support for where its box goes. Where the
+mounting is not known, the **more expensive, complete** option is given
+(high beats low): a bracket box rather than a plain box, and a hanger rather
+than nothing.
+
+The supports, all real catalog rows except **M3**, which is a missing item
+listed above:
+
+- **Bracket box (M3):** swap row 743 for M3, "4" square box, steel, 1-1/2"
+  deep, with FM/FS side bracket". This is a SWAP rather than an addition, because the
+  bracket is part of the box. It is for a box set in a stud wall (wood or
+  metal stud).
+- **T-bar hanger:** add "T-bar box hanger" (Strut & Supports). It is for a
+  device in a lay-in ceiling, the same as DV30.
+- **Ceiling wire:** add "T-grid independent support clip" + "12 ga ceiling
+  hanger wire" (8 ft), the same as MS2. It is for a box above a lay-in
+  ceiling.
+- **Surface, 2 masonry screws:** add 2 × "Masonry screw" (Fasteners &
+  Anchors). It is for a box surface-mounted on block or concrete under a
+  raised cover. Masonry is the more expensive case of the two; on a stud wall
+  the same box goes on with 2 × "Self-drilling screw".
+
+| Ref  | Starter                                               | Where its box goes                              | Proposed support                                                                                                                |
+| ---- | ----------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| LT1  | Surface-mount ceiling fixture                         | Ceiling, framed (it prices NM-B)                | Bracket box                                                                                                                     |
+| DV20 | Duplex receptacle, MC                                 | Stud wall                                       | Bracket box                                                                                                                     |
+| DV21 | GFCI receptacle, MC                                   | Stud wall                                       | Bracket box                                                                                                                     |
+| DV23 | Dedicated 20A receptacle, MC                          | Stud wall                                       | Bracket box                                                                                                                     |
+| DV24 | Isolated-ground receptacle (cash wrap)                | Stud wall                                       | Bracket box                                                                                                                     |
+| DV25 | Controlled receptacle (plug load)                     | Stud wall                                       | Bracket box                                                                                                                     |
+| DV26 | Single-pole switch, MC                                | Stud wall                                       | Bracket box                                                                                                                     |
+| DV27 | 3-way switch, MC                                      | Stud wall                                       | Bracket box                                                                                                                     |
+| DV28 | Key switch, MC                                        | Stud wall                                       | Bracket box                                                                                                                     |
+| DV29 | Wall occupancy sensor, MC                             | Stud wall                                       | Bracket box                                                                                                                     |
+| DV30 | Ceiling occupancy sensor + power pack                 | Lay-in ceiling                                  | **Already has T-bar box hanger** — no change                                                                                    |
+| DV31 | 0-10V dimmer, MC                                      | Stud wall                                       | Bracket box                                                                                                                     |
+| LT24 | 4 ft LED wraparound (back room)                       | Ceiling. A back room may be hard-lid or lay-in  | T-bar hanger. It costs more than a bracket box, so it is the right side of unsure; swap to a bracket box on a hard-lid ceiling. |
+| LT27 | Exit sign                                             | Ceiling or wall                                 | T-bar hanger (high beats low)                                                                                                   |
+| LT28 | Emergency light / exit combo                          | Ceiling or wall                                 | T-bar hanger                                                                                                                    |
+| CS3  | Hand dryer                                            | Stud wall                                       | Bracket box                                                                                                                     |
+| CS4  | Drinking fountain / EWC                               | Stud wall                                       | Bracket box                                                                                                                     |
+| CS5  | Reach-in cooler / freezer receptacle                  | Stud wall                                       | Bracket box                                                                                                                     |
+| CS6  | Twist-lock receptacle, L5-20                          | Surface (raised cover)                          | Surface, 2 masonry screws                                                                                                       |
+| CS7  | Twist-lock receptacle, L6-30                          | Surface (raised cover)                          | Surface, 2 masonry screws                                                                                                       |
+| CS8  | Twist-lock receptacle, L14-30                         | Surface (raised cover)                          | Surface, 2 masonry screws                                                                                                       |
+| CS10 | Modular furniture feed                                | Wall or above ceiling, feeding a furniture whip | Bracket box                                                                                                                     |
+| CS11 | Fire alarm pull station                               | Stud wall                                       | Bracket box                                                                                                                     |
+| CS12 | Fire alarm horn/strobe                                | Stud wall (2-gang ring)                         | Bracket box                                                                                                                     |
+| CS13 | Fire alarm smoke detector (system)                    | Lay-in ceiling                                  | T-bar hanger                                                                                                                    |
+| DR19 | Relocate receptacle (wall move), MC                   | New stud wall                                   | Bracket box                                                                                                                     |
+| MS1  | Junction box, 4" square                               | Unknown                                         | Bracket box. The cheapest complete way to fix a box; MS2 is the above-ceiling case.                                             |
+| MS2  | Junction box above lay-in ceiling                     | Above lay-in ceiling                            | **Already has clip + hanger wire** — no change                                                                                  |
+| GC4  | Emergency light, remote head                          | Wall or ceiling                                 | T-bar hanger (high beats low)                                                                                                   |
+| GC5  | 120V feed for door hardware / access control          | Above the ceiling by the door                   | Ceiling wire, like MS2                                                                                                          |
+| CK1  | Emergency light (bug-eye), standalone                 | Wall (bug-eyes mount high on a wall)            | Bracket box                                                                                                                     |
+| CK2  | Fire alarm strobe only                                | Stud wall (2-gang ring)                         | Bracket box                                                                                                                     |
+| CK5  | Fire alarm control panel connection                   | Wall beside the panel                           | Bracket box                                                                                                                     |
+| CK6  | 208V cooler / freezer receptacle (NEMA 6-20)          | Surface (raised cover)                          | Surface, 2 masonry screws                                                                                                       |
+| CK7  | Duplex receptacle, EMT                                | Stud wall                                       | Bracket box                                                                                                                     |
+| CK8  | Two switches, one box, MC                             | Stud wall (2-gang ring)                         | Bracket box                                                                                                                     |
+| CK10 | Daylight sensor                                       | Lay-in ceiling                                  | T-bar hanger                                                                                                                    |
+| CK12 | Ceiling receptacle for projector                      | Ceiling (raised cover, so hard-lid or exposed)  | Ceiling wire. A raised cover means the box is not in the grid, so it hangs from structure.                                      |
+| CK14 | Electric wall heater, fan-forced                      | Stud wall                                       | Bracket box                                                                                                                     |
+| CK15 | Fire alarm speaker/strobe                             | Stud wall (2-gang ring)                         | Bracket box                                                                                                                     |
+| CK16 | Heat detector                                         | Ceiling                                         | T-bar hanger                                                                                                                    |
+| CW1  | Equipment connection, hardwired (flex whip), 208/240V | Wall or above ceiling at the equipment          | Bracket box                                                                                                                     |
+| CW5  | Overhead door operator connection                     | Ceiling, at the operator                        | Ceiling wire, like MS2                                                                                                          |
+| CW13 | Hospital-grade receptacle (exam / operatory)          | Stud wall                                       | Bracket box                                                                                                                     |
+| CW14 | 208V kitchen equipment receptacle, 30A (NEMA 6-30)    | Surface (raised cover)                          | Surface, 2 masonry screws                                                                                                       |
+| CW15 | Recessed clock receptacle                             | Stud wall                                       | Bracket box                                                                                                                     |
+
+**Count** (recounted from the table): 29 bracket box, 7 T-bar hanger, 3
+ceiling wire, 5 surface masonry screws, 2 already supported — **46**. If a recount in the
+end-of-pricing job gives a different number, stop and find out why before
+changing anything: either a starter changed since 2026-10-12 or this table
+is wrong, and those want different fixes.
+
+**Why swap the box rather than add a bracket.** The FS bracket is welded to
+the box, so it is one part, and the supply house sells it as one SKU (Raco
+8218; Platt carries Raco 223/199 FS). Adding a separate bracket to a bare box
+would price a part nobody buys. The one separate stud support in the catalog,
+row 672 ("Box support bracket", stud-to-stud), is the right answer only
+where a box sits BETWEEN studs, which none of these starters says.

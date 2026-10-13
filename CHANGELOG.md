@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **"Import price list" is hidden for now.** It read a supply house's
+  "$480.00/M" (per thousand feet) as $480 per foot, and saved row by row with
+  no preview and no undo, so one import could put wire on a bid at a thousand
+  times its cost. The button comes back once the import understands per M and
+  per C and shows a preview with undo. Prices a shop already imported are not
+  touched; "Import labor sheet" is unchanged.
+- **The starter pricing sheet stays in the app's order when it is rebuilt**
+  (category, then item type, then real size), instead of going back to
+  most-used first.
+
 - **The proposal now says who does what.** Owner-furnished items are listed
   under Included ("Owner-furnished, installed by us: 24 light fixtures");
   By others and Excluded lines leave the scope of work and are named under
