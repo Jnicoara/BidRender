@@ -208,15 +208,15 @@ in the **end-of-pricing job**, with the owner's yes on the final list. Every
 rename goes through `RENAMED_BASELINE_MATERIALS`, and every new row ships with
 its trade slang (CLAUDE.md § Materials).
 
-| Question                                                       | Answer               | What the end-of-pricing job does                                                                                                                                                                                                                                                                               |
-| -------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Floor box covers (rows 688–693): plastic or brass?             | **Both**             | Each of the 6 covers becomes a plastic row and a brass row, so there are 12 in all. The existing row is renamed to one material, and the other is added. Which one keeps the existing row (and so the "Floor box receptacle (slab)" starter) is still to pick. Plastic matches the nonmetallic box in row 694. |
-| Weatherproof boxes (rows 778–781, 784, 786–787): 3 or 5 holes? | **Both**             | Each becomes a 3-hole row and a 5-hole row, for 14 in all. The existing row becomes 3-hole, since 3-hole is the plain box and its starters do not feed through. The 5-hole rows are new.                                                                                                                       |
-| Fan box (row 683): nail-on or bar hanger?                      | **Both**             | Row 683 becomes "Fan-rated ceiling box, new work, plastic, nail-on, 20 cu in" and keeps "Ceiling fan standard". The bar-hanger box is added as M5: "Fan-rated ceiling box, new work, plastic, adjustable bar hanger, 20 cu in".                                                                                |
-| The 17 missing items (M1–M17)                                  | **Yes**              | Add all 17, with the names in the table above.                                                                                                                                                                                                                                                                 |
-| The 4" square box starters with no support                     | List only (below)    | Add the support each one is given below.                                                                                                                                                                                                                                                                       |
-| Row 735, two products in one                                   | Proposed names below |                                                                                                                                                                                                                                                                                                                |
-| Row 730, no real product                                       | Proposed name below  |                                                                                                                                                                                                                                                                                                                |
+| Question                                                       | Answer                                                                                                   | What the end-of-pricing job does                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Floor box covers (rows 688–693): plastic or brass?             | **Both**                                                                                                 | Each of the 6 covers becomes a plastic row and a brass row, so there are 12 in all. The existing row is renamed to one material, and the other is added. Which one keeps the existing row (and so the "Floor box receptacle (slab)" starter) is still to pick. Plastic matches the nonmetallic box in row 694. |
+| Weatherproof boxes (rows 778–781, 784, 786–787): 3 or 5 holes? | **Both**                                                                                                 | Each becomes a 3-hole row and a 5-hole row, for 14 in all. The existing row becomes 3-hole, since 3-hole is the plain box and its starters do not feed through. The 5-hole rows are new.                                                                                                                       |
+| Fan box (row 683): nail-on or bar hanger?                      | **Both**                                                                                                 | Row 683 becomes "Fan-rated ceiling box, new work, plastic, nail-on, 20 cu in" and keeps "Ceiling fan standard". The bar-hanger box is added as M5: "Fan-rated ceiling box, new work, plastic, adjustable bar hanger, 20 cu in".                                                                                |
+| The 17 missing items (M1–M17)                                  | **Yes**                                                                                                  | Add all 17, with the names in the table above.                                                                                                                                                                                                                                                                 |
+| The 4" square box starters with no support                     | **Yes, as listed** (owner, 2026-10-12, second answer)                                                    | Add the support each of the 44 is given below: 29 bracket box, 7 T-bar hanger, 3 hanger clip + ceiling wire, 5 two masonry screws. DV30 and MS2 stay as they are.                                                                                                                                              |
+| Row 735, two products in one                                   | **Split into two; a starter using either one drops its separate box** (owner, 2026-10-12, second answer) | See "Row 735" below: the two names, and the two starters that change.                                                                                                                                                                                                                                          |
+| Row 730, no real product                                       | Proposed name below                                                                                      |                                                                                                                                                                                                                                                                                                                |
 
 ### Row 735 — split into two
 
@@ -227,14 +227,33 @@ Arlington sells these as two products, and each one has a box built in:
 | Vinyl siding mounting block, light fixture, round (box built in)   | Arlington 8141 (6.8 cu in)  | Exterior porch light                  |
 | Vinyl siding box kit, 1-gang receptacle, GFCI depth (box built in) | Arlington 8081 (15.5 cu in) | Outdoor GFCI receptacle, in-use cover |
 
-**What the split exposes:** both starters ALSO price a separate box today.
-"Exterior porch light" adds a round ceiling box, and the GFCI starter adds a
-single-gang new-work box. With a box built into the block, that box is
-counted twice. At the end-of-pricing job, take the separate box out of those
-two starters, or keep it and name the blocks "block only (no box)" if the
-owner buys the plain blocks. **Owner pick.** Keeping both overstates the cost
-slightly, by one cheap box per starter, which is the safe direction while
-undecided.
+**Owner's answer (2026-10-12): split it, and any starter using either one
+drops its separate box.** The box is built into the block, so keeping both
+would count the box twice.
+
+**The starters that change.** Searched every shipped starter for "Siding
+mounting block"; kits, run types and cover swaps name it nowhere. Exactly two
+starters use it:
+
+| Ref  | Starter                               | Block it moves to                                                  | Separate box it DROPS                       | Stays                                               |
+| ---- | ------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------- | --------------------------------------------------- |
+| DV8  | Outdoor GFCI receptacle, in-use cover | Vinyl siding box kit, 1-gang receptacle, GFCI depth (box built in) | Single-gang new work box, plastic, 18 cu in | GFCI receptacle, in-use cover, 12/2 NM-B, wire nuts |
+| LT15 | Exterior porch light                  | Vinyl siding mounting block, light fixture, round (box built in)   | Round ceiling box, plastic, 20 cu in        | LED wall sconce, 14/2 NM-B, wire nuts               |
+
+**How the split lands without breaking anything** (end-of-pricing job):
+rename row 735 in place to ONE of the two names through
+`RENAMED_BASELINE_MATERIALS`, so the row keeps its id, and add the other as a
+new material. Then point each starter at its own block through
+`server/seed/starterParts.ts`, and drop the box line from each. A bid that
+already priced a line from row 735 keeps its frozen snapshot either way.
+**If the recount at that job finds a third starter, stop and find out why
+before changing anything** — a starter added since 2026-10-12 or a missed
+search, and those want different fixes.
+
+**Check before shipping:** the 8141 fixture block is 6.8 cu in. That is
+enough for a fixture's splice, but it is a smaller box than the 20 cu in
+round box LT15 prices today, so confirm the fill when the name is made
+final.
 
 ### Row 730 — replace with the real product
 
@@ -249,7 +268,11 @@ joists. It is not a retrofit brace: that is row 673, which already exists.
 Rename row 730 in place (no starter uses it) and drop the "can recessed"
 aliases, which belong to a recessed-can accessory.
 
-## The 4" square box starters — the support each one needs (LIST ONLY)
+## The 4" square box starters — the support each one needs (owner: YES, as listed)
+
+**Owner, 2026-10-12: yes to every row below, as listed.** Not applied yet —
+it goes in the end-of-pricing job with the rest, and the swap needs M3 to
+exist first.
 
 **46 starters use row 743. Two already carry a support** (DV30: T-bar box
 hanger; MS2: T-grid independent support clip + 12 ga hanger wire), **so 44
