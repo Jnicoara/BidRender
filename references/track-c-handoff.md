@@ -1,5 +1,20 @@
 # Track C — handoff, 2026-10-06
 
+## FROM TRACK A — 2026-10-12 (session 37): smoke steps when F11 and the panel-label offer merge
+
+F15 (scale is a one-tap offer, Q19) broke smoke step 2 on local-dev: it
+waited for "1/2 scaled" that no longer arrives by viewing. A fixed it in
+`e2e/smoke/flow.spec.ts` — step 2 now taps "Use … — read off the sheet",
+and step 11's 77.78 ft depends on that tap.
+
+**When F11 (homerun offer, `9291c708`) and the panel-label offer
+(`540ac344`) merge to local-dev, C updates any smoke step that expects
+circuits or panels to fill in on their own** — tap "Add N new homerun
+circuits" / "Assign N panels from labels" first. Checked 2026-10-12: no
+step in `e2e/smoke/` does this today, but grep again at merge time
+(`homerun|circuit|panel`) — a step added in between would fail the same
+way step 2 did, on staging, after the Gate's test job passed.
+
 ## FROM TRACK A — 2026-10-12 (session 36): BS-M3–M6 — NOT applied; this is exactly what A needs from C
 
 **Settling who waits on whom (owner asked):** your "FOR TRACK A — what the
