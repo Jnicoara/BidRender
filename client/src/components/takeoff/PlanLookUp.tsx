@@ -1,43 +1,118 @@
 /**
  * "Look up a word or symbol" — the box at the top of the Legend tab, and the
  * "More options" fold at its bottom (references/plan-reading-help-plan.md
- * § 1, § 2; step 1 of § 7).
+ * § 1–3; steps 1 and 2 of § 7).
  *
- * Type `WP`, `AFF`, `hr`, `gfi`, `homerun`: the answer comes from THIS SET'S
- * legend first ("This set's legend"), then the built-in guide ("Usually
- * means"). Drawings disagree with each other, and the one in front of the
- * person is the one that is right for this job.
+ * Type `WP`, `AFF`, `hr`, `plug`, `can`, `homerun`: the answer comes from
+ * THIS SET'S legend first ("This set's legend"), then the built-in guide —
+ * symbols ("What it looks like") and abbreviations ("Usually means"), the
+ * one the query spells exactly first. Drawings disagree with each other,
+ * and the one in front of the person is the one that is right for this job.
  *
- * No model, no server call, nothing saved — the list is shipped content
- * (shared/planHelp/abbreviations.ts, a DRAFT until the owner has reviewed
- * it) and the search is a pure function (shared/planHelp/lookUp.ts).
+ * A symbol answer has ONE action, "Count these" (§ 9 Q11): an ordinary plain
+ * count named for the symbol, exactly as typing the name would make — no
+ * library entry, no assembly asked for. It is not there on a locked bid, or
+ * for a thing that is traced rather than counted. Help never counts
+ * anything by itself.
+ *
+ * No model, no server call of its own, nothing saved — the lists are
+ * shipped content (shared/planHelp/, DRAFTS until the owner has reviewed
+ * them) and the search is pure (shared/planHelp/lookUp.ts).
  */
 import { useMemo, useState } from "react";
-import { BookA, ChevronDown, Search, X } from "lucide-react";
+import { BookA, ChevronDown, MapPin, Search, Shapes, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   ABBREVIATIONS,
   type Abbreviation,
 } from "@shared/planHelp/abbreviations";
-import { legendMatches, lookUpAbbreviations } from "@shared/planHelp/lookUp";
+import {
+  PLAN_SYMBOLS,
+  countName,
+  type PlanSymbol,
+  type SymbolShape,
+} from "@shared/planHelp/symbols";
+import {
+  answerOrder,
+  legendMatches,
+  libraryMatches,
+  lookUpAbbreviations,
+  lookUpSymbols,
+} from "@shared/planHelp/lookUp";
 import type { SymbolEntry } from "./LegendPanel";
 
-/** How many guide answers show before "Show N more". */
+/** How many guide answers of each kind show before "Show N more". */
 const SHOWN = 4;
+
+/** What a symbol card needs from the page. */
+type SymbolActions = {
+  /** The company's assemblies, for "Your library has: …". */
+  assemblies: { id: number; name: string }[];
+  /** Start a plain count. Undefined on a locked bid: no button. */
+  onCountThese?: (name: string) => void;
+};
 
 export function PlanLookUp({
   symbols,
+  ...actions
 }: {
   /** This set's legend, as the Legend tab lists it. */
   symbols: SymbolEntry[];
-}) {
+} & SymbolActions) {
   const [query, setQuery] = useState("");
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState({ symbols: false, words: false });
   const q = query.trim();
   const legend = useMemo(() => legendMatches(q, symbols), [q, symbols]);
-  const guide = useMemo(() => lookUpAbbreviations(q), [q]);
-  const shown = showAll ? guide : guide.slice(0, SHOWN);
+  const words = useMemo(() => lookUpAbbreviations(q), [q]);
+  const drawn = useMemo(() => lookUpSymbols(q), [q]);
+  const order = answerOrder(words, drawn);
+  const shownWords = showAll.words ? words : words.slice(0, SHOWN);
+  const shownDrawn = showAll.symbols ? drawn : drawn.slice(0, SHOWN);
+
+  const sections = {
+    symbols: drawn.length > 0 && (
+      <section key="symbols" aria-label="What it looks like">
+        <h4 className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
+          What it looks like
+        </h4>
+        <ul className="space-y-1.5">
+          {shownDrawn.map(({ symbol }) => (
+            <li key={symbol.name}>
+              <SymbolCard symbol={symbol} {...actions} />
+            </li>
+          ))}
+        </ul>
+        {drawn.length > shownDrawn.length && (
+          <ShowMore
+            n={drawn.length - shownDrawn.length}
+            onClick={() => setShowAll(s => ({ ...s, symbols: true }))}
+          />
+        )}
+      </section>
+    ),
+    abbreviations: words.length > 0 && (
+      <section key="abbreviations" aria-label="Usually means">
+        <h4 className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
+          Usually means
+        </h4>
+        <ul className="space-y-1.5">
+          {shownWords.map(({ entry }) => (
+            <li key={entry.abbr}>
+              <AbbreviationCard entry={entry} />
+            </li>
+          ))}
+        </ul>
+        {words.length > shownWords.length && (
+          <ShowMore
+            n={words.length - shownWords.length}
+            onClick={() => setShowAll(s => ({ ...s, words: true }))}
+          />
+        )}
+      </section>
+    ),
+  };
 
   return (
     <div className="px-3 pt-2 pb-2 space-y-2">
@@ -46,11 +121,11 @@ export function PlanLookUp({
         <Search className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
         <Input
           value={query}
-          placeholder="Look up a word or symbol (WP, AFF, HR…)"
+          placeholder="Look up a word or symbol (WP, AFF, plug…)"
           className="h-9 pl-7 pr-8 text-sm"
           onChange={e => {
             setQuery(e.target.value);
-            setShowAll(false);
+            setShowAll({ symbols: false, words: false });
           }}
           onKeyDown={e => {
             // The page's own keys (letters arm tools, Escape puts one down)
@@ -102,44 +177,175 @@ export function PlanLookUp({
             </section>
           )}
 
-          {guide.length > 0 && (
-            <section aria-label="Usually means">
-              <h4 className="text-[0.7rem] uppercase tracking-wide text-muted-foreground mb-1">
-                Usually means
-              </h4>
-              <ul className="space-y-1.5">
-                {shown.map(({ entry }) => (
-                  <li key={entry.abbr}>
-                    <AbbreviationCard entry={entry} />
-                  </li>
-                ))}
-              </ul>
-              {guide.length > shown.length && (
-                <button
-                  type="button"
-                  className="mt-1 min-h-8 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                  onClick={() => setShowAll(true)}
-                >
-                  Show {guide.length - shown.length} more
-                </button>
-              )}
-            </section>
-          )}
+          {order.map(kind => sections[kind])}
 
-          {legend.length === 0 && guide.length === 0 && (
+          {legend.length === 0 && words.length === 0 && drawn.length === 0 && (
             <p className="text-xs text-muted-foreground">
               Nothing found for &ldquo;{q}&rdquo;. Check this set&rsquo;s legend
-              and general notes sheet — abbreviations change from one set to the
-              next.
+              and general notes sheet — symbols and abbreviations change from
+              one set to the next.
             </p>
           )}
 
-          {guide.length > 0 && legend.length === 0 && (
+          {(words.length > 0 || drawn.length > 0) && (
             <p className="text-[0.7rem] text-muted-foreground">
-              This set&rsquo;s own legend wins if it says something different.
+              Drawn and written differently on every set — this set&rsquo;s own
+              legend wins.
             </p>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ShowMore({ n, onClick }: { n: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="mt-1 min-h-8 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+      onClick={onClick}
+    >
+      Show {n} more
+    </button>
+  );
+}
+
+/**
+ * The common way a symbol is drawn, black on white like the drawing it
+ * stands for, at the 32 px it was drawn to be read at.
+ */
+export function SymbolPicture({
+  shapes,
+  className,
+}: {
+  shapes: SymbolShape[];
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      className={cn("w-8 h-8 shrink-0 rounded bg-white text-black", className)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {shapes.map((s, i) => {
+        if ("circle" in s)
+          return (
+            <circle
+              key={i}
+              cx={s.circle[0]}
+              cy={s.circle[1]}
+              r={s.circle[2]}
+              fill={s.fill ? "currentColor" : "none"}
+            />
+          );
+        if ("line" in s)
+          return (
+            <line
+              key={i}
+              x1={s.line[0]}
+              y1={s.line[1]}
+              x2={s.line[2]}
+              y2={s.line[3]}
+              strokeDasharray={s.dash ? "3 2.5" : undefined}
+            />
+          );
+        if ("rect" in s)
+          return (
+            <rect
+              key={i}
+              x={s.rect[0]}
+              y={s.rect[1]}
+              width={s.rect[2]}
+              height={s.rect[3]}
+              fill={s.fill ? "currentColor" : "none"}
+            />
+          );
+        if ("path" in s)
+          return (
+            <path key={i} d={s.path} fill={s.fill ? "currentColor" : "none"} />
+          );
+        return (
+          <text
+            key={i}
+            x={s.text[0]}
+            y={s.text[1]}
+            fontSize={s.size ?? 10}
+            textAnchor="middle"
+            fill="currentColor"
+            stroke="none"
+            fontFamily="Arial, sans-serif"
+            fontWeight={700}
+          >
+            {s.text[2]}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** One symbol: what it is, how it's usually bid, what to look out for. */
+function SymbolCard({
+  symbol,
+  assemblies,
+  onCountThese,
+}: { symbol: PlanSymbol } & SymbolActions) {
+  const name = countName(symbol);
+  const library = useMemo(
+    () => libraryMatches(symbol, assemblies),
+    [symbol, assemblies]
+  );
+  return (
+    <div className="rounded-md border border-border bg-muted/20 px-2 py-1.5 text-xs space-y-1">
+      <div className="flex items-start gap-2">
+        <SymbolPicture shapes={symbol.picture} />
+        <div className="min-w-0">
+          <p className="font-semibold">{symbol.name}</p>
+          {symbol.aka.length > 0 && (
+            <p className="text-muted-foreground">
+              Also: {symbol.aka.join(", ")}
+            </p>
+          )}
+        </div>
+      </div>
+      <p>{symbol.whatItIs}</p>
+      <p>
+        <span className="text-muted-foreground">
+          How it&rsquo;s usually bid:{" "}
+        </span>
+        {symbol.howBid}
+      </p>
+      {symbol.lookOutFor.length > 0 && (
+        <div>
+          <p className="text-muted-foreground">Look out for:</p>
+          <ul className="list-disc pl-4">
+            {symbol.lookOutFor.map(l => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {library.length > 0 && (
+        <p className="text-muted-foreground">
+          Your library has: {library.map(a => a.name).join(" · ")}
+        </p>
+      )}
+      {name && onCountThese && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-9 gap-1.5 text-xs"
+          onClick={() => onCountThese(name)}
+          title={`Start a count called “${name}” — no assembly needed`}
+        >
+          <MapPin className="w-3.5 h-3.5" /> Count these
+        </Button>
       )}
     </div>
   );
@@ -193,14 +399,16 @@ function AbbreviationCard({
 }
 
 /**
- * The Legend tab's ONE fold (plan § 1): everything past the basic path.
- * Today it holds the whole abbreviation list; the symbol guide, tips and
+ * The Legend tab's ONE fold (plan § 1): everything past the basic path —
+ * the whole symbol guide and the whole abbreviation list today; tips and
  * outlines land here as they are built (§ 7). Closed by default.
  */
-export function LegendMoreOptions() {
+export function LegendMoreOptions(actions: SymbolActions) {
   const [open, setOpen] = useState(false);
-  const [browsing, setBrowsing] = useState(false);
-  const sorted = useMemo(
+  const [browsing, setBrowsing] = useState<"symbols" | "words" | null>(null);
+  /** The symbol opened to its full card in the browse list. */
+  const [openSymbol, setOpenSymbol] = useState<string | null>(null);
+  const sortedWords = useMemo(
     () =>
       [...ABBREVIATIONS]
         .filter(e => e.trade === "electrical")
@@ -209,6 +417,12 @@ export function LegendMoreOptions() {
         ),
     []
   );
+  const allSymbols = useMemo(
+    () => PLAN_SYMBOLS.filter(s => s.trade === "electrical"),
+    []
+  );
+  const toggle = (kind: "symbols" | "words") =>
+    setBrowsing(b => (b === kind ? null : kind));
 
   return (
     <div className="border-t border-border shrink-0">
@@ -227,23 +441,58 @@ export function LegendMoreOptions() {
         <span className="text-sm font-medium">More options</span>
       </button>
       {open && (
-        <div className="px-3 pb-3 space-y-2">
+        <div className="px-3 pb-3 space-y-1">
           <button
             type="button"
-            onClick={() => setBrowsing(v => !v)}
-            aria-expanded={browsing}
+            onClick={() => toggle("symbols")}
+            aria-expanded={browsing === "symbols"}
+            className="w-full flex items-center gap-2 rounded px-1 min-h-9 text-left text-xs hover:bg-muted/50"
+          >
+            <Shapes className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <span className="flex-1">All symbols</span>
+            <span className="text-muted-foreground">{allSymbols.length}</span>
+          </button>
+          {browsing === "symbols" && (
+            <ul
+              className="divide-y divide-border/50 pb-2"
+              aria-label="All symbols"
+            >
+              {allSymbols.map(symbol => (
+                <li key={symbol.name} className="py-1">
+                  {openSymbol === symbol.name ? (
+                    <SymbolCard symbol={symbol} {...actions} />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setOpenSymbol(symbol.name)}
+                      className="w-full flex items-center gap-2 rounded px-1 min-h-9 text-left text-xs hover:bg-muted/50"
+                    >
+                      <SymbolPicture shapes={symbol.picture} />
+                      <span className="flex-1 min-w-0 truncate">
+                        {symbol.name}
+                      </span>
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={() => toggle("words")}
+            aria-expanded={browsing === "words"}
             className="w-full flex items-center gap-2 rounded px-1 min-h-9 text-left text-xs hover:bg-muted/50"
           >
             <BookA className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
             <span className="flex-1">All abbreviations</span>
-            <span className="text-muted-foreground">{sorted.length}</span>
+            <span className="text-muted-foreground">{sortedWords.length}</span>
           </button>
-          {browsing && (
+          {browsing === "words" && (
             <ul
               className="divide-y divide-border/50"
               aria-label="All abbreviations"
             >
-              {sorted.map(entry => (
+              {sortedWords.map(entry => (
                 <li key={entry.abbr}>
                   <AbbreviationCard entry={entry} compact />
                 </li>

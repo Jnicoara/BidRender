@@ -1,6 +1,41 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-12 (latest), PLAN-READING HELP STEP 1 BUILT
+## WHERE B STANDS — 2026-10-13, PHONE BOTTOM BAR FIXED; PLAN-READING HELP STEP 2 BUILT
+
+On `track-b` only. **NOT merged to local-dev — owner says when.** No
+migration.
+
+- **Phone bottom bar (80c648d0).** The icon bar was `fixed` over the
+  content, so at 375–425 px the last item of every screen sat under it
+  ("Pricing settings" on the bid page). It is now the last `shrink-0` row
+  of `<main>`'s column. Two more faults the new check found: the shell
+  root is now `relative` (sr-only labels made Count/Proposal's document
+  up to 2,124 px tall, so the whole app dragged off a phone), and the
+  Dashboard's backups banner is its own row (it pushed the Dashboard's
+  last rows off-screen at every size, admins only). Proof:
+  `server/phoneBottomBar.test.ts` (5, all red on the old shell);
+  `pnpm device:audit --sizes=phone-375,phone-425` — new sizes and a new
+  "covered" check (each scroll box scrolled to its end; is its last item
+  the thing on top?) — 8 faults on the old shell, 0 on every screen
+  after; phone 390, both iPads, laptop: no new fault. **Still open, not
+  this fix:** supplier pricing scrolls sideways at phone width (its
+  filter-chip strip; seen before the change).
+- **Step 1 redo:** Copy text's abbreviation line seen at iPad portrait
+  with a drag placed from the drawing canvas's own position (it read
+  "PVC … NEMA" off E0.01 and named both).
+- **Step 2, symbol guide** (`plan-reading-help-plan.md` § 7 step 2, DONE
+  with details): 38 symbols, DRAFT for the owner (Q5); "What it looks
+  like" in Look up, "All symbols" under More options; "Count these" =
+  plain count named in the PLURAL (the singulars are retired catalog
+  spellings); none for runs; none on a locked bid. Proof:
+  `server/planHelpSymbols.test.ts` (17; guards shown red: digit in "how
+  bid", singular count name, count on a run). Looked at laptop, both
+  iPads, phone 390; Count these armed "Duplex receptacles" (laptop) and
+  "GFCI receptacles" (phone — the panel closes, ready to tap); both test
+  counts deleted from "Bar layout check" afterwards (0 marks each).
+- **Next:** step 3, sheet-kind line + cards.
+
+## WHERE B STOOD — 2026-10-12 (latest), PLAN-READING HELP STEP 1 BUILT
 
 On `track-b` only. **NOT merged to local-dev — frozen until the live
 release.** No migration.

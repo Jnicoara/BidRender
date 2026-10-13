@@ -1,7 +1,7 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEP 1 BUILT on track-b (2026-10-12, owner's go); steps 2–6 not
-started.** All 11 picks in § 9 approved. No migration. Not merged to
+**Status: STEPS 1–2 BUILT on track-b (2026-10-12/13, owner's go); steps
+3–6 not started.** All 11 picks in § 9 approved. No migration. Not merged to
 local-dev (frozen until the live release). Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
@@ -327,6 +327,23 @@ from the real sheets via a script, not hand-typed.
    only taken when printed in capitals, and a one-letter one only in
    brackets (`(E)`, never a bare `C` or `F`).
 2. **Symbol guide** inside Look up, with "Count these".
+   **DONE 2026-10-13 (track-b).** `shared/planHelp/symbols.ts` (38
+   symbols, `SYMBOLS_REVIEW.status = "draft"` until the owner has read it —
+   Q5): picture as a few shapes on a 32 x 32 grid (looked at as a contact
+   sheet at real size; Downlight redrawn as two rings because it matched
+   "conduit turning up"), what it is, how it's usually bid (no digits), look
+   out for. Look up shows "What it looks like" beside "Usually means";
+   whichever the query names exactly leads (`answerOrder`: WP → the
+   abbreviation, plug → the symbol, both → the picture). "Your library has:
+   …" names assemblies whose name holds the symbol's, nothing to click.
+   **"Count these" names the count in the PLURAL** ("Duplex receptacles",
+   `countName`) — on purpose: the singular names ("Duplex receptacle",
+   "GFCI receptacle", "Single-pole switch", "Floor box"…) are retired
+   catalog spellings in `RENAMED_BASELINE_MATERIALS`, which this section's
+   test rule forbids, and a count of many is plural anyway. Runs (home run,
+   conduit run, conduit up/down) have no button: traced, not counted. Not on
+   a locked bid. More options gained "All symbols" (tap a row for its card).
+   Test: `server/planHelpSymbols.test.ts`.
 3. **Sheet-kind line + cards.**
 4. **Tips** (needs 1–3 to point at).
 5. **Taps on the drawing:** 5a closed-square tags + 5b notes parser

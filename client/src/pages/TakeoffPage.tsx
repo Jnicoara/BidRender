@@ -6686,6 +6686,32 @@ export default function TakeoffPage({
   );
 
   /**
+   * "Count these" on a symbol in the Look up guide (plan-reading-help-plan.md
+   * § 3, Q11): an ordinary plain count under the symbol's name — the same
+   * path as an unlinked legend row, reused if the bid already has one.
+   * Undefined on a locked bid, so the button is not drawn at all.
+   */
+  const countThese = useMemo(
+    () =>
+      quantitiesLocked
+        ? undefined
+        : (label: string) =>
+            armWhileCreating(
+              label,
+              null,
+              null,
+              () =>
+                createGroup.mutateAsync({
+                  bidId,
+                  label,
+                  reuseExisting: true,
+                }),
+              () => void utils.takeoffGroups.list.invalidate({ bidId })
+            ),
+    [quantitiesLocked, armWhileCreating, createGroup, bidId, utils]
+  );
+
+  /**
    * Put the batch in before the thing it belongs to changes.
    *
    * The old comment inside the flush claimed "the batch is flushed whenever the
@@ -12277,7 +12303,11 @@ export default function TakeoffPage({
                   <>
                     {/* Look up at the top, More options at the bottom
                         (plan-reading-help-plan.md § 1). */}
-                    <PlanLookUp symbols={symbols} />
+                    <PlanLookUp
+                      symbols={symbols}
+                      assemblies={allAssemblies}
+                      onCountThese={countThese}
+                    />
                     <LegendPanel
                       symbols={symbols}
                       buildBidId={bidId}
@@ -12412,7 +12442,10 @@ export default function TakeoffPage({
                         );
                       }}
                     />
-                    <LegendMoreOptions />
+                    <LegendMoreOptions
+                      assemblies={allAssemblies}
+                      onCountThese={countThese}
+                    />
                   </>
                 }
                 totals={totals}

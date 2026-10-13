@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **A symbol guide in "Look up", with no AI.** Type "plug", "can", "gfi"
+  or "home run" in the Plans screen's Legend tab and it shows the common
+  way that thing is drawn, what it is, how it is usually bid (in words —
+  never hours or prices), what to look out for beside it, and whether your
+  own library already has something like it. "Count these" starts an
+  ordinary count named for it ("Duplex receptacles") — no assembly needed;
+  runs like a home run are traced instead, so they have no button. All 38
+  symbols are under "More options". A DRAFT list for the owner's review
+  before beta.
 - **On a phone, the bottom icon bar no longer covers the last thing on the
   screen.** It used to float over the page, so the bid page's "Pricing
   settings" card stayed half hidden even scrolled all the way down (and the

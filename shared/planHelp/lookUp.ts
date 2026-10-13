@@ -6,6 +6,7 @@
  * Nothing here calls a model or the server: it works with AI switched off.
  */
 import { ABBREVIATIONS, type Abbreviation } from "./abbreviations";
+import { PLAN_SYMBOLS, type PlanSymbol } from "./symbols";
 import { DEFAULT_TRADE, type TradeId } from "../trades";
 
 /**
@@ -133,6 +134,77 @@ export function abbreviationsInText(
     found.push({ printed: token, entry });
   }
   return found;
+}
+
+/** How a symbol was found — the order the answers are listed in. */
+export type SymbolHow = "name" | "starts" | "words";
+
+export type SymbolHit = { symbol: PlanSymbol; how: SymbolHow };
+
+const SYMBOL_RANK: Record<SymbolHow, number> = { name: 0, starts: 1, words: 2 };
+
+/**
+ * The symbol guide's answers (plan § 3): a name or a name it goes by spelled
+ * exactly ("plug", "gfi", "can"), then names that start with what was typed,
+ * then from three letters any name or job-site name containing it
+ * ("receptacle" finds every kind of receptacle).
+ */
+export function lookUpSymbols(
+  query: string,
+  {
+    trade = DEFAULT_TRADE,
+    symbols = PLAN_SYMBOLS,
+  }: { trade?: TradeId; symbols?: readonly PlanSymbol[] } = {}
+): SymbolHit[] {
+  const q = planWordKey(query);
+  if (!q) return [];
+  const hits: SymbolHit[] = [];
+  for (const symbol of symbols) {
+    if (symbol.trade !== trade) continue;
+    const keys = [symbol.name, ...symbol.aka].map(planWordKey);
+    let how: SymbolHow | null = null;
+    if (keys.includes(q)) how = "name";
+    else if (q.length >= STARTS_MIN && keys.some(k => k.startsWith(q)))
+      how = "starts";
+    else if (q.length >= WORDS_MIN && keys.some(k => k.includes(q)))
+      how = "words";
+    if (how) hits.push({ symbol, how });
+  }
+  return hits.sort((a, b) => SYMBOL_RANK[a.how] - SYMBOL_RANK[b.how]);
+}
+
+/**
+ * "Your library has: …" (plan § 3) — the company's assemblies whose name
+ * contains the symbol's name. Shown with nothing to click: linking stays
+ * optional both ways, and nothing prompts anyone to build one.
+ */
+export function libraryMatches<T extends { name: string }>(
+  symbol: PlanSymbol,
+  assemblies: readonly T[],
+  limit = 2
+): T[] {
+  const key = planWordKey(symbol.name);
+  return assemblies
+    .filter(a => planWordKey(a.name).includes(key))
+    .sort((a, b) => a.name.length - b.name.length)
+    .slice(0, limit);
+}
+
+/**
+ * Which of the guide's two sections leads. The one the query names EXACTLY
+ * comes first: "WP" is an abbreviation before it is anything drawn, "plug"
+ * is a symbol. With neither exact, or both, symbols lead — a picture is the
+ * quicker answer to "what is this on my drawing?".
+ */
+export function answerOrder(
+  words: readonly LookUpHit[],
+  drawn: readonly SymbolHit[]
+): ("symbols" | "abbreviations")[] {
+  const wordExact = words.some(h => h.how === "spelling");
+  const drawnExact = drawn.some(h => h.how === "name");
+  return wordExact && !drawnExact
+    ? ["abbreviations", "symbols"]
+    : ["symbols", "abbreviations"];
 }
 
 /** "Home run or Hour" — every meaning, short, for a one-line answer. */
