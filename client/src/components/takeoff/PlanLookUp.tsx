@@ -20,7 +20,19 @@
  * them) and the search is pure (shared/planHelp/lookUp.ts).
  */
 import { useMemo, useState } from "react";
-import { BookA, ChevronDown, MapPin, Search, Shapes, X } from "lucide-react";
+import {
+  BookA,
+  BookOpen,
+  ChevronDown,
+  MapPin,
+  Search,
+  Shapes,
+  X,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { useSheetKindLine } from "@/lib/planHelpPrefs";
+import { SHEET_KIND_CARDS, type SheetKind } from "@shared/planHelp/sheetKind";
+import { SheetKindCardBody } from "./SheetKindLine";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -400,12 +412,22 @@ function AbbreviationCard({
 
 /**
  * The Legend tab's ONE fold (plan § 1): everything past the basic path —
- * the whole symbol guide and the whole abbreviation list today; tips and
+ * the whole symbol guide, the whole abbreviation list, every sheet kind's
+ * card, and the switch for the sheet-kind line (on by default); tips and
  * outlines land here as they are built (§ 7). Closed by default.
  */
 export function LegendMoreOptions(actions: SymbolActions) {
   const [open, setOpen] = useState(false);
-  const [browsing, setBrowsing] = useState<"symbols" | "words" | null>(null);
+  const [browsing, setBrowsing] = useState<
+    "symbols" | "words" | "sheets" | null
+  >(null);
+  /** The sheet kind opened to its card in the browse list. */
+  const [openKind, setOpenKind] = useState<SheetKind | null>(null);
+  const [sheetKindLine, setSheetKindLine] = useSheetKindLine();
+  const sheetCards = useMemo(
+    () => SHEET_KIND_CARDS.filter(c => c.trade === "electrical"),
+    []
+  );
   /** The symbol opened to its full card in the browse list. */
   const [openSymbol, setOpenSymbol] = useState<string | null>(null);
   const sortedWords = useMemo(
@@ -421,7 +443,7 @@ export function LegendMoreOptions(actions: SymbolActions) {
     () => PLAN_SYMBOLS.filter(s => s.trade === "electrical"),
     []
   );
-  const toggle = (kind: "symbols" | "words") =>
+  const toggle = (kind: "symbols" | "words" | "sheets") =>
     setBrowsing(b => (b === kind ? null : kind));
 
   return (
@@ -499,6 +521,57 @@ export function LegendMoreOptions(actions: SymbolActions) {
               ))}
             </ul>
           )}
+          <button
+            type="button"
+            onClick={() => toggle("sheets")}
+            aria-expanded={browsing === "sheets"}
+            className="w-full flex items-center gap-2 rounded px-1 min-h-9 text-left text-xs hover:bg-muted/50"
+          >
+            <BookOpen className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <span className="flex-1">All sheet kinds</span>
+            <span className="text-muted-foreground">{sheetCards.length}</span>
+          </button>
+          {browsing === "sheets" && (
+            <ul
+              className="divide-y divide-border/50 pb-2"
+              aria-label="All sheet kinds"
+            >
+              {sheetCards.map(card => (
+                <li key={card.kind} className="py-1">
+                  {openKind === card.kind ? (
+                    <div className="rounded-md border border-border bg-muted/20 px-2 py-1.5">
+                      <SheetKindCardBody kinds={[card.kind]} showFrom={false} />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setOpenKind(card.kind)}
+                      className="w-full flex items-center gap-2 rounded px-1 min-h-9 text-left text-xs hover:bg-muted/50"
+                    >
+                      <span className="flex-1 min-w-0 truncate">
+                        {card.label}
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {card.hint}
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* ON by default: the line is the basic path (plan § 1). */}
+          <label className="flex items-center gap-2 rounded px-1 min-h-9 text-xs cursor-pointer">
+            <span className="flex-1">
+              Say what each sheet is, beside its name
+            </span>
+            <Switch
+              checked={sheetKindLine}
+              onCheckedChange={setSheetKindLine}
+              aria-label="Say what each sheet is, beside its name"
+            />
+          </label>
         </div>
       )}
     </div>

@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **"What is this sheet?" on the Plans screen, with no AI.** Beside the
+  sheet name a short line now says what kind of sheet it is — "Lighting
+  plan · count fixtures and switches", "Panel schedule", "Demolition plan"
+  — read from the sheet's title. Tap it for a card: what to do on a sheet
+  like this and what to watch for, in words (no hours or prices). A title
+  naming two things ("lighting plan and luminaire schedule") shows both. A
+  sheet whose title says nothing shows no line at all, never a guess. A
+  schedule card can open the sheet's Schedules view. All ten kinds are
+  under the Legend tab's "More options", with a switch to hide the line. A
+  DRAFT for the owner's review before beta.
+- **Supplier pricing no longer scrolls sideways on a phone.** Its price-age
+  filters sat in a strip wider than the screen, so "No price" — the one
+  that finds every unpriced material — was off the edge. They now wrap onto
+  a second row.
 - **A symbol guide in "Look up", with no AI.** Type "plug", "can", "gfi"
   or "home run" in the Plans screen's Legend tab and it shows the common
   way that thing is drawn, what it is, how it is usually bid (in words —

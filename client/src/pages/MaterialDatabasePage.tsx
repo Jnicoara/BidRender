@@ -220,7 +220,19 @@ export default function MaterialDatabasePage() {
             correctedQuery={searched?.correctedQuery ?? null}
           />
 
-          <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap md:overflow-visible">
+          {/*
+            The chips WRAP at every width (2026-10-13). On a phone they used
+            to sit in a sideways-scrolling strip 596 px wide in a 375-425 px
+            window, so "No price" — the filter that finds every unpriced
+            material — was past the edge with nothing to say it was there.
+            Two rows cost one line of height; a hidden filter costs a bid
+            priced with holes in it. server/pricingChipStrip.test.ts.
+          */}
+          <div
+            role="group"
+            aria-label="Price age"
+            className="flex flex-wrap items-center gap-1.5"
+          >
             {AGE_FILTERS.map(filter => {
               const count =
                 filter.key === "all" ? materials.length : tally[filter.key];

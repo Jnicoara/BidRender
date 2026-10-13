@@ -1,7 +1,7 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEPS 1–2 BUILT on track-b (2026-10-12/13, owner's go); steps
-3–6 not started.** All 11 picks in § 9 approved. No migration. Not merged to
+**Status: STEPS 1–3 BUILT on track-b (2026-10-12/13, owner's go); steps
+4–6 not started.** All 11 picks in § 9 approved. No migration. Not merged to
 local-dev (frozen until the live release). Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
@@ -345,6 +345,37 @@ from the real sheets via a script, not hand-typed.
    a locked bid. More options gained "All symbols" (tap a row for its card).
    Test: `server/planHelpSymbols.test.ts`.
 3. **Sheet-kind line + cards.**
+   **DONE 2026-10-13 (track-b).** `shared/planHelp/sheetKind.ts`
+   (`sheetKinds(title)`, ten cards, `SHEET_KINDS_REVIEW.status = "draft"` —
+   the card words are B's draft too, so they go to the owner with the
+   lists, Q5); `SheetKindLine.tsx` (the line + card; popover on laptop and
+   tablet, a sheet along the bottom on a phone); the Legend tab's More
+   options gained "All sheet kinds" and a switch "Say what each sheet is,
+   beside its name" (ON by default, this browser, `@/lib/planHelpPrefs`).
+   Differences from § 4, on purpose:
+   - **The sheet number is not used**, not even as a tie-break: the rules
+     never tie, and a number deciding anything would be a guess.
+   - **Lead order:** demolition first; on a "... PLAN" the drawing kinds
+     (lighting, power, systems, site) in title order; then the rest in title
+     order. **A drawing word in a title that is not a plan, beside another
+     kind, is dropped** — "LIGHTING CONTROL DETAILS" is details, "EXISTING
+     POWER RISER DIAGRAM" is a one-line (neither has things to count).
+     "SPECIFICATION(S)" counts as notes; "SIGNAL" as systems.
+   - **The title is `sheetDisplay(...).title`**, the one the chip shows, not
+     `bid_pdf_sheet_identity` alone — a typed title wins, as everywhere.
+   - **Where it sits:** after the sheet's "…" menu. On a tablet it goes
+     just before the bar's last group (scale, zoom), because beside the chip
+     it pushed a control onto a new row (iPad portrait 209 → 259 px; now
+     209 → 209). **Still costs a row on iPad landscape (107 → 157) and phone
+     425 (107 → 157)** — both bars were already full; no free spot exists.
+     The switch is the way out; owner may prefer it hidden on phones.
+   - The phone sheet is the ordinary dialog moved to the bottom, not the
+     side panel's title row — the panel is closed while the drawing is.
+   - Old Blueridge stores no titles, so the fixture bid shows no line; looked
+     at on "Sheet numbers check" (weld1, uncc, colusa, weld2).
+     Tests: `server/planHelpSheetKind.test.ts` (43, titles read from the
+     database; guards shown red: a digit in a card, the not-a-plan rule),
+     `client/src/lib/planHelpPrefs.test.ts`.
 4. **Tips** (needs 1–3 to point at).
 5. **Taps on the drawing:** 5a closed-square tags + 5b notes parser
    (the legend plan's steps 3–4), then 5c keyed-note popover, then 5d detail

@@ -548,6 +548,8 @@ import { describeScale, type ScaleCandidate } from "@shared/planScale";
 import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
 import type { SheetSchedules } from "@/lib/panelSchedules";
 import { SchedulesView } from "@/components/takeoff/SchedulesView";
+import { SheetKindLine } from "@/components/takeoff/SheetKindLine";
+import { useSheetKindLine } from "@/lib/planHelpPrefs";
 import {
   HomerunLayer,
   HomerunsToggle,
@@ -3761,6 +3763,10 @@ export default function TakeoffPage({
   const activeSchedules = doc
     ? (schedulesByPage[`${doc.id}:${page}`] ?? null)
     : null;
+  /** Held here so the sheet-kind card can open the same Schedules view. */
+  const [schedulesOpen, setSchedulesOpen] = useState(false);
+  /** The sheet-kind line's switch, from the Legend tab's More options. */
+  const [sheetKindLine] = useSheetKindLine();
   const docIdForScale = doc?.id ?? null;
   const handleSchedules = useCallback(
     (pageNumber: number, read: { schedules: SheetSchedules }) => {
@@ -9873,6 +9879,30 @@ export default function TakeoffPage({
             </DropdownMenu>
           )}
 
+          {/*
+            "What is this sheet?" (plan-reading-help-plan.md § 4) — from the
+            title the chip shows, so a corrected title flows through. Nothing
+            at all on a sheet whose title says nothing it recognises, or when
+            the Legend tab's More options turned it off.
+          */}
+          {activeSheet && sheetKindLine && (
+            <SheetKindLine
+              title={sheetDisplay(activeSheet, identities.get(page)).title}
+              phone={phone}
+              compact={compact}
+              tablet={tablet}
+              demoSet={activeWorkTag === "demo" || activeWorkTag === "both"}
+              onOpenSchedules={
+                !phone &&
+                activeSchedules &&
+                (activeSchedules.panels.length > 0 ||
+                  activeSchedules.fixtures.length > 0)
+                  ? () => setSchedulesOpen(true)
+                  : undefined
+              }
+            />
+          )}
+
           <div className="w-px h-4 bg-border" />
 
           {/*
@@ -10437,7 +10467,15 @@ export default function TakeoffPage({
             </>
           )}
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Last on a tablet, so the sheet-kind line (order-last there too,
+              and earlier in the markup) lands just before it — see
+              SheetKindLine's `tablet` prop. */}
+          <div
+            className={cn(
+              "ml-auto flex flex-wrap items-center gap-2",
+              tablet && "order-last"
+            )}
+          >
             {/*
               ── CALIBRATE — beside the thing it changes, not among the tools ─
 
@@ -10561,6 +10599,8 @@ export default function TakeoffPage({
               <SchedulesView
                 schedules={activeSchedules}
                 sheetName={activeSheet.name}
+                open={schedulesOpen}
+                onOpenChange={setSchedulesOpen}
               />
             )}
 

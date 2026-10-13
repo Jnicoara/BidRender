@@ -1,6 +1,33 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-13, PHONE BOTTOM BAR FIXED; PLAN-READING HELP STEP 2 BUILT
+## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 3 BUILT; PRICING CHIPS WRAP
+
+On `track-b` only. **NOT merged to local-dev** — live release in progress,
+and A applies BS-M3..M6 + F13-M1 before B merges. No migration.
+
+- **Step 3, "What is this sheet?"** (`plan-reading-help-plan.md` § 7 step
+  3, DONE with details and deviations): the line after the sheet's "…"
+  menu ("Lighting plan · count fixtures and switches"), card = popover
+  (laptop/tablet) or a bottom sheet (phone); several kinds → lead + "Also
+  on this sheet"; schedule cards open the existing Schedules view; nothing
+  stored. More options: "All sheet kinds" + switch "Say what each sheet is,
+  beside its name" (ON, this browser). Card words are a DRAFT for the owner
+  with the lists (Q5). Proof: `server/planHelpSheetKind.test.ts` (43,
+  titles from the DB; guards shown red), `client/src/lib/planHelpPrefs.test.ts`.
+  Looked at laptop, iPad both ways, phone 375/390/425 on "Sheet numbers
+  check" (Old Blueridge stores no titles — the fixture bid shows no line):
+  no sideways scroll anywhere; switch hides/shows live.
+- **Owner question:** the line costs one toolbar row (50 px) on iPad
+  landscape and phone 425 — those bars were already full. iPad portrait
+  fixed by placing it before the scale/zoom group (209 → 209 px). Keep, or
+  hide it on phones by default?
+- **Supplier pricing at phone width:** chips wrap now (were a 596 px
+  sideways strip; "No price" was off-screen). `server/pricingChipStrip.test.ts`
+  (2, both red on the old code); `device:audit --only=pricing` sideways=no at
+  375/390/425/iPad/laptop.
+- **Next:** step 4, tips.
+
+## WHERE B STOOD — 2026-10-13, PHONE BOTTOM BAR FIXED; PLAN-READING HELP STEP 2 BUILT
 
 On `track-b` only. **NOT merged to local-dev — owner says when.** No
 migration.
@@ -33,7 +60,7 @@ migration.
   iPads, phone 390; Count these armed "Duplex receptacles" (laptop) and
   "GFCI receptacles" (phone — the panel closes, ready to tap); both test
   counts deleted from "Bar layout check" afterwards (0 marks each).
-- **Next:** step 3, sheet-kind line + cards.
+- **Next:** step 3 — DONE, see above.
 
 ## WHERE B STOOD — 2026-10-12 (latest), PLAN-READING HELP STEP 1 BUILT
 
