@@ -1,5 +1,38 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-13 — Surface raceway answers recorded; pack-label scan; nothing applied
+
+**Surface raceway, owner's answers, for A's end-of-pricing job.** They are
+in the review's "Owner's answers" section.
+
+- **Q1:** names, not descriptions.
+- **Q2:** one 500/700 entrance end (code + seed pair) and an offset
+  connector.
+- **Q3:** carry BOTH 1-gang depths. 644 becomes the 1-3/4" deep box that
+  DV34 uses, and a 1-3/8" shallow row is added.
+- **Q4:** retire = hide (`isActive = false`), never delete.
+- **Q5:** one standard-plate row; the old plate names stay search words.
+- **Q6:** 2400D is one per-foot row.
+- **Q7:** ivory is the standard.
+- **Q8:** add S1–S4.
+- **The P1 and P3 packs are not answered;** they are folded into the scan
+  below.
+
+**`pricing/pack-label-scan.md`:** every pack-qty-1 row that is really sold
+on a reel, roll, length or box, with a listing for each, so A can relabel
+them in one pass.
+
+- **Top three:**
+  - warning tape: 18 run types, 1000 ft roll;
+  - grounding pigtail: 15 starters, bag of 50;
+  - 12 ga hanger wire: 7 starters, bundle of 100 × 12 ft, NOT the 100 ft
+    roll.
+- **Also wrong:** tracer wire's roll is 500 ft, not 250.
+- **Waiting on owner picks:** the T8 tube case, the spade terminals, the
+  tape channel and the surface raceway lengths.
+- **What was read:** the search scope is stated in the file. The 1,145
+  `each` rows were filtered by name, not read one by one.
+
 ## (newest) 2026-10-13 — mast answer recorded; Surface raceway name review; nothing applied
 
 **Mast answer, for A's end-of-pricing job.** The owner said yes: the
