@@ -16,8 +16,10 @@ import {
   sql,
   getTableColumns,
 } from "drizzle-orm";
+import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { timePool } from "./slowRequests";
 import {
   QUANTITY_MARK_STATUSES,
@@ -409,7 +411,35 @@ let _db: MySql2Database | null = null;
  */
 let _pool: ReturnType<typeof createPool> | null = null;
 
+/**
+ * The transaction `inOneTransaction` is running, if any. While it is set,
+ * `getDb()` hands out the transaction instead of the pool, so every function
+ * in this file joins it without being rewritten to take an executor.
+ */
+const _transaction = new AsyncLocalStorage<MySql2Database>();
+
+/**
+ * Run `work` as ONE transaction: every query any function in this file makes
+ * inside it, however deep (a fork that copies a recipe, its steps), commits
+ * together or not at all. Built for `applyStarterChange`, whose pins and
+ * change must never land half-way (references/baseline-screen-plan.md
+ * § 10a.3). A function that opens its own `db.transaction` inside nests as a
+ * savepoint. Queries inside run on one connection, one at a time.
+ */
+export async function inOneTransaction<T>(work: () => Promise<T>): Promise<T> {
+  if (_transaction.getStore()) return work();
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.transaction(tx =>
+    // The transaction has the database's whole query surface; the type
+    // differs only in the pool-level members nothing in this file uses.
+    _transaction.run(tx as unknown as MySql2Database, work)
+  );
+}
+
 export async function getDb() {
+  const inTransaction = _transaction.getStore();
+  if (inTransaction) return inTransaction;
   if (!_db && process.env.DATABASE_URL) {
     try {
       // The pool is built from mysqlConnection rather than the URL directly, so
@@ -1430,7 +1460,24 @@ const LIBRARY_OWNERSHIP_FIELDS = [
   // pull an archived row back into the working list.
   "status",
   "archivedAt",
+  // Starter machinery (0154, BS-M5), not content. `hiddenAt` and
+  // `replacedById` are legal on a SHARED row only, so a fork must not copy
+  // them; `isPinnedCopy` is written by applyStarterChange (TRUE on a pin) and
+  // by the company edit paths (FALSE), never by a caller's patch.
+  "isPinnedCopy",
+  "hiddenAt",
+  "replacedById",
 ] as const;
+
+/**
+ * What a COMPANY's edit to its own copy writes into `isPinnedCopy`: a pin
+ * (TRUE) becomes FALSE, "a pin the company has since edited", which counts as
+ * its own change; NULL (an own copy) stays NULL. Every company edit path sets
+ * it (baseline-screen-plan.md § 10a.3), or a real edit would still read as
+ * "not my change" and hide from "My changes".
+ */
+const unpinOnEdit = (column: AnyMySqlColumn) =>
+  sql`IF(${column} IS TRUE, FALSE, ${column})`;
 
 /**
  * Run a seeder under a MySQL advisory lock, so two processes cannot both decide
@@ -1991,7 +2038,11 @@ export async function updateMaterial(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(materials)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(materials.id, id), eq(materials.userId, userId)));
 }
 
@@ -2583,7 +2634,11 @@ export async function updateLaborRate(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(laborRates)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(laborRates.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(laborRates.id, id), eq(laborRates.userId, userId)));
 }
 
@@ -3169,7 +3224,11 @@ export async function updateModifier(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(modifiers)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(modifiers.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(modifiers.id, id), eq(modifiers.userId, userId)));
 }
 
@@ -3932,6 +3991,23 @@ export function assemblyHoursSourceFor(
 }
 
 /** Replace an assembly's step list wholesale (the editor sends the list). */
+/**
+ * A company edit to an assembly's RECIPE (parts, modifiers, steps) is an edit
+ * to its copy: a pin becomes FALSE, as `updateAssembly` does for a field
+ * (`unpinOnEdit`). A recipe-only save never calls `updateAssembly`, so the
+ * setters say it themselves. A fresh fork has NULL and is left alone.
+ */
+async function unpinAssembly(assemblyId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(assemblies)
+    .set({ isPinnedCopy: false })
+    .where(
+      and(eq(assemblies.id, assemblyId), eq(assemblies.isPinnedCopy, true))
+    );
+}
+
 export async function setAssemblySteps(
   assemblyId: number,
   lines: ReadonlyArray<
@@ -3941,6 +4017,7 @@ export async function setAssemblySteps(
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  await unpinAssembly(assemblyId);
   await db.transaction(async tx => {
     await tx
       .delete(assemblyLaborSteps)
@@ -4287,7 +4364,11 @@ export async function updateAssembly(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(assemblies)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(assemblies.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(assemblies.id, id), eq(assemblies.userId, userId)));
 }
 
@@ -4355,6 +4436,7 @@ export async function setAssemblyMaterials(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  await unpinAssembly(assemblyId);
   await db
     .delete(assemblyMaterials)
     .where(eq(assemblyMaterials.assemblyId, assemblyId));
@@ -4378,6 +4460,7 @@ export async function setAssemblyModifiers(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  await unpinAssembly(assemblyId);
   await db
     .delete(assemblyModifiers)
     .where(eq(assemblyModifiers.assemblyId, assemblyId));
@@ -10406,6 +10489,11 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
     archivedAt: _archivedAt,
     createdAt: _createdAt,
     updatedAt: _updatedAt,
+    // Starter machinery (0154), as LIBRARY_OWNERSHIP_FIELDS says for the
+    // other four tables: legal on a shared row only, never copied.
+    isPinnedCopy: _isPinnedCopy,
+    hiddenAt: _hiddenAt,
+    replacedById: _replacedById,
     ...specification
   } = source;
 
@@ -10692,9 +10780,17 @@ export async function updateRunType(
   delete safe.id;
   delete safe.userId;
   delete safe.baselineId;
+  // Starter machinery (0154): never a caller's patch.
+  delete safe.isPinnedCopy;
+  delete safe.hiddenAt;
+  delete safe.replacedById;
   await db
     .update(takeoffRunTypes)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(takeoffRunTypes.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(takeoffRunTypes.id, id), eq(takeoffRunTypes.userId, userId)));
 }
 

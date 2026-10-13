@@ -11,6 +11,7 @@ import {
   laborRates,
   materials,
   modifiers,
+  takeoffRunTypes,
 } from "../drizzle/schema";
 import {
   STARTER_FIELDS,
@@ -31,6 +32,7 @@ const TABLES: Record<StarterTable, object> = {
   assemblies,
   laborRates,
   modifiers,
+  runTypes: takeoffRunTypes,
 };
 
 describe("every starter column is decided (§ 3)", () => {
