@@ -23,12 +23,15 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
 - **Live stays at 152.** At the next release 0152–0156 go on live BEFORE
   any push of this code to `main`. Expect 157, 196/196.
 - C told F13 can be finished; B told it may merge (both handoffs).
-- **Scratch DB drop NOT done — blocked by the permission classifier.**
-  Script for the owner: `node <scratchpad>/dbdrop.mjs` (the nine from
-  session 38 plus this session's `bidrender_scratch_0152` and
-  `bidrender_scratch_staging_0152`). Session 38's four worktrees ARE
+- **Scratch DBs dropped** (by the owner, after the classifier refused it to
+  Claude): the nine from session 38 plus this session's
+  `bidrender_scratch_0152` and `bidrender_scratch_staging_0152`. Session
+  38's four worktrees and this session's `../bidrender-before-0152` are
   removed (two empty `node_modules` husks remain in
   `../bidrender-before-scope` / `-twin`, 1.6 MB each).
+- **Staging app** serves `e689b918`, built 21:02:50 UTC. **Gate run
+  `38467520710` on `e689b918` GREEN**: test, deploy-staging, smoke 96
+  passed / 2 planned skips. B may merge.
 
 ## (earlier) 2026-10-13, session 38: `60479773` + 0144–0151 ARE LIVE
 
