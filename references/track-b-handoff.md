@@ -1,6 +1,57 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 4 (TIPS) BUILT; LINE DEFAULT BY SCREEN
+## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 5a/5b (NOTE TAGS + NOTES LIST) BUILT
+
+On `track-b` only. **NOT merged to local-dev** — order agreed: A applies
+BS-M3..M6 + F13-M1 (done on local-dev as e689b918, 0152–0156), then C
+finishes F13 and merges, THEN B merges. **No migration, none needed.**
+
+- **What it is** (`plan-reading-help-plan.md` § 7 step 5, DONE with
+  details): `client/src/lib/keyedNotes.ts` reads a sheet's numbered note
+  lists (lines joined) and the boxed numbers on the drawing that point at
+  them (closed-square test), in the PDF worker on every sheet open, $0,
+  nothing saved. Seen only under the Legend tab's **More options**:
+  "Notes on this sheet" (tap a note → the drawing goes there; phone panel
+  closes first) and **"Outline note tags on the drawing" — OFF by
+  default** (this browser). Main screen unchanged.
+- **Measured:** 4 ms on E-200, 80 ms worst on the densest sheet on hand
+  (weld2 p10, 61,746 words) — fine to run on open. E-200: 18 notes, 55
+  tags, none above 18 (the red test); UNCC p3: 9 notes, 36 tags; sets with
+  boxed numbers but no list: 0 tags.
+- **Tests:** `client/src/lib/keyedNotes.test.ts` (18, real-page fixtures
+  from `scripts/keyedNotesFixture.mts`; every guard shown red),
+  `planHelpPrefs.test.ts` (+2). Touched tests (with planTips and
+  sourceHygiene): 4 files, 45 passed.
+- **Looked at** laptop, iPad portrait + landscape, phone 375/390/425 on
+  "Sheet numbers check" E-200 (set 648560, page 5): no sideways scroll at
+  any size; rings on the boxed numbers, not the boxed room numbers; note 7
+  jump works on each. Nothing written to the fixture bid.
+- **Gate:** see the handoff-only commit after this one.
+- **Dev servers stopped** (none left with `BidPhase-B` in the command line).
+- **Next:** 5c — tap a tag (no tool in hand) → popover with the note; tip
+  3 switches on then.
+
+### Waiting on track-b to merge into local-dev (11 commits + this one)
+
+9ac82766 starter editor sign-in + read-only `/starter`; a24efc5a scope
+step 6a "Who does this?"; c52b5fd4 / 3f3c13ad plan-reading help plan +
+owner's picks; 7d232952 step 1 Look up; 80c648d0 phone bottom bar fix;
+ae7d3d28 step 2 symbol guide; b4a4a7ec step 3 sheet-kind line + pricing
+chips wrap; e330f675 step 4 tips; this commit step 5a/5b; plus the
+handoff-only commits between them. None carries a migration.
+
+### Conflicts expected with local-dev
+
+Trial merge (`git merge-tree`, 2026-10-13, local-dev at e689b918): **only
+`CHANGELOG.md` and `references/track-b-handoff.md`**, both text — keep
+both sides (local-dev's entries and B's). All code, including
+`MaterialDatabasePage.tsx` (both sides touched it), merges cleanly.
+**C's F13 merge is not in yet**: re-run
+`git merge-tree --write-tree --name-only HEAD origin/local-dev` after it
+lands; the likeliest new overlaps are `TakeoffPage.tsx` and `CHANGELOG.md`.
+B's work there is additive (new props, new state, one overlay).
+
+## WHERE B STOOD — 2026-10-13, PLAN-READING HELP STEP 4 (TIPS) BUILT; LINE DEFAULT BY SCREEN
 
 On `track-b` only. **NOT merged to local-dev** — A applies BS-M3..M6 +
 F13-M1 first. No migration, none needed.

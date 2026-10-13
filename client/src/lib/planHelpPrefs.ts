@@ -118,6 +118,51 @@ export function useSheetKindLine(): [boolean, (on: boolean) => void] {
   return [sheetKindLineShown(raw, screen), set];
 }
 
+// ── Note tag outlines (plan § 1, § 9 Q8) ─────────────────────────────────────
+
+export const NOTE_OUTLINES_KEY = "bidrender.plans.noteTagOutlines";
+
+/**
+ * Whether the drawing rings each note tag it found. OFF unless somebody
+ * turned it on (owner, Q8: a dense sheet does not need forty more rings), on
+ * every screen alike — only "on" is ever stored.
+ */
+export function noteOutlinesShown(raw: string | null | undefined): boolean {
+  return raw === "on";
+}
+
+const OUTLINES_CHANGED = "bidrender:noteTagOutlines";
+
+function readOutlines(): string | null {
+  try {
+    return window.localStorage.getItem(NOTE_OUTLINES_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** The switch (Legend tab) and the rings (the drawing), kept in step. */
+export function useNoteTagOutlines(): [boolean, (on: boolean) => void] {
+  const [raw, setRaw] = useState(readOutlines);
+  useEffect(() => {
+    const onChange = (e: Event) =>
+      setRaw((e as CustomEvent<string | null>).detail);
+    window.addEventListener(OUTLINES_CHANGED, onChange);
+    return () => window.removeEventListener(OUTLINES_CHANGED, onChange);
+  }, []);
+  const set = (on: boolean) => {
+    const value = on ? "on" : null;
+    try {
+      if (value) window.localStorage.setItem(NOTE_OUTLINES_KEY, value);
+      else window.localStorage.removeItem(NOTE_OUTLINES_KEY);
+    } catch {
+      // Blocked storage: the change holds for this visit only.
+    }
+    window.dispatchEvent(new CustomEvent(OUTLINES_CHANGED, { detail: value }));
+  };
+  return [noteOutlinesShown(raw), set];
+}
+
 // ── Tips seen (plan § 5) ─────────────────────────────────────────────────────
 
 const TIPS_CHANGED = "bidrender:planTipsSeen";

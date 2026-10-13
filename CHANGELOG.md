@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **A sheet's numbered notes, read for you, with no AI.** Under the Legend
+  tab's More options, "Notes on this sheet" lists every numbered note the
+  sheet prints (WORK NOTES, KEYED NOTES, GENERAL NOTES…) with its lines
+  joined into one readable sentence and how many times the drawing tags
+  it; tap a note to go to it on the sheet. A switch, off unless you turn it
+  on, rings every boxed note number on the drawing. Only boxed numbers that
+  match a note on the same sheet are ringed, so circuit and room numbers
+  are left alone. Nothing is saved and nothing costs anything.
+
 - **Tips the first time the Plans screen opens.** A small card points at
   one control at a time — start with the notes sheet, what the sheet-kind
   line is for, where to look up a word — with Next and "No more tips". It

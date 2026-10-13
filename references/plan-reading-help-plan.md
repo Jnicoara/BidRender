@@ -1,7 +1,8 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEPS 1–4 BUILT on track-b (2026-10-12/13, owner's go); steps
-5–6 not started (step 6's tips-again / off is already in, with step 4).** All 11 picks in § 9 approved. No migration. Not merged to
+**Status: STEPS 1–4 and 5a/5b BUILT on track-b (2026-10-12/13, owner's
+go); 5c (tap a tag), 5d (detail links) and the rest of 6 not started
+(step 6's tips-again / off and the outlines switch are already in).** All 11 picks in § 9 approved. No migration. Not merged to
 local-dev (frozen until the live release). Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
@@ -419,6 +420,40 @@ from the real sheets via a script, not hand-typed.
 5. **Taps on the drawing:** 5a closed-square tags + 5b notes parser
    (the legend plan's steps 3–4), then 5c keyed-note popover, then 5d detail
    links and Back.
+   **5a + 5b DONE 2026-10-13 (track-b).** `client/src/lib/keyedNotes.ts`
+   (`readNoteLists`, `findTagShapes`, `readKeyedNotes`), run in the PDF
+   worker (`keyedNotes` message) on the page read schedules and homeruns
+   already share, on every sheet open. What a person sees, both under the
+   Legend tab's More options so the main screen is unchanged:
+   **"Notes on this sheet"** (every numbered list, each note's lines joined,
+   "tagged N times on the drawing"; tap a note → the drawing goes there,
+   and on a phone the panel closes first) and the switch **"Outline note
+   tags on the drawing"** (OFF by default, this browser,
+   `bidrender.plans.noteTagOutlines`; Q8). Details, on purpose:
+   - **Timed before running on open** (§ 6 asked): 4 ms on Weld 1 E-200,
+     80 ms on the densest sheet on hand (weld2 p10: 61,746 words, 194,824
+     segments), in the worker, beside a page read of 0.5–2 s.
+   - **The closed-square test:** eight rays from the number's centre must
+     each hit DARK line work within 1.6 glyph heights; every side's ends lie
+     within 2.4 glyph heights (a table's border is not a tag's side); left
+     and right roughly equal. E-200 measured a 13.5 pt square, sides 6.7 /
+     6.8 / 8.1 / 5.4 from the centre.
+   - **Numbers only, not letters,** this version: a lettered hexagon is
+     usually a fixture type, and a lettered general note would claim them.
+   - **GENERAL NOTES are listed but never tagged**; any other "… NOTES",
+     "NOTES" or "KEYNOTES" heading is keyed. A list ends at the first
+     missing number. The list's own numbers are not tags.
+   - Tip 3 stays skipped until 5c builds the tap.
+     Results on the sets on hand: E-200 WORK NOTES 1–18, 55 tags, **none above
+     18 before any list is consulted** (the legend plan's red test); UNCC p3
+     ELECTRICAL NOTES 1–9, 36 tags; colusa, dundas: boxed numbers but no list,
+     so no tags; pinest (scan): nothing. Tests:
+     `client/src/lib/keyedNotes.test.ts` (18, on fixtures written from the
+     real pages by `scripts/keyedNotesFixture.mts`; every guard removed one at
+     a time and shown red), `planHelpPrefs.test.ts` (outlines off by default).
+     Looked at laptop, iPad both ways, phone 375/390/425 on "Sheet numbers
+     check" E-200: no sideways scroll; rings sit on the boxed numbers and skip
+     the boxed room numbers (006, 010); note 7 jumps and rings its number.
 6. **More options:** browse all, outlines toggle, tips again / off.
 
 Each step: tests in `shared/` or `client/src/lib`, then **looked at** on a

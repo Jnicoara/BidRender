@@ -26,6 +26,7 @@ import {
   ChevronDown,
   Lightbulb,
   MapPin,
+  NotebookText,
   Search,
   Shapes,
   X,
@@ -35,6 +36,8 @@ import { usePlanTipsSeen, useSheetKindLine } from "@/lib/planHelpPrefs";
 import { showTipsAgain, turnTipsOff } from "@/lib/planTips";
 import { SHEET_KIND_CARDS, type SheetKind } from "@shared/planHelp/sheetKind";
 import { SheetKindCardBody } from "./SheetKindLine";
+import { NoteOutlinesSwitch, SheetNotesList, notesFound } from "./SheetNotes";
+import type { SheetNotesRead } from "@/lib/keyedNotes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -414,15 +417,25 @@ function AbbreviationCard({
 
 /**
  * The Legend tab's ONE fold (plan § 1): everything past the basic path —
- * the whole symbol guide, the whole abbreviation list, every sheet kind's
+ * this sheet's numbered notes and the switch that rings their tags (off by
+ * default), the whole symbol guide, the whole abbreviation list, every sheet kind's
  * card, and the switch for the sheet-kind line (its default depends on the
  * screen — @/lib/planHelpPrefs); tips and
  * outlines land here as they are built (§ 7). Closed by default.
  */
-export function LegendMoreOptions(actions: SymbolActions) {
+export function LegendMoreOptions({
+  notes,
+  onShowNote,
+  ...actions
+}: SymbolActions & {
+  /** This sheet's numbered notes and tags; null while it is being read. */
+  notes: SheetNotesRead | null;
+  /** Take the drawing to a spot on the sheet, page points. */
+  onShowNote: (at: { x: number; y: number }) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [browsing, setBrowsing] = useState<
-    "symbols" | "words" | "sheets" | null
+    "notes" | "symbols" | "words" | "sheets" | null
   >(null);
   /** The sheet kind opened to its card in the browse list. */
   const [openKind, setOpenKind] = useState<SheetKind | null>(null);
@@ -447,8 +460,9 @@ export function LegendMoreOptions(actions: SymbolActions) {
     () => PLAN_SYMBOLS.filter(s => s.trade === "electrical"),
     []
   );
-  const toggle = (kind: "symbols" | "words" | "sheets") =>
+  const toggle = (kind: "notes" | "symbols" | "words" | "sheets") =>
     setBrowsing(b => (b === kind ? null : kind));
+  const noteCount = notesFound(notes);
 
   return (
     <div className="border-t border-border shrink-0">
@@ -468,6 +482,24 @@ export function LegendMoreOptions(actions: SymbolActions) {
       </button>
       {open && (
         <div className="px-3 pb-3 space-y-1">
+          {/* This sheet's numbered notes (plan § 7 step 5b) — read by code
+              on open, nothing saved (@/lib/keyedNotes). */}
+          <button
+            type="button"
+            onClick={() => toggle("notes")}
+            aria-expanded={browsing === "notes"}
+            className="w-full flex items-center gap-2 rounded px-1 min-h-9 text-left text-xs hover:bg-muted/50"
+          >
+            <NotebookText className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <span className="flex-1">Notes on this sheet</span>
+            {noteCount > 0 && (
+              <span className="text-muted-foreground">{noteCount}</span>
+            )}
+          </button>
+          {browsing === "notes" && (
+            <SheetNotesList read={notes} onShow={onShowNote} />
+          )}
+          <NoteOutlinesSwitch read={notes} />
           <button
             type="button"
             onClick={() => toggle("symbols")}

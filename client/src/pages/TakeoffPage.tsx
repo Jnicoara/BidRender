@@ -549,7 +549,13 @@ import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
 import type { SheetSchedules } from "@/lib/panelSchedules";
 import { SchedulesView } from "@/components/takeoff/SchedulesView";
 import { SheetKindLine } from "@/components/takeoff/SheetKindLine";
-import { usePlanTipsSeen, useSheetKindLine } from "@/lib/planHelpPrefs";
+import {
+  useNoteTagOutlines,
+  usePlanTipsSeen,
+  useSheetKindLine,
+} from "@/lib/planHelpPrefs";
+import type { SheetNotesRead } from "@/lib/keyedNotes";
+import { NoteTagLayer } from "@/components/takeoff/SheetNotes";
 import { PlanTips } from "@/components/takeoff/PlanTips";
 import { markTipSeen, nextTip, turnTipsOff } from "@/lib/planTips";
 import { sheetKinds } from "@shared/planHelp/sheetKind";
@@ -676,6 +682,14 @@ function usePdfWorker() {
       if (msg.type === "schedules") {
         pending.current.get(msg.reqId)?.resolve({
           schedules: msg.schedules,
+          scan: msg.scan,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "keyedNotes") {
+        pending.current.get(msg.reqId)?.resolve({
+          ...msg.read,
           scan: msg.scan,
         });
         pending.current.delete(msg.reqId);
@@ -885,6 +899,8 @@ function usePdfWorker() {
         }),
       homeruns: (pageNum: number, hash: string) =>
         ask<SheetHomeruns>({ type: "homeruns", pageNum, hash }),
+      keyedNotes: (pageNum: number, hash: string) =>
+        ask<SheetNotesRead>({ type: "keyedNotes", pageNum, hash }),
       circuits: (pageNum: number, hash: string) =>
         ask<SheetCircuitText>({ type: "circuits", pageNum, hash }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
@@ -1012,6 +1028,7 @@ function PlanPane({
   onScaleDoubt,
   onSchedules,
   onHomeruns,
+  onKeyedNotes,
   onCircuitText,
   controlsTarget,
   fitOnly = false,
@@ -1089,6 +1106,11 @@ function PlanPane({
    * with the set's panel schedules to tie them to. Code only, writes nothing.
    */
   onHomeruns?: (pageNumber: number, read: SheetHomeruns) => void;
+  /**
+   * The sheet's numbered notes and the boxed numbers on the drawing that
+   * point at them (@/lib/keyedNotes). Code only, no AI, writes nothing.
+   */
+  onKeyedNotes?: (pageNumber: number, read: SheetNotesRead) => void;
   /**
    * The page's words and the set's schedules, for grouping its marks by
    * circuit tag (@/lib/circuitGroups). Code only, writes nothing.
@@ -1266,6 +1288,7 @@ function PlanPane({
     scaleEvidence: scaleEvidenceOnPage,
     schedules: schedulesOnPage,
     homeruns: homerunsOnPage,
+    keyedNotes: keyedNotesOnPage,
     circuits: circuitsOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
@@ -2516,6 +2539,28 @@ function PlanPane({
       cancelled = true;
     };
   }, [page, pageCount, loading, error, hash, homerunsOnPage]);
+
+  /*
+    KEYED NOTES ON THIS SHEET, the same way: read once per page in the
+    worker from the cached page read. Measured before running it on open
+    (plan-reading-help-plan.md § 6): 4 ms on Weld 1 E-200, 80 ms on the
+    densest sheet on hand (weld2 p10, 61,746 words). Plain code, no AI.
+  */
+  const onKeyedNotesRef = useRef(onKeyedNotes);
+  onKeyedNotesRef.current = onKeyedNotes;
+  useEffect(() => {
+    if (loading || error || pageCount === 0) return;
+    let cancelled = false;
+    keyedNotesOnPage(page, hash)
+      .then(read => {
+        if (!cancelled) onKeyedNotesRef.current?.(page, read);
+      })
+      // A failed read shows no notes, which is what it found.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageCount, loading, error, hash, keyedNotesOnPage]);
 
   // CIRCUIT TAGS ON THIS SHEET, the same way — the grouping itself happens
   // in the page, where the marks are.
@@ -3781,6 +3826,23 @@ export default function TakeoffPage({
       setSchedulesByPage(prev => ({
         ...prev,
         [`${docIdForScale}:${pageNumber}`]: read.schedules,
+      }));
+    },
+    [docIdForScale]
+  );
+  /** Numbered notes and their tags, read off each page, keyed the same. */
+  const [notesByPage, setNotesByPage] = useState<
+    Record<string, SheetNotesRead>
+  >({});
+  const activeNotes = doc ? (notesByPage[`${doc.id}:${page}`] ?? null) : null;
+  /** The rings on note tags — More options, off unless turned on. */
+  const [noteOutlines] = useNoteTagOutlines();
+  const handleKeyedNotes = useCallback(
+    (pageNumber: number, read: SheetNotesRead) => {
+      if (docIdForScale === null) return;
+      setNotesByPage(prev => ({
+        ...prev,
+        [`${docIdForScale}:${pageNumber}`]: read,
       }));
     },
     [docIdForScale]
@@ -11190,6 +11252,7 @@ export default function TakeoffPage({
               onScaleDoubt={handleScaleDoubt}
               onSchedules={handleSchedules}
               onHomeruns={handleHomeruns}
+              onKeyedNotes={handleKeyedNotes}
               onCircuitText={handleCircuitText}
               onPageRendered={handlePageRendered}
               /**
@@ -11879,6 +11942,16 @@ export default function TakeoffPage({
                         }}
                       />
                     )}
+                    {noteOutlines &&
+                      activeNotes &&
+                      activeNotes.tags.length > 0 && (
+                        <NoteTagLayer
+                          width={size.width}
+                          height={size.height}
+                          renderScale={size.renderScale}
+                          read={activeNotes}
+                        />
+                      )}
                     {showHomeruns &&
                       activeHomeruns &&
                       activeHomeruns.homeruns.length > 0 && (
@@ -12539,6 +12612,12 @@ export default function TakeoffPage({
                     <LegendMoreOptions
                       assemblies={allAssemblies}
                       onCountThese={countThese}
+                      notes={activeNotes}
+                      onShowNote={at => {
+                        // The phone's panel covers the drawing it moves.
+                        if (phone) setPhonePanelOpen(false);
+                        jumpTo(at);
+                      }}
                     />
                   </>
                 }

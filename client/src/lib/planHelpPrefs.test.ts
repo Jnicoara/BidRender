@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  noteOutlinesShown,
   sheetKindLineDefault,
   sheetKindLineShown,
   sheetKindLineToStore,
@@ -63,5 +64,18 @@ describe("sheetKindLineToStore", () => {
   it("off-then-on on an upright iPad does not switch it on sideways", () => {
     const stored = sheetKindLineToStore(true, ipadUpright);
     expect(sheetKindLineShown(stored, ipadSideways)).toBe(false);
+  });
+});
+
+describe("noteOutlinesShown — rings on note tags (owner, Q8: off by default)", () => {
+  it("is off with nothing stored, on every screen", () => {
+    expect(noteOutlinesShown(null)).toBe(false);
+    expect(noteOutlinesShown(undefined)).toBe(false);
+  });
+
+  it("is on only when somebody turned it on", () => {
+    expect(noteOutlinesShown("on")).toBe(true);
+    expect(noteOutlinesShown("true")).toBe(false);
+    expect(noteOutlinesShown("off")).toBe(false);
   });
 });
