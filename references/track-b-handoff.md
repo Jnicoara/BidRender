@@ -25,6 +25,12 @@ and A applies BS-M3..M6 + F13-M1 before B merges. No migration.
   sideways strip; "No price" was off-screen). `server/pricingChipStrip.test.ts`
   (2, both red on the old code); `device:audit --only=pricing` sideways=no at
   375/390/425/iPad/laptop.
+- **Gate green on b4a4a7ec** (run 38435775409). Locally, one failure in
+  `starterAssembliesSeed.test.ts` on `bidrender_test_b`: a material id
+  differs (23791 expected, 4928 found), i.e. a duplicate-name row in that
+  local test DB. This diff touches no seed code and the Gate (fresh DB)
+  passed. Rebuild `bidrender_test_b` before trusting a local full run.
+- **Dev servers stopped.**
 - **Next:** step 4, tips.
 
 ## WHERE B STOOD — 2026-10-13, PHONE BOTTOM BAR FIXED; PLAN-READING HELP STEP 2 BUILT
