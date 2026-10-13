@@ -106,6 +106,86 @@ holds the 14 answers, § 10a.2 the hand-written SQL, and § 10a.3 the
 empty, and `bidTotals` should come back identical. **The owner has two
 number-facing points in § 10a.5**; neither blocks applying the SQL.
 
+## FROM TRACK A — 2026-10-12 (session 36): BS-M3–M6 — NOT applied; this is exactly what A needs from C
+
+**Settling who waits on whom (owner asked):** your "FOR TRACK A — what the
+baseline screen waits on" says these need "A's migration (drafts in
+`baseline-screen-plan.md` § 10)". **There are no drafts to apply.** § 10
+has one-line table summaries for BS-M3–M6, the BS-M5 three-column pattern,
+and the `eddc870` BS-M3 SQL, which is superseded (it has no `kind` or
+`version`, and holds `decimal` values only). The plan itself says "Full SQL
+for BS-M4 to BS-M8 is written when a piece is scheduled". Writing it means
+deciding how `applyStarterChange` stores, pins and undoes, and that code is
+yours (owner Q12). **So the next move is C's: answer the list below,
+ideally as hand-written SQL in § 10, and A numbers, rehearses and applies it
+the same day.** Every item is a decision, not a typo.
+
+**BS-M3 — `starter_change_batches` + `starter_changes`**
+
+1. **Which tables a change can target.** `StarterTable`
+   (`shared/starterChange.ts`) has 4: materials, assemblies, laborRates,
+   modifiers. § 3 and BS-M5 name 7, adding `takeoff_run_types`, `kits` and
+   `labor_steps`. Say which are in this build. That fixes `targetTable`
+   (enum or varchar).
+2. **`field`:** an enum of column names, or `varchar(64)` checked by
+   `starterFieldKind`? (With an enum, every new column needs a migration.)
+3. **Old/new value type.** Names are offers (Q17), so `decimal` cannot hold
+   them. Options: `text` plus a value-type column, a `json` column, or
+   separate `oldNumber`/`oldText` columns. Your `sameStarterValue` compares
+   "0.5000" to 0.5 and null to not-0, so whichever it is must round-trip
+   NULL distinctly from 0 and from "".
+4. **Recipe, kit and run-type PARTS.** A changed parts list is rows in
+   `assembly_materials` (and kit / run-type children), not a field. One
+   change per child row (`kind` add/remove/qty, with the child's id), or one
+   change carrying the whole list as JSON? This decides whether `kind`
+   needs more values than `change,add,hide,unhide`.
+5. **`version`:** the row's version after this change. Confirm it is the
+   shared row's `version` column (materials, assemblies, labor_rates,
+   modifiers, run types, kits have one).
+6. **`undoneByChangeId`:** a nullable self-FK (`ON DELETE set null`), or no
+   FK? And a batch undo: one `undo`-source batch whose changes each point
+   back?
+7. **Batch `editorUserId`:** `ON DELETE set null` as `eddc870` had, so
+   history outlives the account. Confirm, and NULL = the seed boot.
+
+**BS-M4 — `starter_change_pins`**
+
+8. `forkId` points into whichever table the change targets, so it has no FK
+   (as `eddc870`'s `forkId`). Confirm. **The company:** the owner's
+   `users.id` (the `userId` convention, FK `ON DELETE cascade`) or
+   `companies.id`? Unique on (changeId, companyOwnerId)?
+
+**BS-M5 — `isPinnedCopy`, `hiddenAt`, `replacedById`**
+
+9. **Which tables** (same answer as 1).
+10. **`labor_steps` has `baselineId` and `isActive` but NO `version` and NO
+    `baselineVersion`**, so it cannot be pinned or offered as § 2 describes.
+    Either it gains both, or it is out of this build (Q8 put step minutes
+    "later").
+11. **`replacedById`:** a self-FK (`ON DELETE set null`) or a bare int?
+    And is it only legal on a shared row (`userId IS NULL`), enforced by
+    code only?
+
+**BS-M6 — `companies.starterSeenAt` + `starter_offer_answers`**
+
+12. Key `starter_offer_answers` by company owner `users.id` or by
+    `companies.id`? (`starterSeenAt` is on `companies`, so the two halves
+    would key differently unless decided.) Unique on (company, changeId).
+    FK to `starter_changes` `ON DELETE cascade`?
+13. An answer per change (one field), or per batch for "Accept all"? Your
+    `acceptAllTakes` returns rows, so per change is assumed. Confirm.
+14. **Undo:** when a change is undone, what happens to its `accepted`
+    answers? (§ 4 says companies that accepted are offered the undo, which
+    is a new change, so the old answer stays. Confirm.)
+
+**What A will do with the answers:** hand-write 0152+ (add-only, step 1,
+nullable, no defaults except counters), apply to the local, test and
+staging databases with a backup, a rehearsal on a restored copy, and
+`bidTotals` before/after. Nothing reads them until your code ships, so
+bid totals cannot move.
+
+(**Answered** in `baseline-screen-plan.md` § 10a; see "TO TRACK A" above.)
+
 ## FROM TRACK A — 2026-10-12 (session 34): your schema comment is in; BS-M3–M6 wait for your `applyStarterChange` spec
 
 - **`quantitiesLockedAt` comment applied** to `drizzle/schema.ts` on

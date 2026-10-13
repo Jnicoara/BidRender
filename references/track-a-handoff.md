@@ -4,7 +4,30 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `371b2ab`".
 
-## NOW — 2026-10-12, session 35: pricing sheet — SER rename, pack labels, one rebuild
+## NOW — 2026-10-12, session 37: next release REHEARSED on a fresh copy of live — PASSED
+
+- Merged local-dev `20a1166` (C's bid protection) with `b90ea3d2` →
+  `14f205c1`. **Not pushed** (owner: B lands first).
+- New release-step scripts: `scripts/freezeSentBids.mts` (step 4) and
+  `scripts/applyMathVersion.mts` (step 5), dry run by default.
+- Live copy: 144 → 152 / 183; first boot CLEAN (5 SER renames, 0 company
+  rows); censuses 0; freeze 0 bids; math 2 Drafts → v1, 0 change rows; **2/2
+  totals unchanged**. At scale on a local copy: 3,452 frozen + locked, 934
+  → v1, **4,386/4,386 unchanged**. Full record and expected day figures:
+  `next-live-release-plan.md` § "Rehearsal on a fresh copy of live".
+- Scratch: `bidrender_scratch_live_rehearsal`, `bidrender_scratch_local_freeze`,
+  worktree `../bidrender-live-code` (junction node_modules).
+
+## (earlier) 2026-10-12, session 36: BS-M3–M6 settled — NOT applied, waits on C's answers
+
+C's handoff said BS-M3–M6 wait on A's "drafts in § 10". There are none, only
+one-line summaries (plus superseded `eddc870` BS-M3 SQL). 14 decisions are
+listed for C in `track-c-handoff.md` "FROM TRACK A … session 36". The big
+ones: 4 tables in `StarterTable` vs 7 in BS-M5; the value type (names are
+offers); recipe parts as rows vs JSON; `labor_steps` has no
+`version`/`baselineVersion`. **Nothing applied anywhere; databases still 152.** Committed locally, NOT pushed (owner: C and B land first).
+
+## (earlier) 2026-10-12, session 35: pricing sheet — SER rename, pack labels, one rebuild
 
 - **Owner's sheet committed FIRST, as saved** (`bef6f7f3`, sha256
   `9495e7c9…`). Its 54 typed prices were ALL in "Price per unit" (over the

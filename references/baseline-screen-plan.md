@@ -515,6 +515,12 @@ are in:**
 | **BS-M7** | Done                                                                                                                                                                                                                                                                                                                                                                                | `0148`                                           |
 | **BS-M8** | **No longer needed.** C fixed F9 with no migration (`67ee526`): "Remove scale" stores `scaleSource = "manual"` with no ratio, which detection never overrides                                                                                                                                                                                                                       | nothing to apply                                 |
 
+**BS-M3–M6, settled 2026-10-12 (session 36): NOT final, nothing applied.**
+No SQL exists for them. The 14 open decisions (tables in scope, the value
+type for names, how recipe parts are logged, `labor_steps` lacking
+`version`, keys and FKs) are listed for C in `track-c-handoff.md`, "FROM
+TRACK A … session 36". A applies them once they are answered.
+
 0150–0151 on local, the test DB and staging; live with the next release
 (`next-live-release-plan.md`). The bid-methods drafts (BM-M1–M10) are NOT
 applied (owner, 2026-10-12).

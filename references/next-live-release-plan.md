@@ -80,8 +80,9 @@ first, every time**, and the owner reads the dry-run output before
    prints anything else, **stop and find out why before going on.**
 2. **`bidTotals` BEFORE** with live's code, as always.
 3. **Push `main`**, check `/api/version` (`builtAt`, `commit`).
-4. **Freeze the bids that are ALREADY non-Draft** (C's freeze function,
-   called from a one-off script A writes; never SQL). For every Active /
+4. **Freeze the bids that are ALREADY non-Draft** —
+   `scripts/freezeSentBids.mts` (dry run; `--apply`), on C's
+   `lockBidQuantities` + `freezeBidSettings`; never SQL. For every Active /
    Won / Lost bid with `settingsFrozenAt` NULL: write the overhead / profit
    / productivity / tax values in effect onto it, and lock its quantities
    if unlocked (Q15). Dry run prints each bid with status, what it would
@@ -89,7 +90,7 @@ first, every time**, and the owner reads the dry-run output before
    already in effect, so `bidTotals` before vs after the step must be
    identical for every bid. If one moves, **stop** — the freeze is not
    writing what pricing was reading.
-5. **`applyMathVersion.mts`** (plan § 8 item 4). Dry run: every bid below
+5. **`scripts/applyMathVersion.mts`** (dry run; `--apply`; plan § 8 item 4). Dry run: every bid below
    the current version, its status, lock, and old and new total. Only
    **Draft and unlocked** bids are moved to the current version; each one
    whose total moved gets a `bid_math_changes` row. Everything else stays
@@ -103,6 +104,58 @@ first, every time**, and the owner reads the dry-run output before
 Steps 4 and 5 come AFTER the push because they call the new code. Step 4
 comes before step 5, so a bid that is non-Draft on the day is frozen and
 locked before any math version is applied.
+
+**`bidTotals` is not status-aware yet** (plan § 8 item 6 asked for it). For
+this release that does not matter: version 1 changes no pricing branch, so
+the expected result is EVERY bid unchanged and ZERO `bid_math_changes` rows,
+which a plain `--compare` checks more strictly. The first release whose math
+version moves a total needs the status-aware compare first.
+
+### Rehearsal on a fresh copy of live — 2026-10-12 (session 37), PASSED
+
+Nothing touched live. Live serves `371b2ab` (`/api/version`, built
+2026-10-10T18:58:39Z). Read-only dump
+`live-2026-10-12T22-57-14Z-release-rehearsal.sql` (77 tables, 5,539 rows —
+the same as 2026-10-10, so live has not changed since the release),
+restored as `bidrender_scratch_live_rehearsal`, 77/77 counts equal. Code:
+local-dev `20a1166` merged with A's `b90ea3d2` (`14f205c1`).
+
+| Step                                                                                   | Result on the copy                                                                                                                                                            |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drift before                                                                           | 144 migrations, 180 FKs; exactly 0144–0151's tables/columns missing                                                                                                           |
+| `bidTotals` BEFORE (live's code)                                                       | 2 bids (23, 25), both **Draft, $0.00** (nothing priced), unlocked                                                                                                             |
+| Migrate 0144–0151                                                                      | **8 applied → 152; re-run "Nothing to apply"; matches; 183/183**                                                                                                              |
+| Live's OLD code on the migrated copy                                                   | 2/2 unchanged (the window between migrating and pushing is safe)                                                                                                              |
+| First boot of the new code (`seedBaseline`, the server's own path), `catalogRehearsal` | **CLEAN: renamed 5** (the copper SER → "8/3 SER Copper" etc., same ids), added 0, retired 0, deleted 0; company rows 18 → 18, changed 0; every reference identical, 0 orphans |
+| Twin census                                                                            | 0                                                                                                                                                                             |
+| Remove/relocate census                                                                 | 0 of 2 bids; 22 marks all NULL; VERDICT no Active/Won/Lost or locked bid would move                                                                                           |
+| New code, after boot                                                                   | 2/2 unchanged                                                                                                                                                                 |
+| Step 4 freeze (dry, apply)                                                             | **0 bids** — live has no non-Draft bid                                                                                                                                        |
+| Step 5 math version (dry, apply, again)                                                | 2 Drafts v0 → v1, **0 totals moved, 0 change rows**; second run moves 0                                                                                                       |
+| Live's code BEFORE vs the end                                                          | **2/2 unchanged**                                                                                                                                                             |
+
+**Expected on the day, if live has not changed:** the same figures. Any
+difference — a third bid, a non-Draft bid, a remove/relocate mark, a change
+row — **stop and find out why before going on.**
+
+**Live is too small to exercise steps 4 and 5**, so both scripts were also
+run at scale on `bidrender_scratch_local_freeze` (a copy of the local
+real-data database: 4,386 bids — 934 Draft, 950 Active, 1,352 Won, 1,150
+Lost — none locked or frozen):
+
+- Freeze dry run: 3,452 listed, **nothing written** (checked: 0 locked, 0
+  frozen after). Apply: **3,452 locked and frozen in 33 s; all 4,386 totals
+  unchanged**; a second run finds 0.
+- Math: dry run 934 Drafts to move, nothing written; apply **934 → v1, 0
+  totals moved, 0 change rows**; the 3,452 sent bids stay v0; all 4,386
+  totals unchanged; a second run moves 0.
+- **Learned:** the math dry run printed a line for every bid that STAYS
+  (3,452), burying the Drafts the owner must read. Now counted, not listed.
+
+Scratch left for the release day: DBs `bidrender_scratch_live_rehearsal`,
+`bidrender_scratch_local_freeze`; worktree `../bidrender-live-code`
+(`371b2ab`, node_modules is a junction — remove it before `git worktree
+remove`). The day's own fresh copy replaces the first.
 
 ### The remove / relocate gate — measured 2026-10-10 (superseded 2026-10-12, see above)
 
