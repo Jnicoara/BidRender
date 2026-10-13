@@ -4,6 +4,17 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-13]
+
+- **On a phone, the bottom icon bar no longer covers the last thing on the
+  screen.** It used to float over the page, so the bid page's "Pricing
+  settings" card stayed half hidden even scrolled all the way down (and the
+  last row of the Dashboard, Settings and others the same). The page now
+  ends where the bar starts. Also fixed: on long Count and Proposal screens
+  the whole app could be dragged up off a phone's screen, and the
+  "Backups have stopped" notice pushed the Dashboard's bottom rows out of
+  reach at every size.
+
 ## [2026-10-12]
 
 - **Look up a plan abbreviation, with no AI.** The Plans screen's Legend tab
