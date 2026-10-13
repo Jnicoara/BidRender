@@ -28,6 +28,27 @@ shelf in app order after Conduit Fittings. It uses the same format.
 
 The workbook was read from a copy. **Next shelf: Underground (660–669).**
 
+**Underground, done the same day: `pricing/underground-name-review.md`.**
+
+- **Counts:** 10 rows; 1 OK, 9 need words. None is a non-product.
+- **For A first (U-A):** the sheet's `usedBy`
+  (`pricing/starterSheetLayout.ts`) ignores run-type EXTRAS. So
+  `Underground warning tape` reads "Not in an assembly" and sorts last,
+  although all 18 shipped underground types price it.
+- **The tape's name is matched exactly by `WARNING_TAPE` (U-B),** so a
+  rename is a seed + run-type pair.
+- **P1, could price wrong:** the four reel items (mule tape, pull rope,
+  tracer wire, warning tape) say per foot / 1. A reel price typed as the
+  pack prices each foot at the whole reel. The tracer label says 250 ft;
+  the roll is 500 ft.
+- **P2:** the handhole is box + cover, about $490 together at Platt.
+- **Missing items:** U1 intermediate spacers, U2 detectable tape (optional)
+  and U3 PVC conduit end caps.
+- **Owner questions:** Q1–Q10, each with a suggested answer.
+
+**Next shelf after Underground: Boxes is done (A); then Receptacles
+(788–827).**
+
 ## (newest) 2026-10-12 — Conduit name review for the owner; nothing applied
 
 `pricing/conduit-name-review.md`, in the same format as A's Boxes review.
