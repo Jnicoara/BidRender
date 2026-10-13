@@ -1,5 +1,14 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-12 (plan only), PLAN-READING HELP PLANNED
+
+`references/plan-reading-help-plan.md`: abbreviation lookup, symbol guide,
+"What is this sheet?" cards, tips, keyed-note taps and detail links — no
+AI, **no migration needed to ship**. Two optional add-only drafts for A (H1
+`users.planTipsDoneAt`, H2 `bid_pdf_sheets.sheetKind`) only if the owner
+picks the account-side answers. Waits on the owner's 11 answers (§ 9). No
+code; nothing merged; the scope work below is unchanged.
+
 ## WHERE B STANDS — 2026-10-12 (last), SCOPE STEP 6a DONE; BASELINE GUARDS SHOWN RED
 
 On `track-b`, NOT merged (owner: the live release goes first). No
