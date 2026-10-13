@@ -4,6 +4,16 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-13]
+
+- **Released to bidridge.com.** Bids now protect themselves once sent: a bid
+  that leaves Draft locks its counts and keeps the overhead, profit and tax it
+  was priced with, and later pricing changes reach only Drafts. Also live:
+  who-does-what scope tags on bid lines, remove/relocate labor, job costs in
+  Quick bid, and the database groundwork for the starter editor's own login
+  (not switched on). Both live bids were checked before and after: no total
+  moved.
+
 ## [2026-10-12]
 
 - **"Import price list" is hidden for now.** It read a supply house's

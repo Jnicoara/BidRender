@@ -1,8 +1,27 @@
-# Track A handoff — 2026-10-12 (live is still `371b2ab`)
+# Track A handoff — 2026-10-13 (live is `60479773` / 152)
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
-release record is `deploying.md` § 11 "LIVE: `371b2ab`".
+release record is `deploying.md` § 11 "LIVE: `60479773`".
+
+## NOW — 2026-10-13, session 38: `60479773` + 0144–0151 ARE LIVE
+
+- Owner approvals A–D. Backup `2026-10-13T05-09-10Z` verified (77 / 5,539);
+  fresh rehearsal on its restore matched 2026-10-12 exactly.
+- Live: 8 applied (05:54) → 152, 183/183; push 16:31, `/api/version`
+  `60479773` built 16:32:35; first boot CLEAN (5 SER renames); freeze 0;
+  math 2 Drafts → v1, 0 moved; **2/2 totals unchanged**; owner opened both
+  bids and plans.
+- **Not done:** `STARTER_TOTP_KEY` on live / any starter-editor account
+  (owner's go).
+- **Scratch to drop now the release is out:** DBs `bidrender_backup_verify`
+  (today's restore, migrated), `bidrender_scratch_live_rehearsal`,
+  `bidrender_scratch_local_freeze`, `bidrender_scratch_staging_0146/0148/0150`,
+  `bidrender_scratch_live`, `bidrender_scratch_staging(_0144)`; worktrees
+  `../bidrender-live-code`, `../bidrender-before-scope`, `-starter`, `-twin`
+  (junction node_modules — remove the junction before `git worktree remove`).
+  Not dropped this session.
+- `scripts/_tmpCopyDb.mts` stays untracked (owner).
 
 ## NOW — 2026-10-12, session 37: next release REHEARSED on a fresh copy of live — PASSED
 
