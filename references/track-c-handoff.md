@@ -1,5 +1,15 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-12 — pricing-safety PLAN written; nothing built, nothing merged
+
+`references/pricing-safety-plan.md` covers todo.md "Before beta: wrong
+numbers on bids": pack price + pack qty entry, per M / per C import with
+preview and undo, and the sanity warning. **For A: SQL drafts PS-M1–M6**
+(§ 6, all additive, step 1). **For the owner: Q1–Q10** (§ 8). Pointers added
+in multi-supplier § 4.4 / § 4.5 / § 6 and material-markup D3. **Live fault
+found:** the price parser drops "/M" and "/C" today, and a test pins it
+(plan § 1.1). Build waits on the owner's answers and A's columns.
+
 ## START HERE (2026-10-13) — panel-label offer built; F13 rule built, WIRING WAITS ON ONE COLUMN FROM A; NOT merged (live release first)
 
 **Owner: build on track-c, do not merge; the live release goes first.**
