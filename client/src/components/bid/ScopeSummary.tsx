@@ -17,7 +17,12 @@
  * instead, because its words filter that list and a filter belongs beside
  * what it filters (recorded in the plan, step 5).
  *
- * Nothing at all renders on a bid with no tag and no plans.
+ * - **Who does this?** (step 6a, `ScopePrompts`) — closed, "N items", only
+ *   when a shipped prompt matches a line nobody has answered, never on a
+ *   locked bid, and not after "Don't ask on this bid" (then one quiet line
+ *   offers "Ask again").
+ *
+ * Nothing at all renders on a bid with no tag, no prompt and no plans.
  */
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
@@ -28,29 +33,44 @@ import {
   showScopeCounts,
 } from "@/lib/scopeSummary";
 import type { LineScope } from "@shared/lineScope";
+import { matchScopePrompts, showScopePrompts } from "@shared/scopePrompts";
 import { ScopeNoteFinder, type FinderLine } from "./ScopeNoteFinder";
+import { ScopePrompts, ScopePromptsOff } from "./ScopePrompts";
 
 export function ScopeSummary({
   bidId,
   lines,
   locked,
   hasPlans,
+  promptsDismissedAt,
   filter,
   onFilter,
   refresh,
 }: {
   bidId: number;
-  lines: readonly FinderLine[];
+  lines: readonly (FinderLine & { assemblyCategory: string | null })[];
   locked: boolean;
   hasPlans: boolean;
+  /** `bids.scopePromptsDismissedAt` — "Don't ask on this bid" (step 6a). */
+  promptsDismissedAt: Date | null;
   filter: LineScope | null;
   onFilter: (scope: LineScope | null) => void;
   refresh: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const counts = showScopeCounts(lines);
-  if (!counts && !hasPlans) return null;
+  const matches = matchScopePrompts(lines);
+  const prompts = showScopePrompts({
+    locked,
+    dismissedAt: promptsDismissedAt,
+    matches: matches.length,
+  });
+  // The way back from "Don't ask", only while there would be something to ask.
+  const promptsOff =
+    !locked && promptsDismissedAt !== null && matches.length > 0;
+  if (!counts && !hasPlans && !prompts && !promptsOff) return null;
   const words = scopeSummaryWords(scopeCounts(lines));
+  const above = counts || prompts;
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -94,6 +114,16 @@ export function ScopeSummary({
           )}
         </div>
       )}
+      {prompts && (
+        <div className={cn(counts && "border-t border-border")}>
+          <ScopePrompts bidId={bidId} matches={matches} refresh={refresh} />
+        </div>
+      )}
+      {promptsOff && (
+        <div className={cn(counts && "border-t border-border")}>
+          <ScopePromptsOff bidId={bidId} />
+        </div>
+      )}
       {hasPlans && (
         <>
           <button
@@ -102,7 +132,7 @@ export function ScopeSummary({
             aria-expanded={open}
             className={cn(
               "w-full flex items-center gap-2 px-4 py-2 min-h-10 text-left",
-              counts && "border-t border-border"
+              (above || promptsOff) && "border-t border-border"
             )}
           >
             <ChevronDown

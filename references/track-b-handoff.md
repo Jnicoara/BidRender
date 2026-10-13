@@ -1,6 +1,31 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-12 (latest), BASELINE SCREEN: SIGN-IN + READ-ONLY SCREEN
+## WHERE B STANDS — 2026-10-12 (last), SCOPE STEP 6a DONE; BASELINE GUARDS SHOWN RED
+
+On `track-b`, NOT merged (owner: the live release goes first). No
+migration: 6a uses S3 (0147), already applied.
+
+- **Step 6a — "Who does this?"** (details in `scope-tags-plan.md` step 6,
+  "6a DONE"): the eight shipped prompts in `shared/scopePrompts.ts`, shown
+  closed in the "Who does what" card on a bid with an unanswered matching
+  line; chips tag the ticked lines through `useSetLineScope` (Undo).
+  `bids.setScopePromptsDismissed` = "Don't ask on this bid" / "Ask again".
+  `bids.get` lines gain `assemblyCategory`. Never on a locked bid; moves no
+  number (shown: tagging is step 3's call).
+- **Proof:** `server/scopePrompts.test.ts`, `server/scopePromptsDismiss.test.ts`;
+  each guard removed in a throwaway worktree (deleted afterwards) and its
+  test shown red — see the commit message. Looked at laptop + both iPad
+  sizes on a temporary bid on user 1 (deleted): 5 items asked, the EV
+  circuit and lighting contactor not; answering one → 4 items and the
+  counts strip; Don't ask → "Ask again" → back.
+- **Baseline screen guards: now shown red**, all four, in a throwaway
+  worktree the owner allowed (deleted; track-b untouched at 9ac82766):
+  public builder on `materials` → scopeDiscipline + "every route refuses"
+  red; no `userId IS NULL` on materials → "no company rows" red; none on
+  assembly-by-id → NOT_FOUND red; `Number()` for hours → NULL test red.
+- **6b still waits for A's S2.**
+
+## WHERE B STOOD — 2026-10-12 (latest), BASELINE SCREEN: SIGN-IN + READ-ONLY SCREEN
 
 On `track-b`, NOT merged to local-dev (owner's go). No migration; works on 152. Built on A's login (§ "FROM TRACK A" below).
 
@@ -23,10 +48,8 @@ On `track-b`, NOT merged to local-dev (owner's go). No migration; works on 152. 
 - **Tests:** `server/starterLibrary.test.ts` (every route refuses no
   session, a password-only one and a company login; no company row in the
   lists; a company assembly id is NOT_FOUND; unset hours stay NULL),
-  `client/src/lib/starterAddress.test.ts`. **NOT YET SHOWN RED** — running
-  the suite with the guards removed was refused by the session's permission
-  classifier; the four breakages were reverted unrun. Owner to allow, or
-  run by hand.
+  `client/src/lib/starterAddress.test.ts`. Shown red later the same day
+  (entry above).
 - **Looked at** laptop 1536, iPad 820×1180 and 1180×820 (playwright,
   throwaway starter account made and deleted in bidrender_local_b_new):
   layout audit clean at both iPad sizes; "romex" lists NM-B first. Fixed

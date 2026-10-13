@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-12]
 
+- **"Who does this?" on the bid.** When a bid has lines for work that is
+  often someone else's — light fixtures, appliances, data, fire alarm
+  devices, HVAC controls, EV chargers, permits, trenching and patching —
+  the "Who does what" card asks about them, closed until opened. Pick We
+  install, Owner furnishes, By others or Excluded for the ticked lines (with
+  Undo), or "Don't ask on this bid". It never asks about our own circuits
+  or receptacles, never appears on a locked bid, and changes nothing until
+  you pick.
 - **The starter editor's sign-in page and a first, read-only baseline
   screen**, at `/starter` (outside the company app). Sign in with the
   password, then the authenticator code or a recovery code. The screen

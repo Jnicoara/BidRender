@@ -3758,12 +3758,45 @@ export async function getAssemblyMountKinds(
   userId: number
 ): Promise<Map<number, string>> {
   const kinds = new Map<number, string>();
+  (await resolveStoredAssemblies(storedIds, userId)).forEach((row, id) => {
+    if (row.mountHeightTypeKey !== null) kinds.set(id, row.mountHeightTypeKey);
+  });
+  return kinds;
+}
+
+/**
+ * The category of the assembly each STORED id means, forks followed like
+ * `getAssemblyMountKinds`. Read by the "Who does this?" prompts
+ * (shared/scopePrompts.ts): a troffer is a light fixture by its category
+ * even when its name never says "fixture".
+ */
+export async function getAssemblyCategories(
+  storedIds: readonly (number | null)[],
+  userId: number
+): Promise<Map<number, string>> {
+  const categories = new Map<number, string>();
+  (await resolveStoredAssemblies(storedIds, userId)).forEach((row, id) => {
+    categories.set(id, row.category);
+  });
+  return categories;
+}
+
+/**
+ * Each stored assembly id resolved to the row the company means: its own
+ * fork of a shipped row, or the row itself. Ids that resolve to nothing are
+ * left out. One query for any number of ids.
+ */
+async function resolveStoredAssemblies(
+  storedIds: readonly (number | null)[],
+  userId: number
+): Promise<Map<number, Assembly>> {
+  const resolved = new Map<number, Assembly>();
   const wanted = Array.from(
     new Set(storedIds.filter((id): id is number => id !== null))
   );
-  if (wanted.length === 0) return kinds;
+  if (wanted.length === 0) return resolved;
   const db = await getDb();
-  if (!db) return kinds;
+  if (!db) return resolved;
   const candidates = await db
     .select()
     .from(assemblies)
@@ -3782,10 +3815,10 @@ export async function getAssemblyMountKinds(
   // MERGE BEFORE RESOLVING, as getAssemblyForStoredReference does.
   const visible = mergeLibraryRows(candidates, userId);
   for (const id of wanted) {
-    const key = resolveAssembly(visible, id)?.mountHeightTypeKey ?? null;
-    if (key !== null) kinds.set(id, key);
+    const row = resolveAssembly(visible, id);
+    if (row) resolved.set(id, row);
   }
-  return kinds;
+  return resolved;
 }
 
 export async function getAssemblyDetail(
