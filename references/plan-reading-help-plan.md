@@ -1,7 +1,7 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEPS 1–3 BUILT on track-b (2026-10-12/13, owner's go); steps
-4–6 not started.** All 11 picks in § 9 approved. No migration. Not merged to
+**Status: STEPS 1–4 BUILT on track-b (2026-10-12/13, owner's go); steps
+5–6 not started (step 6's tips-again / off is already in, with step 4).** All 11 picks in § 9 approved. No migration. Not merged to
 local-dev (frozen until the live release). Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
@@ -369,6 +369,16 @@ from the real sheets via a script, not hand-typed.
      209 → 209). **Still costs a row on iPad landscape (107 → 157) and phone
      425 (107 → 157)** — both bars were already full; no free spot exists.
      The switch is the way out; owner may prefer it hidden on phones.
+     **Answered, owner, 2026-10-13: hidden by default wherever it would add
+     a toolbar row — phones (any width, either way round) and iPad
+     landscape; on by default on a laptop and iPad portrait. The switch
+     still turns it on anywhere.** `sheetKindLineDefault` in
+     `@/lib/planHelpPrefs`; only a change from the screen's default is
+     stored, so off-then-on on an upright iPad does not switch it on when
+     the iPad turns sideways. Measured on "Sheet numbers check" E-200 (top
+     of the drawing, line off → on): phone 390 and 375 319 → 319, phone 425
+     269 → 319, iPad portrait 323 → 323, iPad landscape 323 → 323 (on this
+     sheet the bar already wraps a second tool row there), laptop 173 → 173.
    - The phone sheet is the ordinary dialog moved to the bottom, not the
      side panel's title row — the panel is closed while the drawing is.
    - Old Blueridge stores no titles, so the fixture bid shows no line; looked
@@ -377,6 +387,35 @@ from the real sheets via a script, not hand-typed.
      database; guards shown red: a digit in a card, the not-a-plan rule),
      `client/src/lib/planHelpPrefs.test.ts`.
 4. **Tips** (needs 1–3 to point at).
+   **DONE 2026-10-13 (track-b).** `client/src/lib/planTips.ts` (`nextTip`,
+   `placeTip`, seen-state `bidrender.plans.tipsSeen`), `PlanTips.tsx` (one
+   card, a yellow ring round its control, Next / Got it, No more tips, ×).
+   Shown once the sheet is drawn, never while a tool is in hand (count,
+   trace, calibrate, capture, Copy text, area, Select, placing a panel),
+   never with the phone's panel open. Details, on purpose:
+   - **A tip whose control is not on screen is skipped, not seen** — no
+     notes sheet, the line hidden (phones and iPad landscape by default) or
+     silent here, nothing tappable. It still shows on a later sheet or bid.
+     Tip 3 is always skipped until step 5 builds the taps.
+   - **Tip 1 points at the sheet chip** (always on screen, opens the list)
+     and names the sheet ("E-001 has the general notes and legend…"), not
+     at a row of the sheet list, which may be folded or scrolled away.
+   - **× = this one seen, the rest next visit** ("closing one is not a
+     no"); Escape does the same.
+   - **Phone: just above the bar under the drawing, never over it.** There
+     the "not over the drawing's middle" rule cannot hold on a small phone:
+     at 375 x 667 the drawing is 300 px tall and the card 182, so every spot
+     covers the middle. Laptop and tablet: `placeTip` tries below, above,
+     left, right of the control, then a corner, and takes the first that is
+     inside the window and clear of the middle.
+   - More options gained **Show tips again / Turn tips off** (from step 6).
+   Tests: `client/src/lib/planTips.test.ts` (15; "No more tips" guard shown
+   red). Looked at: laptop, iPad both ways, phone 375/390/425 on "Sheet
+   numbers check" E-200 — sequence notes → line → look up where the line
+   shows, notes → look up where it does not; every card inside the window,
+   none over the drawing's middle off the phone; Copy text in hand hides
+   the card and putting it down brings it back; × ends the visit; No more
+   tips survives a reload.
 5. **Taps on the drawing:** 5a closed-square tags + 5b notes parser
    (the legend plan's steps 3–4), then 5c keyed-note popover, then 5d detail
    links and Back.

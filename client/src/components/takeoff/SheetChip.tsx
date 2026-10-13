@@ -180,7 +180,8 @@ export function SheetChip({
   }, [sheets, pageCount, identities]);
 
   return (
-    <div className="flex items-center gap-0.5">
+    // What the "start with the notes sheet" tip points at (PlanTips).
+    <div className="flex items-center gap-0.5" data-plan-tip="sheets">
       <Button
         size="sm"
         variant="ghost"

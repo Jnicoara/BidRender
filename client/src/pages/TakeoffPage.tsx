@@ -549,7 +549,10 @@ import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
 import type { SheetSchedules } from "@/lib/panelSchedules";
 import { SchedulesView } from "@/components/takeoff/SchedulesView";
 import { SheetKindLine } from "@/components/takeoff/SheetKindLine";
-import { useSheetKindLine } from "@/lib/planHelpPrefs";
+import { usePlanTipsSeen, useSheetKindLine } from "@/lib/planHelpPrefs";
+import { PlanTips } from "@/components/takeoff/PlanTips";
+import { markTipSeen, nextTip, turnTipsOff } from "@/lib/planTips";
+import { sheetKinds } from "@shared/planHelp/sheetKind";
 import {
   HomerunLayer,
   HomerunsToggle,
@@ -2687,7 +2690,11 @@ function PlanPane({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0">
+    // `data-plan-tip`: the drawing whose middle a tip must never cover.
+    <div
+      className="flex-1 flex flex-col min-h-0 min-w-0"
+      data-plan-tip="drawing"
+    >
       {controlsTarget ? (
         createPortal(zoomControls, controlsTarget)
       ) : (
@@ -6239,6 +6246,53 @@ export default function TakeoffPage({
       }),
     [bidSummary.data, totals, bidCounts.data]
   );
+
+  /*
+    FIRST-OPEN TIPS (plan-reading-help-plan.md § 5, @/lib/planTips). Only
+    once this sheet is drawn, and never while a tool is in hand: a tip over
+    what the person is about to tap has cost them a tap. The ×  ends tips for
+    this visit; the rest come the next time the screen opens.
+  */
+  const [tipsSeen, setTipsSeen] = usePlanTipsSeen();
+  const [tipsClosedThisVisit, setTipsClosedThisVisit] = useState(false);
+  const notesSheetLabel = useMemo(() => {
+    const notes = sheets.find(s =>
+      sheetKinds(sheetDisplay(s, identities.get(s.pageNumber)).title).includes(
+        "notes"
+      )
+    );
+    if (!notes) return null;
+    const shown = sheetDisplay(notes, identities.get(notes.pageNumber));
+    return shown.number ?? shown.title;
+  }, [sheets, identities]);
+  const toolInHand =
+    Boolean(armedGroup) ||
+    tracing ||
+    calibrating ||
+    capturingSymbol ||
+    capturingLegend ||
+    selectingText ||
+    drawingArea ||
+    touchSelect ||
+    placingPanel !== null;
+  const tipSheet = {
+    hasNotesSheet: notesSheetLabel !== null,
+    sheetKindShown:
+      sheetKindLine &&
+      activeSheet !== null &&
+      sheetKinds(sheetDisplay(activeSheet, identities.get(page)).title).length >
+        0,
+    // Taps on the drawing are step 5 of the plan, not built yet.
+    tappable: false,
+  };
+  const tip =
+    doc &&
+    renderedPage === page &&
+    !toolInHand &&
+    !tipsClosedThisVisit &&
+    !(phone && phonePanelOpen)
+      ? nextTip(tipsSeen, tipSheet)
+      : null;
 
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
@@ -12549,6 +12603,8 @@ export default function TakeoffPage({
         <button
           type="button"
           onClick={() => setPhonePanelOpen(true)}
+          // On a phone every tip sits just above this bar (PlanTips).
+          data-plan-tip="phone-bar"
           className="flex h-12 shrink-0 items-center gap-2 border-t border-border bg-card px-3 text-left"
           aria-label="Open the panel: counts, runs, sheets and totals"
         >
@@ -12565,6 +12621,21 @@ export default function TakeoffPage({
           )}
           <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
         </button>
+      )}
+
+      {tip && (
+        <PlanTips
+          tip={tip}
+          phone={phone}
+          notesSheetLabel={notesSheetLabel}
+          last={nextTip(markTipSeen(tipsSeen, tip), tipSheet) === null}
+          onNext={() => setTipsSeen(markTipSeen(tipsSeen, tip))}
+          onClose={() => {
+            setTipsSeen(markTipSeen(tipsSeen, tip));
+            setTipsClosedThisVisit(true);
+          }}
+          onOff={() => setTipsSeen(turnTipsOff(tipsSeen))}
+        />
       )}
 
       {dragging && docs.length > 0 && (

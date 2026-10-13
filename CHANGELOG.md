@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **Tips the first time the Plans screen opens.** A small card points at
+  one control at a time — start with the notes sheet, what the sheet-kind
+  line is for, where to look up a word — with Next and "No more tips". It
+  never appears while a tool is in hand, and "Show tips again" / "Turn tips
+  off" sit under the Legend tab's More options.
+- **The sheet-kind line is now off by default on phones and on an iPad held
+  sideways**, where it cost a whole toolbar row of drawing; it stays on for
+  laptops and an upright iPad, and the More options switch turns it on
+  anywhere (owner's call).
+
 - **"What is this sheet?" on the Plans screen, with no AI.** Beside the
   sheet name a short line now says what kind of sheet it is — "Lighting
   plan · count fixtures and switches", "Panel schedule", "Demolition plan"

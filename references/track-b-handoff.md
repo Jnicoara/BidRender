@@ -1,6 +1,37 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 3 BUILT; PRICING CHIPS WRAP
+## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 4 (TIPS) BUILT; LINE DEFAULT BY SCREEN
+
+On `track-b` only. **NOT merged to local-dev** — A applies BS-M3..M6 +
+F13-M1 first. No migration, none needed.
+
+- **Sheet-kind line default (owner's answer):** OFF on phones (any width,
+  either way round) and iPad landscape; ON on laptop and iPad portrait;
+  the More options switch turns it on (or off) anywhere. Only a change
+  from the screen's default is stored. Proved at each size (playwright,
+  "Sheet numbers check" E-200, nothing stored): line shown = laptop yes,
+  iPad portrait yes, iPad landscape no, phone 375/390/425 no; forced on
+  and off works at every size. Cost of the line (drawing top, off → on):
+  phone 425 269 → 319 (a row), the rest unchanged on this sheet.
+  `client/src/lib/planHelpPrefs.test.ts` (6; guard shown red).
+- **Step 4, tips** (`plan-reading-help-plan.md` § 7 step 4, DONE with
+  details): notes sheet → sheet-kind line → (taps, skipped until step 5) →
+  Look up. Skipped ≠ seen. Never while a tool is in hand; × = rest next
+  visit; No more tips sticks; More options has Show tips again / Turn tips
+  off. **One honest exception:** on a phone the card sits just above the
+  bar and, at 375 x 667, covers the drawing's middle — the drawing is 300
+  px tall and the card 182, so no spot avoids it. Laptop/tablet: never over
+  the middle (measured). `client/src/lib/planTips.test.ts` (15; guard shown
+  red). Touched tests on `bidrender_test_b`: 21 files, 269 passed.
+- **`bidrender_test_b` rebuilt** (drop, create utf8mb4_unicode_ci, 152
+  migrations, `scripts/seedBaseline.mts` — the Gate's own recipe):
+  `starterAssembliesSeed.test.ts` passes, twice in a row.
+- **Gate:** pending on this commit.
+- **Dev servers stopped.**
+- **Next:** step 5a/5b — closed-square tags + notes parser (the legend
+  plan's steps 3–4), timed on the largest sheet before running on open.
+
+## WHERE B STOOD — 2026-10-13, PLAN-READING HELP STEP 3 BUILT; PRICING CHIPS WRAP
 
 On `track-b` only. **NOT merged to local-dev** — live release in progress,
 and A applies BS-M3..M6 + F13-M1 before B merges. No migration.

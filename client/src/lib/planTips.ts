@@ -1,0 +1,190 @@
+/**
+ * TIPS THE FIRST TIME THE PLANS SCREEN OPENS
+ * (references/plan-reading-help-plan.md § 5; step 4 of § 7).
+ *
+ * Four tips, one at a time, each pointing at the control it is about. The
+ * rules live here rather than in the component because the suite can reach
+ * `client/src/lib` and not a React component (CLAUDE.md § "A rule with no red
+ * to go to is an instruction"):
+ *
+ * - `nextTip` — which tip, if any, comes next on this sheet. A tip whose
+ *   control is not on screen is SKIPPED, not marked seen: no notes sheet in
+ *   this set, a sheet-kind line that is hidden or says nothing here, nothing
+ *   tappable on the drawing. It can still show on a later sheet or bid.
+ * - `placeTip` — where the card goes: beside its control, inside the window,
+ *   and never over the middle of the drawing (§ 5: a tip over what the person
+ *   is about to tap has cost them a tap).
+ *
+ * Seen-state is per person, in this browser — a convenience, so browser
+ * storage (CLAUDE.md § Browser storage); a blocked store just shows the tips
+ * again. Tips tick nothing on the getting-started checklist (CLAUDE.md
+ * § Onboarding): they say nothing about what the person has set up.
+ */
+
+export const PLAN_TIP_IDS = [
+  "notesSheet",
+  "sheetKind",
+  "drawingTaps",
+  "lookUp",
+] as const;
+export type PlanTipId = (typeof PLAN_TIP_IDS)[number];
+
+export const PLAN_TIPS_KEY = "bidrender.plans.tipsSeen";
+
+/** What is stored: the tips already shown, and "No more tips". */
+export type TipsSeen = { seen: PlanTipId[]; off: boolean };
+
+export const NO_TIPS_SEEN: TipsSeen = { seen: [], off: false };
+
+/**
+ * Anything unreadable — nothing stored, a hand-edited value, a later build's
+ * shape — reads as nothing seen. The cost of being wrong that way is four
+ * tips shown once more; the other way, they never show.
+ */
+export function parseTipsSeen(raw: string | null | undefined): TipsSeen {
+  if (!raw) return NO_TIPS_SEEN;
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return NO_TIPS_SEEN;
+    const { seen, off } = value as { seen?: unknown; off?: unknown };
+    return {
+      seen: Array.isArray(seen)
+        ? PLAN_TIP_IDS.filter(id => seen.includes(id))
+        : [],
+      off: off === true,
+    };
+  } catch {
+    return NO_TIPS_SEEN;
+  }
+}
+
+/** What is on this sheet for a tip to point at. */
+export type TipSheetState = {
+  /** The set has a sheet `sheetKinds` calls notes and legend. */
+  hasNotesSheet: boolean;
+  /** The sheet-kind line is on screen for THIS sheet. */
+  sheetKindShown: boolean;
+  /** A keyed-note tag or detail link was found on this sheet (§ 6). */
+  tappable: boolean;
+};
+
+export function nextTip(
+  seen: TipsSeen,
+  sheet: TipSheetState
+): PlanTipId | null {
+  if (seen.off) return null;
+  const onScreen: Record<PlanTipId, boolean> = {
+    notesSheet: sheet.hasNotesSheet,
+    sheetKind: sheet.sheetKindShown,
+    drawingTaps: sheet.tappable,
+    lookUp: true,
+  };
+  return (
+    PLAN_TIP_IDS.find(id => !seen.seen.includes(id) && onScreen[id]) ?? null
+  );
+}
+
+/** "Next", or the card's close: this one is seen, the rest still come. */
+export function markTipSeen(seen: TipsSeen, id: PlanTipId): TipsSeen {
+  return seen.seen.includes(id) ? seen : { ...seen, seen: [...seen.seen, id] };
+}
+
+/** "No more tips". */
+export function turnTipsOff(seen: TipsSeen): TipsSeen {
+  return { ...seen, off: true };
+}
+
+/** More options' "Show tips again". */
+export function showTipsAgain(): TipsSeen {
+  return NO_TIPS_SEEN;
+}
+
+/** The tip text. Plain words; one sentence that says what to do. */
+export function tipText(
+  id: PlanTipId,
+  notesSheetLabel: string | null
+): { title: string; body: string } {
+  switch (id) {
+    case "notesSheet":
+      return {
+        title: "Start with the notes sheet",
+        body: `${notesSheetLabel ? `${notesSheetLabel} has` : "This set has"} the general notes and legend. Read it first — a note there can change what you count on every other sheet.`,
+      };
+    case "sheetKind":
+      return {
+        title: "What is this sheet?",
+        body: "This line says what kind of sheet you are on. Tap it for what to count here.",
+      };
+    case "drawingTaps":
+      return {
+        title: "Tap the drawing to read it",
+        body: "Tap a note number or a detail bubble on the drawing to read the note or go to the detail.",
+      };
+    case "lookUp":
+      return {
+        title: "Don't know a word?",
+        body: "Look it up in the Legend tab — WP, AFF, HR, or a symbol's name. This set's own legend answers first.",
+      };
+  }
+}
+
+export type Rect = { left: number; top: number; width: number; height: number };
+
+/**
+ * Where the card goes, in window pixels. Tries below, above, left of and
+ * right of the control, in that order, and takes the first spot that is
+ * inside the window AND does not cover the middle of the drawing. If none
+ * does, the first corner of the window that does not cover it either. Only a
+ * card as big as the window covers the middle from every corner; then it
+ * goes bottom-left, because there is nowhere else.
+ */
+export function placeTip(
+  anchor: Rect,
+  card: { width: number; height: number },
+  window: { width: number; height: number },
+  drawing: Rect | null,
+  gap = 8
+): { left: number; top: number } {
+  const centre = drawing
+    ? {
+        x: drawing.left + drawing.width / 2,
+        y: drawing.top + drawing.height / 2,
+      }
+    : null;
+  const midX = anchor.left + anchor.width / 2 - card.width / 2;
+  const midY = anchor.top + anchor.height / 2 - card.height / 2;
+  const clampX = (x: number) =>
+    Math.max(gap, Math.min(x, window.width - card.width - gap));
+  const clampY = (y: number) =>
+    Math.max(gap, Math.min(y, window.height - card.height - gap));
+  const spots = [
+    { left: clampX(midX), top: anchor.top + anchor.height + gap },
+    { left: clampX(midX), top: anchor.top - card.height - gap },
+    { left: anchor.left - card.width - gap, top: clampY(midY) },
+    { left: anchor.left + anchor.width + gap, top: clampY(midY) },
+  ];
+  const fits = (s: { left: number; top: number }) =>
+    s.left >= 0 &&
+    s.top >= 0 &&
+    s.left + card.width <= window.width &&
+    s.top + card.height <= window.height;
+  const coversCentre = (s: { left: number; top: number }) =>
+    centre !== null &&
+    centre.x >= s.left &&
+    centre.x <= s.left + card.width &&
+    centre.y >= s.top &&
+    centre.y <= s.top + card.height;
+  const right = Math.max(gap, window.width - card.width - gap);
+  const bottom = Math.max(gap, window.height - card.height - gap);
+  const corners = [
+    { left: gap, top: bottom },
+    { left: right, top: bottom },
+    { left: gap, top: gap },
+    { left: right, top: gap },
+  ];
+  return (
+    spots.find(s => fits(s) && !coversCentre(s)) ??
+    corners.find(s => !coversCentre(s)) ??
+    corners[0]
+  );
+}

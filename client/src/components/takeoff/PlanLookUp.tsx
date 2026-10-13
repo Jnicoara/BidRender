@@ -24,13 +24,15 @@ import {
   BookA,
   BookOpen,
   ChevronDown,
+  Lightbulb,
   MapPin,
   Search,
   Shapes,
   X,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useSheetKindLine } from "@/lib/planHelpPrefs";
+import { usePlanTipsSeen, useSheetKindLine } from "@/lib/planHelpPrefs";
+import { showTipsAgain, turnTipsOff } from "@/lib/planTips";
 import { SHEET_KIND_CARDS, type SheetKind } from "@shared/planHelp/sheetKind";
 import { SheetKindCardBody } from "./SheetKindLine";
 import { cn } from "@/lib/utils";
@@ -413,7 +415,8 @@ function AbbreviationCard({
 /**
  * The Legend tab's ONE fold (plan § 1): everything past the basic path —
  * the whole symbol guide, the whole abbreviation list, every sheet kind's
- * card, and the switch for the sheet-kind line (on by default); tips and
+ * card, and the switch for the sheet-kind line (its default depends on the
+ * screen — @/lib/planHelpPrefs); tips and
  * outlines land here as they are built (§ 7). Closed by default.
  */
 export function LegendMoreOptions(actions: SymbolActions) {
@@ -424,6 +427,7 @@ export function LegendMoreOptions(actions: SymbolActions) {
   /** The sheet kind opened to its card in the browse list. */
   const [openKind, setOpenKind] = useState<SheetKind | null>(null);
   const [sheetKindLine, setSheetKindLine] = useSheetKindLine();
+  const [tipsSeen, setTipsSeen] = usePlanTipsSeen();
   const sheetCards = useMemo(
     () => SHEET_KIND_CARDS.filter(c => c.trade === "electrical"),
     []
@@ -561,7 +565,8 @@ export function LegendMoreOptions(actions: SymbolActions) {
               ))}
             </ul>
           )}
-          {/* ON by default: the line is the basic path (plan § 1). */}
+          {/* Off by default on a phone and a sideways iPad, where the line
+              costs a toolbar row; on elsewhere (@/lib/planHelpPrefs). */}
           <label className="flex items-center gap-2 rounded px-1 min-h-9 text-xs cursor-pointer">
             <span className="flex-1">
               Say what each sheet is, beside its name
@@ -572,6 +577,29 @@ export function LegendMoreOptions(actions: SymbolActions) {
               aria-label="Say what each sheet is, beside its name"
             />
           </label>
+          {/* The first-open tips (plan § 5): back from the start, or never. */}
+          <div className="flex items-center gap-2 rounded px-1 min-h-9 text-xs">
+            <Lightbulb className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            <span className="flex-1">Tips</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 px-2 text-xs"
+              onClick={() => setTipsSeen(showTipsAgain())}
+            >
+              Show tips again
+            </Button>
+            {!tipsSeen.off && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-2 text-xs"
+                onClick={() => setTipsSeen(turnTipsOff(tipsSeen))}
+              >
+                Turn tips off
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>

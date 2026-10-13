@@ -83,6 +83,7 @@ export function SheetKindLine({
         "inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50",
         tablet && "order-last"
       )}
+      data-plan-tip="sheet-kind"
       title={`${lead.label} — what to do on this sheet`}
       aria-label={`${lead.label}: what to do on this sheet`}
     >
