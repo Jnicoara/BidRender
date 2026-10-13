@@ -1,5 +1,39 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-13 — Receptacles answers recorded; Switches name review; nothing applied
+
+**Receptacles, owner's answers** (review's "Owner's answers" section), for
+A's end-of-pricing job: **Q1–Q13 all yes, as suggested.**
+
+- Q5: two duplexes. DV11 takes 2 × `duplex-receptacle`; the quad rows
+  (816, 817) are hidden; "quad", "fourplex" and "4-plex" become search words
+  on the duplex rows.
+- Q9: countertop 20A TR duplex stainless; floor 15A TR duplex wood floor;
+  815 loses "countertop"/"island".
+- Q11: R3 (30A locking raised cover) for CS7/CS8, **after A checks** whether
+  the L5-20 (CS6) and 6-30R fit the single-receptacle cover.
+- Q12: R1, R2 and R3 are all added.
+- **Starter edits in that job:** DV3 (Q13), DV11 (Q5), RS13 (Q6), CS7 and CS8
+  (Q11).
+
+**`pricing/switches-name-review.md`** — rows 828–861, 34 rows. Workbook read
+from a fresh copy.
+
+- **Counts:** 5 OK, 27 need words, 1 owner pick (low-voltage momentary), 1
+  not a real product ("Weatherproof toggle switch" — it is a standard toggle
+  plus a lever cover).
+- **Could price wrong:** P1 "Dimmer" and "3-way dimmer" are one LED product
+  ($33), and a rotary ($17) does not fit DV5's plate; P2 timer switch $39
+  spring-wound vs $74–$110 programmable vs countdown (DV19); P3 the ceiling
+  sensor row names both kinds, DV30 prices the low-voltage one ($184 vs
+  $118); P4 toggle rows carry "rocker decora" search words (8 starters, all
+  toggle plates); P5 "commercial spec grade" on the 20A rows is two grades.
+- **Missing:** W1 decorator 15A single-pole and 3-way, W2 weatherproof toggle
+  switch cover, W3 20A double-pole switch.
+- **Owner questions:** Q1–Q11, each with a suggested answer.
+
+**Next shelf: Wall Plates & Misc (862–954).**
+
 ## (newest) 2026-10-13 — Underground + pack-scan answers recorded; Receptacles name review; nothing applied
 
 **Underground, owner's answers** (review's "Owner's answers" section), for

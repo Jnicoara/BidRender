@@ -227,3 +227,35 @@ Suggested: **yes**, change its part from `duplex-receptacle` to
   duplex rows first.
 - If a recount finds a starter using a receptacle row this review did not
   list, or a run type using any of rows 788–827, stop and find out why first.
+
+## Owner's answers — 2026-10-13
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter. **Every question, Q1–Q13, is
+YES as suggested.**
+
+| Q   | Answer                                                | What the job does                                                                                                                                                                                                                                                                                                  |
+| --- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q1  | **Names**                                             | Every "Needs words" row is renamed to the proposed name through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row. No receptacle name is built by the takeoff, so these are plain renames; starters name keys and need no edit.                                                         |
+| Q2  | **Yes: tamper-resistant on every 15A/20A 125V row**   | The proposed names already carry it (797, 798, 799 by Q2, 792, 793, 803, 804, 807, 808 by Q2, 823–827). WR rows need no word, because WR devices are TR.                                                                                                                                                           |
+| Q3  | **Yes**                                               | Duplex, single and quad rows say "standard". GFCI, AFCI, USB and surge rows get no face word.                                                                                                                                                                                                                      |
+| Q4  | **Commercial grade**                                  | 798 `20A duplex receptacle, standard, tamper-resistant, commercial grade`; 824 `20A single receptacle, tamper-resistant, commercial grade`. Spec grade (799) stays its own row.                                                                                                                                    |
+| Q5  | **Two duplexes**                                      | DV11 changes from one `quad-receptacle` to **two** `duplex-receptacle`, as DV22 does with 20A. 816 and 817 go into `RETIRED_BASELINE_MATERIALS` (hidden, never deleted). "quad", "fourplex" and "4-plex" become search words on the 15A and 20A duplex rows.                                                       |
+| Q6  | **Yes**                                               | Add R2 `50A receptacle, NEMA 14-50R, industrial grade (EV)` and point RS13 at it: the `50a-rv-receptacle` key in `starterParts.ts` moves to R2. RS1 (range) keeps 818.                                                                                                                                             |
+| Q7  | **Yes**                                               | 791, 795, 796 and 818 gain "flush".                                                                                                                                                                                                                                                                                |
+| Q8  | **Yes**                                               | 802 is retired (hidden). "floor receptacle assembly" becomes a search word on the floor box row (`Floor box, 1-gang, adjustable, nonmetallic`).                                                                                                                                                                    |
+| Q9  | **As suggested**                                      | 814 `Pop-up countertop receptacle, 20A TR duplex, stainless`; 815 `Pop-up floor receptacle, 15A TR duplex, wood floor`. Remove "countertop" and "island" from 815's search words in the same commit. USB and other finishes are not added.                                                                         |
+| Q10 | **Yes**                                               | 793 `20A duplex receptacle, half controlled, tamper-resistant`.                                                                                                                                                                                                                                                    |
+| Q11 | **Yes, after A checks the L5-20 and 6-30R cover fit** | Add R3 `4" square raised cover, 30A locking receptacle` (Raco 811C, 1.719") on the Boxes shelf and point CS7 and CS8 at it. **Check first** whether the L5-20 (CS6) and the 6-30R (208V kitchen equipment starter) fit the single-receptacle cover they use; move them to the cover that fits only if they do not. |
+| Q12 | **Yes: R1, R2 and R3 are all added**                  | R1 (15A and 20A decorator TR duplexes, `box of 10` / 10), R2 (Q6), R3 (Q11), with the search words in "Common items that are MISSING".                                                                                                                                                                             |
+| Q13 | **Yes**                                               | DV3 "Dedicated 20A receptacle" changes its part from `duplex-receptacle` to `20a-duplex-receptacle`.                                                                                                                                                                                                               |
+
+**Starter edits in this job:** DV3 (Q13), DV11 (Q5), RS13 (Q6), CS7 and CS8
+(Q11, plus CS6 or the 6-30R starter if the check says so). Bid lines already
+priced keep their snapshots; only new lines change.
+
+**Check before shipping.** Run `scripts/searchSpotCheck.mts` as listed in
+"For A". "quad" and "fourplex" must now surface the duplex rows, "ev" and
+"tesla" R2 ahead of 818, and "pop up floor" must not surface the countertop
+row first. If a recount finds a starter using 802, 816 or 817 that this
+review did not list, stop and find out why before retiring them.
