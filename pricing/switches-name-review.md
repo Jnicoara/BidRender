@@ -201,3 +201,33 @@ Suggested: **yes to both**; W2 comes with Q9.
   first.
 - If a recount finds a starter using a switch row this review did not list,
   or a run type using any of rows 828–861, stop and find out why first.
+
+## Owner's answers — 2026-10-13
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter. **Every question, Q1–Q11, is
+YES as suggested.**
+
+| Q   | Answer                           | What the job does                                                                                                                                                                                                                                                  |
+| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Q1  | **Names**                        | Every "Needs words" row is renamed to the proposed name through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row. No switch name is built by the takeoff, so these are plain renames; starters name keys and need no edit.             |
+| Q2  | **Yes**                          | Single-pole, 3-way, 4-way and illuminated rows say "toggle"; double and triple say "decorator". "rocker" and "decora" come off the toggle rows (`SWITCH_SLANG`) and go onto W1 only.                                                                               |
+| Q3  | **Yes: one dimmer row**          | 837 becomes `Dimmer, LED, single-pole/3-way, decorator`. 829 goes into `RETIRED_BASELINE_MATERIALS` (hidden, never deleted), and "3-way dimmer" stays a search word on 837. DV15's part moves from 829 to 837. Rotary or incandescent-only is a new row if wanted. |
+| Q4  | **Commercial grade**             | 831, 833, 855 say "commercial grade"; "commercial spec grade" leaves their search words. Spec or industrial is a new row if wanted.                                                                                                                                |
+| Q5  | **Yes: low voltage**             | 834 and 835 say "low voltage"; the description says only "needs a power pack per zone and 18/3 control wire". Line-voltage ceiling sensors are new rows if wanted.                                                                                                 |
+| Q6  | **Yes: digital countdown**       | 858 `Timer switch, digital countdown, decorator`; "spring wound" and "programmable" leave its search words. A 7-day programmable timer is a new row if wanted.                                                                                                     |
+| Q7  | **Yes: Wi-Fi, no hub, no brand** | 856 and 857 renamed as proposed; each description says "Needs a neutral in the box."                                                                                                                                                                               |
+| Q8  | **Yes: stem mount, 120–277V**    | 851 `Photocell, stem mount, 120–277V`. A button photocell is a new row if wanted.                                                                                                                                                                                  |
+| Q9  | **Yes**                          | 861 renamed to `Weatherproof toggle switch cover, single-gang` (this IS W2) and moved to Wall Plates & Misc, with "weatherproof toggle switch" kept as a search word. Used by nothing, so no starter changes.                                                      |
+| Q10 | **Yes: retire**                  | 846 goes into `RETIRED_BASELINE_MATERIALS` (hidden, never deleted). "low voltage switch" becomes a search word on 849.                                                                                                                                             |
+| Q11 | **Yes: add W1 and W3**           | W1 (15A single-pole and 3-way decorator, `box of 10` / 10) and W3 (20A double-pole, toggle, commercial grade) are added with the search words in "Common items that are MISSING". W2 comes with Q9.                                                                |
+
+**Starter edits in this job:** DV15 only (Q3). Bid lines already priced keep
+their snapshots; only new lines change.
+
+**Check before shipping.** Run `scripts/searchSpotCheck.mts` with the queries
+in "For A". "3 way dimmer" must surface 837, "decora" and "rocker" must
+surface W1 rather than a toggle row, and a plain "switch" must still surface
+the 15A single-pole first. If a recount finds a starter or run type using
+829, 846 or 861 that this review did not list, stop and find out why before
+retiring or moving them.
