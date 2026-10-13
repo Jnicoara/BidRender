@@ -6,7 +6,9 @@
 "What is this sheet?" cards, tips, keyed-note taps and detail links — no
 AI, **no migration needed to ship**. Two optional add-only drafts for A (H1
 `users.planTipsDoneAt`, H2 `bid_pdf_sheets.sheetKind`) only if the owner
-picks the account-side answers. Waits on the owner's 11 answers (§ 9). No
+picks the account-side answers. **Owner approved all 11 picks (2026-10-12)**
+— so no migration at all, H1/H2 not wanted; owner reviews the abbreviation
+and symbol lists before beta (Q5). Build waits for the live release. No
 code; nothing merged; the scope work below is unchanged.
 
 ## WHERE B STANDS — 2026-10-12 (last), SCOPE STEP 6a DONE; BASELINE GUARDS SHOWN RED

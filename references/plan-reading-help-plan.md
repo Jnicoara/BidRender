@@ -1,8 +1,8 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: PLAN ONLY.** No app code, no migration, nothing merged. Written on
-`track-b` while the live release waits; build starts when the owner answers
-§ 9.
+**Status: PLAN ONLY, ALL 11 ANSWERS IN (owner, 2026-10-12).** Every pick in
+§ 9 is approved. No app code, no migration, nothing merged. Build waits
+until the live release has gone; the owner says when.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
 without any AI: an abbreviation lookup (WP, AFF, EM, GFI, HR…), a symbol
@@ -331,6 +331,10 @@ AND on, since the Reader tab changes the panel's height.
 is recomputed from the stored title; note and detail findings are recomputed
 per sheet open; tips are browser storage.
 
+> **Owner, 2026-10-12: Q3 and Q4 went to the no-migration picks, so H1 and
+> H2 below are NOT wanted now.** Nothing for Track A to apply. The drafts are
+> kept only so that a later change of mind starts from them.
+
 **Two add-only drafts for Track A, ONLY if the owner picks the account-side
 answer in § 9 Q3 / Q4.** Both step 1 (additive, nullable, no default, old
 code ignores them):
@@ -355,6 +359,16 @@ compares the cron strings).
 Q7). Later, if asked.
 
 ## 9. Questions for the owner — my pick first
+
+> **ANSWERED, owner, 2026-10-12: all 11 picks approved as written.** So:
+> Look up in the Legend tab; detail link is a popover with "Go"; tips
+> remembered in this browser only; sheet kind shown from the title, nothing
+> saved; **Q5 — B drafts the abbreviation and symbol lists and the owner
+> reviews both before beta** (they do not ship unreviewed); no numbers in
+> "how it's usually bid"; a shop's own abbreviations later; outlines off by
+> default under More options; Demolition, Details, Site and Systems added;
+> existing users see the tips once; "Count these" starts a plain count.
+> No migration is needed for any of it (§ 8).
 
 1. Where does Look up live? **Pick: the Legend tab's top (no new tab)**; or a new Help tab.
 2. Detail link on tap: **Pick: a popover with "Go"**; or jump straight away.
