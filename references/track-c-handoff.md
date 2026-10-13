@@ -1,5 +1,16 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-12 — step-times DRAFT for the owner; nothing built
+
+`references/step-times-draft.md`: minutes for the 47 steps already in the
+app (two rounded up from the sheet's Draft: S16 8→10, S44 15→20), 62 NEW
+steps S48–S109, and step lists + totals for Track B's top 30 residential
+and top 30 commercial (30 of the 60 already have lists in the app). Every
+step says what it assumes; unsure ones are ⚑ and rounded up. No published
+table used. **Later, for C:** add S48–S109 and the 30 new lists to
+`server/seed/starterLaborSteps.ts` (all not set) once local-dev unfreezes;
+A rebuilds the sheet. The workbook was only read, from a copy.
+
 ## (newest) 2026-10-12 — pricing-safety PLAN written; nothing built, nothing merged
 
 `references/pricing-safety-plan.md` covers todo.md "Before beta: wrong
