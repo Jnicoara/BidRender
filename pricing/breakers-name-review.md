@@ -381,3 +381,20 @@ flex and lugs and MH11's #10 THHN and liquidtight are right at 480V. **If
 the recount at the job finds another starter that feeds a 480V part** (the
 other three transformers have no starters today), stop and add it to this
 list rather than moving it on its own.
+
+## Owner's answers, round 3 — 2026-10-14: the 480V proposal is YES
+
+**Yes to all of it: H1, H2 and H3 are added, PG16 moves to H2, and MH11
+moves to H1 and H3.** For A's end-of-pricing job. Nothing applied here.
+
+- **Before applying H3, A finds a real distributor price for the HU361**
+  (the owner's condition). The eBay range ($59.99–$120) is not a supply-house
+  price, and the NEMA 3R HU361RB ($190) is a different part. If no
+  distributor lists the HU361 itself, stop and ask rather than pricing H3
+  from eBay.
+- H1 and H2 keep their listing prices from round 2 (EDB34030 $265–$548.76,
+  EDB34070 $329–$359.99), checked again the same way as every other row.
+- The moves are part swaps in `server/seed/starterParts.ts`; neither starter
+  gains or loses a line (round 2, "The starter moves").
+- With this, every Breakers question is answered except Q9, which waits for
+  the brand-variants pass.

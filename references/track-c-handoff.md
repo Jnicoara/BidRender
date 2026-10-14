@@ -1,6 +1,68 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, late — Breakers round 2, Lighting answers, the pack-word list, Grounding & Bonding review
+## (newest) 2026-10-14, later — 480V YES, Grounding answers, A's three items confirmed, Life Safety review
+
+**Breakers, round 3** (`pricing/breakers-name-review.md` "Owner's answers,
+round 3"): **the 480V proposal is YES** — add H1 `30A 3-Pole bolt-on
+breaker, 480Y/277V`, H2 `70A 3-Pole bolt-on breaker, 480Y/277V`, H3 `30A
+non-fused disconnect, 3-pole, NEMA 1, 600V`; PG16 → H2; MH11 → H1 + H3.
+**Owner's condition: A finds a real distributor price for the HU361 (H3)
+before applying it** — not eBay, not the NEMA 3R HU361RB. If none is found,
+stop and ask. Nothing applied.
+
+**Grounding & Bonding: Q1–Q11 all YES as suggested** (review's "Owner's
+answers"). No starter edit; the review's "For A" is the job list.
+
+**A's three items for C (A's `boot-seed-plan.md` § 6, PS-M1..M6 and
+PH-M1) — C agrees with all three, two notes:**
+
+1. **`packQty` and `packLabel` = offer; `packPrice` and
+   `priceCheckAcceptedAt` = not-editable — AGREE.** Qty and label must move
+   together (a label without its qty states a wrong pack — the same
+   companion rule as the example tags), so both are offers. `packPrice` and
+   `priceCheckAcceptedAt` are company values the seed never carries; a fork
+   does not copy a dismissal. **Note 1:** `boot-seed-plan.md` still says
+   `packLabel` is "a finding field (stamped)" (§ 6 opening) and "everyone"
+   (§ 6 list); A updates both lines to "offer" so the plan says one thing.
+   **Note 2:** no `packQty` offer may be generated before § E's 380
+   word-guessed packs are relabelled (`pack-label-scan.md` § E), or every
+   company is offered the guessed packs — `Dishwasher whip` as a box of 100.
+2. **The 3 new material links exempt in `forkableReferences.test.ts` —
+   AGREE.** `material_price_history.materialKey` deliberately names the
+   shared item (`materialItemKey`), never a fork; `material_price_history.
+materialId` and `price_import_rows.materialId` record the row actually
+   written. C's plans called that resolver "the row itself", which is the
+   same thing as exempt. **Note:** the `why` should say "a record of the row
+   written — never re-point it", not "nothing reads it", because the
+   history screen will read these.
+3. **PH-M1 `unitOfSale` as `enum('each','foot','box')` from
+   `MATERIAL_UNITS_OF_SALE` — AGREE.** It is the option C offered; a unit
+   added in one place shows as schema drift. Pack wording ("100 ft coil")
+   is `packLabel`, never a unit. 0163 is C's SQL word for word, checked
+   against `price-history-plan.md` § 6.
+
+(Read from A's checkout `C:\dev\BidPhase`, which was mid-merge — 0157–0163
+staged, `CHANGELOG.md` conflicted. Read only; nothing there touched.)
+
+**`pricing/life-safety-name-review.md`** — rows 1327–1352, 26 rows, fresh
+workbook copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 9 OK, 12 need words, 5 owner picks. 14 rows used by starters;
+  no run type; every row `each` / 1, none on § E.
+- **Could price wrong:** P1 CS14 (commercial duct detector) buys the 120V
+  house-alarm relay and no sampling tube; P2 "smoke detector" finds both
+  the 120V alarm and the system head; P3 panels with no size ($438–$1,444
+  for a 5-zone conventional, $961–$979 for a 50-point addressable).
+- **Missing:** M1 duct detector sampling tube, M2 duct detector remote test
+  station, M3 magnetic door holder, M4 120V heat alarm.
+- **Owner questions:** Q1–Q13. **One starter edit proposed (Q12, waits for
+  a yes): CS14's relay → M1 sampling tube.** Q9 moves the exit combo to
+  Lighting Hardware.
+
+**Next shelf in app order: Low Voltage (from row 1353).**
+
+## 2026-10-14, late — Breakers round 2, Lighting answers, the pack-word list, Grounding & Bonding review
 
 **Breakers, round 2** (`pricing/breakers-name-review.md` "Owner's answers,
 round 2"), for A's end-of-pricing job, nothing applied: **the 22 bolt-on

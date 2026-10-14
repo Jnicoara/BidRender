@@ -195,3 +195,34 @@ with the panel", the same as the panel parts (Panels Q8).
   jumper" with the Service Entrance kit.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming or retiring it.
+
+## Owner's answers — 2026-10-14: Q1–Q11 all YES, as suggested
+
+For A's end-of-pricing job. Nothing applied here; no catalog row, seed or
+starter changed.
+
+1. **Q1 yes**: the missing words go in the NAMES, each old name kept as a
+   search word on its row.
+2. **Q2 yes**: rods 1315–1317 say `copper-bonded`; "galvanized" leaves
+   1315's search words (S1).
+3. **Q3 yes**: 1326 becomes `Pipe bonding clamp, bronze, 1/2"-1"` with
+   "water pipe", "gas pipe" and "csst" as search words; 1311 retires into it
+   (`RETIRED_BASELINE_MATERIALS`, its name a search word on 1326).
+4. **Q4 yes**: `Ground rod coupling, 5/8", compression` and `Ground rod
+driving stud, 5/8"` with the description "For threaded sectional rods."
+5. **Q5 yes**: `Exothermic weld mold, #2 solid to 5/8" rod`, `Exothermic
+weld powder, #90`, and M1 (the mold handle clamp) is added.
+6. **Q6 yes**: `Ground plate electrode, copper, 12" x 24" (2 sq ft)`.
+7. **Q7 yes**: `Lay-in ground lug, #14-#4`.
+8. **Q8 yes**: `Bonding jumper` becomes a water-heater bonding jumper kit,
+   named from one listing A checks; "main" leaves its search words (S2).
+9. **Q9 yes**: the rebar clamp names its rebar size, from one listing A
+   checks.
+10. **Q10 yes**: 1311, 1318, 1319, 1325 and 1326 become `each` / 1 in the
+    pack pass; the staple and screw stay boxes. (1311 retires under Q3, so
+    its pack only matters if it is ever un-retired.)
+11. **Q11 yes**: the ground bar kit gets "Fits the panel's own family (QO,
+    Homeline, …) — order with the panel".
+
+**Starter edits: none** — the rod and clamp starters follow their renamed
+rows by key. "For A, when the answers come back" above is the job list.
