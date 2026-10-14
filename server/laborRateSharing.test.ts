@@ -12,7 +12,7 @@
  * Fixture ids are distinct from every other suite — vitest runs files in
  * parallel and shared ids delete each other's rows mid-run.
  */
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import {
@@ -94,12 +94,42 @@ beforeAll(async () => {
  *
  * Written straight to the baseline rows rather than through the router, because
  * going through the router would FORK them and destroy the very setup under
- * test. Safe to leave behind: every suite that seeds labor rates re-stamps them
- * back to $0, so this cannot leak a rate into another file's expectations.
+ * test.
+ *
+ * This said "safe to leave behind: every suite that seeds labor rates
+ * re-stamps them back" until 2026-10-13. Since then a start never re-stamps a
+ * shipped rate (references/boot-seed-plan.md), and leaving them behind broke
+ * exampleTagsFlow and onboarding in the next files of the same run. So the
+ * originals are kept here and put back after the file.
  */
+const originalRates: Array<{ id: number; hourlyCost: string }> = [];
+
+afterAll(async () => {
+  if (!hasDb) return;
+  const db = await getDb();
+  if (!db) return;
+  for (const r of originalRates)
+    await db
+      .update(laborRates)
+      .set({ hourlyCost: r.hourlyCost })
+      .where(eq(laborRates.id, r.id));
+});
+
 async function rateTheStarters() {
   const db = await getDb();
   if (!db) return;
+  if (originalRates.length === 0)
+    originalRates.push(
+      ...(await db
+        .select({ id: laborRates.id, hourlyCost: laborRates.hourlyCost })
+        .from(laborRates)
+        .where(
+          and(
+            isNull(laborRates.userId),
+            inArray(laborRates.name, ["Journeyman", "Apprentice"])
+          )
+        ))
+    );
   for (const [name, hourlyCost] of [
     ["Journeyman", "38.0000"],
     ["Apprentice", "22.0000"],

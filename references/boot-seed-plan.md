@@ -269,8 +269,9 @@ finding-field writes use 0152, already in the release.
 2. **Before the push:** `bidTotals.mts` and `starterRowsCheck.mts` on live
    (read-only) — the "before" half.
 3. **First boot:** read the `[seed] starter:` line in DigitalOcean's runtime
-   log. Expect **inserted 0, finding fields 0, proposed 0, held 0, live ahead
-   0**. Anything else: stop and find out why before going on.
+   log. As built it reads `[seed] starter: finding fields applied 0; proposed
+0 (not applied), held 0, live ahead 0` (no "inserted" count — § 8). Expect
+   all four **0**. Anything else: stop and find out why before going on.
 4. **After:** `starterDrift.mts` on live (read-only) → 0; `bidTotals` and
    `starterRowsCheck` unchanged; `/api/version` commit.
 5. **Rollback warning, written into the release record:** once ANY starter
@@ -330,3 +331,110 @@ in one release, migrations first.
 2. Same behaviour on every database (local, test, staging, live), no automatic re-stamp anywhere? — Yes: one path, so staging rehearses what live does.
 3. Should the boot log search-word / shelf changes it still applies by itself? — Yes: one `seed` batch when something changed, none when nothing did, so undo and "what changed" cover them.
 4. Before rolling back past this change, check drift first (§ 5.5)? — Yes, written into `deploying.md`.
+
+### Owner's answers — 2026-10-13: all four YES, as suggested
+
+1. **Q1 YES.** The remaining pricing-sheet seed edits reach live through the
+   OLD automatic re-stamp BEFORE this change goes live. **This change ships
+   in the release AFTER the end-of-pricing load** — so it must not reach
+   `main` in the same push as those seed edits. § 5 applies to that later
+   release.
+2. **Q2 YES.** One behaviour on every database; no automatic re-stamp
+   anywhere.
+3. **Q3 YES.** Finding-field writes the boot still makes are logged as one
+   `seed` batch (none when nothing changed).
+4. **Q4 YES.** Drift is checked before and after any rollback past this
+   change (`deploying.md`).
+
+---
+
+## 8. BUILT on local-dev — 2026-10-13 (session 40, Track A)
+
+**Not pushed** (waits for B's merge, owner). **Reaches live one release AFTER
+the end-of-pricing load** (Q1) — it must not ride the same push as those seed
+edits.
+
+### What changed
+
+- `server/db.ts`: the start passes now only INSERT. Removed on existing shared
+  rows: `renameBaselineMaterials`, `retireBaselineMaterials`, the
+  `backfillMaterialMetadata` re-stamp (now `stampMaterialTrade`, `trade`
+  only), `backfillLaborRateAmounts`, the assembly role / whip / project-type /
+  hours / laborOnly / Mounts-at passes, the run-type NULL-link repair,
+  `swapBaselineRunTypeMaterials`, `retireBaselineRunTypes`, extras on an
+  existing type, and every labor-step write except inserting a missing
+  library step. Kept: dedupe, reactivate, all inserts. New:
+  `namesTheStarterAlreadyHas` (§ 3.3a pending rename + § 3.3b logged rename
+  count as present), `latestLoggedChanges`, `shippedMaterialIdsByName` (the
+  seed's new name resolves to the old row while a rename is pending), and a
+  new starter's step list / overhead / cleared hours written AT INSERT.
+- `server/seedShippedLibrary.ts`: the step library now seeds with the first
+  group (before assemblies); at the end, one `seedProposal()`, the finding
+  fields applied as ONE logged `seed` batch under a seed lock (Q3), and the
+  one log line.
+- `server/seedProposal.ts` (new): the diff, per field by `starterFieldKind`.
+  `findingFields` / `changes` / `held` / `liveAhead`. Held, besides the no-door
+  cases: a number whose Example tag would change with it (C cannot write the
+  tag yet), a unit change, and a seed 0 on an above-zero field.
+- `scripts/starterDrift.mts` (new): read; `--apply --note` = one batch.
+- Docs: CLAUDE.md § "Where a priced catalog lands" and the rename/retire
+  paragraph (dated overrides, old text kept); `deploying.md` § 4a + § 5b
+  (the confirmed step; rollback drift check, Q4); `baseline-screen-plan.md`
+  § 6; `starterChanges.ts` header (its "do not call before the boot change"
+  warning is now history).
+
+**Differs from §§ 3–5 above, said here:** the log line has no "inserted"
+count (each seeder inserts in its own lock; counting would need a return
+value from all six) — § 5 step 3 now quotes the real line. `starterRowsCheck.mts`
+was not written: the shared-row comparison was done by a whole-table compare
+(below) — write it before the release rehearsal if wanted. The repair
+scripts in § 3.5 are untouched (not needed unless run again).
+
+### Proof
+
+- **Tests red on the old code** — `server/bootLeavesStarterNumbers.test.ts`
+  run in a worktree of `c7865547` (old start passes, new read-only helpers
+  appended): **T1, T2, the seven T3 writers, T4, T5 — 11 of 11 red**, each on
+  its "a start wrote it" assertion (e.g. T1 "a start wrote the seed price
+  back: expected 2 to be 4.25"; T4 "the old name came back"). T7 and T10 also
+  red there (no logged batch / nothing to propose). All 17 green on the new
+  code.
+- **Old tests that pinned the re-stamp, rewritten with their history in the
+  text (12 tests in 9 files):** `seedPreservesUserPrices` (1),
+  `catalogReviewSeed` (3), `sch80And500Seed` (1 — now also the § 3.3a "no
+  second row" check, T9), `seedNameCase` (1), `seedReactivatesRetired` (2),
+  `materialsLibrary` (2), `deviceMountKind` (1), `exampleTagsFlow` (1),
+  `laborOnly` (1). Plus one LEAK: `laborRateSharing` wrote $38 / $22 onto the
+  shipped Journeyman / Apprentice rows and said "safe to leave behind: every
+  suite that seeds labor rates re-stamps them" — now false, and it turned
+  four `onboarding` and two more `exampleTagsFlow` tests red later in the same
+  run. It puts the rates back after the file now. Every test that moves a
+  shared row puts it back itself, because no start will. The first full run
+  on the new code was 11 failed / 6,973 passed / 6 skipped, 420 files (all
+  these). After the fixes the 7 affected files ran 115/115 green with drift 0. **A second FULL run was stopped by Claude Code at 48 of 420 files for
+  low machine memory** (0 failures to that point; not restarted without the
+  owner asking, since memory may still be short) — so the full suite after the
+  fixes is NOT measured here. The Gate run after the push is that check.
+- **Fresh database, old vs new:** two empty DBs migrated to 157,
+  `seedBaseline.mts` with old code in one and new in the other — **all 12
+  starter tables IDENTICAL** (1,717 materials, 6 rates, 5 modifiers, 224
+  assemblies, 24 run types, 47 steps, 3 kits, 1,184 recipe lines, 1 modifier
+  link, 10 kit links, 18 extras, 194 step-list lines). New code's line: 0 / 0
+  / 0 / 0.
+- **Totals on a copy** (`bidrender_scratch_boot_copy`, copy of
+  `bidrender_local`, 84/84 tables): `bidTotals` with the OLD code, then two
+  new-code starts (0 / 0 / 0 / 0 each), then `bidTotals` with the new code:
+  **all 4,386 bids: totalDue, not-priced and incomplete unchanged.** Every
+  library table, shared AND company rows (11,577 materials, 3,027
+  assemblies, …), identical to the untouched source.
+- **The fault, shown on that copy (§ 4.3 step 3):** a logged change "#14 THHN
+  solid Copper" $0 → $1.11 (67 pins). Two new-code starts: still $1.11,
+  "live ahead 1". One old-code start: back to $0.0000, no log.
+- `starterDrift.mts`: `bidrender_local` 0 / 0 / 0 / 0; `bidrender_test_localdev`
+  0 / 0 / 0 / 0 after every run (two drifted rows and the old-code run's
+  duplicates repaired by hand on that test DB, ids kept).
+
+### Scratch left for the owner to drop
+
+DBs `bidrender_scratch_fresh_old`, `bidrender_scratch_fresh_new`,
+`bidrender_scratch_boot_copy`. Worktree removed.

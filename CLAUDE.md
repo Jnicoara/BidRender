@@ -903,6 +903,25 @@ material instead, or the test is really asserting the seed data has not changed.
 
 ## Where a priced catalog lands: THE SEED FILES, AND NOTHING ELSE
 
+> **Narrowed 2026-10-13 by the boot seed change (owner, answers Q1–Q4 in
+> `references/boot-seed-plan.md`).** The seed files still AUTHOR the starter,
+> and a brand-new database still gets every seed value on its first start. But
+> a server start **no longer re-stamps an EXISTING shared row's numbers or
+> names** — the first and third bullets below stopped being true on local-dev
+> that day. A seed number that differs from a shared row is now a PROPOSAL
+> (`server/seedProposal.ts`): `pnpm tsx scripts/starterDrift.mts` lists it, and
+> `--apply --note "…"` sends it through `applyStarterChange` as one logged
+> `seed` batch, pinning every company without its own copy first so no
+> existing company's numbers move (`baseline-screen-plan.md` § 0, § 2). Only
+> finding fields (search words, shelf, description, Specialty, project-type
+> tag) are still applied by a start, as one logged `seed` batch. Why: the
+> re-stamp changed what every unforked company read on each deploy, and wrote
+> the seed back over any change logged through `applyStarterChange`
+> (`baseline-screen-plan.md` § 9 F2–F6). **On live this lands one release
+> AFTER the end-of-pricing load** (owner Q1), so until that release live still
+> re-stamps. Guard: `server/bootLeavesStarterNumbers.test.ts`. The text below
+> is the 2026-09-21 decision as written.
+
 **Decided 2026-09-21.** `server/seed/materials/*.ts` is the source of truth for
 every shipped price. When the pricing spreadsheet is finished, the numbers go
 **into those files**, not into a database.
@@ -1089,6 +1108,15 @@ never touched (`server/seedReactivatesRetired.test.ts`). `pnpm tsx
 scripts/dropOrphanBaselines.mts` reports rows that fell out of the catalog
 without going through either list; `pnpm tsx scripts/categoryAudit.mts` prints
 the curated shelves with their counts.
+
+> **Since 2026-10-13 a start does not apply either list on an EXISTING
+> database** (`references/boot-seed-plan.md`). A rename in
+> `RENAMED_BASELINE_MATERIALS` is PROPOSED (a name is an offer, Q17) and
+> applied by `scripts/starterDrift.mts --apply`; until then the old row keeps
+> its old name and the seed's new name resolves to it, so nothing is inserted
+> twice. A name in `RETIRED_BASELINE_MATERIALS` is HELD — a retire is a hide,
+> and `hideStarterItem` is not built yet. Both lists still work as before on a
+> brand-new database, and the un-retire still runs on every start.
 
 **Sort order is by category, then by size — never alphabetically.** AWG runs
 backwards (18 is thinner than 1), then inverts again at 1/0, then becomes kcmil.

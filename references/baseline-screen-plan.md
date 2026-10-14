@@ -294,6 +294,12 @@ new, and the version it produced. Pins are recorded per change too
 
 - **On LIVE, the shared rows are the starter.** New companies read them
   directly.
+- **BUILT on local-dev 2026-10-13 (Track A) — `references/boot-seed-plan.md`.**
+  It takes the "cleaner option" below with one change: the gate is NOT "a
+  database that has a `starter_changes` log" (live's log is empty, so live
+  would have kept re-stamping) — it is every database, always (owner Q2).
+  Finding fields are applied by the start as one logged `seed` batch (Q3).
+  Reaches live one release after the end-of-pricing load (Q1).
 - **The boot stops writing number fields to shared rows on its own.** Today
   it re-stamps them every start (F2–F6). Instead, a seed value that differs
   from live goes through `applyStarterChange` with source `seed`: pin, change,

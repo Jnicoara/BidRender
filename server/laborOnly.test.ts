@@ -36,6 +36,7 @@ import {
   type PartsLineLike,
 } from "../shared/lineNotPriced";
 import type { BaselineAssembly } from "./seed/assemblyRecipe";
+import { seedProposal } from "./seedProposal";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
@@ -253,10 +254,29 @@ describe.skipIf(!hasDb)("ticking, freezing and the bid", () => {
           inArray(assemblies.name, [SEED_PROBE, SEED_PROBE_UNSAID])
         )
       );
+    // A NEW starter is inserted ticked.
     expect(rows.find(r => r.name === SEED_PROBE)!.laborOnly).toBe(true);
-    expect(rows.find(r => r.name === SEED_PROBE_UNSAID)!.laborOnly).toBe(true);
+    // An EXISTING one that said nothing: until 2026-10-13 a start ticked it.
+    // "Labor only" decides whether a line is priced, so a start now only
+    // PROPOSES it (references/boot-seed-plan.md B13).
+    const unsaid = rows.find(r => r.name === SEED_PROBE_UNSAID)!;
+    expect(unsaid.laborOnly, "a start ticked an existing starter").toBeNull();
+    const [unsaidRow] = await db
+      .select({ id: assemblies.id })
+      .from(assemblies)
+      .where(
+        and(isNull(assemblies.userId), eq(assemblies.name, SEED_PROBE_UNSAID))
+      );
+    const proposesTick = async () =>
+      (
+        await seedProposal({ assemblies: [probe(SEED_PROBE_UNSAID)] })
+      ).changes.some(
+        c => c.rowId === unsaidRow.id && "field" in c && c.field === "laborOnly"
+      );
+    expect(await proposesTick()).toBe(true);
 
-    // Somebody's "no" is kept: an unticked shared row is never re-ticked.
+    // Somebody's "no" is kept: an unticked shared row is never re-ticked,
+    // and never offered either.
     await db
       .update(assemblies)
       .set({ laborOnly: false })
@@ -271,5 +291,6 @@ describe.skipIf(!hasDb)("ticking, freezing and the bid", () => {
         and(isNull(assemblies.userId), eq(assemblies.name, SEED_PROBE_UNSAID))
       );
     expect(kept.laborOnly).toBe(false);
+    expect(await proposesTick()).toBe(false);
   });
 });

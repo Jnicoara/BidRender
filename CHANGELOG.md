@@ -17,6 +17,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-13]
 
+- **Restarting or updating the app no longer changes the shipped starter
+  library by itself.** Until now every server start copied prices, hours,
+  labor rates and run-type parts from the built-in starter files over the
+  shared starter, which changed what every company still using those values
+  saw on each update, and would have quietly undone any recorded starter
+  change. Now a start only adds new starter items and refreshes search words
+  and shelves (recorded). Any other difference is listed for the owner to
+  approve, and approving it keeps every existing company on its old values.
+  A brand-new database still gets the full starter. On the live site this
+  arrives one release after the final pricing load.
+
 - **A sheet's numbered notes, read for you, with no AI.** Under the Legend
   tab's More options, "Notes on this sheet" lists every numbered note the
   sheet prints (WORK NOTES, KEYED NOTES, GENERAL NOTES…) with its lines

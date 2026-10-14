@@ -4,7 +4,25 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-13, session 39: 0152–0156 on local-dev + STAGING (not live)
+## NOW — 2026-10-13, session 40: BOOT SEED CHANGE built on local-dev, NOT pushed
+
+- Owner answered `boot-seed-plan.md` Q1–Q4 all YES. **Q1: this ships in the
+  release AFTER the end-of-pricing load** — never in the same push as those
+  seed edits.
+- Built per the plan; full record `boot-seed-plan.md` § 8. A start now only
+  inserts; finding fields go as one logged `seed` batch; everything else is
+  proposed (`server/seedProposal.ts`, `scripts/starterDrift.mts`).
+- Proof: T1–T5 11/11 red on old code, 17/17 green new; fresh DB old vs new
+  identical (12 tables); copy of local 4,386/4,386 totals unchanged; fault
+  shown on the copy ($1.11 kept by new, reverted by old).
+- **Waiting:** owner says B's merge has landed → pull, re-run changed tests,
+  push local-dev + staging, check Gate incl. smoke.
+- Scratch DBs for the owner to drop: `bidrender_scratch_fresh_old`,
+  `bidrender_scratch_fresh_new`, `bidrender_scratch_boot_copy`.
+- For C: `applyStarterChange` needs a "companion" rule for the Example tags
+  (held today); hide / extras / steps proposals are HELD until C's doors.
+
+## (earlier) 2026-10-13, session 39: 0152–0156 on local-dev + STAGING (not live)
 
 - **Migrations** (all additive, step 1, step 3 empty; C's SQL word for
   word): 0152 change log (BS-M3), 0153 pins (BS-M4), 0154

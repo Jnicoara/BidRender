@@ -6,18 +6,20 @@
  * row that was there BEFORE the new seed — which a fresh catalog, the only
  * thing the pure tests can see, never has:
  *
- *   1. the Specialty tag (0140) lands on the shipped row, is re-stamped on
- *      every start, and never reaches a company's copy — not by the seed,
- *      and not by forking a tagged row;
+ *   1. the Specialty tag (0140) lands on the shipped row, comes back as a
+ *      logged `seed` change if cleared, and never reaches a company's copy —
+ *      not by the seed, and not by forking a tagged row;
  *   2. a shipped run type still linking #12 bare copper as its ground is
- *      moved to #12 THHN green, while a company's own copy is left alone;
- *   3. the shipped 3-1/2" underground type is ARCHIVED, not deleted, and a
- *      second start changes nothing.
+ *      PROPOSED for #12 THHN green (until 2026-10-13 a start moved it), while
+ *      a company's own copy is left alone;
+ *   3. the shipped 3-1/2" underground type is HELD for a hide (until
+ *      2026-10-13 a start archived it), and a second start changes nothing.
  *
  * Fixture ids are this file's own (7510-7511).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
+import { applySeedFindingFields, seedProposal } from "./seedProposal";
 import {
   BASELINE_MATERIALS_SEED_LOCK,
   forkMaterial,
@@ -26,7 +28,12 @@ import {
   seedBaselineRunTypes,
   withSeedLock,
 } from "./db";
-import { materials, takeoffRunTypes, users } from "../drizzle/schema";
+import {
+  materials,
+  starterChanges,
+  takeoffRunTypes,
+  users,
+} from "../drizzle/schema";
 import {
   BASELINE_MATERIALS,
   RETIRED_BASELINE_MATERIALS,
@@ -131,8 +138,19 @@ afterAll(async () => {
 });
 dropFixtureUsersAfterAll([COMPANY]);
 
+/*
+  ── Rewritten 2026-10-13 for the boot seed change ─────────────────────────────
+  Until then a server start re-stamped the tag, moved the ground and archived
+  the type ITSELF, and these tests proved it did. A start no longer changes an
+  existing shared row's numbers, links or visibility
+  (references/boot-seed-plan.md): the tag is a finding field the start applies
+  as a logged `seed` batch (owner Q3); the ground move is PROPOSED; the
+  archive is HELD until hideStarterItem exists. Each test below says which,
+  and puts back by hand whatever it moved, because no start will.
+*/
+
 withDb("the Specialty tag on a database (0140)", () => {
-  it("is on the shipped row, and re-stamped if anything clears it", async () => {
+  it("is on the shipped row, and a cleared tag comes back as a LOGGED seed change", async () => {
     const busway = await shipped("Busway");
     expect(busway.isSpecialty).toBe(true);
     expect((await shipped('4" canless wafer LED downlight')).isSpecialty).toBe(
@@ -145,7 +163,26 @@ withDb("the Specialty tag on a database (0140)", () => {
       .set({ isSpecialty: null })
       .where(eq(materials.id, busway.id));
     await seed();
+    // The material pass itself no longer stamps it...
+    expect((await shipped("Busway")).isSpecialty).toBe(null);
+    // ...the start's finding-field batch does, logged.
+    const proposal = await seedProposal({ materials: BASELINE_MATERIALS });
+    const result = await applySeedFindingFields(proposal);
+    expect(result).not.toBeNull();
     expect((await shipped("Busway")).isSpecialty).toBe(true);
+    const [logged] = await db
+      .select()
+      .from(starterChanges)
+      .where(
+        and(
+          eq(starterChanges.targetTable, "materials"),
+          eq(starterChanges.targetRowId, busway.id),
+          eq(starterChanges.field, "isSpecialty")
+        )
+      )
+      .orderBy(desc(starterChanges.id))
+      .limit(1);
+    expect(logged?.newValue).toEqual({ v: true });
   });
 
   it("never reaches a company's copy: a fork of a tagged row is everyday", async () => {
@@ -160,6 +197,7 @@ withDb("the Specialty tag on a database (0140)", () => {
     expect(fork.isSpecialty, "the fork copied the tag").toBe(null);
 
     await seed();
+    await applySeedFindingFields(await seedProposal());
     const [after] = await db
       .select()
       .from(materials)
@@ -171,7 +209,7 @@ withDb("the Specialty tag on a database (0140)", () => {
 withDb(
   "the #12 + ground run types on a database that predates the review",
   () => {
-    it("move a shipped type's #12 bare ground to #12 THHN green, and leave a company's copy alone", async () => {
+    it("a start leaves a shipped type's #12 bare ground PROPOSED, never moved, and leaves a company's copy alone", async () => {
       const db = (await getDb())!;
       const bareId = await oldBareRow();
       const green = await shipped(GREEN);
@@ -199,35 +237,57 @@ withDb(
         groundCount: 1,
       });
 
-      await seedBaselineRunTypes();
+      try {
+        await seedBaselineRunTypes();
+        const [stayed] = await db
+          .select({ ground: takeoffRunTypes.groundMaterialId })
+          .from(takeoffRunTypes)
+          .where(eq(takeoffRunTypes.id, type.id));
+        expect(stayed.ground, "the start moved a shipped link").toBe(bareId);
 
-      const [moved] = await db
-        .select({ ground: takeoffRunTypes.groundMaterialId })
-        .from(takeoffRunTypes)
-        .where(eq(takeoffRunTypes.id, type.id));
-      expect(moved.ground).toBe(green.id);
-      const [kept] = await db
-        .select({ ground: takeoffRunTypes.groundMaterialId })
-        .from(takeoffRunTypes)
-        .where(eq(takeoffRunTypes.id, own.insertId));
-      expect(kept.ground, "a company's own type was re-pointed").toBe(bareId);
+        const proposal = await seedProposal();
+        expect(proposal.changes).toContainEqual({
+          table: "runTypes",
+          rowId: type.id,
+          kind: "field",
+          field: "groundMaterialId",
+          newValue: green.id,
+        });
+        const [kept] = await db
+          .select({ ground: takeoffRunTypes.groundMaterialId })
+          .from(takeoffRunTypes)
+          .where(eq(takeoffRunTypes.id, own.insertId));
+        expect(kept.ground, "a company's own type was re-pointed").toBe(bareId);
 
-      // And the bare row itself is retired, not deleted: still there, by id.
-      await seed();
-      const [bare] = await db
-        .select({ isActive: materials.isActive })
-        .from(materials)
-        .where(eq(materials.id, bareId));
-      expect(bare?.isActive).toBe(false);
+        // The bare row's retirement is a hide: held, and still there by id.
+        await seed();
+        const [bare] = await db
+          .select({ isActive: materials.isActive })
+          .from(materials)
+          .where(eq(materials.id, bareId));
+        expect(bare?.isActive).toBe(true);
+        if (INSERTED.material !== undefined)
+          expect(
+            (await seedProposal()).held.some(h =>
+              h.row.startsWith(`material #${bareId} `)
+            )
+          ).toBe(true);
+      } finally {
+        // No start will put it back now, so the test does.
+        await db
+          .update(takeoffRunTypes)
+          .set({ groundMaterialId: type.groundMaterialId })
+          .where(eq(takeoffRunTypes.id, type.id));
+      }
     });
   }
 );
 
 withDb('the 3-1/2" underground run type on a database that has it', () => {
-  it("is archived, never deleted, and a second start changes nothing", async () => {
+  it("is HELD for a hide, never archived by a start, and a second start changes nothing", async () => {
     const db = (await getDb())!;
     const existing = await db
-      .select({ id: takeoffRunTypes.id })
+      .select()
       .from(takeoffRunTypes)
       .where(
         and(
@@ -251,35 +311,35 @@ withDb('the 3-1/2" underground run type on a database that has it', () => {
       .set({ status: "active", archivedAt: null })
       .where(eq(takeoffRunTypes.id, id));
 
-    await seedBaselineRunTypes();
-    const [first] = await db
-      .select()
-      .from(takeoffRunTypes)
-      .where(eq(takeoffRunTypes.id, id));
-    expect(first?.status).toBe("archived");
-    expect(first?.archivedAt).not.toBeNull();
-
-    await seedBaselineRunTypes();
-    const [second] = await db
-      .select()
-      .from(takeoffRunTypes)
-      .where(eq(takeoffRunTypes.id, id));
-    expect(second).toEqual(first);
-
-    // The other underground types stay active.
-    const active = await db
-      .select({ label: takeoffRunTypes.label })
-      .from(takeoffRunTypes)
-      .where(
-        and(
-          isNull(takeoffRunTypes.userId),
-          eq(takeoffRunTypes.status, "active"),
-          inArray(takeoffRunTypes.label, [
-            undergroundRunTypeLabel('3"', "PVC Sch 40"),
-            undergroundRunTypeLabel('4"', "PVC Sch 40"),
-          ])
+    try {
+      await seedBaselineRunTypes();
+      const [first] = await db
+        .select()
+        .from(takeoffRunTypes)
+        .where(eq(takeoffRunTypes.id, id));
+      expect(first?.status).toBe("active");
+      expect(
+        (await seedProposal()).held.some(
+          h => h.row.startsWith(`run type #${id} `) && /retire/.test(h.what)
         )
-      );
-    expect(active).toHaveLength(2);
+      ).toBe(true);
+
+      await seedBaselineRunTypes();
+      const [second] = await db
+        .select()
+        .from(takeoffRunTypes)
+        .where(eq(takeoffRunTypes.id, id));
+      expect(second).toEqual(first);
+    } finally {
+      // Back to how the database held it before this test.
+      if (existing[0])
+        await db
+          .update(takeoffRunTypes)
+          .set({
+            status: existing[0].status,
+            archivedAt: existing[0].archivedAt,
+          })
+          .where(eq(takeoffRunTypes.id, id));
+    }
   });
 });

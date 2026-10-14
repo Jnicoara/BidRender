@@ -23,6 +23,7 @@ import {
 } from "./db";
 import { materials, users } from "../drizzle/schema";
 import { BASELINE_MATERIALS } from "./seed/baselineMaterials";
+import { applySeedFindingFields, seedProposal } from "./seedProposal";
 
 const USER = 4242;
 const OTHER_USER = 9999;
@@ -197,6 +198,8 @@ describe.skipIf(!hasDb)("material categories", () => {
     expect(baselines.every(r => r.category !== null)).toBe(true);
   });
 
+  // A shelf is a finding field: since 2026-10-13 the start's logged `seed`
+  // batch re-stamps it, not the material pass (references/boot-seed-plan.md).
   it("re-stamps a baseline row whose category was lost, so the seed file stays the authority", async () => {
     const db = await getDb();
     const before = await getLibraryMaterials(USER);
@@ -209,6 +212,7 @@ describe.skipIf(!hasDb)("material categories", () => {
       .set({ category: null })
       .where(eq(materials.id, target.id));
     await seedBaselineMaterials();
+    await applySeedFindingFields(await seedProposal());
 
     const after = await getMaterialById(target.id, USER);
     expect(after?.category).toBe("Conduit Fittings");
@@ -335,6 +339,8 @@ describe.skipIf(!hasDb)("material search aliases", () => {
       .set({ searchAliases: null })
       .where(eq(materials.id, target.id));
     await seedBaselineMaterials();
+    // Finding field: the start's logged `seed` batch puts it back (Q3).
+    await applySeedFindingFields(await seedProposal());
 
     const after = await getMaterialById(target.id, USER);
     expect(after?.searchAliases).toContain("1900");

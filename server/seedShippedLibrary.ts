@@ -6,7 +6,13 @@ import {
   seedBaselineModifiers,
   seedBaselineRunTypes,
   seedStarterLaborSteps,
+  withSeedLock,
 } from "./db";
+import {
+  applySeedFindingFields,
+  seedProposal,
+  seedProposalSummary,
+} from "./seedProposal";
 
 /**
  * Seed every shipped library, in the one order that works.
@@ -38,12 +44,18 @@ import {
  * `.then().catch()` always did.
  */
 export async function seedShippedLibrary(
-  report: (step: string, err: unknown) => void
+  report: (step: string, err: unknown) => void,
+  /** Where the one summary line goes; the server's console by default. */
+  log: (line: string) => void = line => console.info(line)
 ): Promise<void> {
   await Promise.all([
     seedBaselineMaterials().catch(err => report("BaselineMaterials", err)),
     seedBaselineLaborRates().catch(err => report("BaselineLaborRates", err)),
     seedBaselineModifiers().catch(err => report("BaselineModifiers", err)),
+    // The step LIBRARY before the starters: a starter inserted below writes
+    // its step list as it is inserted (0143). Its own catch, so a step
+    // failure can never stop the starters, kits or run types.
+    seedStarterLaborSteps().catch(err => report("StarterLaborSteps", err)),
   ]);
   try {
     await seedBaselineAssemblies();
@@ -52,7 +64,28 @@ export async function seedShippedLibrary(
   } catch (err) {
     report("BaselineAssemblies/Kits/RunTypes", err);
   }
-  // Steps after the starters they attach to (0143). Its own catch, so a step
-  // failure can never stop the starters, kits or run types above.
-  await seedStarterLaborSteps().catch(err => report("StarterLaborSteps", err));
+
+  /*
+    ── Everything above only INSERTS what is missing (2026-10-13) ──
+    A start no longer rewrites an existing shared row's numbers or names
+    (references/boot-seed-plan.md). What the seed says differently is
+    computed once here: the finding fields are applied as ONE logged `seed`
+    batch (owner Q3), and the rest is only counted — `scripts/starterDrift.mts`
+    lists it and applies it when somebody confirms.
+  */
+  try {
+    const proposal = await seedProposal();
+    let applied = 0;
+    await withSeedLock("helixbid:seed:finding_fields", async () => {
+      const result = await applySeedFindingFields(proposal);
+      if (result === "no-log")
+        log(
+          "[seed] starter: finding fields NOT applied — no change log yet (0152)"
+        );
+      else if (result !== null) applied = result.applied.length;
+    });
+    log(seedProposalSummary(proposal, applied));
+  } catch (err) {
+    report("SeedProposal", err);
+  }
 }

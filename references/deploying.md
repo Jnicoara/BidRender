@@ -124,6 +124,10 @@ code never arrived.
 GitHub nor your local checkout. **This is the fastest way out of a bad deploy**
 and the first thing to reach for.
 
+**Once the boot seed change is live, a rollback to a build WITHOUT it can undo
+logged starter changes** — run `scripts/starterDrift.mts` before and after
+(owner Q4, § 5b).
+
 Rolling back the code as well, when you want `main` to match what is running —
 **through `local-dev`, because `main` refuses a commit the gate has not seen**
 (the ruleset, § 4):
@@ -718,6 +722,32 @@ database is **already missing five foreign keys** from the 0004 incident in July
 exactly that reason.
 
 ### 5b. A catalog release IS a migration — it just runs at startup
+
+> **Changes with the boot seed change (built on local-dev 2026-10-13; reaches
+> live one release AFTER the end-of-pricing load, owner Q1 —
+> `references/boot-seed-plan.md`).** From the release that carries it, a
+> start no longer renames, retires or re-stamps an existing shared row; it
+> inserts new names and applies finding fields as one logged `seed` batch, and
+> logs one line: `[seed] starter: finding fields applied N; proposed P (not
+applied), held H, live ahead L`. **A seed edit then reaches live only by a
+> separate, owner-confirmed step after the deploy:**
+>
+> ```bash
+> DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/starterDrift.mts            # read: what would change
+> ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local \
+>   pnpm tsx scripts/starterDrift.mts --apply --note "<what and why>"                    # one batch, pins first
+> ```
+>
+> Rehearse the `--apply` on a copy exactly as below, with `bidTotals.mts`
+> before and after — it pins every company, so it must move no bid number.
+> Until that release, live still re-stamps and this section applies as written.
+>
+> **Rollback past that release (owner Q4): check drift before AND after.** A
+> build without the change re-stamps shared rows from ITS seed on its first
+> start, writing over every change logged through `applyStarterChange` for
+> every company without a copy — with no log. So run `starterDrift.mts`
+> (read-only) before the rollback, keep its output, and run it again after;
+> a "live ahead" line that disappears is a change the rollback undid.
 
 **Added 2026-09-26.** A release that only touches `server/seed/materials/`
 has nothing in `drizzle/`, so § 5a looks as if it does not apply. It does. The
