@@ -1,5 +1,49 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-14 — Wall Plates & Misc name review; C's databases made exact; Gate for b11abf2e
+
+**`pricing/wallplates-misc-name-review.md`** — spreadsheet rows 862–954, 93
+rows, read from a fresh copy of the workbook. Read-only.
+
+- **Counts:** 74 OK (the 2026-10-08 cover family is sound, and every
+  starter's plate matches its device), 11 need words, 8 owner picks.
+- **Could price wrong:**
+  - P1: every plate is `box of 25`, but stainless, midway, oversized and
+    3/4-gang plates are sold each, so a typed price comes out 1/25 of cost.
+  - P2: stainless grade, 430 $1.01 vs 302 $2.91.
+  - P3: the in-use covers on DV8, LT17, MH6 and PG20 do not say
+    "extra-duty", which NEC 406.9(B)(1) requires for 15/20A in a wet
+    location.
+  - P4: six generic plate rows duplicate family rows.
+  - P5: the screwless plate is about 10x a standard one.
+  - P6: Device shim is `each`, but it is sold in 5/25/100 (for the pack
+    scan).
+  - P7: the panel filler plate fits one panel family.
+- **Missing:** M1, a deep in-use cover (for LT17's transformer plug); M2, a
+  GFCI/decorator flip cover.
+- **Owner questions:** Q1–Q10, each with a suggested answer.
+
+**Next shelf: Service Entrance (from row 955).**
+
+**C's databases now match the Gate's** (`schemaDrift.mts`: matches,
+196/196 on both).
+
+- **`bidrender_test_c` was rebuilt the Gate's way:** DROP; CREATE
+  `utf8mb4_unicode_ci`; `scripts/migrate.mts` (157 applied);
+  `scripts/seedBaseline.mts` (1,717 materials, 24 run types). DV33 is clean:
+  `starterAssembliesSeed.test.ts` passes, along with
+  `starterChanges` and `lockedWarningsFrozen` (29/29).
+- **`bidrender_local_c` was fixed IN PLACE, not rebuilt**, because it holds
+  the 4,237 bids `bidTotals` measures and the "Bar layout check" fixture.
+  The drift script's own statements were applied: 3 collation `CONVERT`s
+  and 5 FKs. `bidTotals`: all 4,237 unchanged.
+- **One of the drift script's suggestions cannot run.**
+  `project_assembly_items_projectAssemblyId_project_assemblies_id_fk` is 66
+  characters, so MySQL refuses it (`ER_TOO_LONG_IDENT`). Migration 0004
+  names it `project_assembly_items_projectAssemblyId_fk`, and that name
+  worked. That is a small fault in `scripts/schemaDrift.mts`'s suggested
+  SQL, for whoever next touches it.
+
 ## START HERE (2026-10-13, night) — F13 finished; applyStarterChange built; Switches answers recorded
 
 **State.** track-c merged local-dev at `dc08f1a2` (A's 0152–0156) as
