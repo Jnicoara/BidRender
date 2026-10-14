@@ -430,11 +430,14 @@ function AbbreviationCard({
  */
 export function LegendMoreOptions({
   notes,
+  detailLinks = 0,
   onShowNote,
   ...actions
 }: SymbolActions & {
   /** This sheet's numbered notes and tags; null while it is being read. */
   notes: SheetNotesRead | null;
+  /** Detail links found on this sheet (5d), for the outlines' count. */
+  detailLinks?: number;
   /** Take the drawing to a spot on the sheet, page points. */
   onShowNote: (at: { x: number; y: number }) => void;
 }) {
@@ -504,7 +507,7 @@ export function LegendMoreOptions({
           {browsing === "notes" && (
             <SheetNotesList read={notes} onShow={onShowNote} />
           )}
-          <NoteOutlinesSwitch read={notes} />
+          <NoteOutlinesSwitch read={notes} links={detailLinks} />
           <NoteTapsSwitch />
           <button
             type="button"

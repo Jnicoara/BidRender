@@ -45,6 +45,8 @@
  * claim every one of them.
  */
 
+import type { DetailRef } from "./detailRefs";
+
 /** A word on the page: text, bounds and centre in page points, y down. */
 export type NoteWord = {
   text: string;
@@ -96,8 +98,14 @@ export type SheetKeyedNotes = {
   tags: NoteTag[];
 };
 
-/** What the worker hands back for one page: `scan` = no text to read. */
-export type SheetNotesRead = SheetKeyedNotes & { scan: boolean };
+/**
+ * What the worker hands back for one page: `scan` = no text to read. `refs`
+ * rides along (step 5d, @/lib/detailRefs): the same words, read once.
+ */
+export type SheetNotesRead = SheetKeyedNotes & {
+  scan: boolean;
+  refs: DetailRef[];
+};
 
 // ── 5b: the note list ───────────────────────────────────────────────────────
 

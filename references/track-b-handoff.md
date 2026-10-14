@@ -1,5 +1,34 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-14 (last), PLAN-READING HELP STEP 5d (DETAIL LINKS + BACK) BUILT
+
+- **5d built on `track-b`, NOT merged to local-dev** (A is pushing). No
+  AI, no migration. Tap "2/E004" on a sheet → "Detail 2 on E004 · Go to
+  detail 2" → E004 zoomed to detail 2's title bubble (or "not located") →
+  **Back to E121** (drawing's bottom-left) restores sheet, zoom and spot.
+  Full notes: `plan-reading-help-plan.md` § 7 step 5, "5d DONE".
+- **Code:** `client/src/lib/detailRefs.ts` (reader + link/title rules),
+  worker returns `refs` with the keyed notes; `SheetNotes.tsx` now has one
+  `DrawingTaps` layer and one `TapCard` shell for notes and links, plus
+  `DetailLinkCard`, `DetailBack`; PlanPane gained `viewNow`, `viewRequest`,
+  `drawingChrome`. Go and Back flush the mark queue themselves:
+  `setPage` does NOT (the plan said it did; corrected there).
+- **Three plan points overridden, recorded in § 6:** text links need a
+  letter in the sheet (breaker sizes 30/2 are everywhere); Back sits
+  bottom-left, not top (tool pills, Find/Check panels and fold buttons are
+  there); a title is the bubble naming its own sheet.
+- **Tests:** `detailRefs.test.ts` 16 (UNCC/Weld 1/Weld 2 real words, sheet
+  numbers from the app's title-block reader), every guard shown red. With
+  noteTagTap, planTips, planHelpPrefs, keyedNotes, planAddress,
+  sourceHygiene: 7 files, 97 passed. `pnpm check` clean. Reader 17 ms on
+  the densest sheet (was 1.5 s before indexing).
+- **Looked at** laptop, iPad both ways, phone 375 on UNCC E121: Go lands on
+  detail 2; Back returns to the same zoom and pixel; drag from a link
+  opens nothing. Not seen on screen: "not located" (no real case on hand).
+- **Dev server and MySQL 3307 stopped.**
+- **Next:** step 6 leftovers are done; plan-reading help is complete
+  except anything the owner adds. Then the open items below.
+
 ## WHERE B STANDS — 2026-10-14 (later), PLAN-READING HELP STEP 5c (TAP A NOTE TAG) BUILT
 
 - **Smoke back to green on local-dev f22c12f2:** 96 passed / 2 skipped
@@ -29,6 +58,8 @@
   opens nothing; Copy text in hand → 0 targets; switch off → 0, survives a
   reload; tip 3 shows inside the drawing.
 - **Dev server and MySQL 3307 stopped.**
+- **Gate GREEN on 5e73997e** (run 38635567651: test + drizzle-guard;
+  deploy-staging and smoke skipped on track-b as usual).
 - **Next:** 5d — detail links ("3/E5") with a Go popover and a Back pill.
 
 ## WHERE B STOOD — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)

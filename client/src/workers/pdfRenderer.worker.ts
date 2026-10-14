@@ -75,6 +75,7 @@ import { layerIdsFrom } from "@/lib/cadLayers";
 import { quarterArcRadii } from "@/lib/scaleCheck";
 import { readSchedules, type PanelSchedule } from "@/lib/panelSchedules";
 import { readKeyedNotes } from "@/lib/keyedNotes";
+import { readDetailRefs } from "@/lib/detailRefs";
 import { readCircuitTags, readHomeruns } from "@/lib/homeruns";
 import { detectScaleFromText } from "@shared/planScale";
 import {
@@ -1008,8 +1009,13 @@ self.onmessage = async (e: MessageEvent) => {
         type: "keyedNotes",
         reqId,
         read: scan
-          ? { lists: [], tags: [] }
-          : readKeyedNotes(matchPage.words, matchPage.geo),
+          ? { lists: [], tags: [], refs: [] }
+          : {
+              ...readKeyedNotes(matchPage.words, matchPage.geo),
+              // Detail references (step 5d, @/lib/detailRefs): the same
+              // words; 17 ms on the densest sheet on hand.
+              refs: readDetailRefs(matchPage.words),
+            },
         scan,
       });
     } catch (err) {

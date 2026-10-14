@@ -98,13 +98,14 @@ export function noteTapsLive(state: {
   tapsOn: boolean;
   /** Any tool picked up: count, trace, capture, Copy text… (§ 6). */
   toolInHand: boolean;
-  read: Pick<SheetNotesRead, "tags"> | null;
+  /**
+   * What there is to tap on this sheet: note tags plus detail links (5d).
+   * Null while the sheet is still being read.
+   */
+  spots: number | null;
 }): boolean {
   return (
-    state.tapsOn &&
-    !state.toolInHand &&
-    state.read !== null &&
-    state.read.tags.length > 0
+    state.tapsOn && !state.toolInHand && state.spots !== null && state.spots > 0
   );
 }
 

@@ -124,17 +124,20 @@ describe("the switch — taps are on unless turned off", () => {
 });
 
 describe("noteTapsLive — counting and tracing never change", () => {
-  const ready = { tapsOn: true, toolInHand: false, read: e200 };
+  const ready = { tapsOn: true, toolInHand: false, spots: e200.tags.length };
   it("is live with no tool in hand on a sheet with tags", () => {
     expect(noteTapsLive(ready)).toBe(true);
   });
   it("is dead while any tool is in hand", () => {
     expect(noteTapsLive({ ...ready, toolInHand: true })).toBe(false);
   });
-  it("is dead when turned off, while reading, or with no tags", () => {
+  it("is dead when turned off, while reading, or with nothing to tap", () => {
     expect(noteTapsLive({ ...ready, tapsOn: false })).toBe(false);
-    expect(noteTapsLive({ ...ready, read: null })).toBe(false);
-    expect(noteTapsLive({ ...ready, read: { tags: [] } })).toBe(false);
+    expect(noteTapsLive({ ...ready, spots: null })).toBe(false);
+    expect(noteTapsLive({ ...ready, spots: 0 })).toBe(false);
+  });
+  it("a sheet with only a detail link (no note tags) is live", () => {
+    expect(noteTapsLive({ ...ready, spots: 1 })).toBe(true);
   });
 });
 

@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Tap a detail reference on a plan to go to that detail, and Back to
+  return.** When a sheet says "SEE DETAIL 2/E004", tapping that reference
+  now offers "Go to detail 2". Go opens sheet E004 zoomed to detail 2's own
+  title, or says it couldn't find the detail on that sheet rather than
+  guessing. A "Back to E121" button in the drawing's bottom-left corner
+  returns to the exact sheet, zoom and spot you left. A reference only
+  becomes a link when the sheet it names really exists in this plan set, so
+  breaker sizes like "30/2" and architectural sheets that aren't in the set
+  are never links. It only works with no tool picked up, and a drag still
+  moves the sheet. No AI, nothing saved. The More options switches now cover
+  detail links too.
+
 - **Tap a note number on a plan to read the note.** On a sheet with keyed
   notes ("WORK NOTES", "KEYED NOTES"), tapping one of the small boxed numbers
   on the drawing now opens that note's text in a card beside it, with a

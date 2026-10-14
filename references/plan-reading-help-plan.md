@@ -1,8 +1,8 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEPS 1–4 and 5a/5b/5c BUILT on track-b (2026-10-12/13/14,
-owner's go); 5d (detail links + Back) and the rest of 6 not started
-(step 6's tips-again / off and the outlines switch are already in).** All 11 picks in § 9 approved. No migration. Step 1 notes are in § 7.
+**Status: STEPS 1–5 BUILT on track-b (2026-10-12/13/14, owner's go),
+5d (detail links + Back) included; of step 6 only "browse all" is
+already in with tips-again / off and the switches.** All 11 picks in § 9 approved. No migration. Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
 without any AI: an abbreviation lookup (WP, AFF, EM, GFI, HR…), a symbol
@@ -295,19 +295,33 @@ E5`.
   (`bid_pdf_sheet_identity.sheetNumber`, compared ignoring dots, dashes and
   case). This is what keeps `3/4` (a conduit size) and `1/2"` from becoming
   links — unless a sheet called "4" exists, which the test must cover.
+  **Overridden 2026-10-14 (5d):** the sheet half must start with a letter.
+  The sets on hand print breaker sizes (`20/2`, `30/2`, `60/3`) on every
+  panel schedule, and the app's sheet-number reader never stores a bare
+  number (`SHEET_NUMBER_PATTERN`), so a "sheet 4" link would only ever be
+  wrong. The test covers it the other way: `30/2` is not a link even in a
+  set with a sheet named "2". A number two sheets share is not a link either.
 - **Tap → popover, not a jump** (§ 9 Q2): "Detail 3 on E5.01 — Go". A jump on
   touch would fire on every accidental tap while panning.
 - **Go** opens that sheet and, if a detail title "3" is found on it (a
   number in a circle beside an underlined title, the biggest text near it),
   zooms to it; otherwise opens the whole sheet with "Detail 3 is on this
   sheet — not located". Never zooms to a guess.
+  **As built (5d):** the title is the split bubble on that sheet naming
+  ITSELF ("2 over E004" on E004) — the measured shape on every set on hand.
 - **Back:** a "Back to E2.01" pill at the top of the drawing, returning to
   the same sheet, zoom and position. One level of history only; a second jump
   replaces it.
+  **Moved 2026-10-14 (5d): bottom-left of the drawing, not the top.** The
+  top already holds the tool pills (centre), the Find / Check panels
+  (left) and the touch fold buttons (corners).
 - The jump reuses the sheet-change path the sheet list already uses, so
   whatever is queued (marks being sent) is flushed exactly as a sheet change
   flushes it today — read that path before trusting this sentence
   (CLAUDE.md, "a comment claiming that something else handles it").
+  **Read 2026-10-14: it does NOT.** `setPage` flushes nothing; the queue
+  flushes when a count is put down. So Go and Back call the flush
+  themselves (`flushStampsRef.current()`), a guard rather than a reliance.
 
 **Tests:** `keyedNotes.test.ts` (E-200's words: tags found are 1–18 only;
 notes joined into 18 texts), `detailRefs.test.ts` (a reference to a missing
@@ -502,6 +516,44 @@ from the real sheets via a script, not hand-typed.
      every time, no sideways scroll, no console errors; Copy text in hand →
      0 targets, put down → 55; the switch off → 0, still off after reload;
      tip 3 shows on E-200 inside the drawing.
+     **5d DONE 2026-10-14 (track-b).** A detail reference on the drawing is
+     a tap target beside the note tags (one layer, `DrawingTaps`; one card
+     shell, `TapCard`). Tap → "Detail 2 on E004", that sheet's title, **Go to
+     detail 2**. Go → that sheet, zoomed to the detail's title bubble once the
+     sheet is drawn AND read (a focus aimed at the old raster would be used
+     up), or "Detail 2 is on this sheet — not located". **Back to E121**
+     (bottom-left, × to stay) returns to the same sheet, zoom and position
+     (PlanPane `viewNow` / `viewRequest`, on `planAddress`'s tested
+     `rememberView` / `restoreView`). No AI, no migration, nothing saved.
+   - **Reader:** `client/src/lib/detailRefs.ts`, run in the PDF worker on
+     the words the note reader already has, returned in the same message
+     (`SheetNotesRead.refs`). Two forms: text ("2/E004.") and the split
+     bubble (label over sheet number, same centre line, similar type size).
+     **What it is depends on where it points:** another sheet in this set →
+     link; this sheet → a title (where Go lands); no sheet / two sheets →
+     nothing. Only this plan set; never across sets.
+   - **Measured on the sets on hand:** UNCC E121 → 2/E004, 3/E004 (links);
+     UNCC E004 has titles 1–3; Weld 1 E-200's A–D/E-200 are its own titles;
+     5/A1, 1/HE-62, T5/T8, 1/S201, A2/A2, D1/V1, 30/2, 60/3 are not links.
+     Time: first version 1.5 s on weld2 E3.1 (61,746 words, every word
+     against every word); now 17 ms (label words sorted across, halving).
+   - **Switches:** the existing ones now say "Tap note tags and detail
+     links" (on) and "Outline note tags and detail links" (off; links ring
+     blue, notes amber). Tip 3 names both.
+     Tests: `client/src/lib/detailRefs.test.ts` (16, fixtures from the real
+     sets by `scripts/detailRefsFixture.mts`, sheet numbers from the app's
+     own title-block reader). Each guard removed in turn and shown red:
+     sheet must exist, two-sheet number, own sheet is not a link, letter in
+     the sheet, bubble type size, title only on its own sheet.
+     `noteTagTap.test.ts` +1 (a sheet with only a link is live).
+     Looked at: laptop, iPad 820×1180 and 1180×820, phone 375×667 on UNCC
+     E121 (bid "Sheet numbers check"): zoomed and panned first, tap 2/E004 →
+     card beside it; Go → E004 at detail 2's title (66% laptop, 43% iPad
+     sideways); Back → E121 at the same zoom and the link at the same screen
+     pixel, every size; a drag from the link opened nothing; no sideways
+     scroll, no console errors. NOT looked at: the "not located" line (no
+     sheet on hand has a link without its title; unit-tested) and a mark
+     sitting on a link (layer order, as 5c).
 6. **More options:** browse all, outlines toggle, tips again / off.
 
 Each step: tests in `shared/` or `client/src/lib`, then **looked at** on a
