@@ -321,3 +321,12 @@ keep their snapshots; only new lines change.
 must surface the midway row, "in use cover" the in-use covers (never a flip
 cover), and "gfci flip cover" M2. If a recount finds a starter or run type
 using a row being retired, stop and find out why before retiring it.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

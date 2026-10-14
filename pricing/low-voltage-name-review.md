@@ -238,3 +238,53 @@ listing A checks. No starter edit proposed.
   the real panels, not the blank.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming or retiring it.
+
+## Owner's answers — 2026-10-14: Q1–Q14 all YES, as suggested
+
+For A's end-of-pricing job. Nothing applied here; no catalog row, seed or
+starter changed.
+
+1. **Q1 yes**: jacket descriptions on the cable rows ("Riser (CMR)",
+   "Plenum (CMP)", "Shielded (F/UTP), riser", "Riser (CMR), 10G"; the
+   camera cable "Siamese: RG59 video + 18/2 power, for analog cameras").
+   Names stay as frozen; `frozen-names.json` does not move.
+2. **Q2 yes**: `In-ceiling speaker, 6.5"`, pack `pair` / 2 (MS10 keeps qty
+   1); `Speaker volume control, 100W, impedance-matching`.
+3. **Q3 yes**: `Structured media enclosure, 28"` (MS12).
+4. **Q4 yes**: `Network rack, wall mount, 12U swing gate` (MS11),
+   `Horizontal cable manager, 1U` (MS11), `Rack shelf, 1U cantilever`,
+   `Rack blank panel, 1U`, `Vertical cable manager, 7 ft`.
+5. **Q5 yes**: `Cat5e patch panel, 24-port`; `Fiber enclosure, 1U rack
+mount`.
+6. **Q6 yes**: `Coax splitter, 2-way`; `Coax distribution amplifier,
+4-port`.
+7. **Q7 yes**: `Security camera, dome, IP PoE` (MS9); `Security camera,
+bullet, IP PoE`.
+8. **Q8 yes**: `Landscape path light, LED, 12V` (LT18 stays on it); M1 spot
+   light added.
+9. **Q9 yes**: `Telecom grounding busbar, 1/4" x 2" x 12"`; backboard
+   description "Fire-retardant 3/4" plywood".
+10. **Q10 yes**: video doorbell kept, description "Often supplied by the
+    homeowner — price it only if you furnish it"; power kit "Fits the
+    doorbell's own brand".
+11. **Q11 yes**: keypad plate kept with "Fits the alarm's own brand"; NVR
+    enclosure retired (`RETIRED_BASELINE_MATERIALS`, hidden, never deleted).
+12. **Q12 yes**: `Surface raceway, low voltage, adhesive-back, 1/2"`, pack
+    `5 ft length` / 5, after A checks one listing.
+13. **Q13 yes**: `Coax F connector` `bag of 10` / 10; `Cat6 RJ45 end` `bag
+of 50` / 50; the eight low-voltage wall plates `each` / 1. In the pack
+    pass.
+14. **Q14 yes**: M1–M4 added (spot light, surface mount data box, LC
+    connector, firestop pathway). Their prices follow the owner's
+    2026-10-14 source rule — `new-rows-source-check.md`.
+
+**Starter edits: none.**
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

@@ -398,3 +398,12 @@ moves to H1 and H3.** For A's end-of-pricing job. Nothing applied here.
   gains or loses a line (round 2, "The starter moves").
 - With this, every Breakers question is answered except Q9, which waits for
   the brand-variants pass.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

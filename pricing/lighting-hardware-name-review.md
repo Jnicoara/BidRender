@@ -347,3 +347,12 @@ base cover, 4" square pole`. The five P1 packs go in the pack pass.
 
 **Starter edits in this job: LT23 and LT26 only** (Q12). Every rename keeps
 its row's id, so the starters on it move with it.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

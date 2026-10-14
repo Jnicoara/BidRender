@@ -387,3 +387,12 @@ Rows 156–159 and 161–164 get a coil pack size and pack qty in the
 end-of-pricing job: 100 ft coil and 100, or 50 ft and 50 at 1-1/4"
 liquidtight. Confirm each one against the listing. **The owner leaves those
 rows blank until then.**
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

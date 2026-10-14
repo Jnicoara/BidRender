@@ -1,6 +1,54 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, latest — Life Safety answers, Low Voltage review
+## (newest) 2026-10-14, end of day — SOURCE RULE for new rows, Low Voltage answers, Connectors & Terminations review
+
+**THE OWNER'S SOURCE RULE (2026-10-14) — A FOLLOWS IT FOR EVERY NEW ROW
+FROM EVERY NAME REVIEW, PAST AND FUTURE:**
+
+- **COMMON** (found at **Home Depot, Platt or Stoneway**): add the row; its
+  **Example price comes from those three only**. Other sites are comparison.
+- **SPECIALTY** (found at none of the three): **still add the row** so it
+  can be counted, with the **price BLANK** (no Example price) and the
+  description **"Specialty - price from your supplier."** The bid's "not
+  priced" warning covers it.
+
+**`pricing/new-rows-source-check.md`** applies it to every accepted new row
+from the 14 earlier reviews plus Connectors M1: **60 families, 58 COMMON,
+2 SPECIALTY** (Life Safety M1 sampling tube and M2 remote test station),
+each with its store, part and link. **It overrides each review's "Listing"
+column for price**; every earlier review now ends with a pointer to it. Five
+rows change what A adds (⚠ in the file): Boxes M9 (fan rating
+unconfirmed), M13 (Arlington FN101F, not Cantex), M16 (Carlon B432A, not
+the 2-gang parts named), Service Entrance M1 (3/0–4/0 only), Low Voltage M3
+(OM3/OM4 LC part). **Breakers H3's condition is met**: Platt Eaton DH361UGK
+or HD Square D VHU361. A also checks that seeding accepts a shipped row
+with no price without writing a $0 example. If A's count of accepted new
+rows differs from 60, stop and find out why.
+
+**Low Voltage: Q1–Q14 all YES as suggested** (review's "Owner's answers").
+No starter edit. Cable rows get descriptions, not renames.
+
+**`pricing/connectors-terminations-name-review.md`** — rows 1422–1518, 97
+rows, fresh workbook copy (unchanged since the Low Voltage read); matches
+`BASELINE_MATERIALS` one for one. Read-only; written under the source rule.
+
+- **Counts:** 71 OK, 25 need words, 1 owner pick. 12 rows used — including
+  `Wire nut, 22-8 AWG (tan/red)` (133 starters), `MC anti-short bushing`
+  (37) and `3/8" MC connector` (36). No run type.
+- **Could price wrong:** P1 anti-short is a guessed box of 25 (Platt sells
+  100s), 3/8" MC connector a guessed box of 25; P2 set-screw splices a
+  box of 100 and the 2" SE connector (PG3, CW3) a box of 25 though sold
+  each; P3 1-hole lugs with no stud size (PG15, PG16). The wire nut's
+  guessed box of 100 happens to be right.
+- **C1:** the crimp lug descriptions contradict their names.
+- **Missing:** M1 `#6 copper compression lug, 2-hole, 1/4" stud` (COMMON,
+  Platt).
+- **Owner questions:** Q1–Q9. No starter edit proposed.
+
+**Next shelf in app order: from row 1519** (the shelf after Connectors &
+Terminations).
+
+## 2026-10-14, latest — Life Safety answers, Low Voltage review
 
 **Life Safety: Q1–Q13 all YES as suggested** (`pricing/life-safety-name-
 review.md` "Owner's answers"), for A's end-of-pricing job, nothing applied.

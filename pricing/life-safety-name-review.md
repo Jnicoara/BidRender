@@ -274,3 +274,12 @@ Safety **26 → 29** (−1 exit combo to Lighting Hardware, +4 M rows);
 Lighting Hardware **+1**. If either number does not match, stop and find
 out why — a recount that disagrees means this line is stale or a row moved
 that this review did not see.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.
