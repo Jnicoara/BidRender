@@ -36,7 +36,12 @@ import { usePlanTipsSeen, useSheetKindLine } from "@/lib/planHelpPrefs";
 import { showTipsAgain, turnTipsOff } from "@/lib/planTips";
 import { SHEET_KIND_CARDS, type SheetKind } from "@shared/planHelp/sheetKind";
 import { SheetKindCardBody } from "./SheetKindLine";
-import { NoteOutlinesSwitch, SheetNotesList, notesFound } from "./SheetNotes";
+import {
+  NoteOutlinesSwitch,
+  NoteTapsSwitch,
+  SheetNotesList,
+  notesFound,
+} from "./SheetNotes";
 import type { SheetNotesRead } from "@/lib/keyedNotes";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -500,6 +505,7 @@ export function LegendMoreOptions({
             <SheetNotesList read={notes} onShow={onShowNote} />
           )}
           <NoteOutlinesSwitch read={notes} />
+          <NoteTapsSwitch />
           <button
             type="button"
             onClick={() => toggle("symbols")}

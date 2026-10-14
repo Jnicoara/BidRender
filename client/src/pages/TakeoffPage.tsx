@@ -554,11 +554,17 @@ import { SchedulesView } from "@/components/takeoff/SchedulesView";
 import { SheetKindLine } from "@/components/takeoff/SheetKindLine";
 import {
   useNoteTagOutlines,
+  useNoteTagTaps,
   usePlanTipsSeen,
   useSheetKindLine,
 } from "@/lib/planHelpPrefs";
 import type { SheetNotesRead } from "@/lib/keyedNotes";
-import { NoteTagLayer } from "@/components/takeoff/SheetNotes";
+import {
+  NoteTagCard,
+  NoteTagLayer,
+  NoteTagTaps,
+} from "@/components/takeoff/SheetNotes";
+import { noteForTag, noteTapsLive } from "@/lib/noteTagTap";
 import { PlanTips } from "@/components/takeoff/PlanTips";
 import { markTipSeen, nextTip, turnTipsOff } from "@/lib/planTips";
 import { sheetKinds } from "@shared/planHelp/sheetKind";
@@ -3840,6 +3846,10 @@ export default function TakeoffPage({
   const activeNotes = doc ? (notesByPage[`${doc.id}:${page}`] ?? null) : null;
   /** The rings on note tags — More options, off unless turned on. */
   const [noteOutlines] = useNoteTagOutlines();
+  /** Tapping a tag opens its note (5c) — on unless turned off. */
+  const [noteTaps] = useNoteTagTaps();
+  /** The tag whose note card is open, by index into `activeNotes.tags`. */
+  const [openNoteTag, setOpenNoteTag] = useState<number | null>(null);
   const handleKeyedNotes = useCallback(
     (pageNumber: number, read: SheetNotesRead) => {
       if (docIdForScale === null) return;
@@ -6408,8 +6418,8 @@ export default function TakeoffPage({
       activeSheet !== null &&
       sheetKinds(sheetDisplay(activeSheet, identities.get(page)).title).length >
         0,
-    // Taps on the drawing are step 5 of the plan, not built yet.
-    tappable: false,
+    // A note tag to tap (step 5c). Detail links (5d) join this when built.
+    tappable: noteTaps && (activeNotes?.tags.length ?? 0) > 0,
   };
   const tip =
     doc &&
@@ -7242,6 +7252,33 @@ export default function TakeoffPage({
       current && current.sheetId !== activeSheet?.id ? null : current
     );
   }, [activeSheet?.id]);
+
+  /*
+    TAP A NOTE TAG (plan-reading-help-plan.md § 6, step 5c). The targets are
+    mounted only when nothing else wants the drawing — no tool in hand, no
+    Find or Check session, no legend being named — so counting and tracing
+    never change. The open card closes on a sheet change and the moment any
+    of that starts: a guard here, not a hope that the card is not in the way.
+  */
+  const noteTapsNow = noteTapsLive({
+    tapsOn: noteTaps,
+    toolInHand:
+      toolInHand ||
+      findSession !== null ||
+      checkSession !== null ||
+      legendDraft !== null,
+    read: activeNotes,
+  });
+  const openNote =
+    noteTapsNow && openNoteTag !== null && activeNotes
+      ? (() => {
+          const tag = activeNotes.tags[openNoteTag];
+          return tag ? noteForTag(activeNotes, tag.label) : null;
+        })()
+      : null;
+  useEffect(() => {
+    setOpenNoteTag(null);
+  }, [doc?.id, page, noteTapsNow]);
   const startCheck = useCallback(() => {
     if (!activeSheet) return;
     setFindSession(null);
@@ -11782,6 +11819,21 @@ export default function TakeoffPage({
                         onRead={setConnectRead}
                       />
                     )}
+                    {/*
+                      Note tag taps (5c): BEFORE the marks layer, so a mark
+                      sitting on a tag is still the mark's to click.
+                    */}
+                    {noteTapsNow && activeNotes && (
+                      <NoteTagTaps
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        zoom={size.zoom}
+                        read={activeNotes}
+                        open={openNote ? openNoteTag : null}
+                        onOpen={setOpenNoteTag}
+                      />
+                    )}
                     <TraceLayer
                       width={size.width}
                       height={size.height}
@@ -12809,6 +12861,22 @@ export default function TakeoffPage({
           )}
           <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
         </button>
+      )}
+
+      {openNote && openNoteTag !== null && (
+        <NoteTagCard
+          key={`${doc?.id}:${page}:${openNoteTag}`}
+          index={openNoteTag}
+          list={openNote.list}
+          note={openNote.note}
+          phone={phone}
+          touch={phone || coarse}
+          onShow={() => {
+            setOpenNoteTag(null);
+            jumpTo(openNote.note.at);
+          }}
+          onClose={() => setOpenNoteTag(null)}
+        />
       )}
 
       {tip && (

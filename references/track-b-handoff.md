@@ -1,6 +1,37 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)
+## WHERE B STANDS — 2026-10-14 (later), PLAN-READING HELP STEP 5c (TAP A NOTE TAG) BUILT
+
+- **Smoke back to green on local-dev f22c12f2:** 96 passed / 2 skipped
+  (run 38615422125), so the tips fix (fbc89ffb) holds on staging.
+- **5c built on `track-b`, NOT merged to local-dev** (A is pushing; owner's
+  word). No migration. With no tool in hand, tapping a boxed note number on
+  the drawing opens a card beside it: "Note 8", the list it is in, the
+  text as printed, and **Show it in the notes list**. Details and every
+  decision: `plan-reading-help-plan.md` § 7 step 5, "5c DONE".
+- **Code:** `client/src/lib/noteTagTap.ts` (`tagTapRadius` ≥ 32 screen px,
+  `nearestTag`, `noteForTag`, `noteTapsOn`, `noteTapsLive`,
+  `placeNoteCard`); `SheetNotes.tsx` (`NoteTagTaps`, `NoteTagCard`,
+  `NoteTapsSwitch`); `planHelpPrefs.ts` (`useNoteTagTaps`); TakeoffPage
+  mounts the targets BELOW the marks layer and only with no tool / Find /
+  Check / legend naming going on; tip 3 is on (`tappable`) with words that
+  mention only note numbers until 5d.
+- **More options:** "Tap a note tag to read it", ON by default (it draws
+  nothing). The rings stay a separate switch, OFF.
+- **Tests:** `noteTagTap.test.ts` 20 passed, each guard removed and shown
+  red. With planTips, planHelpPrefs, keyedNotes, sourceHygiene: 5 files,
+  67 passed (pure files, run with `DATABASE_URL=` empty).
+  `pnpm check` clean. No smoke spec added: a boxed number on the smoke
+  plan would look like its SWITCH symbol to Find matching.
+- **Looked at** laptop, iPad both ways, phone 375 on "Sheet numbers check"
+  E-200 (throwaway probes in `scripts/`, deleted): card beside the tag,
+  inside the drawing, off toolbars/panel/phone bar; drag pans 40 px and
+  opens nothing; Copy text in hand → 0 targets; switch off → 0, survives a
+  reload; tip 3 shows inside the drawing.
+- **Dev server and MySQL 3307 stopped.**
+- **Next:** 5d — detail links ("3/E5") with a Go popover and a Back pill.
+
+## WHERE B STOOD — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)
 
 - **local-dev went to f4f61ed6 (the merge below) and its smoke went RED**
   (run 38595716662: 83 passed, 2 failed, 2 skipped, 11 not run). Desktop
@@ -13,7 +44,7 @@
   away for the visit without marking that one seen (`PlanTips` `onAway`),
   because a tool's own popover ("Name this symbol") also opens over the
   drawing. Tip buttons are 44 px on any touch screen (`touch = phone ||
-  coarse`). Recorded in `plan-reading-help-plan.md` § 5.
+coarse`). Recorded in `plan-reading-help-plan.md` § 5.
 - **Test fix (the test was wrong):** flow 3 found the name box as "the last
   visible input". That became the Legend Look up box on 2026-10-13, so the
   name went into search and Save stayed disabled. It now finds the box by

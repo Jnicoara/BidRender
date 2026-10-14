@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { usePlansLayout } from "@/hooks/usePlansLayout";
 import type { PlansLayout } from "./plansLayout";
 import { PLAN_TIPS_KEY, parseTipsSeen, type TipsSeen } from "./planTips";
+import { NOTE_TAPS_KEY, noteTapsOn } from "./noteTagTap";
 
 export const SHEET_KIND_LINE_KEY = "bidrender.plans.sheetKindLine";
 
@@ -161,6 +162,44 @@ export function useNoteTagOutlines(): [boolean, (on: boolean) => void] {
     window.dispatchEvent(new CustomEvent(OUTLINES_CHANGED, { detail: value }));
   };
   return [noteOutlinesShown(raw), set];
+}
+
+// ── Tapping a note tag (plan § 6, step 5c) ──────────────────────────────────
+
+const TAPS_CHANGED = "bidrender:noteTagTaps";
+
+function readTaps(): string | null {
+  try {
+    return window.localStorage.getItem(NOTE_TAPS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether tapping a note tag opens its note. ON unless turned off under
+ * More options: the taps draw nothing, so they cost the screen nothing.
+ * Only "off" is stored (@/lib/noteTagTap).
+ */
+export function useNoteTagTaps(): [boolean, (on: boolean) => void] {
+  const [raw, setRaw] = useState(readTaps);
+  useEffect(() => {
+    const onChange = (e: Event) =>
+      setRaw((e as CustomEvent<string | null>).detail);
+    window.addEventListener(TAPS_CHANGED, onChange);
+    return () => window.removeEventListener(TAPS_CHANGED, onChange);
+  }, []);
+  const set = (on: boolean) => {
+    const value = on ? null : "off";
+    try {
+      if (value) window.localStorage.setItem(NOTE_TAPS_KEY, value);
+      else window.localStorage.removeItem(NOTE_TAPS_KEY);
+    } catch {
+      // Blocked storage: the change holds for this visit only.
+    }
+    window.dispatchEvent(new CustomEvent(TAPS_CHANGED, { detail: value }));
+  };
+  return [noteTapsOn(raw), set];
 }
 
 // ── Tips seen (plan § 5) ─────────────────────────────────────────────────────

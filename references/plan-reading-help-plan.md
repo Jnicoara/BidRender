@@ -1,9 +1,8 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEPS 1–4 and 5a/5b BUILT on track-b (2026-10-12/13, owner's
-go); 5c (tap a tag), 5d (detail links) and the rest of 6 not started
-(step 6's tips-again / off and the outlines switch are already in).** All 11 picks in § 9 approved. No migration. Not merged to
-local-dev (frozen until the live release). Step 1 notes are in § 7.
+**Status: STEPS 1–4 and 5a/5b/5c BUILT on track-b (2026-10-12/13/14,
+owner's go); 5d (detail links + Back) and the rest of 6 not started
+(step 6's tips-again / off and the outlines switch are already in).** All 11 picks in § 9 approved. No migration. Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
 without any AI: an abbreviation lookup (WP, AFF, EM, GFI, HR…), a symbol
@@ -452,7 +451,7 @@ from the real sheets via a script, not hand-typed.
    - **GENERAL NOTES are listed but never tagged**; any other "… NOTES",
      "NOTES" or "KEYNOTES" heading is keyed. A list ends at the first
      missing number. The list's own numbers are not tags.
-   - Tip 3 stays skipped until 5c builds the tap.
+   - Tip 3 stayed skipped until 5c built the tap (it is on since 5c).
      Results on the sets on hand: E-200 WORK NOTES 1–18, 55 tags, **none above
      18 before any list is consulted** (the legend plan's red test); UNCC p3
      ELECTRICAL NOTES 1–9, 36 tags; colusa, dundas: boxed numbers but no list,
@@ -463,6 +462,46 @@ from the real sheets via a script, not hand-typed.
      Looked at laptop, iPad both ways, phone 375/390/425 on "Sheet numbers
      check" E-200: no sideways scroll; rings sit on the boxed numbers and skip
      the boxed room numbers (006, 010); note 7 jumps and rings its number.
+     **5c DONE 2026-10-14 (track-b).** Tap a tag with no tool in hand → a card
+     beside it: the boxed number, "Note 8", "WORK NOTES · on this sheet", the
+     note's text as printed, and **Show it in the notes list** (the same jump
+     the notes list uses). No AI, no migration, nothing saved.
+     `client/src/lib/noteTagTap.ts` holds every decision; `SheetNotes.tsx` has
+     `NoteTagTaps` (invisible targets) and `NoteTagCard`. Details, on purpose:
+   - **Taps are ON unless turned off** ("Tap a note tag to read it", More
+     options, `bidrender.plans.noteTagTaps`, only "off" stored). They draw
+     nothing, so they cost no clutter; the RINGS stay a separate switch, off
+     (Q8). The tapped tag gets one yellow ring while its card is open.
+   - **No tool in hand** (`noteTapsLive`): the targets are not mounted
+     while a count, trace, calibrate, capture, Copy text, area, Select,
+     panel placing, Find or Check session or legend naming is going on.
+     Picking a tool up closes an open card.
+   - **Targets ≥ 32 screen px at any zoom** (`tagTapRadius`; the layer is
+     inside the zoom transform, so the radius is divided back out). Zoomed
+     out, neighbouring targets overlap, so **the nearest tag to the tap wins**
+     (`nearestTag`), not the circle drawn last.
+   - **Below the marks layer**, so a mark on a tag is still the mark's to
+     click. A press is not stopped: a drag from a tag pans, and the click
+     after a real pan is swallowed (`swallowNextClick`), so a pan never
+     opens a note (looked at: moved 40 px, no card).
+   - **The card is never on the tag, never off the drawing** (`placeNoteCard`):
+     below, above, right, left of the tag, slid into the drawing's box, then
+     the box's corners. It follows the tag every 200 ms and closes when the
+     tag leaves the drawing, on any press outside it, on Escape and on ×.
+     Buttons are 44 px on a touch screen.
+   - **Tip 3** is on: shown on a sheet with tags while taps are on. Its words
+     say only note numbers until 5d adds detail bubbles.
+   - **Not done:** "Note N not on this sheet → go to the notes sheet" (§ 6).
+     It cannot happen yet: a tag is only offered when its number IS in a
+     keyed list on the same sheet. It becomes real with cross-sheet notes.
+     Tests: `client/src/lib/noteTagTap.test.ts` (20, on E-200's real words;
+     each guard (32 px floor, keyed only, tool in hand, nearest wins, card
+     off the tag and inside the drawing) removed in turn and shown red).
+     Looked at: laptop 1536×864, iPad 820×1180 and 1180×820, phone 375×667 on
+     "Sheet numbers check" E-200: 55 targets, note 8 opens beside its tag
+     every time, no sideways scroll, no console errors; Copy text in hand →
+     0 targets, put down → 55; the switch off → 0, still off after reload;
+     tip 3 shows on E-200 inside the drawing.
 6. **More options:** browse all, outlines toggle, tips again / off.
 
 Each step: tests in `shared/` or `client/src/lib`, then **looked at** on a

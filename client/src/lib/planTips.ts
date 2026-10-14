@@ -119,7 +119,8 @@ export function tipText(
     case "drawingTaps":
       return {
         title: "Tap the drawing to read it",
-        body: "Tap a note number or a detail bubble on the drawing to read the note or go to the detail.",
+        // Detail bubbles join this sentence when step 5d builds them.
+        body: "Tap a boxed note number on the drawing to read that note. Put any tool down first.",
       };
     case "lookUp":
       return {

@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Tap a note number on a plan to read the note.** On a sheet with keyed
+  notes ("WORK NOTES", "KEYED NOTES"), tapping one of the small boxed numbers
+  on the drawing now opens that note's text in a card beside it, with a
+  button that takes you to the note in its printed list. It only works with
+  no tool picked up, so counting and tracing behave exactly as before, and a
+  drag still moves the sheet. The card never sits on the number you tapped
+  or over a toolbar or the side panel. Fingers get a target at least 32
+  pixels across at any zoom. No AI, nothing saved. To turn it off, use
+  "Tap a note tag to read it" under the Legend tab's More options. The
+  first-visit tip about tapping the drawing now shows on sheets that have
+  note numbers.
+
 - **The first-visit tips on the Plans screen no longer get in the way.** The
   "Don't know a word?" card used to drop into the side panel, right on top of
   the Legend tab's Capture button and its symbol list, so neither could be
