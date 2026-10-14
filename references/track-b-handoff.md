@@ -1,6 +1,42 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-13 (merge), LOCAL-DEV b11abf2e MERGED INTO TRACK-B
+## WHERE B STANDS — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)
+
+- **local-dev went to f4f61ed6 (the merge below) and its smoke went RED**
+  (run 38595716662: 83 passed, 2 failed, 2 skipped, 11 not run). Desktop
+  flow 3 timed out clicking **Capture**; tablet-landscape touch timed out
+  tapping **"CI TOUCH"**. Cause, from the failure screenshots: B's own
+  "Don't know a word?" tip. `placeTip` only kept the drawing's middle clear,
+  so the card sat in the side panel on top of Capture and the legend rows.
+- **App fix (fbc89ffb):** `placeTip` keeps the card inside the drawing's box,
+  never over toolbars or the panel. Any press outside the card puts tips
+  away for the visit without marking that one seen (`PlanTips` `onAway`),
+  because a tool's own popover ("Name this symbol") also opens over the
+  drawing. Tip buttons are 44 px on any touch screen (`touch = phone ||
+  coarse`). Recorded in `plan-reading-help-plan.md` § 5.
+- **Test fix (the test was wrong):** flow 3 found the name box as "the last
+  visible input". That became the Legend Look up box on 2026-10-13, so the
+  name went into search and Save stayed disabled. It now finds the box by
+  label ("Symbol name", "New name for CI DUPLEX"). Nothing else in
+  `e2e/smoke` uses a positional input locator.
+- **Proof, local dev server on 127.0.0.1:3002:** both steps failed before
+  the fix (same timeouts as CI) and passed after. Full local smoke: 95
+  passed / 3 skipped; the third skip is `version.spec`, which skips under
+  `pnpm dev` (no build stamp). Looked at laptop 1536×864, iPad 820×1180 and
+  1180×820, phone 375×667 (throwaway probe, deleted). `planTips.test` 17
+  passed on `bidrender_test_b`. `pnpm check` clean.
+- **Local MySQL 3307 was down after the shutdown.** Start it with
+  `C:\Users\15krp\BidRenderLocal\start-mysql.cmd`; stop it with
+  `stop-mysql.cmd`. It was stopped again at the end, along with the dev
+  server.
+- **Next:** once local-dev moves, check that its smoke is back to 96 passed
+  / 2 skips. Then step 5c (tap a tag → popover with the note).
+- **Gate GREEN on fbc89ffb** (run 38612509276: test 7120 passed / 6
+  skipped + drizzle-guard; smoke runs only on local-dev).
+- **Owner pushes local-dev:** `git push origin <this handoff commit>:refs/heads/local-dev`
+  (a descendant of fbc89ffb; handoff text only).
+
+## WHERE B STOOD — 2026-10-13 (merge), LOCAL-DEV b11abf2e MERGED INTO TRACK-B
 
 - **Merged `origin/local-dev` (C's b11abf2e — F13 frozen warnings,
   `applyStarterChange`, the Q19 homerun/panel offers; A's 0152–0156) into
