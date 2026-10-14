@@ -30,8 +30,16 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
   skipped (staging kept serving `d38f5930` on the migrated DB — additive,
   so safe). **Missed locally because only the changed test files ran; that
   guard reads `schema.ts` as text.** Fixed by naming `materialKey` in its
-  exclusion list beside `itemKey`; pushed with this handoff. Check the new
-  Gate, then staging `/api/version` `commit` = the fix's sha.
+  exclusion list beside `itemKey`; pushed as `22c30965`.
+- **Gate 38640040867 on `22c30965`**: test green; deploy-staging REFUSED by
+  design (`drizzle/` differs from staging — migrations are A's by hand).
+  The DB was already migrated, so A pushed `local-dev:staging` by hand
+  (`d38f5930..22c30965`, fast-forward), then re-ran the failed jobs:
+  **deploy-staging, smoke all green, 96 passed / 2 skips**. Staging
+  `/api/version` **`22c30965`**, built 22:05:18 UTC.
+- **Lesson:** a push that changes `drizzle/` ALWAYS needs the hand push to
+  `staging` (`deploying.md` § "Staging first", item 0), then
+  `gh run rerun <id> --failed` to get the smoke.
 - **Local**: `bidrender_local` 164 / 200 (known legacy-FK drift),
   `bidrender_test_localdev` 164 / 205. 4,386/4,386 totals unchanged.
 - **Live (152) at the next release:** 0152–0163 all go on live BEFORE the
@@ -40,8 +48,11 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
   `bidrender_scratch_fresh_old`, `bidrender_scratch_fresh_new`,
   `bidrender_scratch_boot_copy`, and new `bidrender_scratch_staging_0157`.
   Worktree `../bidrender-before-0157` removed.
-- **MySQL 3307 stopped** (task kill — the `bidrender` user may not
-  SHUTDOWN; InnoDB recovers on the next start). No dev servers running.
+- **MySQL 3307 is DOWN** — A ended it (task kill; the `bidrender` user may
+  not SHUTDOWN, InnoDB recovers on the next start) on that job's
+  instruction, before the standing rule "leave shared MySQL running" was
+  written. Other tracks: start it with
+  `C:\Users\15krp\BidRenderLocal\start-mysql.cmd`. No dev servers running.
 
 ## (earlier) 2026-10-13, session 40: BOOT SEED CHANGE built on local-dev, NOT pushed
 
