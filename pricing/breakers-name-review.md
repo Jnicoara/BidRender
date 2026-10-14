@@ -215,3 +215,104 @@ property (QO PON vs QO pigtail), priced about the same.
   pole" must not lead with a plug-on row.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming or retiring it.
+
+## Owner's answers — 2026-10-14
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter. **Q1 and Q3–Q8 are YES as
+suggested; Q2 is YES with a starter list (below); Q9 waits for the
+brand-variants pass.**
+
+| Q   | Answer                                | What the job does                                                                                                                                                                                                                                                                                    |
+| --- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | **Names**                             | Every "Needs words" row is renamed through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row.                                                                                                                                                                             |
+| Q2  | **Yes, plus the starter list below**  | Add M1–M5 (bolt-on). The existing rows become plug-on only, with "Plug-on, for a load center. A panelboard takes a bolt-on breaker." S1: "bolt on" moves off the 74 plug-on rows onto M1–M5. **The starter moves wait for the owner's yes on the list below** (same pattern as the 4" box supports). |
+| Q3  | **Yes**                               | 1140–1142 → `{125,150,200}A 3-Pole molded-case breaker`, description "Bolts into a panelboard. Not a plug-on breaker."                                                                                                                                                                               |
+| Q4  | **Yes**                               | Half-size names stay (frozen); description "Half-size (1/2-inch). Fits only panels that take half-size breakers; a standard breaker is 1 inch." A checks one listing for the 2-pole 40A and 50A half-size rows before pricing; with none, they are retired (hidden, never deleted).                  |
+| Q5  | **Yes**                               | Tandems get "Two circuits in one space. Only in panels or slots rated for tandems."                                                                                                                                                                                                                  |
+| Q6  | **Yes**                               | 1113–1116 get "Back-fed main breaker with its hold-down. Do not add a Breaker hold-down kit."                                                                                                                                                                                                        |
+| Q7  | **Yes**                               | 1144–1148 stay generic, with "Fits the breaker's own family (QO, Homeline, …) — order with the breakers"; parents with brand variants in the brand pass.                                                                                                                                             |
+| Q8  | **In the description**                | 1119 and 1143 get "120V shunt coil. Match the coil to the hood or fire system."                                                                                                                                                                                                                      |
+| Q9  | **Waits for the brand-variants pass** | Nothing in this job.                                                                                                                                                                                                                                                                                 |
+
+### The commercial starters that move to a bolt-on row (owner: Q2 asked for this list; waits for a yes)
+
+**What was searched.** Every shipped starter whose recipe names a Breakers
+row (`BASELINE_ASSEMBLIES` via `starterPartName`, read 2026-10-14): 64
+starters. The list below is the **26 marked `commercial`**. The 8 marked
+`both` (DV3, PG1, PG7, PG8, MH1, CK14, CW6, CW7) and the 30 marked
+`residential` **stay plug-on**: a house or light-commercial job is usually a
+load center, and PG1 IS a load center. A shop doing panelboard work on one of
+those swaps the line on that bid.
+
+**Why every commercial one moves, even where the panel is not known.**
+Square D's NQ panelboard takes either kind; a panelboard that takes only
+bolt-on breakers needs the bolt-on row. The bolt-on costs the same or more,
+so it is the right side of unsure — the same rule as the 4" box supports
+(`boxes-name-review.md`, "high beats low").
+
+**The price gap, from ONE supply house on one day** (Standard Electric
+Supply, 2026-10-14), so both sides compare like with like. Other houses
+differ widely (QOB230 runs $25–$140 across four sellers), so these show how
+big the move is; they are not proposed prices.
+
+| Row now → bolt-on row                                    | Plug-on                                                         | Bolt-on         | Change per breaker          |
+| -------------------------------------------------------- | --------------------------------------------------------------- | --------------- | --------------------------- |
+| `20A 1-Pole breaker` → M1 `20A 1-Pole bolt-on breaker`   | QO120 $13.57                                                    | QOB120 $34.96   | **+$21.39**                 |
+| `20A 2-Pole breaker` → M2 `20A 2-Pole bolt-on breaker`   | QO220 $34.19                                                    | QOB220 $80.41   | **+$46.22**                 |
+| `30A 2-Pole breaker` → M3 `30A 2-Pole bolt-on breaker`   | QO230 $34.19                                                    | QOB230 $80.41   | **+$46.22**                 |
+| `30A 3-Pole breaker` → M4 `30A 3-Pole bolt-on breaker`   | QO330 $104.52 (shown for several QO sizes; SupplyHouse $165.43) | QOB330 $277.96  | **+$173.44**                |
+| `100A 3-Pole breaker` → M5 `100A 3-Pole bolt-on breaker` | QO3100 $401.56 (SupplyHouse $135.09)                            | QOB3100 $397.49 | **−$4.07** (about the same) |
+
+**Every starter here uses ONE breaker**, so its price change is the row's
+change above.
+
+| Ref  | Starter                                            | Breaker row now       | Proposed bolt-on row | Price change |
+| ---- | -------------------------------------------------- | --------------------- | -------------------- | ------------ |
+| DV23 | Dedicated 20A receptacle, MC                       | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| DV24 | Isolated-ground receptacle (cash wrap)             | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| CS1  | Sign circuit and disconnect                        | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| CS3  | Hand dryer                                         | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| CS4  | Drinking fountain / EWC                            | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| CS5  | Reach-in cooler / freezer receptacle               | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| CS6  | Twist-lock receptacle, L5-20                       | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| GC5  | 120V feed for door hardware / access control       | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| CK5  | Fire alarm control panel connection                | `20A 1-Pole breaker`  | M1                   | +$21.39      |
+| MH8  | Walk-in cooler, evaporator                         | `20A 2-Pole breaker`  | M2                   | +$46.22      |
+| CK6  | 208V cooler / freezer receptacle (NEMA 6-20)       | `20A 2-Pole breaker`  | M2                   | +$46.22      |
+| CK13 | Mini-split connection, MC                          | `20A 2-Pole breaker`  | M2                   | +$46.22      |
+| CW1  | Equipment connection, hardwired (flex whip)        | `20A 2-Pole breaker`  | M2                   | +$46.22      |
+| CS7  | Twist-lock receptacle, L6-30                       | `30A 2-Pole breaker`  | M3                   | +$46.22      |
+| CS8  | Twist-lock receptacle, L14-30                      | `30A 2-Pole breaker`  | M3                   | +$46.22      |
+| MH12 | Unit heater                                        | `30A 2-Pole breaker`  | M3                   | +$46.22      |
+| CK3  | Water heater connection, commercial (208V, MC)     | `30A 2-Pole breaker`  | M3                   | +$46.22      |
+| CW14 | 208V kitchen equipment receptacle, 30A (NEMA 6-30) | `30A 2-Pole breaker`  | M3                   | +$46.22      |
+| PG18 | Building surge protective device                   | `30A 3-Pole breaker`  | M4                   | +$173.44     |
+| MH7  | Walk-in cooler, condensing unit                    | `30A 3-Pole breaker`  | M4                   | +$173.44     |
+| MH10 | Motor with starter, 3-phase                        | `30A 3-Pole breaker`  | M4                   | +$173.44     |
+| PG15 | Feeder breaker, 3-pole                             | `100A 3-Pole breaker` | M5                   | −$4.07       |
+
+**22 move. The other 4 commercial starters do NOT move**, each for its own
+reason:
+
+| Ref  | Starter                             | Breaker row now                 | Why it stays                                                                                                                                                                                           |
+| ---- | ----------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CW2  | Commercial Level 2 EV charger, 208V | `40A 2-Pole breaker`            | No 40A bolt-on row. **Suggested: add M6 `40A 2-Pole bolt-on breaker` and move CW2 to it** (QOB240 is a stocked part; not priced on 2026-10-14). Needs the owner's yes, like the rest of this list.     |
+| CS15 | Kitchen hood shunt interface        | `30A 2-Pole shunt-trip breaker` | The QO shunt-trip breakers found are plug-in (Border States). No bolt-on shunt-trip row is proposed.                                                                                                   |
+| PG16 | Dry-type transformer, 45 kVA        | `70A 3-Pole breaker`            | **The transformer's primary is 480V**, and QO/QOB breakers are 120/240V. Neither row fits; a 480V breaker row is a new question (below).                                                               |
+| MH11 | Motor on VFD                        | `30A 3-Pole breaker`            | **The drive is "5 HP, 480V 3-phase"**, so the same: a 240V breaker cannot feed it. And its `30A non-fused disconnect, NEMA 1, 240V` is a 240V switch on a 480V load — flagged for A, not changed here. |
+
+**Found while making the list — for the owner, not in this job:** PG16 and
+MH11 price a 480V load from 240V parts. The fix is either a 480V breaker row
+(and a 600V disconnect for MH11) or a 208V version of each starter. That is a
+new question, raised here so it is not lost; nothing changes until it is
+answered.
+
+**How it lands** (end-of-pricing job, after the owner's yes): add M1–M5 (and
+M6 if yes) as seed rows with keys in `server/seed/starterParts.ts`, then
+point each starter above at its key. The plug-on rows keep their ids, so
+nothing else moves. A bid that already priced a line keeps its frozen
+snapshot. **If the recount at that job finds a commercial starter not on
+this list, or one of these no longer using the row named, stop and find out
+why before moving anything** — a starter added or changed since 2026-10-14,
+or a missed search, and those want different fixes.

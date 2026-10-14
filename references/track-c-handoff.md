@@ -1,6 +1,47 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, evening — Panels answers recorded; Breakers name review
+## (newest) 2026-10-14, night — Breakers answers recorded; Lighting Hardware name review
+
+**Breakers, owner's answers** (`pricing/breakers-name-review.md` "Owner's
+answers"), for A's end-of-pricing job: **Q1 and Q3–Q8 yes, as suggested;
+Q9 waits for the brand-variants pass; Q2 yes** (add M1–M5 bolt-on; the
+existing rows become plug-on only, "bolt on" moves to M1–M5) **plus a
+starter list the owner asked for.** Nothing applied.
+
+- **The list (waits for the owner's yes, like the 4" box supports):** of the
+  64 starters that use a breaker row, the 26 `commercial` ones were read;
+  **22 move** to a bolt-on row (9 to M1, 4 to M2, 5 to M3, 3 to M4, PG15 to
+  M5), each with its row now, its bolt-on row and the price change from one
+  supply house (+$21.39 / +$46.22 / +$46.22 / +$173.44 / −$4.07 per
+  breaker). `both` and `residential` starters stay plug-on.
+- **4 do not move:** CW2 (40A; suggested new M6 `40A 2-Pole bolt-on
+breaker`), CS15 (shunt-trip stays plug-in), **PG16 and MH11 feed 480V
+  loads from 120/240V breakers** — and MH11's disconnect is a 240V switch.
+  A new question, raised in the file; nothing changes until answered.
+
+**`pricing/lighting-hardware-name-review.md`** — rows 1149–1307, 159 rows,
+workbook read from a fresh copy; the sheet matches `BASELINE_MATERIALS` one
+for one. Read-only.
+
+- **Counts:** 93 OK, 27 decided (wafer/disc/retrofit sizes; tape channel),
+  8 need words, 31 owner picks. 58 rows used by starters; no run type.
+- **Could price wrong:** P1 five rows got a box pack by accident from
+  `packFor`'s word rules (`pricing/starterSheetLayout.ts` 448/459) — **the
+  pole anchor bolt kit (3 starters) is "box of 100", so a ~$107 set prices
+  at ~$1**; P2 high bay and area light have no wattage ($123 vs $230); P3 a
+  bollard and an EV pedestal priced on a 20 ft pole's footing and bolts; P4
+  GC4's remote head has nothing to run it.
+- **Same pack fault on later shelves:** `Furniture feed connector` (1666),
+  `Strut wing connector` (1557), `2" SE cable connector` (1494).
+- **No 8 ft prefab fixture whip found** (all 6 ft) — LT23/LT26 use one; Q12.
+- **Missing:** M1 `Pole anchor bolt kit, 1" x 36", set of 4` for the 30 ft
+  pole.
+- **Owner questions:** Q1–Q14. Starter edits only if Q12 is yes (LT23, LT26
+  to the 6 ft whip).
+
+**Next shelf in app order: Grounding & Bonding (from row 1308).**
+
+## 2026-10-14, evening — Panels answers recorded; Breakers name review
 
 **Panels, owner's answers** (`pricing/panels-name-review.md` "Owner's
 answers"), for A's end-of-pricing job: **Q1–Q10 all yes, as suggested.**
