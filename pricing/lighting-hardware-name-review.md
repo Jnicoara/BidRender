@@ -316,3 +316,34 @@ Suggested: **yes**. It is another material's name.
   with the trim, not a wafer.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming or retiring it.
+
+## Owner's answers — 2026-10-14
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter. **Every question, Q1–Q14,
+is YES as suggested.**
+
+| Q   | Answer                      | What the job does                                                                                                                                                                                                                               |
+| --- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | **Names**                   | Every "Needs words" row is renamed through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row.                                                                                                                        |
+| Q2  | **Yes**                     | 1192 → `High bay, LED UFO, 150W` (LT26, DR13 move with it); 1198 → `LED area light, 150W` (GC3). Flood light, canopy, cylinder and the three wall packs get the common wattage A finds in one listing each, named the same way, before pricing. |
+| Q3  | **Description, not lumens** | Strips, wraparounds, vapor tights and troffers keep their names; description "Standard output. A high-output or emergency-battery version is a different price."                                                                                |
+| Q4  | **Yes**                     | The 13 decorative rows get "Builder-grade example. The customer's choice sets the real price."                                                                                                                                                  |
+| Q5  | **Yes, retire**             | The six 3" lamp trims go on `RETIRED_BASELINE_MATERIALS` (hidden, never deleted). No starter uses them.                                                                                                                                         |
+| Q6  | **Yes**                     | The 18 kept lamp trims get "For a lamp can of the same size and maker's series; takes a bulb. An LED retrofit trim needs neither."                                                                                                              |
+| Q7  | **Yes**                     | The six track rows get "Match H, J or L track across the rail, heads, feeds and connectors."                                                                                                                                                    |
+| Q8  | **Yes, 24V**                | 1234 → `LED tape light, 24V`; 1235 → `LED tape light power supply, 24V`, plus the common wattage from one listing. 1234's reel label (2026-10-13) and 1288's channel name stand.                                                                |
+| Q9  | **Yes**                     | 1203 gains the common wattage from one listing; 1219 → `LED PL lamp, G24q 4-pin, ballast bypass`.                                                                                                                                               |
+| Q10 | **Yes**                     | 1256 → `Pole anchor bolt kit, 3/4" x 30", set of 4`, pack `each` / 1; M1 `Pole anchor bolt kit, 1" x 36", set of 4` added. The pack is part of the pack pass (`pack-label-scan.md` § E).                                                        |
+| Q11 | **A checks first**          | A reads one bollard listing and one EV pedestal listing for the anchor hardware they ship with, then proposes the CW9 / CW2 change for a yes. **No starter edit until then.**                                                                   |
+| Q12 | **Yes**                     | **LT23 and LT26 move to `6 ft fixture whip, 3/8" MC, 14/3`; 1248 `8 ft MC whip, 14/3` is retired** (hidden, never deleted). These are the job's two starter edits.                                                                              |
+| Q13 | **Yes**                     | 1177 → `Emergency light remote head, single`, with "Runs from an emergency unit with remote capacity — price that unit if the job does not already have one." GC4 unchanged.                                                                    |
+| Q14 | **Yes**                     | "retrofit trim" comes off the 16 wafers' search words; "retrofit" stays.                                                                                                                                                                        |
+
+Also for the job, from the review's other rows: 1261 → `Recessed can
+pendant conversion kit`; 1239 → `LED troffer retrofit kit, 2x4` (DR7 moves
+with it); 1284 → `30 ft square steel light pole, 5" 11 ga`; 1257 → `Pole
+base cover, 4" square pole`. The five P1 packs go in the pack pass.
+
+**Starter edits in this job: LT23 and LT26 only** (Q12). Every rename keeps
+its row's id, so the starters on it move with it.

@@ -316,3 +316,68 @@ snapshot. **If the recount at that job finds a commercial starter not on
 this list, or one of these no longer using the row named, stop and find out
 why before moving anything** — a starter added or changed since 2026-10-14,
 or a missed search, and those want different fixes.
+
+## Owner's answers, round 2 — 2026-10-14
+
+**Nothing below is applied yet.** All of it is for A's end-of-pricing job.
+
+| Item                 | Answer                    | What the job does                                                                                                                                |
+| -------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Bolt-on starter list | **Yes, move all 22**      | The 22 starters in the table above move to M1–M5 as listed.                                                                                      |
+| M6                   | **Yes**                   | Add `40A 2-Pole bolt-on breaker` (search words "bolt on", "bolt-on", "qob", "panelboard breaker"); **CW2 moves to it.** 23 starter moves in all. |
+| CS15                 | **Stays plug-on**         | No change.                                                                                                                                       |
+| PG16 / MH11          | **Fix them — propose it** | The proposal below. **It waits for the owner's yes;** nothing in it is part of the job until then.                                               |
+
+### PG16 and MH11 — the 480V proposal (waits for the owner's yes)
+
+**What is wrong today.** PG16 (45 kVA transformer, 480V primary) and MH11
+(5 HP VFD, 480V 3-phase) are each fed from a plug-on 3-pole breaker, which is
+a 120/240V part, and MH11's motor disconnect is
+`30A non-fused disconnect, NEMA 1, 240V`. None of those is rated for a 480V
+circuit, so both starters price parts the job cannot use, and cheaper ones
+than the parts it will buy.
+
+**Where the 480V parts go.** The catalog already has `480V 3-phase
+panelboard` (Distribution Equipment). It takes bolt-on breakers rated for
+480Y/277V (Square D's E-frame, EDB), and the catalog has none, so that
+panelboard can be priced today but nothing in it can.
+
+**Sizes, so the rows are the right ones.** PG16: a 45 kVA transformer draws
+45,000 ÷ (480 × 1.732) = 54A on the primary; the 70A breaker it already
+prices is the next standard size up from 125% of that, so the size stays
+and only the voltage changes. MH11: a 5 HP motor at 480V is a small load,
+and the 30A it already prices stays.
+
+**Proposed new rows:**
+
+| #   | Name                                             | Shelf    | Listing (2026-10-14)                                                                                                                                                          | Search words                                                      |
+| --- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| H1  | `30A 3-Pole bolt-on breaker, 480Y/277V`          | Breakers | Square D EDB34030: **$265** (JRL), **$548.76** (Standard Electric Supply, list $669)                                                                                          | "480v breaker", "277/480", "edb", "e frame", "bolt on", "3p 30"   |
+| H2  | `70A 3-Pole bolt-on breaker, 480Y/277V`          | Breakers | Square D EDB34070: **$329–$359.99** (JRL, superbreakers.com); **$1,067.89** (SupplyHouse)                                                                                     | "480v breaker", "277/480", "edb", "e frame", "bolt on", "3p 70"   |
+| H3  | `30A non-fused disconnect, 3-pole, NEMA 1, 600V` | Panels   | Square D HU361 (heavy duty, 600V): new **$59.99–$120** on eBay, no distributor price found; the NEMA 3R HU361RB **$190** (Stokes Electric). A checks one distributor listing. | "heavy duty", "hd", "600v disconnect", "480v disconnect", "hu361" |
+
+**A 480Y/277V breaker is for a WYE system.** A 480V delta service (no
+neutral) needs a breaker rated straight 480V, which is a different part.
+H1 and H2 are named with their rating so nobody puts one on the wrong
+system; a straight-480V row is a new row if wanted.
+
+**The heavy-duty switch is right for MH11, not only a 600V rating.** A
+general-duty switch, which every disconnect on the Panels shelf is today, is
+a 240V product. A 600V switch is sold only as heavy duty, which is why H3's
+search words include "heavy duty". The Panels answers took "heavy duty" off
+the 240V switches for exactly this reason, so it now points only at H3.
+
+**The starter moves:**
+
+| Ref  | Starter                      | Part now                                 | Proposed part | Change, from the listings                                                                                                 |
+| ---- | ---------------------------- | ---------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| PG16 | Dry-type transformer, 45 kVA | `70A 3-Pole breaker`                     | H2            | The breaker goes from a 240V plug-on to a ~$330–$360 E-frame breaker.                                                     |
+| MH11 | Motor on VFD                 | `30A 3-Pole breaker`                     | H1            | From a plug-on (QO330 $104.52 at Standard Electric Supply) to a $265–$549 E-frame breaker.                                |
+| MH11 | Motor on VFD                 | `30A non-fused disconnect, NEMA 1, 240V` | H3            | A 240V general-duty switch to a 600V heavy-duty one. The price gap is not measured: no new HU361 distributor price found. |
+
+**Neither starter gains or loses a line**, so each is a part swap in
+`server/seed/starterParts.ts`. Nothing else in either recipe changes: PG16's
+flex and lugs and MH11's #10 THHN and liquidtight are right at 480V. **If
+the recount at the job finds another starter that feeds a 480V part** (the
+other three transformers have no starters today), stop and add it to this
+list rather than moving it on its own.

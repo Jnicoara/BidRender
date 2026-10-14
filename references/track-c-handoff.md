@@ -1,6 +1,52 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, night — Breakers answers recorded; Lighting Hardware name review
+## (newest) 2026-10-14, late — Breakers round 2, Lighting answers, the pack-word list, Grounding & Bonding review
+
+**Breakers, round 2** (`pricing/breakers-name-review.md` "Owner's answers,
+round 2"), for A's end-of-pricing job, nothing applied: **the 22 bolt-on
+moves YES; M6 `40A 2-Pole bolt-on breaker` YES and CW2 moves to it (23
+moves); CS15 stays plug-on.** PG16/MH11: owner said fix them, so the file
+now **proposes** H1 `30A 3-Pole bolt-on breaker, 480Y/277V` (EDB34030,
+$265–$549), H2 `70A 3-Pole bolt-on breaker, 480Y/277V` (EDB34070,
+$329–$360), H3 `30A non-fused disconnect, 3-pole, NEMA 1, 600V` (HU361,
+heavy duty; no distributor price found) and the moves PG16 → H2, MH11 → H1
+
+- H3. **That part waits for the owner's yes.**
+
+**Lighting Hardware: Q1–Q14 all yes as suggested** (Q3 a description, not
+lumens; Q11 A checks first). Recorded in the review's "Owner's answers".
+**The job's starter edits: LT23 and LT26 to the 6 ft whip** (Q12).
+
+**`pricing/pack-label-scan.md` § E — every row whose pack came from a word
+in its name**, as the owner asked: **380 box packs** (84 box of 100, 18 box
+of 10, 278 box of 25) and **47 per-foot rows made a 10 ft stick**, each with
+its row, the word, what the sheet holds now and column I. **4 have a typed
+price, all on packs the owner had already overwritten** (752; flex 154, 155,
+160). 7 marked ACCIDENTAL — **`Dishwasher whip` (RS4) is a "box of 100" from
+"washer"**, `Screwless wall plate` from "screw", and the five lighting rows.
+
+**For A — owner, 2026-10-14: change `pricing/buildStarterSheets.mts` (and
+`packFor` in `pricing/starterSheetLayout.ts`) so the sheet NEVER guesses a
+pack from words in the name.** Packs come from a value written per row; a row
+without one is `each` / 1 and the build lists it. Add a test that fails if
+`packFor` guesses. Relabel § E in the same pass as A–D, before more prices
+are typed. Details in § E "for A".
+
+**`pricing/grounding-bonding-name-review.md`** — rows 1308–1326, 19 rows,
+workbook read from a fresh copy; the sheet matches `BASELINE_MATERIALS` one
+for one. Read-only.
+
+- **Counts:** 5 OK, 1 decided, 10 need words, 3 owner picks. 6 rows used by
+  starters; no run type.
+- **Could price wrong:** P1 the rod clamp (10 starters) and pipe clamp (5)
+  are "box of 25" from the word "clamp"; P2 rods don't say copper-bonded or
+  galvanized; P3 an unnamed exothermic mold ($342–$432, one connection each).
+- **Missing:** M1 exothermic mold handle clamp.
+- **Owner questions:** Q1–Q11. No starter edit proposed.
+
+**Next shelf in app order: Life Safety (from row 1327).**
+
+## 2026-10-14, night — Breakers answers recorded; Lighting Hardware name review
 
 **Breakers, owner's answers** (`pricing/breakers-name-review.md` "Owner's
 answers"), for A's end-of-pricing job: **Q1 and Q3–Q8 yes, as suggested;
