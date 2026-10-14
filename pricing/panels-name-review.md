@@ -312,3 +312,31 @@ Suggested: **yes.**
   must return only main-lug rows.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming it.
+
+## Owner's answers — 2026-10-14
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter. **Every question, Q1–Q10,
+is YES as suggested.**
+
+| Q   | Answer                                  | What the job does                                                                                                                                                                                                                                                                                                                                                    |
+| --- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | **Names**                               | Every "Needs words" row is renamed to the proposed name through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row.                                                                                                                                                                                                                        |
+| Q2  | **Yes**                                 | S1–S3 search words and descriptions as listed: "nema 1 interior"/"mb" and "mb rainproof" on the 12 older main-breaker rows; "Main-lug only" and "nema 1 interior" on 1020, 1024, 1027, 1028, 1032, 1034 (and "nema 1 interior" on 1036); "general duty gd" replaces "heavy duty" on 972–979 and 1048–1055.                                                           |
+| Q3  | **Yes — pole count, 3-pole rows, PG17** | 972–979 and 1048–1055 → `…, 2-pole, NEMA 1 \| NEMA 3R, 240V`. **New:** `100A` and `200A fused disconnect, 3-pole, NEMA 1, 240V` and the same in NEMA 3R (4 rows). **PG17 → `100A fused disconnect, 3-pole, NEMA 1, 240V`, keeping its 3 fuses — the job's ONE starter edit.** Check one listing each for the 100A and 200A non-fused 2-pole rows before naming them. |
+| Q4  | **Yes**                                 | Row 980 → `200A main-breaker panel, generator-ready, 40-space, indoor`; "generator ready" and "genready" stay search words.                                                                                                                                                                                                                                          |
+| Q5  | **Keep both, renamed**                  | Row 983 → `400A main-breaker panel, 42-space, indoor`; row 1040 → `400A main-lug panel, 42-space, indoor` (main-lug description, "mlo"). Both get "Commercial-grade 400A load center. A house's 400A service is usually the 400A meter base with two 200A panels."                                                                                                   |
+| Q6  | **125A per position**                   | 1044 → `Meter center, 4-position, 125A per position`; 1045 → `Meter center, 6-position, 125A per position`. CW12 stays on the 4-position row (renamed in place).                                                                                                                                                                                                     |
+| Q7  | **Yes**                                 | Row 1047 → `200A meter-main combination, 8-space, outdoor`; "meter main" and "meter combo" stay search words. PG3 stays on it.                                                                                                                                                                                                                                       |
+| Q8  | **Generic, with the descriptions**      | 971, 1046, 1057–1060 get "Fits the panel's own family (QO, Homeline, …) — order with the panel". 971 → `Feed-through lug kit, 225A`. Covers get "Replacement cover or panelboard trim — sized by the box"; 1062–1067 get "Complete: box, interior and cover". 1059 gets "For an extra neutral only — grounds go on a Ground bar kit."                                |
+| Q9  | **Yes**                                 | Row 1061 → `225A panelboard interior, 3-phase main-lug, 42-space`; "interior only" and "guts" stay search words.                                                                                                                                                                                                                                                     |
+| Q10 | **Yes**                                 | M1 `60A fused pullout disconnect` added, with the search words in "Common items that are MISSING".                                                                                                                                                                                                                                                                   |
+
+**Starter edits in this job: PG17 only** (Q3). Every other rename keeps its
+row's id, so the starters on it move with it.
+
+**Check before shipping.** The fuse ↔ switch test and its by-name line for
+`60A fused disconnect, NEMA 1, 240V` change in the same commit (see "For
+A"). Run `scripts/searchSpotCheck.mts` with the queries listed there. If a
+recount finds a starter or run type on a row this review says is unused,
+stop and find out why before renaming it.

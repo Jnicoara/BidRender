@@ -1,6 +1,37 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, later — price history: owner's answers recorded
+## (newest) 2026-10-14, evening — Panels answers recorded; Breakers name review
+
+**Panels, owner's answers** (`pricing/panels-name-review.md` "Owner's
+answers"), for A's end-of-pricing job: **Q1–Q10 all yes, as suggested.**
+Names carry the words; S1–S3 search-word fixes; pole count on every
+disconnect (2-pole), plus 3-pole fused 100A/200A in NEMA 1 and 3R (4 new
+rows); **PG17 → `100A fused disconnect, 3-pole, NEMA 1, 240V`, keeping its
+3 fuses — the job's one starter edit**; generator-ready, 400A, meter
+center (125A per position), meter-main (8-space outdoor), panelboard
+interior (225A) renamed; panel parts generic with descriptions; M1 60A
+fused pullout added. Nothing applied.
+
+**`pricing/breakers-name-review.md`** — rows 1068–1148, 81 rows, workbook
+read from a fresh copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 65 OK, 8 decided (half-size, names frozen), 3 need words
+  (125–200A 3-pole → molded-case), 5 owner picks (accessories). 18 rows used
+  by starters; no run type.
+- **Could price wrong:** P1 plug-on and bolt-on are one row, and its search
+  words say both — commercial starters price panelboard breakers at
+  load-center prices; P2 125–200A 3-pole are ~$475–$525 frame breakers, not
+  plug-ons; P3 back-fed main kit plus a hold-down kit, twice.
+- **No US listing found for a 1/2-inch half-size breaker**, so Q4 asks A to
+  confirm the 2-pole 40A/50A half-size rows before pricing (names stay).
+- **Missing:** M1–M5 bolt-on breakers (20A 1-Pole, 20A/30A 2-Pole, 30A/100A
+  3-Pole).
+- **Owner questions:** Q1–Q9. No starter edit proposed.
+
+**Next shelf in app order: Lighting Hardware (from row 1149).**
+
+## 2026-10-14, later — price history: owner's answers recorded
 
 **`references/price-history-plan.md` § 9: Q1–Q8 all yes, as suggested.**
 Recording ships in the same release as PS-M1..M6, with PH-M1 right behind
