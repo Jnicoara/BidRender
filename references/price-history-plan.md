@@ -334,7 +334,26 @@ Every count below is a **before-and-after of the same query** (CLAUDE.md
 4. With Accept (after `c6d80249` merges): `starter_accepted`.
 5. With multi-supplier: PH-M2 and the supplier filter.
 
-## 9. Questions for the owner — suggested answers
+## 9. Questions for the owner — ALL ANSWERED 2026-10-14: yes to Q1–Q8, as suggested
+
+The owner took every suggestion below. What that fixes:
+
+- **Q1:** the RECORDING (build order § 8 steps 1–2) ships in the **same
+  release as PS-M1..M6**, with PH-M1 right behind them; the panel follows
+  in a later release.
+- **Q2:** BidRidge example-price changes show, labelled, **only while the
+  shop uses the shipped price** (§ 3.4).
+- **Q3:** a price on one bid line is **not** recorded; "save to library"
+  from a bid is.
+- **Q4:** kept **forever**; deleted only with the account.
+- **Q5:** labor rates and hours **later, in their own table**, same shape.
+- **Q6:** **anyone who can see Materials** can see it.
+- **Q7:** "last changed … before history was kept" is shown, read live
+  from the row (§ 3.5).
+- **Q8:** **one history per item**, with a supplier filter once suppliers
+  exist (PH-M2, § 4.2).
+
+Plan only — nothing built.
 
 | #   | Question                                                                                                              | Suggested                                                                                                                      |
 | --- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |

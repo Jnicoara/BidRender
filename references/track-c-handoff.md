@@ -1,6 +1,22 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, after the restart — PRICE HISTORY plan (plan only)
+## (newest) 2026-10-14, later — price history: owner's answers recorded
+
+**`references/price-history-plan.md` § 9: Q1–Q8 all yes, as suggested.**
+Recording ships in the same release as PS-M1..M6, with PH-M1 right behind
+them; the screen comes in a later release. Example-price changes are shown only while the
+shop uses the shipped price; bid-line prices are not recorded; kept
+forever; labor later in its own table; anyone who sees Materials sees it;
+"last changed … before history was kept" shown; one history per item
+with a supplier filter. Nothing built.
+
+**For A:** PH-M1 (§ 6) is a confirmed part of the PS-M1..M6 release, queued
+directly after PS-M6.
+
+**Panels review (`pricing/panels-name-review.md`) Q1–Q10 shown to the
+owner again; still waiting for answers.**
+
+## 2026-10-14, after the restart — PRICE HISTORY plan (plan only)
 
 Items 1–4 of the restart prompt were already in `4eaa756e` (Service Entrance
 answers, Wire & Cable skipped, Panels review, the Example-tag QUEUED entry);
