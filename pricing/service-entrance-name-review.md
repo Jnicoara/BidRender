@@ -154,3 +154,30 @@ Suggested: **yes to both.**
   still surface the conduit heads first, and "se cap" the SE cable cap.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before retiring it.
+
+## Owner's answers — 2026-10-14
+
+**Nothing below is applied yet.** It is all for A's **end-of-pricing job**.
+Track C changes no catalog row, seed or starter. **Every question, Q1–Q8,
+is YES as suggested.**
+
+| Q   | Answer                    | What the job does                                                                                                                                                                            |
+| --- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | **Names**                 | Every "Needs words" row is renamed to the proposed name through `RENAMED_BASELINE_MATERIALS`, each old name kept as a search word on its row.                                                |
+| Q2  | **One row, 1/0–4/0**      | Row 960 → `Service entrance cap, SE cable, 1/0–4/0`. No smaller cap.                                                                                                                         |
+| Q3  | **1-1/4", 1-1/2" and 2"** | Row 961 → `2" service entrance elbow (SLB), aluminum` through the rename map (keeps its id; "service entrance elbow" a search word there). `1-1/4"` and `1-1/2"` rows are new, same pattern. |
+| Q4  | **Keep it, generic**      | Row 956 keeps its name. Description: "Usually ships with the panel — add only when it is missing. Fits the panel's own family (QO, Homeline, …)."                                            |
+| Q5  | **The sealing ring**      | Row 958 → `Meter sealing ring, ring-type socket`; "meter seal" stays a search word.                                                                                                          |
+| Q6  | **Retire it**             | Row 959 "Meter socket adapter ring" into `RETIRED_BASELINE_MATERIALS` (hidden, never deleted). "meter ring" becomes a search word on the sealing ring (Q5).                                  |
+| Q7  | **Yes**                   | Row 955 → `Ground rod inspection well, 10", HDPE`; "access well" and "test well" stay search words.                                                                                          |
+| Q8  | **Yes to both**           | M1 `SE cable sill plate, 1/0–4/0` and M2 `SE cable strap, 3/0–4/0, 1-hole` added, with the search words in "Common items that are MISSING".                                                  |
+
+**Starter edits in this job: none.** No starter or run type uses this shelf.
+The three masts (962–964) retire into rigid in the same pass, as already
+decided.
+
+**Check before shipping.** `scripts/searchSpotCheck.mts` with the queries in
+"For A": "weatherhead" must still surface the conduit heads first, "se cap"
+the SE cable cap, "meter ring" the sealing ring (never the retired row), and
+"sill plate" M1. If a recount finds a starter or run type using a row being
+retired, stop and find out why before retiring it.

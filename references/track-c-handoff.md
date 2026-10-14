@@ -1,5 +1,52 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-14, latest — Service Entrance answers recorded; Panels name review; one item QUEUED
+
+**Service Entrance, owner's answers**
+(`pricing/service-entrance-name-review.md` "Owner's answers"), for A's
+end-of-pricing job: **Q1–Q8 all yes, as suggested.** Names carry the missing
+words (old names stay search words); one SE cable cap, 1/0–4/0; SE elbows
+1-1/4", 1-1/2", 2" aluminum SLB (the old name is a search word on 2");
+generic bonding jumper kit with the suggested description; `Meter sealing
+ring, ring-type socket`; the adapter ring retired (hidden); `Ground rod
+inspection well, 10", HDPE`; M1 sill plate and M2 SE strap added. **No
+starter edit.** Nothing applied.
+
+**Wire & Cable: no name review** (owner, 2026-10-14). Its names were frozen
+2026-10-07 and SER has its own plan.
+
+**`pricing/panels-name-review.md`** — rows 965–1067, 103 rows, workbook read
+from a fresh copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 74 OK, 1 decided (400A meter base = CL320), 21 need words, 7
+  owner picks. 21 rows used by starters; no run type.
+- **Could price wrong:** P1 `400A main panel, 42-space` is a $5,700–$7,100
+  commercial load center; P2 "heavy duty" search word on every 240V
+  (general duty) switch; P3 no pole count on any disconnect, so PG17's 3
+  fuses imply a 3-pole switch the row does not name; P4 panel covers $40 or
+  $800; P5 meter centers with no rating per position; P6 an unsized
+  panelboard interior.
+- **Search-word/description gaps (S1–S3):** 12 older main-breaker rows lack
+  the NEMA words, 6 main-lug rows lack the "Main-lug only" description.
+- **Missing:** M1, a 60A fused pullout disconnect.
+- **Owner questions:** Q1–Q10, each with a suggested answer. Q3 (pole
+  count) would make PG17 the job's one starter edit.
+
+**Next shelf in app order: Breakers (from row 1068).**
+
+### QUEUED — do NOT build yet: `applyStarterChange` writes the "Example" tag
+
+When a starter change sets a price, hours or a rate, `applyStarterChange`
+writes the matching "Example" tag **in the same change**:
+`materials.isExamplePrice` / `isExampleLaborHours`,
+`labor_rates.isExampleRate`, `assemblies.isExampleHours`, and the steps'
+`isExampleMinutes` (`drizzle/schema.ts`; `shared/exampleTags.ts`), so a changed
+starter number is never shown untagged. **Build it only after A's boot
+change (`c6d80249`) lands on local-dev and track-c has merged it**, because
+A's `starterDrift` calls `applyStarterChange`; building it first means two
+versions of the same function to reconcile.
+
 ## (newest) 2026-10-14, later — Wall Plates answers recorded; Service Entrance review; Gate green on b11abf2e
 
 **Gate for the local-dev push of `b11abf2e`** (run 38511437076, attempt 2;
