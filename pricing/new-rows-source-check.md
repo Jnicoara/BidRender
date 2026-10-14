@@ -31,7 +31,8 @@ refused direct fetches (403), so Stoneway was checked through search only;
 a row found at none of the three may still be at Stoneway, and A may move
 it to COMMON if A finds it there.
 
-**Totals: 60 families checked — 58 COMMON, 2 SPECIALTY.** Five COMMON rows
+**Totals: 61 families checked — 59 COMMON, 2 SPECIALTY** (60 on
+2026-10-14, plus Strut & Supports M1 the same evening). Five COMMON rows
 carry a note A must act on (marked ⚠). If A's recount finds a different
 number of accepted new rows, stop and find out why: either a later answer
 added or dropped one, or this list missed it.

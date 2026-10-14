@@ -184,3 +184,36 @@ there. Telecom busbars and ground bars take 2-hole lugs.
   rail". "lug" should not lead with a lug a size off.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming it.
+
+## Owner's answers — 2026-10-14: Q1–Q9 all YES, as suggested
+
+For A's end-of-pricing job. Nothing applied here; no catalog row, seed or
+starter changed.
+
+1. **Q1 yes**: the 14 crimp lugs become `{size} copper compression lug,
+1-hole, {stud} stud` — 1/4" through #2, 3/8" for #1 to 2/0, 1/2" for 3/0
+   and up, each confirmed at Platt — with one description, "One conductor
+   size; the crimp die must match", "single size" dropped from the kcmil
+   names, and the cross search words dropped (S1). PG15 and PG16 follow by
+   key.
+2. **Q2 yes**: crimp sleeves described "Copper compression splice, one
+   size; the crimp die must match".
+3. **Q3 yes**: `3/4" cord grip (0.40"-0.70" cord)`, `1" cord grip
+(0.50"-0.90" cord)`.
+4. **Q4 yes**: the six ring and spade terminals add `#8-#10 stud`.
+5. **Q5 yes**: `Push-in wire connector, 3-port`.
+6. **Q6 yes**: `Cable staple, insulated, NM 14/2-12/2`.
+7. **Q7 yes**: `DIN rail, 35 mm, 1 m`; `Terminal block, DIN rail,
+feed-through, 12-10 AWG`.
+8. **Q8 yes — the pack pass**: `MC anti-short bushing` `bag of 100` / 100;
+   3/8" and 1/2" MC connectors `box of 50` / 50; 3/4" and 1" MC connectors,
+   the eight set-screw splices, `2" SE cable connector` and `Ferrule kit`
+   `each` / 1; ring, spade and butt splices `bag of 100` / 100; NM clamps,
+   snap-ins, push-ins and lever connectors as A finds them at Home Depot,
+   Platt or Stoneway. **Before** the owner types these prices.
+9. **Q9 yes**: M1 `#6 copper compression lug, 2-hole, 1/4" stud` added,
+   COMMON — Example price from Platt (Burndy YA6CL2TC14), per
+   `new-rows-source-check.md`.
+
+S2 and S3 (the cross search words on the mechanical lug and the NM clamps)
+go with these. **Starter edits: none.**

@@ -1,5 +1,40 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-14, night — Connectors answers, Strut & Supports review
+
+**Standing rule (owner, 2026-10-14): never stop MySQL 3307** — every track
+shares it; the owner stops it at end of day. Track C ran no dev server and
+touched no database this round.
+
+**Connectors & Terminations: Q1–Q9 all YES as suggested**
+(`pricing/connectors-terminations-name-review.md` "Owner's answers"), for
+A's end-of-pricing job, nothing applied: the 14 crimp lugs renamed with
+stud size and one description; sleeve descriptions; cord grip ranges;
+`#8-#10 stud` on ring/spade terminals; push-in 3-port; insulated NM staple;
+DIN rail and terminal block named; **Q8 pack fixes for the pack pass**
+(anti-short `bag of 100`, 3/8"/1/2" MC connectors `box of 50`, big
+splices, SE connector and ferrule kit `each`, crimp terminals `bag of
+100`); **Q9 M1 `#6 copper compression lug, 2-hole, 1/4" stud` added**
+(COMMON, Platt). No starter edit.
+
+**`pricing/strut-supports-name-review.md`** — rows 1519–1567, 49 rows,
+fresh workbook copy (unchanged); matches `BASELINE_MATERIALS` one for one.
+Read-only, under the source rule.
+
+- **Counts:** 26 OK, 22 need words, 1 owner pick. 9 rows used (T-grid
+  clips in 5 and 6 starters; PG16, MS5, MH12, DV30, PG20). No run type.
+- **Could price wrong:** strut with no finish (hot-dip ≈ 2x
+  pre-galvanized); strut straps that don't say EMT or rigid; the temp pole
+  post with no length (PG20).
+- **Packs:** 29 guessed from words; straps, channel nut and wing fitting
+  should be `each`.
+- **Missing:** M1 `3/8"-16 x 1" hex bolt, zinc` (COMMON, Home Depot) —
+  added to `new-rows-source-check.md` (now 61 families, 59 COMMON).
+- **Owner questions:** Q1–Q9. No starter edit proposed.
+
+**Next shelf in app order: Fasteners & Anchors (from row 1568).** Its
+`Rod hanger clip` must be checked against Strut Q5.
+
 ## (newest) 2026-10-14, end of day — SOURCE RULE for new rows, Low Voltage answers, Connectors & Terminations review
 
 **THE OWNER'S SOURCE RULE (2026-10-14) — A FOLLOWS IT FOR EVERY NEW ROW
