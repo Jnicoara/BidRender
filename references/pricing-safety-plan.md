@@ -400,6 +400,11 @@ import wrote), so its resolver is "the row itself", not `materialItemKey`.
 NOT NULL on the new tables' required columns: a row exists only to hold
 these values; there is no "not yet" state (multi-supplier § 6's argument).
 
+> **Queued after PS-M6 (Track C, 2026-10-14): PH-M1, `material_price_history`**
+> (`references/price-history-plan.md` § 6). It points at `price_imports` and
+> records the pack columns, so it comes after these. `priceWrite` and the
+> history's `priceWhy` travel in one argument to `db.updateMaterial`.
+
 ## 7. Build order for C (once A's columns exist)
 
 1. `shared/packPricing.ts` (`priceWrite`, round-up) + the `updateMaterial`

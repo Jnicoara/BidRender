@@ -1,6 +1,34 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, latest — Service Entrance answers recorded; Panels name review; one item QUEUED
+## (newest) 2026-10-14, after the restart — PRICE HISTORY plan (plan only)
+
+Items 1–4 of the restart prompt were already in `4eaa756e` (Service Entrance
+answers, Wire & Cable skipped, Panels review, the Example-tag QUEUED entry);
+nothing was redone.
+
+**`references/price-history-plan.md`** — plan only, no code, no migration.
+
+- **One insert-only table, `material_price_history`** (PH-M1, SQL draft in
+  § 6, for A, **queued after PS-M1..M6**): per change of a company's price —
+  per-unit price and the one before, unit, pack qty/label/price, supplier
+  text, sheet date, who (the person), how (`typed` · `imported` ·
+  `import_undone` · `starter_accepted`), Example tag. Keyed on
+  `materialItemKey`, so a fork never splits an item's history.
+- **One door:** `db.updateMaterial`/`createMaterial` take a price only with
+  a `priceWhy` (union type), record in the same transaction, only when the
+  number changed. A source-scan test goes red on a price write elsewhere.
+- **Shipped prices are not copied:** their history is `starter_changes`,
+  read as "BidRidge example price". Accept (not built) records
+  `starter_accepted` — waits on `c6d80249` like the QUEUED item.
+- **View-only, never read by pricing; bid-line prices not recorded.**
+  PH-M2 (`supplierId`) waits for multi-supplier's `suppliers`.
+- **Owner questions Q1–Q8** with suggested answers. Q1 is the urgent one:
+  ship recording with PS-M1..M6, screen after, because nothing can be
+  backfilled.
+- Cross-referenced from `multi-supplier-plan.md` § 6 and
+  `pricing-safety-plan.md` § 6.
+
+## 2026-10-14, latest — Service Entrance answers recorded; Panels name review; one item QUEUED
 
 **Service Entrance, owner's answers**
 (`pricing/service-entrance-name-review.md` "Owner's answers"), for A's
