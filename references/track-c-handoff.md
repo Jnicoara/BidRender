@@ -45,8 +45,7 @@ rows, fresh workbook copy (unchanged since the Low Voltage read); matches
   Platt).
 - **Owner questions:** Q1–Q9. No starter edit proposed.
 
-**Next shelf in app order: from row 1519** (the shelf after Connectors &
-Terminations).
+**Next shelf in app order: Strut & Supports (from row 1519).**
 
 ## 2026-10-14, latest — Life Safety answers, Low Voltage review
 
