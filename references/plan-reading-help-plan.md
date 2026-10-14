@@ -218,6 +218,15 @@ Each has **Next** and **No more tips**. Closing one is not a "no".
 
 - **Never over the drawing's centre and never while a tool is picked up.** A
   tip that covers what the person is about to tap has cost them a tap.
+- **Never over a control either — added 2026-10-14.** The rule above only
+  protected the drawing's middle, so "Don't know a word?" sat in the side
+  panel on top of Capture and the legend rows, and staging smoke run
+  38595716662 timed out on both (laptop and sideways iPad). Now: the card
+  stays inside the drawing's box, off the toolbars and the panel
+  (`placeTip`); the first press anywhere outside it puts tips away for the
+  visit WITHOUT marking that one seen (a tool's own popover, such as "Name
+  this symbol", also opens over the drawing); and its buttons are 44 px on any
+  touch screen, not only a phone.
 - **Seen-state: per person, in this browser** (`localStorage`, key
   `bidrender.plans.tipsSeen`, try/catch, renders fine without storage) — a
   convenience per CLAUDE.md § browser storage. Cost: a person on a laptop and

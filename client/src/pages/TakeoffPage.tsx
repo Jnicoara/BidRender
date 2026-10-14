@@ -6375,7 +6375,9 @@ export default function TakeoffPage({
     FIRST-OPEN TIPS (plan-reading-help-plan.md § 5, @/lib/planTips). Only
     once this sheet is drawn, and never while a tool is in hand: a tip over
     what the person is about to tap has cost them a tap. The ×  ends tips for
-    this visit; the rest come the next time the screen opens.
+    this visit; the rest come the next time the screen opens. So does any
+    press outside the card (PlanTips' `onAway`), without marking it seen —
+    a tip must never stand between the person and a control.
   */
   const [tipsSeen, setTipsSeen] = usePlanTipsSeen();
   const [tipsClosedThisVisit, setTipsClosedThisVisit] = useState(false);
@@ -12813,6 +12815,7 @@ export default function TakeoffPage({
         <PlanTips
           tip={tip}
           phone={phone}
+          touch={phone || coarse}
           notesSheetLabel={notesSheetLabel}
           last={nextTip(markTipSeen(tipsSeen, tip), tipSheet) === null}
           onNext={() => setTipsSeen(markTipSeen(tipsSeen, tip))}
@@ -12820,6 +12823,7 @@ export default function TakeoffPage({
             setTipsSeen(markTipSeen(tipsSeen, tip));
             setTipsClosedThisVisit(true);
           }}
+          onAway={() => setTipsClosedThisVisit(true)}
           onOff={() => setTipsSeen(turnTipsOff(tipsSeen))}
         />
       )}

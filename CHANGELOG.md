@@ -4,6 +4,17 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-14]
+
+- **The first-visit tips on the Plans screen no longer get in the way.** The
+  "Don't know a word?" card used to drop into the side panel, right on top of
+  the Legend tab's Capture button and its symbol list, so neither could be
+  clicked or tapped until the tip was dismissed. Tips now sit over the edge
+  of the drawing, never over the toolbars or the panel. The first press
+  anywhere else puts them away for this visit, and they come back next time.
+  On a tablet or phone their buttons are finger-sized. Found by the staging
+  smoke test, which timed out on both a laptop and a sideways iPad.
+
 ## [2026-10-13]
 
 - **A sheet's numbered notes, read for you, with no AI.** Under the Legend

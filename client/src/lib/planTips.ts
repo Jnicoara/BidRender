@@ -11,9 +11,10 @@
  *   control is not on screen is SKIPPED, not marked seen: no notes sheet in
  *   this set, a sheet-kind line that is hidden or says nothing here, nothing
  *   tappable on the drawing. It can still show on a later sheet or bid.
- * - `placeTip` — where the card goes: beside its control, inside the window,
- *   and never over the middle of the drawing (§ 5: a tip over what the person
- *   is about to tap has cost them a tap).
+ * - `placeTip` — where the card goes: as near its control as it can get while
+ *   staying inside the drawing's box — never over the toolbars or the side
+ *   panel — and never over the middle of the drawing (§ 5: a tip over what
+ *   the person is about to tap has cost them a tap).
  *
  * Seen-state is per person, in this browser — a convenience, so browser
  * storage (CLAUDE.md § Browser storage); a blocked store just shows the tips
@@ -131,12 +132,25 @@ export function tipText(
 export type Rect = { left: number; top: number; width: number; height: number };
 
 /**
- * Where the card goes, in window pixels. Tries below, above, left of and
- * right of the control, in that order, and takes the first spot that is
- * inside the window AND does not cover the middle of the drawing. If none
- * does, the first corner of the window that does not cover it either. Only a
- * card as big as the window covers the middle from every corner; then it
- * goes bottom-left, because there is nowhere else.
+ * Where the card goes, in window pixels.
+ *
+ * FIRST CHOICE: inside the drawing's own box, clear of its middle. Outside
+ * that box are the toolbars and the side panel, which are nothing but
+ * controls — and a card over a control is a control that cannot be used
+ * until the tip is dismissed. That is not hypothetical: until 2026-10-14
+ * this took the first spot inside the WINDOW, so "Don't know a word?" sat
+ * under the Legend tab, on top of Capture and the legend's own rows, and
+ * smoke run 38595716662 timed out clicking both (desktop and a sideways
+ * tablet). The drawing is the one place where covering an edge costs
+ * nothing that a pan cannot get back.
+ *
+ * So each of below, above, left of and right of the control is slid into the
+ * drawing's box, then the drawing's own corners are tried, nearest the
+ * control first; the first that fits and keeps the middle clear wins.
+ *
+ * Only when the drawing is too small to hold the card (or is not known) does
+ * it fall back to the window: the first side spot inside the window that
+ * keeps the middle clear, then the window's corners, then bottom-left.
  */
 export function placeTip(
   anchor: Rect,
@@ -182,6 +196,40 @@ export function placeTip(
     { left: gap, top: gap },
     { left: right, top: gap },
   ];
+  if (drawing) {
+    const box = {
+      left: Math.max(0, drawing.left) + gap,
+      top: Math.max(0, drawing.top) + gap,
+      right: Math.min(window.width, drawing.left + drawing.width) - gap,
+      bottom: Math.min(window.height, drawing.top + drawing.height) - gap,
+    };
+    if (
+      box.right - box.left >= card.width &&
+      box.bottom - box.top >= card.height
+    ) {
+      const into = (s: { left: number; top: number }) => ({
+        left: Math.max(box.left, Math.min(s.left, box.right - card.width)),
+        top: Math.max(box.top, Math.min(s.top, box.bottom - card.height)),
+      });
+      const ax = anchor.left + anchor.width / 2;
+      const ay = anchor.top + anchor.height / 2;
+      const inner = [
+        { left: box.left, top: box.top },
+        { left: box.right - card.width, top: box.top },
+        { left: box.left, top: box.bottom - card.height },
+        { left: box.right - card.width, top: box.bottom - card.height },
+      ].sort(
+        (a, b) =>
+          Math.hypot(
+            a.left + card.width / 2 - ax,
+            a.top + card.height / 2 - ay
+          ) -
+          Math.hypot(b.left + card.width / 2 - ax, b.top + card.height / 2 - ay)
+      );
+      const inside = [...spots.map(into), ...inner].find(s => !coversCentre(s));
+      if (inside) return inside;
+    }
+  }
   return (
     spots.find(s => fits(s) && !coversCentre(s)) ??
     corners.find(s => !coversCentre(s)) ??

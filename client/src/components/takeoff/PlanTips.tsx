@@ -12,8 +12,16 @@
  *
  * Not modal: the page behind it still works, and the card swallows its own
  * pointer events so a tap on it can never pan or mark the drawing behind.
+ *
+ * NEVER IN THE WAY (2026-10-14). The card is placed off the toolbars and the
+ * side panel (`placeTip`), and the person's first press ANYWHERE ELSE puts
+ * it away for this visit (`onAway`). Placement alone was not enough: a tool's
+ * own popover — "Name this symbol" after a capture — opens over the drawing,
+ * which is exactly where the card goes. Smoke run 38595716662 timed out on
+ * both, on a laptop and a sideways tablet. The press still does what it was
+ * for; the listener is on the capture phase so nothing below can swallow it.
  */
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { placeTip, tipText, type PlanTipId, type Rect } from "@/lib/planTips";
@@ -38,23 +46,47 @@ function findRect(name: string): Rect | null {
 export function PlanTips({
   tip,
   phone,
+  touch,
   notesSheetLabel,
   last,
   onNext,
   onClose,
+  onAway,
   onOff,
 }: {
   tip: PlanTipId;
   phone: boolean;
+  /**
+   * A finger, not a mouse — a tablet as much as a phone. Every way out of
+   * the card is then 44 px, so dismissing it is one easy tap.
+   */
+  touch: boolean;
   notesSheetLabel: string | null;
   /** No tip after this one on this sheet: "Next" reads "Got it". */
   last: boolean;
   onNext: () => void;
   /** The card's ×: this one is seen; the rest wait for the next visit. */
   onClose: () => void;
+  /**
+   * A press outside the card: the person is busy. Tips go away for this
+   * visit and this one is NOT marked seen, so it comes back next time.
+   */
+  onAway: () => void;
   onOff: () => void;
 }) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const onAwayRef = useRef(onAway);
+  onAwayRef.current = onAway;
+
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      const card = cardRef.current;
+      if (card && e.target instanceof Node && card.contains(e.target)) return;
+      onAwayRef.current();
+    };
+    window.addEventListener("pointerdown", away, true);
+    return () => window.removeEventListener("pointerdown", away, true);
+  }, []);
   const [at, setAt] = useState<{
     left: number;
     top: number;
@@ -156,7 +188,11 @@ export function PlanTips({
           <button
             type="button"
             onClick={onClose}
-            className="-m-1 p-1 rounded text-muted-foreground hover:text-foreground"
+            className={
+              touch
+                ? "-m-3 flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
+                : "-m-1 p-1 rounded text-muted-foreground hover:text-foreground"
+            }
             aria-label="Close this tip"
           >
             <X className="w-4 h-4" />
@@ -167,12 +203,12 @@ export function PlanTips({
           <Button
             size="sm"
             variant="ghost"
-            className={phone ? "h-11" : "h-8"}
+            className={touch ? "h-11" : "h-8"}
             onClick={onOff}
           >
             No more tips
           </Button>
-          <Button size="sm" className={phone ? "h-11" : "h-8"} onClick={onNext}>
+          <Button size="sm" className={touch ? "h-11" : "h-8"} onClick={onNext}>
             {last ? "Got it" : "Next"}
           </Button>
         </div>

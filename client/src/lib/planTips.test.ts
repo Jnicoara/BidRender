@@ -113,12 +113,47 @@ describe("placeTip", () => {
   const card = { width: 280, height: 120 };
   const drawing = { left: 0, top: 100, width: 900, height: 700 };
 
-  it("goes under a control at the top of the screen", () => {
+  it("goes under a control at the top of the screen, inside the drawing", () => {
+    // Straight under the control would be y 76 — still in the toolbar band
+    // above the drawing (top 100). It slides down into the drawing instead.
     const anchor = { left: 300, top: 40, width: 200, height: 28 };
     expect(placeTip(anchor, card, win, drawing)).toEqual({
       left: 260,
-      top: 76,
+      top: 108,
     });
+  });
+
+  it("never covers the side panel: a tab in it gets a card over the drawing", () => {
+    // The Legend tab case from smoke run 38595716662: the tab sits at the top
+    // of a panel to the right of the drawing, and under it are Capture and
+    // the legend's rows. The card must not land on any of that.
+    const panel = { left: 900, top: 100, width: 300, height: 700 };
+    const legendTab = { left: 1060, top: 105, width: 80, height: 30 };
+    const at = placeTip(legendTab, card, win, drawing);
+    expect(at.left + card.width).toBeLessThanOrEqual(panel.left);
+    expect(at.top).toBeGreaterThanOrEqual(drawing.top);
+    // And as near the tab as the drawing allows: against the drawing's right
+    // edge, at the height "just under the tab" would have had.
+    expect(at).toEqual({ left: 900 - 8 - 280, top: 105 + 30 + 8 });
+  });
+
+  it("stays inside the drawing for any control around it", () => {
+    for (const anchor of [
+      { left: 0, top: 0, width: 1200, height: 60 },
+      { left: 950, top: 400, width: 200, height: 30 },
+      { left: 20, top: 300, width: 150, height: 30 },
+      { left: 100, top: 760, width: 100, height: 30 },
+    ]) {
+      const at = placeTip(anchor, card, win, drawing);
+      expect(at.left).toBeGreaterThanOrEqual(drawing.left);
+      expect(at.top).toBeGreaterThanOrEqual(drawing.top);
+      expect(at.left + card.width).toBeLessThanOrEqual(
+        drawing.left + drawing.width
+      );
+      expect(at.top + card.height).toBeLessThanOrEqual(
+        drawing.top + drawing.height
+      );
+    }
   });
 
   it("stays inside the window at its edge", () => {
@@ -142,11 +177,13 @@ describe("placeTip", () => {
     expect(at.top).toBe(300 - 120 - 8);
   });
 
-  it("falls back to a corner that keeps the middle clear", () => {
-    // A control covering the whole window: no side fits, the bottom-left
-    // corner does and is clear of the middle.
+  it("falls back to a window corner when the drawing cannot hold the card", () => {
+    // A drawing narrower than the card, and a control covering the whole
+    // window: no side fits, the bottom-left corner does and is clear of the
+    // middle.
+    const narrow = { left: 0, top: 100, width: 200, height: 700 };
     const anchor = { left: 0, top: 0, width: 1200, height: 800 };
-    expect(placeTip(anchor, card, win, drawing)).toEqual({
+    expect(placeTip(anchor, card, win, narrow)).toEqual({
       left: 8,
       top: 800 - 120 - 8,
     });
