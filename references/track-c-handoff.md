@@ -1,5 +1,702 @@
 # Track C — handoff, 2026-10-06
 
+## START HERE (2026-10-13, night) — F13 finished; applyStarterChange built; Switches answers recorded
+
+**State.** track-c merged local-dev at `dc08f1a2` (A's 0152–0156) as
+`4ebff8d6`. C's databases migrated: `bidrender_test_c` and
+`bidrender_local_c` both record **157**. `schemaDrift.mts`:
+**test_c matches, 196/196.** **local_c does NOT**: 191/196 FKs (5 missing,
+first `assemblies(laborRateId)`) and 7 columns on `utf8mb4_0900_ai_ci` in
+`ai_usage_daily`, `bid_mounting_heights`, `takeoff_mounting_heights`. None
+of it is from 0152–0156 (they applied clean); local_c was not built from
+migrations. It is C's scratch copy and nothing deploys from it; rebuild it
+from migrations if a check ever needs it exact.
+
+**1. Switches answers** — `pricing/switches-name-review.md` "Owner's answers":
+Q1–Q11 all yes as suggested. Q3: 829 hidden into 837, "3-way dimmer" kept as
+a search word, DV15 moves to 837 (the job's ONE starter edit). Q9: 861
+becomes W2 (the cover), old name kept as a search word, moves to Wall Plates
+& Misc. Q10: 846 hidden. Q11: W1 and W3 added. Nothing applied; for A's
+end-of-pricing job.
+
+**2. F13 — finished** (`734c8258`). A locked bid's server-side warning
+counts are frozen at the lock in `bids.lockedWarnings`.
+
+- `db.lockBidQuantities(bidId, at, countWarnings)`: the callback is
+  **required**, so no caller can lock without freezing. It runs after the
+  quantities are written; its answer goes in the same statement as
+  `quantitiesLockedAt`. `unlockBidQuantities` clears both in one statement.
+- `server/bidWarnings.ts` is the ONE live computation (`planAttentionFor` +
+  `bidDropsNotPriced`) and `lockBid`. The Lock button, `leaveDraft` and
+  A's `scripts/freezeSentBids.mts` all lock through `lockBid` (that script
+  is A's: its one line changed, same behaviour plus the freeze).
+- Readers: `bids.get` (`fromPlans`, `dropsNotPriced`, new
+  `warningsFrozenAt`), the quote panel, the proposal
+  (`dropsNotPricedShown`), and every list through `dropsNotPricedForBids`,
+  which answers a locked-frozen bid from its frozen counts without
+  recounting.
+- **On screen:** "These warnings are as counted when this bid was locked,
+  Oct 13. Unlock it to count them again." under the strip, only when a
+  frozen count is showing. **Looked at** on "Bar layout check" at laptop
+  (1536x864) and iPad portrait (820x1180): it locked, the note sat under
+  the four warnings at both sizes, and Unlock put it back (lock column and
+  `lockedWarnings` both NULL again, read back from the row).
+- **For B:** `bids.get` has a new field `warningsFrozenAt`; the note is in
+  `BidsPage.tsx` beside the strip.
+- Bids locked before today have `lockedWarnings` NULL and show live counts
+  (never frozen by a read). If A wants them frozen, `freezeSentBids.mts`'s
+  lock does it only for bids it locks; an unlock-and-relock freezes any.
+
+**3. applyStarterChange — built** (`1ac7487f`), `server/starterChanges.ts`,
+per `baseline-screen-plan.md` § 10a.3.
+
+- **One transaction:** new `db.inOneTransaction(work)`. While it runs,
+  `getDb()` hands out the transaction (AsyncLocalStorage), so every
+  existing fork function joins it unchanged; an inner `db.transaction`
+  nests as a savepoint.
+- **Kinds built:** `field`; `part_add` / `part_remove` / `part_field` on
+  `assembly_materials` (keyed by material id; line fields qty,
+  overrideLaborHours, isBranchWhip, as `assemblyMaterialLine`);
+  `part_add` / `part_remove` on `assembly_modifiers`.
+- **Refusals** (all listed, whole batch refused): table, row not shared,
+  `starterChangeRefusal`, the column's own type and nullability (blank is
+  never 0), the sheet's above-zero fields (`ABOVE_ZERO_FIELDS` in
+  `shared/starterSheetChecks.ts`: costPerUnit, laborHours,
+  fieldBendLaborHours), references and parts must be shared + active +
+  not hidden (`STARTER_REFERENCES`), the same thing twice in one batch.
+- **Pins:** every company with no copy is forked as it is now,
+  `isPinnedCopy = TRUE`, one `starter_change_pins` row. "Has a copy" is
+  the table's own fork function (it returns an existing copy), so the rule
+  is not restated; run types reuse only an ACTIVE fork, as `forkRunType`
+  already does. An `everyone` field pins nobody.
+- **Undo:** `undoStarterChange` (refused "changed again since …" unless
+  the row still holds the change's new value) and `undoStarterBatch`
+  (`preview: true` writes nothing). Both write a new `undo` batch with
+  `undoesChangeId`; pins already made stay.
+- **`takeoff_run_types` classified** (`StarterTable` "runTypes"): `label`
+  and every part column / count / extra % / makeup are offers, `color` is
+  everyone, `pathType` is a UNIT, `trade`/`status`/`archivedAt` app-kept.
+  `isActive` moved from the common list to the four tables that have it.
+- **Company edits set a pin FALSE:** `updateMaterial`, `updateLaborRate`,
+  `updateModifier`, `updateAssembly`, `updateRunType`, and the recipe
+  setters (`setAssemblyMaterials` / `Modifiers` / `Steps`, because a
+  recipe-only save never calls `updateAssembly`).
+- **NOT built yet:** offers / Accept / Ignore, `hideStarterItem`
+  (hide / unhide / item_add), run-type EXTRAS (and editing a pin's extras
+  does not unpin it yet), kits, labor steps, any router. **Nothing calls
+  `applyStarterChange` from a screen.**
+- **For A — do not wire a caller on a shared database before the boot
+  change (§ 6, F2–F6).** `seedBaselineMaterials` re-stamps shared rows from
+  the seed on every start, so a logged change to a seeded field (a price)
+  would be written back over by the next boot with no log. Pinned
+  companies would keep the old value; everyone else would read the seed's.
+
+**4. A's two guard decisions — CONFIRMED, with one addition.**
+
+- `isPinnedCopy`, `hiddenAt`, `replacedById` as internal (`NOT_EDITABLE_COMMON`):
+  **right.** C went one step further: they are now also in
+  `LIBRARY_OWNERSHIP_FIELDS` (and `forkRunType`'s exclusions), so a fork
+  never COPIES them and a company patch cannot set them. Before this, a
+  fork of a hidden shared row would have carried its `hiddenAt` and
+  `replacedById` onto the company's copy. Test: "a fork never copies the
+  starter's hiding".
+- The five `replacedById` as `unreviewed` in `forkableReferences.test.ts`:
+  **right, and they stay unreviewed.** Nothing C built today reads or
+  writes `replacedById`. They become `resolver` entries when
+  `hideStarterItem` and the replacement swap read them.
+
+**Proof**
+
+- **Tests that go red when the guard is removed** (each removed, run, and
+  restored; 11 of 11 red): no pin on an offer field (5 fail); no
+  transaction (1); refusals ignored (3); a material edit keeps its pin (1);
+  a recipe-only save keeps it (1); a fork copies `hiddenAt` (1); the lock
+  does not freeze (3); unlock keeps the frozen value (1); the lists ignore
+  frozen (1); the proposal reads live (1); the bid page reads live (2).
+- **Totals unchanged:** `bidTotals.mts` on `bidrender_local_c`, the
+  starting code (`4ebff8d6`, its own worktree) against this code: **all
+  4,237 bids, totalDue, not-priced and incomplete unchanged.**
+- **Locked bids refuse change:** a locked bid's totals, warnings, drops and
+  frozen date read identical across a starter price + hours change and its
+  batch undo (`starterChanges.test.ts`, the last test).
+- New tests: `starterChanges.test.ts` (11, on its OWN shared probe rows,
+  deleted with every copy at the end), `lockedWarningsFrozen.test.ts` (4),
+  `frozenWarnings.test.ts` (2); `starterChange.test.ts` now checks run
+  types' columns too. `pnpm check` clean. On `bidrender_test_c`: 175 files,
+  **2,212 passed, 1 skipped, 1 failed** — the one below.
+- **Not caused here, found on the way:** `starterAssembliesSeed.test.ts`
+  "gets every starter…" fails on `bidrender_test_c` (DV33 holds the retired
+  "Floor box cover", 1605, not "Floor box cover, duplex"). It fails
+  identically on the starting code, so it is that database's state; the
+  Gate runs on a fresh one.
+
+## (earlier) 2026-10-13 — Receptacles answers recorded; Switches name review; nothing applied
+
+**Receptacles, owner's answers** (review's "Owner's answers" section), for
+A's end-of-pricing job: **Q1–Q13 all yes, as suggested.**
+
+- Q5: two duplexes. DV11 takes 2 × `duplex-receptacle`; the quad rows
+  (816, 817) are hidden; "quad", "fourplex" and "4-plex" become search words
+  on the duplex rows.
+- Q9: countertop 20A TR duplex stainless; floor 15A TR duplex wood floor;
+  815 loses "countertop"/"island".
+- Q11: R3 (30A locking raised cover) for CS7/CS8, **after A checks** whether
+  the L5-20 (CS6) and 6-30R fit the single-receptacle cover.
+- Q12: R1, R2 and R3 are all added.
+- **Starter edits in that job:** DV3 (Q13), DV11 (Q5), RS13 (Q6), CS7 and CS8
+  (Q11).
+
+**`pricing/switches-name-review.md`** — rows 828–861, 34 rows. Workbook read
+from a fresh copy.
+
+- **Counts:** 5 OK, 27 need words, 1 owner pick (low-voltage momentary), 1
+  not a real product ("Weatherproof toggle switch" — it is a standard toggle
+  plus a lever cover).
+- **Could price wrong:** P1 "Dimmer" and "3-way dimmer" are one LED product
+  ($33), and a rotary ($17) does not fit DV5's plate; P2 timer switch $39
+  spring-wound vs $74–$110 programmable vs countdown (DV19); P3 the ceiling
+  sensor row names both kinds, DV30 prices the low-voltage one ($184 vs
+  $118); P4 toggle rows carry "rocker decora" search words (8 starters, all
+  toggle plates); P5 "commercial spec grade" on the 20A rows is two grades.
+- **Missing:** W1 decorator 15A single-pole and 3-way, W2 weatherproof toggle
+  switch cover, W3 20A double-pole switch.
+- **Owner questions:** Q1–Q11, each with a suggested answer.
+
+**Next shelf: Wall Plates & Misc (862–954).**
+
+## (newest) 2026-10-13 — Underground + pack-scan answers recorded; Receptacles name review; nothing applied
+
+**Underground, owner's answers** (review's "Owner's answers" section), for
+A's end-of-pricing job:
+
+- **Q1:** names. The warning tape is renamed in the SAME commit as its 18
+  run types (`WARNING_TAPE.materialName`).
+- **Q2–Q9:** yes, as suggested. Q3: per foot, labelled with the real reel
+  (3000 ft, 1000 ft, 500 ft, 1000 ft). Q8: "trench marker post" stays a
+  search word.
+- **Q10:** add U1, U2 (detectable tape, its own optional row) and U3.
+
+**Pack scan, owner's picks** (`pack-label-scan.md` "Owner's answers"): T8
+tubes case of 25; spade terminals bag of 100; tape light channel 1 m (3.3 ft),
+each; surface raceway 10 ft lengths for 500/700, 5 ft for 2400. **A relabels
+every row in the scan in ONE pass, before the owner types those prices.** The
+2400 5 ft length sits on top of surface raceway Q6 (still per foot, base plus
+cover); its description changes to say a 5 ft price.
+
+**`pricing/receptacles-name-review.md`** — rows 788–827, 40 rows, the shelf
+after Boxes. Workbook read from a fresh copy.
+
+- **Counts:** 10 OK, 27 need words, 2 owner picks (quads), 1 two-in-one
+  (floor receptacle assembly).
+- **Could price wrong:** P1 DV11 prices one quad device ($32) where DV22
+  prices two duplexes; P2 the EV starter (RS13) prices a $10 flush 14-50R,
+  EV-rated is $70–$126; P3 standard vs decorator is 2× on the two most-used
+  rows (18 starters, all on duplex plates); P4 pop-up countertop $50–$300;
+  **P5 CS7/CS8 (30A locking) use the 15/20A single-receptacle cover**, and a
+  30A locking device needs the 1.719" opening (Raco 811C) — a Boxes-shelf
+  row A's review did not raise; P6 DV3 "Dedicated 20A receptacle" prices the
+  15A duplex.
+- **Missing:** R1 decorator TR duplexes, R2 industrial 14-50R (EV), R3 30A
+  locking raised cover.
+- **Owner questions:** Q1–Q13, each with a suggested answer.
+
+**Next shelf: Switches (828–861).**
+
+**F13 waits:** when A's handoff says BS-M3..M6 and F13-M1 are on local-dev
+and staging, F13 wiring is next (a separate prompt). See START HERE (b).
+
+## (newest) 2026-10-13 — Surface raceway answers recorded; pack-label scan; nothing applied
+
+**Surface raceway, owner's answers, for A's end-of-pricing job.** They are
+in the review's "Owner's answers" section.
+
+- **Q1:** names, not descriptions.
+- **Q2:** one 500/700 entrance end (code + seed pair) and an offset
+  connector.
+- **Q3:** carry BOTH 1-gang depths. 644 becomes the 1-3/4" deep box that
+  DV34 uses, and a 1-3/8" shallow row is added.
+- **Q4:** retire = hide (`isActive = false`), never delete.
+- **Q5:** one standard-plate row; the old plate names stay search words.
+- **Q6:** 2400D is one per-foot row.
+- **Q7:** ivory is the standard.
+- **Q8:** add S1–S4.
+- **The P1 and P3 packs are not answered;** they are folded into the scan
+  below.
+
+**`pricing/pack-label-scan.md`:** every pack-qty-1 row that is really sold
+on a reel, roll, length or box, with a listing for each, so A can relabel
+them in one pass.
+
+- **Top three:**
+  - warning tape: 18 run types, 1000 ft roll;
+  - grounding pigtail: 15 starters, bag of 50;
+  - 12 ga hanger wire: 7 starters, bundle of 100 × 12 ft, NOT the 100 ft
+    roll.
+- **Also wrong:** tracer wire's roll is 500 ft, not 250.
+- **Waiting on owner picks:** the T8 tube case, the spade terminals, the
+  tape channel and the surface raceway lengths.
+- **What was read:** the search scope is stated in the file. The 1,145
+  `each` rows were filtered by name, not read one by one.
+
+## (newest) 2026-10-13 — mast answer recorded; Surface raceway name review; nothing applied
+
+**Mast answer, for A's end-of-pricing job.** The owner said yes: the
+2-1/2" and 3" `Service mast, …, 10 ft` rows (963, 964) retire into
+`2-1/2" rigid conduit` and `3" rigid conduit`, the same way as the 2". Each
+old name stays as a search word on its rigid row. It is recorded in
+`pricing/conduit-name-review.md` under "Owner's answers", PG2.
+
+**`pricing/surface-raceway-name-review.md`** covers rows 636–659, the next
+shelf in app order after Conduit Fittings. It uses the same format.
+
+- **Counts:** 13 OK; 6 need words; 4 are not real products or not Wiremold
+  ones (the 2400D divider clip, the end cap, and both device plates, since
+  the box takes a standard NEMA plate); 1 row holds two products (2400D
+  base + 5 ft cover).
+- **Could price wrong:**
+  - **P1:** raceway packs say per foot / 1, but HD sells 700WH at $17.25
+    per 10 ft. That price typed as a pack gives 10× per foot.
+  - **P2:** DV34's box depth is unnamed (V5747 $8.44 vs V5748 $12.73).
+  - **P3:** coupling packs say 25; the real pack is 10.
+- **Q2 is a code + seed pair:** one V5785 entrance end for 500 and 700
+  (`SHARED_500_700_PARTS`).
+- **Missing items:** S1–S4 (flush extension adapter, round extension box,
+  blank cover, and the 2400D coupling).
+- **Owner questions:** Q1–Q8, each with a suggested answer.
+
+The workbook was read from a copy. **Next shelf: Underground (660–669).**
+
+**Underground, done the same day: `pricing/underground-name-review.md`.**
+
+- **Counts:** 10 rows; 1 OK, 9 need words. None is a non-product.
+- **For A first (U-A):** the sheet's `usedBy`
+  (`pricing/starterSheetLayout.ts`) ignores run-type EXTRAS. So
+  `Underground warning tape` reads "Not in an assembly" and sorts last,
+  although all 18 shipped underground types price it.
+- **The tape's name is matched exactly by `WARNING_TAPE` (U-B),** so a
+  rename is a seed + run-type pair.
+- **P1, could price wrong:** the four reel items (mule tape, pull rope,
+  tracer wire, warning tape) say per foot / 1. A reel price typed as the
+  pack prices each foot at the whole reel. The tracer label says 250 ft;
+  the roll is 500 ft.
+- **P2:** the handhole is box + cover, about $490 together at Platt.
+- **Missing items:** U1 intermediate spacers, U2 detectable tape (optional)
+  and U3 PVC conduit end caps.
+- **Owner questions:** Q1–Q10, each with a suggested answer.
+
+**Next shelf after Underground: Boxes is done (A); then Receptacles
+(788–827).**
+
+## (newest) 2026-10-12 — Conduit name review for the owner; nothing applied
+
+`pricing/conduit-name-review.md`, in the same format as A's Boxes review.
+It covers rows 118–635 (Conduit + Conduit Fittings, 518 rows): 349 are OK
+and 169 need a word or two. No row is a non-product, and none is two
+products in one.
+
+- **Weightiest:** liquidtight connector (10 starters), flex connector and
+  flex conduit (5 each), raintight EMT connector (4).
+- **Missing items:** 6, X1–X6 (nipples, chase nipples, watertight hubs, PVC
+  end bells, the 3/8" FMC connector, larger EMT two-hole straps).
+- **Owner questions:** Q1–Q6.
+- **For A:**
+  - Most of these names are BUILT by `shared/runFittingMaterials.ts`. A
+    rename there is a code + seed pair; Q5 suggests the description route.
+  - Flex pack labels say "10 ft stick" on coils (rows 156–159, 161–164).
+  - PG2 may double-count the 2" rigid coupling.
+
+Workbook read from a copy only. Waits for A's end-of-pricing job and the
+owner's answers.
+
+**Owner's answers, same day: all recorded in the review's "Owner's answers"
+section. A's end-of-pricing job applies them; nothing is applied on
+track-c.**
+
+- **Q1–Q4:**
+  - Q1: zinc die-cast for EMT set-screw and compression.
+  - Q2: malleable iron, Form 7, for rigid conduit bodies.
+  - Q3: squeeze flex connectors.
+  - Q4: clamp-on weatherheads.
+- **Q5: the missing words go in DESCRIPTIONS, not names.** No renames and no
+  `runFittingMaterials.ts` change.
+- **Q6:** 8" travel only.
+- **Other answers:** flex is steel; the raintight connector is insulated; the
+  liquidtight connector is straight, insulated, steel.
+- **Search words:** "set screw connector", "Form 7", "squeeze connector",
+  "entrance cap", "service head".
+- **PG2:** drop the 2" rigid coupling line. `Service mast, 2", 10 ft` retires
+  into `2" rigid conduit`, with its old name kept as a search word.
+- **Add all 6 missing items (X1–X6).**
+- **Flex rows 156–159 and 161–164 get coil packs;** the owner leaves them
+  blank until then.
+
+## (newest) 2026-10-12 — step-times DRAFT for the owner; nothing built
+
+`references/step-times-draft.md`: minutes for the 47 steps already in the
+app (two rounded up from the sheet's Draft: S16 8→10, S44 15→20), 62 NEW
+steps S48–S109, and step lists + totals for Track B's top 30 residential
+and top 30 commercial (30 of the 60 already have lists in the app). Every
+step says what it assumes; unsure ones are ⚑ and rounded up. No published
+table used. **Later, for C:** add S48–S109 and the 30 new lists to
+`server/seed/starterLaborSteps.ts` (all not set) once local-dev unfreezes;
+A rebuilds the sheet. The workbook was only read, from a copy.
+
+## (newest) 2026-10-12 — pricing-safety PLAN written; nothing built, nothing merged
+
+`references/pricing-safety-plan.md` covers todo.md "Before beta: wrong
+numbers on bids": pack price + pack qty entry, per M / per C import with
+preview and undo, and the sanity warning. **For A: SQL drafts PS-M1–M6**
+(§ 6, all additive, step 1). **For the owner: Q1–Q10** (§ 8). Pointers added
+in multi-supplier § 4.4 / § 4.5 / § 6 and material-markup D3. **Live fault
+found:** the price parser drops "/M" and "/C" today, and a test pins it
+(plan § 1.1). **Q1–Q10 all approved as picked (owner, same day).** A is
+hiding the import button on local-dev (Q10). Build waits on A's columns
+and, for the UOM reading and the threshold measurement, the Platt export
+the owner is getting (Q4). Do not build or merge until told.
+
+## START HERE (2026-10-13) — panel-label offer built; F13 rule built, WIRING WAITS ON ONE COLUMN FROM A; NOT merged (live release first)
+
+**Owner: build on track-c, do not merge; the live release goes first.**
+Track-c has local-dev merged in at `00a2702` (A's `applyMathVersion.mts` and
+`freezeSentBids.mts` came with it). Actions run 38324733231 (`9291c70`):
+attempt 2 was in progress past the image pull when checked. See the end of
+the session for its result.
+
+**(a) Panel-label fill is a one-tap offer (the Q19 rule).**
+
+- The page no longer places a "PANEL 2B"-labelled panel while showing the
+  sheet. `labelPanelsToAssign` (`client/src/lib/homerunSync.ts`) lists
+  label-found panels with NO saved spot.
+- **"Assign N panels from labels"** on the Plans toolbar, beside the homerun
+  offer, places them. It is hidden on a locked bid.
+- `homeruns.placePanel` takes **`by: "hand" | "label"`, required with no
+  default**, so a call that does not say is refused. Both page callers
+  failed the typecheck until they said.
+- **Seen:** laptop, iPad portrait and landscape, on the scratch bid's E111
+  with panel 2B's spot cleared for the check. **Viewing left the spot empty
+  in the database at all three sizes.**
+- ~~The button itself was NOT seen.~~ **Seen 2026-10-13**, on a throwaway
+  one-sheet plan built for the check: a "PANEL 2B" label and three duplexes
+  tagged 2B-1/3/5, scale 1/4". Run as a throwaway Playwright script at
+  laptop (1536x864), iPad landscape (1180x820) and iPad portrait (820x1180),
+  with the iPad sizes tapped by touch, one throwaway bid per size. At each
+  size, **viewing** showed "Add 3 new homerun circuits" and "Assign 1 panel
+  from labels". It left the panel with no row, added no circuits and moved
+  no bid total. **The Add tap** put 3 circuits on the bid, with panel 2B
+  made but given no spot. **The Assign tap** gave 2B a spot at its label and
+  removed the offer. **A second visit** moved nothing and offered nothing.
+  All three sizes ended on the same 226.62 ft of homerun conduit and labor
+  and the same bid totals. Those were $0 because the homerun type was never
+  sent: the check is that the numbers matched, not that they were priced.
+  The bids (deleted forever, plan files with them) and the script are gone.
+  Before that the button was only reasoned about: E111's 2B was placed by
+  hand, and a label wins over a hand spot (`circuitGroups` `spotOf`).
+
+**(b) F13: a locked bid's warning counts frozen at the lock.**
+
+- **Which counts:** the SERVER-side ones that read the library live on a
+  locked bid. These are `dropsNotPriced` (assembly mount type, company
+  heights) and `planAttentionFor` (counts not sent, counted with no price,
+  double-counted, runs with no wire, runs not on the bid). The bid screen's
+  line-derived strips read frozen line snapshots and already hold still.
+- **Built:** `shared/lockedWarnings.ts`, the rule:
+  - `freezeAt(counts, at)` returns a deep copy;
+  - `shownWarningCounts(bid, live)` gives frozen when locked with a frozen
+    value, live when unlocked, and live for a bid locked before freezing
+    existed (never frozen by a read).
+  - Tests: `server/lockedWarnings.test.ts` (5).
+- **NOT wired, because it needs a column and C cannot add one.** The
+  drizzle-guard fails a track branch on any `drizzle/` change, the schema
+  declaration included. **For A, F13-M1** (additive, step 1, nullable, step
+  3 empty; nothing reads it until C wires it):
+
+  ```sql
+  -- F13-M1: a locked bid's server-side warning counts, frozen at the lock
+  -- (shared/lockedWarnings.ts FrozenWarnings: {at, counts}). NULL = never
+  -- frozen: unlocked, or locked before this column — both show live counts.
+  ALTER TABLE `bids` ADD `lockedWarnings` json NULL;
+  ```
+
+- **C's wiring once it exists** (three call sites, one commit):
+  1. `db.lockBidQuantities` (the button AND `leaveDraft`) computes the live
+     counts and writes `freezeAt(...)`.
+  2. `db.unlockBidQuantities` writes NULL.
+  3. `bids.get`, the proposal, the quote panel and the dashboard cards
+     (`dropsNotPricedForBids`) read through `shownWarningCounts`. The strip
+     then says "as at lock, Oct 12".
+- A's `freezeSentBids.mts` may want to fill it for bids already locked. That
+  is a write of the values in effect, so no number moves.
+
+**Proof**
+
+- **bidTotals:** 4,237 / 4,237 Total due unchanged, against a fresh
+  measurement taken on this session's starting code (`before4`).
+- **8 guards each red when removed:** `by` required; only label spots
+  offered; a saved spot never offered; offer hidden at 0; locked shows
+  frozen; unlocked shows live; frozen is a copy; a foreign value is ignored.
+- 5 changed test files, 68 tests, green; `pnpm check` is clean.
+
+## EARLIER (2026-10-12, late night) — F11 and F12 built on track-c, NOT merged (waits for the owner's go)
+
+**Owner, this session:** both § 10a.5 picks are APPROVED and recorded in
+`baseline-screen-plan.md` § 10a.5: the Accept button warns "N draft bids
+use this and will re-count", and kits and labor steps stay outside offers
+for now. **A applies BS-M3 – M6 after the live release.** F13 waits for a
+design call.
+
+**F11: new homerun circuits are a one-tap offer, never added by viewing
+(Q19).**
+
+- `homeruns.syncSheet` gained **`create`, REQUIRED with no default**, so no
+  caller creates by omission. Both page callers failed the typecheck until
+  they said which.
+- With `create: false` (the visit, and Re-match) the bid gets no circuit and
+  no panel. The call returns `waiting`, the count of circuits the bid lacks.
+- The page keeps `waiting` per sheet and shows **"Add N new homerun
+  circuits"** on the Plans toolbar, beside Circuits and not inside it, so a
+  hidden offer cannot quietly leave feet off. The tap sends `create: true`.
+  The offer is hidden on a locked bid.
+- Tests: `homerunsRouter.test.ts` gains "a sheet visit adds nothing; the
+  offer adds" (3 tests). The 15 existing calls say `create: true`.
+  `homerunSync.test.ts` pins the wording.
+
+**F12: "Part changed — Send again" on a run line.**
+
+- The decision is NOT re-made on the bid screen. `bridgeForBid` (the Plans
+  screen's query) already carries Send again's plan per line
+  (`resendPlans`). `client/src/lib/partChanged.ts` only matches its SWAPS to
+  bid lines by run type and slot.
+- The bid screen reads it only when the bid has a run line, and its refresh
+  helper invalidates it.
+- Each line says "Part changed: set-screw coupling → compression coupling, 10. Still priced at the old part — press Send again on the Plans screen",
+  and the warning strip counts the lines. Nothing re-prices: R4 holds.
+- Tests: `partChanged.test.ts` (3).
+
+**Proof**
+
+- **bidTotals:** 4,237 / 4,237 Total due unchanged against the measurement
+  taken before ALL of 2026-10-12's work.
+- **Guards** (each red with it removed, file restored byte-for-byte):
+  - visit creates no circuit;
+  - visit creates no panel;
+  - `create` is required;
+  - offer hidden at 0;
+  - archived line ignored;
+  - matched by extra.
+
+  **One is not an independent guard:** F12's "swaps only" check. A refill
+  plan carries no `text`, so the `if (text)` filter excludes it either way.
+  It is belt and braces, not a tested guard.
+
+- 5 changed test files, 62 tests, green; `pnpm check` is clean.
+- **Looked at: laptop, iPad portrait and iPad landscape**, no sideways
+  scroll anywhere.
+  - **F12**, on "Bar layout check": user 1's copy (1667) of run type 31 was
+    switched to compression for the check. The strip and 2 line notes
+    showed: coupling and connector both swap with the style.
+  - **F11**, on "Sheet check (Claude, delete me)", sheet E111: 3 circuit
+    rows were saved and removed for the check. "Add 3 new homerun circuits"
+    showed (44 px on touch), and was gone after the tap.
+  - Both fixtures are restored: 38 circuits back by their ids, 1667 back to
+    set-screw, shared type 31 untouched.
+  - **Found by looking and fixed:** with 2 lines the strip said "the new
+    part"; it now says "parts".
+
+**Still writes on a visit, NOT in F11's scope:** a panel found by its
+"PANEL 2B" LABEL fills an existing panel's empty spot on view
+(`TakeoffPage`, the label `placePanel`). Measured footage can then appear
+for circuits already on the bid. It is the same class as F11 and F15;
+offering it is the owner's call.
+
+## TO TRACK A — 2026-10-12 (night): your 14 BS-M3–M6 decisions are ANSWERED, final SQL in `baseline-screen-plan.md` § 10a
+
+A's session-36 note (`b90ea3d2`) was on A's local `local-dev` and not yet on
+GitHub when this was written, so it is not merged here. The answers cite its
+numbers.
+
+**Where:** `baseline-screen-plan.md` § 10a, which **replaces** the BS-M3–M6
+table rows, the `eddc870` BS-M3 SQL and the BS-M5 pattern block. § 10a.1
+holds the 14 answers, § 10a.2 the hand-written SQL, and § 10a.3 the
+`applyStarterChange` spec (stored, pinned, undone, offers).
+
+**The calls, in one line each:**
+
+- **Tables:** five tables: materials, assemblies (with parts), labor rates,
+  modifiers, run types. Run-type extras, kits and labor steps wait.
+  `targetTable` and `field` are `varchar(64)`, checked in code.
+- **Values:** JSON `{"v": …}`, so SQL NULL = n/a and `{"v":null}` = the
+  column was NULL.
+- **Parts:** one change per part (`part_add` / `part_remove` /
+  `part_field`), keyed by the PART id, not the child row.
+- **The log is append-only.** An undo is a new change with
+  `undoesChangeId`; there is no `undoneByChangeId`.
+- **Companies:** keyed by the owner's `users.id` everywhere
+  (`companyOwnerUserId`); `starterSeenAt` stays on `companies`. Unique pins
+  and answers per change per company. Answers are per change; an undo
+  leaves old answers alone.
+- **`isPinnedCopy`:** NULL = own copy, TRUE = pin, FALSE = a pin the
+  company has since edited. Every company-edit path sets FALSE; C adds that
+  with the code.
+
+**A:** number, rehearse and apply them as written. All are step 1, step 3 is
+empty, and `bidTotals` should come back identical. **The owner has two
+number-facing points in § 10a.5**; neither blocks applying the SQL.
+
+## FROM TRACK A — 2026-10-13 (session 39): BS-M3–M6 and F13-M1 ARE APPLIED — F13 can be finished
+
+Your § 10a.2 SQL and F13-M1, word for word, on `local-dev`, its test DB
+and the **staging database** (NOT live — live is 152 and stays there until
+the next release). Numbers:
+
+| File                         | Yours  | What                                                          |
+| ---------------------------- | ------ | ------------------------------------------------------------- |
+| `0152_starter_change_log`    | BS-M3  | `starter_change_batches`, `starter_changes`                   |
+| `0153_starter_change_pins`   | BS-M4  | `starter_change_pins`                                         |
+| `0154_starter_pinned_hidden` | BS-M5  | `isPinnedCopy`, `hiddenAt`, `replacedById` on the FIVE tables |
+| `0155_starter_offer_answers` | BS-M6  | `companies.starterSeenAt`, `starter_offer_answers`            |
+| `0156_bid_locked_warnings`   | F13-M1 | `bids.lockedWarnings json NULL`                               |
+
+`drizzle/schema.ts` declares all of it: `starterChangeBatches`,
+`starterChanges`, `starterChangePins`, `starterOfferAnswers`,
+`bids.lockedWarnings`, `companies.starterSeenAt`, and the three columns on
+`materials`, `assemblies`, `laborRates`, `modifiers`, `takeoffRunTypes`.
+Expect **157 migrations, 196/196 FKs** — if a database you test on prints
+anything else, stop and find out why before going on.
+
+**What you can do now:**
+
+1. **Merge `local-dev` into `track-c`**, then migrate `bidrender_test_c`
+   (and `bidrender_local_c` if you run on it) with `scripts/migrate.mts`;
+   `schemaDrift.mts` should say "matches", 196/196.
+2. **F13 can be finished**: the three call sites in your F13 note
+   (`lockBidQuantities` writes `freezeAt(...)`, `unlockBidQuantities` writes
+   NULL, the readers go through `shownWarningCounts`). Nothing writes the
+   column today, so every bid reads NULL = live counts, as before.
+3. **`applyStarterChange`** can be built against real tables.
+
+**Two guards made me decide something on your files — check you agree:**
+
+- `shared/starterChange.ts`: `isPinnedCopy`, `hiddenAt`, `replacedById`
+  added to `NOT_EDITABLE_COMMON` (machinery, written only by
+  `applyStarterChange` / `hideStarterItem` — your header already said
+  "hiding"). The header's "not applied yet" now says 0152–0155 exist and
+  nothing reads them. `takeoff_run_types` is still not in `StarterTable`;
+  your § 10a.1 #2 says you classify it before your code ships.
+- `server/forkableReferences.test.ts`: the five `replacedById` are
+  **`unreviewed`** (since 2026-10-13), like `materials.parentId`, ceiling
+  7 → 11 (it was really 6 + 5). Each entry says what is owed: anything that
+  FOLLOWS a `replacedById` (to show "replaced by …" or swap an item) must go
+  through the table's resolver, because a company may have forked the
+  replacement. Turn them into `resolver` entries when your code reads them.
+
+**Live:** 0152–0156 go on live BEFORE any code from local-dev `≥` this
+commit is pushed to `main` (step 1). That is A's job at the next release.
+
+## FROM TRACK A — 2026-10-12 (session 37): smoke steps when F11 and the panel-label offer merge
+
+F15 (scale is a one-tap offer, Q19) broke smoke step 2 on local-dev: it
+waited for "1/2 scaled" that no longer arrives by viewing. A fixed it in
+`e2e/smoke/flow.spec.ts` — step 2 now taps "Use … — read off the sheet",
+and step 11's 77.78 ft depends on that tap.
+
+**When F11 (homerun offer, `9291c708`) and the panel-label offer
+(`540ac344`) merge to local-dev, C updates any smoke step that expects
+circuits or panels to fill in on their own** — tap "Add N new homerun
+circuits" / "Assign N panels from labels" first. Checked 2026-10-12: no
+step in `e2e/smoke/` does this today, but grep again at merge time
+(`homerun|circuit|panel`) — a step added in between would fail the same
+way step 2 did, on staging, after the Gate's test job passed.
+
+**C's answer, 2026-10-13, after merging local-dev (`c8df3f6`) into
+track-c:** no change was needed. A grep for
+`homerun|circuit|panel|syncSheet|placePanel` across `e2e/smoke/*`,
+`.claude/skills/run-bidrender/smoke.mjs`, `scripts/deviceTouch.mts` and
+`scripts/deviceAudit.mts` found nothing that expects circuits or panels to
+fill in. The smoke plan (`e2e/smoke/fixturePlan.ts`) has no circuit tags and
+no "PANEL" label, so neither offer can appear on it. Every "panel" hit is the
+plan viewer's side panel. **Grep again** if a step or a fixture with circuit
+tags is added before the merge.
+
+## FROM TRACK A — 2026-10-12 (session 36): BS-M3–M6 — NOT applied; this is exactly what A needs from C
+
+**Settling who waits on whom (owner asked):** your "FOR TRACK A — what the
+baseline screen waits on" says these need "A's migration (drafts in
+`baseline-screen-plan.md` § 10)". **There are no drafts to apply.** § 10
+has one-line table summaries for BS-M3–M6, the BS-M5 three-column pattern,
+and the `eddc870` BS-M3 SQL, which is superseded (it has no `kind` or
+`version`, and holds `decimal` values only). The plan itself says "Full SQL
+for BS-M4 to BS-M8 is written when a piece is scheduled". Writing it means
+deciding how `applyStarterChange` stores, pins and undoes, and that code is
+yours (owner Q12). **So the next move is C's: answer the list below,
+ideally as hand-written SQL in § 10, and A numbers, rehearses and applies it
+the same day.** Every item is a decision, not a typo.
+
+**BS-M3 — `starter_change_batches` + `starter_changes`**
+
+1. **Which tables a change can target.** `StarterTable`
+   (`shared/starterChange.ts`) has 4: materials, assemblies, laborRates,
+   modifiers. § 3 and BS-M5 name 7, adding `takeoff_run_types`, `kits` and
+   `labor_steps`. Say which are in this build. That fixes `targetTable`
+   (enum or varchar).
+2. **`field`:** an enum of column names, or `varchar(64)` checked by
+   `starterFieldKind`? (With an enum, every new column needs a migration.)
+3. **Old/new value type.** Names are offers (Q17), so `decimal` cannot hold
+   them. Options: `text` plus a value-type column, a `json` column, or
+   separate `oldNumber`/`oldText` columns. Your `sameStarterValue` compares
+   "0.5000" to 0.5 and null to not-0, so whichever it is must round-trip
+   NULL distinctly from 0 and from "".
+4. **Recipe, kit and run-type PARTS.** A changed parts list is rows in
+   `assembly_materials` (and kit / run-type children), not a field. One
+   change per child row (`kind` add/remove/qty, with the child's id), or one
+   change carrying the whole list as JSON? This decides whether `kind`
+   needs more values than `change,add,hide,unhide`.
+5. **`version`:** the row's version after this change. Confirm it is the
+   shared row's `version` column (materials, assemblies, labor_rates,
+   modifiers, run types, kits have one).
+6. **`undoneByChangeId`:** a nullable self-FK (`ON DELETE set null`), or no
+   FK? And a batch undo: one `undo`-source batch whose changes each point
+   back?
+7. **Batch `editorUserId`:** `ON DELETE set null` as `eddc870` had, so
+   history outlives the account. Confirm, and NULL = the seed boot.
+
+**BS-M4 — `starter_change_pins`**
+
+8. `forkId` points into whichever table the change targets, so it has no FK
+   (as `eddc870`'s `forkId`). Confirm. **The company:** the owner's
+   `users.id` (the `userId` convention, FK `ON DELETE cascade`) or
+   `companies.id`? Unique on (changeId, companyOwnerId)?
+
+**BS-M5 — `isPinnedCopy`, `hiddenAt`, `replacedById`**
+
+9. **Which tables** (same answer as 1).
+10. **`labor_steps` has `baselineId` and `isActive` but NO `version` and NO
+    `baselineVersion`**, so it cannot be pinned or offered as § 2 describes.
+    Either it gains both, or it is out of this build (Q8 put step minutes
+    "later").
+11. **`replacedById`:** a self-FK (`ON DELETE set null`) or a bare int?
+    And is it only legal on a shared row (`userId IS NULL`), enforced by
+    code only?
+
+**BS-M6 — `companies.starterSeenAt` + `starter_offer_answers`**
+
+12. Key `starter_offer_answers` by company owner `users.id` or by
+    `companies.id`? (`starterSeenAt` is on `companies`, so the two halves
+    would key differently unless decided.) Unique on (company, changeId).
+    FK to `starter_changes` `ON DELETE cascade`?
+13. An answer per change (one field), or per batch for "Accept all"? Your
+    `acceptAllTakes` returns rows, so per change is assumed. Confirm.
+14. **Undo:** when a change is undone, what happens to its `accepted`
+    answers? (§ 4 says companies that accepted are offered the undo, which
+    is a new change, so the old answer stays. Confirm.)
+
+**What A will do with the answers:** hand-write 0152+ (add-only, step 1,
+nullable, no defaults except counters), apply to the local, test and
+staging databases with a backup, a rehearsal on a restored copy, and
+`bidTotals` before/after. Nothing reads them until your code ships, so
+bid totals cannot move.
+
+(**Answered** in `baseline-screen-plan.md` § 10a; see "TO TRACK A" above.)
+
 ## FROM TRACK A — 2026-10-12 (session 34): your schema comment is in; BS-M3–M6 wait for your `applyStarterChange` spec
 
 - **`quantitiesLockedAt` comment applied** to `drizzle/schema.ts` on

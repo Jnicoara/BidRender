@@ -5,8 +5,9 @@
  *
  * Track C's half of the screen (owner Q12: "C = number rules + tests"). Pure,
  * so `applyStarterChange`, the sheet upload and the screen read one answer.
- * The tables that record pins, changes and offers (BS-M3 – BS-M6) are not
- * applied yet; this is the part that does not need them.
+ * The tables that record pins, changes and offers (BS-M3 – BS-M6, 0152–0155)
+ * are written by `applyStarterChange` (server/starterChanges.ts), which reads
+ * every rule below; this file is the part that needs no database.
  *
  * ── The four kinds ───────────────────────────────────────────────────────────
  *   offer         a number, or a name, a company sees. An existing company
@@ -23,7 +24,7 @@
  *                 status, hiding) or by the company (its supplier, its
  *                 brand note). The screen never writes these as a field.
  *
- * EVERY column of the four starter tables is listed, and
+ * EVERY column of the five starter tables is listed, and
  * `server/starterChange.test.ts` fails on a column that is not — so a column
  * added later has to be decided here before the screen can touch it.
  */
@@ -32,7 +33,8 @@ export type StarterTable =
   | "materials"
   | "assemblies"
   | "laborRates"
-  | "modifiers";
+  | "modifiers"
+  | "runTypes";
 export type StarterFieldKind = "offer" | "everyone" | "unit" | "not-editable";
 
 const NOT_EDITABLE_COMMON = [
@@ -43,7 +45,11 @@ const NOT_EDITABLE_COMMON = [
   "version",
   "createdAt",
   "updatedAt",
-  "isActive",
+  // Starter hiding and pins (0154, BS-M5) — machinery, written only by
+  // applyStarterChange / hideStarterItem, never as a field.
+  "isPinnedCopy",
+  "hiddenAt",
+  "replacedById",
 ] as const;
 
 function kinds(
@@ -80,6 +86,7 @@ export const STARTER_FIELDS: Record<
     ["searchAliases", "category", "description", "isSpecialty"],
     ["unitOfSale"],
     [
+      "isActive",
       "isExamplePrice",
       "isExampleLaborHours",
       "status",
@@ -106,7 +113,7 @@ export const STARTER_FIELDS: Record<
     ],
     ["category", "projectType", "markShape", "markLetter", "markColor"],
     [],
-    ["isExampleHours", "status", "archivedAt", "trade"]
+    ["isActive", "isExampleHours", "status", "archivedAt", "trade"]
   ),
   laborRates: kinds(
     [
@@ -123,15 +130,69 @@ export const STARTER_FIELDS: Record<
     [],
     // Hourly vs salaried changes what every amount above MEANS — a unit.
     ["rateType"],
-    ["isExampleRate", "trade"]
+    ["isActive", "isExampleRate", "trade"]
   ),
   modifiers: kinds(
     // `scope` decides which lines it adds to, so it moves numbers.
     ["name", "laborAdjustmentPct", "scope"],
     [],
     [],
-    ["status", "archivedAt"]
+    ["isActive", "status", "archivedAt"]
   ),
+  // takeoff_run_types (§ 10a.1 #1): its parts are COLUMNS, so each is an
+  // offer like any number. Its EXTRAS are child rows and wait with kits.
+  runTypes: kinds(
+    [
+      "label",
+      "racewayMaterialId",
+      "conductorMaterialId",
+      "conductorCount",
+      "groundMaterialId",
+      "groundCount",
+      "fittingStyle",
+      "couplingMaterialId",
+      "connectorMaterialId",
+      "strapMaterialId",
+      "elbow90MaterialId",
+      "elbow45MaterialId",
+      "lbMaterialId",
+      "pullBoxMaterialId",
+      "conduitExtraPct",
+      "wireExtraPct",
+      "makeupDeviceInches",
+      "makeupPanelInches",
+      "makeupByKindInches",
+    ],
+    // The run's colour on the drawing: its look, no number.
+    ["color"],
+    // Conduit vs cable vs … decides what every foot on a bid IS — a unit.
+    ["pathType"],
+    ["trade", "status", "archivedAt"]
+  ),
+};
+
+/**
+ * The fields that NAME another starter row. A change may point one only at a
+ * SHARED, active row of that table (§ 10a.3 step 1, as for a part): a starter
+ * that pointed at one company's copy would hand that company's item to every
+ * other company.
+ */
+export const STARTER_REFERENCES: Partial<
+  Record<StarterTable, Record<string, StarterTable>>
+> = {
+  assemblies: { laborRateId: "laborRates" },
+  runTypes: {
+    racewayMaterialId: "materials",
+    conductorMaterialId: "materials",
+    groundMaterialId: "materials",
+    couplingMaterialId: "materials",
+    connectorMaterialId: "materials",
+    strapMaterialId: "materials",
+    elbow90MaterialId: "materials",
+    elbow45MaterialId: "materials",
+    lbMaterialId: "materials",
+    pullBoxMaterialId: "materials",
+  },
 };
 
 /** The kind of one field, or `undefined` for a field this list does not know. */

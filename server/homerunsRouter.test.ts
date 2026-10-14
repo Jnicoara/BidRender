@@ -131,10 +131,100 @@ beforeEach(async () => {
   await database.delete(bids).where(inArray(bids.userId, [USER, STRANGER]));
 });
 
+/*
+  F11 (owner Q19, 2026-10-12; baseline-screen-plan.md § 9): opening a sheet
+  never ADDS homerun circuits. A visit sends `create: false` and gets back how
+  many are waiting; "Add N new homerun circuits" sends `create: true`. Red
+  before: a visit created the circuit and its panel, so homerun feet arrived
+  on a Draft because somebody looked.
+*/
+describeDb("a sheet visit adds nothing; the offer adds (F11)", () => {
+  it("a visit creates no circuit and no panel, and reports what is waiting", async () => {
+    const { bidId, sheetId, near, far } = await aBid();
+    const visit = await caller().homeruns.syncSheet({
+      create: false,
+      bidId,
+      sheetId,
+      circuits: [
+        { panel: "2B", circuits: [1], leavingStampId: near },
+        { panel: "2B", circuits: [3], leavingStampId: far },
+      ],
+    });
+    expect(visit).toMatchObject({ created: 0, waiting: 2 });
+    const after = await homeruns(bidId);
+    expect(after.rows).toHaveLength(0);
+    expect(after.panels).toHaveLength(0);
+
+    const added = await caller().homeruns.syncSheet({
+      create: true,
+      bidId,
+      sheetId,
+      circuits: [
+        { panel: "2B", circuits: [1], leavingStampId: near },
+        { panel: "2B", circuits: [3], leavingStampId: far },
+      ],
+    });
+    expect(added).toMatchObject({ created: 2, waiting: 0 });
+    expect((await homeruns(bidId)).rows).toHaveLength(2);
+  });
+
+  it("a visit after adding reports only the NEW circuit as waiting", async () => {
+    const { bidId, sheetId, near, far } = await aBid();
+    await caller().homeruns.syncSheet({
+      create: true,
+      bidId,
+      sheetId,
+      circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
+    });
+    const visit = await caller().homeruns.syncSheet({
+      create: false,
+      bidId,
+      sheetId,
+      circuits: [
+        { panel: "2B", circuits: [1], leavingStampId: near },
+        { panel: "2B", circuits: [5], leavingStampId: far },
+      ],
+    });
+    expect(visit).toMatchObject({ created: 0, waiting: 1 });
+    expect((await homeruns(bidId)).rows).toHaveLength(1);
+  });
+
+  it("refuses a panel placement that does not say who is placing it", async () => {
+    // Owner, 2026-10-12 (the Q19 rule): a visit used to fill an empty panel
+    // spot from a "PANEL 2B" label. `by` has no default, so nothing places
+    // a panel without saying it is a person's hand or their "Assign" tap.
+    const { bidId, sheetId } = await aBid();
+    await expect(
+      caller().homeruns.placePanel({
+        bidId,
+        panel: "2B",
+        spot: { sheetId, x: 0, y: ft(10) },
+      } as unknown as Parameters<
+        ReturnType<typeof caller>["homeruns"]["placePanel"]
+      >[0])
+    ).rejects.toThrow();
+    expect((await homeruns(bidId)).panels).toHaveLength(0);
+  });
+
+  it("refuses a sync that does not say whether it creates", async () => {
+    const { bidId, sheetId, near } = await aBid();
+    await expect(
+      caller().homeruns.syncSheet({
+        bidId,
+        sheetId,
+        circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
+      } as unknown as Parameters<
+        ReturnType<typeof caller>["homeruns"]["syncSheet"]
+      >[0])
+    ).rejects.toThrow();
+  });
+});
+
 describeDb("panel spots and circuits are saved (step 2)", () => {
   it("no panel spot: no number, said — then the spot gives 40 + 12.5 ft", async () => {
     const { bidId, sheetId, near } = await aBid();
     await caller().homeruns.syncSheet({
+      create: true,
       bidId,
       sheetId,
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
@@ -147,6 +237,7 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
     });
 
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -176,12 +267,14 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
     const { bidId, sheetId, near, far } = await aBid();
     const sync = (stamp: number) =>
       caller().homeruns.syncSheet({
+        create: true,
         bidId,
         sheetId,
         circuits: [{ panel: "2B", circuits: [1], leavingStampId: stamp }],
       });
     await sync(near);
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -201,6 +294,7 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
     const { bidId, sheetId, near, far } = await aBid();
     const sync = (stamp: number, rematch: boolean) =>
       caller().homeruns.syncSheet({
+        create: true,
         bidId,
         sheetId,
         rematch,
@@ -231,6 +325,7 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
   it("a two-pole tag is ONE homerun", async () => {
     const { bidId, sheetId, near } = await aBid();
     await caller().homeruns.syncSheet({
+      create: true,
       bidId,
       sheetId,
       circuits: [{ panel: "2B", circuits: [36, 38], leavingStampId: near }],
@@ -245,6 +340,7 @@ describeDb("panel spots and circuits are saved (step 2)", () => {
     const other = await aBid();
     await expect(
       caller().homeruns.syncSheet({
+        create: true,
         bidId: one.bidId,
         sheetId: one.sheetId,
         circuits: [{ panel: "2B", circuits: [1], leavingStampId: other.near }],
@@ -257,11 +353,13 @@ describeDb("homerun rows: confirm and override (step 3)", () => {
   async function placed() {
     const b = await aBid();
     await caller().homeruns.syncSheet({
+      create: true,
       bidId: b.bidId,
       sheetId: b.sheetId,
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId: b.bidId,
       panel: "2B",
       spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
@@ -339,11 +437,13 @@ describeDb(
         routingPct: 0.15,
       });
       await caller().homeruns.syncSheet({
+        create: true,
         bidId,
         sheetId,
         circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
       });
       await caller().homeruns.placePanel({
+        by: "hand",
         bidId,
         panel: "2B",
         spot: { sheetId, x: 0, y: ft(10) },
@@ -382,6 +482,7 @@ describeDb(
 
       // And they follow the drawing: a second homerun moves them.
       await caller().homeruns.syncSheet({
+        create: true,
         bidId,
         sheetId,
         circuits: [
@@ -418,11 +519,13 @@ describeDb("extra bends per homerun (0131, owner 2026-10-07)", () => {
       runTypeId: type.id,
     });
     await caller().homeruns.syncSheet({
+      create: true,
       bidId: b.bidId,
       sheetId: b.sheetId,
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId: b.bidId,
       panel: "2B",
       spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
@@ -525,11 +628,13 @@ describeDb("every total the bid line agrees with includes homeruns", () => {
       routingPct: 0.15,
     });
     await caller().homeruns.syncSheet({
+      create: true,
       bidId,
       sheetId,
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -557,11 +662,13 @@ describeDb("the bid line (step 4)", () => {
       routingPct: 0.15,
     });
     await caller().homeruns.syncSheet({
+      create: true,
       bidId,
       sheetId,
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId,
       panel: "2B",
       spot: { sheetId, x: 0, y: ft(10) },
@@ -610,11 +717,13 @@ describeDb("height areas inside a sheet (0130)", () => {
   async function placed() {
     const b = await aBid();
     await caller().homeruns.syncSheet({
+      create: true,
       bidId: b.bidId,
       sheetId: b.sheetId,
       circuits: [{ panel: "2B", circuits: [1], leavingStampId: b.near }],
     });
     await caller().homeruns.placePanel({
+      by: "hand",
       bidId: b.bidId,
       panel: "2B",
       spot: { sheetId: b.sheetId, x: 0, y: ft(10) },
@@ -801,6 +910,7 @@ describeDb("refusals", () => {
     await caller().bids.lockQuantities({ bidId });
     await expect(
       caller().homeruns.syncSheet({
+        create: true,
         bidId,
         sheetId,
         circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],
@@ -818,6 +928,7 @@ describeDb("refusals", () => {
     ).rejects.toThrow(/not found/i);
     await expect(
       callerFor(STRANGER).homeruns.syncSheet({
+        create: true,
         bidId,
         sheetId,
         circuits: [{ panel: "2B", circuits: [1], leavingStampId: near }],

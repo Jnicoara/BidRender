@@ -1616,6 +1616,35 @@ additive ones run BEFORE the push (§ 5, three steps).
 5. Then production, in the same order — see the release entry below for the
    current one, and § 5a for the full commands.
 
+### LIVE: `60479773` and migrations 0144–0151 (released 2026-10-13)
+
+**Done with the owner's four approvals (A start, B database, C code, D done),
+per `next-live-release-plan.md` "Release steps AFTER C's bid-protection code
+merges".** Live went from `371b2ab` / 144 migrations to **`60479773` / 152**.
+Every figure matched the 2026-10-12 rehearsal AND that day's fresh one
+(below). Times UTC.
+
+| Step                      | Printed                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Backup                    | **`2026-10-13T05-09-10Z`**: 77 tables, 5,539 rows (same as 2026-10-12), 5/5 files (324.3 MB), `r2://bidsoftware/helixbid`                                                                                                                                                                                                                  |
+| Backup verified           | restored 77 / 5,539 = manifest, kept as `bidrender_backup_verify` (`VERIFY_DATABASE_URL` must name a database the local login can open — `bidrender_test_clean`, not `mysql`)                                                                                                                                                              |
+| Rehearsal on that copy    | drift 144 / 180, exactly 0144–0151 out; **8 applied, 152**, re-run nothing, matches, **183/183**; `371b2ab` on the migrated copy 2/2 unchanged; first boot ×2 CLEAN (5 copper SER renamed in place, #78–82; company 18 → 18); twin 0; remove/relocate 0 of 2; freeze 0; math 2 Drafts v0 → v1, 0 moved, 0 rows, again 0; **2/2 unchanged** |
+| A — pre-flight            | live `371b2ab`; Gate 38345146822 green on `60479773` (test, deploy-staging, smoke); no `drizzle/` or `server/seed/` change since the rehearsed `14f205c1`; 90 non-merge commits read; status clean but `scripts/_tmpCopyDb.mts` (kept untracked); `pnpm check` clean                                                                       |
+| Live drift before         | **144**, the same 8 tables, FKs 180/183                                                                                                                                                                                                                                                                                                    |
+| Totals before             | `371b2ab`'s code: read only proven, 2 bids, 2 owners (`bidrender-backups/live-totals-before-2026-10-13.json`)                                                                                                                                                                                                                              |
+| B — migrate live (05:54)  | **"Applied 8 migrations: 0144_sheet_work_tag to 0151_starter_editor_factors. This database now has all 152."** Second run: nothing. Drift: **matches, FKs 183/183**. Old code still serving (home 200); old code 2/2 unchanged                                                                                                             |
+| C — push                  | catalog snapshot first; `371b2abc..60479773 main -> main` 16:31:47; `/api/version` **`60479773`, builtAt 16:32:35**, serving by 16:34:59 (also on www)                                                                                                                                                                                     |
+| First boot                | `catalogRehearsal` before vs after on live: added 0, **renamed 5** (the copper SER → "8/3 SER Copper" etc., same ids), retired 0, **deleted 0**; old spellings 0; duplicates 0; company rows 18 → 18, changed 0; every reference identical; **CLEAN**                                                                                      |
+| Totals after boot         | 2/2 unchanged                                                                                                                                                                                                                                                                                                                              |
+| Step 4 `freezeSentBids`   | dry run 0; owner read it; `--apply` **0 bids, 0 locked, 0 frozen** (live has no non-Draft bid)                                                                                                                                                                                                                                             |
+| Step 5 `applyMathVersion` | dry run bids 23, 25 Draft v0 → v1, $0.00 → $0.00; owner read it; `--apply` **2 moved, 0 with a moved total**; again: 0 below v1                                                                                                                                                                                                            |
+| D — totals after          | **"ok all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged"** (23: $0 → $0, 25: $0 → $0); owner opened both bids and their plans on live                                                                                                                                                                                  |
+
+**Not done, by design:** no `STARTER_TOTP_KEY` on live and no starter-editor
+account — the starter sign-in refuses until the owner says go. Rollback, had it
+been needed: DO Activity → previous deployment; all 8 files are additive, and
+`371b2ab` was measured working on the migrated database before the push.
+
 ### LIVE: `371b2ab` and migrations 0105–0143 (released 2026-10-10)
 
 **Done with the owner's four approvals (A start, B database, C code, D done),
@@ -1713,6 +1742,49 @@ link were refused.
   cause. Read the log line before changing settings.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
+
+### Staging: migrations 0152–0156 — starter change log, pins, hiding, offers; locked warnings (2026-10-13 UTC) — NOT on live
+
+`0152_starter_change_log` (C's BS-M3: `starter_change_batches`,
+`starter_changes`), `0153_starter_change_pins` (BS-M4),
+`0154_starter_pinned_hidden` (BS-M5: `isPinnedCopy`, `hiddenAt`,
+`replacedById` + self-FK on `materials`, `assemblies`, `labor_rates`,
+`modifiers`, `takeoff_run_types`), `0155_starter_offer_answers` (BS-M6:
+`companies.starterSeenAt` + `starter_offer_answers`) — all word for word
+from `baseline-screen-plan.md` § 10a.2 on `track-c` (`bf168fbd`), BS-M5's
+"same four statements" written out. `0156_bid_locked_warnings` (C's F13-M1:
+`bids.lockedWarnings json NULL`, `track-c-handoff.md` F13). No `UPDATE`,
+every column nullable with no default — additive, step 1, step 3 empty.
+`schema.ts` declares everything (13 new FKs), so all five MUST be on a
+database before code from this commit on reaches it.
+
+1. **Throwaway first**: copy of `bidrender_local` → `bidrender_scratch_0152`:
+   **5 applied**, 157; re-run "Nothing to apply"; drift shows nothing new
+   (only that copy's known 3 collation tables and 5 legacy FKs); 4,386 /
+   4,386 totals unchanged with the old code (`9475799e`, worktree
+   `../bidrender-before-0152`) AND the new code.
+2. **Backup**: `staging-2026-10-13T20-51-43Z-before-0152-0156.sql` (80
+   tables, 16,145 rows), restored to `bidrender_scratch_staging_0152`:
+   **80/80 counts equal**. Rehearsal on it: drift before = exactly the 4
+   tables, 16 columns and 13 FKs; **5 applied**, 157; re-run nothing;
+   "matches", 196/196; **1,305/1,305 unchanged** (old and new code).
+3. **Staging database**: **5 applied**, 157; re-run "Nothing to apply";
+   "matches", 196/196. Totals before (old code) vs after with old AND new
+   code: **all 1,306 bids that existed before unchanged**; the only
+   differences were bids 1308–1310, created on staging while measuring
+   ("missing before, present after"). JSONs
+   `staging-totals-{before,after-…-new,after-…-old}-0152-2026-10-13.json`.
+4. **Local**: `bidrender_local` and `bidrender_test_localdev`, both 157
+   (test DB "matches", 196/196).
+5. Two guards asked for a decision, as designed: `shared/starterChange.ts`
+   classes the three new columns `not-editable` (machinery), and
+   `server/forkableReferences.test.ts` registers the five `replacedById`
+   as `unreviewed` (ceiling 7 → 11) — C's starter code owes a resolver
+   before it writes one.
+
+**Live**: 0152–0156 join the next release's batch, BEFORE the push of any
+code from this commit on (all additive). Expect 157, 196/196 — **if what it
+prints does not match, stop and find out why before going on.**
 
 ### Staging: migrations 0150–0151 — the starter editor's role and authenticator (2026-10-12 UTC) — NOT on live
 

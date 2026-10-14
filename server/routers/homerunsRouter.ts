@@ -186,6 +186,15 @@ export const homerunsRouter = router({
           .max(2000),
         /** A person asked to re-point unconfirmed homerun devices. */
         rematch: z.boolean().default(false),
+        /**
+         * Whether circuits (and panels) the bid does not have yet are ADDED.
+         * REQUIRED, with no default, so no caller can create by omission:
+         * a sheet VISIT sends false and gets back how many are `waiting`; the
+         * person's "Add them" sends true (owner Q19, 2026-10-12;
+         * baseline-screen-plan.md § 9 F11). Until then a visit created them,
+         * adding homerun feet to a Draft because somebody looked.
+         */
+        create: z.boolean(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -197,21 +206,40 @@ export const homerunsRouter = router({
           .filter(s => s.bidId === input.bidId)
           .map(s => s.id)
       );
-      const panelIds = new Map<string, number>();
-      let synced = 0;
-      let created = 0;
-      let repointed = 0;
-      for (const c of input.circuits) {
+      // Checked before anything is written, so a bad device refuses the
+      // whole sync rather than half of it.
+      for (const c of input.circuits)
         if (c.leavingStampId !== null && !marks.has(c.leavingStampId))
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "That device is not a mark on this sheet.",
           });
+      const existingPanels = new Map(
+        (await db.getHomerunPanels(input.bidId, userId)).map(p => [
+          (p.name ?? "").toUpperCase(),
+          p.id,
+        ])
+      );
+      const panelIds = new Map<string, number | null>();
+      let synced = 0;
+      let created = 0;
+      let repointed = 0;
+      /** Circuits on this sheet the bid does not have, left for "Add them". */
+      let waiting = 0;
+      for (const c of input.circuits) {
         const key = c.panel.toUpperCase();
         let panelId = panelIds.get(key);
         if (panelId === undefined) {
-          panelId = await db.ensureHomerunPanel(input.bidId, userId, c.panel);
+          // A visit never creates a panel either: a panel with no circuits
+          // prices nothing, and it would be one more write for a look.
+          panelId = input.create
+            ? await db.ensureHomerunPanel(input.bidId, userId, c.panel)
+            : (existingPanels.get(key) ?? null);
           panelIds.set(key, panelId);
+        }
+        if (panelId === null) {
+          waiting++;
+          continue;
         }
         // A two-pole "2B-36,38" is ONE homerun, kept on its first circuit.
         const result = await db.syncHomerunCircuit(
@@ -220,13 +248,15 @@ export const homerunsRouter = router({
           Math.min(...c.circuits),
           c.circuits.length,
           c.leavingStampId,
-          input.rematch
+          input.rematch,
+          input.create
         );
         synced++;
         if (result.created) created++;
         if (result.repointed) repointed++;
+        if (result.waiting) waiting++;
       }
-      return { synced, created, repointed };
+      return { synced, created, repointed, waiting };
     }),
 
   /** Where a panel sits on a sheet — the Measured method's other end. */
@@ -242,6 +272,16 @@ export const homerunsRouter = router({
             y: z.number().min(0).max(100000),
           })
           .nullable(),
+        /**
+         * WHO is placing it, REQUIRED with no default (owner, 2026-10-12, the
+         * Q19 rule): `"hand"`, a person tapping the panel's spot on the
+         * drawing; `"label"`, a person pressing "Assign N panels from labels".
+         * There is no value for "the page read a label while showing the
+         * sheet". That used to fill an empty spot on every visit, and
+         * Measured footage then appeared on a Draft because somebody looked.
+         * A caller that does not say is refused.
+         */
+        by: z.enum(["hand", "label"]),
       })
     )
     .mutation(async ({ ctx, input }) => {

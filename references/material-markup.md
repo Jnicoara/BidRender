@@ -154,6 +154,12 @@ handling cost, and wire at $0.40/ft must not land in the under-$1 band at 75%.
 For items sold singly the two are the same. `materials` has no pack size
 today, so Piece 2 adds one; until then the band level returns "no rule".
 
+> **The pack columns are specified in `references/pricing-safety-plan.md`
+> § 2 (2026-10-12)** — `packQty`, `packLabel`, `packPrice`, ONE set shared
+> by price entry, these bands and the purchase list. Band key =
+> `packPrice ?? costPerUnit × packQty`. Agrees with D3; switching the bands
+> onto it stays Piece 2's job (a math version, bid-methods Q8).
+
 **D4. "Quoted" is a LINE TYPE, not a category and not a band.** (2026-09-25)
 Supplier-quoted gear and fixture packages, with their own markup %. Not built
 yet, but it has its slot in the order: item override → **quoted line** →

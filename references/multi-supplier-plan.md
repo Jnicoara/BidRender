@@ -296,6 +296,11 @@ review step:
 This is the review screen the owner's Q5 asks for; the button can come
 back when it ships.
 
+> **Planned in detail 2026-10-12: `references/pricing-safety-plan.md` § 3**
+> (Track C). It builds this preview and undo BEFORE the supplier tables, on
+> an import log (`price_imports`) that this plan reuses instead of creating
+> `supplier_price_imports` (§ 6 below). It agrees with everything above.
+
 ### 4.5 Unit of sale
 
 A supplier price is stored **per the material's `unitOfSale`** (each,
@@ -304,6 +309,12 @@ devices per box. The import does not convert: the preview flags a price
 more than 5x away from your price or the other list (the multiplier is a
 starting point, not measured), and the user fixes the row. Typed prices
 are per the unit shown beside the box.
+
+> **Overridden in part, owner 2026-10-12 — `references/pricing-safety-plan.md`
+> § 3.2.** A price the file STATES as per M (1,000) or per C (100) is now
+> converted, and the preview shows the per-unit result. Anything unstated
+> keeps the 5x flag exactly as written here. Typed prices gain a pack-price
+> box once a material has a pack size (that plan § 2).
 
 ### 4.6 Brand variants
 
@@ -372,6 +383,12 @@ a row exists only to hold a price; there is no "not yet" state to keep.
 
 **New table `supplier_price_imports`** (needed only for undo; can follow
 the first build if it ships preview-only)
+
+> **Replaced 2026-10-12** by `price_imports` / `price_import_rows`
+> (`references/pricing-safety-plan.md` § 3.5, § 6), built first for the
+> before-beta import undo. When this plan builds, add a nullable
+> `supplierId` to `price_imports` and point `supplier_prices.importId` at
+> it. One undo log, not two. The table below is kept as the record.
 
 | Column                    | Type          | NULL meaning | Default | FK / ON DELETE     |
 | ------------------------- | ------------- | ------------ | ------- | ------------------ |

@@ -16,8 +16,10 @@ import {
   sql,
   getTableColumns,
 } from "drizzle-orm";
+import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2/promise";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { timePool } from "./slowRequests";
 import {
   QUANTITY_MARK_STATUSES,
@@ -386,6 +388,11 @@ import {
 } from "../shared/takeoffBridge";
 import { extraFeetForRuns, extraKeyOf } from "../shared/runExtrasPerFoot";
 import { followsDrawing } from "../shared/quantityLock";
+import {
+  freezeAt,
+  frozenWarningsShown,
+  type WarningCounts,
+} from "../shared/lockedWarnings";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
 import {
   quantityCircuit,
@@ -404,7 +411,35 @@ let _db: MySql2Database | null = null;
  */
 let _pool: ReturnType<typeof createPool> | null = null;
 
+/**
+ * The transaction `inOneTransaction` is running, if any. While it is set,
+ * `getDb()` hands out the transaction instead of the pool, so every function
+ * in this file joins it without being rewritten to take an executor.
+ */
+const _transaction = new AsyncLocalStorage<MySql2Database>();
+
+/**
+ * Run `work` as ONE transaction: every query any function in this file makes
+ * inside it, however deep (a fork that copies a recipe, its steps), commits
+ * together or not at all. Built for `applyStarterChange`, whose pins and
+ * change must never land half-way (references/baseline-screen-plan.md
+ * § 10a.3). A function that opens its own `db.transaction` inside nests as a
+ * savepoint. Queries inside run on one connection, one at a time.
+ */
+export async function inOneTransaction<T>(work: () => Promise<T>): Promise<T> {
+  if (_transaction.getStore()) return work();
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.transaction(tx =>
+    // The transaction has the database's whole query surface; the type
+    // differs only in the pool-level members nothing in this file uses.
+    _transaction.run(tx as unknown as MySql2Database, work)
+  );
+}
+
 export async function getDb() {
+  const inTransaction = _transaction.getStore();
+  if (inTransaction) return inTransaction;
   if (!_db && process.env.DATABASE_URL) {
     try {
       // The pool is built from mysqlConnection rather than the URL directly, so
@@ -1425,7 +1460,24 @@ const LIBRARY_OWNERSHIP_FIELDS = [
   // pull an archived row back into the working list.
   "status",
   "archivedAt",
+  // Starter machinery (0154, BS-M5), not content. `hiddenAt` and
+  // `replacedById` are legal on a SHARED row only, so a fork must not copy
+  // them; `isPinnedCopy` is written by applyStarterChange (TRUE on a pin) and
+  // by the company edit paths (FALSE), never by a caller's patch.
+  "isPinnedCopy",
+  "hiddenAt",
+  "replacedById",
 ] as const;
+
+/**
+ * What a COMPANY's edit to its own copy writes into `isPinnedCopy`: a pin
+ * (TRUE) becomes FALSE, "a pin the company has since edited", which counts as
+ * its own change; NULL (an own copy) stays NULL. Every company edit path sets
+ * it (baseline-screen-plan.md § 10a.3), or a real edit would still read as
+ * "not my change" and hide from "My changes".
+ */
+const unpinOnEdit = (column: AnyMySqlColumn) =>
+  sql`IF(${column} IS TRUE, FALSE, ${column})`;
 
 /**
  * Run a seeder under a MySQL advisory lock, so two processes cannot both decide
@@ -1986,7 +2038,11 @@ export async function updateMaterial(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(materials)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(materials.id, id), eq(materials.userId, userId)));
 }
 
@@ -2578,7 +2634,11 @@ export async function updateLaborRate(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(laborRates)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(laborRates.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(laborRates.id, id), eq(laborRates.userId, userId)));
 }
 
@@ -3164,7 +3224,11 @@ export async function updateModifier(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(modifiers)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(modifiers.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(modifiers.id, id), eq(modifiers.userId, userId)));
 }
 
@@ -3960,6 +4024,23 @@ export function assemblyHoursSourceFor(
 }
 
 /** Replace an assembly's step list wholesale (the editor sends the list). */
+/**
+ * A company edit to an assembly's RECIPE (parts, modifiers, steps) is an edit
+ * to its copy: a pin becomes FALSE, as `updateAssembly` does for a field
+ * (`unpinOnEdit`). A recipe-only save never calls `updateAssembly`, so the
+ * setters say it themselves. A fresh fork has NULL and is left alone.
+ */
+async function unpinAssembly(assemblyId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(assemblies)
+    .set({ isPinnedCopy: false })
+    .where(
+      and(eq(assemblies.id, assemblyId), eq(assemblies.isPinnedCopy, true))
+    );
+}
+
 export async function setAssemblySteps(
   assemblyId: number,
   lines: ReadonlyArray<
@@ -3969,6 +4050,7 @@ export async function setAssemblySteps(
 ): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  await unpinAssembly(assemblyId);
   await db.transaction(async tx => {
     await tx
       .delete(assemblyLaborSteps)
@@ -4315,7 +4397,11 @@ export async function updateAssembly(
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
   await db
     .update(assemblies)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(assemblies.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(assemblies.id, id), eq(assemblies.userId, userId)));
 }
 
@@ -4383,6 +4469,7 @@ export async function setAssemblyMaterials(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  await unpinAssembly(assemblyId);
   await db
     .delete(assemblyMaterials)
     .where(eq(assemblyMaterials.assemblyId, assemblyId));
@@ -4406,6 +4493,7 @@ export async function setAssemblyModifiers(
 ) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  await unpinAssembly(assemblyId);
   await db
     .delete(assemblyModifiers)
     .where(eq(assemblyModifiers.assemblyId, assemblyId));
@@ -7153,10 +7241,19 @@ export async function compareBidQuantitiesWithPlans(bidId: number): Promise<{
  * ── The clock is a parameter ─────────────────────────────────────────────────
  * So a test can say when. Nothing on a path that decides what a screen says
  * about a date may read `Date.now()` for itself (CLAUDE.md § Scheduled work).
+ *
+ * ── The warning counts freeze with it (F13, shared/lockedWarnings.ts) ────────
+ * `countWarnings` is REQUIRED, so no caller can lock a bid without freezing
+ * what its warnings say. It is a callback because the counts live in
+ * server/bidWarnings.ts, which imports this file. It runs AFTER the
+ * quantities are written, so the counts describe the bid as locked, and its
+ * answer goes in the same statement as the timestamp: a bid is never locked
+ * with no frozen counts, nor holds counts while unlocked.
  */
 export async function lockBidQuantities(
   bidId: number,
-  at: Date
+  at: Date,
+  countWarnings: () => Promise<WarningCounts>
 ): Promise<{ lockedAt: Date; frozen: number; moved: number }> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -7187,9 +7284,10 @@ export async function lockBidQuantities(
       .where(and(eq(bidLineItems.id, line.id), eq(bidLineItems.bidId, bidId)));
   }
 
+  const warnings = freezeAt(await countWarnings(), at);
   await db
     .update(bids)
-    .set({ quantitiesLockedAt: at })
+    .set({ quantitiesLockedAt: at, lockedWarnings: warnings })
     .where(eq(bids.id, bidId));
 
   /*
@@ -7203,13 +7301,17 @@ export async function lockBidQuantities(
   return { lockedAt: at, frozen, moved };
 }
 
-/** Let the quantities follow the plans again. One column, back to NULL. */
+/**
+ * Let the quantities follow the plans again: the lock and the warning counts
+ * frozen with it (F13) go back to NULL in one statement, so the strip shows
+ * live counts from this moment.
+ */
 export async function unlockBidQuantities(bidId: number): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   await db
     .update(bids)
-    .set({ quantitiesLockedAt: null })
+    .set({ quantitiesLockedAt: null, lockedWarnings: null })
     .where(eq(bids.id, bidId));
 }
 
@@ -10420,6 +10522,11 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
     archivedAt: _archivedAt,
     createdAt: _createdAt,
     updatedAt: _updatedAt,
+    // Starter machinery (0154), as LIBRARY_OWNERSHIP_FIELDS says for the
+    // other four tables: legal on a shared row only, never copied.
+    isPinnedCopy: _isPinnedCopy,
+    hiddenAt: _hiddenAt,
+    replacedById: _replacedById,
     ...specification
   } = source;
 
@@ -10706,9 +10813,17 @@ export async function updateRunType(
   delete safe.id;
   delete safe.userId;
   delete safe.baselineId;
+  // Starter machinery (0154): never a caller's patch.
+  delete safe.isPinnedCopy;
+  delete safe.hiddenAt;
+  delete safe.replacedById;
   await db
     .update(takeoffRunTypes)
-    .set({ ...safe, updatedAt: new Date() })
+    .set({
+      ...safe,
+      isPinnedCopy: unpinOnEdit(takeoffRunTypes.isPinnedCopy),
+      updatedAt: new Date(),
+    })
     .where(and(eq(takeoffRunTypes.id, id), eq(takeoffRunTypes.userId, userId)));
 }
 
@@ -15713,6 +15828,10 @@ export async function bidDropsNotPriced(
  * bid page's own function, so a card and the bid it opens cannot disagree.
  * The filter can only let too many through, never too few. A few at a time,
  * so a long history does not open one connection per bid.
+ *
+ * A LOCKED bid with frozen counts (F13) answers from them, as its bid page
+ * does (server/bidWarnings.ts), and is not recounted: a library edit since
+ * the lock must not move its card.
  */
 export async function dropsNotPricedForBids(
   bidIds: readonly number[],
@@ -15722,6 +15841,27 @@ export async function dropsNotPricedForBids(
   if (bidIds.length === 0) return out;
   const db = await getDb();
   if (!db) return out;
+  const frozenIds = new Set<number>();
+  for (const bid of await db
+    .select({
+      id: bids.id,
+      quantitiesLockedAt: bids.quantitiesLockedAt,
+      lockedWarnings: bids.lockedWarnings,
+    })
+    .from(bids)
+    .where(
+      and(
+        eq(bids.userId, userId),
+        inArray(bids.id, Array.from(new Set(bidIds))),
+        isNotNull(bids.lockedWarnings)
+      )
+    )) {
+    const frozen = frozenWarningsShown(bid);
+    if (!frozen) continue;
+    frozenIds.add(bid.id);
+    if (frozen.counts.dropsNotPriced > 0)
+      out.set(bid.id, frozen.counts.dropsNotPriced);
+  }
   const withMarks = (
     await db
       .selectDistinct({ bidId: takeoffStamps.bidId })
@@ -15732,7 +15872,9 @@ export async function dropsNotPricedForBids(
           inArray(takeoffStamps.bidId, Array.from(new Set(bidIds)))
         )
       )
-  ).map(r => r.bidId);
+  )
+    .map(r => r.bidId)
+    .filter(id => !frozenIds.has(id));
   for (let i = 0; i < withMarks.length; i += 4) {
     const batch = withMarks.slice(i, i + 4);
     const counts = await Promise.all(
@@ -16367,8 +16509,20 @@ export async function syncHomerunCircuit(
   circuitNumber: number,
   poles: number,
   leavingStampId: number | null,
-  repoint: boolean
-): Promise<{ id: number; created: boolean; repointed: boolean }> {
+  repoint: boolean,
+  /**
+   * Whether a circuit the bid does not have yet may be CREATED. False on a
+   * sheet visit (owner Q19, 2026-10-12: new homerun circuits are a one-tap
+   * offer, never added because somebody looked): a missing circuit is then
+   * reported as `waiting` and nothing is written.
+   */
+  create: boolean
+): Promise<{
+  id: number | null;
+  created: boolean;
+  repointed: boolean;
+  waiting: boolean;
+}> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const [existing] = await db
@@ -16387,6 +16541,8 @@ export async function syncHomerunCircuit(
     )
     .limit(1);
   if (!existing) {
+    if (!create)
+      return { id: null, created: false, repointed: false, waiting: true };
     const [result] = await db.insert(bidPanelCircuits).values({
       panelId,
       userId,
@@ -16394,13 +16550,24 @@ export async function syncHomerunCircuit(
       poles,
       homerunFromStampId: leavingStampId,
     });
-    return { id: result.insertId, created: true, repointed: false };
+    return {
+      id: result.insertId,
+      created: true,
+      repointed: false,
+      waiting: false,
+    };
   }
   const moves =
     repoint &&
     existing.confirmedAt === null &&
     existing.from !== leavingStampId;
-  if (!moves) return { id: existing.id, created: false, repointed: false };
+  if (!moves)
+    return {
+      id: existing.id,
+      created: false,
+      repointed: false,
+      waiting: false,
+    };
   await db
     .update(bidPanelCircuits)
     .set({ homerunFromStampId: leavingStampId, poles })
@@ -16411,7 +16578,7 @@ export async function syncHomerunCircuit(
         isNull(bidPanelCircuits.homerunConfirmedAt)
       )
     );
-  return { id: existing.id, created: false, repointed: true };
+  return { id: existing.id, created: false, repointed: true, waiting: false };
 }
 
 /** A homerun's own settings. Omitted leaves a field; NULL clears it. */

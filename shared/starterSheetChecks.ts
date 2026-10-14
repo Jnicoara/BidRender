@@ -134,3 +134,13 @@ export function checkHoursRow(input: {
   }
   return { problems, value: Object.keys(entry).length ? entry : null };
 }
+
+/**
+ * The fields the sheet refuses at or below 0 (`checkPriceRow`,
+ * `checkHoursRow`): a price and the hours. `applyStarterChange` refuses the
+ * same, so a value the sheet would stop cannot arrive through the screen.
+ * Every other number on a starter row may be 0 (a modifier, a percentage).
+ */
+export const ABOVE_ZERO_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  materials: ["costPerUnit", "laborHours", "fieldBendLaborHours"],
+};

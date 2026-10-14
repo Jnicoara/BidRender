@@ -3,6 +3,9 @@ import {
   confirmableHomeruns,
   homerunKey,
   homerunKeyForCircuit,
+  homerunOfferLabel,
+  labelPanelsToAssign,
+  panelOfferLabel,
   homerunSyncPayload,
   homerunSyncStep,
   type HomerunSyncState,
@@ -188,5 +191,44 @@ describe("a hand-placed panel re-matches ITS sheet, never the next one", () => {
       send: true,
       rematch: false,
     });
+  });
+});
+
+describe("the homerun offer's words (F11, owner Q19)", () => {
+  it("shows nothing with nothing waiting, and counts what is", () => {
+    expect(homerunOfferLabel(0)).toBeNull();
+    expect(homerunOfferLabel(1)).toBe("Add 1 new homerun circuit");
+    expect(homerunOfferLabel(3)).toBe("Add 3 new homerun circuits");
+  });
+});
+
+describe("panels from labels are offered, never placed by looking (owner, 2026-10-12)", () => {
+  const read = [
+    { name: "2B", spot: { source: "label", x: 10, y: 20 } },
+    { name: "2C", spot: { source: "label", x: 30, y: 40 } },
+    { name: "2D", spot: { source: "hand", x: 50, y: 60 } },
+    { name: "2E", spot: null },
+  ];
+
+  it("offers only label-found panels with no saved spot", () => {
+    const offered = labelPanelsToAssign(read, [
+      { name: "2b", planSheetId: null },
+      { name: "2C", planSheetId: 7 },
+    ]);
+    // 2C already has a spot (never moved); 2D was placed by hand; 2E has none.
+    expect(offered).toEqual([{ name: "2B", x: 10, y: 20 }]);
+  });
+
+  it("offers a label panel the bid does not have yet", () => {
+    expect(labelPanelsToAssign(read, []).map(p => p.name)).toEqual([
+      "2B",
+      "2C",
+    ]);
+  });
+
+  it("says how many, and nothing at zero", () => {
+    expect(panelOfferLabel(0)).toBeNull();
+    expect(panelOfferLabel(1)).toBe("Assign 1 panel from labels");
+    expect(panelOfferLabel(2)).toBe("Assign 2 panels from labels");
   });
 });

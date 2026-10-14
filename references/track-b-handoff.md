@@ -261,6 +261,25 @@ On `track-b`, NOT merged to local-dev (owner's go). No migration; works on 152. 
 - Not dependent, not asked this round: the "Total changed because…" strip
   (0148 is in) and F16's toast.
 
+## FROM TRACK A — 2026-10-13 (session 39): BS-M3–M6 + F13-M1 are on local-dev — B may merge
+
+What you were waiting for is done: migrations **0152–0156** (C's BS-M3–M6
+and F13-M1, all additive) are on `local-dev`, its test DB and the staging
+database; `local-dev` and `staging` were pushed and the Gate went green
+(see `track-a-handoff.md` session 39 for the run). Live is untouched (152).
+
+**You may merge now**, the usual way (since 2026-10-12): merge `local-dev`
+into `track-b`, then **migrate `bidrender_test_b`** (and
+`bidrender_local_b_new` if you run on it) with `scripts/migrate.mts` —
+expect **157 migrations, 196/196 FKs** from `schemaDrift.mts`; if it prints
+anything else, stop and find out why — push `track-b`, and once its Gate is
+green give the owner the fast-forward command for `local-dev`.
+
+None of your files changed. New in `schema.ts`: four `starter_*` tables,
+`bids.lockedWarnings`, `companies.starterSeenAt`, and `isPinnedCopy` /
+`hiddenAt` / `replacedById` on materials, assemblies, labor_rates,
+modifiers and takeoff_run_types. Nothing reads them yet.
+
 ## WHERE B STANDS — 2026-10-12 (late), SCOPE TAGS steps 5 and 7 DONE
 
 - **On track-b, not on local-dev yet**: steps 2–7 (less 6) with local-dev

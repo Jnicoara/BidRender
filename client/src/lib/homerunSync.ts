@@ -104,6 +104,50 @@ export function homerunSyncStep(
 }
 
 /**
+ * The offer's words (owner Q19, 2026-10-12; baseline-screen-plan.md § 9 F11).
+ * A visit reports how many of this sheet's circuits the bid does not have
+ * yet and adds none; this button is how they are added. Null = nothing to
+ * offer, so nothing is shown.
+ */
+export function homerunOfferLabel(waiting: number): string | null {
+  if (waiting <= 0) return null;
+  return `Add ${waiting} new homerun circuit${waiting === 1 ? "" : "s"}`;
+}
+
+/**
+ * Panels this sheet found by a "PANEL 2B" LABEL that the bid has no spot for
+ * — what "Assign N panels from labels" would place (owner, 2026-10-12, the
+ * Q19 rule). A visit used to place these by itself, and Measured footage then
+ * appeared for circuits already on the bid because somebody looked.
+ *
+ * Only panels with NO saved spot: a label fills an empty spot, it never moves
+ * a saved one (owner, 2026-10-07), so a panel placed by hand is never
+ * offered.
+ */
+export function labelPanelsToAssign(
+  read: readonly {
+    name: string;
+    spot: { source: string; x: number; y: number } | null | undefined;
+  }[],
+  saved: readonly { name: string | null; planSheetId: number | null }[]
+): { name: string; x: number; y: number }[] {
+  return read.flatMap(p => {
+    if (p.spot?.source !== "label") return [];
+    const s = saved.find(
+      row => (row.name ?? "").toUpperCase() === p.name.toUpperCase()
+    );
+    if (s?.planSheetId != null) return [];
+    return [{ name: p.name, x: p.spot.x, y: p.spot.y }];
+  });
+}
+
+/** The panel offer's words; null = nothing to offer. */
+export function panelOfferLabel(count: number): string | null {
+  if (count <= 0) return null;
+  return `Assign ${count} panel${count === 1 ? "" : "s"} from labels`;
+}
+
+/**
  * The key a server homerun row matches a circuit on screen by. A two-pole
  * "2B-36,38" is stored on its FIRST circuit (the router keeps `min`), so a
  * circuit's key is its panel and its lowest number.

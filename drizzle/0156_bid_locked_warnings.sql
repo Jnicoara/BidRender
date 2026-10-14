@@ -1,0 +1,19 @@
+-- 0156 — A LOCKED BID'S WARNING COUNTS, FROZEN AT THE LOCK (2026-10-13;
+-- Track C's F13-M1, word for word from references/track-c-handoff.md, F13).
+-- Track A owns the number.
+--
+--   bids.lockedWarnings   the server-side counts that read the library live
+--                         (dropsNotPriced, planAttentionFor), frozen when the
+--                         bid's quantities lock — shared/lockedWarnings.ts
+--                         FrozenWarnings: {at, counts}.
+--                         NULL = never frozen: unlocked, or locked before this
+--                         column — both show live counts, as today.
+--
+-- ── ADDITIVE. STEP 1. SAFE BEFORE THE CODE ─────────────────────────────────
+-- One nullable column with no default. No UPDATE, nothing reads it until C
+-- wires lockBidQuantities / unlockBidQuantities / the readers, no number
+-- moves. Step 3 is EMPTY (filling it for bids already locked would be a write
+-- of the values in effect, decided separately).
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `bids` ADD `lockedWarnings` json NULL;

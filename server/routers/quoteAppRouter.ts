@@ -29,7 +29,7 @@ import {
   quotePlanWarnings,
   type QuoteAppDoc,
 } from "../../shared/quoteAppExport";
-import { planAttentionFor } from "../planAttention";
+import { warningCountsForBid } from "../bidWarnings";
 import * as db from "../db";
 
 /**
@@ -100,13 +100,10 @@ export const quoteAppRouter = router({
         // Track A's example-price flag (plan § 10, H2) does not exist yet,
         // so no line can be example-priced. Fed from it the day it lands.
         examplePricedLines: 0,
-        // The same read as the bid page's warning strip (server/planAttention).
+        // The same read as the bid page's warning strip, frozen on a locked
+        // bid as it is there (server/bidWarnings.ts, F13).
         planWarnings: quotePlanWarnings(
-          await planAttentionFor(
-            bid.id,
-            userId,
-            await db.getBidLineItems(bid.id)
-          )
+          (await warningCountsForBid(bid, userId)).counts
         ),
       });
     }),

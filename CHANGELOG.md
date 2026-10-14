@@ -84,6 +84,62 @@ This is the human-readable companion to the git history — read this to see wha
   run types — under the band "STARTER: changes reach NEW companies;
   existing ones get an offer". Nothing can be edited yet: that waits for
   the change log, so no company's prices or bids can move.
+- **The engine behind changing the shipped starter library (not switched on
+  yet).** When BidRidge changes a starter price, recipe or rate, every
+  existing company first gets its own copy of the old one, so nothing on
+  its bids or in its library moves; companies that join later get the new
+  one. Every change is recorded and can be undone. Nothing in the app uses
+  it until the starter editor's screen arrives.
+
+- **A locked bid's warnings now hold what they said when it was locked.**
+  "2 drops not priced", "counts not on the bid" and the other plan warnings
+  used to re-count from the library every time a locked bid was opened, so
+  editing an assembly could change what a sent bid warned about with nothing
+  on the bid having changed. Now they are counted once at the lock (by hand,
+  or when the bid leaves Draft), and the bid page, the dashboard card, "Find
+  a bid", the quote panel and the proposal all show those counts, with a
+  line saying they are from the lock. Unlocking counts them live again.
+
+- **Database groundwork for starter updates and for locked bids' warnings
+  (staging only, nothing switched on).** New empty tables record changes to
+  the shipped starter library, which company copies they affect, and how
+  each company answered the offer; shipped items gain "hidden" and "replaced
+  by" markers; and a locked bid gains a place to keep the warning counts it
+  had when it locked. Nothing reads any of it yet, and every bid total on the
+  practice site was checked before and after: none moved. Not on
+  bidridge.com yet.
+- **Released to bidridge.com.** Bids now protect themselves once sent: a bid
+  that leaves Draft locks its counts and keeps the overhead, profit and tax it
+  was priced with, and later pricing changes reach only Drafts. Also live:
+  who-does-what scope tags on bid lines, remove/relocate labor, job costs in
+  Quick bid, and the database groundwork for the starter editor's own login
+  (not switched on). Both live bids were checked before and after: no total
+  moved.
+
+## [2026-10-12]
+
+- **Opening a plan sheet no longer places panels from their labels.** When
+  a sheet names a panel ("PANEL 2B") that has no spot on the bid yet, an
+  "Assign 1 panel from labels" button appears beside Circuits; measured
+  homerun lengths use the spot only once you press it. Before, just looking
+  at the sheet placed it.
+- **Opening a plan sheet no longer adds homerun circuits by itself.** When
+  a sheet shows circuits the bid does not have yet, an "Add 3 new homerun
+  circuits" button appears beside Circuits; their homerun feet count once
+  you press it. Before, just looking at the sheet added them.
+- **A run line says when its part has changed.** If a run type now uses a
+  different fitting (say compression instead of set-screw couplings), the
+  bid line says "Part changed: … still priced at the old part" and the
+  warnings count it, until you press Send again on the Plans screen.
+- **"Import price list" is hidden for now.** It read a supply house's
+  "$480.00/M" (per thousand feet) as $480 per foot, and saved row by row with
+  no preview and no undo, so one import could put wire on a bid at a thousand
+  times its cost. The button comes back once the import understands per M and
+  per C and shows a preview with undo. Prices a shop already imported are not
+  touched; "Import labor sheet" is unchanged.
+- **The starter pricing sheet stays in the app's order when it is rebuilt**
+  (category, then item type, then real size), instead of going back to
+  most-used first.
 
 - **The proposal now says who does what.** Owner-furnished items are listed
   under Included ("Owner-furnished, installed by us: 24 light fixtures");

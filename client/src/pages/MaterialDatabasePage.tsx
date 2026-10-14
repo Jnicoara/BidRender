@@ -28,6 +28,7 @@ import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PRICE_LIST_IMPORT_SHOWN } from "@/lib/priceListImport";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIsMobile } from "@/hooks/useMobile";
@@ -169,16 +170,20 @@ export default function MaterialDatabasePage() {
               uses. Set a price here and every assembly that uses it follows.
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-xs shrink-0"
-            onClick={() => setImportOpen(true)}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span className="md:hidden">Import</span>
-            <span className="hidden md:inline">Import price list</span>
-          </Button>
+          {/* Hidden until per M / per C, a preview and undo exist — see
+              @/lib/priceListImport for why. */}
+          {PRICE_LIST_IMPORT_SHOWN && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs shrink-0"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="md:hidden">Import</span>
+              <span className="hidden md:inline">Import price list</span>
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"

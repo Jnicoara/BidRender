@@ -185,6 +185,18 @@ export function usedBy(name: string): { text: string; count: number } {
  * that price from it — price these and the shipped recipes price), then by
  * category, then by size within the category (the Materials screen's order).
  */
+/**
+ * The PRICES sheet's order: the app's own (owner, 2026-10-12) — category,
+ * then item type, then real size, by `compareMaterials`, the one comparator
+ * the Materials screen uses. Most-used first suited the first pass; pricing
+ * the rest means walking a supply-house shelf, one product at a time, and
+ * the sheet was re-sorted by hand to this order in 28245633. Without this a
+ * rebuild would put it back. The labor and brand sheets keep most-used.
+ */
+export function catalogInAppOrder(): BaselineMaterial[] {
+  return [...BASELINE_MATERIALS].sort(compareMaterials);
+}
+
 export function catalogInSheetOrder(): BaselineMaterial[] {
   return [...BASELINE_MATERIALS].sort((a, b) => {
     const used = usedBy(b.name).count - usedBy(a.name).count;

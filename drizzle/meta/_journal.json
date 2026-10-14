@@ -1065,6 +1065,41 @@
       "when": 1789964100000,
       "tag": "0151_starter_editor_factors",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "5",
+      "when": 1789964200000,
+      "tag": "0152_starter_change_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "5",
+      "when": 1789964300000,
+      "tag": "0153_starter_change_pins",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "5",
+      "when": 1789964400000,
+      "tag": "0154_starter_pinned_hidden",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "5",
+      "when": 1789964500000,
+      "tag": "0155_starter_offer_answers",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "5",
+      "when": 1789964600000,
+      "tag": "0156_bid_locked_warnings",
+      "breakpoints": true
     }
   ]
 }

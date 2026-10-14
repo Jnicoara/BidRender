@@ -51,7 +51,7 @@ import {
   rangeIsBackwards,
   toPage,
 } from "../../shared/bidSearch";
-import { planAttentionFor } from "../planAttention";
+import { lockBid, warningCountsForBid } from "../bidWarnings";
 import {
   staleRateLines,
   type RatedLineLike,
@@ -1009,6 +1009,12 @@ export const bidsRouter = router({
         });
       }
 
+      const warnings = await warningCountsForBid(
+        bid,
+        ctx.scope.dataUserId,
+        lines
+      );
+
       return {
         bid,
         /**
@@ -1075,19 +1081,28 @@ export const bidsRouter = router({
          * All three sit in the warning strip under the totals, which is the
          * rule that surface already follows: it goes directly under the number
          * it contradicts. None of them is a badge on the drawing.
+         *
+         * FROZEN on a locked bid (F13): what they said at the lock, with
+         * `warningsFrozenAt` saying when (server/bidWarnings.ts).
          */
-        fromPlans: await planAttentionFor(bid.id, ctx.scope.dataUserId, lines),
+        fromPlans: {
+          waitingToSend: warnings.counts.waitingToSend,
+          countedWithNoPrice: warnings.counts.countedWithNoPrice,
+          doubleCounted: warnings.counts.doubleCounted,
+          runsWithNoWire: warnings.counts.runsWithNoWire,
+          runsNotOnBid: warnings.counts.runsNotOnBid,
+        },
         /**
          * Drops NOT PRICED for want of a drop material (owner, 2026-10-07).
          * The bid page adds this to its not-priced tally
          * (`withDropsNotPriced`), the same way the proposal does, so the
          * totals say it and a priced print is blocked. Returned with the bid
-         * so every mutation that refreshes `bids.get` refreshes it.
+         * so every mutation that refreshes `bids.get` refreshes it. Frozen
+         * with the rest on a locked bid.
          */
-        dropsNotPriced: await db.bidDropsNotPriced(
-          bid.id,
-          ctx.scope.dataUserId
-        ),
+        dropsNotPriced: warnings.counts.dropsNotPriced,
+        /** The lock's instant when the counts above are frozen, else null. */
+        warningsFrozenAt: warnings.frozenAt,
         /**
          * Assembly lines frozen at a labor rate their role no longer has —
          * "$68/hr where Journeyman is $43/hr now". Flagged, never changed:
@@ -1154,7 +1169,7 @@ export const bidsRouter = router({
       await requireBid(input.bidId, ctx.scope.dataUserId);
       // The clock is passed in rather than read inside, so the date on the
       // banner and the date in the row are one value. See db.lockBidQuantities.
-      return db.lockBidQuantities(input.bidId, new Date());
+      return lockBid(input.bidId, ctx.scope.dataUserId, new Date());
     }),
 
   /**

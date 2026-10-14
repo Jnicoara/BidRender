@@ -155,9 +155,17 @@ test("2. a plan uploads; the right panel is tabs; the scale is read off the shee
   await expect(page.getByText(/^1\/2$/).first()).toBeVisible(); // sheet 1 of 2
   // Sheet 1's printed scale is read straight after the upload, with no flip
   // away and back. Until 2026-10-01 a fresh upload sat on "Set scale" here
-  // ("0/2 scaled"): the page was read before its sheet row existed and the
-  // reading was dropped (@/lib/scaleCatchUp). "1/2" because sheet 2 has not
-  // been shown yet, and only a shown page is read.
+  // with no offer: the page was read before its sheet row existed and the
+  // reading was dropped (@/lib/scaleCatchUp). Since owner Q19 (2026-10-12)
+  // a reading is never APPLIED by viewing — it is offered as one tap
+  // ("Use 1/4" = 1'-0" — read off the sheet"), so the sheet stays unscaled
+  // until the tap. Step 11's 77.78 ft depends on this tap.
+  await expect(page.getByText(/^0\/2 scaled$/).first()).toBeVisible();
+  await page
+    .getByRole("button", { name: /read off the sheet/ })
+    .first()
+    .click({ timeout: 30_000 });
+  // "1/2" because only sheet 1 was offered and taken.
   await expect(page.getByText(/^1\/2 scaled$/).first()).toBeVisible({
     timeout: 30_000,
   });
