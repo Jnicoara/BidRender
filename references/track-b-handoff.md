@@ -1,5 +1,30 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-14 (plan), STARTER EDITS AS OFFERS — PLAN ONLY
+
+- **`references/starter-offers-plan.md`** — plan only, no code, no
+  migration. Wires the admin starter screen so an edit goes through
+  `applyStarterChange`, existing shops get "N starter updates available"
+  offers, new shops read it directly, Drafts re-count only after Accept,
+  sent/locked bids never move, and the Example tag travels with its number.
+- **No migration from A:** 0152–0155 and 0163 already hold everything.
+  **C:** Example-tag companion, the offer read with the per-field collapse,
+  Accept/Ignore, `recountsDrafts`. **B:** admin write routes + edit UI +
+  change log; shop routes, Dashboard card, Updates tabs, one refresh helper.
+  **A:** release order (0152–0156 live → boot change live → this code).
+- **Fault found in C's offer spec (plan § 3a):** `baselineVersion` is per
+  row, changes are per field, so accepting one field's change can make an
+  unanswered change on another field vanish, and a field changed twice
+  reads as "own-value". Pointer added in `baseline-screen-plan.md` § 10a.3.
+  Tests 4 and 5 in the plan are red on the spec as written.
+- **Owner questions Q1–Q7** at the end of the plan, suggested answers given.
+- **New rule (owner, 2026-10-14): do NOT stop MySQL 3307 at the end of a
+  session** — all tracks share it; the owner stops it at end of day. It was
+  restarted after this session's earlier stop and left running.
+- **Not merged to local-dev** (A mid-push). Before building any write path,
+  local-dev (boot change `d38f5930`, 0157–0163) must be merged into
+  track-b.
+
 ## WHERE B STANDS — 2026-10-14 (last), PLAN-READING HELP STEP 5d (DETAIL LINKS + BACK) BUILT
 
 - **5d built on `track-b`, NOT merged to local-dev** (A is pushing). No
@@ -25,7 +50,11 @@
 - **Looked at** laptop, iPad both ways, phone 375 on UNCC E121: Go lands on
   detail 2; Back returns to the same zoom and pixel; drag from a link
   opens nothing. Not seen on screen: "not located" (no real case on hand).
-- **Dev server and MySQL 3307 stopped.**
+- **Dev server stopped.** MySQL 3307 was stopped then, and restarted the
+  same day under the owner's new rule: **never stop 3307 at the end of a
+  session — every track shares it; the owner stops it at end of day.**
+- **Gate GREEN on 2cc8f0b1** (run 38640420528: test + drizzle-guard;
+  deploy-staging and smoke skipped on track-b as usual).
 - **Next:** step 6 leftovers are done; plan-reading help is complete
   except anything the owner adds. Then the open items below.
 
