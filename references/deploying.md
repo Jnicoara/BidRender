@@ -1773,6 +1773,39 @@ link were refused.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
 
+### Staging: migrations 0157–0163 — pack price, price check, price imports, price history (2026-10-14 UTC) — NOT on live
+
+`0157_material_pack_qty`, `0158_material_pack_label`,
+`0159_material_pack_price`, `0160_material_price_check_accepted` (four
+nullable `materials` columns), `0161_price_imports`,
+`0162_price_import_rows`, `0163_material_price_history` — C's PS-M1..M6
+(`pricing-safety-plan.md` § 6) and PH-M1 (`price-history-plan.md` § 6) word
+for word. No `UPDATE`, every new `materials` column nullable with no
+default: additive, step 1, step 3 empty. `schema.ts` selects the four
+`materials` columns on every materials read, so all seven MUST be on a
+database before code from `656b0fb8` on reaches it. Verified locally: the
+new code against the un-migrated local DB refused 7 owners.
+
+1. **Local first**: `bidrender_local` 157 → 164, FKs 191 → 200 (local's
+   known legacy-FK drift); re-run nothing; drift report unchanged; 4,386 /
+   4,386 totals unchanged, old and new code. `bidrender_test_localdev`
+   164 / 205.
+2. **Boot change pushed alone first** (`d38f5930`): Gate 38633682443
+   green, smoke 96 / 2 skips.
+3. **Backup**: `staging-2026-10-14T21-01-51Z-before-0157-0163.sql` (84
+   tables, 16,639 rows), restored to `bidrender_scratch_staging_0157`:
+   **84/84 counts equal**. Rehearsal on it: 157/196 → **164/205**, re-run
+   nothing.
+4. **Staging database**: 157/196 before; **7 applied**, 164; re-run
+   "Nothing to apply"; "matches", **205/205**. Totals: **1,357/1,357
+   unchanged** with old code (`d38f5930`) AND new code. JSONs
+   `staging-totals-{before,after-…-old,after-…-new}-0157-2026-10-14.json`.
+5. **Code**: `656b0fb8` pushed after step 4.
+
+**Live**: 0152–0163 join the next release's batch, BEFORE the push of any
+code from `e689b918` on. Expect 164, 205/205 — **if what it prints does not
+match, stop and find out why before going on.**
+
 ### Staging: migrations 0152–0156 — starter change log, pins, hiding, offers; locked warnings (2026-10-13 UTC) — NOT on live
 
 `0152_starter_change_log` (C's BS-M3: `starter_change_batches`,

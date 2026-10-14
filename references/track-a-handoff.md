@@ -1,10 +1,49 @@
-# Track A handoff — 2026-10-13 (live is `60479773` / 152)
+# Track A handoff — 2026-10-14 (live is `60479773` / 152; staging DB 164)
 
 Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-13, session 40: BOOT SEED CHANGE built on local-dev, NOT pushed
+## NOW — 2026-10-14, session 41: boot change + 0157–0163 on local-dev AND the staging DB (not live)
+
+- **Rebased** onto `origin/local-dev` (B's `f22c12f2`); only CHANGELOG.md
+  conflicted, both sides kept. `pnpm check` clean; 16 changed/affected test
+  files, 197 tests green on `bidrender_test_localdev`. No full suite (memory).
+- **Boot change pushed alone** (`d38f5930`, plan `0a1a2b53` under it):
+  Gate **38633682443 green** — test, deploy-staging, smoke 96 / 2 skips.
+- **0157–0162 = C's PS-M1..M6, 0163 = PH-M1**, SQL word for word (PH-M1's
+  inline comments moved to the header). Additive, step 1, step 3 empty;
+  nothing reads them yet. 9 new FKs. PH-M1 `unitOfSale` = the enum from
+  `MATERIAL_UNITS_OF_SALE`. Guards decided by A, **C to confirm**
+  (`track-c-handoff.md`): packQty/packLabel = offer, packPrice /
+  priceCheckAcceptedAt = not-editable; the three new FKs into `materials`
+  exempt, unreviewed ceiling unchanged.
+- **Staging DB** (record: `deploying.md` § 11 "Staging: migrations
+  0157–0163"): backup `staging-2026-10-14T21-01-51Z-before-0157-0163.sql`
+  84/84 restored; rehearsal on the copy 164/205; staging **157/196 →
+  164/205**, re-run nothing, "matches"; **1,357/1,357 totals unchanged** with
+  old and new code.
+- **Migrations commit pushed after the DB** (`656b0fb8`). Gate
+  **38637845427 RED** — 1 of 7,143: `backup.test.ts` "lists every column
+  … that holds a storage key" reads any `*Key` column in `schema.ts` as a
+  stored file, and PH-M1's `materialKey` is an item id. deploy-staging was
+  skipped (staging kept serving `d38f5930` on the migrated DB — additive,
+  so safe). **Missed locally because only the changed test files ran; that
+  guard reads `schema.ts` as text.** Fixed by naming `materialKey` in its
+  exclusion list beside `itemKey`; pushed with this handoff. Check the new
+  Gate, then staging `/api/version` `commit` = the fix's sha.
+- **Local**: `bidrender_local` 164 / 200 (known legacy-FK drift),
+  `bidrender_test_localdev` 164 / 205. 4,386/4,386 totals unchanged.
+- **Live (152) at the next release:** 0152–0163 all go on live BEFORE the
+  push to `main`. Expect **164, FKs 183 → 205**; if not, stop.
+- **Scratch DBs for the owner to drop (later — owner said skip for now):**
+  `bidrender_scratch_fresh_old`, `bidrender_scratch_fresh_new`,
+  `bidrender_scratch_boot_copy`, and new `bidrender_scratch_staging_0157`.
+  Worktree `../bidrender-before-0157` removed.
+- **MySQL 3307 stopped** (task kill — the `bidrender` user may not
+  SHUTDOWN; InnoDB recovers on the next start). No dev servers running.
+
+## (earlier) 2026-10-13, session 40: BOOT SEED CHANGE built on local-dev, NOT pushed
 
 - Owner answered `boot-seed-plan.md` Q1–Q4 all YES. **Q1: this ships in the
   release AFTER the end-of-pricing load** — never in the same push as those

@@ -1,5 +1,18 @@
 # Track C — handoff, 2026-10-06
 
+## FROM TRACK A (2026-10-14) — PS-M1..M6 = 0157–0162, PH-M1 = 0163, on local-dev + STAGING DB
+
+Built word for word, on `origin/local-dev` as `656b0fb8`, and applied to
+the **staging DB** (164, 205/205) before that push; not on live (152).
+Merge local-dev and migrate your DBs to 164 before building on them. Three
+calls A made for you to confirm or overturn:
+
+1. `STARTER_FIELDS.materials`: `packQty`, `packLabel` = **offer**;
+   `packPrice`, `priceCheckAcceptedAt` = **not-editable** (step 6 seeding).
+2. Forkable registry: `price_import_rows.materialId`,
+   `material_price_history.materialKey`, `.materialId` = **exempt**.
+3. PH-M1 `unitOfSale` = the enum from `MATERIAL_UNITS_OF_SALE`, not varchar.
+
 ## START HERE (2026-10-13, night) — F13 finished; applyStarterChange built; Switches answers recorded
 
 **State.** track-c merged local-dev at `dc08f1a2` (A's 0152–0156) as
