@@ -1056,6 +1056,27 @@ export const materials = mysqlTable(
     priceUpdatedAt: timestamp("priceUpdatedAt"),
 
     /**
+     * Pricing safety (0157–0160, Track C's PS-M1..M4,
+     * references/pricing-safety-plan.md § 2.2 and § 4). Nothing reads them
+     * until C's code ships; `costPerUnit` stays the number every total reads.
+     *
+     * `packQty`: how many `unitOfSale` units are in the pack. NULL = sold
+     * singly / not known, read as 1. `packLabel`: roll, spool, stick, box;
+     * NULL = "pack". `packPrice`: the pack price AS TYPED, NULL = typed per
+     * unit — only ever written together with `costPerUnit`, by
+     * shared/packPricing.ts `priceWrite`. `priceCheckAcceptedAt`: the PRICE
+     * (not a time) the sanity warning was accepted at; NULL = never
+     * dismissed, and a different price is checked again.
+     */
+    packQty: decimal("packQty", { precision: 10, scale: 4 }),
+    packLabel: varchar("packLabel", { length: 32 }),
+    packPrice: decimal("packPrice", { precision: 12, scale: 4 }),
+    priceCheckAcceptedAt: decimal("priceCheckAcceptedAt", {
+      precision: 10,
+      scale: 4,
+    }),
+
+    /**
      * active / archived / deleted — the lifecycle Modifiers has had since
      * Foundation, extended here so removing a material is recoverable.
      *
@@ -1101,6 +1122,132 @@ export const materials = mysqlTable(
 
 export type Material = typeof materials.$inferSelect;
 export type InsertMaterial = typeof materials.$inferInsert;
+
+/**
+ * One row per price import, for undo (0161, Track C's PS-M5,
+ * references/pricing-safety-plan.md § 3.4–3.5). Multi-supplier later ADDS a
+ * nullable `supplierId` here rather than a second import log.
+ */
+export const priceImports = mysqlTable(
+  "price_imports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    supplierName: varchar("supplierName", { length: 128 }),
+    fileName: varchar("fileName", { length: 255 }),
+    /** The date on the supplier's sheet, asked once (PS § 3.3). */
+    priceAsOf: date("priceAsOf").notNull(),
+    rowsChanged: int("rowsChanged").notNull(),
+    /** NULL = not undone. */
+    undoneAt: timestamp("undoneAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [index("price_imports_userId_idx").on(t.userId)]
+);
+
+/**
+ * What each imported row replaced (0162, Track C's PS-M6). `materialId` is the
+ * company's own row the import wrote — the row itself, never resolved through
+ * a baseline. `writtenCostPerUnit` lets undo restore only rows nobody has
+ * edited since.
+ */
+export const priceImportRows = mysqlTable(
+  "price_import_rows",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    importId: int("importId")
+      .notNull()
+      .references(() => priceImports.id, { onDelete: "cascade" }),
+    materialId: int("materialId")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    replacedCostPerUnit: decimal("replacedCostPerUnit", {
+      precision: 10,
+      scale: 4,
+    }).notNull(),
+    replacedPackPrice: decimal("replacedPackPrice", {
+      precision: 12,
+      scale: 4,
+    }),
+    replacedSupplierName: varchar("replacedSupplierName", { length: 128 }),
+    replacedPriceUpdatedAt: timestamp("replacedPriceUpdatedAt"),
+    replacedIsExamplePrice: boolean("replacedIsExamplePrice"),
+    writtenCostPerUnit: decimal("writtenCostPerUnit", {
+      precision: 10,
+      scale: 4,
+    }).notNull(),
+    madeFork: boolean("madeFork").notNull(),
+  },
+  t => [index("price_import_rows_importId_idx").on(t.importId)]
+);
+
+/**
+ * Material price history (0163, Track C's PH-M1,
+ * references/price-history-plan.md § 3 and § 6). INSERT-ONLY — one row per
+ * change of a COMPANY's material price, so no `updatedAt` on purpose. Shared
+ * (shipped) rows are not here: their history is `starter_changes`.
+ *
+ * Read by `materialKey` (`materialItemKey`: baselineId ?? id) so a fork never
+ * splits one item's history; `materialId` is the row written, for audit.
+ * `userId` is the company owner (scope); `changedByUserId` is the PERSON.
+ * Recording only: nothing writes or reads it until C's price door ships.
+ */
+export const materialPriceHistory = mysqlTable(
+  "material_price_history",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    materialKey: int("materialKey")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    materialId: int("materialId").references(() => materials.id, {
+      onDelete: "set null",
+    }),
+    unitCost: decimal("unitCost", { precision: 12, scale: 4 }).notNull(),
+    /** NULL = the row had no price before (a new row). */
+    previousUnitCost: decimal("previousUnitCost", { precision: 12, scale: 4 }),
+    /** Frozen: a unit change later must not re-read old prices. */
+    unitOfSale: mysqlEnum("unitOfSale", MATERIAL_UNITS_OF_SALE).notNull(),
+    packQty: decimal("packQty", { precision: 10, scale: 4 }),
+    packLabel: varchar("packLabel", { length: 32 }),
+    packPrice: decimal("packPrice", { precision: 12, scale: 4 }),
+    supplierName: varchar("supplierName", { length: 128 }),
+    /** The date on the supplier's sheet. NULL = typed (same day). */
+    priceAsOf: date("priceAsOf"),
+    source: mysqlEnum("source", [
+      "typed",
+      "imported",
+      "import_undone",
+      "starter_accepted",
+    ]).notNull(),
+    /** The row's Example tag AFTER the write. */
+    isExamplePrice: boolean("isExamplePrice").notNull(),
+    changedByUserId: int("changedByUserId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    importId: int("importId").references(() => priceImports.id, {
+      onDelete: "set null",
+    }),
+    starterChangeId: int("starterChangeId").references(
+      () => starterChanges.id,
+      { onDelete: "set null" }
+    ),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => [
+    index("material_price_history_key_idx").on(
+      t.userId,
+      t.materialKey,
+      t.createdAt,
+      t.id
+    ),
+  ]
+);
 
 // ─── Labor Rates ──────────────────────────────────────────────────────────────
 // Fully separate from assemblies — an assembly stores hours, never a rate.

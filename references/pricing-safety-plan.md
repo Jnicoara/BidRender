@@ -324,6 +324,13 @@ no T does both, say so and ask, rather than shipping a guess.
 
 ## 6. SQL drafts for Track A — all ADDITIVE, step 1, step 3 empty
 
+> **Built by Track A 2026-10-14 as 0157–0162** (PS-M1..M6 in order), with
+> PH-M1 (`price-history-plan.md` § 6) as **0163**. Local + local test DB
+> only; not on staging or live. Starter kinds: `packQty`/`packLabel` OFFER,
+> `packPrice`/`priceCheckAcceptedAt` not-editable (A's call — C to confirm
+> before step 6). `price_import_rows.materialId` registered EXEMPT ("the row
+> itself"). See `track-a-handoff.md` session 41.
+
 Nullable, no default, no `UPDATE`; nothing reads them until C's code ships,
 so each can go first. Numbered by A at write time; one table or column per file;
 house collation and `decimal(12,4)` money (multi-supplier § 6).

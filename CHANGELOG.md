@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Groundwork for safer prices and a price history (nothing visible yet).**
+  The database can now hold a material's pack size and pack price (so a $120
+  roll of 250 ft can be typed as such instead of divided by hand), remember
+  when a "this price looks off" warning was accepted, keep a record of each
+  supplier price import so it can be undone, and keep a dated history of
+  every price change a company makes. Only the storage exists so far;
+  nothing reads or writes it yet, and no bid total moves.
+
 - **The first-visit tips on the Plans screen no longer get in the way.** The
   "Don't know a word?" card used to drop into the side panel, right on top of
   the Legend tab's Capture button and its symbol list, so neither could be
