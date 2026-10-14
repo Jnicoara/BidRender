@@ -1,5 +1,42 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-14, later — Wall Plates answers recorded; Service Entrance review; Gate green on b11abf2e
+
+**Gate for the local-dev push of `b11abf2e`** (run 38511437076, attempt 2;
+attempt 1 died on a Docker pull before any test): test ✓, deploy-staging ✓,
+**smoke ✓ 96 passed / 2 skipped**, step 10 green. Staging `/api/version`:
+`commit b11abf2e`, built 2026-10-14 04:39:54Z. So F13 and
+`applyStarterChange` are on staging (not live).
+
+**Wall Plates & Misc, owner's answers** (review's "Owner's answers"), for
+A's end-of-pricing job: **Q1–Q10 all yes, as suggested.**
+
+- Q2 retires six generic plates (map in the table).
+- Q5 relabels stainless, midway, oversized, 3- to 6-gang and screwless
+  plates to `each` / 1.
+- Q7 retires the stainless flip cover into the die-cast extra-duty in-use
+  cover.
+- Q10 adds M1 and moves LT17 to it. **That is the job's one starter edit.**
+
+**`pricing/service-entrance-name-review.md`** — rows 955–964, 10 rows,
+workbook read from a fresh copy. Read-only.
+
+- **Counts:** 1 OK (mast guy kit), 3 need words, 2 owner picks, 1 two
+  products in one row ("Meter seal": an $18 sealing ring vs the utility's
+  tag), 3 decided (the masts, already retiring into rigid).
+- **No starter or run type uses the shelf.**
+- **Could price wrong:** a ground rod well at $11 (valve box) vs $100–140;
+  an SE elbow at $23 (1/2") vs $245 (2") with no size; the meter seal; the
+  SE cap priced from HD's conduit "SE cap".
+- **Missing:** M1, an SE cable sill plate; M2, an SE cable strap.
+- **Owner questions:** Q1–Q8.
+
+**Next shelf in app order: Panels (965–1067).** Note: **Wire & Cable (rows
+3–117) has never had a name review.** The reviews began at Conduit. Its
+names were frozen in the 2026-10-07 rename, and SER has its own plan
+(`references/ser-rename-plan.md`), so it may not need one. Say so if it
+does.
+
 ## (newest) 2026-10-14 — Wall Plates & Misc name review; C's databases made exact; Gate for b11abf2e
 
 **`pricing/wallplates-misc-name-review.md`** — spreadsheet rows 862–954, 93
