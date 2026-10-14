@@ -1,5 +1,33 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-13 (merge), LOCAL-DEV b11abf2e MERGED INTO TRACK-B
+
+- **Merged `origin/local-dev` (C's b11abf2e — F13 frozen warnings,
+  `applyStarterChange`, the Q19 homerun/panel offers; A's 0152–0156) into
+  `track-b` as 91dcf7f5.** Conflicts were only `CHANGELOG.md` and this
+  file, text, both sides kept (A's "B may merge" note is below, under the
+  step 5a/5b section).
+- **`TakeoffPage.tsx` merged with no conflict.** C's changes there are the
+  "Add N new homerun circuits" / "Assign N panels from labels" toolbar
+  offers (hidden on a locked bid) and `create: false` / `by:` on the
+  homerun calls; C's F13 locked-bid warnings live in `BidsPage.tsx`. B's
+  Look up, More options (notes list, tag outlines), tips, sheet-kind line
+  and `NoteTagLayer` are all still in place. No B call to `placePanel` or
+  `syncHomeruns` was added, so C's now-required fields are not missed.
+  `pnpm check` clean.
+- **Migrated** `bidrender_test_b` and `bidrender_local_b_new`: 5 applied
+  (0152–0156), **157 migrations, 196/196 FKs** — what A said to expect.
+- **Tests (only the merged-in files + sourceHygiene, laptop low on
+  memory):** 13 files, 121 passed on `bidrender_test_b`. No full local run.
+- **Gate GREEN on 91dcf7f5** (run 38522761229: test 431/431 files +
+  drizzle-guard; deploy-staging and smoke skipped on track-b as usual —
+  smoke runs once local-dev moves, expect 96 passed / 2 planned skips).
+  Then the owner fast-forwards `local-dev`:
+  `git push origin 91dcf7f5:refs/heads/local-dev` (or this handoff
+  commit's sha — it is a descendant).
+- **Dev servers stopped** (none running).
+- **Next:** step 5c — tap a tag (no tool in hand) → popover with the note.
+
 ## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 5a/5b (NOTE TAGS + NOTES LIST) BUILT
 
 On `track-b` only. **NOT merged to local-dev** — order agreed: A applies
