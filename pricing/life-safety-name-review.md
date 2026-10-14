@@ -226,3 +226,51 @@ checks. It is the most common fire-alarm line the shelf does not have.
   120V alarm and the system head, each named so the difference is plain.
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming it.
+
+## Owner's answers — 2026-10-14: Q1–Q13 all YES, as suggested
+
+For A's end-of-pricing job. Nothing applied here; no catalog row, seed or
+starter changed.
+
+1. **Q1 yes**: `Hardwired smoke detector, 120V`, `Hardwired smoke/CO
+detector, 120V` (RS9), `Hardwired CO detector, 120V`.
+2. **Q2 yes**: `Conventional fire alarm control panel, 5-zone` (CK5) and
+   `Addressable fire alarm control panel, 50-point`; "addressable" and
+   "annunciator" leave the conventional panel's search words (S1).
+3. **Q3 yes**: `System smoke detector, conventional, photoelectric` (CS13),
+   `Detector base, conventional 2-wire` (CS13, CK16), `Fire alarm pull
+station, conventional, double action` (CS11); "addressable" leaves their
+   search words (S5).
+4. **Q4 yes**: `Heat detector, 135°F fixed/rate-of-rise` (CK16); "garage"
+   leaves its search words (S3).
+5. **Q5 yes**: 1341 `Addressable relay module`; 1351 `Smoke alarm relay
+module, 120V`.
+6. **Q6 yes**: `Beam smoke detector, reflected`.
+7. **Q7 yes**: `Rapid-entry key box, surface mount` (CS16), description
+   "Ordered through the local fire department's account."
+8. **Q8 yes**: `Hardwired smoke detector, 120V, 10-year sealed battery`.
+9. **Q9 yes**: `Exit sign / emergency light combo, LED`, moved to Lighting
+   Hardware (LT28, DR15 follow by key).
+10. **Q10 yes**: `Smoke alarm mounting plate, 120V` and `Smoke alarm wiring
+harness, 120V`, each described "Fits the alarm's own brand — order with
+    the alarm".
+11. **Q11 yes**: "Works only with the panel's own maker" on `Addressable
+monitor module`, `Addressable relay module` and `Fire alarm remote
+annunciator`; "Value set by the panel maker; panels ship with them" on
+    `End-of-line resistor`.
+12. **Q12 yes — the one starter edit**: in CS14, the `Relay module, smoke
+alarm` line (key `detector-relay-module`) becomes M1 `Duct detector
+sampling tube, 2-4 ft duct`, x1. CS14's other lines (duct detector,
+    fire alarm cable, 18/4 control wire for the fan shutdown) stay. The
+    old key stays in `starterParts.ts` only if something else still uses
+    it — today nothing does.
+13. **Q13 yes**, and **all four missing rows are added**: M1 sampling tube,
+    M2 `Duct detector remote test station`, M3 `Magnetic door holder, 24V`,
+    M4 `Hardwired heat alarm, 120V`. M2–M4 are priced from one listing A
+    checks each; none is in a starter except M1 (CS14).
+
+**Counts for A's before-and-after** (`scripts/categoryAudit.mts`): Life
+Safety **26 → 29** (−1 exit combo to Lighting Hardware, +4 M rows);
+Lighting Hardware **+1**. If either number does not match, stop and find
+out why — a recount that disagrees means this line is stale or a row moved
+that this review did not see.

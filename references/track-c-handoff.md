@@ -1,6 +1,38 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, later — 480V YES, Grounding answers, A's three items confirmed, Life Safety review
+## (newest) 2026-10-14, latest — Life Safety answers, Low Voltage review
+
+**Life Safety: Q1–Q13 all YES as suggested** (`pricing/life-safety-name-
+review.md` "Owner's answers"), for A's end-of-pricing job, nothing applied.
+That includes **Q12, the one starter edit: CS14's `Relay module, smoke
+alarm` line becomes M1 `Duct detector sampling tube, 2-4 ft duct`, x1**,
+and **all four missing rows**: M1 sampling tube, M2 `Duct detector remote
+test station`, M3 `Magnetic door holder, 24V`, M4 `Hardwired heat alarm,
+120V`. Q9 moves the exit combo to Lighting Hardware. Expected counts for
+A's before-and-after: Life Safety **26 → 29**, Lighting Hardware **+1** —
+if either differs, stop and find out why.
+
+**`pricing/low-voltage-name-review.md`** — rows 1353–1421, 69 rows, fresh
+workbook copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 18 decided (the cable names frozen 2026-10-07), 31 OK, 14
+  need words, 6 owner picks. 28 rows used by starters; no run type.
+- **Could price wrong:** P1 `In-ceiling speaker` is `each` / 1 but sold in
+  pairs (MS10 would price double); P2 racks, the media enclosure and patch
+  panels with no size; P3 one "Landscape light fixture" for four products
+  (LT18).
+- **Packs:** F connectors (box of 25 from a word; sold in 10s and 50s),
+  RJ45 ends (each; sold in 50s), eight low-voltage wall plates (box of 25
+  from "plate"; sold each).
+- **Missing:** M1 landscape spot light, M2 surface mount data box, M3 LC
+  fiber connector, M4 firestop cable pathway.
+- **Owner questions:** Q1–Q14. No starter edit proposed. Cable rows get
+  descriptions, not renames, so `frozen-names.json` does not move.
+
+**Next shelf in app order: Connectors & Terminations (from row 1422).**
+
+## 2026-10-14, later — 480V YES, Grounding answers, A's three items confirmed, Life Safety review
 
 **Breakers, round 3** (`pricing/breakers-name-review.md` "Owner's answers,
 round 3"): **the 480V proposal is YES** — add H1 `30A 3-Pole bolt-on
