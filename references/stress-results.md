@@ -45,6 +45,20 @@ worker — roughly two hundred real people), so this is the far end; it is
 written up in todo.md with the fixes in order of safety, not changed
 overnight.
 
+## Eleven companies WRITING at once, production build (2026-10-15)
+
+60 s, each company in a loop: drop a mark, remove it, rename its bid, read
+the bid back. 1,872 rounds, **0 errors**.
+
+| Call   | p50 ms | p95 ms | max ms |
+| ------ | ------ | ------ | ------ |
+| drop   | 74     | 112    | 152    |
+| remove | 78     | 115    | 167    |
+| rename | 58     | 93     | 128    |
+| read   | 129    | 178    | 236    |
+
+Data left as found: no bid still renamed, no mark at the drop point.
+
 ## Server timings (`scripts/stressTime.mts`, after the fix)
 
 Over HTTP exactly as the browser calls (signed in, JSON), 10 runs each.
