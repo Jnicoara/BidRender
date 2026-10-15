@@ -200,3 +200,17 @@ drawing is short and a floating panel's live buttons sat on top of it.
   before — the mark was saved (count read 3 = expected). Fixed: with a
   finger those extras wait behind one **More** button; Delete and ✕ stay.
   Laptop unchanged.
+- **A trace ended at its second point.** In trace mode the toolbar takes
+  three rows at 375x667, the drawing is about 220 px tall, and the trace
+  pill (top, three rows) covered most of it: the script's tap aimed at the
+  drawing landed on Finish (screenshot: "Run finished … 72 ft" after two
+  taps). Fixed: with a finger the pill docks to the BOTTOM of the drawing
+  and drops what is shown elsewhere (run type, point count, From → to, the
+  total repeated on Finish). Seen by eye at 375 and on an upright iPad,
+  where it now sits at thumb height clear of the sheet.
+- **Result:** `pnpm device:touch` passes at iPad landscape, iPad portrait,
+  phone 390, 375 and 425 — every check, every size.
+- **Still true, not fixed:** at 375x667 the trace toolbar's three rows leave
+  a short drawing, and the bottom-docked pill still covers its lower part;
+  two fingers move the sheet out from under it. Shrinking that toolbar is
+  its own change.

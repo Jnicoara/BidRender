@@ -2339,16 +2339,29 @@ export function TraceLayer({
               The counting pill below has the same `left-1/2` pattern and the
               same latent ceiling. It is not over it today, so it is left
               alone — but it is the same one line if it ever gets a term added.
+
+              ── With a finger it sits at the BOTTOM, and says less ─────────
+              On a 375x667 phone the trace toolbar takes three rows and the
+              drawing is about 220 px tall; this pill, at the top and three
+              rows of 44 px buttons, covered most of it, and a tap meant for
+              the drawing landed on Finish — the run ended at its second
+              point (`pnpm device:touch --sizes=phone-375`, 2026-10-15). So
+              with a finger it docks to the bottom edge and drops what is
+              said elsewhere: the run type and From → to are in the toolbar,
+              the points are on the drawing, and the total is shown once.
             */
             <div
               className={cn(
-                "absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                "absolute left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
+                coarse ? "bottom-3" : "top-3",
                 pillShape
               )}
             >
-              <span className="text-xs text-muted-foreground">
-                {pathType === "conduit" ? "Conduit run" : "Cable run"}
-              </span>
+              {!coarse && (
+                <span className="text-xs text-muted-foreground">
+                  {pathType === "conduit" ? "Conduit run" : "Cable run"}
+                </span>
+              )}
               {/*
                 ONE NUMBER: THE RUN TOTAL.
 
@@ -2393,11 +2406,13 @@ export function TraceLayer({
                   ? "—"
                   : formatFeetInches(readout.runTotal)}
               </span>
-              <span className="text-[0.7rem] text-muted-foreground inline-block min-w-[4.5rem] tabular-nums">
-                {points.length} {points.length === 1 ? "point" : "points"}
-              </span>
+              {!coarse && (
+                <span className="text-[0.7rem] text-muted-foreground inline-block min-w-[4.5rem] tabular-nums">
+                  {points.length} {points.length === 1 ? "point" : "points"}
+                </span>
+              )}
 
-              {endsLabel && (
+              {endsLabel && !coarse && (
                 <>
                   <div className="w-px h-4 bg-border" />
                   <span
@@ -2485,11 +2500,13 @@ export function TraceLayer({
                 title="Finish this run (Enter or double-click)"
               >
                 <Check className="w-3 h-3" /> Finish
-                <span className="font-mono inline-block min-w-[9ch] text-left">
-                  {readout.runTotal !== null && points.length >= 2
-                    ? formatFeetInches(readout.runTotal)
-                    : ""}
-                </span>
+                {!coarse && (
+                  <span className="font-mono inline-block min-w-[9ch] text-left">
+                    {readout.runTotal !== null && points.length >= 2
+                      ? formatFeetInches(readout.runTotal)
+                      : ""}
+                  </span>
+                )}
               </Button>
               <Button
                 size="sm"

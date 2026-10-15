@@ -10,6 +10,11 @@ This is the human-readable companion to the git history — read this to see wha
   "marks selected" panel used to fill the top half of the drawing with its
   extra controls, so a second mark under it could not be tapped. With a
   finger those extras now sit behind a "More" button.
+- **On a small phone a traced run no longer ends a point early.** The
+  tracing panel (with Finish) covered most of a short phone's drawing, so a
+  tap meant for the drawing could land on Finish. With a finger the panel
+  now sits at the bottom of the drawing and shows only the total and its
+  buttons.
 
 ## [2026-10-14]
 
