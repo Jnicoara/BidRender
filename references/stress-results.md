@@ -108,6 +108,21 @@ Vite and file watching. **Open:** measure a production build
 (`pnpm build && pnpm start`) over ~10 minutes of load before calling it
 either way.
 
+## 2,000 marks on ONE sheet (bid "Stress dense sheet", 4 counts × 500)
+
+The brief's "bids with 2,000+ marks" taken at its hardest: all on one sheet,
+not spread over 60.
+
+| Size            | Sheet drawn and "2000 marks" shown (3 loads) | One zoom step painted |
+| --------------- | -------------------------------------------- | --------------------- |
+| Laptop 1440×900 | 2,037 / 2,266 / 1,985 ms                     | 251 ms                |
+| Phone 375×812   | 1,845 / 1,655 / 1,877 ms                     | —                     |
+
+At the 2 s line on the dev server (unbundled modules add ~0.9 s to every
+screen here — see below), correct, and usable. Inside Track B's viewer, so
+noted for B rather than changed. Screenshot:
+`overnight-shots/stress-dense-sheet-laptop.png`.
+
 ## Do the screens agree on the money? (`scripts/totalsCrossCheck.mjs`)
 
 After pricing the stress company for real (labor rates, 260 materials,
