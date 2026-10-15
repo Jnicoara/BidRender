@@ -9,7 +9,18 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
 Branch `track-a-night` from `origin/local-dev` `d0152f60`; pushed only
 there. Nothing touched staging/live, no deploy, no migration outside a
 throwaway local schema. Item-by-item record: `overnight-log-a.md`; owner
-questions: `morning-questions-a.md`.
+questions: `morning-questions-a.md` (5).
+
+**Gate runs on `track-a-night`:** 38683716637 RED (MySQL image pull refused
+— the outage, not the code); 38684649809 green (preinstalled MySQL);
+38685881731 green (FULL/DOCS/SEEN, mode full); 38687119248 green (item 3);
+38687906570 green (items 4–5 + second pass, mode full); the final docs-only
+push is the first real DOCS run (result in the log).
+
+**To land it:** the owner merges `track-a-night` into local-dev (fast-
+forward if local-dev has not moved: `git checkout local-dev && git merge
+--ff-only origin/track-a-night && git push origin local-dev`). No `drizzle/`
+change, so staging auto-deploys. B and C's Gates need the MySQL fix in it.
 
 - **1. Signup race FIXED in code** (`signup-race-plan.md`): per-user named
   lock + re-check inside, `withNamedLock` in `db.ts`.

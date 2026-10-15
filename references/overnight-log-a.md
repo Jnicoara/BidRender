@@ -1,11 +1,14 @@
 # Track A overnight log — 2026-10-14 → 15
 
-Branch `track-a-night` (from `origin/local-dev` `d0152f60`). Times PDT.
+Branch `track-a-night` (from `origin/local-dev` `d0152f60`). Times PDT, from
+the commit clock. (The first draft of this log carried ESTIMATED end times
+for items 2–5, running to 02:45; they were wrong and are replaced by the
+commit times — corrected 22:40.)
 Rules for the night: push only `track-a-night`; no staging/live database,
 no deploy, no migration except throwaway local; no dev server; changed test
 files only (B and C also running). MySQL 3307 shared — left running.
 
-## Item 1 — signup race fix — 21:45 → 22:20
+## Item 1 — signup race fix — 21:45 → 21:52
 
 - `createPersonalCompany` under a per-user MySQL named lock with the
   membership re-checked inside; company + membership in one transaction.
@@ -23,7 +26,7 @@ files only (B and C also running). MySQL 3307 shared — left running.
   second personal company `ER_DUP_ENTRY`; MySQL 1093 measured for the naive
   form. Plan: `references/signup-race-plan.md`.
 
-## Item 2 — GitHub minutes / private repo — 22:20 → 23:40
+## Item 2 — GitHub minutes / private repo — 21:52 → 22:16
 
 - **Outage found and fixed first:** every track's Gate failed tonight pulling
   `public.ecr.aws/docker/library/mysql:8.0` ("toomanyrequests: Data limit
@@ -44,7 +47,7 @@ files only (B and C also running). MySQL 3307 shared — left running.
   private; not verified against the dashboard (morning question 2).
 - Tests: docs list with no DB 29 passed / 6 DB-skipped; `pnpm check` clean.
 
-## Item 3 — next live release prep (paper + scripts) — 23:40 → 00:30
+## Item 3 — next live release prep (paper + scripts) — 22:05 → 22:17 (overlapped item 2 while its Gate ran)
 
 - `next-live-release-plan.md` § "Night prep 2026-10-14": contents
   (0152–0163, boot change, pack fix, signup fix, companies 5–8), P1–P4
@@ -61,7 +64,7 @@ files only (B and C also running). MySQL 3307 shared — left running.
 - Gate 38684649809 (preinstalled MySQL) **green**. SEEN lookup checked
   against the real API: 3854d2d5 → seen (run 38684649809), e03bead6 → full.
 
-## Item 4 — invite gate (server, OFF by default) — 00:30 → 01:45
+## Item 4 — invite gate (server, OFF by default) — 22:17 → 22:26
 
 - **Found:** the gate's table already exists — 0107 `signup_invites`, live
   since 10-10 — and the owner-answered plan lived only on `a-plans`. Copied
@@ -79,7 +82,7 @@ files only (B and C also running). MySQL 3307 shared — left running.
   personalCompanyRace, scopeDiscipline (router listed), sourceHygiene: 121
   green; `pnpm check` clean.
 
-## Item 5 — light cleanup (measured, drafts only) — 01:45 → 02:45
+## Item 5 — light cleanup (measured, drafts only) — 22:26 → 22:36
 
 `references/night-cleanup-2026-10-14.md`.
 
@@ -96,3 +99,18 @@ files only (B and C also running). MySQL 3307 shared — left running.
 - **Type-check `scripts/`**: 589 errors / 56 files today; 5 / 2 files with
   `target: ES2022`; app 0 with it. Not applied (todo.md: `target` affects
   class-field compile) — numbers added to todo.md.
+
+## Second pass — 22:36 → 22:45
+
+- Release plan names the invite gate (ships OFF) as riding along if merged.
+- Invite plan § 12 names the one known difference from § 2 (an existing
+  account using a company code gets "already exists", not "sign in and it
+  will be waiting").
+- `auth.signup` names its fallback message instead of `problem!`.
+- Log times corrected to the commit clock (the first draft had estimates).
+- **Final local check, one run:** 14 files touched or affected —
+  personalCompanyRace, raceCompanies, signupInviteGate, docsOnlyGate,
+  scopeDiscipline, sourceHygiene, seedLock, permissions, auth.email,
+  auth.logout, seats, starterAssembliesPlan/Seed, starterEditorLogin:
+  **178 / 178** on `bidrender_test_localdev`. `pnpm check` 0 errors. Full
+  suite only in the Gate (memory rule tonight).
