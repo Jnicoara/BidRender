@@ -64,9 +64,12 @@ async function main() {
     {
       name: `Dashboard (${bids.length} bids)`,
       hash: "/dashboard",
+      // VISIBLE: a bid in a folded stage is in the page but hidden, and once
+      // one sorts first, `.first()` waits on it forever (2026-10-15).
       ready: p =>
         p
           .getByText(/Stress job \d+/)
+          .filter({ visible: true })
           .first()
           .waitFor(),
     },
@@ -76,6 +79,7 @@ async function main() {
       ready: p =>
         p
           .getByText(/Stress job \d+/)
+          .filter({ visible: true })
           .first()
           .waitFor(),
     },
