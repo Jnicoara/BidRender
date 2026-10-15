@@ -81,6 +81,11 @@ Numbers and drills: `references/stress-results.md`; every change in
   there gives the Plans screen the same honesty. Also: a page or list
   keeps its data when a background REFRESH fails — use `isLoadingError`
   (nothing to show) rather than `isError` for "Couldn't load".
+- **A bid in Recently deleted says so** on the bid page and Count
+  (`components/bid/ArchivedBidNotice.tsx`: deletion date + Restore). The
+  server still accepts edits to an archived bid (`todo.md`). **For Track
+  B:** the Plans screen does not show it — `<ArchivedBidNotice bidId
+archivedAt />` drops in anywhere the bid is loaded.
 - **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
   still first).
 
