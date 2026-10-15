@@ -25,6 +25,8 @@
 import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useMutationState } from "@tanstack/react-query";
+import { getMutationKey } from "@trpc/react-query";
 import { isReachFailure } from "@/lib/dataReach";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ArchivedBidNotice } from "@/components/bid/ArchivedBidNotice";
@@ -134,6 +136,20 @@ export default function QuickBidPage({
     void utils.bids.units.invalidate({ bidId });
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
+
+  /*
+    Counts held for the connection. Offline, a count is PAUSED, not failed,
+    and the line does not exist yet — so the header said "0 lines" after two
+    counts, inviting a third (drill, 2026-10-15). Only paused ones: a count
+    in flight online takes a tenth of a second and needs no word.
+  */
+  const waitingToSend = useMutationState({
+    filters: {
+      mutationKey: getMutationKey(trpc.bids.addAssembly),
+      predicate: m => m.state.status === "pending" && m.state.isPaused,
+    },
+    select: m => (m.state.variables as { bidId?: number } | undefined)?.bidId,
+  }).filter(id => id === bidId).length;
 
   const addAssembly = trpc.bids.addAssembly.useMutation({
     onError: error => toast.error(errorText(error)),
@@ -344,6 +360,12 @@ export default function QuickBidPage({
                 ? `${lines.length} line${lines.length === 1 ? "" : "s"}`
                 : "…"}{" "}
               · counting mode
+              {waitingToSend > 0 && (
+                <span className="text-amber-500">
+                  {" "}
+                  · {waitingToSend} waiting to send
+                </span>
+              )}
             </p>
           </div>
           {/* On a phone .page-header drops this block to its own line, flush

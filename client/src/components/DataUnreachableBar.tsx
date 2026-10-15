@@ -24,6 +24,11 @@ import { dataIsUnreachable, subscribeDataReach } from "@/lib/dataReach";
 const RETRY_MS = 15_000;
 
 /*
+  Taps pass THROUGH the bar (pointer-events-none, except its own button):
+  it sits over the top of the screen, and on a phone that is where "← Bid"
+  lives — a notice must never be the thing between a person and the way
+  back (drill, 2026-10-15).
+
   OFFLINE is its own case. While the browser says it is offline, React Query
   PAUSES reads and saves instead of failing them, so nothing ever raises the
   "can't reach" flag — a save just sat there looking done (drill,
@@ -57,7 +62,7 @@ export function DataUnreachableBar({ retry }: { retry: () => void }) {
       <div
         role="status"
         aria-live="polite"
-        className="bp-no-print fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-amber-500/60 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
+        className="bp-no-print pointer-events-none fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-amber-500/60 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
       >
         <WifiOff className="w-4 h-4 shrink-0 text-amber-500" aria-hidden />
         <div className="flex-1 min-w-0">
@@ -74,7 +79,7 @@ export function DataUnreachableBar({ retry }: { retry: () => void }) {
     <div
       role="status"
       aria-live="polite"
-      className="bp-no-print fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-amber-500/60 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
+      className="bp-no-print pointer-events-none fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-amber-500/60 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
     >
       <WifiOff className="w-4 h-4 shrink-0 text-amber-500" aria-hidden />
       <div className="flex-1 min-w-0">
@@ -89,7 +94,7 @@ export function DataUnreachableBar({ retry }: { retry: () => void }) {
       <button
         type="button"
         onClick={retry}
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+        className="pointer-events-auto shrink-0 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
       >
         <RotateCcw className="w-3.5 h-3.5" />
         Try again
