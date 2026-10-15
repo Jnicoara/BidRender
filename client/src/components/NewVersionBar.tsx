@@ -12,6 +12,11 @@
  * things. Dismissing hides it for THAT build only, so a later deploy asks
  * again.
  *
+ * Taps pass THROUGH it except on its two buttons: it sits where a phone's
+ * bottom navigation and the guide strip's "Where do I…?" live, and a notice
+ * must never be what stands between a person and a control (2026-10-15 —
+ * it blocked that button in an e2e run).
+ *
  * Rendered outside <App> (main.tsx), so it needs no provider and still shows
  * on the landing page. Plain `fetch`, not tRPC, for the same reason. Hidden
  * when printing — it must never end up on a client's proposal.
@@ -74,7 +79,7 @@ export function NewVersionBar() {
     <div
       role="status"
       aria-live="polite"
-      className="bp-no-print fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-[#F5C518]/50 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
+      className="bp-no-print pointer-events-none fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-[#F5C518]/50 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
     >
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium">
@@ -88,7 +93,7 @@ export function NewVersionBar() {
         type="button"
         // Waits for a save in flight, which a reload would cancel.
         onClick={() => reloadWhenSaved()}
-        className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-[#F5C518] px-3 py-1.5 text-xs font-semibold text-black hover:bg-[#F5C518]/90"
+        className="pointer-events-auto shrink-0 inline-flex items-center gap-1.5 rounded-md bg-[#F5C518] px-3 py-1.5 text-xs font-semibold text-black hover:bg-[#F5C518]/90"
       >
         <RotateCcw className="w-3.5 h-3.5" />
         Refresh
@@ -96,7 +101,7 @@ export function NewVersionBar() {
       <button
         type="button"
         onClick={() => setDismissedKey(key)}
-        className="shrink-0 text-muted-foreground hover:text-foreground"
+        className="pointer-events-auto shrink-0 text-muted-foreground hover:text-foreground"
         aria-label="Not now"
         title="Not now"
       >
