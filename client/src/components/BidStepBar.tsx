@@ -2,6 +2,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useShowStepBar } from "@/hooks/useCrosshairColor";
 import {
   BID_STEPS,
   NEXT_LABEL,
@@ -40,8 +41,10 @@ export function BidStepBar({
   onGo: (place: StepPlace) => void;
   className?: string;
 }) {
-  const { data } = trpc.bids.progress.useQuery({ bidId });
-  if (!data) return null;
+  const [show] = useShowStepBar();
+  // Not fetched at all when turned off in Settings › Display.
+  const { data } = trpc.bids.progress.useQuery({ bidId }, { enabled: show });
+  if (!show || !data) return null;
   const { states, next } = bidSteps(data);
 
   const go = (step: BidStep) => {

@@ -48,3 +48,35 @@ The sheet "⋯" menu → "More options — this sheet shows": Not said / New wor
 "Both". Not renamed: it is B's label and "Demo and new" also shows in
 banners where "Both" alone would not say both of what. **Owner: keep "Demo
 and new", or "Both"?**
+
+## P4. Copy a bid (competitors: STACK "copy project", Accubid "copy estimate") — parked: it changes money
+
+Nothing copies a whole bid today (only a repeating unit inside one). The
+build is small — a "Copy this bid" under the bid's "Send ▾"/More options
+that creates a new Draft with the same lines and settings, no drawings —
+but one choice decides what the copy COSTS:
+
+- **(a) Re-price at today's library** (suggested): each line is added again
+  from its assembly, so the snapshot is today's material, hours and rate.
+  A copy is a new bid; pricing it on last year's numbers would be a quiet
+  wrong number.
+- (b) Keep the original's frozen snapshots — the copy prices exactly like the
+  bid it came from, however old.
+
+Hand-priced lines and "by others" lines copy as they are either way. Lines
+that follow the drawing do not copy (no drawing on the copy).
+
+## P5. Price history screen (owner's request, 2026-10-14) — next after recording
+
+Recording ships tonight (item 7). The panel — Materials editor › More
+options › "Price history" — is plan § 8 steps 2–3 (read query, cursor 50,
+staleness wired into the material refresh helper). Not built tonight: the
+queue asked for recording only.
+
+## P6. Labor hours by system (competitor: Accubid / McCormick phase reports) — idea
+
+A read-only breakdown on the bid: hours by assembly category (Devices,
+Lighting, Feeders, Low voltage) — what a foreman schedules by. All numbers
+already exist on the lines; nothing would change. Would sit under the bid
+total's More options. Worth asking whether a small shop wants it before
+building.

@@ -45,6 +45,7 @@ import {
   useCrosshairColor,
   useCrosshairSize,
   useShowNextSegment,
+  useShowStepBar,
 } from "@/hooks/useCrosshairColor";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -101,7 +102,7 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
     display: {
       label: "Display",
       blurb:
-        "Theme, text size and the plan crosshair. Saved on this device, and affects nothing else.",
+        "Theme, text size, the plan crosshair and the bid step bar. Saved on this device, and affects nothing else.",
     },
     account: {
       label: "Account",
@@ -445,6 +446,7 @@ function DisplaySection() {
 
       <CrosshairColorSetting />
       <ShowNextSegmentSetting />
+      <ShowStepBarSetting />
     </div>
   );
 }
@@ -468,6 +470,29 @@ function ShowNextSegmentSetting() {
         </p>
       </div>
       <Switch id="show-next-segment" checked={show} onCheckedChange={setShow} />
+    </section>
+  );
+}
+
+/**
+ * The bid step bar (Plans › … › Print). On by default; off hides it on the
+ * bid and Plans screens for this person on this browser. Nothing else moves.
+ */
+function ShowStepBarSetting() {
+  const [show, setShow] = useShowStepBar();
+  return (
+    <section className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          <label htmlFor="show-step-bar">Show the bid step bar</label>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          The line under a bid's name — Plans, Scale, Count, Runs, Review, Print
+          — with one Next button. Turn it off if you know your own way through a
+          bid.
+        </p>
+      </div>
+      <Switch id="show-step-bar" checked={show} onCheckedChange={setShow} />
     </section>
   );
 }

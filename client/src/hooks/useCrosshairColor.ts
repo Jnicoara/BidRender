@@ -69,3 +69,18 @@ export function useShowNextSegment(): [boolean, (show: boolean) => void] {
   // Anything but an explicit false reads as the default.
   return [stored !== false, setStored];
 }
+
+/**
+ * Whether a bid shows its step bar (Plans › Scale › Count › Runs › Review ›
+ * Print, `BidStepBar`). Default ON (owner, 2026-10-14); a person who knows
+ * their own flow can turn it off in Settings › Display. Per person, on this
+ * browser — a view preference, never a company setting.
+ */
+export function useShowStepBar(): [boolean, (show: boolean) => void] {
+  const id = useMeId();
+  const [stored, setStored] = useLocalStorage<boolean>(
+    `bp_show_step_bar:${id}`,
+    true
+  );
+  return [stored !== false, setStored];
+}
