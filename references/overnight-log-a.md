@@ -114,3 +114,9 @@ files only (B and C also running). MySQL 3307 shared — left running.
   auth.logout, seats, starterAssembliesPlan/Seed, starterEditorLogin:
   **178 / 178** on `bidrender_test_localdev`. `pnpm check` 0 errors. Full
   suite only in the Gate (memory rule tonight).
+- **DOCS mode proven in CI** — Gate 38689089046 on the docs-only handoff
+  commit `f6540de3`: "Gate mode: docs", 4 files, 29 passed / 6 DB-skipped,
+  test job **24 s** (1 billed minute, against ~13 for FULL), no deploy.
+  Gate 38687906570 (items 4–5) green, mode full. Every code commit on the
+  branch has a green FULL run. End 22:53. MySQL 3307 left running (shared);
+  no dev server was started.
