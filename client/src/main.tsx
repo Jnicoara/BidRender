@@ -12,7 +12,7 @@ import StagingBand from "@/components/StagingBand";
 import { NewVersionBar } from "@/components/NewVersionBar";
 import { markPageOutOfDate } from "@/lib/versionCheck";
 import { withQueryDeadline } from "@/lib/queryDeadline";
-import { isStepBarQuery } from "@/lib/stepBarQuery";
+import { isPriceHistoryQuery, isStepBarQuery } from "@/lib/stepBarQuery";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -45,7 +45,8 @@ queryClient.getQueryCache().subscribe(event => {
 queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "success")
     void queryClient.invalidateQueries({
-      predicate: query => isStepBarQuery(query.queryKey),
+      predicate: query =>
+        isStepBarQuery(query.queryKey) || isPriceHistoryQuery(query.queryKey),
     });
 });
 

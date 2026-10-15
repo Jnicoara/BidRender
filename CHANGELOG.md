@@ -6,6 +6,8 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **See a material's price history.** In a material's editor, More options › Price history lists every recorded price change, newest first: the price, the change in %, who changed it and how (typed, imported), the supplier, and the pack it was priced from. View only — bids keep the prices they were built with.
+
 - **Type a price by the roll or box.** In a material's editor, "More
   options" now holds the pack it's bought in ("10 in a bundle", "250 ft
   roll"). Once set, you can type the price of the whole pack and the app

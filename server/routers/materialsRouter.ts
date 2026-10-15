@@ -11,6 +11,8 @@
  * UI can say "you now have your own copy" without orchestrating it.
  */
 import { priceWrite } from "../../shared/packPricing";
+import { materialItemKey } from "../../shared/materialMarkup";
+import { readPriceHistory } from "../priceHistoryRead";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
@@ -589,6 +591,34 @@ export const materialsRouter = router({
         ctx.scope.dataUserId
       );
       return { id: archivedId, alreadyArchived: false };
+    }),
+
+  /**
+   * PRICE HISTORY (references/price-history-plan.md § 8 step 2): every
+   * recorded change of this item's price, newest first, 50 a page, plus
+   * BidRidge's example-price changes while the shop used the shipped price.
+   * View-only; anyone who can see Materials can see it (owner Q6).
+   */
+  priceHistory: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        cursor: z.string().max(80).nullish(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const target = await db.getMaterialById(input.id, ctx.scope.dataUserId);
+      if (!target)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Material not found.",
+        });
+      return readPriceHistory({
+        userId: ctx.scope.dataUserId,
+        materialKey: materialItemKey(target),
+        shippedId: target.userId === null ? target.id : target.baselineId,
+        cursor: input.cursor,
+      });
     }),
 
   /** Put an archived material back on the working list. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getQueryKey } from "@trpc/react-query";
 import { trpc } from "@/lib/trpc";
-import { isStepBarQuery } from "./stepBarQuery";
+import { isPriceHistoryQuery, isStepBarQuery } from "./stepBarQuery";
 
 describe("isStepBarQuery", () => {
   // Against the key tRPC itself builds, not a hand-written copy of it: a
@@ -17,5 +17,16 @@ describe("isStepBarQuery", () => {
     );
     expect(isStepBarQuery(getQueryKey(trpc.bids.dashboard))).toBe(false);
     expect(isStepBarQuery(["bids"])).toBe(false);
+  });
+});
+
+describe("isPriceHistoryQuery", () => {
+  it("matches the key tRPC builds for materials.priceHistory, infinite or not", () => {
+    expect(
+      isPriceHistoryQuery(
+        getQueryKey(trpc.materials.priceHistory, { id: 3 }, "infinite")
+      )
+    ).toBe(true);
+    expect(isPriceHistoryQuery(getQueryKey(trpc.materials.list))).toBe(false);
   });
 });

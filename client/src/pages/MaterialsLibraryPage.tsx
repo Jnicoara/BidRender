@@ -27,6 +27,7 @@ import {
   Boxes,
   Check,
   ChevronRight,
+  History,
   CircleDollarSign,
   Clock,
   Loader2,
@@ -85,6 +86,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIsMobile } from "@/hooks/useMobile";
 import { unitCost } from "@/lib/money";
 import { packPhrase, priceWrite } from "@shared/packPricing";
+import { PriceHistoryPanel } from "@/components/PriceHistoryPanel";
 import { materialItemKey } from "@shared/materialMarkup";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { focusOnOpen, NEEDS_WHY, type NeedsField } from "@/lib/needsFix";
@@ -396,6 +398,8 @@ function MaterialRow({
   const [editing, setEditing] = useState(false);
   /** The editor's one "More options" fold (pack size). Shut each time it opens. */
   const [moreOpen, setMoreOpen] = useState(false);
+  /** The price-history side panel, opened from More options. */
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   /*
     The markup is NOT part of the material draft, on purpose. Saving the draft
@@ -763,8 +767,26 @@ function MaterialRow({
                 worked out for you, rounded up. Leave it blank if you buy them
                 one at a time.
               </p>
+              <div className="pt-1 border-t border-border">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1.5 text-xs px-2"
+                  onClick={() => setHistoryOpen(true)}
+                >
+                  <History className="w-3.5 h-3.5" /> Price history
+                </Button>
+              </div>
             </div>
           )}
+          <PriceHistoryPanel
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            materialId={material.id}
+            name={material.name}
+            unitOfSale={material.unitOfSale}
+          />
         </div>
 
         {/* Aliases are editable here for the same reason they are collected on

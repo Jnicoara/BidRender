@@ -326,6 +326,8 @@ Every count below is a **before-and-after of the same query** (CLAUDE.md
 
 ## 8. Build order for C (once PH-M1 exists)
 
+> **Steps 2–3 (read query + panel) BUILT the same night** as item-11 work: `server/priceHistoryRead.ts` (keyset 50, `materialItemKey`, BidRidge example-price changes from `starter_changes` only before the shop's own copy — the rule is `shippedOnPage`, tested pure), `materials.priceHistory`, `PriceHistoryPanel` under the editor's More options, kept fresh by `main.tsx` (any mutation). Tests: `priceHistoryRead.test.ts` (7: paging 120 rows / no dupes, same history from shipped row or copy, who, other company sees none, Q2 rule, never read by pricing). Not built: the Supplier-pricing row entry, and test 10 against a real `starter_changes` row (see the test file for why).
+
 > **Step 1 (RECORDING) BUILT 2026-10-14 (overnight, Track C, on track-c).**
 > The door is `db.updateMaterial` / `createMaterial` (`PricedWrite` =
 > `priceWrite` pair + `PriceWhy`), one transaction, a row only when the
