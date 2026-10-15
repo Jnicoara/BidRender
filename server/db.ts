@@ -1090,28 +1090,96 @@ export async function deleteMasterAssembly(id: number, userId: number) {
     );
 }
 
-export async function addItemToMasterAssembly(data: InsertMasterAssemblyItem) {
+/**
+ * The legacy assembly-item writers take the OWNER and check it themselves
+ * (security sweep, 2026-10-14). Until then they took a row id and nothing
+ * else, so any signed-in user could add to, change or delete the items of
+ * ANY company's legacy assembly by id — found by
+ * server/crossCompanyAttack.test.ts. Nothing in client/src calls them; the
+ * API did.
+ */
+async function ownsMasterAssembly(
+  assemblyId: number,
+  userId: number
+): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.insert(masterAssemblyItems).values(data);
+  const [row] = await db
+    .select({ id: masterAssemblies.id })
+    .from(masterAssemblies)
+    .where(
+      and(
+        eq(masterAssemblies.id, assemblyId),
+        eq(masterAssemblies.userId, userId)
+      )
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
+/** The item's assembly id when that assembly is `userId`'s, else null. */
+async function ownedMasterAssemblyItem(
+  id: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ id: masterAssemblyItems.id })
+    .from(masterAssemblyItems)
+    .innerJoin(
+      masterAssemblies,
+      eq(masterAssemblies.id, masterAssemblyItems.assemblyId)
+    )
+    .where(
+      and(eq(masterAssemblyItems.id, id), eq(masterAssemblies.userId, userId))
+    )
+    .limit(1);
+  return row ? row.id : null;
+}
+
+/** False when the assembly or the item is not `userId`'s; nothing written. */
+export async function addItemToMasterAssembly(
+  data: InsertMasterAssemblyItem,
+  userId: number
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  if (!(await ownsMasterAssembly(data.assemblyId, userId))) return false;
+  if (!(await getMasterItemById(data.masterItemId, userId))) return false;
+  await db.insert(masterAssemblyItems).values(data);
+  return true;
+}
+
+/** False when the item's assembly is not `userId`'s; nothing written. */
 export async function updateMasterAssemblyItem(
   id: number,
+  userId: number,
   data: Partial<InsertMasterAssemblyItem>
-) {
+): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  if ((await ownedMasterAssemblyItem(id, userId)) === null) return false;
+  // Never re-pointed at somebody else's assembly or item through the patch.
+  const { assemblyId: _a, masterItemId: _m, id: _i, ...safe } = data;
+  if (Object.keys(safe).length === 0) return true;
   await db
     .update(masterAssemblyItems)
-    .set(data)
+    .set(safe)
     .where(eq(masterAssemblyItems.id, id));
+  return true;
 }
 
-export async function removeItemFromMasterAssembly(id: number) {
+/** False when the item's assembly is not `userId`'s; nothing deleted. */
+export async function removeItemFromMasterAssembly(
+  id: number,
+  userId: number
+): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  if ((await ownedMasterAssemblyItem(id, userId)) === null) return false;
   await db.delete(masterAssemblyItems).where(eq(masterAssemblyItems.id, id));
+  return true;
 }
 
 // ─── Master Labor Rates ───────────────────────────────────────────────────────

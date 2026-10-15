@@ -69,6 +69,7 @@ import {
   refuseUnknownKinds,
 } from "../extrasInput";
 import * as db from "../db";
+import { requireLibraryRefs } from "../libraryRefs";
 import { refuseSendIfLocked } from "../lockGuard";
 
 /**
@@ -128,6 +129,30 @@ const fittingFields = {
   lbMaterialId: z.number().int().positive().nullable().optional(),
   pullBoxMaterialId: z.number().int().positive().nullable().optional(),
 };
+
+/**
+ * Every material slot a run type stores, for the visibility check: a run
+ * type's slot must name this company's material or a shared one
+ * (server/libraryRefs.ts — a foreign id here priced runs from another
+ * company's price book).
+ */
+const MATERIAL_SLOTS = [
+  "racewayMaterialId",
+  "conductorMaterialId",
+  "groundMaterialId",
+  "couplingMaterialId",
+  "connectorMaterialId",
+  "strapMaterialId",
+  "elbow90MaterialId",
+  "elbow45MaterialId",
+  "lbMaterialId",
+  "pullBoxMaterialId",
+] as const;
+function slotIds(
+  input: Partial<Record<(typeof MATERIAL_SLOTS)[number], number | null>>
+) {
+  return MATERIAL_SLOTS.map(slot => input[slot]);
+}
 
 /**
  * What a run-type line is called: the type, then what this row is — unless
@@ -520,6 +545,9 @@ export const takeoffRunTypesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        materials: slotIds(input),
+      });
       await refuseDuplicate(ctx.scope.dataUserId, input.label, input.pathType);
       const id = await db.createRunType({
         userId: ctx.scope.dataUserId,
@@ -583,6 +611,10 @@ export const takeoffRunTypesRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const target = await requireOwnType(input.id, ctx.scope.dataUserId);
+      // Before any fork, like every refusal below.
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        materials: slotIds(input),
+      });
       if (input.makeupByKindInches) {
         await refuseUnknownKinds(
           Object.keys(input.makeupByKindInches),

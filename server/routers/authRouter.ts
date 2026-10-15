@@ -80,6 +80,39 @@ const wrongSignInsFromSender = createFailureLimiter({
   max: 30,
 });
 
+/*
+  New accounts (security sweep, 2026-10-14). Until then signup had NO limit:
+  one script could make accounts — each with its own company and a bcrypt
+  hash — as fast as the server answered, and probe which addresses already
+  have an account (the "already exists" answer) just as fast. Counted on
+  every attempt, BEFORE the address is looked up, so probing pays the same
+  as signing up. Per sender, plus one ceiling for everybody, because the
+  sender key is best-effort (rateLimit.ts) and the ceiling is what still
+  holds when it is not. A real office behind one address signs up a handful
+  of people, never ten in an hour.
+*/
+const overSignupSenderLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+});
+const overSignupOverallLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 100,
+});
+export const TOO_MANY_SIGNUPS =
+  "Too many new accounts were started from here in the last hour. Wait an hour and try again.";
+
+/*
+  Wrong CURRENT password at "Change password" (security sweep, 2026-10-14).
+  The form needs a session, but a session left open on a shared laptop
+  would otherwise let anybody guess the password behind it without limit —
+  and the password is what opens every other device. Per account.
+*/
+const wrongCurrentPasswords = createFailureLimiter({
+  windowMs: SIGN_IN_WINDOW_MS,
+  max: 10,
+});
+
 /** Names the wait, whole minutes, never "0". */
 export function tooManySignIns(waitMs: number): string {
   const minutes = Math.max(1, Math.ceil(waitMs / 60_000));
@@ -121,6 +154,16 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // Both counted on every attempt, so neither can be skipped by tripping
+      // the other first.
+      const now = Date.now();
+      const overSender = overSignupSenderLimit(clientKey(ctx.req), now);
+      const overAll = overSignupOverallLimit("all", now);
+      if (overSender || overAll)
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: TOO_MANY_SIGNUPS,
+        });
       const existing = await db.getUserByEmail(input.email.toLowerCase());
       if (existing) {
         throw new TRPCError({
@@ -260,11 +303,19 @@ export const authRouter = router({
         });
       }
 
+      const account = String(user.id);
+      const wait = wrongCurrentPasswords.blockedFor(account, Date.now());
+      if (wait > 0)
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: tooManySignIns(wait),
+        });
       const valid = await bcrypt.compare(
         input.currentPassword,
         user.passwordHash
       );
       if (!valid) {
+        wrongCurrentPasswords.fail(account, Date.now());
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Current password is incorrect.",

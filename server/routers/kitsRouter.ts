@@ -20,6 +20,7 @@ import { hourlyCostFor } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import { DEFAULT_TRADE } from "../../shared/trades";
 import * as db from "../db";
+import { requireLibraryRefs } from "../libraryRefs";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -198,6 +199,11 @@ export const kitsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // A kit item must name this company's assembly or a shared one
+      // (server/libraryRefs.ts).
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        assemblies: input.items.map(i => i.assemblyId),
+      });
       const existing = await db.getLibraryKits(ctx.scope.dataUserId);
       const clash = existing.find(
         k => k.name.toLowerCase() === input.name.toLowerCase()
@@ -240,6 +246,10 @@ export const kitsRouter = router({
       const target = await db.getKitById(input.id, ctx.scope.dataUserId);
       if (!target)
         throw new TRPCError({ code: "NOT_FOUND", message: "Kit not found." });
+      // Before the fork, so a refusal leaves no fork behind.
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        assemblies: input.items?.map(i => i.assemblyId),
+      });
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline

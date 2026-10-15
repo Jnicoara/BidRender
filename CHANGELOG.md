@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Closed security gaps found by an automated "attacker" test.** A new test
+  signs in as a stranger from another company and calls every one of the
+  server's 403 routes with the first company's ids. It found that saving an
+  assembly, kit or run type with another company's material or assembly id
+  was accepted, and the reply showed that material's name and price. Any
+  logged-in user could read a competitor's prices one id at a time. Old
+  hidden assembly routes also let anyone change another company's items.
+  All refused now. Sign-up is now limited (10 an hour per sender, 100 an
+  hour overall), and so are wrong current passwords on "Change password".
+
 - **See a material's price history.** In a material's editor, More options › Price history lists every recorded price change, newest first: the price, the change in %, who changed it and how (typed, imported), the supplier, and the pack it was priced from. View only — bids keep the prices they were built with.
 
 - **Type a price by the roll or box.** In a material's editor, "More

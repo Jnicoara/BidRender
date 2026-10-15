@@ -26,6 +26,7 @@ import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
 import { requireKnownKind } from "../knownHeightKind";
+import { requireLibraryRefs } from "../libraryRefs";
 import { heightList } from "../../shared/takeoffHeights";
 import { MOST_USED_WINDOW_DAYS, rankMostUsed } from "../../shared/mostUsed";
 import { resolveAssembly } from "../../shared/assemblyLookup";
@@ -233,6 +234,13 @@ export const assembliesRouter = router({
       input.mountHeightTypeKey ?? null,
       ctx.scope.dataUserId
     );
+    // Every stored reference must be this company's or shared — see
+    // server/libraryRefs.ts for the price book this used to leak.
+    await requireLibraryRefs(ctx.scope.dataUserId, {
+      materials: input.materials.map(line => line.materialId),
+      modifiers: input.modifierIds,
+      laborRates: [input.laborRateId],
+    });
     const existing = await db.getLibraryAssemblies(ctx.scope.dataUserId);
     const clash = existing.find(
       a => a.name.toLowerCase() === input.name.toLowerCase()
@@ -286,7 +294,16 @@ export const assembliesRouter = router({
         message: "Assembly not found.",
       });
 
-    // Checked BEFORE the fork, so a refused key leaves no fork behind.
+    // Checked BEFORE the fork, so a refusal leaves no fork behind. Every
+    // stored reference must be this company's or shared (libraryRefs.ts).
+    await requireLibraryRefs(ctx.scope.dataUserId, {
+      materials: materials?.map(line => line.materialId),
+      modifiers: modifierIds,
+      laborRates: [rest.laborRateId],
+      laborSteps: steps?.map(step =>
+        step.kind === "step" ? step.laborStepId : null
+      ),
+    });
     if (rest.mountHeightTypeKey != null)
       await requireKnownKind(rest.mountHeightTypeKey, ctx.scope.dataUserId);
     // Resolved BEFORE the fork, so a refused "not set" leaves no fork behind.
