@@ -9,6 +9,8 @@ import { AppProvider } from "./contexts/AppContext";
 import { useTheme } from "./contexts/ThemeContext";
 import AuthGuard from "./components/AuthGuard";
 import { isStarterAddress } from "./lib/starterAddress";
+import { preloadable } from "./lib/preloadable";
+import { reloadingImport } from "./lib/lazyPage";
 
 /**
  * The estimating app, split out of the first download.
@@ -23,7 +25,25 @@ import { isStarterAddress } from "./lib/starterAddress";
  * A signed-in user pays for the chunk once, on a screen that was always going
  * to show a loading state while auth resolved.
  */
-const BidRenderShell = lazy(() => import("./pages/BidRenderShell"));
+const BidRenderShell = preloadable(
+  reloadingImport(() => import("./pages/BidRenderShell"))
+);
+
+/*
+  A browser that has been signed in before starts fetching the app NOW, in
+  parallel with the "who is signed in?" check, so the shell is usually here
+  before it is needed and renders without a Suspense boundary — saving the
+  ~300 ms React holds a boundary's reveal (@/lib/preloadable; measured
+  2026-10-15). `useAuth` keeps the last signed-in person in this key; a new
+  visitor has none and still downloads only the landing page.
+*/
+try {
+  const last = localStorage.getItem("manus-runtime-user-info");
+  if (last && last !== "null" && last !== "undefined")
+    void BidRenderShell.preload().catch(() => {});
+} catch {
+  // Storage blocked: no head start, same as a new visitor.
+}
 
 /**
  * The starter editor's sign-in and baseline screen, at `/starter` — its own

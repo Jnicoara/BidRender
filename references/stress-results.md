@@ -124,9 +124,36 @@ the tab ONCE (driven: a 404 on the Bids file → one reload → Bids shown),
 never in a loop. A quiet "Loading…" only after 300 ms (`PageLoading`), and
 every page is fetched in the background 4 s after the first screen, so
 later clicks stay instant. The signed-out landing page was already lean:
-148 KB gzipped (~0.7 s) — the app's code was never on it. Against the production build: newScreens + guide
+148 KB gzipped (~0.7 s) — the app's code was never on it. Against the
+production build: newScreens, guide and the smoke screens spec, 103 passed
+at four sizes.
 
-- the smoke screens spec, 103 passed at four sizes.
+### The ~300 ms nobody was using (2026-10-15)
+
+With the code split, the waterfall showed a gap with nothing in it: the
+"who am I" check answered at ~60 ms, and the Dashboard's data request did
+not LEAVE until ~360 ms. A timer trace put the wait in React's scheduler —
+React 19 reveals a Suspense boundary's content in ~300 ms batches, and the
+shell sat behind one.
+
+**Fixed:** `client/src/lib/preloadable.ts`. A browser that has been signed in
+before starts fetching the shell at once, in parallel with the "who am I"
+check; once a module is here, new mounts render it directly, with no
+boundary to throttle (a mounted page keeps the path it started on, so it
+never remounts mid-edit). The background prefetch uses the same `preload`,
+so a later page click also skips the boundary. A failed early fetch is
+forgotten, so the next ask tries again.
+
+Production build, warm cache, stress account (151 bids),
+`waterfall.mjs`-style timing from navigation to the first "Stress job" row:
+
+| Dashboard          | Data request leaves | Dashboard shown |
+| ------------------ | ------------------- | --------------- |
+| Before (one run)   | 368 ms              | 879 ms          |
+| After (three runs) | **78–87 ms**        | **388–417 ms**  |
+
+Landing page unchanged: 148 KB gzipped, one file — a new visitor has no
+remembered user and fetches nothing extra.
 
 ## 2,000 marks on ONE sheet (bid "Stress dense sheet", 4 counts × 500)
 
@@ -236,5 +263,21 @@ signed out — `server/sessionUnavailable.test.ts`, 4 cases), `AuthGuard`,
 
 Drilled with the AI client aimed at a local server that never answers (a
 fake key; nothing left this machine). Not drilled: a hang on a fresh page
-load (the hang step reused an open page and proved nothing), storage that
-refuses uploads.
+load (the hang step reused an open page and proved nothing).
+
+### Storage that refuses an upload (2026-10-15)
+
+Drilled on the production build by putting a plain FILE where the stress
+account's upload folder goes, so the server's write fails for that one
+account (folder restored afterwards). Control run first, storage working:
+upload → attach → sheets, all 200.
+
+With storage refusing: the PUT got a 500, nothing called `confirmAttach`,
+and the Plans screen said "Storage refused drill-plan.pdf with an HTTP 500.
+The upload reached storage, so this is not a connection problem — it is
+worth reporting rather than retrying", with a **Retry** button. After a
+reload the bid shows NO plan — it does not claim a set it does not have, and
+no half-written file was left on disk. **Passes.** One wording note for B
+(TakeoffPage is B's screen): "rather than retrying" sits beside a Retry
+button; on a full disk a later retry is exactly what works. Screenshots:
+`overnight-shots/drill-upload-refused*.png`.

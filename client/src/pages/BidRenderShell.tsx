@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
+import { preloadable } from "@/lib/preloadable";
 import { reloadingImport } from "@/lib/lazyPage";
 import { PageLoading } from "@/components/PageLoading";
 /**
@@ -39,63 +40,63 @@ import { useApp } from "@/contexts/AppContext";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 const loadSettingsPage = reloadingImport(() => import("@/pages/SettingsPage"));
-const SettingsPage = lazy(loadSettingsPage);
+const SettingsPage = preloadable(loadSettingsPage);
 const loadMaterialDatabasePage = reloadingImport(
   () => import("@/pages/MaterialDatabasePage")
 );
-const MaterialDatabasePage = lazy(loadMaterialDatabasePage);
+const MaterialDatabasePage = preloadable(loadMaterialDatabasePage);
 import DashboardPage from "@/pages/DashboardPage";
 import { BackupHealthBanner } from "@/components/BackupHealthBanner";
 const loadAdminSettingsPage = reloadingImport(
   () => import("@/pages/AdminSettingsPage")
 );
-const AdminSettingsPage = lazy(loadAdminSettingsPage);
+const AdminSettingsPage = preloadable(loadAdminSettingsPage);
 const loadMaterialsLibraryPage = reloadingImport(
   () => import("@/pages/MaterialsLibraryPage")
 );
-const MaterialsLibraryPage = lazy(loadMaterialsLibraryPage);
+const MaterialsLibraryPage = preloadable(loadMaterialsLibraryPage);
 const loadLaborRatesPage = reloadingImport(
   () => import("@/pages/LaborRatesPage")
 );
-const LaborRatesPage = lazy(loadLaborRatesPage);
+const LaborRatesPage = preloadable(loadLaborRatesPage);
 const loadModifiersPage = reloadingImport(
   () => import("@/pages/ModifiersPage")
 );
-const ModifiersPage = lazy(loadModifiersPage);
+const ModifiersPage = preloadable(loadModifiersPage);
 const loadAssembliesLibraryPage = reloadingImport(
   () => import("@/pages/AssembliesLibraryPage")
 );
-const AssembliesLibraryPage = lazy(loadAssembliesLibraryPage);
+const AssembliesLibraryPage = preloadable(loadAssembliesLibraryPage);
 const loadBidsPage = reloadingImport(() => import("@/pages/BidsPage"));
-const BidsPage = lazy(loadBidsPage);
+const BidsPage = preloadable(loadBidsPage);
 const loadQuickBidPage = reloadingImport(() => import("@/pages/QuickBidPage"));
-const QuickBidPage = lazy(loadQuickBidPage);
+const QuickBidPage = preloadable(loadQuickBidPage);
 const loadTakeoffPage = reloadingImport(() => import("@/pages/TakeoffPage"));
-const TakeoffPage = lazy(loadTakeoffPage);
+const TakeoffPage = preloadable(loadTakeoffPage);
 const loadProposalPage = reloadingImport(() => import("@/pages/ProposalPage"));
-const ProposalPage = lazy(loadProposalPage);
+const ProposalPage = preloadable(loadProposalPage);
 const loadBidArchivePage = reloadingImport(
   () => import("@/pages/BidArchivePage")
 );
-const BidArchivePage = lazy(loadBidArchivePage);
+const BidArchivePage = preloadable(loadBidArchivePage);
 const loadBidListPage = reloadingImport(() => import("@/pages/BidListPage"));
-const BidListPage = lazy(loadBidListPage);
+const BidListPage = preloadable(loadBidListPage);
 const loadPlansIndexPage = reloadingImport(
   () => import("@/pages/PlansIndexPage")
 );
-const PlansIndexPage = lazy(loadPlansIndexPage);
+const PlansIndexPage = preloadable(loadPlansIndexPage);
 const loadTrashPage = reloadingImport(() => import("@/pages/TrashPage"));
-const TrashPage = lazy(loadTrashPage);
+const TrashPage = preloadable(loadTrashPage);
 const loadKitsPage = reloadingImport(() => import("@/pages/KitsPage"));
-const KitsPage = lazy(loadKitsPage);
+const KitsPage = preloadable(loadKitsPage);
 const loadClientsPage = reloadingImport(() => import("@/pages/ClientsPage"));
-const ClientsPage = lazy(loadClientsPage);
+const ClientsPage = preloadable(loadClientsPage);
 const loadTeamPage = reloadingImport(() => import("@/pages/TeamPage"));
-const TeamPage = lazy(loadTeamPage);
+const TeamPage = preloadable(loadTeamPage);
 const loadAnalyticsPage = reloadingImport(
   () => import("@/pages/AnalyticsPage")
 );
-const AnalyticsPage = lazy(loadAnalyticsPage);
+const AnalyticsPage = preloadable(loadAnalyticsPage);
 import FirstRunPage from "@/pages/FirstRunPage";
 import { useCompany } from "@/hooks/useCompany";
 import { trpc } from "@/lib/trpc";
@@ -267,25 +268,25 @@ const NavSection = ({
  * 2026-10-15: 834 KB → 217 KB gzipped before the Dashboard shows).
  */
 const PAGE_LOADERS = [
-  loadSettingsPage,
-  loadMaterialDatabasePage,
-  loadAdminSettingsPage,
-  loadMaterialsLibraryPage,
-  loadLaborRatesPage,
-  loadModifiersPage,
-  loadAssembliesLibraryPage,
-  loadBidsPage,
-  loadQuickBidPage,
-  loadTakeoffPage,
-  loadProposalPage,
-  loadBidArchivePage,
-  loadBidListPage,
-  loadPlansIndexPage,
-  loadTrashPage,
-  loadKitsPage,
-  loadClientsPage,
-  loadTeamPage,
-  loadAnalyticsPage,
+  SettingsPage.preload,
+  MaterialDatabasePage.preload,
+  AdminSettingsPage.preload,
+  MaterialsLibraryPage.preload,
+  LaborRatesPage.preload,
+  ModifiersPage.preload,
+  AssembliesLibraryPage.preload,
+  BidsPage.preload,
+  QuickBidPage.preload,
+  TakeoffPage.preload,
+  ProposalPage.preload,
+  BidArchivePage.preload,
+  BidListPage.preload,
+  PlansIndexPage.preload,
+  TrashPage.preload,
+  KitsPage.preload,
+  ClientsPage.preload,
+  TeamPage.preload,
+  AnalyticsPage.preload,
 ];
 
 export default function BidRenderShell() {
