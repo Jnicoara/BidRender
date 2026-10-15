@@ -71,6 +71,26 @@ number; no migration).** BEFORE → AFTER rows in `overnight-log.md`.
 - **For B when merging**: `TakeoffPage.tsx` changed in ONE place (the
   header blurb → `BidStepBar`), plus `HomerunsView.tsx`'s icon.
 
+**Items 6 + 7 — pricing safety steps 1, 5, 6 and price-history RECORDING
+(on track-c, NOT merged; no migration — uses A's 0157–0163).**
+
+- **The price door** (`server/db.ts`): `updateMaterial` / `createMaterial`
+  take a price only as `PricedWrite` = `priceWrite` pair
+  (`shared/packPricing.ts`, round UP) + `PriceWhy`; `costPerUnit?: never`
+  catches a spread too. One transaction; a `material_price_history` row
+  only when the number changed. Writers: materials.update/.create,
+  importPrices (importId NULL until PS step 4), save line as assembly,
+  revert to shipped (as `typed` — Q-PH1 drafts a `reverted` enum for A).
+- **Forcing tests**: `priceHistoryDoor.test.ts` (every direct `materials`
+  write must be in a named function; red on a planted write) and
+  `priceHistoryRecording.test.ts` (10). `typedPriceFixture.ts` for fixtures.
+- **Pack entry** on screen (step 5): editor More options + "unit or pack"
+  price row; Supplier pricing pack box. **Sanity warning NOT built** (step 3
+  waits on the Platt export, Q4/Q8).
+- **Step 6**: `realPackFromSheet` built and run over the catalog; NOT
+  written (A's hold until the owner's sheet — Q-PS6).
+- **Not yet**: price-history read query + panel (plan § 8 steps 2–3).
+
 ## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
 
 **Standing rule: never stop MySQL 3307** (all tracks share it). No dev
