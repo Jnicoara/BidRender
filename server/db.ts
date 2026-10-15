@@ -1580,10 +1580,10 @@ export async function withNamedLock<T>(
 
   const connection = await _pool.getConnection();
   try {
-    const [rows] = await connection.query(
-      "SELECT GET_LOCK(?, ?) AS acquired",
-      [name, timeoutSeconds]
-    );
+    const [rows] = await connection.query("SELECT GET_LOCK(?, ?) AS acquired", [
+      name,
+      timeoutSeconds,
+    ]);
     const acquired = (rows as unknown as Array<{ acquired: number | null }>)[0]
       ?.acquired;
     if (acquired !== 1) return { acquired: false };

@@ -4,7 +4,20 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
+## NOW — 2026-10-14 night, session 44: OVERNIGHT RUN on `track-a-night` (not local-dev)
+
+Branch `track-a-night` from `origin/local-dev` `d0152f60`; pushed only
+there. Nothing touched staging/live, no deploy, no migration outside a
+throwaway local schema. Item-by-item record: `overnight-log-a.md`; owner
+questions: `morning-questions-a.md`.
+
+- **1. Signup race FIXED in code** (`signup-race-plan.md`): per-user named
+  lock + re-check inside, `withNamedLock` in `db.ts`.
+  `personalCompanyRace.test.ts` is a normal test (12 parallel), red without
+  the lock. DB rule drafted in `references/drafts/personal-company-unique.sql`
+  (NOT in `drizzle/`), rehearsed on a throwaway schema.
+
+## (earlier) 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
 
 **Nothing on live was changed or deleted.** Read with two throwaway
 SELECT-only scripts (`START TRANSACTION READ ONLY`, deleted after use).

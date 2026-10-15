@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **A new account now gets exactly one company, even when its first screen
+  sends many requests at once.** One live sign-up had ended up owning five
+  identical companies created in the same second, which quietly gave one
+  account five sets of team seats. Sign-up now waits its turn and checks
+  again before creating anything. (Code only; not live yet. The database
+  rule that makes this impossible at the source is drafted for later.)
+
 - **Tap a detail reference on a plan to go to that detail, and Back to
   return.** When a sheet says "SEE DETAIL 2/E004", tapping that reference
   now offers "Go to detail 2". Go opens sheet E004 zoomed to detail 2's own
