@@ -27,6 +27,32 @@ route is attacked automatically.
   first tap). `client/src/lib/shellNavStable.test.ts` now fails on ANY
   component declared inside another in client/src.
 
+**Items 4–6 (the endless part) — what other tracks will meet.**
+Numbers and drills: `references/stress-results.md`; every change in
+`references/overnight-log.md` with BEFORE → AFTER.
+
+- **A valid session the database can't load is SERVICE_UNAVAILABLE, not
+  signed out** (`server/_core/context.ts` `sessionUnavailable`; `auth.me`
+  and both "must be signed in" checks). The client shows "Can't reach
+  BidRidge right now" (`AuthGuard`). A failed list says so
+  (`components/LoadFailed.tsx`) instead of "No bids yet" / "Nothing here".
+- **Signed out mid-edit** keeps the address and says why on the sign-in
+  form (`lib/sessionExpiry.ts`, `main.tsx`).
+- **`InvokeParams.timeoutMs`** (AI): honoured by the Anthropic adapter
+  (timeout, no retries) and the gateway (one AbortSignal). "Find it" uses
+  15 s. **The plan reader has none yet — Q-AI1.**
+- **`shared/csvWrite.ts` `defuseFormula`** — every CSV cell; the
+  early-access export now uses the shared writer.
+- **`parseTypedNumber`** (`lib/inlineEdit.ts`) in every self-saving number
+  box and the Materials editor; other Save forms listed in todo.md.
+- **Races:** a lost `sendToBid` answers CONFLICT; markup override falls
+  back to update; `saveCloseout` takes a bid row lock (`inOneTransaction`).
+  `db.isDuplicateKey` is exported. `server/weirdInputs.test.ts` (edges +
+  twice-at-once over every route) and `server/sendRace.test.ts` guard them.
+- **Dashboard drops check** skips bids with no drop kind (`bidsWithADropKind`):
+  2.4 s → 0.4 s under load.
+- **Sidebar**: one scroll area (the menu vanished on a sideways phone).
+
 **FOR TRACK B (from the stress run):** the 500-sheet set opens its first
 sheet in ~3.0 s and sheet 400 in ~2.5 s at laptop size — over the owner's
 2 s budget. Range loading is fine (7.2 MB / 2.1 MB); the time is the
