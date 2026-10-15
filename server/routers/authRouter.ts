@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, DATA_UNAVAILABLE_MSG } from "@shared/const";
 import { getSessionCookieOptions } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
@@ -156,7 +156,16 @@ export const authRouter = router({
    * what it receives in `localStorage`, so it was written to disk too. See
    * shared/publicUser.ts.
    */
-  me: publicProcedure.query(opts => toPublicUser(opts.ctx.user)),
+  me: publicProcedure.query(opts => {
+    // Never "nobody" for a valid session the database could not load: the
+    // app would show a signed-in contractor the landing page (context.ts).
+    if (opts.ctx.sessionUnavailable)
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: DATA_UNAVAILABLE_MSG,
+      });
+    return toPublicUser(opts.ctx.user);
+  }),
 
   /** Sign up with email + password */
   signup: publicProcedure

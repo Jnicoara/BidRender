@@ -137,7 +137,19 @@ export default function DashboardPage({
   );
 
   const utils = trpc.useUtils();
-  const { data: bids = [], isLoading } = trpc.bids.dashboard.useQuery();
+  const {
+    data: bids = [],
+    isLoading,
+    isError,
+    refetch: refetchBids,
+  } = trpc.bids.dashboard.useQuery();
+  /*
+    The headline is a NUMBER, so it waits for real data. Until 2026-10-14 it
+    read the empty list a loading or failed query defaults to, and said "Out
+    for bid (0) · total due $0" above "Loading bids…" — for seconds on a
+    slow connection (failure drill, references/stress-results.md).
+  */
+  const headlineKnown = !isLoading && !isError;
   const recentPlans = useMemo(() => recentPlanBids(bids), [bids]);
   const { data: archived = [] } = trpc.bids.archived.useQuery();
 
@@ -347,16 +359,28 @@ export default function DashboardPage({
           </div>
           <div className="text-right shrink-0 mr-2">
             <div className="text-xs text-muted-foreground">
-              Out for bid ({summary.open.count}) · total due{" "}
-              <IncompletePriceTag show={summary.open.incomplete} />
+              Out for bid{headlineKnown && ` (${summary.open.count})`} · total
+              due{" "}
+              {headlineKnown && (
+                <IncompletePriceTag show={summary.open.incomplete} />
+              )}
             </div>
             {/* The same "+ 4 lines not priced" the cards carry, summed — a
                 headline quietly short by four parts reads as a whole one. */}
-            <NotPricedTotal
-              amount={moneyWhole(summary.open.total)}
-              notPriced={summary.open.notPriced}
-              className="font-mono text-base text-[#F5C518]"
-            />
+            {headlineKnown ? (
+              <NotPricedTotal
+                amount={moneyWhole(summary.open.total)}
+                notPriced={summary.open.notPriced}
+                className="font-mono text-base text-[#F5C518]"
+              />
+            ) : (
+              <div
+                className="font-mono text-base text-muted-foreground"
+                aria-label={isError ? "Total not available" : "Loading total"}
+              >
+                {isError ? "—" : "…"}
+              </div>
+            )}
           </div>
           {/* Only offered once there is something in it — an always-visible
               empty Archive is a door to a blank room. */}
@@ -543,6 +567,22 @@ export default function DashboardPage({
         {isLoading ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
             Loading bids…
+          </div>
+        ) : isError ? (
+          /* A failed load is not an empty company: it said "No bids yet"
+             to a company with 150 of them until 2026-10-14. */
+          <div className="py-16 text-center text-sm text-muted-foreground space-y-2">
+            <p>
+              Couldn't load your bids. They're safe — this is a connection
+              problem.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void refetchBids()}
+            >
+              Try again
+            </Button>
           </div>
         ) : bids.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">

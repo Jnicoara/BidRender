@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import { FileText, Map as MapIcon, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/hooks/useCompany";
@@ -48,7 +49,12 @@ export default function PlansIndexPage({
     openCount: onCount,
   });
   const fileInput = useRef<HTMLInputElement | null>(null);
-  const { data: bids = [], isLoading } = trpc.bids.dashboard.useQuery();
+  const {
+    data: bids = [],
+    isLoading,
+    isError,
+    refetch,
+  } = trpc.bids.dashboard.useQuery();
   const withPlans = useMemo(() => recentPlanBids(bids, Infinity), [bids]);
   const canUpload = access.can("bids.edit");
 
@@ -103,6 +109,8 @@ export default function PlansIndexPage({
               />
             ))}
           </div>
+        ) : isError ? (
+          <LoadFailed what="your plans" onRetry={() => void refetch()} />
         ) : withPlans.length === 0 ? (
           <div className="max-w-4xl rounded-xl border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground">No plans yet.</p>

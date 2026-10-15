@@ -97,8 +97,25 @@ drawn sheet, the bid total…), 3 fresh loads each.
   production build is smaller. The 5.5 s first Dashboard is the dev server
   compiling for the very first browser visit; every load after it is 0.9 s.
 
-## Failure drills
+## Failure drills — the database (`scripts/dbFaultProxy.mts`)
 
-`scripts/dbFaultProxy.mts` sits between ONE dev server and MySQL and makes
-the database slow, hang or vanish without touching MySQL itself. Results
-below as drills run.
+One dev server pointed at the proxy (`DATABASE_URL=…@127.0.0.1:3399/…`),
+MySQL itself untouched. Driven in Chrome, laptop size, signed in as Stress
+Co. Screens in `references/overnight-shots/drill-*.png`.
+
+| Database                                        | BEFORE (what a signed-in contractor saw)                                                                                                                                                       | AFTER                                                                                                                                                                   |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Down**, page reloaded                         | **The public landing page** ("Sign in · Get early access"), so they look signed out, maybe with their account gone; any protected call answered "Please login", which **redirects to sign in** | "Can't reach BidRidge right now — you're still signed in and nothing you saved is lost", retried every 10 s, **address kept**; back by itself when the database returns |
+| **Down**, app already open                      | Dashboard: **"No bids yet. Create one to start pricing a job."** to a company with 150 bids; header "Out for bid (0) · total due **$0**"                                                       | "Couldn't load your bids. They're safe — this is a connection problem." + Try again; header shows "—"                                                                   |
+| Down: Plans list, Recently deleted, Bids search | "No plans yet" / **"Nothing here"** (the deleted bid you came to restore, reported gone) / "Bids you create will show up here"                                                                 | The same "Couldn't load …" + Try again (`LoadFailed.tsx`)                                                                                                               |
+| Down: a save (status change)                    | Refused; stored value unchanged                                                                                                                                                                | Same — **nothing lost or half-saved**                                                                                                                                   |
+| **Slow** (4 s a packet)                         | Header "Out for bid (0) · total due **$0**" above "Loading bids…" for 11 s+                                                                                                                    | Header "…" until the real number arrives                                                                                                                                |
+
+Fixes: `server/_core/context.ts` (a VALID session the database cannot load
+is `sessionUnavailable`; `auth.me` and both "must be signed in" checks
+answer SERVICE_UNAVAILABLE; a deleted person with the database up is still
+signed out — `server/sessionUnavailable.test.ts`, 4 cases), `AuthGuard`,
+`DashboardPage`, `LoadFailed` on Plans, Recently deleted and Bids search.
+
+Not yet drilled: file storage unreachable, AI unreachable or slow, a hang
+on a fresh page load (the hang step reused an open page and proved nothing).

@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **A database hiccup no longer looks like being signed out or losing
+  everything.** If the server briefly can't reach its data, BidRidge now
+  says "Can't reach BidRidge right now — you're still signed in and nothing
+  is lost" and tries again by itself. Before, it showed the public sign-up
+  page, or bounced you to sign in. Lists that fail to load now say so with
+  a Try again button instead of "No bids yet" or "Nothing here". The
+  Dashboard's "total due" no longer shows $0 while it is still loading.
+
 - **The Dashboard stays fast for a busy company.** With 150 bids and ten other
   companies working at the same time, the Dashboard took 2.4 seconds to
   load. It now takes 0.4. It had been doing the slow "drops not priced"

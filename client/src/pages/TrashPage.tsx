@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { toast } from "sonner";
 import { ArrowRight, RotateCcw, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { RETENTION_DAYS } from "@shared/retention";
 import { errorText } from "@/lib/errorText";
@@ -44,6 +45,16 @@ export default function TrashPage({
   const modifiers = trpc.modifiers.list.useQuery({ status: "archived" });
   const clients = trpc.clients.list.useQuery({ archived: true });
 
+  // Any list that failed: "Nothing here" would tell someone the bid they
+  // came to restore is gone (LoadFailed.tsx).
+  const failedLoads = [
+    bids,
+    materials,
+    assemblies,
+    kits,
+    modifiers,
+    clients,
+  ].filter(q => q.isError);
   const done = (name: string) => toast.success(`${name} is back.`);
   const failed = (error: { message: string }) => toast.error(errorText(error));
 
@@ -121,6 +132,11 @@ export default function TrashPage({
                 />
               ))}
             </div>
+          ) : failedLoads.length > 0 && total === 0 ? (
+            <LoadFailed
+              what="what you deleted"
+              onRetry={() => failedLoads.forEach(q => void q.refetch())}
+            />
           ) : total === 0 ? (
             <div className="rounded-xl border border-dashed border-border p-8 text-center">
               <p className="text-sm text-muted-foreground">Nothing here.</p>

@@ -29,7 +29,24 @@ interface AuthGuardProps {
  * hash-based, so every app URL shares the single wouter path this wraps.
  */
 export default function AuthGuard({ children }: AuthGuardProps) {
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, refresh, error } = useAuth();
+  /*
+    The server could not reach its data (SERVICE_UNAVAILABLE from auth.me —
+    server/_core/context.ts). NOT "signed out": until 2026-10-14 this fell
+    through to the landing page, so a database blip showed a signed-in
+    contractor "Sign in / Get early access" (failure drill,
+    references/stress-results.md). Retried by itself every 10 s.
+  */
+  const unavailable =
+    !user &&
+    !!error &&
+    (error as { data?: { code?: string } }).data?.code ===
+      "SERVICE_UNAVAILABLE";
+  useEffect(() => {
+    if (!unavailable) return;
+    const timer = window.setInterval(() => refresh(), 10_000);
+    return () => window.clearInterval(timer);
+  }, [unavailable, refresh]);
   /** A visitor asked to sign in, so the form replaces the marketing page. */
   const [signingIn, setSigningIn] = useState(false);
   /** Was this browser signed in at some point during this visit? */
@@ -109,6 +126,28 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       </div>
     );
   }
+
+  if (unavailable)
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-background px-4">
+        <div className="max-w-sm text-center space-y-3">
+          <p className="text-base font-semibold text-foreground">
+            Can't reach BidRidge right now
+          </p>
+          <p className="text-sm text-muted-foreground">
+            You're still signed in and nothing you saved is lost. This is a
+            problem on our side — it tries again by itself every few seconds.
+          </p>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="inline-flex h-9 items-center rounded-md bg-[#F5C518] px-4 text-sm font-medium text-black"
+          >
+            Try again now
+          </button>
+        </div>
+      </div>
+    );
 
   if (!user) {
     if (signingIn)

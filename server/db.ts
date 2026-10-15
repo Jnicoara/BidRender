@@ -459,6 +459,29 @@ export async function getDb() {
   return _db;
 }
 
+/**
+ * Can the database answer right now? A `SELECT 1`, given up on after
+ * `timeoutMs` (a database that hangs is as unreachable as one that refuses).
+ * Asked only on the rare path where a valid session could not load its
+ * person (server/_core/context.ts), never per request.
+ */
+export async function databaseReachable(timeoutMs = 3000): Promise<boolean> {
+  try {
+    const db = await getDb();
+    if (!db) return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<false>(resolve => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
+    const ping = db.execute(sql`SELECT 1`).then(() => true);
+    const answer = await Promise.race([ping, timeout]);
+    clearTimeout(timer);
+    return answer;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export async function upsertUser(user: InsertUser): Promise<void> {

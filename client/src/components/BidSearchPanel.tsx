@@ -22,6 +22,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -319,6 +320,8 @@ export function BidSearchPanel({
             />
           ))}
         </div>
+      ) : query.isError && rows.length === 0 ? (
+        <LoadFailed what="your bids" onRetry={() => void query.refetch()} />
       ) : rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border/60 py-12 text-center">
           <p className="text-sm font-medium">No bids match</p>
