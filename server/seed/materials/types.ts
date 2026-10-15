@@ -206,8 +206,22 @@ export function sizeAliases(size: string): string {
  *
  * Deduplicates by word while preserving order, so a generator can hand in the
  * size spellings and the family's slang without checking whether both mention
- * "inch". Phrases are kept whole — see mergeAliases in shared/aliasSuggestions
- * for why phrase-level dedupe matters — this one only drops exact repeats.
+ * "inch".
+ *
+ * ── Phrases are NOT kept whole, whatever this comment used to say ──────────
+ * It said "Phrases are kept whole … this one only drops exact repeats". It
+ * drops every repeated WORD, so "one hole two hole" is stored "one hole two",
+ * and "2 pole double pole two pole" as "2 pole double two". Measured
+ * 2026-10-14 by logging every drop over the catalog: 1,334 dropped words in
+ * 660 calls, 269 of them a noun right after a number ("two pole", "two
+ * hole", "5 square") in 190 calls. Searched for those phrases with
+ * scripts/searchSpotCheck.mts — "double pole 20 breaker", "two hole lug",
+ * "5 square box", "3 port wago", "triple pole 100 breaker" — every one still
+ * ranks the right row first, because the NAME carries the count ("2-Pole",
+ * "2-hole") and search maps number words. So it is left as it is: changing it
+ * would rewrite the search words of 190 shipped rows to fix nothing a search
+ * can see. To keep a phrase that only an alias carries, hyphenate it
+ * ("3-hole"), as the weatherproof boxes do.
  */
 export function aliases(...parts: (string | undefined)[]): string {
   const seen = new Set<string>();

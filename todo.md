@@ -3884,7 +3884,8 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       sweep has none of these queries, which is why it passed. Planned, with
       the risk to other count searches: `references/track-c-next-batch-plan.md`
       § S1.
-- [ ] **`aliases()` drops a repeated word, which silently breaks alias
+- [x] **AUDITED 2026-10-14 (Track C, overnight): 269 count phrases dropped in 190 shipped rows, and every one still searches right** (the name carries the count; search maps number words) — measured, left as is, the false comment in `types.ts` corrected. Was:
+      **`aliases()` drops a repeated word, which silently breaks alias
       PHRASES.** `server/seed/materials/types.ts`: it de-duplicates word by
       word, so "one hole 1 hole two hole 2 hole" was stored as "one hole 1
       two 2" and "2 hole strap" could not find `EMT strap`; my own "3 hole 5
