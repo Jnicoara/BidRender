@@ -56,6 +56,30 @@ describe("help topics", () => {
     expect(searchHelp("zzqx")).toEqual([]);
   });
 
+  // One slip of the thumb, on a phone, must still find the answer.
+  const SLIPS: [string, string][] = [
+    ["pasword", "Change my password"],
+    ["labr rate", "Set my labor rates"],
+    ["sales taxx", "Set sales tax"],
+    ["uplaod pdf", "Upload a drawing set"],
+    ["asembly", "Build an assembly"],
+    ["custmers", "Keep track of customers"],
+  ];
+  it.each(SLIPS)("typo %s → %s", (query, question) => {
+    expect(searchHelp(query)[0]?.question).toBe(question);
+  });
+
+  it("ranks a word typed right above one a slip away", () => {
+    // "scale" is exact for the scale topic; it must not lose to a near miss.
+    expect(searchHelp("scale")[0]?.question).toBe("Set the scale on a sheet");
+  });
+
+  it("does not guess at short words, where one slip is another word", () => {
+    expect(searchHelp("tax")[0]?.question).toBe("Set sales tax");
+    expect(searchHelp("zzqx")).toEqual([]);
+    expect(searchHelp("qqqqqqq")).toEqual([]);
+  });
+
   it("caps the list", () => {
     expect(searchHelp("price", 3).length).toBeLessThanOrEqual(3);
   });

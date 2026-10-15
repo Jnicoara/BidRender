@@ -243,10 +243,49 @@ function words(text: string): string[] {
 }
 
 /**
+ * Edits between two words — insert, delete, change, or swap two neighbours
+ * ("pirce" is one from "price") — giving up past `max`. Short words only:
+ * help words are a dozen letters at most, so the full table is cheap.
+ */
+function editsWithin(a: string, b: string, max: number): boolean {
+  if (Math.abs(a.length - b.length) > max) return false;
+  const d: number[][] = [];
+  for (let i = 0; i <= a.length; i++) d.push([i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1])
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length] <= max;
+}
+
+/**
+ * A typed word one slip away from a word in the topic — "matrials",
+ * "pirce". Only for words of 4+ letters (one edit for 4–6, two for 7+):
+ * below that, one edit turns most words into other real words.
+ */
+function nearMiss(typed: string, candidates: string[]): boolean {
+  if (typed.length < 4) return false;
+  const max = typed.length >= 7 ? 2 : 1;
+  return candidates.some(w => w.length >= 4 && editsWithin(typed, w, max));
+}
+
+/**
  * The topics for a typed question, best first, at most `limit`. Each word
  * typed scores where it matches the START of a word in the question (2) or
- * the extra words (1); a topic every typed word hits ranks above one that
- * only some do. Nothing typed, or nothing matched, is an empty list.
+ * the extra words (1). A word one slip away scores just under the exact
+ * hit in the same place (1.5 in the question, 0.5 in the extra words), so a
+ * typo still lands on the topic that NAMES the thing. A topic every typed
+ * word hits ranks above one that only some do. Nothing typed, or nothing
+ * matched, is an empty list.
  */
 export function searchHelp(query: string, limit = 5): HelpTopic[] {
   const typed = words(query);
@@ -257,11 +296,13 @@ export function searchHelp(query: string, limit = 5): HelpTopic[] {
     let score = 0;
     let hits = 0;
     for (const t of typed) {
-      const inQuestion = q.some(w => w.startsWith(t));
-      const inWords = extra.some(w => w.startsWith(t));
-      if (inQuestion) score += 2;
-      else if (inWords) score += 1;
-      if (inQuestion || inWords) hits++;
+      let s = 0;
+      if (q.some(w => w.startsWith(t))) s = 2;
+      else if (extra.some(w => w.startsWith(t))) s = 1;
+      else if (nearMiss(t, q)) s = 1.5;
+      else if (nearMiss(t, extra)) s = 0.5;
+      score += s;
+      if (s > 0) hits++;
     }
     return { topic, index, score: score + (hits === typed.length ? 10 : 0) };
   }).filter(s => s.score > 0);

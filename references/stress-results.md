@@ -108,6 +108,14 @@ Vite and file watching. **Open:** measure a production build
 (`pnpm build && pnpm start`) over ~10 minutes of load before calling it
 either way.
 
+**Measured 2026-10-15 — closed.** Production build (`node dist/index.js`),
+11 companies for 600 s: 27,000+ calls, 0 errors. Working set sampled every
+20 s: **336 MB at the start, 344 MB at the end**, never above 344 and
+wandering 336–344 throughout — no growth under sustained load. Latency
+under that load, p50 / p95: Dashboard 226 / 373 ms, bid page 276 / 421,
+Plans summary 323 / 474, bids search 239 / 389; the owner's big bid page
+275 / 344.
+
 ## First load on a phone: the app's own download (production build)
 
 Measured in Chrome against `pnpm build` + `node dist/index.js`, cold cache,

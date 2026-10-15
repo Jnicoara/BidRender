@@ -111,6 +111,10 @@ test("Where do I…? finds a screen and opens it", async ({ page }, info) => {
   await strip(page)
     .getByRole("button", { name: /Where do I/ })
     .click();
+  // A thumb slip on a phone still finds it.
+  await page.getByLabel("What do you want to do?").fill("pasword");
+  await expect(page.getByText("Change my password")).toBeVisible();
+  await shot(page, "help-typo", info.project.name);
   await page.getByLabel("What do you want to do?").fill("labor rate");
   await expect(page.getByText("Set my labor rates")).toBeVisible();
   await shot(page, "help", info.project.name);

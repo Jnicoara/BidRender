@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **"Where do I…?" forgives a typo.** Typing "pasword" or "custmers" now
+  finds the right help topic instead of saying nothing matches — one slip
+  of the thumb on a phone no longer sends you hunting through menus.
+
 - **The app opens about half a second sooner.** Every open used to sit
   idle for about 300 ms before asking for the Dashboard's data, waiting on
   a built-in pause in the screen library. The app's code now starts
