@@ -1033,6 +1033,8 @@ export type StarterPreview = {
   /** The value as it would be stored, for the "Old → New" line. */
   oldValue: unknown;
   newValue: unknown;
+  /** Every field the Confirm writes, old → new (a rate: wage and rate). */
+  lines: Array<{ field: string | null; oldValue: unknown; newValue: unknown }>;
 };
 
 /**
@@ -1045,11 +1047,24 @@ export type StarterPreview = {
 export async function previewStarterChange(
   change: StarterChangeInput
 ): Promise<StarterPreview> {
+  return previewStarterChanges([change]);
+}
+
+/**
+ * The same for one Confirm that writes several fields of ONE row together —
+ * a labor rate's wage and the rate it makes (owner Q5: one Confirm, one
+ * batch). Pins are the batch's (only the first change can pin: after it every
+ * shop has a copy). A shop is "offered" when its copy differs from ANY of the
+ * new values. `lines` lists each field, old → new.
+ */
+export async function previewStarterChanges(
+  changes: StarterChangeInput[]
+): Promise<StarterPreview> {
   try {
     await db.inOneTransaction(async () => {
       const result = await applyPlanned(
         { editorUserId: null, source: "screen", note: "preview" },
-        [{ input: change, undoesChangeId: null }]
+        changes.map(input => ({ input, undoesChangeId: null }))
       );
       const handle = await database();
       if (result.applied.length === 0)
@@ -1059,21 +1074,31 @@ export async function previewStarterChange(
           offered: 0,
           oldValue: null,
           newValue: null,
+          lines: [],
         });
-      const [logged] = await handle
+      const logged = await handle
         .select()
         .from(starterChanges)
-        .where(eq(starterChanges.id, result.applied[0].changeId));
-      const isField = change.kind === "field";
-      const everyone =
-        isField && starterFieldKind(change.table, change.field) === "everyone";
+        .where(
+          inArray(
+            starterChanges.id,
+            result.applied.map(a => a.changeId)
+          )
+        )
+        .orderBy(asc(starterChanges.id));
+      const first = changes[0];
+      const everyone = changes.every(
+        c =>
+          c.kind === "field" &&
+          starterFieldKind(c.table, c.field) === "everyone"
+      );
       let offered = 0;
       if (!everyone) {
-        const cols = columnsOf(change.table);
+        const cols = columnsOf(first.table);
         const copies = (await handle
           .select()
-          .from(TABLES[change.table].table)
-          .where(eq(cols.baselineId, change.rowId))) as Array<
+          .from(TABLES[first.table].table)
+          .where(eq(cols.baselineId, first.rowId))) as Array<
           Record<string, unknown>
         >;
         const owners = new Map<number, Record<string, unknown>[]>();
@@ -1083,27 +1108,32 @@ export async function previewStarterChange(
           if (!owners.has(o)) owners.set(o, []);
           owners.get(o)!.push(c);
         }
-        const newValue = unwrap(logged.newValue);
         for (const list of Array.from(owners.values())) {
-          if (!isField) {
-            offered += 1;
-            continue;
-          }
           const live =
             list.find(
               c =>
                 c.isActive !== false &&
                 (c.status == null || c.status === "active")
             ) ?? list[0];
-          if (!sameStarterValue(live[change.field], newValue)) offered += 1;
+          const differs = logged.some(l =>
+            l.kind !== "field"
+              ? true
+              : !sameStarterValue(live[l.field!], unwrap(l.newValue))
+          );
+          if (differs) offered += 1;
         }
       }
       throw new PreviewRollback({
         reach: everyone ? "everyone" : "offer",
-        pins: result.applied[0].pins,
+        pins: result.applied.reduce((n, a) => n + a.pins, 0),
         offered,
-        oldValue: unwrap(logged.oldValue),
-        newValue: unwrap(logged.newValue),
+        oldValue: unwrap(logged[0].oldValue),
+        newValue: unwrap(logged[0].newValue),
+        lines: logged.map(l => ({
+          field: l.field,
+          oldValue: unwrap(l.oldValue),
+          newValue: unwrap(l.newValue),
+        })),
       });
     });
   } catch (err) {

@@ -20,6 +20,7 @@ import {
   type LoggedOfferChange,
   type StarterTable,
 } from "../shared/starterChange";
+import { rateEditFields } from "../shared/loadedRate";
 
 const change = (
   id: number,
@@ -221,5 +222,52 @@ describe("which offers re-count Drafts (§ 2.4)", () => {
     expect(recountsDrafts("materials", "costPerUnit")).toBe(false);
     expect(recountsDrafts("assemblies", "baseLaborHours")).toBe(false);
     expect(recountsDrafts("laborRates", "hourlyCost")).toBe(false);
+  });
+});
+
+describe("a starter rate edit writes the part AND the rate it makes", () => {
+  const broken = {
+    rateType: "hourly",
+    baseWage: "40.0000",
+    payrollTaxPct: "0.1000",
+    workersCompPct: "0.0700",
+    insurancePct: "0.0400",
+    benefitsPct: "0.2000",
+  };
+
+  it("a new wage re-makes the hourly rate with the same arithmetic as the company editor", () => {
+    // 45 x (1 + 0.41) = 63.45
+    expect(rateEditFields(broken, "baseWage", 45)).toEqual([
+      { field: "baseWage", value: 45 },
+      { field: "hourlyCost", value: "63.4500" },
+    ]);
+    expect(rateEditFields(broken, "benefitsPct", 0.25)).toEqual([
+      { field: "benefitsPct", value: 0.25 },
+      // 40 x (1 + 0.46) = 58.40
+      { field: "hourlyCost", value: "58.4000" },
+    ]);
+  });
+
+  it("typing the rate itself on a broken-down rate is refused", () => {
+    expect(rateEditFields(broken, "hourlyCost", 70)).toHaveProperty("refused");
+    expect(rateEditFields(broken, "baseWage", 0)).toHaveProperty("refused");
+  });
+
+  it("a plain hourly rate changes alone; a salaried role by salary or hours", () => {
+    const plain = {
+      rateType: "hourly",
+      baseWage: null,
+      payrollTaxPct: null,
+      workersCompPct: null,
+      insurancePct: null,
+      benefitsPct: null,
+    };
+    expect(rateEditFields(plain, "hourlyCost", 55)).toEqual([
+      { field: "hourlyCost", value: 55 },
+    ]);
+    expect(rateEditFields(plain, "baseWage", 40)).toHaveProperty("refused");
+    expect(
+      rateEditFields({ ...plain, rateType: "salary" }, "annualSalary", 90000)
+    ).toEqual([{ field: "annualSalary", value: 90000 }]);
   });
 });

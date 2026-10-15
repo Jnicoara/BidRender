@@ -9,12 +9,12 @@
  * not 10 (a 1,000% waste is a wrong number nothing else would catch), and an
  * emptied hours box is "not set", never 0 (CLAUDE.md § Editing fields 6).
  *
- * Labor rates are not edited here: a rate is its base wage times its burden,
- * and changing one figure alone would leave the rate disagreeing with its own
- * breakdown. They wait for an edit that writes the wage and the rate as one
- * batch.
+ * A labor rate is its base wage times its burden. Its parts go through the
+ * `rateEdit` route, which writes the part AND the rate it makes in one batch
+ * (`rateEditFields`, shared/loadedRate.ts); which boxes a rate gets depends
+ * on how it is stored (`editFieldsFor`).
  */
-export type EditTable = "materials" | "assemblies" | "runTypes";
+export type EditTable = "materials" | "assemblies" | "runTypes" | "laborRates";
 
 export type EditUnit =
   | "money"
@@ -32,9 +32,67 @@ export type EditField = {
   everyone?: boolean;
   /** Blank is allowed and means "not set". */
   blankable?: boolean;
+  /** A labor-rate figure: saved through `rateEdit`, with the rate it makes. */
+  rate?: boolean;
 };
 
+const BREAKDOWN = new Set([
+  "baseWage",
+  "payrollTaxPct",
+  "workersCompPct",
+  "insurancePct",
+  "benefitsPct",
+]);
+
+/**
+ * The boxes ONE row gets. A labor rate shows only the figures that make it:
+ * a salaried role its salary and hours, a broken-down rate its wage and
+ * burden (never the rate itself, which follows), a plain rate the rate.
+ */
+export function editFieldsFor(
+  table: EditTable,
+  row: Record<string, unknown>
+): EditField[] {
+  const all = STARTER_EDIT_FIELDS[table];
+  if (table !== "laborRates") return all;
+  const salaried = row.rateType === "salary";
+  const broken = row.baseWage !== null && row.baseWage !== undefined;
+  return all.filter(f => {
+    if (!f.rate) return true;
+    if (salaried)
+      return f.field === "annualSalary" || f.field === "annualHours";
+    if (broken) return BREAKDOWN.has(f.field);
+    return f.field === "hourlyCost";
+  });
+}
+
 export const STARTER_EDIT_FIELDS: Record<EditTable, EditField[]> = {
+  laborRates: [
+    { field: "baseWage", label: "Base wage", unit: "money", rate: true },
+    {
+      field: "payrollTaxPct",
+      label: "Payroll tax",
+      unit: "percent",
+      rate: true,
+    },
+    {
+      field: "workersCompPct",
+      label: "Workers' comp",
+      unit: "percent",
+      rate: true,
+    },
+    { field: "insurancePct", label: "Insurance", unit: "percent", rate: true },
+    { field: "benefitsPct", label: "Benefits", unit: "percent", rate: true },
+    { field: "hourlyCost", label: "Hourly rate", unit: "money", rate: true },
+    {
+      field: "annualSalary",
+      label: "Annual salary",
+      unit: "money",
+      rate: true,
+    },
+    { field: "annualHours", label: "Hours a year", unit: "count", rate: true },
+    { field: "name", label: "Name", unit: "text" },
+  ],
   materials: [
     { field: "costPerUnit", label: "Price per unit", unit: "money" },
     {

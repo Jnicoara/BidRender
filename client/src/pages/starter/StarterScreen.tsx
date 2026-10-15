@@ -191,7 +191,9 @@ export default function StarterScreen({
           {tab === "assemblies" && (
             <AssembliesTab rows={assemblies.data} onEdit={setEditing} />
           )}
-          {tab === "labor-rates" && <LaborRatesTab rows={laborRates.data} />}
+          {tab === "labor-rates" && (
+            <LaborRatesTab rows={laborRates.data} onEdit={setEditing} />
+          )}
           {tab === "run-types" && (
             <RunTypesTab rows={runTypes.data} onEdit={setEditing} />
           )}
@@ -521,19 +523,21 @@ function AssemblyParts({ id }: { id: number }) {
 
 // ── Labor rates and run types ────────────────────────────────────────────────
 
-function LaborRatesTab({ rows }: { rows: RateRow[] | undefined }) {
+function LaborRatesTab({
+  rows,
+  onEdit,
+}: {
+  rows: RateRow[] | undefined;
+  onEdit: (e: Editing) => void;
+}) {
   if (rows === undefined) return <Skeleton />;
   return (
     <>
-      <p className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
-        Rates aren’t changed on this screen yet: a rate is its wage times its
-        burden, and both have to change together.
-      </p>
       <ul>
         {rows.map(r => (
           <li
             key={r.id}
-            className="flex flex-wrap items-baseline gap-x-4 border-b border-border/50 px-4 py-2.5"
+            className="flex flex-wrap items-center gap-x-4 border-b border-border/50 pl-4 pr-2 py-1.5"
           >
             <span className="flex-1 basis-48 text-sm">{r.name}</span>
             <span className="text-xs text-muted-foreground">
@@ -557,6 +561,16 @@ function LaborRatesTab({ rows }: { rows: RateRow[] | undefined }) {
                 why={STARTER_WHY}
               />
             </span>
+            <EditButton
+              onClick={() =>
+                onEdit({
+                  table: "laborRates",
+                  rowId: r.id,
+                  itemName: r.name,
+                  current: r,
+                })
+              }
+            />
           </li>
         ))}
       </ul>

@@ -24,6 +24,7 @@ import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import {
   assemblies,
+  laborRates,
   materials,
   starterChangeBatches,
   users,
@@ -305,6 +306,73 @@ withDb("the baseline screen's reads", () => {
           .where(inArray(starterChangeBatches.id, batchIds));
       await db.delete(materials).where(eq(materials.baselineId, probe.id));
       await db.delete(materials).where(eq(materials.id, probe.id));
+    }
+  });
+
+  it("a rate edit writes the wage AND the rate it makes, as one batch", async () => {
+    const api = caller(await starterCookie("done"));
+    const db = (await getDb())!;
+    const [probe] = await db
+      .insert(laborRates)
+      .values({
+        name: `starter-lib-test rate probe ${Date.now()}`,
+        rateType: "hourly",
+        hourlyCost: "56.4000",
+        baseWage: "40.0000",
+        payrollTaxPct: "0.1000",
+        workersCompPct: "0.0700",
+        insurancePct: "0.0400",
+        benefitsPct: "0.2000",
+        isExampleRate: true,
+      })
+      .$returningId();
+    const batchIds: number[] = [];
+    try {
+      const preview = await api.starterLibrary.rateEdit({
+        rowId: probe.id,
+        field: "baseWage",
+        value: 45,
+        preview: true,
+      });
+      expect(preview.preview!.lines.map(l => [l.field, l.newValue])).toEqual([
+        ["baseWage", "45.0000"],
+        ["hourlyCost", "63.4500"],
+      ]);
+      // Typing the rate itself is refused on a broken-down rate.
+      expect(
+        await codeOf(
+          api.starterLibrary.rateEdit({
+            rowId: probe.id,
+            field: "hourlyCost",
+            value: 70,
+            preview: true,
+          })
+        )
+      ).toBe("BAD_REQUEST");
+      const saved = await api.starterLibrary.rateEdit({
+        rowId: probe.id,
+        field: "baseWage",
+        value: 45,
+        preview: false,
+      });
+      batchIds.push(saved.applied!.batchId!);
+      expect(saved.applied!.applied).toHaveLength(2);
+      const [row] = await db
+        .select()
+        .from(laborRates)
+        .where(eq(laborRates.id, probe.id));
+      expect([row.baseWage, row.hourlyCost, row.isExampleRate]).toEqual([
+        "45.0000",
+        "63.4500",
+        true,
+      ]);
+    } finally {
+      if (batchIds.length)
+        await db
+          .delete(starterChangeBatches)
+          .where(inArray(starterChangeBatches.id, batchIds));
+      await db.delete(laborRates).where(eq(laborRates.baselineId, probe.id));
+      await db.delete(laborRates).where(eq(laborRates.id, probe.id));
     }
   });
 

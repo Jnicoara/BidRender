@@ -72,3 +72,19 @@ beyond the plan, money, or anything irreversible go to
   time, the driver reads UTC); live MySQL is UTC.
 - Local data: two test changes (14/2 NM-B price, a run type's wire waste)
   made and undone through the app; user 1 is offered the price undo.
+
+## Starter offers — labor-rate edits (22:14–22:19)
+
+- A shipped rate edits as a PAIR: the admin changes the wage or a burden
+  part; `rateEdit` writes it AND the hourly rate `loadedRate` makes, in
+  one batch (`rateEditFields`). Typing the rate itself on a broken-down rate
+  is refused; a plain rate edits its rate; a salaried role its salary or
+  hours. `previewStarterChanges` previews a batch.
+- Tests: `starterOfferRules` (+3: 45 × 1.41 = 63.45, refusal, shapes),
+  `starterEdit` (+2: which boxes a rate gets), `starterLibrary` (+1: one
+  batch, two changes, tag kept). 5 files, 55 passed.
+- By eye laptop + phone 375: "Base wage $26.00 → $45.00 / Hourly rate
+  $36.66 → $63.45", preview 1.1 s.
+- **Scaling note:** a preview is a dry run that pins every shop (69 here,
+  1.1 s). With thousands of shops it grows linearly — measured in the
+  stress pass.

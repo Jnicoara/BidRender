@@ -52,10 +52,11 @@ to be fixed before it's built (§ 3a).
 >   types and modifiers have no library screen, so a per-screen filter would
 >   have hidden them. The tab shows only while there are updates. The
 >   Dashboard card links to Materials → Updates.
-> - **Labor rates are NOT editable on the admin screen yet**: a rate is
->   base wage × (1 + burden), stored as both, and a one-field change would
->   leave the rate disagreeing with its breakdown. Needs a two-field batch
->   (wage + rate) — next.
+> - **Labor rates edit as a PAIR**: a rate is base wage × (1 + burden),
+>   stored as both, so the admin edits the wage or a burden part and the
+>   `rateEdit` route writes it AND the rate `loadedRate` makes, in one batch
+>   (`rateEditFields`, shared/loadedRate.ts). Typing the rate itself is
+>   refused on a broken-down rate.
 > - **Undo restores a $0 price** (found by eye): the above-zero rule is for
 >   new values; an undo puts back what the row held.
 > - **No `starter_accepted` price-history row**: nothing writes

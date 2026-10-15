@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import {
   STARTER_EDIT_FIELDS,
+  editFieldsFor,
   fromInputText,
   previewSentence,
   toInputText,
@@ -62,6 +63,7 @@ describe("typed value → stored value", () => {
       materials: "materials",
       assemblies: "assemblies",
       runTypes: "runTypes",
+      laborRates: "laborRates",
     } as const;
     for (const [t, fields] of Object.entries(STARTER_EDIT_FIELDS) as [
       keyof typeof table,
@@ -87,5 +89,31 @@ describe("what the preview says", () => {
     expect(previewSentence({ reach: "everyone", pins: 0, offered: 0 })).toMatch(
       /Changes no number/
     );
+  });
+});
+
+describe("which boxes a labor rate gets", () => {
+  const names = (row: Record<string, unknown>) =>
+    editFieldsFor("laborRates", row).map(f => f.field);
+  it("a broken-down rate: wage and burden, never the rate itself", () => {
+    expect(names({ rateType: "hourly", baseWage: 40 })).toEqual([
+      "baseWage",
+      "payrollTaxPct",
+      "workersCompPct",
+      "insurancePct",
+      "benefitsPct",
+      "name",
+    ]);
+  });
+  it("a plain rate: the rate; a salaried role: salary and hours", () => {
+    expect(names({ rateType: "hourly", baseWage: null })).toEqual([
+      "hourlyCost",
+      "name",
+    ]);
+    expect(names({ rateType: "salary", baseWage: null })).toEqual([
+      "annualSalary",
+      "annualHours",
+      "name",
+    ]);
   });
 });

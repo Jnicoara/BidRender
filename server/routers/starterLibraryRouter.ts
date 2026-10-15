@@ -36,10 +36,12 @@ import { needsPricing } from "../../shared/materialPricing";
 import { hourlyCostOf } from "../../shared/laborRateLookup";
 import { needsRate } from "../../shared/laborRatePricing";
 import { assemblyHours } from "../../shared/assemblyHours";
+import { RATE_PARTS, rateEditFields } from "../../shared/loadedRate";
 import {
   StarterChangeRefused,
   applyStarterChange,
   previewStarterChange,
+  previewStarterChanges,
   starterChangeLog,
   undoStarterBatch,
 } from "../starterChanges";
@@ -183,6 +185,15 @@ export const starterLibraryRouter = router({
       trade: row.trade,
       rateType: row.rateType,
       hourlyRate: hourlyCostOf(row),
+      // The stored figures, for the edit dialog (parts are fractions).
+      hourlyCost: decimalOrNull(row.hourlyCost),
+      annualSalary: decimalOrNull(row.annualSalary),
+      annualHours: decimalOrNull(row.annualHours),
+      baseWage: decimalOrNull(row.baseWage),
+      payrollTaxPct: decimalOrNull(row.payrollTaxPct),
+      workersCompPct: decimalOrNull(row.workersCompPct),
+      insurancePct: decimalOrNull(row.insurancePct),
+      benefitsPct: decimalOrNull(row.benefitsPct),
       needsRate: needsRate(row),
       isExampleRate: row.isExampleRate === true,
       version: row.version,
@@ -216,6 +227,64 @@ export const starterLibraryRouter = router({
           changes: [change],
         })
       );
+    }),
+
+  /**
+   * A shipped labor rate: the part AND the rate it makes, in ONE batch
+   * (`rateEditFields`, shared/loadedRate.ts) — a one-field change would
+   * leave the rate disagreeing with its own breakdown. `preview: true`
+   * answers like previewEdit; false saves.
+   */
+  rateEdit: starterEditorProcedure
+    .input(
+      z.object({
+        rowId: z.number().int().positive(),
+        field: z.enum([
+          ...RATE_PARTS,
+          "hourlyCost",
+          "annualSalary",
+          "annualHours",
+        ]),
+        value: z.number().finite(),
+        preview: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = (await db.getStarterLaborRates()).find(
+        r => r.id === input.rowId
+      );
+      if (!row)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No starter labor rate has that id.",
+        });
+      const fields = rateEditFields(row, input.field, input.value);
+      if ("refused" in fields)
+        throw new TRPCError({ code: "BAD_REQUEST", message: fields.refused });
+      const changes = fields.map(f => ({
+        kind: "field" as const,
+        table: "laborRates" as const,
+        rowId: row.id,
+        field: f.field,
+        newValue: f.value,
+      }));
+      if (input.preview)
+        return {
+          preview: await refusedAsBadRequest(() =>
+            previewStarterChanges(changes)
+          ),
+          applied: null,
+        };
+      return {
+        preview: null,
+        applied: await refusedAsBadRequest(() =>
+          applyStarterChange({
+            editorUserId: ctx.starterEditor.user.id,
+            source: "screen",
+            changes,
+          })
+        ),
+      };
     }),
 
   /** The change log, newest first. */

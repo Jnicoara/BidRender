@@ -23,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
-  STARTER_EDIT_FIELDS,
+  editFieldsFor,
   fromInputText,
   previewSentence,
   toInputText,
@@ -35,12 +35,24 @@ import {
   type UpdateTable,
 } from "@/lib/starterUpdates";
 
+/** A field the rateEdit route takes. */
+type RateField =
+  | "baseWage"
+  | "payrollTaxPct"
+  | "workersCompPct"
+  | "insurancePct"
+  | "benefitsPct"
+  | "hourlyCost"
+  | "annualSalary"
+  | "annualHours";
+
 type Preview = {
   reach: "offer" | "everyone" | "unchanged";
   pins: number;
   offered: number;
   oldValue: unknown;
   newValue: unknown;
+  lines: Array<{ field: string | null; oldValue: unknown; newValue: unknown }>;
 };
 
 function shops(n: number) {
@@ -78,7 +90,7 @@ export function StarterEditDialog({
   current: Record<string, unknown>;
   onClose: () => void;
 }) {
-  const fields = STARTER_EDIT_FIELDS[table];
+  const fields = editFieldsFor(table, current);
   const [fieldName, setFieldName] = useState(fields[0].field);
   const f = fields.find(x => x.field === fieldName)!;
   const [text, setText] = useState(() => toInputText(f.unit, current[f.field]));
@@ -98,6 +110,8 @@ export function StarterEditDialog({
     },
     onError: e => setProblem(e.message),
   });
+  // A labor-rate figure: the part and the rate it makes, one batch.
+  const rate = trpc.starterLibrary.rateEdit.useMutation();
 
   const pickField = (name: string) => {
     const next = fields.find(x => x.field === name)!;
@@ -127,7 +141,15 @@ export function StarterEditDialog({
     setChecking(true);
     setProblem(null);
     try {
-      setPreview(await utils.starterLibrary.previewEdit.fetch(edit));
+      if (f.rate) {
+        const r = await rate.mutateAsync({
+          rowId,
+          field: f.field as RateField,
+          value: Number(edit.newValue),
+          preview: true,
+        });
+        setPreview(r.preview);
+      } else setPreview(await utils.starterLibrary.previewEdit.fetch(edit));
     } catch (e) {
       setPreview(null);
       setProblem((e as Error).message);
@@ -136,8 +158,32 @@ export function StarterEditDialog({
     }
   };
 
-  const fmt = (v: unknown) =>
-    formatUpdateValue(table as UpdateTable, f.field, v);
+  const fmtField = (field: string | null, v: unknown) =>
+    formatUpdateValue(table as UpdateTable, field ?? f.field, v);
+
+  const confirm = async () => {
+    if (!edit) return;
+    if (!f.rate) {
+      apply.mutate(edit);
+      return;
+    }
+    try {
+      const r = await rate.mutateAsync({
+        rowId,
+        field: f.field as RateField,
+        value: Number(edit.newValue),
+        preview: false,
+      });
+      const pins = r.applied?.applied.reduce((n, a) => n + a.pins, 0) ?? 0;
+      toast.success(
+        `Saved. ${pins ? `${shops(pins)} pinned to the old value.` : ""}`
+      );
+      void utils.starterLibrary.invalidate();
+      onClose();
+    } catch (e) {
+      setProblem((e as Error).message);
+    }
+  };
 
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
@@ -206,12 +252,20 @@ export function StarterEditDialog({
         )}
         {preview && (
           <div className="rounded-md border border-border p-3 text-sm">
-            {preview.reach !== "unchanged" && (
-              <p className="tabular-nums">
-                {fmt(preview.oldValue)} →{" "}
-                <span className="font-semibold">{fmt(preview.newValue)}</span>
-              </p>
-            )}
+            {preview.reach !== "unchanged" &&
+              preview.lines.map((l, i) => (
+                <p key={i} className="tabular-nums">
+                  {preview.lines.length > 1 && (
+                    <span className="text-muted-foreground">
+                      {fieldLabel(table as UpdateTable, l.field ?? "")}:{" "}
+                    </span>
+                  )}
+                  {fmtField(l.field, l.oldValue)} →{" "}
+                  <span className="font-semibold">
+                    {fmtField(l.field, l.newValue)}
+                  </span>
+                </p>
+              ))}
             <p
               className={
                 preview.reach === "unchanged"
@@ -234,8 +288,8 @@ export function StarterEditDialog({
           {preview && preview.reach !== "unchanged" ? (
             <button
               type="button"
-              disabled={apply.isPending || !edit}
-              onClick={() => edit && apply.mutate(edit)}
+              disabled={apply.isPending || rate.isPending || !edit}
+              onClick={() => void confirm()}
               className="rounded-md bg-[#F5C518] px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
             >
               Confirm

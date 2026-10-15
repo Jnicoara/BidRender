@@ -14,8 +14,8 @@
 - **Screens:** Dashboard card, one Updates view on Materials / Assemblies /
   Labor rates (`?view=updates`), the admin edit dialog and Change log on
   `/starter`. Looked at laptop, iPad both ways, phone 375.
-- **Not built:** labor-rate edits on the admin screen (wage and rate must
-  change together), a `starter_accepted` price-history row (no writer
+- **Not built:**
+  a `starter_accepted` price-history row (no writer
   exists), hide offers.
 - **For A:** `starterDrift --apply` may now stop holding tag splits where
   the tag `exampleTagAfter` would write equals the seed's (§ 4 step 1).
