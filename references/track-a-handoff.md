@@ -25,6 +25,11 @@ questions: `morning-questions-a.md`.
   ≈ 10,000. Still ~5× the free 2,000 — **money decision in
   `morning-questions-a.md` § 1 before the switch**, or Actions stop ≈ day 6.
   DigitalOcean reads the repo through the GitHub app per our docs (check § 4).
+- **3. Next live release** planned (`next-live-release-plan.md` § "Night
+  prep 2026-10-14"): 0152–0163 before the push (expect 164, 205/205), boot
+  change, pack fix, signup fix, then companies 5–8 via the new
+  `scripts/removeRaceCompanies.mts` (dry run; `--apply --expect 5,6,7,8`).
+  **Blocked on owner: the boot change vs Q1** (pricing load not in seed yet).
 
 ## (earlier) 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
 

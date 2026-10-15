@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **A safe, checked way to remove the four empty duplicate companies one
+  live sign-up was given.** It only ever removes a company with nothing in
+  it but its owner, keeps the one the person actually works in, and refuses
+  outright if anything has changed since it was last looked at. Not run on
+  live; waiting for the owner's yes on release day.
+
 - **The automatic test run costs far fewer minutes, ahead of the code going
   private.** A push that only changes notes now runs just the checks that
   read notes, and a version that already passed every test is not tested

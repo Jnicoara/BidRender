@@ -43,3 +43,20 @@ files only (B and C also running). MySQL 3307 shared — left running.
 - **DigitalOcean**: docs say GitHub integration + autodeploy → fine when
   private; not verified against the dashboard (morning question 2).
 - Tests: docs list with no DB 29 passed / 6 DB-skipped; `pnpm check` clean.
+
+## Item 3 — next live release prep (paper + scripts) — 23:40 → 00:30
+
+- `next-live-release-plan.md` § "Night prep 2026-10-14": contents
+  (0152–0163, boot change, pack fix, signup fix, companies 5–8), P1–P4
+  before the window with expected figures, day steps 1–11, rollback.
+- **Found:** the boot change conflicts with owner Q1 (ships the release
+  AFTER the end-of-pricing load, which has not landed) → morning question 3.
+- New `server/raceCompanies.ts` + `scripts/removeRaceCompanies.mts`: keeps
+  the lowest-id company, checks every FK into `companies` from
+  information_schema + `users.activeCompanyId`, `--apply --expect` or
+  nothing, one transaction with a re-check. `raceCompanies.test.ts` 5/5
+  (live's shape; invite, active pointer, second member each refused;
+  mismatched `--expect` removes nothing). Script dry run + refusal without
+  `--expect` exercised on `bidrender_test_localdev`. `pnpm check` clean.
+- Gate 38684649809 (preinstalled MySQL) **green**. SEEN lookup checked
+  against the real API: 3854d2d5 → seen (run 38684649809), e03bead6 → full.

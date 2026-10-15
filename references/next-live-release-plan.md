@@ -13,6 +13,144 @@
 > matched § 5g. The rest of this file is the record of that release; the
 > section below is the start of the NEXT one.
 
+## Night prep 2026-10-14 — the release AFTER `60479773` (PAPER ONLY)
+
+Track A, overnight run on `track-a-night`. **Nothing here was run against
+live or staging.** Owner's yes needed for every approval below, and for
+item 5 separately.
+
+### What it carries
+
+| #   | Item                                                                                                                  | Where now                                                   | Kind                                                                                                                                         | Moves a total?             |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 1   | **0152–0163** (12 files: starter change log, pins, hiding, offers, locked warnings, pack/price-safety, price history) | local-dev; staging DB 164/205 (`deploying.md` § 11)         | all additive, step 1, step 3 empty; **ON LIVE BEFORE THE PUSH** — `schema.ts` reads the four new `materials` columns on every materials read | No (staging 1,357/1,357)   |
+| 2   | **Boot seed change** (`d38f5930`)                                                                                     | local-dev, staging                                          | code; changes what a START writes (`boot-seed-plan.md` § 8)                                                                                  | No (4,386/4,386 on a copy) |
+| 3   | **Pack fix** (`9a497c95`)                                                                                             | local-dev                                                   | code; pricing-sheet builder + `starterPacks.ts`; nothing writes `materials.packQty` yet                                                      | No                         |
+| 4   | **Signup race fix** (`c0f67720`)                                                                                      | `track-a-night` ONLY — needs the owner's merge to local-dev | code only (`signup-race-plan.md` § 1); the DB rule is a later, separate migration                                                            | No                         |
+| 5   | **Remove live companies 5–8** (user 3036)                                                                             | script `removeRaceCompanies.mts` on `track-a-night`         | data repair, after the backup; **owner's yes pending**                                                                                       | No (data keys on the user) |
+
+Everything else on local-dev since `60479773` (47 non-merge commits on
+2026-10-14) is B's plan-reading help steps 1–5d, C's applyStarterChange /
+F13 / F11 / panel-label offers, the starter editor sign-in page, scope 6a,
+the phone bottom bar, and docs/answers. `git log 60479773..<candidate>
+--no-merges` is the change set — read it on the day.
+
+### STOP FIRST: the boot change and owner Q1 disagree
+
+Owner Q1 (2026-10-13, `boot-seed-plan.md` § 7): the boot change ships **in
+the release AFTER the end-of-pricing load**, never in the same push. Since
+`60479773` the only seed edit is the pack fix; **the end-of-pricing load
+(Switches / Receptacles / Boxes / Conduit / … answers) is NOT in the seed
+files yet.** The boot change is already on local-dev, so any release cut
+from local-dev carries it, and the pricing edits would then reach live only
+through `starterDrift.mts --apply` (pins every company first — Q1's reason
+was that live companies would be pinned at old values with no Accept
+button). → `morning-questions-a.md` § 3. Until answered, this plan assumes
+the owner either waives Q1 for this release or the pricing load lands
+first; the steps are the same except step 9.
+
+### Before the window (no live writes)
+
+P1. **Candidate** = the commit staging serves after the merges (local-dev
+incl. items 4–5 if merged). Gate green on it **including smoke**. If the
+Gate change from `track-a-night` is merged, a SEEN or DOCS run on the
+candidate is not enough on its own — the candidate's FULL run (on any
+branch) must exist; the run page names it.
+
+P2. `git diff 60479773 <candidate> --stat -- drizzle server/seed` shows
+**exactly** 0152–0163 (+ `schema.ts`, `_journal.json`) and the pack fix's
+seed files. **If it shows anything else, stop and find out why before going
+on** — this plan is stale or local-dev moved, and those want opposite
+responses.
+
+P3. **Signup fix on staging** (staging DB, after it serves the candidate):
+create one throwaway account through the sign-up page, open the app, then
+`SELECT COUNT(*) FROM companies WHERE ownerUserId = <it>` → **1**. Delete
+the account after (`users` cascade). Optional; the test is the proof.
+
+P4. **Rehearse on a FRESH read-only copy of live** (`_tmpCopyDb.mts` or
+`backup.mts` + `verifyBackup.mts KEEP_SCRATCH=1`), with the candidate's code:
+
+| Step on the copy                               | Expected (2026-10-14 figures — re-measure)                                                                                                                                                            |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Drift before                                   | **152 recorded, 183 FKs**; exactly 0152–0163's tables/columns missing                                                                                                                                 |
+| `bidTotals` before (live's code `60479773`)    | 2 bids (23, 25), Draft, $0.00 — on 2026-10-13; more if anyone has bid since                                                                                                                           |
+| `migrate.mts`                                  | **12 applied → 164**; re-run "Nothing to apply"; "matches"; **FKs 205/205**                                                                                                                           |
+| `60479773` on the migrated copy                | totals unchanged (the window between migrating and pushing is safe)                                                                                                                                   |
+| First boot of the candidate (`seedBaseline`)   | ONE line `[seed] starter: finding fields applied N; proposed P (not applied), held H, live ahead L` — record N/P/H/L; `catalogRehearsal`: renamed 0, retired 0, **deleted 0**, company rows unchanged |
+| `starterDrift.mts` (read)                      | lists P proposals; nothing applied. Keep the output (rollback check, Q4)                                                                                                                              |
+| Totals after boot                              | unchanged                                                                                                                                                                                             |
+| `removeRaceCompanies.mts --owner 3036`         | kept **4**; `removable: [5, 6, 7, 8]` — any other list or a KEEP line: stop                                                                                                                           |
+| `--apply --expect 5,6,7,8`, then dry run again | removed [5,6,7,8]; after: kept 4, other companies owned 0; live totals 8 companies → 4                                                                                                                |
+| Totals at the end vs before                    | **all unchanged**                                                                                                                                                                                     |
+
+### The day — in this order
+
+Same skeleton as `live-release-plan.md` § 4; times in `deploying.md` § 11.
+
+1. **Freeze merges** to local-dev (tell B and C). **Approval A**:
+   pre-flight — live `/api/version` = `60479773`; candidate = what staging
+   serves; Gate (test + deploy-staging + smoke) green; `git status
+--porcelain` empty; `pnpm check` clean; P2 matched.
+2. **Backup + verify**: `DOTENV_CONFIG_PATH=.env.production.local pnpm tsx
+scripts/backup.mts`, then `verifyBackup.mts` (`KEEP_SCRATCH=1`). Counts
+   must equal the manifest. **This is the backup item 5 depends on.**
+3. **Rehearsal P4 on THAT restored copy** (not an older one). Every figure as
+   expected → **Approval B.**
+4. **Read-only baselines on live**: `schemaDrift.mts` (expect 152/183, the
+   0152–0163 objects missing); `bidTotals.mts` from a `60479773` worktree →
+   `live-totals-before-<date>.json`; `starterDrift.mts` from the candidate
+   (read) → keep the output.
+5. **Migrate live**: `ALLOW_REMOTE_DATABASE=yes
+DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts`.
+   Expect **"Applied 12 migrations … all 164"**; second run nothing;
+   `schemaDrift` "matches", **FKs 205/205**. **If what it prints does not
+   match, stop and find out why before going on.** Old code still serving
+   (home 200); totals unchanged with `60479773`.
+6. **Approval C → push `main`**: `git merge --ff-only <candidate>`, push,
+   `git checkout local-dev`. Watch DO Activity. `/api/version`: `commit` =
+   candidate, `builtAt` after the push.
+7. **First boot**: DO Runtime Logs show the one `[seed] starter:` line with
+   the rehearsal's N/P/H/L; `catalogRehearsal` before/after: renamed 0,
+   retired 0, deleted 0, company rows unchanged. A rename or retire here
+   means the old boot ran — stop.
+8. **Totals after**: `bidTotals.mts` (candidate) → `--compare` against step
+   4: **"ok all N bid(s) … unchanged"**. Any other line: stop.
+9. **Pricing edits**: only if Q1 was waived AND the owner wants them now —
+   `starterDrift.mts --apply --note "…"`, rehearsed on the step-3 copy with
+   totals before and after. Otherwise nothing; the proposals wait.
+10. **Item 5, only with the owner's separate yes** — save the eight rows
+    first, so the undo is a paste:
+    `SELECT * FROM companies WHERE id IN (5,6,7,8)` and
+    `SELECT * FROM company_members WHERE companyId IN (5,6,7,8)` → JSON in
+    `bidrender-backups/`. Then the dry run (owner reads: kept 4, removable
+    [5,6,7,8]), then
+    `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm
+tsx scripts/removeRaceCompanies.mts --owner 3036 --apply --expect
+5,6,7,8`. It refuses and removes nothing if the list found then is not
+    exactly 5,6,7,8. After: dry run again → kept 4, 0 others; totals
+    unchanged; user 3036 still signs in to company 4 (owner opens it as an
+    admin check only if wanted).
+11. **Approval D**: totals compare clean, owner opens a bid and its plans.
+    Record everything in `deploying.md` § 11 "LIVE: <candidate>".
+
+### Rollback
+
+- **Code**: DO → Activity → Rollback to `60479773`. Safe on the migrated
+  database because 0152–0163 are additive and `60479773` was measured on
+  the migrated copy (P4 row 4). **Q4: run `starterDrift.mts` before and
+  after** — a build without the boot change re-stamps shared rows on its
+  first start; a "live ahead" line that vanishes is a logged change the
+  rollback undid (on live today nothing has been logged through
+  `applyStarterChange`, so expect none).
+- **Migrations**: forward-only, not rolled back; extra columns nothing reads.
+- **Item 5**: re-insert the saved rows with their ids
+  (`INSERT INTO companies (...) VALUES (...)` then `company_members`), from
+  the JSON of step 10 — or from the step-2 backup. Nothing else pointed at
+  them (that is what the script checks), so nothing else needs restoring.
+- **Signup fix**: rides the code rollback; the race reopens (no data harm,
+  just possible extra companies for a new signup).
+
 ## For the NEXT release (after `371b2ab`) — started 2026-10-10
 
 Live is `371b2ab` / 144 migrations / 180 FKs. Updated 2026-10-10 (Track A,
