@@ -297,6 +297,13 @@ TakeoffPage / pdfRenderer worker), so it is written up for B rather than
 changed here: next step is splitting it into open-document, page-fetch and
 render time to see which part to work on.
 
+**Production build, 2026-10-15** (the numbers above were the dev server):
+opening the set to sheet 1 drawn **1,897 / 1,929 / 1,905 ms** at laptop,
+**1,875 / 1,916 / 1,909 ms** at phone 375; the next sheet drawn in 977 ms /
+764 ms. **Just under 2 s, with ~100 ms to spare** — not over, but the first
+thing a heavier set would push past it. Session minted in memory for user
+1 and handed to the browser as a cookie; never printed or written.
+
 ## Failure drills — the database (`scripts/dbFaultProxy.mts`)
 
 One dev server pointed at the proxy (`DATABASE_URL=…@127.0.0.1:3399/…`),
