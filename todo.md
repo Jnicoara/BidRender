@@ -1417,6 +1417,9 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       AWAITED save (closed even after a refusal); fixed: its editor now
       stays open with the edit. A better shape for the optimistic ones:
       on error, reopen the editor holding the draft that failed.
+      **Done for Modifiers (2026-10-15 day):** the row editor reopens with
+      the typed values; Add keeps its form and no longer says "Added" (or
+      "Deleted permanently") before the server agrees. Labor rates, Kits next.
 
 - [ ] **The server accepts edits to an ARCHIVED bid** (drill, 2026-10-15).
       Archive in one tab and the other tab's `updateLine`, `addAssembly`,
