@@ -4,6 +4,13 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-15]
+
+- **On a small phone you can now select several marks by finger.** The
+  "marks selected" panel used to fill the top half of the drawing with its
+  extra controls, so a second mark under it could not be tapped. With a
+  finger those extras now sit behind a "More" button.
+
 ## [2026-10-14]
 
 - **BidRidge can now change its starter catalog without changing anyone's

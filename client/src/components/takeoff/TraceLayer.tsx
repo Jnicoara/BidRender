@@ -475,6 +475,21 @@ export function TraceLayer({
   */
   const widePillShape =
     "w-max max-w-[calc(100%-1rem)] flex-wrap justify-center rounded-2xl";
+  /*
+    With a FINGER, the selection pill's extra controls (Move to, Mark as, a
+    height, No drop) wait behind one "More" button. Wrapped and 44 px tall
+    they filled the top half of a 375x667 phone's drawing, and they take
+    taps: the second mark of a Select sat under the height control, so
+    tapping it opened that instead and only one mark could be picked
+    (`pnpm device:touch --sizes=phone-375`, 2026-10-15). A mouse keeps them
+    on show, as before. Folded again whenever the selection empties.
+  */
+  const [selectionMore, setSelectionMore] = useState(false);
+  const nothingSelected = selectedStampIds.size === 0;
+  useEffect(() => {
+    if (nothingSelected) setSelectionMore(false);
+  }, [nothingSelected]);
+  const selectionExtrasShown = !coarse || selectionMore;
   const svgRef = useRef<SVGSVGElement | null>(null);
   /** When the last press while tracing landed — see @/lib/traceClick. */
   const lastTracePress = useRef(Number.NEGATIVE_INFINITY);
@@ -2087,32 +2102,50 @@ export function TraceLayer({
               >
                 Delete
               </Button>
-              {onMoveSelected && moveTargets && moveTargets.length > 1 && (
-                /*
+              {coarse &&
+                ((onMoveSelected && moveTargets && moveTargets.length > 1) ||
+                  onSetStatusSelected ||
+                  ((onSetHeightSelected || onSetDropExcludedSelected) &&
+                    selectedDrop)) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs pointer-events-auto"
+                    aria-expanded={selectionMore}
+                    onClick={() => setSelectionMore(m => !m)}
+                  >
+                    {selectionMore ? "Less" : "More"}
+                  </Button>
+                )}
+              {selectionExtrasShown &&
+                onMoveSelected &&
+                moveTargets &&
+                moveTargets.length > 1 && (
+                  /*
                   Counted as the wrong thing — most often a device drawn as
                   existing to remain, counted with the new ones. A plain
                   select: one choice, and the keyboard and screen readers
                   already know it.
                 */
-                <select
-                  className="h-6 rounded-md border border-border bg-background px-1.5 text-xs pointer-events-auto max-w-56"
-                  value=""
-                  aria-label="Move the selected marks to another count"
-                  title="Move the selected marks to another count. They keep their places."
-                  onChange={e => {
-                    const id = Number(e.target.value);
-                    if (id > 0) onMoveSelected(id);
-                  }}
-                >
-                  <option value="">Move to…</option>
-                  {moveTargets.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {onSetStatusSelected && (
+                  <select
+                    className="h-6 rounded-md border border-border bg-background px-1.5 text-xs pointer-events-auto max-w-56"
+                    value=""
+                    aria-label="Move the selected marks to another count"
+                    title="Move the selected marks to another count. They keep their places."
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      if (id > 0) onMoveSelected(id);
+                    }}
+                  >
+                    <option value="">Move to…</option>
+                    {moveTargets.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              {selectionExtrasShown && onSetStatusSelected && (
                 /*
                   What these marks ARE (pin plan § 7). Existing, remove and
                   relocate are drawn differently and are NOT priced as new
@@ -2136,7 +2169,7 @@ export function TraceLayer({
                   ))}
                 </select>
               )}
-              {onSetHeightSelected && selectedDrop && (
+              {selectionExtrasShown && onSetHeightSelected && selectedDrop && (
                 /*
                   THESE MARKS' OWN HEIGHT (vertical-drops-plan § 2). Empty
                   follows the count — a real height IS in effect, so it is
@@ -2164,25 +2197,27 @@ export function TraceLayer({
                   />
                 </span>
               )}
-              {onSetDropExcludedSelected && selectedDrop && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 px-2 text-xs pointer-events-auto"
-                  onClick={() =>
-                    onSetDropExcludedSelected(selectedDrop.excluded === 0)
-                  }
-                  title={
-                    selectedDrop.excluded === 0
-                      ? "Leave these marks' drops off the bid. They stay counted as devices."
-                      : "Count these marks' drops again."
-                  }
-                >
-                  {selectedDrop.excluded === 0
-                    ? "No drop on these"
-                    : "Give these a drop"}
-                </Button>
-              )}
+              {selectionExtrasShown &&
+                onSetDropExcludedSelected &&
+                selectedDrop && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs pointer-events-auto"
+                    onClick={() =>
+                      onSetDropExcludedSelected(selectedDrop.excluded === 0)
+                    }
+                    title={
+                      selectedDrop.excluded === 0
+                        ? "Leave these marks' drops off the bid. They stay counted as devices."
+                        : "Count these marks' drops again."
+                    }
+                  >
+                    {selectedDrop.excluded === 0
+                      ? "No drop on these"
+                      : "Give these a drop"}
+                  </Button>
+                )}
               <Button
                 size="sm"
                 variant="ghost"

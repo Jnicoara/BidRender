@@ -187,3 +187,16 @@ run had flagged "Select + two taps" (morning question Q3).
   `dblclick` fired.
 - Noted: on a phone the drawing shifts 25 px when a count is put down (the
   "Counting …" line above it goes away) — a jump, not a fault.
+
+## Round 7 — the two 375 px touch steps (2026-10-15, second morning)
+
+Both were the APP, not the script, and the same fault twice: at 375x667 the
+drawing is short and a floating panel's live buttons sat on top of it.
+
+- **Select picked one mark of two.** The "1 mark selected" panel wrapped
+  into four rows of 44 px controls (Move to, Mark as, a height, No drop) and
+  covered the top half of the drawing; the second mark sat under the height
+  control, so the tap opened that instead. Not "still pending" as noted
+  before — the mark was saved (count read 3 = expected). Fixed: with a
+  finger those extras wait behind one **More** button; Delete and ✕ stay.
+  Laptop unchanged.
