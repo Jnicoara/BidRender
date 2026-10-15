@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **The first tap on the menu works now.** The side menu (and the phone's
+  bottom bar) was rebuilt from scratch whenever the app redrew, which
+  happens several times as a screen loads, so a tap in the first moments
+  after opening the app, or during a refresh, could do nothing. On a slow
+  connection on a job site that could be several seconds of dead taps.
+- **Recently deleted shows the newest first**, so the bid you just deleted
+  is at the top instead of below the fold.
+- **The bid step bar ignores deleted drawings.** Marks and runs on a plan
+  set you had deleted still ticked "Count" and "Runs". They no longer do.
+
 - **Another website can no longer act as you.** While you were signed in, a
   page on any other site could quietly send BidRidge a request that cleared
   your logo, removed the sample bid or accepted every labor-step

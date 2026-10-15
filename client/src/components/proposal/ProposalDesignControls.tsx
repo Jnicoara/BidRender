@@ -203,7 +203,10 @@ export function ProposalDesignControls({
       )}
 
       {/* fieldset: one switch for every control below. */}
-      <fieldset disabled={!canEdit} className="space-y-4 min-w-0">
+      <fieldset
+        disabled={!canEdit}
+        className="space-y-4 min-w-0 disabled:opacity-60"
+      >
         {/* ── Layout ─────────────────────────────────────────────────────────── */}
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <Label className="text-sm">Layout</Label>

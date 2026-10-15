@@ -112,3 +112,9 @@ Sketches and reasons: `references/overnight-parked.md`. None of these changes a 
 - C4 (decided overnight, reversible — built) Error toasts no longer show raw text: `errorText` keeps every message the server wrote for a person and replaces only "Failed to fetch", validation dumps and code-like internal errors. 96 sites done; the 67 on the Plans screen are Track B's file and left for B. Different wording? → **Keep.** Affects: error wording only.
 
 (Items 6–11 add below.)
+
+## From overnight run #2 (2026-10-14 → 15)
+
+- Q-SEC1 Security: the seven legacy routers (`projects`, `masterItems`, `masterAssemblies`, `masterLaborRates`, `projectAssemblies`, `projectItems`, `bidSummary`) have no screen and no caller in the app, but anyone signed in can still reach them through the API — one of them let any user change other companies' rows (fixed tonight). **Unmount them** in their own commit? → **Yes.** Affects: nothing on screen; retires `server/v545.test.ts`. (`references/security-sweep.md`)
+- Q-SEC2 (decided overnight, reversible — built) Only the **owner or an admin** may change the letterhead and proposal look; estimators now see them read-only. That is what the role list always said (`settings.edit`), but nothing enforced it. Keep? → **Keep.** Affects: who can edit Settings › Branding / proposal design.
+- Q-SEC3 (decided overnight, reversible — built) **Sign-up limit: 10 new accounts an hour from one place, 100 an hour across the whole site.** A beta wave bigger than 100 an hour would be refused with "wait an hour". Raise the overall number before a launch? → **Keep 100 for beta.** Affects: sign-up only.

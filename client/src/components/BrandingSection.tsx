@@ -265,6 +265,7 @@ export function BrandingSection() {
               Still needed: {missing.map(f => f.label).join(", ")}. Until then a
               proposal prints a visible prompt in place of each one, so nothing
               can be sent looking blank by mistake.
+              {!canEdit && " Ask the owner or an admin to fill it in."}
             </div>
           </div>
         </div>
@@ -277,7 +278,10 @@ export function BrandingSection() {
       )}
 
       {/* fieldset: one switch for every input and button below. */}
-      <fieldset disabled={!canEdit} className="space-y-4 min-w-0">
+      <fieldset
+        disabled={!canEdit}
+        className="space-y-4 min-w-0 disabled:opacity-60"
+      >
         {/* ── Logo ───────────────────────────────────────────────────────────── */}
         <div className="rounded-lg border border-border bg-card p-4 space-y-3">
           <div>

@@ -34,7 +34,6 @@ export const FIELD_TABLE: Record<string, string> = {
   hostRunId: "takeoff_runs",
   rootRunId: "takeoff_runs",
   runTypeId: "takeoff_run_types",
-  dropRunTypeId: "takeoff_run_types",
   stampId: "takeoff_stamps",
   startStampId: "takeoff_stamps",
   endStampId: "takeoff_stamps",

@@ -133,11 +133,22 @@ export default function TrashPage({
             <>
               <Section
                 title="Bids"
-                rows={(bids.data ?? []).map(b => ({
-                  id: b.id,
-                  name: b.name,
-                  detail: `Deleted for good ${new Date(b.purgeDueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${b.daysRemaining} day${b.daysRemaining === 1 ? "" : "s"} left`,
-                }))}
+                // Newest deleted first: what you just deleted is what you
+                // came to find. The server's order (oldest first, expiring
+                // soonest) suits the bid archive page, not this one — on the
+                // first look at this screen the bid just deleted sat below
+                // the fold (2026-10-14).
+                rows={[...(bids.data ?? [])]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.purgeDueAt).getTime() -
+                      new Date(a.purgeDueAt).getTime()
+                  )
+                  .map(b => ({
+                    id: b.id,
+                    name: b.name,
+                    detail: `Deleted for good ${new Date(b.purgeDueAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${b.daysRemaining} day${b.daysRemaining === 1 ? "" : "s"} left`,
+                  }))}
                 onRestore={row =>
                   restoreBid.mutate(
                     { id: row.id },

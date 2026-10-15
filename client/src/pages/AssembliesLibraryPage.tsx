@@ -333,6 +333,39 @@ function OriginBadge({ assembly }: { assembly: Assembly }) {
 
 type ProfitMethod = "markup" | "margin" | "none";
 
+/** One line of the cost preview. Module level so a re-render updates it rather than rebuilding it (see BidRenderShell's NavBtn note, 2026-10-14). */
+const Row = ({
+  label,
+  value,
+  strong,
+  warn,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  /** Amber: this figure leaves something out. */
+  warn?: boolean;
+}) => (
+  <div className="flex items-baseline justify-between gap-3 py-1">
+    <span
+      className={cn(
+        "text-xs",
+        strong ? "text-foreground font-medium" : "text-muted-foreground"
+      )}
+    >
+      {label}
+    </span>
+    <span
+      className={cn(
+        "font-mono text-sm",
+        warn ? "text-[#F5C518]" : strong ? "text-[#F5C518]" : "text-foreground"
+      )}
+    >
+      {value}
+    </span>
+  </div>
+);
+
 function CostPreview({
   draft,
   laborRate,
@@ -420,42 +453,6 @@ function CostPreview({
   // same rule a bid line follows (`lineMaterialNotPriced`).
   const materialMissing =
     !draft.laborOnly && line.materialCost === 0 && line.laborCost > 0;
-
-  const Row = ({
-    label,
-    value,
-    strong,
-    warn,
-  }: {
-    label: string;
-    value: string;
-    strong?: boolean;
-    /** Amber: this figure leaves something out. */
-    warn?: boolean;
-  }) => (
-    <div className="flex items-baseline justify-between gap-3 py-1">
-      <span
-        className={cn(
-          "text-xs",
-          strong ? "text-foreground font-medium" : "text-muted-foreground"
-        )}
-      >
-        {label}
-      </span>
-      <span
-        className={cn(
-          "font-mono text-sm",
-          warn
-            ? "text-[#F5C518]"
-            : strong
-              ? "text-[#F5C518]"
-              : "text-foreground"
-        )}
-      >
-        {value}
-      </span>
-    </div>
-  );
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-1">

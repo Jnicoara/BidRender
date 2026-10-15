@@ -129,6 +129,92 @@ function getCurrentRouteState(): RouteState {
   return pathToRoute(window.location.pathname);
 }
 
+// ── Sidebar nav item helpers ───────────────────────────────────────────────
+//
+// At MODULE level, never inside BidRenderShell (2026-10-14). They were
+// declared inside the shell's render, so every shell re-render made them a
+// NEW component type and React unmounted and rebuilt the whole menu — twice
+// in the first second after load, and again on any later re-render. A tap
+// whose press and release straddled a rebuild landed on a detached button
+// and did nothing: the first tap on Bids after opening the app was lost
+// (found by e2e/smoke/newScreens.spec.ts; client/src/lib/shellNavStable.test.ts
+// keeps them out here).
+const NavBtn = ({
+  onClick,
+  isActive,
+  icon: Icon,
+  label,
+  title,
+}: {
+  onClick: () => void;
+  isActive: boolean;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  title?: string;
+}) => (
+  <button
+    data-nav-trigger
+    onClick={onClick}
+    title={title ?? label}
+    className={cn(
+      "flex items-center gap-3 px-2.5 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
+      "hover:bg-accent hover:text-accent-foreground",
+      isActive ? "bp-tab-active text-foreground" : "text-muted-foreground"
+    )}
+  >
+    <Icon
+      size={20}
+      className={cn("shrink-0", isActive ? "text-[#F5C518]" : "")}
+    />
+    <span
+      className="whitespace-nowrap opacity-0 group-data-[open=true]:opacity-100 transition-opacity duration-150 truncate text-xs"
+      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+    >
+      {label}
+    </span>
+  </button>
+);
+
+/**
+ * A labelled group of nav items.
+ *
+ * ── Why it has two appearances ──────────────────────────────────────────────
+ * The sidebar is 64px of icons until you hover it, so a text heading alone
+ * would leave the grouping invisible in the state the sidebar is in almost
+ * all of the time. Collapsed, each group is separated by a hairline rule;
+ * expanded, that rule is replaced by the actual word. Either way the three
+ * purposes read as three things rather than one long list.
+ *
+ * The headings are plain nouns naming what the group is FOR — Work, Library,
+ * Company — so someone scanning top to bottom can tell daily tools from
+ * building blocks from the things they set up once.
+ */
+const NavSection = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div className="flex flex-col gap-1">
+    <div className="px-2.5 pt-3 pb-1 first:pt-1">
+      <span
+        className="hidden group-data-[open=true]:block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap"
+        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {label}
+      </span>
+      {/* Collapsed stand-in for the heading. aria-hidden because the group is
+          already named for assistive tech by the <nav> aria-label below. */}
+      <span
+        className="block group-data-[open=true]:hidden h-px bg-sidebar-border mx-1"
+        aria-hidden
+      />
+    </div>
+    {children}
+  </div>
+);
+
 export default function BidRenderShell() {
   const { uiFontScale } = useApp();
 
@@ -477,83 +563,6 @@ export default function BidRenderShell() {
   // replays the enter transition instead of swapping content under a static
   // frame — the tab strip is the only thing telling you the screen changed.
   const routeKey = `${route}:${activeView ?? ""}`;
-
-  // ── Sidebar nav item helper ────────────────────────────────────────────────
-  const NavBtn = ({
-    onClick,
-    isActive,
-    icon: Icon,
-    label,
-    title,
-  }: {
-    onClick: () => void;
-    isActive: boolean;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    label: string;
-    title?: string;
-  }) => (
-    <button
-      data-nav-trigger
-      onClick={onClick}
-      title={title ?? label}
-      className={cn(
-        "flex items-center gap-3 px-2.5 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
-        "hover:bg-accent hover:text-accent-foreground",
-        isActive ? "bp-tab-active text-foreground" : "text-muted-foreground"
-      )}
-    >
-      <Icon
-        size={20}
-        className={cn("shrink-0", isActive ? "text-[#F5C518]" : "")}
-      />
-      <span
-        className="whitespace-nowrap opacity-0 group-data-[open=true]:opacity-100 transition-opacity duration-150 truncate text-xs"
-        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-      >
-        {label}
-      </span>
-    </button>
-  );
-
-  /**
-   * A labelled group of nav items.
-   *
-   * ── Why it has two appearances ──────────────────────────────────────────────
-   * The sidebar is 64px of icons until you hover it, so a text heading alone
-   * would leave the grouping invisible in the state the sidebar is in almost
-   * all of the time. Collapsed, each group is separated by a hairline rule;
-   * expanded, that rule is replaced by the actual word. Either way the three
-   * purposes read as three things rather than one long list.
-   *
-   * The headings are plain nouns naming what the group is FOR — Work, Library,
-   * Company — so someone scanning top to bottom can tell daily tools from
-   * building blocks from the things they set up once.
-   */
-  const NavSection = ({
-    label,
-    children,
-  }: {
-    label: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="flex flex-col gap-1">
-      <div className="px-2.5 pt-3 pb-1 first:pt-1">
-        <span
-          className="hidden group-data-[open=true]:block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          {label}
-        </span>
-        {/* Collapsed stand-in for the heading. aria-hidden because the group is
-            already named for assistive tech by the <nav> aria-label below. */}
-        <span
-          className="block group-data-[open=true]:hidden h-px bg-sidebar-border mx-1"
-          aria-hidden
-        />
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <div

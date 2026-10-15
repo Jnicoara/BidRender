@@ -211,7 +211,7 @@ export const authRouter = router({
     .input(
       z.object({
         email: z.string().email(),
-        password: z.string().min(1),
+        password: z.string().min(1).max(1024),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -290,7 +290,7 @@ export const authRouter = router({
   changePassword: protectedProcedure
     .input(
       z.object({
-        currentPassword: z.string().min(1),
+        currentPassword: z.string().min(1).max(1024),
         newPassword: z.string().min(8).max(128),
       })
     )

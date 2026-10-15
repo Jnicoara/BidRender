@@ -7003,11 +7003,24 @@ export async function getBidProgressCounts(bidId: number): Promise<{
     db
       .select({ n: sql<string>`COUNT(*)` })
       .from(takeoffStamps)
-      .where(eq(takeoffStamps.bidId, bidId)),
+      .where(
+        and(
+          eq(takeoffStamps.bidId, bidId),
+          // Marks on a plan set that was deleted are not on the bid any
+          // more; counting them ticked "Count" for drawings that are gone
+          // (fixed 2026-10-14, caught by quantitiesIgnoreDeletedPlans).
+          onLivePlanSheet(takeoffStamps.sheetId, bidId)
+        )
+      ),
     db
       .select({ n: sql<string>`COUNT(*)` })
       .from(takeoffRuns)
-      .where(eq(takeoffRuns.bidId, bidId)),
+      .where(
+        and(
+          eq(takeoffRuns.bidId, bidId),
+          onLivePlanSheet(takeoffRuns.sheetId, bidId)
+        )
+      ),
     db
       .select({ n: sql<string>`COUNT(*)` })
       .from(bidLineItems)
