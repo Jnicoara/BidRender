@@ -51,6 +51,7 @@ Numbers and drills: `references/stress-results.md`; every change in
   twice-at-once over every route) and `server/sendRace.test.ts` guard them.
 - **Dashboard drops check** skips bids with no drop kind (`bidsWithADropKind`):
   2.4 s → 0.4 s under load.
+- **Pages load on demand** (`BidRenderShell`: every page is `lazy(reloadingImport(...))`; `lib/lazyPage.ts`). **For Track B:** TakeoffPage is now a lazy import in the shell — a merge touching those imports keeps the pattern. 834 → 217 KB before the Dashboard shows.
 - **Sidebar**: one scroll area (the menu vanished on a sideways phone).
 
 **FOR TRACK B — smoke flow 3 fails locally, not from tonight's changes.**

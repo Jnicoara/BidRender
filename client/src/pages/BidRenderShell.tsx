@@ -1,3 +1,6 @@
+import { lazy, Suspense } from "react";
+import { reloadingImport } from "@/lib/lazyPage";
+import { PageLoading } from "@/components/PageLoading";
 /**
  * BidRenderShell — Main layout shell
  * Desktop: fixed left sidebar (icon-only 64px, expands to 224px when the
@@ -35,27 +38,64 @@
 import { useApp } from "@/contexts/AppContext";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import SettingsPage from "@/pages/SettingsPage";
-import MaterialDatabasePage from "@/pages/MaterialDatabasePage";
+const loadSettingsPage = reloadingImport(() => import("@/pages/SettingsPage"));
+const SettingsPage = lazy(loadSettingsPage);
+const loadMaterialDatabasePage = reloadingImport(
+  () => import("@/pages/MaterialDatabasePage")
+);
+const MaterialDatabasePage = lazy(loadMaterialDatabasePage);
 import DashboardPage from "@/pages/DashboardPage";
 import { BackupHealthBanner } from "@/components/BackupHealthBanner";
-import AdminSettingsPage from "@/pages/AdminSettingsPage";
-import MaterialsLibraryPage from "@/pages/MaterialsLibraryPage";
-import LaborRatesPage from "@/pages/LaborRatesPage";
-import ModifiersPage from "@/pages/ModifiersPage";
-import AssembliesLibraryPage from "@/pages/AssembliesLibraryPage";
-import BidsPage from "@/pages/BidsPage";
-import QuickBidPage from "@/pages/QuickBidPage";
-import TakeoffPage from "@/pages/TakeoffPage";
-import ProposalPage from "@/pages/ProposalPage";
-import BidArchivePage from "@/pages/BidArchivePage";
-import BidListPage from "@/pages/BidListPage";
-import PlansIndexPage from "@/pages/PlansIndexPage";
-import TrashPage from "@/pages/TrashPage";
-import KitsPage from "@/pages/KitsPage";
-import ClientsPage from "@/pages/ClientsPage";
-import TeamPage from "@/pages/TeamPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
+const loadAdminSettingsPage = reloadingImport(
+  () => import("@/pages/AdminSettingsPage")
+);
+const AdminSettingsPage = lazy(loadAdminSettingsPage);
+const loadMaterialsLibraryPage = reloadingImport(
+  () => import("@/pages/MaterialsLibraryPage")
+);
+const MaterialsLibraryPage = lazy(loadMaterialsLibraryPage);
+const loadLaborRatesPage = reloadingImport(
+  () => import("@/pages/LaborRatesPage")
+);
+const LaborRatesPage = lazy(loadLaborRatesPage);
+const loadModifiersPage = reloadingImport(
+  () => import("@/pages/ModifiersPage")
+);
+const ModifiersPage = lazy(loadModifiersPage);
+const loadAssembliesLibraryPage = reloadingImport(
+  () => import("@/pages/AssembliesLibraryPage")
+);
+const AssembliesLibraryPage = lazy(loadAssembliesLibraryPage);
+const loadBidsPage = reloadingImport(() => import("@/pages/BidsPage"));
+const BidsPage = lazy(loadBidsPage);
+const loadQuickBidPage = reloadingImport(() => import("@/pages/QuickBidPage"));
+const QuickBidPage = lazy(loadQuickBidPage);
+const loadTakeoffPage = reloadingImport(() => import("@/pages/TakeoffPage"));
+const TakeoffPage = lazy(loadTakeoffPage);
+const loadProposalPage = reloadingImport(() => import("@/pages/ProposalPage"));
+const ProposalPage = lazy(loadProposalPage);
+const loadBidArchivePage = reloadingImport(
+  () => import("@/pages/BidArchivePage")
+);
+const BidArchivePage = lazy(loadBidArchivePage);
+const loadBidListPage = reloadingImport(() => import("@/pages/BidListPage"));
+const BidListPage = lazy(loadBidListPage);
+const loadPlansIndexPage = reloadingImport(
+  () => import("@/pages/PlansIndexPage")
+);
+const PlansIndexPage = lazy(loadPlansIndexPage);
+const loadTrashPage = reloadingImport(() => import("@/pages/TrashPage"));
+const TrashPage = lazy(loadTrashPage);
+const loadKitsPage = reloadingImport(() => import("@/pages/KitsPage"));
+const KitsPage = lazy(loadKitsPage);
+const loadClientsPage = reloadingImport(() => import("@/pages/ClientsPage"));
+const ClientsPage = lazy(loadClientsPage);
+const loadTeamPage = reloadingImport(() => import("@/pages/TeamPage"));
+const TeamPage = lazy(loadTeamPage);
+const loadAnalyticsPage = reloadingImport(
+  () => import("@/pages/AnalyticsPage")
+);
+const AnalyticsPage = lazy(loadAnalyticsPage);
 import FirstRunPage from "@/pages/FirstRunPage";
 import { useCompany } from "@/hooks/useCompany";
 import { trpc } from "@/lib/trpc";
@@ -220,7 +260,41 @@ const NavSection = ({
   </div>
 );
 
+/**
+ * Every page's loader, fetched in the background a few seconds after the
+ * first screen is up, so a later click is instant on a good signal — while
+ * the first screen, on a weak one, waits for none of them (stress run,
+ * 2026-10-15: 834 KB → 217 KB gzipped before the Dashboard shows).
+ */
+const PAGE_LOADERS = [
+  loadSettingsPage,
+  loadMaterialDatabasePage,
+  loadAdminSettingsPage,
+  loadMaterialsLibraryPage,
+  loadLaborRatesPage,
+  loadModifiersPage,
+  loadAssembliesLibraryPage,
+  loadBidsPage,
+  loadQuickBidPage,
+  loadTakeoffPage,
+  loadProposalPage,
+  loadBidArchivePage,
+  loadBidListPage,
+  loadPlansIndexPage,
+  loadTrashPage,
+  loadKitsPage,
+  loadClientsPage,
+  loadTeamPage,
+  loadAnalyticsPage,
+];
+
 export default function BidRenderShell() {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      for (const load of PAGE_LOADERS) void load().catch(() => {});
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const { uiFontScale } = useApp();
 
   const { user } = useAuth();
@@ -935,7 +1009,9 @@ export default function BidRenderShell() {
           className="flex-1 min-h-0 overflow-hidden tab-enter"
           key={routeKey}
         >
-          {renderContent()}
+          {/* Pages arrive on demand (lib/lazyPage.ts); a quiet line after
+              300 ms if one is slow, never a blank screen. */}
+          <Suspense fallback={<PageLoading />}>{renderContent()}</Suspense>
         </div>
 
         {/* Guide mode: one tip, under the work, never over it. */}

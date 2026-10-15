@@ -108,6 +108,25 @@ Vite and file watching. **Open:** measure a production build
 (`pnpm build && pnpm start`) over ~10 minutes of load before calling it
 either way.
 
+## First load on a phone: the app's own download (production build)
+
+Measured in Chrome against `pnpm build` + `node dist/index.js`, cold cache,
+JavaScript needed before the Dashboard shows (gzipped, as live serves it):
+
+| Build                                   | JS for the Dashboard | ~at 200 KB/s (weak 4G) |
+| --------------------------------------- | -------------------- | ---------------------- |
+| Before (every page in the shell bundle) | 834 KB               | ~4.2 s                 |
+| After (pages load on demand)            | **217 KB**           | **~1.1 s**             |
+
+**Fixed:** pages are `lazy()` with `reloadingImport`
+(`client/src/lib/lazyPage.ts`): a page file that a deploy replaced reloads
+the tab ONCE (driven: a 404 on the Bids file → one reload → Bids shown),
+never in a loop. A quiet "Loading…" only after 300 ms (`PageLoading`), and
+every page is fetched in the background 4 s after the first screen, so
+later clicks stay instant. Against the production build: newScreens + guide
+
+- the smoke screens spec, 103 passed at four sizes.
+
 ## 2,000 marks on ONE sheet (bid "Stress dense sheet", 4 counts × 500)
 
 The brief's "bids with 2,000+ marks" taken at its hardest: all on one sheet,

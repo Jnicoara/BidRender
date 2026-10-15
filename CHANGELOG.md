@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **BidRidge opens much faster on a phone.** The first screen used to
+  download the code for every screen in the app — about 834 KB, roughly 4
+  seconds on a weak signal before anything showed. Each screen's code now
+  arrives when you open it (and in the background once you're in), so the
+  Dashboard needs 217 KB, about 1 second. If BidRidge was updated while a
+  tab was open, the tab refreshes itself once instead of breaking.
+
 - **Signed out in the middle of work, you're told so and taken back.** If
   your session ended while you worked (it expired, or you changed your
   password on another device), BidRidge used to drop you on the public
