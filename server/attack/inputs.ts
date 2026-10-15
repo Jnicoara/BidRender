@@ -88,7 +88,23 @@ export type Pool = {
    * even when no name came with it.
    */
   number?: number;
+  /**
+   * "Break it" mode (server/weirdInputs.test.ts): every number not an id at
+   * the edge its schema allows ("high": the maximum, or 1e15 when there is
+   * none; "low": the minimum, or -1e15), and every free text at its longest
+   * (or 10,000 characters when uncapped), made of emoji.
+   */
+  extreme?: "high" | "low";
 };
+
+/** Emoji text of exactly `length` UTF-16 units (each emoji is two). */
+function emojiText(length: number): string {
+  const unit = "🔌⚡";
+  let text = "";
+  while (text.length + unit.length <= length) text += unit;
+  while (text.length < length) text += "x";
+  return text;
+}
 
 type Choice = { spray?: { field: string; table: string } };
 type Optional = "all" | "none" | "refs";
@@ -170,6 +186,10 @@ function stringFor(schema: Json, name: string, pool: Pool): string {
     ])
       if (pattern.test(guess)) return guess.slice(0, max);
   }
+  if (pool.extreme) {
+    const longest = (schema.maxLength as number | undefined) ?? 10_000;
+    return emojiText(Math.max(min, longest));
+  }
   let text = `${pool.marker} ${name}`;
   while (text.length < min) text += "x";
   return text.slice(0, max);
@@ -187,6 +207,17 @@ function numberFor(
       ? choice.spray.table
       : tableForField(name);
   if (table && pool.ids[table]?.length) return pool.ids[table][0];
+  if (pool.extreme && !table) {
+    const max = schema.maximum as number | undefined;
+    const exclusiveMax = schema.exclusiveMaximum as number | undefined;
+    const min = schema.minimum as number | undefined;
+    const exclusiveMin = schema.exclusiveMinimum as number | undefined;
+    const edge =
+      pool.extreme === "high"
+        ? (max ?? (exclusiveMax !== undefined ? exclusiveMax - 1 : 1e15))
+        : (min ?? (exclusiveMin !== undefined ? exclusiveMin + 1 : -1e15));
+    return integer ? Math.trunc(edge) : edge;
+  }
   const hi0 = (schema.maximum as number | undefined) ?? Number.MAX_SAFE_INTEGER;
   if (pool.number !== undefined && !integer && !table && pool.number <= hi0)
     return pool.number;

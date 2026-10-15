@@ -135,6 +135,23 @@ const hoursPerUnitSchema = z.number().min(0).max(99999);
 const labelSchema = z.string().trim().min(1).max(128);
 
 const overheadModeSchema = z.enum(["percentage", "flat"]);
+/**
+ * Overhead, either way it is entered. Capped at what its column holds
+ * (decimal(12,4) on bids and pricing_defaults): uncapped, a 1e15 got through
+ * validation and crashed the save (weird-input sweep, 2026-10-14).
+ */
+const overheadValueSchema = z.number().min(0).max(99_999_999);
+
+/** Turn "the line would overflow" into the sentence it carries. */
+async function refuseOverfullLine<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof db.LineQuantityTooLarge)
+      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    throw error;
+  }
+}
 const profitMethodSchema = z.enum(["markup", "margin"]);
 
 /**
@@ -496,7 +513,7 @@ export const bidsRouter = router({
         // default; omitting the key leaves it as it is.
         overheadEnabled: z.boolean().nullable().optional(),
         overheadMode: overheadModeSchema.nullable().optional(),
-        overheadValue: z.number().min(0).nullable().optional(),
+        overheadValue: overheadValueSchema.nullable().optional(),
         profitMethod: profitMethodSchema.nullable().optional(),
         profitValue: z.number().min(0).max(0.99).nullable().optional(),
         productivityPct: productivitySchema.nullable().optional(),
@@ -1367,13 +1384,15 @@ export const bidsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
-      const { id, merged } = await db.addAssemblyToBid(
-        input.bidId,
-        ctx.scope.dataUserId,
-        input.assemblyId,
-        input.qty,
-        input.unitLabel,
-        { merge: input.merge }
+      const { id, merged } = await refuseOverfullLine(() =>
+        db.addAssemblyToBid(
+          input.bidId,
+          ctx.scope.dataUserId,
+          input.assemblyId,
+          input.qty,
+          input.unitLabel,
+          { merge: input.merge }
+        )
       );
       const line = await db.getBidLineItem(id, input.bidId);
       return { line, merged };
@@ -2136,7 +2155,7 @@ export const bidsRouter = router({
       z.object({
         overheadEnabled: z.boolean().optional(),
         overheadMode: overheadModeSchema.optional(),
-        overheadValue: z.number().min(0).optional(),
+        overheadValue: overheadValueSchema.optional(),
         profitMethod: profitMethodSchema.optional(),
         profitValue: z.number().min(0).max(0.99).optional(),
         productivityPct: productivitySchema.optional(),

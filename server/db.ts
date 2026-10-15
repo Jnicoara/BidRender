@@ -7339,6 +7339,18 @@ async function nextBidSortOrder(bidId: number): Promise<number> {
  * library assembly afterwards has no effect on this bid, which is the whole
  * point (ASSEMBLIES_PLAN.md § PROJECT ESTIMATES).
  */
+/** The most one bid line's quantity column can hold (decimal(10,4)). */
+export const LINE_QTY_MAX = 999_999.9999;
+
+/** Adding to a line would take it past what the column can hold. */
+export class LineQuantityTooLarge extends Error {
+  constructor(readonly wouldBe: number) {
+    super(
+      `That would put ${wouldBe.toLocaleString("en-US")} on one line — more than a line can hold (999,999). Add it as a separate line instead.`
+    );
+  }
+}
+
 export async function addAssemblyToBid(
   bidId: number,
   userId: number,
@@ -7383,6 +7395,10 @@ export async function addAssemblyToBid(
 
     if (existing[0]) {
       const merged = Number(existing[0].qty) + qty;
+      // decimal(10,4): the most one line can hold. Past it the UPDATE failed
+      // as a server error (weird-input sweep, 2026-10-14); now it is refused
+      // in words, and the line keeps what it had.
+      if (merged > LINE_QTY_MAX) throw new LineQuantityTooLarge(merged);
       await db
         .update(bidLineItems)
         .set({ qty: merged.toFixed(4), updatedAt: new Date() })
@@ -10555,6 +10571,13 @@ export async function updateRunTypeExtra(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const { feetPerFoot, ...rest } = patch;
+  // Nothing to change is not an error: an UPDATE with no columns is one
+  // (weird-input sweep, 2026-10-14 — a 500 for an empty edit).
+  if (
+    feetPerFoot === undefined &&
+    Object.values(rest).every(v => v === undefined)
+  )
+    return;
   await db
     .update(takeoffRunTypeExtras)
     .set({

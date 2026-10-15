@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Extreme numbers no longer crash a save.** A test now throws the biggest,
+  most negative and longest values each screen allows at every save in the
+  app. Five crashed instead of saying no, and now each gets a plain answer:
+  - Adding an assembly again when the line was already huge. It now says
+    "more than a line can hold — add it as a separate line" and keeps the
+    line as it was.
+  - An overhead amount over 99,999,999.
+  - A close-out on a bid with an absurd estimate.
+  - An empty edit to a run type's extra.
+  - Setting a starter labor rate that doesn't exist.
+
 - **The "Find it" helper gives up after 15 seconds and says why.** When the AI
   service was down or stuck, it could take six minutes and then claim it
   didn't understand the question. Now it says the helper didn't answer and
