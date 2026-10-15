@@ -5,5 +5,5 @@
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo.scripts"
   },
   "include": ["scripts/**/*.ts", "scripts/**/*.mts"],
-  "exclude": ["node_modules", "build", "dist", "scripts/_tmp*"]
+  "exclude": ["node_modules", "build", "dist"]
 }

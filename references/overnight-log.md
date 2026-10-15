@@ -37,3 +37,19 @@ Times: start from the clock when the item began, end = its commit's timestamp (c
 | 11b error text | 21:16 | 21:17 | BEFORE: ~163 `toast.error(error.message)` showed "Failed to fetch", JSON validation dumps or SQL text. → AFTER: `errorText` (tested): a message the server WROTE passes through (checked in the browser — the duplicate-material refusal reads word for word); offline / validation / code-like internal → one plain sentence; raw text to the console. 96 sites in 41 files; the 67 in Track B's Plans-screen files reverted and left for B (handoff). | 1e9652a6 | errorText 5 (new), sourceHygiene; driven in Chrome | green |
 | 11c copy leftovers | 21:18 | 21:17 | From the copy list: toasts end with a period; "restore it any time from the Archived tab" → "…from Recently deleted."; client archive title quoted like the library's; "Push to N" → "Update N copies" (plural-safe); sales-tax "bids pinned to it keep working" → "bids already using it keep their rate"; "Total due of the Draft bids" → "on Draft bids". | 9a47ff61 | typecheck; no test pins these strings | green |
 | 11d price history screen | 21:19 | 21:23 | The owner's Price history (plan § 8 steps 2–3; recording was item 7): read query (keyset 50, keyed by item so forks never split it, BidRidge example-price changes only while the shop used the shipped price), `materials.priceHistory`, side panel under the editor's More options with Show older; fresh after any mutation. Seen at laptop and phone 375 with a real recorded change ("$1.799 · Typed by jjnico99 · from $17.99 per bundle of 10"); phone header padded after the close button overlapped. | b3676bb3 | priceHistoryRead 7 (new), stepBarQuery 3 | green |
+
+## Totals
+
+- **Run:** 19:57 → 21:30 by this machine's clock (about **1 h 33 min** of
+  wall time; several reviews and the copy sweep ran as background agents at
+  the same time).
+- **Queue:** items 1–10 done (4 before 2–3 because it could run while the
+  reviews did; 10 before 8 for the same reason); item 11 worked: alias audit,
+  error text, copy leftovers, price-history screen, a stale todo closed.
+- **Morning questions: 75 lines** in `pricing/morning-questions.md` — 10
+  flagged ⚠ at the top (2 starter edits: PG19, DV32; 1 new money question:
+  copy a bid), 62 more questions, and 3 overnight decisions to confirm (D1, D2,
+  C4).
+- **Last check:** `pnpm check` green (app + scripts); the 16 test files
+  touched tonight, 211 tests, all passing; `device:audit --check` 0 hard
+  faults at laptop, iPad both ways, phone 375.

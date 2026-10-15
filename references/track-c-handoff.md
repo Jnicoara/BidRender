@@ -89,7 +89,29 @@ number; no migration).** BEFORE → AFTER rows in `overnight-log.md`.
   waits on the Platt export, Q4/Q8).
 - **Step 6**: `realPackFromSheet` built and run over the catalog; NOT
   written (A's hold until the owner's sheet — Q-PS6).
-- **Not yet**: price-history read query + panel (plan § 8 steps 2–3).
+- **Price-history screen** also built (item 11): `materials.priceHistory`
+  - `PriceHistoryPanel` (editor › More options › Price history).
+
+**Items 8–11.**
+
+- **Copy** (item 8): the clear fixes, plus `CAPABILITY_LABEL` / `roleLabel`
+  on Crew and one name for deleted things ("Recently deleted"; the bids-only
+  page is "Deleted bids"). The rest, with reasons:
+  `references/copy-review-2026-10-14.md`. Naming decisions C1–C3 are in
+  morning-questions.
+- **Error toasts** (item 11): `client/src/lib/errorText.ts` on 96 sites.
+  **For Track B:** the 67 `toast.error(x.message)` in `TakeoffPage.tsx` and
+  `components/takeoff/` were left alone; the same one-line change applies.
+- **Step-bar switch** (item 9): Settings › Display. Parked ideas:
+  `overnight-parked.md` P4 (copy a bid — a money question), P6.
+- **Scripts typecheck** (item 10): `tsconfig.scripts.json` is the second
+  pass of `pnpm check`.
+- **Todo housekeeping** (item 11): the `aliases()` audit was measured and
+  closed, and the white-box entry closed (B fixed it in `14fead91`).
+- **State at the end:** `pnpm check` green on both passes; tonight's 16
+  test files pass (211 tests); `device:audit --check` shows 0 hard faults
+  at four sizes. Dev server stopped; MySQL 3307 left running. Not merged:
+  everything is on `track-c` only.
 
 ## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
 
