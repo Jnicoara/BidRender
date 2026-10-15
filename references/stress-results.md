@@ -176,6 +176,24 @@ once and shows Bids; a file that STAYS missing reloads once, then shows
 shows nothing for the first 300 ms, then "Loading…" with the sidebar still
 there. Landing page unchanged: 148 KB gzipped, one file.
 
+## 50 plan sets on ONE bid (bid "Stress fifty plan sets", 2026-10-15)
+
+The account already held 153 sets, one or two per bid; this is the other
+shape — a job that piled up addenda. Attached through the browser's own
+three calls (ticket → PUT → `confirmAttach`) by a scratch script: 50 sets
+in 3.2 s. Production build, 3 fresh loads each:
+
+| Screen                          | laptop ms | phone 375 ms |
+| ------------------------------- | --------- | ------------ |
+| Bid page                        | 256–267   | 157–271      |
+| Plans screen, first sheet drawn | 887–911   | 862–893      |
+| Plans list                      | 348–371   | 366–402      |
+
+No sideways scroll at either size. The Plans screen lists "50 DOCUMENTS"
+in its own scrolling box above the sheets; the bid page says "Plans · 50
+plan sets". (Count is left out: since tonight its header shows "… ·
+counting mode" while loading, so that probe fires before the data.)
+
 ## 2,000 marks on ONE sheet (bid "Stress dense sheet", 4 counts × 500)
 
 The brief's "bids with 2,000+ marks" taken at its hardest: all on one sheet,
