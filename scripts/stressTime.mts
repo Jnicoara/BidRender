@@ -104,13 +104,25 @@ async function main() {
   ).data;
   const groupList = Array.isArray(groups) ? groups : (groups.groups ?? []);
   const got = (
-    await call<{ lines?: { id: number; quantity?: string; qty?: string }[] }>(
-      owner,
-      "bids.get",
-      { id: small.id }
-    )
+    await call<{
+      lines?: {
+        id: number;
+        quantity?: string;
+        qty?: string;
+        takeoffGroupId?: number | null;
+        takeoffRunTypeId?: number | null;
+      }[];
+    }>(owner, "bids.get", { id: small.id })
   ).data;
-  const line = got.lines?.find(l => l && typeof l.id === "number");
+  // A typed line: one that counts from the plans refuses a typed quantity
+  // (the app is right to), so timing it measures the refusal, not a save.
+  const line = got.lines?.find(
+    l =>
+      l &&
+      typeof l.id === "number" &&
+      l.takeoffGroupId == null &&
+      l.takeoffRunTypeId == null
+  );
   const counts = {
     bids: bids.length,
     bigSheets: sheets.length,
@@ -197,6 +209,16 @@ async function main() {
             proc: "bids.updateLine",
             input: { bidId: small.id, id: line.id, qty: 7 },
             mutation: true,
+            // Set back, so the header's "data ends where it started" is
+            // true — until 2026-10-15 it said so and left the line at 7.
+            after: async () => {
+              await call(
+                owner,
+                "bids.updateLine",
+                { bidId: small.id, id: line.id, qty: Number(line.qty) },
+                true
+              );
+            },
           } satisfies Probe,
         ]
       : []),
