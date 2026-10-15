@@ -96,12 +96,24 @@ const TABLES: Record<StarterTable, Registry> = {
   runTypes: { table: takeoffRunTypes, fork: db.forkRunType },
 };
 
+/** The drizzle table behind a starter table name: ONE registry for both files. */
+export function starterTableOf(table: StarterTable): MySqlTable {
+  return TABLES[table].table;
+}
+
+/** Its columns by name (the offer read reads fields by name). */
+export function starterColumnsOf(
+  table: StarterTable
+): Record<string, MySqlColumn> {
+  return columnsOf(table);
+}
+
 /** What `targetTable` stores: the SQL name, as `childTable` does. */
 export function starterTableName(table: StarterTable): string {
   return getTableName(TABLES[table].table);
 }
 
-function tableFromName(name: string): StarterTable | null {
+export function tableFromName(name: string): StarterTable | null {
   for (const key of Object.keys(TABLES) as StarterTable[])
     if (starterTableName(key) === name) return key;
   return null;
@@ -112,7 +124,11 @@ function columnsOf(table: StarterTable): Record<string, MySqlColumn> {
 }
 
 /** A recipe line's fields a part change may set (`assemblyMaterialLine`'s). */
-const PART_LINE_FIELDS = ["qty", "overrideLaborHours", "isBranchWhip"] as const;
+export const PART_LINE_FIELDS = [
+  "qty",
+  "overrideLaborHours",
+  "isBranchWhip",
+] as const;
 type PartLineField = (typeof PART_LINE_FIELDS)[number];
 export type PartLine = {
   qty: string | number;
@@ -882,7 +898,7 @@ async function reverseOf(
   };
 }
 
-function sameLine(a: unknown, b: unknown): boolean {
+export function sameLine(a: unknown, b: unknown): boolean {
   const x = a as Record<string, unknown> | null;
   const y = b as Record<string, unknown> | null;
   if (!x || !y) return x === y;
