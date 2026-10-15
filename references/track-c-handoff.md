@@ -44,6 +44,32 @@ file, both sides kept. **C's databases are at 164**: `bidrender_test_c`
 matches the schema, 205/205 FKs; `bidrender_local_c` migrated the same
 (still C's scratch copy, not exact — see below).
 
+**Item 5 — layout, built on track-c (NOT merged; nothing changes a bid
+number; no migration).** BEFORE → AFTER rows in `overnight-log.md`.
+
+- **Nav** (`BidRenderShell.tsx`, `appRoutes.ts`): Work = Dashboard, **Bids**
+  (`/bids`, new `BidListPage` — the Dashboard's `BidSearchPanel` full page),
+  **Plans** (`/plans`, new `PlansIndexPage` — every bid with drawings +
+  Upload a plan), Clients; Library = Materials, Assemblies; bottom =
+  Performance, Labor rates, **Recently deleted**, Settings, Crew, Admin.
+  Phone bar: Dashboard, Bids, Plans, Materials, **More** (popover).
+  `/bids` left `RETIRED_PATHS`; CLAUDE.md § Architecture, todo.md and
+  track-b-beta-plan.md record the override. `useStartBid` hook shares the
+  three ways to start a bid.
+- **Recently deleted** (`/trash`, `TrashPage`): archived bids, materials,
+  assemblies, kits, modifiers, clients with Restore — existing calls only.
+- **Bid page**: the rail is client + total (sticky); close-out, extras, tax,
+  pricing settings sit under the lines. Settings › Pricing 2×2 on ≥1280 px.
+- **Back** returns to where a bid was opened from (`BID_ORIGINS`).
+- **Step bar** (`BidStepBar`, rule `shared/bidSteps.ts`, read-only
+  `bids.progress`, refreshed after any mutation in `main.tsx`): bid page and
+  the Plans header (laptop).
+- **Homerun icon** (`HomerunIcon`, solid arrow + ticks); sign-in tagline;
+  help bar wording. **Parked with sketches**: `overnight-parked.md` (slimmer
+  toolbar, touch hint for B's tips, work-tag label).
+- `pnpm device:audit --check` at laptop, both iPads, phone 375: 0 hard faults.
+- **For B when merging**: `TakeoffPage.tsx` changed in ONE place (the
+  header blurb → `BidStepBar`), plus `HomerunsView.tsx`'s icon.
 
 ## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
 
