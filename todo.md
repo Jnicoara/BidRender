@@ -1752,6 +1752,10 @@ Measurements: `references/code-first-ceiling.md` § d.
       "$12.50" and "1,500" as not-a-number (refused with a message — honest)
       and "0x10" as 16 (a wrong number, if anyone ever typed it). Move them to
       the same reader, one screen per commit, and look at each.
+      **Done so far:** Labor rates and Materials price (2026-10-15 night);
+      the Assemblies editor's labor and overhead hours (2026-10-15 day —
+      check, preview and save all read the box the same way; "$1.5" saves
+      1.5, "0x10" is refused instead of saved as 16).
 
 ### Flaky tests — fix in a batch before beta
 

@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Assembly hours read the way you type them.** "$1.5" in an assembly's
+  labor hours now saves 1.5 hours, and a mistyped entry like "0x10" is
+  refused with a message instead of being saved as 16 hours.
+
 - **Fixed counts being lost when two arrive at once.** On the Count screen,
   counting the same item twice in quick succession — a double tap, two
   people on one bid, or counts sent together when the signal came back —

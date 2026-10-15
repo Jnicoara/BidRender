@@ -29,6 +29,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -392,8 +393,8 @@ function CostPreview({
           costPerUnit: m.costPerUnit,
           qty: m.qty,
         })),
-        baseLaborHours: draft.baseLaborHours,
-        overheadLaborHours: Number(draft.overheadLaborHours) || 0,
+        baseLaborHours: hoursToSave(draft.baseLaborHours),
+        overheadLaborHours: parseTypedNumber(draft.overheadLaborHours) || 0,
         modifiers: modifierPcts,
         laborRate,
       });
@@ -697,7 +698,7 @@ function AssemblyBuilder({
   const showsPlaceholderHours =
     !hoursTouched &&
     assemblyHours(draft.baseLaborHours) !== null &&
-    isPlaceholderHours(draft.name, Number(draft.baseLaborHours));
+    isPlaceholderHours(draft.name, parseTypedNumber(draft.baseLaborHours));
 
   /**
    * What the parts come to, against what was typed.
@@ -815,7 +816,9 @@ function AssemblyBuilder({
     }
     // Blank is NOT SET (D1) and saves as such; anything else must be a
     // number of 0 or more. A blank never becomes 0.
-    const hours = Number(draft.baseLaborHours);
+    // The same reader the save uses (hoursToSave), so what passes here is
+    // what is stored: "$2" is 2, "0x10" is refused rather than saved as 16.
+    const hours = parseTypedNumber(draft.baseLaborHours);
     if (
       draft.baseLaborHours.trim() !== "" &&
       (Number.isNaN(hours) || hours < 0)
@@ -823,7 +826,7 @@ function AssemblyBuilder({
       toast.error("Labor hours must be 0 or more, or left blank for not set.");
       return;
     }
-    const overhead = Number(draft.overheadLaborHours);
+    const overhead = parseTypedNumber(draft.overheadLaborHours);
     if (
       draft.overheadLaborHours.trim() === "" ||
       Number.isNaN(overhead) ||
@@ -1353,21 +1356,26 @@ function AssemblyBuilder({
                   this one assembly — not a percentage, and nothing to do with
                   the company-wide productivity factor in Settings.
                 </p>
-                {Number(draft.overheadLaborHours) > 0 &&
+                {parseTypedNumber(draft.overheadLaborHours) > 0 &&
                 assemblyHours(draft.baseLaborHours) === null ? (
                   <p className="text-xs text-[#F5C518]">
                     Hours not set — the overhead hours are not priced on their
                     own until the work hours are.
                   </p>
                 ) : (
-                  Number(draft.overheadLaborHours) > 0 && (
+                  parseTypedNumber(draft.overheadLaborHours) > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      {round(Number(draft.baseLaborHours) || 0, 3)} h +{" "}
-                      {round(Number(draft.overheadLaborHours) || 0, 3)} h ={" "}
+                      {round(parseTypedNumber(draft.baseLaborHours) || 0, 3)} h
+                      +{" "}
+                      {round(
+                        parseTypedNumber(draft.overheadLaborHours) || 0,
+                        3
+                      )}{" "}
+                      h ={" "}
                       <span className="text-foreground font-medium">
                         {round(
-                          (Number(draft.baseLaborHours) || 0) +
-                            (Number(draft.overheadLaborHours) || 0),
+                          (parseTypedNumber(draft.baseLaborHours) || 0) +
+                            (parseTypedNumber(draft.overheadLaborHours) || 0),
                           3
                         )}{" "}
                         h
@@ -1599,7 +1607,7 @@ export default function AssembliesLibraryPage() {
               trade: draft.trade,
               projectType: draft.projectType,
               baseLaborHours: hoursToSave(draft.baseLaborHours),
-              overheadLaborHours: Number(draft.overheadLaborHours),
+              overheadLaborHours: parseTypedNumber(draft.overheadLaborHours),
               laborRateId: draft.laborRateId,
               materials: draft.materials.map(m => ({
                 materialId: m.materialId,
@@ -1697,7 +1705,7 @@ export default function AssembliesLibraryPage() {
               trade: draft.trade,
               projectType: draft.projectType,
               baseLaborHours: hoursToSave(draft.baseLaborHours),
-              overheadLaborHours: Number(draft.overheadLaborHours),
+              overheadLaborHours: parseTypedNumber(draft.overheadLaborHours),
               laborRateId: draft.laborRateId,
               materials: draft.materials.map(m => ({
                 materialId: m.materialId,
