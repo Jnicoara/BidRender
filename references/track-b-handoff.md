@@ -1,5 +1,16 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-15 (second morning), 375 px TOUCH FIXED
+
+- **Pushed to track-b only:** screenshots (`overnight-shots/b/`), morning
+  Q4 (phone finger check), and the two 375 px touch fixes in
+  `TraceLayer.tsx` (selection extras behind "More" on touch; trace pill at
+  the bottom on touch). Touch check passes at all five touch sizes.
+- **Gate 38743997163 green on eb94729a** (test + drizzle-guard). Not merged
+  to local-dev. (Run 38740741446 on 92e29d04 was the MySQL image refusal, Q1.)
+- **Open:** at 375x667 the trace toolbar is three rows tall, so the drawing
+  is short; zoom at 5,000 marks; Q1, Q2, Q4.
+
 ## WHERE B STANDS — 2026-10-15 (morning), GATE GREEN ON e8993da2
 
 - **Gate 38704354488 green on e8993da2** — covers starter offers, stress

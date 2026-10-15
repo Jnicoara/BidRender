@@ -129,3 +129,17 @@ beyond the plan, money, or anything irreversible go to
   named failures); "Name this symbol" now closes on a sheet change / Trace /
   armed count (`@/lib/captureLifetime`). iPad both ways + phone 390 pass
   twice; two steps open at 375 px (Q3). Worktree removed; server stopped.
+
+## Second morning — screenshots, phone check, 375 px (06:00–06:45)
+
+- Screenshots of every new screen at laptop, iPad both ways and phone 390:
+  `references/overnight-shots/b/` (33 files, index in its README). The
+  starter change used for them was undone through the app's Undo.
+- Morning Q4: the two-minute real-finger check for the owner's phone.
+- Both 375 px touch steps fixed (stress-results-b.md round 7) — both were a
+  floating panel's buttons over a short drawing: the selection pill's
+  extras fold behind "More" with a finger; the trace pill docks to the
+  bottom. `pnpm device:touch` passes at all five touch sizes; `pnpm check`
+  clean. Leftover touch-check counts removed; server stopped; MySQL 3307
+  left running.
+- Gate 38743997163 green on eb94729a.
