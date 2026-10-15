@@ -15,6 +15,9 @@ route is attacked automatically.
   limits are dodgeable until it reads what DO/Cloudflare actually append;
   A-S13 signed upload URLs don't bind Content-Length and tickets are
   unlimited (storage abuse); A-S14 the signup race (yours already).
+- **FOR TRACK A (stress, 2026-10-15) — Q-AUTH1:** 11 sign-ins at once
+  stall every other request ~0.7 s (`bcryptjs` on the main thread).
+  Worker pool or native `bcrypt`; no stored hash changes.
 - **FOR TRACK A (drill, 2026-10-15) — Q-DB1:** a database that stops
   answering can wedge the server until restart: stuck pooled connections
   are never thrown away (mysql2's `timeout` returns them out of step), and
