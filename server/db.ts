@@ -4821,7 +4821,7 @@ function newStarterOverheadAndClear(
  * all. Losing the race is not an error: the row the caller wanted now exists,
  * so the right response is to read it back.
  */
-function isDuplicateKey(error: unknown): boolean {
+export function isDuplicateKey(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
@@ -7897,12 +7897,23 @@ export async function setItemMarkupOverride(
       .where(eq(markupRules.id, existing.id));
     return;
   }
-  await db.insert(markupRules).values({
-    userId,
-    kind: "item",
-    itemKey,
-    markupPct: markupPct.toFixed(6),
-  });
+  try {
+    await db.insert(markupRules).values({
+      userId,
+      kind: "item",
+      itemKey,
+      markupPct: markupPct.toFixed(6),
+    });
+  } catch (error) {
+    // Two saves at once (a double-click): the other one made the row a
+    // moment ago, so this one is an update of it, not a server error
+    // (twice-at-once sweep, 2026-10-14).
+    if (!isDuplicateKey(error)) throw error;
+    await db
+      .update(markupRules)
+      .set({ markupPct: markupPct.toFixed(6) })
+      .where(where);
+  }
 }
 
 /**
@@ -12971,6 +12982,32 @@ export async function saveCloseout(
       actualHours: string;
     }>;
   }
+): Promise<number> {
+  /*
+    ONE SAVE PER BID AT A TIME (twice-at-once sweep, 2026-10-14). Two saves
+    together both found no close-out, both inserted, and the second hit the
+    unique key as a server error — and a plain retry would not do, because
+    each save also REPLACES the lines, so two interleaved saves could leave
+    both sets of lines behind. Locking the bid row first makes the second
+    save wait for the first and then update it.
+  */
+  return inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    await db
+      .select({ id: bids.id })
+      .from(bids)
+      .where(and(eq(bids.id, bidId), eq(bids.userId, userId)))
+      .limit(1)
+      .for("update");
+    return saveCloseoutLocked(bidId, userId, data);
+  });
+}
+
+async function saveCloseoutLocked(
+  bidId: number,
+  userId: number,
+  data: Parameters<typeof saveCloseout>[2]
 ): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");

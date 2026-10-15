@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Double-clicks no longer show false errors.** Sending a count to the bid,
+  setting a material's own markup, or saving a job close-out twice in a row
+  quickly could show an error even though it had worked. The count was
+  never doubled, but the second close-out save could have left two sets of
+  hours behind. Now the second click quietly agrees with the first, and a
+  close-out always keeps exactly one set of lines.
+
 - **The menu is back on a phone turned sideways.** With the phone on its
   side, the main menu (Dashboard, Bids, Plans and the rest) shrank to
   nothing and only the bottom group showed. The whole menu now scrolls

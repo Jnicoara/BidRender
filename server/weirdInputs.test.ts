@@ -189,6 +189,45 @@ describeDb("weird input everywhere", () => {
     expect(Number(after?.qty)).toBe(999_999);
   });
 
+  /**
+   * A double-click: every route, the same valid input twice at the same
+   * moment. Losing a race to a unique key is not a server error — sendToBid
+   * answered the loser with the raw failed INSERT until 2026-10-14.
+   */
+  it("no route crashes when the same call arrives twice at once", async () => {
+    const crashes: Record<string, string> = {};
+    let calls = 0;
+    const order = Object.keys(PROCS)
+      .filter(
+        p =>
+          !SKIPPED[p] &&
+          !NOT_COMPANY.test(p) &&
+          PROCS[p]._def.type === "mutation"
+      )
+      .sort(
+        (a, b) => Number(DESTRUCTIVE.test(a)) - Number(DESTRUCTIVE.test(b))
+      );
+    for (const path of order) {
+      const { inputs } = inputsFor(PROCS[path]._def.inputs[0], pool, []);
+      for (const input of inputs.slice(0, 2)) {
+        calls += 2;
+        const both = await Promise.all([
+          call(owner, path, input),
+          call(owner, path, input),
+        ]);
+        for (const result of both)
+          if (
+            result?.code === "INTERNAL_SERVER_ERROR" &&
+            !EXPLAINED[path] &&
+            !crashes[path]
+          )
+            crashes[path] = result.message.slice(0, 200);
+      }
+    }
+    report.twice = { calls, crashes };
+    expect(crashes).toEqual({});
+  }, 1_800_000);
+
   for (const extreme of ["high", "low"] as const)
     it(`no route crashes on ${extreme} edge values`, async () => {
       const crashes: Record<string, string> = {};
