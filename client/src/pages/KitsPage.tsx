@@ -20,7 +20,7 @@
  * library is hand-curated and stays small.
  */
 import { pointerMovedHighlight } from "@/lib/pointerHighlight";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { InlineNumberField } from "@/components/InlineNumberField";
@@ -237,7 +237,12 @@ function KitBuilder({
     setHighlight(0);
   };
 
+  const saving = useRef(false);
   const save = () => {
+    // One save at a time: a double click sent two creates — two kits. A ref,
+    // set in this call; `isPending` is stale for the second click of a
+    // double click (2026-10-15).
+    if (saving.current) return;
     if (!name.trim()) {
       toast.error("Give the kit a name.");
       return;
@@ -251,9 +256,16 @@ function KitBuilder({
       description: description.trim() || null,
       items: draftItems.map(i => ({ assemblyId: i.assemblyId, qty: i.qty })),
     };
-    if (isNew) createKit.mutate(payload);
-    else updateKit.mutate({ id: kitId!, ...payload });
+    saving.current = true;
+    const done = {
+      onSettled: () => {
+        saving.current = false;
+      },
+    };
+    if (isNew) createKit.mutate(payload, done);
+    else updateKit.mutate({ id: kitId!, ...payload }, done);
   };
+  const busy = createKit.isPending || updateKit.isPending;
 
   const isStarter = loaded?.userId === null;
 
@@ -280,7 +292,12 @@ function KitBuilder({
               </p>
             )}
           </div>
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={save}>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={save}
+            disabled={busy}
+          >
             <Check className="w-3.5 h-3.5" /> Save kit
           </Button>
         </div>

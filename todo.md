@@ -1409,7 +1409,7 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       is restarted. Morning question Q-DB1; numbers in
       `references/stress-results.md` ("Third round").
 
-- [ ] **An optimistic Save form drops the typed edit when the save is
+- [x] **An optimistic Save form drops the typed edit when the save is
       refused** (drill, 2026-10-15). Labor rates, Kits and Modifiers close
       their row editor at once and roll back on error — CLAUDE.md §
       Responsiveness rule 1, and the toast does say it failed — but the
@@ -1422,7 +1422,9 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       "Deleted permanently") before the server agrees. **Labor rates too**
       (same day): reopens on refusal; Add says "Added" only once true, and
       sends the number its check read (Number() would have sent "$45" as
-      NaN — from reading the code). Kits next.
+      NaN — from reading the code). **Kits** needed no reopen (its editor
+      closes only on success); its Save is now guarded so a double click
+      sends one create (drilled: 1 request, 1 kit). Item done.
 
 - [ ] **The server accepts edits to an ARCHIVED bid** (drill, 2026-10-15).
       Archive in one tab and the other tab's `updateLine`, `addAssembly`,
