@@ -126,7 +126,7 @@ export function DeleteForeverDialog({
             <br />
             <br />
             If you only want it out of the way, leave it archived instead —
-            archived {noun}s stay recoverable indefinitely.
+            archived ones stay recoverable indefinitely.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -331,7 +331,7 @@ function ArchivedRow({
           className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
           onClick={() => onDeleteForever(modifier)}
         >
-          <Trash2 className="w-3.5 h-3.5" /> Delete Forever
+          <Trash2 className="w-3.5 h-3.5" /> Delete forever
         </Button>
       </div>
     </div>

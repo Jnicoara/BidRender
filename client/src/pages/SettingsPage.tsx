@@ -133,7 +133,7 @@ function AccountSection() {
           className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/40 text-sm text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
         >
           <LogOut size={14} />
-          Sign Out
+          Sign out
         </button>
       </div>
     </section>

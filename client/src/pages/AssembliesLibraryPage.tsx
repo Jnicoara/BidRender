@@ -1412,7 +1412,8 @@ function AssemblyBuilder({
               </div>
               {modifiers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No active modifiers. Add some on the Modifiers screen first.
+                  No active modifiers. Add some on the Modifiers tab of
+                  Assemblies first.
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -1930,7 +1931,7 @@ export default function AssembliesLibraryPage() {
                                 name: assembly.name,
                               })
                             }
-                            title="Delete permanently — cannot be undone"
+                            title="Delete forever — cannot be undone"
                             aria-label={`Delete ${assembly.name} forever`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />

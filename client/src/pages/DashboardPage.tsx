@@ -366,7 +366,7 @@ export default function DashboardPage({
               className="h-8 gap-1.5 text-xs shrink-0"
               onClick={onOpenArchive}
             >
-              <Archive className="w-3.5 h-3.5" /> Archive
+              <Archive className="w-3.5 h-3.5" /> Recently deleted
               <span className="text-muted-foreground">{archived.length}</span>
             </Button>
           )}
@@ -654,7 +654,7 @@ export default function DashboardPage({
                                 }}
                                 className="shrink-0 -mr-1 -mt-0.5 p-1 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted transition-all"
                                 aria-label={`Archive ${bid.name}`}
-                                title="Archive — hides it here, recoverable for 30 days"
+                                title={`Archive — moves it to Recently deleted, recoverable for ${RETENTION_DAYS} days`}
                               >
                                 <Archive className="w-3.5 h-3.5" />
                               </button>

@@ -129,11 +129,11 @@ export default function BidArchivePage({
             className="h-8 gap-1.5 text-xs"
             onClick={onBack}
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" /> Recently deleted
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold flex items-center gap-2">
-              <Archive className="w-4 h-4 text-muted-foreground" /> Archive
+              <Archive className="w-4 h-4 text-muted-foreground" /> Deleted bids
             </h1>
             <p className="text-xs text-muted-foreground">
               Archived bids stay here for {RETENTION_DAYS} days, then they are
@@ -273,7 +273,7 @@ export default function BidArchivePage({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete “{confirmDelete?.name}” for good?
+              Delete “{confirmDelete?.name}” forever?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This removes the bid, every line on it and any plans attached to
@@ -295,7 +295,7 @@ export default function BidArchivePage({
                 setConfirmDelete(null);
               }}
             >
-              Delete permanently
+              Delete forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

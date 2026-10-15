@@ -328,7 +328,7 @@ export default function ProposalPage({
           <p className="text-xs text-muted-foreground">
             {mode === "scope-only"
               ? "Scope only — no prices anywhere on this version"
-              : `${lineCount} line${lineCount === 1 ? "" : "s"} · priced from the snapshot taken when each was added`}
+              : `${lineCount} line${lineCount === 1 ? "" : "s"} · each priced as it was when you added it`}
           </p>
         </div>
 
@@ -482,7 +482,7 @@ export default function ProposalPage({
               hint={
                 client
                   ? bid.clientName
-                    ? `Overrides ${client.name}, the attached client. Clear this to use the record.`
+                    ? `Overrides ${client.name}, the attached client. Clear this to use the client's saved details.`
                     : `Filled from ${client.name}, the attached client. Type here only to address this one proposal differently.`
                   : undefined
               }

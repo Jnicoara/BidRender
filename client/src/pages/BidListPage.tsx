@@ -94,7 +94,7 @@ export default function BidListPage({
               onClick={onOpenArchive}
             >
               <Archive className="w-3.5 h-3.5" />
-              Archive
+              Recently deleted
               <span className="text-muted-foreground">{archived.length}</span>
             </Button>
           )}

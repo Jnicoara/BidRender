@@ -101,9 +101,9 @@ export default function TrashPage({
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold">Recently deleted</h1>
             <p className="text-xs text-muted-foreground">
-              Everything you archived, in one place. Restore puts it back
-              exactly as it was. Bids are deleted for good {RETENTION_DAYS} days
-              after you archive them; everything else waits for you.
+              Everything you archived or deleted, in one place. Restore puts it
+              back exactly as it was. Bids are deleted for good {RETENTION_DAYS}{" "}
+              days after you archive them; everything else waits for you.
             </p>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function TrashPage({
             </div>
           ) : total === 0 ? (
             <div className="rounded-xl border border-dashed border-border p-8 text-center">
-              <p className="text-sm text-muted-foreground">Nothing deleted.</p>
+              <p className="text-sm text-muted-foreground">Nothing here.</p>
               <p className="text-xs text-muted-foreground/80 mt-1">
                 When you archive a bid, a client or a library item, it lands
                 here, and Restore brings it back.
@@ -143,7 +143,10 @@ export default function TrashPage({
                     { onSuccess: () => done(row.name) }
                   )
                 }
-                seeAll={{ label: "Bid archive", onClick: onOpenBidArchive }}
+                seeAll={{
+                  label: "All deleted bids",
+                  onClick: onOpenBidArchive,
+                }}
               />
               <Section
                 title="Materials"

@@ -112,7 +112,7 @@ const BID_ORIGINS: Partial<Record<Route, string>> = {
   "plans-index": "Plans",
   clients: "Clients",
   analytics: "Performance",
-  "bid-archive": "Archive",
+  "bid-archive": "Deleted bids",
   trash: "Recently deleted",
 };
 /** The screens that belong to one bid: moving between them keeps the origin. */
@@ -359,7 +359,7 @@ export default function BidRenderShell() {
       <div className="flex-1 min-h-0">
         <DashboardPage
           onOpenBid={openBid}
-          onOpenArchive={() => navigate("bid-archive")}
+          onOpenArchive={() => navigate("trash")}
           onOpenPlans={id => navigate("takeoff", { id })}
           onCount={id => navigate("count", { id })}
         />
@@ -376,7 +376,7 @@ export default function BidRenderShell() {
           onOpenBid={openBid}
           onOpenPlans={id => navigate("takeoff", { id })}
           onCount={id => navigate("count", { id })}
-          onOpenArchive={() => navigate("bid-archive")}
+          onOpenArchive={() => navigate("trash")}
         />
       );
     if (route === "trash")
@@ -461,10 +461,7 @@ export default function BidRenderShell() {
     }
     if (isInBidArchive)
       return (
-        <BidArchivePage
-          onBack={() => navigate("dashboard")}
-          onOpenBid={openBid}
-        />
+        <BidArchivePage onBack={() => navigate("trash")} onOpenBid={openBid} />
       );
     if (isInClients) return <ClientsPage />;
     if (isInTeam) return <TeamPage />;
@@ -778,7 +775,7 @@ export default function BidRenderShell() {
                 isActive={isInAdmin}
                 icon={Shield}
                 label="Admin"
-                title="Admin settings"
+                title="Admin"
               />
             )}
           </NavSection>
@@ -851,7 +848,7 @@ export default function BidRenderShell() {
                                 ? "Modifiers"
                                 : "Assemblies"
                             : isInLaborRates
-                              ? "Labor Rates"
+                              ? "Labor rates"
                               : isInClients
                                 ? "Clients"
                                 : isInTeam

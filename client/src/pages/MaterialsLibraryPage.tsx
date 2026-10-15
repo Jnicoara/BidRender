@@ -1107,7 +1107,7 @@ function MaterialRow({
               variant="ghost"
               className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
               onClick={() => onDeleteForever?.(material)}
-              title="Delete permanently — cannot be undone"
+              title="Delete forever — cannot be undone"
               aria-label={`Delete ${material.name} forever`}
             >
               <Trash2 className="w-3.5 h-3.5" />

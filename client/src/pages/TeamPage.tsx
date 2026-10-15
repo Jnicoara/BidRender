@@ -42,7 +42,9 @@ import {
 import { useCompany } from "@/hooks/useCompany";
 import {
   INVITABLE_ROLES,
+  CAPABILITY_LABEL,
   capabilitiesFor,
+  roleLabel,
   type CompanyRole,
 } from "@shared/permissions";
 
@@ -148,7 +150,10 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
           </div>
           {access.role && (
             <span className="text-xs text-muted-foreground shrink-0">
-              You are {access.isOwner ? "the owner" : `an ${access.role}`}
+              You are{" "}
+              {access.isOwner
+                ? "the owner"
+                : `${/^[aeiou]/i.test(access.role) ? "an" : "a"} ${access.role}`}
             </span>
           )}
         </div>
@@ -232,7 +237,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                   <SelectContent>
                     {INVITABLE_ROLES.map(role => (
                       <SelectItem key={role} value={role}>
-                        {role}
+                        {roleLabel(role)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -325,8 +330,8 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                       )}
                     >
                       {member.status === "suspended"
-                        ? "suspended"
-                        : member.role}
+                        ? "Suspended"
+                        : roleLabel(member.role)}
                     </span>
 
                     {canManage && member.role !== "owner" && !isSelf && (
@@ -346,7 +351,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                           <SelectContent>
                             {INVITABLE_ROLES.map(role => (
                               <SelectItem key={role} value={role}>
-                                {role}
+                                {roleLabel(role)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -392,7 +397,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                     {item.email ?? "(no email noted)"}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {item.role}
+                    {roleLabel(item.role)}
                   </span>
                   <span className="text-xs shrink-0">
                     {/* From inviteStatus (shared/permissions.ts). This used
@@ -460,9 +465,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
             <h2 className="text-sm font-semibold">What your role covers</h2>
             <ul className="text-xs text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-0.5">
               {capabilitiesFor(access.role).map(capability => (
-                <li key={capability} className="font-mono">
-                  {capability}
-                </li>
+                <li key={capability}>{CAPABILITY_LABEL[capability]}</li>
               ))}
             </ul>
           </section>

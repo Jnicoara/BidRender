@@ -732,7 +732,7 @@ export default function KitsPage() {
                         onClick={() =>
                           setPendingDelete({ id: kit.id, name: kit.name })
                         }
-                        title="Delete permanently — cannot be undone"
+                        title="Delete forever — cannot be undone"
                         aria-label={`Delete ${kit.name} forever`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

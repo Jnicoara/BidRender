@@ -144,7 +144,7 @@ class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
               Something went wrong while drawing this page. It is not something
               you did, and nothing you had already saved is affected — your
-              bids, pricing and library are on the server and were not touched.
+              bids, pricing and library are saved and were not touched.
             </p>
 
             <div className="flex flex-wrap items-center gap-2 mt-5">

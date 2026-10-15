@@ -2395,7 +2395,7 @@ export default function BidsPage({
                     priced at $0. On a line priced by hand, pick who does the
                     hours beside them. On an assembly line, press &ldquo;Fix
                     this line&rdquo; and pick who does them. A role with no rate
-                    yet gets one in Labor Rates.{" "}
+                    yet gets one on the Labor rates screen.{" "}
                     <FixTheseButton
                       count={fixCount("rate")}
                       onClick={() => startFixWalk("rate")}
