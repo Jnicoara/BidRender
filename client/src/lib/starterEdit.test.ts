@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  PART_QTY_FIELD,
   STARTER_EDIT_FIELDS,
   editFieldsFor,
   fromInputText,
@@ -115,5 +116,13 @@ describe("which boxes a labor rate gets", () => {
       "annualHours",
       "name",
     ]);
+  });
+});
+
+describe("a recipe line's quantity", () => {
+  it("takes a decimal, and blank is refused (a part always has a quantity)", () => {
+    expect(fromInputText(PART_QTY_FIELD, "2.5")).toEqual({ value: 2.5 });
+    expect(fromInputText(PART_QTY_FIELD, "")).toHaveProperty("error");
+    expect(toInputText("number", "2.0000")).toBe("2");
   });
 });

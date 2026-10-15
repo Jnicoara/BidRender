@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
+  PART_QTY_FIELD,
   editFieldsFor,
   fromInputText,
   previewSentence,
@@ -82,15 +83,17 @@ export function StarterEditDialog({
   rowId,
   itemName,
   current,
+  part,
   onClose,
 }: {
   table: EditTable;
   rowId: number;
   itemName: string;
   current: Record<string, unknown>;
+  part?: { materialId: number };
   onClose: () => void;
 }) {
-  const fields = editFieldsFor(table, current);
+  const fields = part ? [PART_QTY_FIELD] : editFieldsFor(table, current);
   const [fieldName, setFieldName] = useState(fields[0].field);
   const f = fields.find(x => x.field === fieldName)!;
   const [text, setText] = useState(() => toInputText(f.unit, current[f.field]));
@@ -124,13 +127,23 @@ export function StarterEditDialog({
   const parsed = fromInputText(f, text);
   const edit =
     "value" in parsed
-      ? {
-          kind: "field" as const,
-          table,
-          rowId,
-          field: f.field,
-          newValue: parsed.value,
-        }
+      ? part
+        ? {
+            kind: "part_field" as const,
+            table: "assemblies" as const,
+            rowId,
+            childTable: "assembly_materials" as const,
+            childRefId: part.materialId,
+            field: "qty" as const,
+            newValue: parsed.value,
+          }
+        : {
+            kind: "field" as const,
+            table,
+            rowId,
+            field: f.field,
+            newValue: parsed.value,
+          }
       : null;
 
   const runPreview = async () => {
@@ -306,7 +319,7 @@ export function StarterEditDialog({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          {fieldLabel(table as UpdateTable, f.field)} ·{" "}
+          {f.label} ·{" "}
           {f.everyone ? "a finding field" : "an offer to existing shops"}
         </p>
       </DialogContent>

@@ -22,6 +22,7 @@ export type EditUnit =
   | "percent"
   | "feet"
   | "count"
+  | "number"
   | "text";
 
 export type EditField = {
@@ -162,6 +163,13 @@ export const STARTER_EDIT_FIELDS: Record<EditTable, EditField[]> = {
     },
     { field: "groundCount", label: "Grounds", unit: "count", blankable: true },
   ],
+};
+
+/** A recipe line's quantity: a part change, offered per part (plan § 3b). */
+export const PART_QTY_FIELD: EditField = {
+  field: "qty",
+  label: "Quantity in this assembly",
+  unit: "number",
 };
 
 /** The stored value as the box shows it: 0.1 → "10" for a percent. */

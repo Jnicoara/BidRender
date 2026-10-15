@@ -56,6 +56,8 @@ type Editing = {
   rowId: number;
   itemName: string;
   current: Record<string, unknown>;
+  /** Set for a recipe line: the part (material) whose quantity changes. */
+  part?: { materialId: number };
 };
 
 type Me = { name: string | null; email: string | null; sessionEndsAt: number };
@@ -476,14 +478,24 @@ function AssembliesTab({
               }
             />
           </div>
-          {open === a.id && <AssemblyParts id={a.id} />}
+          {open === a.id && (
+            <AssemblyParts id={a.id} name={a.name} onEdit={onEdit} />
+          )}
         </li>
       ))}
     </ul>
   );
 }
 
-function AssemblyParts({ id }: { id: number }) {
+function AssemblyParts({
+  id,
+  name,
+  onEdit,
+}: {
+  id: number;
+  name: string;
+  onEdit: (e: Editing) => void;
+}) {
   const detail = trpc.starterLibrary.assembly.useQuery({ id });
   if (!detail.data)
     return <p className="px-10 pb-3 text-xs text-muted-foreground">…</p>;
@@ -511,6 +523,21 @@ function AssemblyParts({ id }: { id: number }) {
                   {p.costPerUnit === null
                     ? ""
                     : `${unitCost(p.costPerUnit)} / ${p.unitOfSale ? unitLabel(p.unitOfSale) : ""}`}
+                </td>
+                <td className="w-9 py-0.5 text-right">
+                  {p.name !== null && (
+                    <EditButton
+                      onClick={() =>
+                        onEdit({
+                          table: "assemblies",
+                          rowId: id,
+                          itemName: `${name}: ${p.name}`,
+                          current: { qty: p.qty },
+                          part: { materialId: p.materialId },
+                        })
+                      }
+                    />
+                  )}
                 </td>
               </tr>
             ))}
