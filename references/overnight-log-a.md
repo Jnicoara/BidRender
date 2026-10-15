@@ -138,3 +138,26 @@ files only (B and C also running). MySQL 3307 shared — left running.
   green with it; `health.test.ts` 3. Related 8 files 57/57 ×3. One earlier
   `personalCompanyRace` failure (77 ms, message not captured) did not recur
   in 16 runs — recorded in the plan. `pnpm check` 0.
+
+## Item 2 — C's four parked security findings — 06:16 → 06:24
+
+`references/security-parked-a.md` (status + recommended order).
+
+- **A-S14** signup race: already fixed 2026-10-14.
+- **A-S9b FIXED**: session cookie `SameSite=Lax` on https too
+  (`_core/cookies.ts`); `cookies.test.ts` turned around — 2 of 3 red on the
+  old code, 3/3 green.
+- **A-S12 PREPARED**: `CLIENT_IP_FROM` (`first-forwarded` default = no
+  change; `last-forwarded`; `header:<name>`). 3 new tests, 2 red on the old
+  code; `rateLimit.test.ts` 8/8. Needs one live request's headers first.
+- **A-S13 NOT DONE**: needs proof on an R2 bucket; a wrong guess breaks
+  every upload. Recommended order: S12 switch → health check → S13 on the
+  staging bucket → Q-SEC1 (unmount legacy routers, owner).
+- `environment.md`: `DB_QUERY_DEADLINE_MS`, `CLIENT_IP_FROM`,
+  `SIGNUP_INVITE_ONLY` added.
+
+## Item 3 — Q-AUTH1 in todo.md — 06:24
+
+Under the stress-test items ("Before beta: speed of the summary…"): the
+measurement, the cause (`bcryptjs` on the main thread), two fix options
+(native `bcrypt` or a `worker_threads` pool), and a done-when.

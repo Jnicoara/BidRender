@@ -43,10 +43,16 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    // Browsers discard a SameSite=None cookie that is not also Secure, so over
-    // plain http (a local run) the session would never be stored and sign-in
-    // would bounce straight back to the form. None stays for https.
-    sameSite: secure ? "none" : "lax",
+    // Lax on https too, since 2026-10-15 (A-S9b, security-sweep.md on
+    // track-c). It was None on https — a leftover from the Manus preview,
+    // which ran the app inside another site's frame. With None, a hostile
+    // page could send a request that carried the session; Lax sends it only
+    // on the app's own pages and on a top-level link INTO the app (a reset
+    // email, a bookmark), which is everything this app needs. csrfGuard
+    // (track-c) closes the form-POST case on its own; this closes the class.
+    // Lax is also what a plain-http local run needs: a None cookie that is
+    // not Secure is discarded and sign-in bounces back to the form.
+    sameSite: "lax",
     secure,
   };
 }

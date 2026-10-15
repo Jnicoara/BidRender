@@ -1641,6 +1641,23 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
+- [ ] **Stress test Q-AUTH1 (Track C's sign-in burst, 2026-10-15; Track A
+      to fix): 11 sign-ins at once stall EVERY other request ~0.7 s.**
+      Measured on the production build (`references/stress-results.md` "Sign-in
+      burst", on `track-c`): 11/11 sign-ins ok at ~680 ms each; an ordinary bid
+      read went from p50 42 ms / max 73 ms to **701 ms**, and only one read got
+      through while they ran. Cause: `bcryptjs` (pure JavaScript, cost 12)
+      hashes on the main thread, and its "async" chunks do not yield enough.
+      Sign-up, change-password and reset hash too, so a burst of any of them
+      does the same. **Fix options (no stored hash changes either way — the
+      `$2a$/$2b$` format is the same):** (a) native `bcrypt` (a compiled
+      dependency — check it builds on App Platform's image, and that
+      `bcryptjs`-made hashes verify unchanged); (b) keep `bcryptjs` and run
+      `hash`/`compare` in a small `worker_threads` pool (no new dependency;
+      size it to the instance's CPUs). Prefer (b) if (a) needs build changes.
+      **Done when** the same burst leaves the bid read under ~150 ms p95, the
+      existing auth tests pass unchanged, and a hash made before the change
+      still signs in. Re-run C's burst script to measure, before and after.
 - [x] **DONE 2026-10-10 (Track B):** the remove gets the same
       "Removed circuit X." toast with Undo as every other delete
       (`notUndoableWired.test.ts`). Was:

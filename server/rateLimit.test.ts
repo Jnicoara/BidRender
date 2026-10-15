@@ -38,6 +38,42 @@ describe("clientKey", () => {
     expect(clientKey({ ip: "5.6.7.8", headers: {} })).toBe("5.6.7.8");
     expect(clientKey({ headers: {} })).toBe("unknown");
   });
+
+  // A-S12: with the default, a client that writes its own first entry gets a
+  // fresh key every time. These are the settings that close it, once a live
+  // request has shown which is right.
+  it("last-forwarded: a client-written first entry cannot change the key", () => {
+    const keys = ["9.9.9.1", "9.9.9.2"].map(fake =>
+      clientKey(
+        { headers: { "x-forwarded-for": `${fake}, 203.0.113.7` } },
+        "last-forwarded"
+      )
+    );
+    expect(keys).toEqual(["203.0.113.7", "203.0.113.7"]);
+  });
+
+  it("header:<name>: reads the platform's own header, ignoring X-Forwarded-For", () => {
+    expect(
+      clientKey(
+        {
+          headers: {
+            "x-forwarded-for": "9.9.9.1, 203.0.113.7",
+            "do-connecting-ip": "198.51.100.4",
+          },
+        },
+        "header:Do-Connecting-IP"
+      )
+    ).toBe("198.51.100.4");
+    expect(
+      clientKey({ ip: "5.6.7.8", headers: {} }, "header:do-connecting-ip")
+    ).toBe("5.6.7.8");
+  });
+
+  it("an unknown setting behaves like the default — a typo must not lock sign-in", () => {
+    expect(
+      clientKey({ headers: { "x-forwarded-for": "1.2.3.4, 10.0.0.1" } }, "lst")
+    ).toBe("1.2.3.4");
+  });
 });
 
 describe("createFailureLimiter", () => {

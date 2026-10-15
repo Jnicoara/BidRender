@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **The sign-in cookie can no longer be used by another website.** It was
+  set so that pages on other sites could send requests carrying a signed-in
+  person’s session; now only BidRidge’s own pages, and links into it, carry
+  it. Takes effect at each person’s next sign-in. A switch for how the
+  sign-in limits recognise a sender is also ready, off until checked on live.
+
 - **The server now recovers by itself when the database comes back after a
   network hiccup.** Before, a database that stopped answering for a while
   could leave the app unable to read anything until it was restarted, while

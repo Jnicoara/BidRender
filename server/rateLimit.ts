@@ -77,17 +77,54 @@ export function createFailureLimiter(options: {
   };
 }
 
-/** Best-effort client identity for a limiter. Never stored. */
-export function clientKey(req: {
-  ip?: string;
-  headers: Record<string, unknown>;
-}): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const first =
-    typeof forwarded === "string"
-      ? forwarded.split(",")[0]?.trim()
-      : Array.isArray(forwarded)
-        ? String(forwarded[0])
+/**
+ * Best-effort client identity for a limiter. Never stored.
+ *
+ * ── Where the address comes from: `CLIENT_IP_FROM` (A-S12, 2026-10-15) ───────
+ * Unset (or `first-forwarded`): the FIRST `X-Forwarded-For` entry — today's
+ * behaviour, unchanged. That entry is whatever the CLIENT wrote, so a script
+ * sending a fresh value per request dodges every per-sender limit (Track C's
+ * security sweep, A-S12). Per-address limits and sign-up's overall ceiling
+ * still hold.
+ *
+ * The fix depends on what sits in front of the app, which nobody has looked
+ * at yet on a live request:
+ *   `last-forwarded` — the LAST entry, i.e. the one our own front proxy
+ *                      appended. Right only if exactly one proxy we trust
+ *                      appends to the header; behind TWO (Cloudflare in front
+ *                      of DigitalOcean) the last entry is the inner proxy, and
+ *                      every visitor would share one key.
+ *   `header:<name>`  — a header the platform sets and overwrites itself
+ *                      (for example `header:do-connecting-ip`, if
+ *                      DigitalOcean sends it).
+ * Choose after reading one live request's headers (references/
+ * security-parked-a.md). An unknown value falls back to the default rather
+ * than refusing to start — a typo must not lock sign-in.
+ */
+export function clientKey(
+  req: {
+    ip?: string;
+    headers: Record<string, unknown>;
+  },
+  source: string | undefined = process.env.CLIENT_IP_FROM
+): string {
+  const one = (value: unknown): string | undefined =>
+    typeof value === "string"
+      ? value
+      : Array.isArray(value)
+        ? value.map(String).join(",")
         : undefined;
-  return first || req.ip || "unknown";
+  if (source?.startsWith("header:")) {
+    const named = one(req.headers[source.slice("header:".length).toLowerCase()])
+      ?.split(",")[0]
+      ?.trim();
+    return named || req.ip || "unknown";
+  }
+  const entries = (one(req.headers["x-forwarded-for"]) ?? "")
+    .split(",")
+    .map(entry => entry.trim())
+    .filter(Boolean);
+  const picked =
+    source === "last-forwarded" ? entries[entries.length - 1] : entries[0];
+  return picked || req.ip || "unknown";
 }
