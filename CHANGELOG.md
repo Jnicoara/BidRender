@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **"Fix this line" no longer turns "1,5" into 15.** Typing hours or a price
+  with a comma as the decimal point used to be read as fifteen on the bid;
+  now it's refused with "must be a number" so the line never takes a number
+  you didn't mean. "$12.50" and "1,500" still read as written.
+
 - **A material's labor hours are now checked before they're saved.** A
   mistyped entry used to be saved as some other number without a word; now
   it's refused with a message ("between 0 and 12, or blank") and the editor

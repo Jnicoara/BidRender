@@ -1757,7 +1757,10 @@ Measurements: `references/code-first-ceiling.md` § d.
       check, preview and save all read the box the same way; "$1.5" saves
       1.5, "0x10" is refused instead of saved as 16). Modifiers' percent
       (check, save and add; also accepts a trailing "%": "15%" saves 15%). Materials' labor
-      hours (now checked: 0–12 or blank), pack quantity and raceway lengths.
+      hours (now checked: 0–12 or blank), pack quantity and raceway lengths. Fix
+      this line (hours and prices): it stripped EVERY comma, so "1,5" became
+      15 on a bid line — now refused in words. Left: SeatLimitsPanel (admin)
+      and B's plan-screen components.
 
 ### Flaky tests — fix in a batch before beta
 
