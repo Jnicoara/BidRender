@@ -3,6 +3,7 @@ import { router } from "./_core/trpc";
 import { authRouter } from "./routers/authRouter";
 import { starterAuthRouter } from "./routers/starterAuthRouter";
 import { starterLibraryRouter } from "./routers/starterLibraryRouter";
+import { starterOffersRouter } from "./routers/starterOffersRouter";
 import { projectsRouter } from "./routers/projectsRouter";
 import { masterItemsRouter } from "./routers/masterItemsRouter";
 import { masterAssembliesRouter } from "./routers/masterAssembliesRouter";
@@ -53,6 +54,7 @@ export const appRouter = router({
   auth: authRouter,
   starterAuth: starterAuthRouter,
   starterLibrary: starterLibraryRouter,
+  starterOffers: starterOffersRouter,
   projects: projectsRouter,
   masterItems: masterItemsRouter,
   masterAssemblies: masterAssembliesRouter,

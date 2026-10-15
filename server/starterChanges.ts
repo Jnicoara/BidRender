@@ -69,6 +69,7 @@ import {
   starterChangePins,
   starterChanges,
   takeoffRunTypes,
+  users,
 } from "../drizzle/schema";
 import * as db from "./db";
 import {
@@ -1000,4 +1001,260 @@ export async function changesFor(table: StarterTable, rowId: number) {
       )
     )
     .orderBy(asc(starterChanges.id));
+}
+
+// ─── The admin screen's preview and change log (Track B, 2026-10-14) ─────────
+
+/** Thrown inside the preview's transaction so nothing it wrote is kept. */
+class PreviewRollback extends Error {
+  constructor(readonly outcome: StarterPreview) {
+    super("preview: rolled back");
+  }
+}
+
+export type StarterPreview = {
+  /** "offer" pins and offers; "everyone" reaches every shop now. */
+  reach: "offer" | "everyone" | "unchanged";
+  /** Shops that get a pinned copy holding today's value. */
+  pins: number;
+  /** Shops whose copy will NOT already hold the new value: they get an offer. */
+  offered: number;
+  /** The value as it would be stored, for the "Old → New" line. */
+  oldValue: unknown;
+  newValue: unknown;
+};
+
+/**
+ * What `applyStarterChange` WOULD do with ONE change, measured by doing it in
+ * a transaction and rolling it back — so the preview's numbers are the
+ * function's own, and cannot drift from what Confirm then does
+ * (starter-offers-plan.md § 6 test 14). Refusals throw `StarterChangeRefused`
+ * exactly as the real call would.
+ */
+export async function previewStarterChange(
+  change: StarterChangeInput
+): Promise<StarterPreview> {
+  try {
+    await db.inOneTransaction(async () => {
+      const result = await applyPlanned(
+        { editorUserId: null, source: "screen", note: "preview" },
+        [{ input: change, undoesChangeId: null }]
+      );
+      const handle = await database();
+      if (result.applied.length === 0)
+        throw new PreviewRollback({
+          reach: "unchanged",
+          pins: 0,
+          offered: 0,
+          oldValue: null,
+          newValue: null,
+        });
+      const [logged] = await handle
+        .select()
+        .from(starterChanges)
+        .where(eq(starterChanges.id, result.applied[0].changeId));
+      const isField = change.kind === "field";
+      const everyone =
+        isField && starterFieldKind(change.table, change.field) === "everyone";
+      let offered = 0;
+      if (!everyone) {
+        const cols = columnsOf(change.table);
+        const copies = (await handle
+          .select()
+          .from(TABLES[change.table].table)
+          .where(eq(cols.baselineId, change.rowId))) as Array<
+          Record<string, unknown>
+        >;
+        const owners = new Map<number, Record<string, unknown>[]>();
+        for (const c of copies) {
+          if (c.userId === null) continue;
+          const o = c.userId as number;
+          if (!owners.has(o)) owners.set(o, []);
+          owners.get(o)!.push(c);
+        }
+        const newValue = unwrap(logged.newValue);
+        for (const list of Array.from(owners.values())) {
+          if (!isField) {
+            offered += 1;
+            continue;
+          }
+          const live =
+            list.find(
+              c =>
+                c.isActive !== false &&
+                (c.status == null || c.status === "active")
+            ) ?? list[0];
+          if (!sameStarterValue(live[change.field], newValue)) offered += 1;
+        }
+      }
+      throw new PreviewRollback({
+        reach: everyone ? "everyone" : "offer",
+        pins: result.applied[0].pins,
+        offered,
+        oldValue: unwrap(logged.oldValue),
+        newValue: unwrap(logged.newValue),
+      });
+    });
+  } catch (err) {
+    if (err instanceof PreviewRollback) return err.outcome;
+    throw err;
+  }
+  throw new Error("preview: the transaction did not roll back");
+}
+
+export type StarterLogEntry = {
+  batchId: number;
+  source: string;
+  note: string | null;
+  editorName: string | null;
+  at: Date;
+  changes: Array<{
+    changeId: number;
+    table: StarterTable | null;
+    rowId: number;
+    itemName: string;
+    kind: string;
+    field: string | null;
+    childRefId: number | null;
+    childName: string | null;
+    oldValue: unknown;
+    newValue: unknown;
+    pins: number;
+    undoesChangeId: number | null;
+    /** The undo that put this one back, if any. */
+    undoneByChangeId: number | null;
+  }>;
+};
+
+/**
+ * The change log, newest batch first (the admin screen's Change log tab).
+ * The SEED's finding-field batches are left out unless asked for: a start
+ * writes one whenever search words differ, and they would bury the edits a
+ * person made.
+ */
+export async function starterChangeLog(input: {
+  limit: number;
+  includeSeed: boolean;
+}): Promise<StarterLogEntry[]> {
+  const handle = await database();
+  const batchRows = await handle
+    .select()
+    .from(starterChangeBatches)
+    .where(
+      input.includeSeed
+        ? sql`1 = 1`
+        : sql`${starterChangeBatches.source} <> 'seed'`
+    )
+    .orderBy(desc(starterChangeBatches.id))
+    .limit(input.limit);
+  if (batchRows.length === 0) return [];
+  const changes = await handle
+    .select()
+    .from(starterChanges)
+    .where(
+      inArray(
+        starterChanges.batchId,
+        batchRows.map(b => b.id)
+      )
+    )
+    .orderBy(asc(starterChanges.id));
+  const ids = changes.map(c => c.id);
+  const pinRows = ids.length
+    ? await handle
+        .select({
+          changeId: starterChangePins.changeId,
+          n: sql<number>`count(*)`,
+        })
+        .from(starterChangePins)
+        .where(inArray(starterChangePins.changeId, ids))
+        .groupBy(starterChangePins.changeId)
+    : [];
+  const undoRows = ids.length
+    ? await handle
+        .select({
+          id: starterChanges.id,
+          undoes: starterChanges.undoesChangeId,
+        })
+        .from(starterChanges)
+        .where(inArray(starterChanges.undoesChangeId, ids))
+    : [];
+  const editorIds = batchRows
+    .map(b => b.editorUserId)
+    .filter((id): id is number => id !== null);
+  const editors = editorIds.length
+    ? await handle
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(inArray(users.id, editorIds))
+    : [];
+  const pins = new Map(pinRows.map(p => [p.changeId, Number(p.n)]));
+  const undoneBy = new Map(
+    undoRows.map(u => [u.undoes as number, u.id] as const)
+  );
+  const editorName = new Map(editors.map(e => [e.id, e.name || e.email]));
+
+  // Names: the target rows, and the parts a recipe change names.
+  const names = new Map<string, string>();
+  const byTable = new Map<StarterTable, Set<number>>();
+  const want = (t: StarterTable, id: number) => {
+    if (!byTable.has(t)) byTable.set(t, new Set());
+    byTable.get(t)!.add(id);
+  };
+  for (const c of changes) {
+    const t = tableFromName(c.targetTable);
+    if (!t) continue;
+    want(t, c.targetRowId);
+    if (c.childRefId !== null)
+      want(
+        c.childTable === "assembly_modifiers" ? "modifiers" : "materials",
+        c.childRefId
+      );
+  }
+  for (const [t, set] of Array.from(byTable)) {
+    const cols = columnsOf(t);
+    const nameCol = t === "runTypes" ? cols.label : cols.name;
+    const rows = (await handle
+      .select({ id: cols.id, name: nameCol })
+      .from(TABLES[t].table)
+      .where(inArray(cols.id, Array.from(set)))) as Array<{
+      id: number;
+      name: string;
+    }>;
+    for (const r of rows) names.set(`${t}:${r.id}`, r.name);
+  }
+
+  return batchRows.map(b => ({
+    batchId: b.id,
+    source: b.source,
+    note: b.note,
+    editorName:
+      b.editorUserId === null ? null : (editorName.get(b.editorUserId) ?? null),
+    at: b.createdAt,
+    changes: changes
+      .filter(c => c.batchId === b.id)
+      .map(c => {
+        const table = tableFromName(c.targetTable);
+        const childTable =
+          c.childTable === "assembly_modifiers" ? "modifiers" : "materials";
+        return {
+          changeId: c.id,
+          table,
+          rowId: c.targetRowId,
+          itemName:
+            names.get(`${table}:${c.targetRowId}`) ?? `#${c.targetRowId}`,
+          kind: c.kind,
+          field: c.field,
+          childRefId: c.childRefId,
+          childName:
+            c.childRefId === null
+              ? null
+              : (names.get(`${childTable}:${c.childRefId}`) ?? null),
+          oldValue: c.oldValue === null ? null : unwrap(c.oldValue),
+          newValue: c.newValue === null ? null : unwrap(c.newValue),
+          pins: pins.get(c.id) ?? 0,
+          undoesChangeId: c.undoesChangeId,
+          undoneByChangeId: undoneBy.get(c.id) ?? null,
+        };
+      }),
+  }));
 }

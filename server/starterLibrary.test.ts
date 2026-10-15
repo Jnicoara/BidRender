@@ -16,13 +16,18 @@
  * starter editors made per run, `starter-lib-test-*@example.com`.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, isNull, like } from "drizzle-orm";
+import { and, eq, inArray, isNull, like } from "drizzle-orm";
 import { COOKIE_NAME } from "@shared/const";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
-import { assemblies, materials, users } from "../drizzle/schema";
+import {
+  assemblies,
+  materials,
+  starterChangeBatches,
+  users,
+} from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { createStarterEditor } from "./starterEditor/store";
 import { STARTER_COOKIE, signStarterToken } from "./starterEditor/session";
@@ -189,6 +194,117 @@ withDb("the baseline screen's reads", () => {
     if (first) {
       const one = await api.starterLibrary.assembly({ id: first.id });
       expect(one.id).toBe(first.id);
+    }
+  });
+
+  it("previewEdit's counts are what applyEdit does; the log shows it; undo puts it back (plan test 14)", async () => {
+    const api = caller(await starterCookie("done"));
+    const db = (await getDb())!;
+    const [probe] = await db
+      .insert(materials)
+      .values({
+        name: `starter-lib-test preview probe ${Date.now()}`,
+        unitOfSale: "each",
+        costPerUnit: "2.0000",
+        category: "Receptacles",
+        trade: "electrical",
+      })
+      .$returningId();
+    const batchIds: number[] = [];
+    try {
+      const edit = {
+        kind: "field" as const,
+        table: "materials" as const,
+        rowId: probe.id,
+        field: "costPerUnit",
+        newValue: "2.5",
+      };
+      const preview = await api.starterLibrary.previewEdit(edit);
+      expect(preview.reach).toBe("offer");
+      expect(preview.pins).toBeGreaterThan(0);
+      expect(preview.offered).toBe(preview.pins);
+      expect(preview.newValue).toBe("2.5000");
+      // The preview wrote nothing: the row and the forks are as they were.
+      const [still] = await db
+        .select()
+        .from(materials)
+        .where(eq(materials.id, probe.id));
+      expect(still.costPerUnit).toBe("2.0000");
+      expect(
+        await db
+          .select({ id: materials.id })
+          .from(materials)
+          .where(eq(materials.baselineId, probe.id))
+      ).toHaveLength(0);
+
+      const applied = await api.starterLibrary.applyEdit(edit);
+      batchIds.push(applied.batchId!);
+      expect(applied.applied[0].pins).toBe(preview.pins);
+
+      // A finding field reaches everyone and pins nobody.
+      const words = await api.starterLibrary.previewEdit({
+        ...edit,
+        field: "searchAliases",
+        newValue: "probe words",
+      });
+      expect(words).toMatchObject({ reach: "everyone", pins: 0 });
+
+      // A unit is refused with the reason, not a 500.
+      expect(
+        await codeOf(
+          api.starterLibrary.previewEdit({
+            ...edit,
+            field: "unitOfSale",
+            newValue: "foot",
+          })
+        )
+      ).toBe("BAD_REQUEST");
+
+      const log = await api.starterLibrary.changeLog({
+        limit: 10,
+        includeSeed: false,
+      });
+      const entry = log.find(b => b.batchId === applied.batchId)!;
+      expect(entry.editorName).toBe("Starter lib test");
+      expect(entry.changes[0]).toMatchObject({
+        table: "materials",
+        field: "costPerUnit",
+        oldValue: "2.0000",
+        newValue: "2.5000",
+        pins: preview.pins,
+        undoneByChangeId: null,
+      });
+
+      const undoPreview = await api.starterLibrary.undoBatch({
+        batchId: applied.batchId!,
+        preview: true,
+      });
+      expect(undoPreview.undoable).toEqual([entry.changes[0].changeId]);
+      const undone = await api.starterLibrary.undoBatch({
+        batchId: applied.batchId!,
+        preview: false,
+      });
+      batchIds.push(undone.result!.batchId!);
+      const [back] = await db
+        .select()
+        .from(materials)
+        .where(eq(materials.id, probe.id));
+      expect(back.costPerUnit).toBe("2.0000");
+      const after = await api.starterLibrary.changeLog({
+        limit: 10,
+        includeSeed: false,
+      });
+      expect(
+        after.find(b => b.batchId === applied.batchId)!.changes[0]
+          .undoneByChangeId
+      ).not.toBeNull();
+    } finally {
+      if (batchIds.length)
+        await db
+          .delete(starterChangeBatches)
+          .where(inArray(starterChangeBatches.id, batchIds));
+      await db.delete(materials).where(eq(materials.baselineId, probe.id));
+      await db.delete(materials).where(eq(materials.id, probe.id));
     }
   });
 

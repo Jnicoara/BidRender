@@ -23,6 +23,8 @@ import {
   assemblies,
   assemblyMaterials,
   bidPdfs,
+  companies,
+  companyMembers,
   bids,
   materials,
   starterChangeBatches,
@@ -564,5 +566,118 @@ describeDb("starter updates for a shop (starter-offers-plan.md § 6)", () => {
       .from(assemblyMaterials)
       .where(eq(assemblyMaterials.assemblyId, probe.assembly));
     expect(shared).toHaveLength(1);
+  });
+});
+
+// ─── The shop's routes (plan test 15, owner Q1) ──────────────────────────────
+
+const ADMIN = 9855;
+const ESTIMATOR = 9856;
+const VIEWER = 9857;
+dropFixtureUsersAfterAll([ADMIN, ESTIMATOR, VIEWER]);
+
+describeDb("the shop's update routes", () => {
+  const probeRow = { id: 0 };
+  const batchIds: number[] = [];
+
+  beforeAll(async () => {
+    const database = (await getDb())!;
+    await makeCompany(A);
+    const [company] = await database
+      .select()
+      .from(companies)
+      .where(eq(companies.ownerUserId, A));
+    for (const [id, role] of [
+      [ADMIN, "admin"],
+      [ESTIMATOR, "estimator"],
+      [VIEWER, "viewer"],
+    ] as const) {
+      const [exists] = await database
+        .select()
+        .from(users)
+        .where(eq(users.id, id));
+      if (!exists)
+        await database.insert(users).values({
+          id,
+          openId: `test-starter-offers-${id}`,
+          name: `Starter offers ${role}`,
+        });
+      await database
+        .insert(companyMembers)
+        .values({ companyId: company.id, userId: id, role, status: "active" });
+    }
+    const [m] = await database.insert(materials).values({
+      name: `${PROBE} routes`,
+      unitOfSale: "each",
+      costPerUnit: "3.0000",
+      category: "Receptacles",
+      trade: "electrical",
+    });
+    probeRow.id = m.insertId;
+    const result = await applyStarterChange({
+      editorUserId: null,
+      source: "screen",
+      changes: [
+        {
+          table: "materials",
+          rowId: probeRow.id,
+          kind: "field",
+          field: "costPerUnit",
+          newValue: "3.5",
+        },
+      ],
+    });
+    batchIds.push(result.batchId!);
+  });
+
+  afterAll(async () => {
+    if (!hasDb) return;
+    const database = (await getDb())!;
+    await database
+      .delete(starterChangeBatches)
+      .where(inArray(starterChangeBatches.id, batchIds));
+    await database
+      .delete(materials)
+      .where(eq(materials.baselineId, probeRow.id));
+    await database.delete(materials).where(eq(materials.id, probeRow.id));
+  });
+
+  it("count is the list's own length, for every member (test 15)", async () => {
+    for (const who of [A, ADMIN, ESTIMATOR, VIEWER]) {
+      const list = await caller(who).starterOffers.list();
+      const count = await caller(who).starterOffers.count();
+      expect([who, count.count]).toEqual([who, list.offers.length]);
+      expect(
+        list.offers.some(o => o.rowId === probeRow.id && o.bucket === "offer")
+      ).toBe(true);
+    }
+  });
+
+  it("only the owner and admins may answer (Q1); the list says so", async () => {
+    const offer = (await caller(A).starterOffers.list()).offers.find(
+      o => o.rowId === probeRow.id
+    )!;
+    const p = { key: offer.key, latestChangeId: offer.latestChangeId };
+    for (const who of [ESTIMATOR, VIEWER]) {
+      expect((await caller(who).starterOffers.list()).canAnswer).toBe(false);
+      await expect(
+        caller(who).starterOffers.ignore({ picks: [p] })
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller(who).starterOffers.accept(p)).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+    }
+    expect((await caller(ADMIN).starterOffers.list()).canAnswer).toBe(true);
+    await caller(ADMIN).starterOffers.ignore({ picks: [p] });
+    const after = await caller(A).starterOffers.list();
+    expect(after.offers.some(o => o.rowId === probeRow.id)).toBe(false);
+    expect(after.ignored.some(o => o.rowId === probeRow.id)).toBe(true);
+    await caller(A).starterOffers.unignore({ picks: [p] });
+    await caller(A).starterOffers.accept(p);
+    expect(Number((await copyOf(A, probeRow.id)).costPerUnit)).toBe(3.5);
+    // A stale pick is a plain refusal, not a server error.
+    await expect(caller(A).starterOffers.accept(p)).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
   });
 });
