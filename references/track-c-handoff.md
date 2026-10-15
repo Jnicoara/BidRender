@@ -1,5 +1,19 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-14, overnight run — see `references/overnight-log.md`
+
+The owner's overnight queue (11 items) is worked in order; each item's
+commit, tests and Gate result are one line in `references/overnight-log.md`.
+Questions that need the owner are in `pricing/morning-questions.md`.
+
+**Item 1 — Fasteners & Anchors: Q1–Q14 all YES as suggested**
+(`pricing/fasteners-anchors-name-review.md` "Owner's answers"), nothing
+applied: the ten renames, Q7 retires `Plastic conduit clip`, Q13 pack
+fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
+(COMMON; `new-rows-source-check.md` marks them accepted — still 64
+families, 62 COMMON, 2 SPECIALTY). No starter edit.
+
+
 ## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
 
 **Standing rule: never stop MySQL 3307** (all tracks share it). No dev

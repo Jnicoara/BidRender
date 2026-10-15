@@ -202,3 +202,36 @@ without one.
   "minerallac".
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming or retiring it.
+
+## Owner's answers — 2026-10-14: Q1–Q14 all YES, as suggested
+
+For A's end-of-pricing job. Nothing applied here; no catalog row, seed or
+starter changed.
+
+1. **Q1 yes**: `12 ga ceiling hanger wire, 12 ft piece` (the 7 starters
+   follow by key; priced per piece, never from a 100 ft roll).
+2. **Q2 yes**: `1/2" conduit hanger with bolt`, and **M2 `3/4" conduit
+   hanger with bolt` and M3 `1" conduit hanger with bolt` added**, COMMON
+   (Platt, Minerallac 1B / 2B), per `new-rows-source-check.md`.
+3. **Q3 yes**: `3/8" drop-in anchor`; "rod hanger" comes out of its search
+   words (S2).
+4. **Q4 yes**: `Plastic drywall anchor, #10-12`; "toggle" comes out (S1).
+5. **Q5 yes**: `J-hook, 2", with rod/wire clip` (MS6, CK9, CW8 keep the
+   key).
+6. **Q6 yes**: `3/16" x 1-3/4" masonry screw, hex head`.
+7. **Q7 yes**: `Plastic conduit clip` RETIRED through
+   `RETIRED_BASELINE_MATERIALS` (no starter uses it).
+8. **Q8 yes**: `1-1/2" powder-actuated pin with washer`.
+9. **Q9 yes**: `Rod to flange clip, 3/8" rod, hammer-on`; "bat wing" comes
+   out (S3). M2 and M3 may now carry "rod hanger".
+10. **Q10 yes**: `Self-drilling screw, #10 x 3/4", hex washer head`.
+11. **Q11 yes**: `1/4" x 2-1/4" sleeve anchor, hex nut`.
+12. **Q12 yes**: `1/4" x 3" toggle bolt`.
+13. **Q13 yes — the pack pass**: beam clamp `each`; drop-in `box of 50`;
+    drywall anchor and masonry screw `pack of 75`; toggle `pack of 10`; the
+    rest as A reads them at the three stores. **Before** the owner types
+    these prices.
+14. **Q14 yes**: **M1 `Powder load, .27 cal, yellow strip` added**, COMMON
+    (Home Depot, Ramset 00667, 100-count).
+
+**Starter edits: none.**
