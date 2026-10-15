@@ -23,6 +23,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -381,7 +382,7 @@ export default function ClientsPage() {
               >
                 {tab === "active" ? "Working list" : "Archived"}
                 <span className="ml-1.5 text-muted-foreground/70">
-                  {view === tab ? visible.length : ""}
+                  {view === tab && !listQuery.isError ? visible.length : ""}
                 </span>
               </button>
             ))}
@@ -434,6 +435,13 @@ export default function ClientsPage() {
               />
             ))}
           </div>
+        ) : listQuery.isError ? (
+          // Not "No clients yet" — a list that failed to load is not an
+          // empty one (drill, 2026-10-15; LoadFailed.tsx).
+          <LoadFailed
+            what="your clients"
+            onRetry={() => void listQuery.refetch()}
+          />
         ) : visible.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">

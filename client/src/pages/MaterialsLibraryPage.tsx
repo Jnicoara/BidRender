@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -1210,6 +1211,7 @@ export default function MaterialsLibraryPage() {
   const {
     data: materials = [],
     isLoading,
+    isError: materialsFailed,
     refetch,
   } = trpc.materials.list.useQuery({ status: view });
   const { data: archivedRows = [] } = trpc.materials.list.useQuery({
@@ -1691,7 +1693,8 @@ export default function MaterialsLibraryPage() {
                 onlyUnpriced ? "opacity-80" : "text-muted-foreground"
               )}
             >
-              {unpricedCount}
+              {/* A count of a list that did not load is not zero. */}
+              {materialsFailed ? "—" : unpricedCount}
             </span>
           </Button>
           <Button
@@ -1710,19 +1713,19 @@ export default function MaterialsLibraryPage() {
                 onlyUnhoured ? "opacity-80" : "text-muted-foreground"
               )}
             >
-              {unhouredCount}
+              {materialsFailed ? "—" : unhouredCount}
             </span>
           </Button>
         </div>
 
-        {onlyUnpriced && unpricedCount === 0 && (
+        {onlyUnpriced && unpricedCount === 0 && !materialsFailed && (
           <p className="text-xs text-muted-foreground mb-3">
             Every material in your library has a price. Switch the filter off to
             see them all.
           </p>
         )}
 
-        {onlyUnhoured && unhouredCount === 0 && (
+        {onlyUnhoured && unhouredCount === 0 && !materialsFailed && (
           <p className="text-xs text-muted-foreground mb-3">
             Every material in your library has a labor unit. Switch the filter
             off to see them all.
@@ -1859,6 +1862,15 @@ export default function MaterialsLibraryPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading materials…
+            </div>
+          ) : materialsFailed ? (
+            // Not "No materials yet" — a catalog that failed to load is not
+            // an empty one (drill, 2026-10-15; LoadFailed.tsx).
+            <div className="p-4">
+              <LoadFailed
+                what="your materials"
+                onRetry={() => void refetch()}
+              />
             </div>
           ) : visible.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">

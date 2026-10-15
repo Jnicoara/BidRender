@@ -167,6 +167,8 @@ import {
 import { homerunSummaryLine } from "@/lib/homerunText";
 import { frozenWarningsNote } from "@/lib/frozenWarnings";
 import { errorText } from "@/lib/errorText";
+import { isReachFailure } from "@/lib/dataReach";
+import { LoadFailed } from "@/components/LoadFailed";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -745,6 +747,24 @@ export default function BidsPage({
    * into a bid since the list was folded into the Dashboard, so there is no
    * surrounding screen left to notice you are stuck on.
    */
+  if (detailQuery.isError && isReachFailure(detailQuery.error)) {
+    // Not "may have been deleted": the bid is fine and the DATA was out of
+    // reach. Said otherwise, a contractor with the database blipping was
+    // told their bid might be gone (drill, 2026-10-15; @/lib/dataReach).
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6">
+        <div className="w-full max-w-md">
+          <LoadFailed
+            what="this bid"
+            onRetry={() => void detailQuery.refetch()}
+          />
+        </div>
+        <Button size="sm" variant="ghost" className="gap-1.5" onClick={onBack}>
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to {backLabel}
+        </Button>
+      </div>
+    );
+  }
   if (detailQuery.isError) {
     return (
       <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6 text-center">

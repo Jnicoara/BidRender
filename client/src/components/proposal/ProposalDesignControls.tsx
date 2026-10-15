@@ -46,6 +46,7 @@ import {
   type ProposalSectionId,
 } from "@shared/proposal";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 /**
  * A handful of accents that look right in print.
@@ -139,7 +140,8 @@ export function ProposalDesignControls({
   compact?: boolean;
 }) {
   const utils = trpc.useUtils();
-  const { data: settings } = trpc.proposals.settings.useQuery();
+  const settingsQuery = trpc.proposals.settings.useQuery();
+  const settings = settingsQuery.data;
   // Company-wide, so settings.edit (owner, admin) — the server refuses
   // anyone else (proposalsRouter, security sweep 2026-10-14).
   const canEdit = useCompany().can("settings.edit");
@@ -165,7 +167,14 @@ export function ProposalDesignControls({
     if (!editingTerms.current) setTermsDraft(settings.termsText);
   }, [settings]);
 
-  if (!settings) return null;
+  // Not blank: a section that failed to load says so (drill, 2026-10-15).
+  if (!settings)
+    return settingsQuery.isError ? (
+      <LoadFailed
+        what="your proposal settings"
+        onRetry={() => void settingsQuery.refetch()}
+      />
+    ) : null;
 
   const hidden = settings.hiddenSections;
 

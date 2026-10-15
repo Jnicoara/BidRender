@@ -10,6 +10,8 @@ import { registerServiceWorker } from "@/lib/registerServiceWorker";
 import { markStagingEnvironment } from "@/lib/appEnvironment";
 import StagingBand from "@/components/StagingBand";
 import { NewVersionBar } from "@/components/NewVersionBar";
+import { DataUnreachableBar } from "@/components/DataUnreachableBar";
+import { noteReadFailure, noteReadSuccess } from "@/lib/dataReach";
 import { markPageOutOfDate } from "@/lib/versionCheck";
 import { withQueryDeadline } from "@/lib/queryDeadline";
 import { isPriceHistoryQuery, isStepBarQuery } from "@/lib/stepBarQuery";
@@ -51,9 +53,17 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
+    noteReadFailure(error);
     console.error("[API Query Error]", error);
   }
+  // Any read that answers means the data is reachable (@/lib/dataReach).
+  if (event.type === "updated" && event.action.type === "success")
+    noteReadSuccess();
 });
+
+/** The unreachable bar's retry: ask again for what is on screen. */
+const retryVisibleReads = () =>
+  void queryClient.refetchQueries({ type: "active" });
 
 // The bid's step bar (BidStepBar) counts marks, runs, lines and sheets that
 // nearly every editing mutation on a bid moves. Rather than adding it to each
@@ -73,6 +83,7 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error, true);
+    noteReadFailure(error);
     console.error("[API Mutation Error]", error);
   }
 });
@@ -133,6 +144,7 @@ createRoot(document.getElementById("root")!).render(
   <>
     {isStaging && <StagingBand />}
     <NewVersionBar />
+    <DataUnreachableBar retry={retryVisibleReads} />
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <App />

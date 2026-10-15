@@ -29,6 +29,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -1482,7 +1483,12 @@ export default function AssembliesLibraryPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingItem | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: assemblies = [], isLoading } = trpc.assemblies.list.useQuery({
+  const {
+    data: assemblies = [],
+    isLoading,
+    isError: assembliesFailed,
+    refetch: refetchAssemblies,
+  } = trpc.assemblies.list.useQuery({
     status: view,
   });
   const { data: archivedRows = [] } = trpc.assemblies.list.useQuery({
@@ -1804,6 +1810,15 @@ export default function AssembliesLibraryPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading assemblies…
+            </div>
+          ) : assembliesFailed ? (
+            // Not "No assemblies yet" — a list that failed to load is not
+            // an empty one (drill, 2026-10-15; LoadFailed.tsx).
+            <div className="p-4">
+              <LoadFailed
+                what="your assemblies"
+                onRetry={() => void refetchAssemblies()}
+              />
             </div>
           ) : visible.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">

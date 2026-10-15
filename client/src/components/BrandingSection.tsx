@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsBranding, missingBrandingFields } from "@shared/proposal";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -171,7 +172,8 @@ export function BrandingSection() {
   // the server refuses anyone else (proposalsRouter, security sweep
   // 2026-10-14). Shown to everyone, editable by them only.
   const canEdit = useCompany().can("settings.edit");
-  const { data: branding } = trpc.proposals.branding.useQuery();
+  const brandingQuery = trpc.proposals.branding.useQuery();
+  const branding = brandingQuery.data;
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -195,7 +197,14 @@ export function BrandingSection() {
     onSettled: invalidate,
   });
 
-  if (!branding) return null;
+  // Not blank: a section that failed to load says so (drill, 2026-10-15).
+  if (!branding)
+    return brandingQuery.isError ? (
+      <LoadFailed
+        what="your letterhead"
+        onRetry={() => void brandingQuery.refetch()}
+      />
+    ) : null;
 
   const missing = missingBrandingFields(branding);
   const missingKeys = new Set(missing.map(f => f.key));

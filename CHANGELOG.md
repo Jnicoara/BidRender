@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **When BidRidge can't reach its data, screens now say so instead of
+  saying something false.** With the database briefly unreachable, a bid
+  you opened claimed it "may have been archived or deleted", and other
+  screens said "No clients yet", "No roles yet", "0 lines", "Needs
+  pricing 0", sales tax "off", or went blank. Each now says it couldn't load, with a Try
+  again button, and a bar at the top says what's on screen may be
+  incomplete. The bar clears by itself when the connection comes back.
+
 - **"Where do I…?" forgives a typo.** Typing "pasword" or "custmers" now
   finds the right help topic instead of saying nothing matches — one slip
   of the thumb on a phone no longer sends you hunting through menus.

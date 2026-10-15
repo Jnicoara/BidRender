@@ -48,6 +48,7 @@ import {
   type CompanyRole,
 } from "@shared/permissions";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 const ROLE_BLURB: Record<CompanyRole, string> = {
   owner: "Everything, including who else is here.",
@@ -61,7 +62,12 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const access = useCompany();
   const canManage = access.can("members.manage");
 
-  const { data: members = [], isLoading } = trpc.company.members.useQuery();
+  const {
+    data: members = [],
+    isLoading,
+    isError: membersFailed,
+    refetch: refetchMembers,
+  } = trpc.company.members.useQuery();
   const { data: invites = [] } = trpc.company.invites.useQuery(undefined, {
     enabled: canManage,
   });
@@ -279,7 +285,8 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
         <section className="space-y-2">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-sm font-semibold">
-              In this company ({members.length})
+              {/* A crew that did not load is not a crew of 0 (drill, 2026-10-15). */}
+              In this company{membersFailed ? "" : ` (${members.length})`}
             </h2>
             {/* Members plus pending invitations; suspended people hold no
                 seat. The rule is shared/seats.ts. */}
@@ -296,6 +303,11 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
           </div>
           {isLoading ? (
             <div className="h-20 rounded bg-muted/40 animate-pulse" />
+          ) : membersFailed ? (
+            <LoadFailed
+              what="your crew"
+              onRetry={() => void refetchMembers()}
+            />
           ) : (
             <div className="border border-border rounded-lg divide-y divide-border/60">
               {members.map(member => {

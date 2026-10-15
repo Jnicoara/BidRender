@@ -44,6 +44,7 @@ import {
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { combinedRatePct } from "@shared/salesTax";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 type ComponentDraft = { label: string; ratePct: string };
 
@@ -317,6 +318,22 @@ export function SalesTaxSection() {
   const rows = areas.data ?? [];
   const archivedRows = archived.data ?? [];
 
+  // Not drawn from defaults: a failed load showed "Charge sales tax" OFF and
+  // "No tax areas yet" to a company that charges tax (drill, 2026-10-15).
+  if ((rules.isError && !current) || (areas.isError && !areas.data))
+    return (
+      <section className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Sales tax</h3>
+        <LoadFailed
+          what="your sales tax settings"
+          onRetry={() => {
+            void rules.refetch();
+            void areas.refetch();
+          }}
+        />
+      </section>
+    );
+
   return (
     <section className="space-y-4">
       <div>
@@ -363,6 +380,8 @@ export function SalesTaxSection() {
           </div>
           <Switch
             checked={current?.enabled ?? false}
+            // Until the setting is known, "off" would be a guess.
+            disabled={!current}
             onCheckedChange={enabled => setRules.mutate({ enabled })}
             aria-label="Charge sales tax on bids"
           />

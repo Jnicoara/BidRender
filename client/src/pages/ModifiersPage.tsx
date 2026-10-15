@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { applyModifiersToHours } from "@shared/pricing";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -540,7 +541,11 @@ export default function ModifiersPage() {
             >
               {tab}
               <span className="ml-1.5 text-muted-foreground/70">
-                {tab === "active" ? active.length : archived.length}
+                {(tab === "active" ? activeQuery : archivedQuery).isError
+                  ? ""
+                  : tab === "active"
+                    ? active.length
+                    : archived.length}
               </span>
             </button>
           ))}
@@ -636,6 +641,14 @@ export default function ModifiersPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading modifiers…
+            </div>
+          ) : (view === "active" ? activeQuery : archivedQuery).isError ? (
+            // A list that failed to load is not an empty one (drill, 2026-10-15).
+            <div className="p-4">
+              <LoadFailed
+                what="your modifiers"
+                onRetry={() => void refreshBoth()}
+              />
             </div>
           ) : view === "active" ? (
             active.length === 0 ? (

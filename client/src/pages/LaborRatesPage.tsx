@@ -66,6 +66,7 @@ import {
   type LoadedParts,
 } from "@shared/loadedRate";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -699,7 +700,12 @@ export default function LaborRatesPage() {
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
 
   const utils = trpc.useUtils();
-  const { data: rates = [], isLoading } = trpc.laborRates.list.useQuery();
+  const {
+    data: rates = [],
+    isLoading,
+    isError: ratesFailed,
+    refetch: refetchRates,
+  } = trpc.laborRates.list.useQuery();
   const [scope, setScope] = useState<LibraryScope>("all");
   /** Scope is a view filter only — labor rates have no archive of their own. */
   // (scope is applied in `visible` below, alongside the search filter)
@@ -969,6 +975,14 @@ export default function LaborRatesPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading roles…
+            </div>
+          ) : ratesFailed ? (
+            // A list that failed to load is not an empty one (drill, 2026-10-15).
+            <div className="p-4">
+              <LoadFailed
+                what="your labor rates"
+                onRetry={() => void refetchRates()}
+              />
             </div>
           ) : visible.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">

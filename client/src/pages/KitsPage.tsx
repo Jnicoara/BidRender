@@ -72,6 +72,7 @@ import { smartSearch } from "@/lib/smartSearch";
 import { money } from "@/lib/money";
 import { hoursNotSetWords } from "@/lib/notPricedTotal";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -540,7 +541,12 @@ export default function KitsPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingItem | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: kits = [], isLoading } = trpc.kits.list.useQuery({
+  const {
+    data: kits = [],
+    isLoading,
+    isError: kitsFailed,
+    refetch: refetchKits,
+  } = trpc.kits.list.useQuery({
     status: view,
   });
   const { data: archivedRows = [] } = trpc.kits.list.useQuery({
@@ -649,6 +655,11 @@ export default function KitsPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading kits…
+            </div>
+          ) : kitsFailed ? (
+            // A list that failed to load is not an empty one (drill, 2026-10-15).
+            <div className="p-4">
+              <LoadFailed what="your kits" onRetry={() => void refetchKits()} />
             </div>
           ) : visibleKits.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">

@@ -25,6 +25,8 @@
 import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { isReachFailure } from "@/lib/dataReach";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
 import { cn } from "@/lib/utils";
@@ -289,6 +291,31 @@ export default function QuickBidPage({
   // Newest first: what you just counted is what you want to check.
   const recent = [...lines].reverse();
 
+  // A bid that did not load is not an empty bid: drawn anyway, this screen
+  // said "Quick bid · 0 lines" under a database outage (drill, 2026-10-15).
+  if (detailQuery.isError) {
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6">
+        <div className="w-full max-w-md">
+          {isReachFailure(detailQuery.error) ? (
+            <LoadFailed
+              what="this bid"
+              onRetry={() => void detailQuery.refetch()}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center">
+              That bid could not be opened — it may have been archived or
+              deleted.
+            </p>
+          )}
+        </div>
+        <Button size="sm" variant="ghost" className="gap-1.5" onClick={onBack}>
+          <ArrowLeft className="w-3.5 h-3.5" /> Bid
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="page-header border-b border-border px-6 py-4">
@@ -307,7 +334,10 @@ export default function QuickBidPage({
               {detail?.bid.name ?? "Quick bid"}
             </h1>
             <p className="text-xs text-muted-foreground">
-              {lines.length} line{lines.length === 1 ? "" : "s"} · counting mode
+              {detail
+                ? `${lines.length} line${lines.length === 1 ? "" : "s"}`
+                : "…"}{" "}
+              · counting mode
             </p>
           </div>
           {/* On a phone .page-header drops this block to its own line, flush

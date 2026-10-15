@@ -38,6 +38,7 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 /** Fraction (0.1) → percent string ("10"). Blank stays blank. */
 const toPercent = (fraction: number | string | null | undefined) =>
@@ -48,7 +49,8 @@ const toFraction = (percent: string) => (Number(percent) || 0) / 100;
 
 export function BidPricingDefaultsSection() {
   const utils = trpc.useUtils();
-  const { data: defaults } = trpc.bids.pricingDefaults.useQuery();
+  const defaultsQuery = trpc.bids.pricingDefaults.useQuery();
+  const defaults = defaultsQuery.data;
 
   const save = trpc.bids.setPricingDefaults.useMutation({
     onSuccess: () => {
@@ -91,7 +93,14 @@ export function BidPricingDefaultsSection() {
     setProductivityPct(toPercent(defaults.productivityPct));
   }, [defaults]);
 
-  if (!defaults) return null;
+  // Not blank: a section that failed to load says so (drill, 2026-10-15).
+  if (!defaults)
+    return defaultsQuery.isError ? (
+      <LoadFailed
+        what="your pricing settings"
+        onRetry={() => void defaultsQuery.refetch()}
+      />
+    ) : null;
 
   const isPercentage = defaults.overheadMode === "percentage";
 

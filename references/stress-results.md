@@ -295,6 +295,51 @@ answer SERVICE_UNAVAILABLE; a deleted person with the database up is still
 signed out — `server/sessionUnavailable.test.ts`, 4 cases), `AuthGuard`,
 `DashboardPage`, `LoadFailed` on Plans, Recently deleted and Bids search.
 
+### Second round: every other screen, database down with the app open (2026-10-15)
+
+Production build through the proxy. Dashboard opened normally, database cut,
+then each screen opened in-app so it had to fetch fresh. Text read off the
+screen; screenshots `overnight-shots/drill-dbdown-*.png`.
+
+| Screen                                          | BEFORE                                                                    | AFTER                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Bid page                                        | **"That bid could not be opened — it may have been archived or deleted"** | "Couldn't load this bid. Nothing is lost…" + Try again      |
+| Count screen                                    | **"Quick bid · 0 lines · counting mode"**, ready to count into            | Same "Couldn't load this bid" + Try again                   |
+| Materials                                       | Empty table, **"Needs pricing 0 · Needs hours 0"**                        | "Couldn't load your materials" + Try again; counts read "—" |
+| Assemblies                                      | **"No assemblies yet. Build your first one."**                            | "Couldn't load your assemblies" + Try again                 |
+| Clients                                         | **"No clients yet"**, tab "Working list 0"                                | "Couldn't load your clients" + Try again; no count          |
+| Crew                                            | **"In this company (0)"**                                                 | "Couldn't load your crew" + Try again; no count             |
+| Settings › Pricing                              | **Blank**                                                                 | "Couldn't load your pricing settings" + Try again           |
+| Settings › Branding                             | Blank (same `return null`)                                                | "Couldn't load your letterhead" + Try again                 |
+| Settings › Proposal                             | Blank (same)                                                              | "Couldn't load your proposal settings" + Try again          |
+| Settings › Heights                              | Blank (same)                                                              | "Couldn't load your heights" + Try again                    |
+| Performance                                     | **Blank**                                                                 | "Couldn't load your figures" + Try again                    |
+| Labor rates (not cached)                        | **"No roles yet. Add your first one"**                                    | "Couldn't load your labor rates" + Try again                |
+| Kits                                            | **"No kits yet"**                                                         | "Couldn't load your kits" + Try again                       |
+| Modifiers                                       | **"Active 0 · Archived 0"**, "No modifiers in the working list"           | "Couldn't load your modifiers" + Try again; no counts       |
+| Settings › Sales tax                            | **"Charge sales tax" switch OFF**, "No tax areas yet"                     | "Couldn't load your sales tax settings" + Try again         |
+| Bids list                                       | "0 bids" above a correct "Couldn't load your bids"                        | No count over a failed list                                 |
+| Proposal, Plans list, Recently deleted, Account | Already honest                                                            | Unchanged                                                   |
+
+The second half of the table came from a SECOND pass, opened from Settings ›
+Display so nothing was cached — the first pass, opened from the Dashboard,
+had Labor rates already in memory and so missed it. The Sales tax switch
+is now also disabled until its setting is known, so a load in flight
+cannot show "off" either.
+
+**And one net under all of them, including screens not written yet:**
+`client/src/lib/dataReach.ts` + `components/DataUnreachableBar.tsx`. Any
+read that fails because the data is out of reach (`SERVICE_UNAVAILABLE`, or
+no answer at all) raises a bar at the top — "BidRidge can't reach your data
+right now. What's on screen may be incomplete. Nothing you saved is lost" —
+which re-asks every 15 s and falls on the next read that answers. A
+NOT_FOUND, FORBIDDEN or bad input never raises it (`dataReach.test.ts`).
+
+Driven at phone width: healthy, six screens — bar never shown; database
+slow (2.5 s a packet) — never shown, list loaded; down — bar up and the
+list says it couldn't load; database back — **bar gone by itself after
+9.2 s**, assemblies listed.
+
 ## Failure drills — file storage and AI
 
 | What failed                                   | BEFORE                                                                                                          | AFTER                                                                                                                                                                                                          |
