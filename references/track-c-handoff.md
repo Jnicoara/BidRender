@@ -91,6 +91,13 @@ archivedAt />` drops in anywhere the bid is loaded.
   "The name is too long — 255 characters at most" and the like, from the
   issue's path and limit. Anything else keeps the general line. Every
   `toast.error(errorText(e))` on every track gets it with no change.
+- **Finished mutations are let go at once** (`main.tsx`, mutations
+  `gcTime: 0`, 2026-10-15). Their callbacks closed over the Plans screen's
+  canvas ref and kept the whole drawing alive 5 minutes per visit (+14,590
+  nodes each). **For Track B:** nothing to change in TakeoffPage; but a
+  future `useMutationState` / `useIsMutating` would see no FINISHED
+  mutations — pending ones are unaffected. `references/stress-results.md`
+  "Memory".
 - **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
   still first).
 

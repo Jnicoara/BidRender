@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **The app no longer piles up memory when you go back and forth to the
+  plans.** Each visit to a busy drawing used to stay in memory for five
+  minutes after you left — fifteen trips left the page using almost four
+  times the memory, enough to slow a phone down. It is now let go as soon
+  as you leave.
+
 - **Clearer messages when something you typed is refused.** Instead of
   "Something in that wasn't valid", the app now says which box and what
   the limit is — "The name is too long — 255 characters at most". And

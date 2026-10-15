@@ -26,7 +26,22 @@ import {
 } from "@/lib/sessionExpiry";
 import "./index.css";
 
-const queryClient = new QueryClient();
+/*
+  Finished mutations are let go as soon as nothing on screen watches them.
+
+  React Query keeps one for 5 minutes by default (`gcTime`), and with it the
+  callbacks it was given — which close over the screen that made it. Measured
+  2026-10-15 (references/stress-results.md, "Memory"): every visit to a dense
+  Plans screen fires a few saves whose callbacks hold its canvas ref, so the
+  whole drawing — ~14,600 DOM nodes and 4,400 listeners for 2,000 marks —
+  stayed alive for 5 minutes after leaving, and each further visit in that
+  window stacked another copy (90,000 nodes after six). Nothing here reads a
+  finished mutation (no useMutationState / useIsMutating), and a mounted
+  useMutation keeps its own result, so 0 loses nothing.
+*/
+const queryClient = new QueryClient({
+  defaultOptions: { mutations: { gcTime: 0 } },
+});
 
 const redirectToLoginIfUnauthorized = (
   error: unknown,

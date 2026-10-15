@@ -304,6 +304,40 @@ opening the set to sheet 1 drawn **1,897 / 1,929 / 1,905 ms** at laptop,
 thing a heavier set would push past it. Session minted in memory for user
 1 and handed to the browser as a cookie; never printed or written.
 
+## Memory in the browser: going back and forth all day (2026-10-15)
+
+Production build, laptop. Dashboard → the 2,000-mark Plans screen → bid
+page → Dashboard, over and over; after each round the JS heap is collected
+(`HeapProfiler.collectGarbage`) and read through the DevTools protocol, so a
+number that stays is memory something still holds.
+
+| After round | BEFORE heap / DOM nodes / listeners | AFTER                     |
+| ----------- | ----------------------------------- | ------------------------- |
+| 0           | 18.4 MB / 17,383 / 4,904            | 16.0 MB / 2,793 / 545     |
+| 5           | 37.1 MB / 90,333 / 26,699           | 18.4 MB / 2,793 / 545     |
+| 15          | **70.0 MB / 236,233 / 70,289**      | **19.1 MB / 2,793 / 545** |
+
+**Which screen:** one leg at a time, 6 trips each — Dashboard ↔ Trash,
+↔ bid page, ↔ Materials held nothing measurable; **↔ Plans screen held
++14,590 nodes and +4,359 listeners per trip**: its whole drawing.
+
+**Why, from a heap snapshot** (shortest path from the GC root to a detached
+node): Window → a pending timer → a React Query **mutation** → its
+`onSuccess` closure → a ref → the Plans screen's `<canvas>`
+(`TakeoffPage.tsx:2924`). A detached node still links to its parent, so
+that one ref kept all 21,000 detached objects (4,290 SVG paths, 4,010
+circles, 4,000 "Show this one on the drawing" buttons…). The timer is
+React Query's 5-minute garbage collection for FINISHED mutations; every
+Plans visit fires a few saves (page count, sheet reads, scale). Confirmed
+by waiting: 90,329 nodes after six visits, unchanged at 1 and 3 minutes,
+**2,789 at 5½** — bounded, but each visit inside the window stacked a copy.
+
+**Fix:** `new QueryClient({ defaultOptions: { mutations: { gcTime: 0 } } })`
+in `main.tsx` — a finished mutation is let go once nothing on screen
+watches it. Nothing in the app reads finished mutations (no
+`useMutationState` / `useIsMutating`). Plans trips now hold **+0 nodes, +0
+listeners**. Smoke suite at four sizes: 140 passed.
+
 ## Failure drills — the database (`scripts/dbFaultProxy.mts`)
 
 One dev server pointed at the proxy (`DATABASE_URL=…@127.0.0.1:3399/…`),
