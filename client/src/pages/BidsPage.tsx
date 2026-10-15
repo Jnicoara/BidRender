@@ -1191,8 +1191,19 @@ export default function BidsPage({
         {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
             track is as wide as its widest child's longest unbreakable line,
             which made the whole bid 445 px wide on a 390 px phone. */}
-        <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[1fr_22rem]">
-          <div className="space-y-4 min-w-0">
+        {/*
+          THREE BLOCKS, TWO COLUMNS (owner, 2026-10-14: "you scroll down and
+          it's mostly empty with a little text off to the right"). The rail
+          used to hold close-out, extras, tax and pricing settings under the
+          total, so once the line list ended the left half was empty for a
+          screen or more. Now on a laptop the rail is only the client and the
+          total — sticky, beside the lines — and the four panels sit under the
+          lines in the main column (row 2). On a phone the grid is one column
+          and the blocks keep their old order: lines, then client and total,
+          then the panels.
+        */}
+        <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[1fr_22rem] lg:grid-rows-[auto_1fr]">
+          <div className="space-y-4 min-w-0 lg:col-start-1 lg:row-start-1">
             {/* Add an assembly — deliberately minimal */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-2">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -1870,7 +1881,7 @@ export default function BidsPage({
           </div>
 
           {/* Rollup */}
-          <div className="lg:sticky lg:top-0 h-fit space-y-4 min-w-0">
+          <div className="lg:sticky lg:top-0 h-fit lg:self-start space-y-4 min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
             {/* Who the work is for. Above the total because it is part of what
                 the bid IS rather than part of what it costs, and because the
                 proposal reads it. Entirely optional — see ClientLinkField. */}
@@ -2792,7 +2803,10 @@ export default function BidsPage({
                 </>
               )}
             </div>
+          </div>
 
+          {/* Under the lines on a laptop, after the total on a phone. */}
+          <div className="space-y-4 min-w-0 lg:col-start-1 lg:row-start-2">
             {/* After the bid is built, not before: closing out is something
                 that happens when the job is finished, and it sits shut until
                 somebody opens it. */}
