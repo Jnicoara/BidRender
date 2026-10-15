@@ -147,6 +147,10 @@ export function BidSearchPanel({
             placeholder="Search bids — job name, client, address…"
             className="pl-9 h-9"
             aria-label="Search bids"
+            // The server's own limit (bids.search, 200). Past it the search
+            // was refused, and the list said it couldn't load — blaming the
+            // connection for a long paste (break-it drill, 2026-10-15).
+            maxLength={200}
           />
           {text && (
             <button
@@ -188,6 +192,7 @@ export function BidSearchPanel({
               value={client}
               onChange={e => setClient(e.target.value)}
               placeholder="Who it was for"
+              maxLength={200}
               className="h-8 text-sm"
             />
           </label>
@@ -198,6 +203,7 @@ export function BidSearchPanel({
               value={address}
               onChange={e => setAddress(e.target.value)}
               placeholder="Where the job was"
+              maxLength={200}
               className="h-8 text-sm"
             />
           </label>
