@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **One "Recently deleted" page.** Everything you archive — bids, materials,
+  assemblies, kits, modifiers and clients — is now listed in one place in the
+  left menu, each with a Restore button. Before, each kind had its own
+  Archived tab and you had to know where to look.
+
 - **The left menu is now daily work on top, setup at the bottom.** Bids and
   Plans have their own entries again: Bids is every bid in one searchable
   list, and Plans is every job with drawings plus an "Upload a plan" button.

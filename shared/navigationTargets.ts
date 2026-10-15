@@ -135,6 +135,14 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
       "Archived bids, and where to restore one that was removed by mistake before it is permanently deleted.",
   },
   {
+    /** Every archived thing in one place, with Restore (owner, 2026-10-14). */
+    id: "trash",
+    label: "Recently deleted",
+    path: "#/trash",
+    purpose:
+      "Trash: everything you deleted or archived — bids, materials, assemblies, kits, modifiers and clients — in one place, with a Restore button to bring any of it back.",
+  },
+  {
     /**
      * Listed for everybody, even though only owners and admins may open it.
      *

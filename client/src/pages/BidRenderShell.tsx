@@ -51,6 +51,7 @@ import ProposalPage from "@/pages/ProposalPage";
 import BidArchivePage from "@/pages/BidArchivePage";
 import BidListPage from "@/pages/BidListPage";
 import PlansIndexPage from "@/pages/PlansIndexPage";
+import TrashPage from "@/pages/TrashPage";
 import KitsPage from "@/pages/KitsPage";
 import ClientsPage from "@/pages/ClientsPage";
 import TeamPage from "@/pages/TeamPage";
@@ -72,6 +73,7 @@ import {
   FileStack,
   Map as MapIcon,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import {
   Popover,
@@ -223,6 +225,7 @@ export default function BidRenderShell() {
   const isInAdmin = route === "admin";
   const isInBidList = route === "bid-list";
   const isInPlansIndex = route === "plans-index";
+  const isInTrash = route === "trash" || route === "bid-archive";
   /** Which Work entry a per-bid screen belongs to: the plans to Plans, the
    *  rest of a bid (the bid, its count, its proposal) to Bids. */
   const bidsActive = isInBidList || isInBids || isInCount || isInProposal;
@@ -257,6 +260,12 @@ export default function BidRenderShell() {
       icon: HardHat,
       active: isInLaborRates,
       go: () => navigate("library-labor-rates"),
+    },
+    {
+      label: "Recently deleted",
+      icon: Trash2,
+      active: isInTrash,
+      go: () => navigate("trash"),
     },
     {
       label: "Settings",
@@ -339,6 +348,15 @@ export default function BidRenderShell() {
           onOpenPlans={id => navigate("takeoff", { id })}
           onCount={id => navigate("count", { id })}
           onOpenArchive={() => navigate("bid-archive")}
+        />
+      );
+    if (route === "trash")
+      return (
+        <TrashPage
+          onOpenBidArchive={() => navigate("bid-archive")}
+          go={hash => {
+            window.location.hash = hash;
+          }}
         />
       );
     if (isInPlansIndex)
@@ -697,6 +715,16 @@ export default function BidRenderShell() {
               label="Labor rates"
               title="Labor rates — what an hour costs, by role"
             />
+            {/* Always shown, even empty (owner, 2026-10-14: "one easy-to-find
+                place"). Unlike the old Archive entry, an empty page here
+                still says something useful: where deleted things go. */}
+            <NavBtn
+              onClick={() => navigate("trash")}
+              isActive={isInTrash}
+              icon={Trash2}
+              label="Recently deleted"
+              title="Recently deleted — everything archived, with Restore"
+            />
             <NavBtn
               onClick={() => navigate("settings")}
               isActive={isInSettings}
@@ -774,33 +802,35 @@ export default function BidRenderShell() {
             <span>
               {isOnDashboard
                 ? "Dashboard"
-                : isInBidList
-                  ? "Bids"
-                  : isInPlansIndex
-                    ? "Plans"
-                    : isInSettings
-                      ? "Settings"
-                      : isInLibraryMats
-                        ? activeView === "pricing"
-                          ? "Supplier pricing"
-                          : "Materials"
-                        : isInLibraryAsms
-                          ? activeView === "kits"
-                            ? "Kits"
-                            : activeView === "modifiers"
-                              ? "Modifiers"
-                              : "Assemblies"
-                          : isInLaborRates
-                            ? "Labor Rates"
-                            : isInClients
-                              ? "Clients"
-                              : isInTeam
-                                ? "Crew"
-                                : isInAnalytics
-                                  ? "Performance"
-                                  : isInAdmin
-                                    ? "Admin"
-                                    : "Bid"}
+                : route === "trash"
+                  ? "Recently deleted"
+                  : isInBidList
+                    ? "Bids"
+                    : isInPlansIndex
+                      ? "Plans"
+                      : isInSettings
+                        ? "Settings"
+                        : isInLibraryMats
+                          ? activeView === "pricing"
+                            ? "Supplier pricing"
+                            : "Materials"
+                          : isInLibraryAsms
+                            ? activeView === "kits"
+                              ? "Kits"
+                              : activeView === "modifiers"
+                                ? "Modifiers"
+                                : "Assemblies"
+                            : isInLaborRates
+                              ? "Labor Rates"
+                              : isInClients
+                                ? "Clients"
+                                : isInTeam
+                                  ? "Crew"
+                                  : isInAnalytics
+                                    ? "Performance"
+                                    : isInAdmin
+                                      ? "Admin"
+                                      : "Bid"}
             </span>
           </div>
         </header>

@@ -34,6 +34,7 @@ export type Route =
   | "bids"
   | "bid-list"
   | "plans-index"
+  | "trash"
   | "clients"
   | "team"
   | "analytics"
@@ -190,6 +191,9 @@ export function pathToRoute(path: string): RouteState {
   // "trash" for soft-deleted projects; that screen and its route are gone, and
   // this is the only archive left.
   if (p === "archive") return { route: "bid-archive" };
+  // Recently deleted: every archived thing in one place, with Restore
+  // (owner, 2026-10-14). The bid archive above stays as the bids' own page.
+  if (p === "trash") return { route: "trash" };
   // The two daily lists the owner asked to have in the nav (2026-10-14):
   // every bid, and every bid with plans. Each is a real screen with its own
   // content, not a "which one?" chooser — see bidListPages in the shell.

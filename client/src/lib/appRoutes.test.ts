@@ -144,6 +144,12 @@ describe("retired addresses", () => {
     expect(routeToPath("plans-index")).toBe("/plans");
   });
 
+  it("serves Recently deleted at /trash, beside the bid archive", () => {
+    expect(pathToRoute("#/trash")).toEqual({ route: "trash" });
+    expect(routeToPath("trash")).toBe("/trash");
+    expect(pathToRoute("#/archive")).toEqual({ route: "bid-archive" });
+  });
+
   it("names the canonical address so the URL can be rewritten", () => {
     expect(retiredAddress("#/matdb")).toBe("/library/materials?view=pricing");
     expect(retiredAddress("#/library/kits")).toBe(
