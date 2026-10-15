@@ -209,6 +209,10 @@ screen here — see below), correct, and usable. Inside Track B's viewer, so
 noted for B rather than changed. Screenshot:
 `overnight-shots/stress-dense-sheet-laptop.png`.
 
+**Production build, 2026-10-15:** laptop **1,059 / 917 / 923 ms**, one zoom
+step 107 ms; phone **924 / 918 / 904 ms**. Well under 2 s — the dev-server
+numbers above were the dev server. Nothing for B to chase here.
+
 ## Do the screens agree on the money? (`scripts/totalsCrossCheck.mjs`)
 
 After pricing the stress company for real (labor rates, 260 materials,
