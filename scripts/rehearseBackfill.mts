@@ -60,6 +60,8 @@ if (!beforeFolder) {
   );
   process.exit(1);
 }
+/** Past the guard above: the folder is given. Typed so later code can rely on it. */
+const productionFolder: string = beforeFolder;
 
 const SCHEMA = process.env.REHEARSE_SCHEMA ?? "bidrender_rehearsal";
 
@@ -239,9 +241,9 @@ async function main() {
       } as never);
       const t = await caller.takeoffRuns.totals({ bidId: bid.id });
       out.set(bid.id, {
-        conduitFeet: t.conduitFeet,
-        cableFeet: t.cableFeet,
-        wireFeet: t.wireFeet,
+        conduitFeet: t.conduitBoughtFeet,
+        cableFeet: t.cableBoughtFeet,
+        wireFeet: t.wireBoughtFeet,
         unmeasurableCount: t.unmeasurableCount,
       });
     }
@@ -266,7 +268,7 @@ async function main() {
   };
 
   // ── 3. Bring it to production's state, then measure ───────────────────────
-  const atProduction = await applyFrom(beforeFolder);
+  const atProduction = await applyFrom(productionFolder);
   console.log(
     `brought to production's state: ${atProduction.applied} migrations applied`
   );

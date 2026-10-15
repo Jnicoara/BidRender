@@ -39,7 +39,7 @@ import {
 import {
   measurabilityOf,
   runFeet,
-  type RunPathType,
+  tracedRunOf,
 } from "../shared/takeoffQuantities";
 
 function where(): string {
@@ -106,13 +106,10 @@ for (const run of conduitRuns) {
       })
     : ({ ok: false, reason: "no-scale", message: "" } as const);
   const flatFeet = measurability.ok
-    ? runFeet(
-        {
-          pathType: run.pathType as RunPathType,
-          points: run.points ?? [],
-        },
-        measurability.ratio
-      )
+    ? // From the ROW (tracedRunOf), so a typed length is honoured like the
+      // app honours it — the hand-built object here dropped it once the
+      // field was added, which only a typecheck of scripts/ could see.
+      runFeet(tracedRunOf(run), measurability.ratio)
     : null;
 
   affected.push({
