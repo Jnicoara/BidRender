@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import {
   Archive as ArchiveIcon,
   Boxes,
@@ -263,7 +264,7 @@ const emptyDraft: Draft = {
 /** Shared validation for both the add form and inline edits. */
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return "Give the material a name.";
-  const cost = Number(draft.costPerUnit);
+  const cost = parseTypedNumber(draft.costPerUnit);
   if (draft.costPerUnit.trim() === "" || Number.isNaN(cost))
     return "Enter a cost.";
   if (cost < 0) return "Cost cannot be negative.";
@@ -1450,8 +1451,8 @@ export default function MaterialsLibraryPage() {
           ...(draft.priceTyped === "pack" &&
           Number(draft.packQty) > 0 &&
           (draft.packPrice ?? "").trim() !== ""
-            ? { packPrice: Number(draft.packPrice) }
-            : { costPerUnit: Number(draft.costPerUnit) }),
+            ? { packPrice: parseTypedNumber(draft.packPrice ?? "") }
+            : { costPerUnit: parseTypedNumber(draft.costPerUnit) }),
           ...(draft.packQty !== undefined
             ? {
                 packQty:
@@ -1592,7 +1593,7 @@ export default function MaterialsLibraryPage() {
       await createMaterial.mutateAsync({
         name: newDraft.name.trim(),
         unitOfSale: newDraft.unitOfSale,
-        costPerUnit: Number(newDraft.costPerUnit),
+        costPerUnit: parseTypedNumber(newDraft.costPerUnit),
         // A new material starts with no labor unit unless one was typed —
         // NULL, never 0, so it joins the Needs hours worklist rather than
         // claiming to take no time.

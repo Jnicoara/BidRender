@@ -1690,6 +1690,16 @@ Measurements: `references/code-first-ceiling.md` § d.
       release, so the scale check passes it clean there too. Other
       worktrees' `reader-accuracy/plans/Weld 1.pdf` copies are also old.
 
+### Number boxes in forms with a Save button read only plain numbers (Track C, 2026-10-15)
+
+- [ ] **`parseTypedNumber` (client/src/lib/inlineEdit.ts) is used by every
+      self-saving number box and the Materials editor's price boxes.** The
+      other forms with their own Save button (~38 `Number(draft…)` /
+      `parseFloat` sites in client/src/pages and components) still read
+      "$12.50" and "1,500" as not-a-number (refused with a message — honest)
+      and "0x10" as 16 (a wrong number, if anyone ever typed it). Move them to
+      the same reader, one screen per commit, and look at each.
+
 ### Flaky tests — fix in a batch before beta
 
 - [ ] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
