@@ -97,6 +97,24 @@ drawn sheet, the bid total…), 3 fresh loads each.
   production build is smaller. The 5.5 s first Dashboard is the dev server
   compiling for the very first browser visit; every load after it is 0.9 s.
 
+## The 500-sheet set (user 1's "Large set check", 270 MB, local disk)
+
+Measured in Chrome at laptop size, signed in the device audit's way, bytes
+from Playwright's `request.sizes()` (what actually arrived — a first
+attempt summed `content-length` and reported ~276 MB a sheet, which is the
+size of the streams pdf.js aborts on purpose; wrong, and caught before use).
+
+| Open      | Sheet drawn | Plan bytes in the first 4 s |
+| --------- | ----------- | --------------------------- |
+| Sheet 1   | 3,041 ms    | 7.2 MB in 24 range requests |
+| Sheet 400 | 2,530 ms    | 2.1 MB in 6 range requests  |
+
+Byte-range loading works as designed (CLAUDE.md § Large plan sets). The
+time is **over the 2 s budget** and it is inside the plan viewer (Track B's
+TakeoffPage / pdfRenderer worker), so it is written up for B rather than
+changed here: next step is splitting it into open-document, page-fetch and
+render time to see which part to work on.
+
 ## Failure drills — the database (`scripts/dbFaultProxy.mts`)
 
 One dev server pointed at the proxy (`DATABASE_URL=…@127.0.0.1:3399/…`),

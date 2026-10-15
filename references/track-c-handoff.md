@@ -27,6 +27,13 @@ route is attacked automatically.
   first tap). `client/src/lib/shellNavStable.test.ts` now fails on ANY
   component declared inside another in client/src.
 
+**FOR TRACK B (from the stress run):** the 500-sheet set opens its first
+sheet in ~3.0 s and sheet 400 in ~2.5 s at laptop size — over the owner's
+2 s budget. Range loading is fine (7.2 MB / 2.1 MB); the time is the
+viewer's open + render. Numbers and method: `references/stress-results.md`.
+Also: a plan whose file is missing says "could not be opened … (404)" —
+honest, but it could say what to do ("upload it again").
+
 **Item 3 — guide mode: `references/guide-mode.md` (G1–G8).** A one-tip
 strip at the bottom of the main column (`GuideStrip`, mounted in
 `BidRenderShell`) + a local "Where do I…?" (`HelpSearch`). **For Track B:**
