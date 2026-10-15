@@ -34,6 +34,10 @@ export const INTERNAL_TEXT =
 const TECHNICAL =
   /\b(ER_[A-Z_]+|SQL|sqlMessage|undefined|null is not|Cannot read propert|is not a function|DB unavailable|ECONN|ETIMEDOUT|Unexpected token|TypeError|ReferenceError)\b/i;
 
+/** How zod's own messages begin — never a sentence somebody wrote here. */
+const ZOD_DEFAULT =
+  /^(Too (big|small)|Invalid|Expected|Unrecognized|Required|String must|Number must|Array must)/i;
+
 /** Field names whose words alone would read oddly. */
 const FIELD_WORDS: Record<string, string> = {
   qty: "quantity",
@@ -72,8 +76,18 @@ function validationSentence(message: string): string | null {
     maximum?: unknown;
     minimum?: unknown;
     path?: unknown;
+    message?: unknown;
   } | null;
   if (!issue) return null;
+  // A schema's OWN sentence ("Give it a name — that is what the count is
+  // called.") was written for the person: show it as written. zod's
+  // defaults read like "Too big: expected string to have <=255 characters".
+  if (
+    typeof issue.message === "string" &&
+    issue.message.trim() !== "" &&
+    !ZOD_DEFAULT.test(issue.message)
+  )
+    return issue.message.trim();
   const words = fieldWords(issue.path);
   const field = words ? `The ${words}` : "That";
   const num = (n: unknown) =>

@@ -88,6 +88,23 @@ describe("errorText", () => {
     ).toBe("That can't be below 0.");
   });
 
+  it("shows a schema's own written sentence as written", () => {
+    expect(
+      errorText({
+        message: JSON.stringify([
+          {
+            origin: "string",
+            code: "too_small",
+            minimum: 1,
+            path: ["name"],
+            message: "Give it a name — that is what the count is called.",
+          },
+        ]),
+        data: { code: "BAD_REQUEST" },
+      })
+    ).toBe("Give it a name — that is what the count is called.");
+  });
+
   it("keeps the general sentence for anything it cannot say plainly", () => {
     const say = (message: string) =>
       errorText({ message, data: { code: "BAD_REQUEST" } });
