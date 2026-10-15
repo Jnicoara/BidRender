@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { isReachFailure } from "@/lib/dataReach";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ArchivedBidNotice } from "@/components/bid/ArchivedBidNotice";
 import { toast } from "sonner";
 import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
 import { cn } from "@/lib/utils";
@@ -372,6 +373,10 @@ export default function QuickBidPage({
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-4xl space-y-4">
+          <ArchivedBidNotice
+            bidId={bidId}
+            archivedAt={detail?.bid.archivedAt}
+          />
           {/* Same strip as the bid screen (owner Q14, Q22). */}
           <MathChangeStrip bidId={bidId} />
           {/* The loop: type, arrow, Enter */}

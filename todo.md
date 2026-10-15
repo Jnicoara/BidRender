@@ -1418,6 +1418,16 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       stays open with the edit. A better shape for the optimistic ones:
       on error, reopen the editor holding the draft that failed.
 
+- [ ] **The server accepts edits to an ARCHIVED bid** (drill, 2026-10-15).
+      Archive in one tab and the other tab's `updateLine`, `addAssembly`,
+      `update` and `removeLine` all succeed — onto a bid that is deleted for
+      good when its 30 days run out. The bid page and Count screen now say
+      so ("This bid is in Recently deleted … Restore",
+      `components/bid/ArchivedBidNotice.tsx`), and a tab picks it up when
+      it is shown again. Refusing the edits server-side needs ONE guard in
+      every route that writes under a bid, the plan-screen routes (Track B)
+      included — or an owner decision that editing in the trash is fine.
+
 ### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
 
 A pack or bulk price stored as a per-unit price does not look broken. It

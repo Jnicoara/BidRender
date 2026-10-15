@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A deleted bid says so.** Open a bid that was moved to Recently deleted
+  (in another tab, or from an old link) and it now says so at the top,
+  with the date it will be deleted for good and a Restore button. Before,
+  it looked like a normal bid, and work done on it would have been
+  deleted with it.
+
 - **Editing a material no longer loses your changes if the save fails.**
   The editor used to close even when the save was refused, throwing away
   everything you had typed; now it stays open so you can try again.

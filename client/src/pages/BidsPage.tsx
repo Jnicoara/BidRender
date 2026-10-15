@@ -169,6 +169,7 @@ import { frozenWarningsNote } from "@/lib/frozenWarnings";
 import { errorText } from "@/lib/errorText";
 import { isReachFailure } from "@/lib/dataReach";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ArchivedBidNotice } from "@/components/bid/ArchivedBidNotice";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -1217,6 +1218,7 @@ export default function BidsPage({
       </div>
 
       <div className="shrink-0 md:shrink md:flex-1 md:overflow-y-auto px-4 md:px-6 py-5">
+        <ArchivedBidNotice bidId={bid.id} archivedAt={bid.archivedAt} />
         {bid.isSample && <SampleBidNotice bidId={bid.id} />}
         <ExampleRatesBanner className="mb-4" />
         {/* Above everything, full width: it changes what every quantity below
