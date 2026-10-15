@@ -421,6 +421,19 @@ these values; there is no "not yet" state (multi-supplier § 6's argument).
 > caught too). Built together with price-history recording (that plan § 8
 > step 1), as § 6's note said they would travel. `server/packPricing.test.ts`
 > shown red on nearest-rounding.
+>
+> **Step 5 BUILT 2026-10-14 (overnight):** the pack pair in the Materials
+> editor (pack size under More options) and on Supplier pricing; the router
+> rules in `materials.update`. **The sanity warning is NOT built** — it is
+> step 3 and waits on the measured T (Q4/Q8, the Platt export).
+>
+> **Step 6 HALF-BUILT, write HELD:** `realPackFromSheet` (shared/packPricing)
+> maps every shipped row's sheet pack to a real pack (`shippedPacks.test.ts`
+> runs it over the whole catalog). Nothing writes `packQty`/`packLabel` to a
+> shipped row, because Track A's rule in `starterPacks.ts` is that no pack
+> reaches a shop until STARTER_PACKS has been through the owner's sheet.
+> When unheld: new rows take it at insert; existing ones through
+> `seedProposal` as an OFFER field (A's door), never the boot.
 
 1. `shared/packPricing.ts` (`priceWrite`, round-up) + the `updateMaterial`
    union; tests red on round-down and on a stale `packPrice`.

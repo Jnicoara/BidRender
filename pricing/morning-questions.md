@@ -103,4 +103,6 @@ Sketches and reasons: `references/overnight-parked.md`. None of these changes a 
 - Q-PH1 Price history: "Reset to BidRidge's price" on a material is recorded as **typed** (the history's "how" kinds are typed / imported / import undone / starter accepted). Add a "reverted" kind? → **Yes, later** — it needs a one-word enum change from Track A (draft below); until then "typed" is true, a person did it. Affects: the history's wording only, never a price.
   Draft for A (additive, step 1): ``ALTER TABLE `material_price_history` MODIFY `source` enum('typed','imported','import_undone','starter_accepted','reverted') NOT NULL;``
 
+- Q-PS6 Shipped pack sizes (wire 250 ft roll, box of 25, 10 ft stick …): the rule that reads them from the pricing sheet is built and checked on every row, but NOT written to any material, because Track A's rule says no pack size goes to shops until the pack list has been through your sheet. Has it? → **Tell A when you've checked the sheet's packs; then A sends them as an offer** (never at boot). Affects: which rows show the "or [pack price]" box; never a stored price.
+
 (Items 6–11 add below.)

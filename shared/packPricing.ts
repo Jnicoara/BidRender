@@ -88,3 +88,32 @@ export function packPhrase(
   if (unitOfSale === "box") return `${word} of ${n} boxes`;
   return `${word} of ${n}`;
 }
+
+/**
+ * The REAL pack behind a pricing-sheet pack label (pricing-safety-plan § 2.4,
+ * owner Q2): the app stores the roll even where the sheet types wire per
+ * foot with pack qty 1. "per foot (from 250 ft roll)" → 250, "roll";
+ * "box of 25" → 25, "box"; "10 ft stick" → 10, "stick"; "pair" → 2;
+ * "each" and "per foot (cut to length)" → sold singly (both NULL).
+ *
+ * Built, NOT written anywhere yet: Track A's rule (starterPacks.ts) is that
+ * no pack size reaches a shop until STARTER_PACKS has been through the
+ * owner's sheet. `server/shippedPacks.test.ts` runs it over every shipped
+ * row so the day it is unheld, every label is already known to parse.
+ */
+export function realPackFromSheet(
+  label: string,
+  qty: number
+): { packQty: number | null; packLabel: string | null } {
+  const single = { packQty: null, packLabel: null };
+  const fromReel = /^per foot \(from ([\d.]+) ft ([a-z]+)\)$/i.exec(label);
+  if (fromReel) return { packQty: Number(fromReel[1]), packLabel: fromReel[2] };
+  if (/^per foot\b/i.test(label) || label === "each") return single;
+  if (label === "pair") return { packQty: 2, packLabel: "pair" };
+  const ofN = /^([a-z]+) of ([\d.]+)$/i.exec(label); // "box of 25"
+  if (ofN && Number(ofN[2]) === qty) return { packQty: qty, packLabel: ofN[1] };
+  const length = /^([\d.]+) ft ([a-z]+)$/i.exec(label); // "10 ft stick"
+  if (length && Number(length[1]) === qty)
+    return { packQty: qty, packLabel: length[2] };
+  throw new Error(`Pack label not understood: "${label}" (qty ${qty})`);
+}
