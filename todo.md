@@ -1395,6 +1395,20 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       1.9 MB. Every other main screen is under 240 KB. Still fine behind
       the edge; still the whole table.
 
+### A database that stops answering can wedge the server (drill, 2026-10-15)
+
+- [ ] **Pooled connections stuck on a reply that never comes are never
+      thrown away** (Track A — `server/db.ts`, `server/slowRequests.ts`).
+      Drilled with `scripts/dbFaultProxy.mts`: three hangs of 8 reads each
+      used all 10 mysql2 connections, and every later database read waited
+      forever — sign-in dead until a restart, `/api/version` still 200.
+      mysql2's per-query `timeout` only reports; it returns the connection
+      to the pool still waiting for the old reply. Fix: a time limit that
+      DESTROYS the connection, never applied to the backup's long reads;
+      plus a health check that touches the database so a wedged instance
+      is restarted. Morning question Q-DB1; numbers in
+      `references/stress-results.md` ("Third round").
+
 ### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
 
 A pack or bulk price stored as a per-unit price does not look broken. It

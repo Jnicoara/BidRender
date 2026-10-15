@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A stalled connection is reported in 20 seconds, not 80.** When the
+  database stops answering without failing, screens used to sit on
+  "Loading…" for over a minute with no explanation. Now the "can't reach
+  your data" bar appears after 20 seconds and clears itself when the
+  connection returns.
+
 - **When BidRidge can't reach its data, screens now say so instead of
   saying something false.** With the database briefly unreachable, a bid
   you opened claimed it "may have been archived or deleted", and other

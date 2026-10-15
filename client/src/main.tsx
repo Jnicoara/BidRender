@@ -11,9 +11,13 @@ import { markStagingEnvironment } from "@/lib/appEnvironment";
 import StagingBand from "@/components/StagingBand";
 import { NewVersionBar } from "@/components/NewVersionBar";
 import { DataUnreachableBar } from "@/components/DataUnreachableBar";
-import { noteReadFailure, noteReadSuccess } from "@/lib/dataReach";
+import {
+  noteNoAnswer,
+  noteReadFailure,
+  noteReadSuccess,
+} from "@/lib/dataReach";
 import { markPageOutOfDate } from "@/lib/versionCheck";
-import { withQueryDeadline } from "@/lib/queryDeadline";
+import { QUERY_DEADLINE_MS, withQueryDeadline } from "@/lib/queryDeadline";
 import { isPriceHistoryQuery, isStepBarQuery } from "@/lib/stepBarQuery";
 import {
   SESSION_EXPIRED_KEY,
@@ -114,9 +118,14 @@ const trpcClient = trpc.createClient({
         return {};
       },
       // A read that never answers is given up on and retried, rather than
-      // holding a screen blank for good (@/lib/queryDeadline).
+      // holding a screen blank for good (@/lib/queryDeadline) — and says so
+      // at once, rather than after every retry (@/lib/dataReach).
       fetch(input, init) {
-        return withQueryDeadline(globalThis.fetch)(input, {
+        return withQueryDeadline(
+          globalThis.fetch,
+          QUERY_DEADLINE_MS,
+          noteNoAnswer
+        )(input, {
           ...(init ?? {}),
           credentials: "include",
         });

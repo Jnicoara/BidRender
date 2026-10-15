@@ -50,6 +50,15 @@ export function noteReadFailure(error: unknown): void {
   if (isReachFailure(error)) set(true);
 }
 
+/**
+ * A read got no answer at all by its deadline (@/lib/queryDeadline). To the
+ * person that is the same as out of reach — and it is the case nothing else
+ * reports, because a stalled read never FAILS until every retry has run.
+ */
+export function noteNoAnswer(): void {
+  set(true);
+}
+
 /** A read succeeded — the data is reachable again. */
 export function noteReadSuccess(): void {
   set(false);

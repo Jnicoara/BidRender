@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   dataIsUnreachable,
   isReachFailure,
+  noteNoAnswer,
   noteReadFailure,
   noteReadSuccess,
   subscribeDataReach,
@@ -59,5 +60,12 @@ describe("the app-wide flag", () => {
     expect(dataIsUnreachable()).toBe(false);
     expect(calls).toBe(2); // up once, down once — repeats are not news
     stop();
+  });
+
+  it("rises when a read got no answer at all, and falls on the next one", () => {
+    noteNoAnswer();
+    expect(dataIsUnreachable()).toBe(true);
+    noteReadSuccess();
+    expect(dataIsUnreachable()).toBe(false);
   });
 });

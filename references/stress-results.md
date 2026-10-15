@@ -340,6 +340,36 @@ slow (2.5 s a packet) — never shown, list loaded; down — bar up and the
 list says it couldn't load; database back — **bar gone by itself after
 9.2 s**, assemblies listed.
 
+### Third round: the database STALLS — answers nothing, errors nothing (2026-10-15)
+
+`dbFaultProxy.mts` gained a `stall` mode: bytes are HELD and delivered
+when the stall ends, which is what TCP does across a network blackhole.
+(`hang` throws them away — harsher than any healthy network.)
+
+| What                                       | BEFORE                                                                                                                                                                                                | AFTER                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Screen opened during a 70 s stall          | **"Loading assemblies…" for the whole 70 s**, no word (React Query quietly retries each 20 s deadline; the error lands after ~80 s)                                                                   | "Loading…" + **the bar at 20 s** — the deadline now raises it (`withQueryDeadline(…, onGiveUp)`) |
+| Stall ends                                 | Screen filled in 1 s; a fresh read answered in 79–111 ms                                                                                                                                              | Same, and the bar clears itself                                                                  |
+| One 40 s `hang` (bytes lost), then back    | Recovers: fresh read 45 ms, screen filled in 3 s                                                                                                                                                      | Same                                                                                             |
+| **Three `hang`s, 8 reads each, then back** | **The server stops answering every database read — for good.** 40 of 40 reads timed out at 30 s; sign-in still dead minutes later; `/api/version` (no database) still 200. Only a restart cleared it. | **Not fixed — Track A's layer. Q-DB1.**                                                          |
+
+**Why the last one happens.** Each read sent into a hang leaves its pooled
+connection (mysql2, 10 by default) waiting forever for a reply. Three rounds
+of 8 used up all 10; every later read queues behind them. mysql2's own
+per-query `timeout` does NOT help as it stands: it reports an error but
+leaves the connection waiting for the old reply, and the pool hands it out
+again out of step. A fix has to DESTROY a connection whose query passes a
+time limit — in `server/db.ts` / `server/slowRequests.ts`, which every
+track and live share, and without cutting the nightly backup's long reads.
+
+**Is it real?** Lost bytes are not, on a healthy network. The real-world
+version is a database failover or a dropped path that leaves connections
+half-open: Linux TCP gives up on an unanswered connection after ~15
+minutes, so the app would stay dead for up to ~15 minutes AFTER the
+database is back. And a health check that does not touch the database
+(like `/api/version`) would call that server healthy throughout — which
+check App Platform uses is not written down anywhere in `references/`.
+
 ## Failure drills — file storage and AI
 
 | What failed                                   | BEFORE                                                                                                          | AFTER                                                                                                                                                                                                          |

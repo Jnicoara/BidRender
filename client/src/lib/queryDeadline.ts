@@ -39,10 +39,19 @@ function methodOf(input: RequestInfo | URL, init?: RequestInit): string {
   return "GET";
 }
 
-/** `fetch`, with a deadline on reads that have not started answering. */
+/**
+ * `fetch`, with a deadline on reads that have not started answering.
+ *
+ * `onGiveUp` runs when the deadline (not the caller) cuts a read. React
+ * Query retries a given-up read quietly, three times, so without it a
+ * screen said "Loading…" for ~80 s with no word while the database stalled
+ * (drill, 2026-10-15); main.tsx uses it to raise the "can't reach your
+ * data" bar at the first 20 s instead (@/lib/dataReach).
+ */
 export function withQueryDeadline(
   fetchImpl: typeof fetch,
-  ms: number = QUERY_DEADLINE_MS
+  ms: number = QUERY_DEADLINE_MS,
+  onGiveUp?: () => void
 ): typeof fetch {
   return (input, init) => {
     if (methodOf(input, init) !== "GET") return fetchImpl(input, init);
@@ -54,10 +63,10 @@ export function withQueryDeadline(
     if (outer?.aborted) forward();
     else outer?.addEventListener("abort", forward, { once: true });
 
-    const timer = setTimeout(
-      () => controller.abort(new Error(QUERY_DEADLINE_MESSAGE)),
-      ms
-    );
+    const timer = setTimeout(() => {
+      controller.abort(new Error(QUERY_DEADLINE_MESSAGE));
+      onGiveUp?.();
+    }, ms);
     return fetchImpl(input, { ...init, signal: controller.signal }).finally(
       () => clearTimeout(timer)
     );
