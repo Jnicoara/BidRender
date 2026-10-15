@@ -128,7 +128,9 @@ hours, roles and (on a third) a modifier; 126 more lines; company sales
 tax switched on for materials (it was off, and the bid page said so).
 Paths now covered — labor on 71 bids, the productivity factor on 12,
 modifiers on 43, sales tax on 10. **73 priced bids: still 0
-disagreements across the four screens, 0 broken rules.**
+disagreements across the four screens, 0 broken rules.** The script now also
+compares the figure the CUSTOMER reads on the proposal
+(`document.investment.total`) — compared on all 151 bids, 0 disagreements.
 
 ## Screens in a real browser (`scripts/stressScreens.mts`)
 

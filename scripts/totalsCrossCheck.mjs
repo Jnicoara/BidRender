@@ -130,6 +130,7 @@ if (setup) {
 // The cross-check
 const dash = await get("bids.dashboard", null);
 const money = x => Math.round(Number(x) * 100);
+let customerCompared = 0;
 let checked = 0,
   nonzero = 0;
 const bad = [];
@@ -145,8 +146,14 @@ for (const row of dash) {
     bidPage: money(g.totals?.totalDue),
     search: srow ? money(srow.totalDue) : null,
     proposal: d.error ? null : money(d.internalTotals?.totalDue),
+    // What the CUSTOMER reads on the document — not only the internal figures.
+    customerSees:
+      d.error || d.document?.investment?.total == null
+        ? null
+        : money(d.document.investment.total),
   };
   checked++;
+  if (values.customerSees !== null) customerCompared++;
   if (values.bidPage) nonzero++;
   const vals = Object.values(values).filter(v => v !== null);
   if (new Set(vals).size > 1)
@@ -159,7 +166,7 @@ for (const row of dash) {
     });
 }
 console.log(
-  `checked ${checked} bids (${nonzero} with a non-zero total); disagreements: ${bad.length}`
+  `checked ${checked} bids (${nonzero} with a non-zero total); disagreements: ${bad.length}; customer-facing total compared on ${customerCompared}`
 );
 for (const b of bad.slice(0, 12)) console.log(JSON.stringify(b));
 
