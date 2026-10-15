@@ -89,12 +89,33 @@ type Registry = {
   fork: (rowId: number, ownerUserId: number) => Promise<number>;
 };
 
+/*
+  Each fork is looked up when CALLED, not when this module loads: the routers
+  import this file now, and a test that mocks ./db without the fork functions
+  (server/auth.email.test.ts) failed to load the whole router tree on
+  `db.forkMaterial` (Gate 38686356758, 2026-10-15).
+*/
 const TABLES: Record<StarterTable, Registry> = {
-  materials: { table: materials, fork: db.forkMaterial },
-  assemblies: { table: assemblies, fork: db.forkAssembly },
-  laborRates: { table: laborRates, fork: db.forkLaborRate },
-  modifiers: { table: modifiers, fork: db.forkModifier },
-  runTypes: { table: takeoffRunTypes, fork: db.forkRunType },
+  materials: {
+    table: materials,
+    fork: (id, owner) => db.forkMaterial(id, owner),
+  },
+  assemblies: {
+    table: assemblies,
+    fork: (id, owner) => db.forkAssembly(id, owner),
+  },
+  laborRates: {
+    table: laborRates,
+    fork: (id, owner) => db.forkLaborRate(id, owner),
+  },
+  modifiers: {
+    table: modifiers,
+    fork: (id, owner) => db.forkModifier(id, owner),
+  },
+  runTypes: {
+    table: takeoffRunTypes,
+    fork: (id, owner) => db.forkRunType(id, owner),
+  },
 };
 
 /** The drizzle table behind a starter table name: ONE registry for both files. */
