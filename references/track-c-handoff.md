@@ -13,6 +13,27 @@ fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
 (COMMON; `new-rows-source-check.md` marks them accepted — still 64
 families, 62 COMMON, 2 SPECIALTY). No starter edit.
 
+**Item 2 — the last three shelves reviewed (read-only, source rule, nothing
+applied), from the owner's live workbook copy** (`C:devBidPhasepricing`,
+saved 19:29 on 2026-10-14; it already carries the owner's own pack fixes on
+rows 1598, 1602, 1666, 1688, 1693, 1719). All 138 names match
+`BASELINE_MATERIALS` one for one. **The sheet ends at row 1719: every shelf
+now has a review.**
+
+- `pricing/equipment-appliances-name-review.md` — rows 1582–1646, 65 rows:
+  30 OK, 28 need words, 7 owner picks; 39 rows used. **Q1 is a STARTER EDIT
+  (PG19: the generator battery charger line → M1 battery)**; Q11 changes
+  what CW2's pedestal line counts. 26 questions; M1–M4 proposed.
+- `pricing/distribution-equipment-name-review.md` — rows 1647–1691, 45 rows:
+  6 OK, 27 need words, 12 owner picks; 14 rows used by 10 starters. **Q15 is
+  a STARTER EDIT (DV32 loses its separate duplex: the prewired poke-through
+  includes it)**; Q1/Q12/Q13/Q16 make built-to-order gear SPECIALTY (price
+  blank). 19 questions; M1–M5 proposed (M5 conditional).
+- `pricing/consumables-name-review.md` — rows 1692–1719, 28 rows: 5 OK, 20
+  need words, 3 owner picks; 7 rows used. No starter edit. 18 questions;
+  M1–M2 proposed.
+- The 11 proposed rows are in `new-rows-source-check.md` as "waits for".
+
 **Item 4 — merged `origin/local-dev` as `0c8e324f`** (A's 0157–0163,
 B's plan-reading help 1–5b and phone bottom bar). Conflict only in this
 file, both sides kept. **C's databases are at 164**: `bidrender_test_c`

@@ -31,9 +31,13 @@ refused direct fetches (403), so Stoneway was checked through search only;
 a row found at none of the three may still be at Stoneway, and A may move
 it to COMMON if A finds it there.
 
-**Totals: 64 families checked — 62 COMMON, 2 SPECIALTY** (60 on
+**Totals: 64 families ACCEPTED — 62 COMMON, 2 SPECIALTY** (60 on
 2026-10-14, plus Strut & Supports M1 the same evening, plus Fasteners &
-Anchors M1–M3 that night, accepted with Fasteners Q2 and Q14). Five COMMON rows
+Anchors M1–M3 that night, accepted with Fasteners Q2 and Q14). **Plus 11
+PROPOSED overnight** (Equipment & Appliances M1–M4, Distribution Equipment
+M1–M5, Consumables M1–M2), each marked "waits for" its question in
+`pricing/morning-questions.md`; Distribution M5 is COMMON only if A finds
+the part. Count only the accepted ones. Five COMMON rows
 carry a note A must act on (marked ⚠). If A's recount finds a different
 number of accepted new rows, stop and find out why: either a later answer
 added or dropped one, or this list missed it.
@@ -106,6 +110,17 @@ added or dropped one, or this list missed it.
 | Fasteners        | M1     | Powder load, .27 cal, yellow strip                                        | COMMON        | HD, Ramset 00667, 100-count — [HD](https://www.homedepot.com/p/Ramset-0-27-Steel-Concrete-Strip-Single-Use-Load-Booster-Caliber-Yellow-Strip-Loads-100-Count-00667/100190942) (accepted, Fasteners Q14 yes) |
 | Fasteners        | M2     | 3/4" conduit hanger with bolt                                             | COMMON        | Platt, Minerallac 1B — [Platt](https://www.platt.com/p/0686524/minerallac/3-4-conduit-hanger-w-bolt-zp/784610120012/min1b); Raco 2053 — [Platt](https://www.platt.com/p/0171101/hubbell-raco/conduit-hanger-with-bolt-3-4-steel/050169020531/rac2053) (accepted, Fasteners Q2 yes) |
 | Fasteners        | M3     | 1" conduit hanger with bolt                                               | COMMON        | Platt, Minerallac 2B — [Platt](https://www.platt.com/p/0042457/minerallac/conduit-hanger-with-bolt-diameter-1-steel/784610120029/min2b) (accepted, Fasteners Q2 yes) |
+| Equipment        | M1     | Generator battery, 12V Group 26R                                          | COMMON        | Platt, Generac 0H3421S — [Platt](https://www.platt.com/p/1995722/generac/26r-wet-cell-battery-not-ups-shippable-/gps0h3421s) (proposed; waits for Equipment Q1, a STARTER EDIT to PG19) |
+| Equipment        | M2     | AC whip, 1/2" x 6 ft liquidtight, #10                                     | COMMON        | HD, Southwire 55189407 — [HD](https://www.homedepot.com/p/reviews/Southwire-1-2-in-x-6-ft-10-3-Ultra-Whip-Liquidtight-Flexible-Non-Metallic-PVC-Conduit-Cable-Whip-55189407/202210500/3) (proposed; waits for Equipment Q25) |
+| Equipment        | M3     | Mechanical time switch, 24-hour, 240V 40A, indoor                         | COMMON        | Platt, Intermatic T104 — [Platt](https://www.platt.com/platt-electric-supply/Mechanical-Time-Switches-24-Hour/Intermatic/T104/product.aspx?zpid=29598&cr=400471); HD T104D89 — [HD](https://homedepot.com/p/Intermatic-T100-Series-40-Amp-208-277-Volt-DPST-24-Hour-Mechanical-Time-Switch-with-Indoor-Enclosure-T104D89/100142466) (proposed; waits for Equipment Q26) |
+| Equipment        | M4     | Roof de-icing cable, 120V, 60 ft                                          | COMMON        | Platt, Easyheat ADKS-300 — [Platt](https://www.platt.com/p/0165928/easyheat/roof-deicing-cable-60/013627109711/easadks300); HD Frost King RC60 — [HD](https://www.homedepot.com/p/Frost-King-60-ft-Roof-De-Icing-Cable-Kit-Accessory-RC60/100187093) (proposed; waits for Equipment Q21) |
+| Distribution     | M1     | 4x4 wireway closure plate                                                 | COMMON        | Platt, Hoffman F44GCPNK — [Platt](https://www.platt.com/p/0027689/nvent-hoffman/wireway-closure-plate-4-x-4-type-1-gray-no-kos/783510528201/hoff44gcpnk) (proposed; waits for Distribution Q17) |
+| Distribution     | M2     | 6x6 wireway coupling                                                      | COMMON        | Platt, Hoffman F66GUC — [Platt](https://www.platt.com/p/0027747/nvent-hoffman/wireway-connector-type-1-lay-in-6-x-6-steel-gray/783510524302/hoff66guc) (proposed; waits for Distribution Q17) |
+| Distribution     | M3     | 6x6 wireway elbow, 90-degree                                              | COMMON        | Platt, Hoffman F66G90E — [Platt](https://www.platt.com/p/0027758/nvent-hoffman/wireway-90-elbow-type-1-lay-in-6-x-6-steel-gray/783510525309/hoff66g90e) (proposed; waits for Distribution Q17) |
+| Distribution     | M4     | 6x6 wireway closure plate                                                 | COMMON        | Platt, Hoffman F66GCPNK — [Platt](https://www.platt.com/p/0027745/nvent-hoffman/wireway-closure-plate-6-x-6-type-1-gray-no-kos/783510528300/hoff66gcpnk) (proposed; waits for Distribution Q17) |
+| Distribution     | M5     | Cable tray splice plates, 12" ladder, aluminum, 4" deep, pair             | ⚠ COMMON?     | Platt sells B-Line pairs ([category](https://www.platt.com/s/cable-tray-splicer-plates?cat=4virf354)); no 4"-tray part confirmed. **A confirms the part; with none at the three stores it is SPECIALTY.** (proposed; waits for Distribution Q18) |
+| Consumables      | M1     | Wire marker booklet, 0-9                                                  | COMMON        | HD, Gardner Bender 42-027 — [HD](https://homedepot.com/p/Gardner-Bender-Wire-Marker-Booklet-Numbers-0-9-42-027/302444108) (proposed; waits for Consumables Q17) |
+| Consumables      | M2     | Zip ties, 14", bag of 100                                                 | COMMON        | HD, Commercial Electric GT-370STB — [HD](https://homedepot.com/p/Commercial-Electric-14in-Standard-50lb-Tensile-Strength-UL-21S-Rated-Cable-Zip-Ties-100-Pack-UV-Black-GT-370STB/203531913) (proposed; waits for Consumables Q18) |
 
 Not on this list on purpose: Switches W2 (`Weatherproof toggle switch
 cover`) is an existing row renamed and moved, not a new row; the Panels,
