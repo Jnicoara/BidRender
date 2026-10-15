@@ -23,6 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { ScopeFilter } from "@/components/library/LibraryControls";
 import {
   filterByScope,
@@ -197,7 +198,7 @@ function validateDraft(draft: Draft): string | null {
       : "Enter a wage, and each percentage from 0 to 200.";
   }
   if (draft.rateType === "hourly") {
-    const rate = Number(draft.hourlyCost);
+    const rate = parseTypedNumber(draft.hourlyCost);
     if (draft.hourlyCost.trim() === "" || Number.isNaN(rate))
       return "Enter an hourly rate.";
     if (rate < 0) return "An hourly rate cannot be negative.";
@@ -205,13 +206,13 @@ function validateDraft(draft: Draft): string | null {
     return null;
   }
 
-  const salary = Number(draft.annualSalary);
+  const salary = parseTypedNumber(draft.annualSalary);
   if (draft.annualSalary.trim() === "" || Number.isNaN(salary))
     return "Enter an annual salary.";
   if (salary < 0) return "A salary cannot be negative.";
   if (salary > MAX_SALARY) return "That salary is too large.";
 
-  const working = Number(draft.annualHours);
+  const working = parseTypedNumber(draft.annualHours);
   if (draft.annualHours.trim() === "" || Number.isNaN(working))
     return "Enter the working hours per year.";
   // Zero hours is a division by zero, not a free employee.
@@ -229,12 +230,12 @@ function draftHourlyRate(draft: Draft): number | null {
       return parts ? loadedRate(parts) : null;
     }
     if (draft.rateType === "hourly") {
-      const rate = Number(draft.hourlyCost);
+      const rate = parseTypedNumber(draft.hourlyCost);
       return Number.isFinite(rate) ? rate : null;
     }
     return effectiveHourlyRate(
-      Number(draft.annualSalary),
-      Number(draft.annualHours)
+      parseTypedNumber(draft.annualSalary),
+      parseTypedNumber(draft.annualHours)
     );
   } catch {
     return null;
@@ -844,10 +845,13 @@ export default function LaborRatesPage() {
         ...(parts
           ? { breakdown: parts }
           : draft.rateType === "hourly"
-            ? { hourlyCost: Number(draft.hourlyCost), breakdown: null }
+            ? {
+                hourlyCost: parseTypedNumber(draft.hourlyCost),
+                breakdown: null,
+              }
             : {
-                annualSalary: Number(draft.annualSalary),
-                annualHours: Number(draft.annualHours),
+                annualSalary: parseTypedNumber(draft.annualSalary),
+                annualHours: parseTypedNumber(draft.annualHours),
                 breakdown: null,
               }),
       });

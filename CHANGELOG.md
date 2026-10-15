@@ -14,7 +14,7 @@ This is the human-readable companion to the git history — read this to see wha
   saved, when that's the case), and signing in takes you back to the same
   screen.
 
-- **Number boxes understand "1,500" and "$12.50".** Typing a price with a
+- **Number boxes understand "1,500" and "$12.50"** — now on the Materials and Labor rates editors too (a salary of "65,000" was refused). Typing a price with a
   dollar sign or a thousands comma used to make the box snap back and lose
   what you typed. It now saves what you meant. Things that aren't plain
   numbers ("0x10", "1,5") are refused instead of turning into a different
