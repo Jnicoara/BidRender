@@ -1419,7 +1419,10 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       on error, reopen the editor holding the draft that failed.
       **Done for Modifiers (2026-10-15 day):** the row editor reopens with
       the typed values; Add keeps its form and no longer says "Added" (or
-      "Deleted permanently") before the server agrees. Labor rates, Kits next.
+      "Deleted permanently") before the server agrees. **Labor rates too**
+      (same day): reopens on refusal; Add says "Added" only once true, and
+      sends the number its check read (Number() would have sent "$45" as
+      NaN — from reading the code). Kits next.
 
 - [ ] **The server accepts edits to an ARCHIVED bid** (drill, 2026-10-15).
       Archive in one tab and the other tab's `updateLine`, `addAssembly`,

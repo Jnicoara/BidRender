@@ -18,7 +18,7 @@
  * is bounded at a couple of dozen by the nature of an org chart, so windowing
  * would add machinery with nothing to window.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -463,7 +463,8 @@ function LaborRateRow({
   onRemove,
 }: {
   rate: LaborRate;
-  onSave: (id: number, draft: Draft) => void;
+  /** Resolves false when the save was refused (its toast says why). */
+  onSave: (id: number, draft: Draft) => Promise<boolean>;
   onRevert: (rate: LaborRate) => void;
   onRemove: (rate: LaborRate) => void;
 }) {
@@ -501,9 +502,16 @@ function LaborRateRow({
       toast.error(problem);
       return;
     }
-    // Fire and forget — the row updates from cache immediately.
-    onSave(rate.id, draft);
+    // The row updates from cache immediately — and the editor reopens
+    // holding what was typed if the save is refused, instead of the edit
+    // being lost (todo.md, 2026-10-15).
+    const typed = draft;
     setEditing(false);
+    void onSave(rate.id, typed).then(saved => {
+      if (saved) return;
+      setDraft(typed);
+      setEditing(true);
+    });
   };
 
   if (editing) {
@@ -841,49 +849,72 @@ export default function LaborRatesPage() {
         draft.rateType === "hourly" && draft.breakdown
           ? breakdownParts(draft.breakdown)
           : null;
-      updateRate.mutate({
-        id,
-        name: draft.name.trim(),
-        rateType: draft.rateType,
-        // Parts when built from a wage; otherwise null, so parts that no
-        // longer explain the number are not left beside it (the router
-        // compares, so an untouched example stays an example).
-        ...(parts
-          ? { breakdown: parts }
-          : draft.rateType === "hourly"
-            ? {
-                hourlyCost: parseTypedNumber(draft.hourlyCost),
-                breakdown: null,
-              }
-            : {
-                annualSalary: parseTypedNumber(draft.annualSalary),
-                annualHours: parseTypedNumber(draft.annualHours),
-                breakdown: null,
-              }),
-      });
+      return updateRate
+        .mutateAsync({
+          id,
+          name: draft.name.trim(),
+          rateType: draft.rateType,
+          // Parts when built from a wage; otherwise null, so parts that no
+          // longer explain the number are not left beside it (the router
+          // compares, so an untouched example stays an example).
+          ...(parts
+            ? { breakdown: parts }
+            : draft.rateType === "hourly"
+              ? {
+                  hourlyCost: parseTypedNumber(draft.hourlyCost),
+                  breakdown: null,
+                }
+              : {
+                  annualSalary: parseTypedNumber(draft.annualSalary),
+                  annualHours: parseTypedNumber(draft.annualHours),
+                  breakdown: null,
+                }),
+        })
+        .then(
+          () => true,
+          () => false
+        );
     },
     [updateRate]
   );
 
+  const creating = useRef(false);
   const handleCreate = useCallback(() => {
+    // One add at a time — the form stays until the server answers.
+    if (creating.current) return;
     const problem = validateDraft(newDraft);
     if (problem) {
       toast.error(problem);
       return;
     }
-    createRate.mutate({
-      name: newDraft.name.trim(),
-      rateType: newDraft.rateType,
-      ...(newDraft.rateType === "hourly"
-        ? { hourlyCost: Number(newDraft.hourlyCost) }
-        : {
-            annualSalary: Number(newDraft.annualSalary),
-            annualHours: Number(newDraft.annualHours),
-          }),
-    });
-    toast.success(`Added "${newDraft.name.trim()}"`);
-    setNewDraft(emptyDraft);
-    setAdding(false);
+    creating.current = true;
+    const name = newDraft.name.trim();
+    createRate.mutate(
+      {
+        name,
+        rateType: newDraft.rateType,
+        // The same reader validateDraft used: Number() here sent "$45",
+        // which the check had accepted, to the server as NaN (2026-10-15).
+        ...(newDraft.rateType === "hourly"
+          ? { hourlyCost: parseTypedNumber(newDraft.hourlyCost) }
+          : {
+              annualSalary: parseTypedNumber(newDraft.annualSalary),
+              annualHours: parseTypedNumber(newDraft.annualHours),
+            }),
+      },
+      {
+        // "Added" and the cleared form only once it IS added; a refused add
+        // keeps what was typed beside the message saying why.
+        onSuccess: () => {
+          toast.success(`Added "${name}"`);
+          setNewDraft(emptyDraft);
+          setAdding(false);
+        },
+        onSettled: () => {
+          creating.current = false;
+        },
+      }
+    );
   }, [createRate, newDraft]);
 
   return (

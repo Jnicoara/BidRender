@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Labor rates keep your typing when a save fails,** the same as modifiers:
+  a refused edit reopens with what you typed, and adding a role only says
+  "Added" once it really is. A rate typed with a dollar sign ("$45") is now
+  saved as 45.
+
 - **Modifiers keep your typing when a save fails.** Editing a job condition
   and losing the connection used to throw the change away; now the editor
   opens again with what you typed. Adding one no longer says "Added" before
