@@ -597,7 +597,8 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       with it, at laptop and tablet. Staging (`06791ea`): "No flash" at
       both sizes, the renewal landing after sheet 1 was drawn.
       Original item:
-- [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
+- [x] **DONE by Track B in `14fead91`** (planCanvasStep forgets the drawn page on a load; planLoadState reads the drawn page) — this entry was left open; found stale 2026-10-14. Was:
+      **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet
       (1180x820, touch) with `scripts/stagingOpenFlash.mts`, which prints
       `FLASH` today. Screencast frame:
