@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Modifier percentages accept "15%".** Typing the percent sign in a job
+  condition's labor adjustment used to be refused; now "15%" saves as 15%,
+  and a mistyped entry is refused instead of turning into a different number.
+
 - **Assembly hours read the way you type them.** "$1.5" in an assembly's
   labor hours now saves 1.5 hours, and a mistyped entry like "0x10" is
   refused with a message instead of being saved as 16 hours.

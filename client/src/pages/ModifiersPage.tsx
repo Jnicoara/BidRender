@@ -20,6 +20,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -106,9 +107,17 @@ const formatArchivedAt = (value: Modifier["archivedAt"]) => {
 type Draft = { name: string; percent: string };
 const emptyDraft: Draft = { name: "", percent: "" };
 
+/**
+ * The box as a person types it: "15", "15%", "+15" all mean 15. Read with
+ * the app's one number reader (parseTypedNumber) — Number() took "0x10" as
+ * 16 — plus a trailing "%", which in a percent box says what it means.
+ */
+const typedPercent = (text: string) =>
+  parseTypedNumber(text.trim().replace(/%$/, ""));
+
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return "Give the modifier a name.";
-  const percent = Number(draft.percent);
+  const percent = typedPercent(draft.percent);
   if (draft.percent.trim() === "" || Number.isNaN(percent))
     return "Enter a percentage.";
   if (percent < MIN_PCT)
@@ -464,7 +473,7 @@ export default function ModifiersPage() {
       updateModifier.mutate({
         id,
         name: draft.name.trim(),
-        laborAdjustmentPct: toFraction(Number(draft.percent)),
+        laborAdjustmentPct: toFraction(typedPercent(draft.percent)),
       });
     },
     [updateModifier]
@@ -478,7 +487,7 @@ export default function ModifiersPage() {
     }
     createModifier.mutate({
       name: newDraft.name.trim(),
-      laborAdjustmentPct: toFraction(Number(newDraft.percent)),
+      laborAdjustmentPct: toFraction(typedPercent(newDraft.percent)),
     });
     toast.success(`Added "${newDraft.name.trim()}"`);
     setNewDraft(emptyDraft);

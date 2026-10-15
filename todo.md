@@ -1755,7 +1755,8 @@ Measurements: `references/code-first-ceiling.md` § d.
       **Done so far:** Labor rates and Materials price (2026-10-15 night);
       the Assemblies editor's labor and overhead hours (2026-10-15 day —
       check, preview and save all read the box the same way; "$1.5" saves
-      1.5, "0x10" is refused instead of saved as 16).
+      1.5, "0x10" is refused instead of saved as 16). Modifiers' percent
+      (check, save and add; also accepts a trailing "%": "15%" saves 15%).
 
 ### Flaky tests — fix in a batch before beta
 
