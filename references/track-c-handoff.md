@@ -2,8 +2,8 @@
 
 ## (newest) 2026-10-14 → 15, overnight run #2 — see `references/overnight-log.md`
 
-**Item 1 — security sweep: `references/security-sweep.md`.** 19 findings,
-11 fixed on track-c (not merged). The attacker test
+**Item 1 — security sweep: `references/security-sweep.md`.** 21 findings,
+13 fixed on track-c (not merged). The attacker test
 (`server/crossCompanyAttack.test.ts` + `server/attack/`) runs every route
 as a stranger, a viewer, an estimator and signed-out in ~90 s; every new
 route is attacked automatically.
@@ -53,8 +53,28 @@ Numbers and drills: `references/stress-results.md`; every change in
   2.4 s → 0.4 s under load.
 - **Pages load on demand** (`BidRenderShell`: every page is `lazy(reloadingImport(...))`; `lib/lazyPage.ts`). **For Track B:** TakeoffPage is now a lazy import in the shell — a merge touching those imports keeps the pattern. 834 → 217 KB before the Dashboard shows.
 - **Sidebar**: one scroll area (the menu vanished on a sideways phone).
+- **Pages are `preloadable`, not `lazy`** (`lib/preloadable.ts`, 2026-10-15).
+  React 19 holds a Suspense reveal ~300 ms; the loader shows its own
+  fallback and swaps the page in with plain state, so the Dashboard shows
+  at ~400 ms instead of ~890. **For Track B:** a new page in the shell is
+  `preloadable(loadX, PageLoading)` and its loader goes in `PAGE_LOADERS`.
+- **A screen that failed to load must say so — never draw from defaults.**
+  Database-down drill (2026-10-15): 16 screens said "No roles yet", sales
+  tax OFF, "0 lines", a bid "may have been deleted", or went blank. Each
+  now shows `LoadFailed`; a section that did `if (!data) return null`
+  returns `LoadFailed` when the query `isError`. App-wide net:
+  `lib/dataReach.ts` + `DataUnreachableBar` (top of the screen, clears
+  itself). **For Track B:** the Plans screen (TakeoffPage) was NOT drilled
+  — it is yours; `isReachFailure(error)` tells "out of reach" from "gone".
+- **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
+  still first).
 
 **FOR TRACK B — smoke flow 3 fails locally, not from tonight's changes.**
+**Update 2026-10-15 03:16: it PASSED in a full desktop run (46/46).** The
+look-alike prompt depends on what the account has already captured, so
+leftover captures from earlier runs are the likely difference — not
+confirmed. If it fails again, look at the account's captured symbols first.
+
 Run locally against `bidrender_local_c` (desktop): capturing "CI SWITCH"
 raises the look-alike check — "This look also matches 4 places a look of CI
 DUPLEX also finds on this sheet. Add it anyway?" — and the test does not
