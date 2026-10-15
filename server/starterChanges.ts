@@ -21,15 +21,18 @@
  *   4. Anything else PINS first: every company with no copy of the row gets
  *      one, forked AS IT IS NOW and marked `isPinnedCopy = TRUE`, so the
  *      change cannot reach it. A part change pins the ASSEMBLY.
- *   5. CHANGE the shared row (or its part) and bump its version by 1.
+ *   5. CHANGE the shared row (or its part) and bump its version by 1. A
+ *      number that carries an Example tag writes the tag in the SAME change
+ *      (`exampleTagAfter`; starter-offers-plan.md § 2.6, Track B 2026-10-14):
+ *      a price above 0 is an example, a blank or $0 is not.
  *   6. LOG it: append-only, values wrapped `{"v": …}` so a column that WAS
  *      NULL is not mistaken for "not applicable" (SQL NULL).
  *
  * ── Not in this file yet ────────────────────────────────────────────────────
- * Offers, Accept and Ignore (§ 10a.3 "Offers"), hide / unhide / item_add
- * (`hideStarterItem`), and run-type EXTRAS, kits and labor steps (§ 10a.1
- * #1). Nothing calls this from a screen yet: the screen is Track B's and the
- * starter editor's login Track A's.
+ * Hide / unhide / item_add (`hideStarterItem`), and run-type EXTRAS, kits
+ * and labor steps (§ 10a.1 #1). Offers, Accept and Ignore are
+ * `server/starterOffers.ts` (Track B, 2026-10-14), read per FIELD
+ * (starter-offers-plan.md § 3a), not by `baselineVersion`.
  *
  * ── The boot no longer undoes a change here (Track A, 2026-10-13) ───────────
  * Until then `seedBaselineMaterials` re-stamped shared rows from the seed files
@@ -70,6 +73,7 @@ import {
 import * as db from "./db";
 import {
   STARTER_REFERENCES,
+  exampleTagAfter,
   sameStarterValue,
   starterChangeRefusal,
   starterFieldKind,
@@ -250,8 +254,14 @@ function storedValue(
   }
 }
 
-/** The log's wrapper: `{"v": null}` is "was NULL"; SQL NULL is "n/a". */
-const wrap = (v: unknown) => ({ v: v ?? null });
+/**
+ * The log's wrapper: `{"v": null}` is "was NULL"; SQL NULL is "n/a". A number
+ * that carries an Example tag logs it beside the value, `{"v": "0.5500",
+ * "example": true}`, so the tag is part of the same change and an Accept
+ * writes both (§ 2.6). `sameStarterValue` compares `v` only.
+ */
+const wrap = (v: unknown, example?: boolean) =>
+  example === undefined ? { v: v ?? null } : { v: v ?? null, example };
 
 // ─── Reading rows inside the transaction ─────────────────────────────────────
 
@@ -334,6 +344,8 @@ type Planned = {
   /** SQL NULL in the log: a part added has no old value, a removed none new. */
   oldApplies: boolean;
   newApplies: boolean;
+  /** The Example tag before and after, for a number that carries one. */
+  example?: { old: boolean; new: boolean } | null;
   write: () => Promise<void>;
 };
 
@@ -378,6 +390,14 @@ async function plan(
       return { skip: true, problems };
     const { table } = TABLES[input.table];
     const cols = columnsOf(input.table);
+    // The Example tag goes WITH its number, in this same change (§ 2.6 of
+    // references/starter-offers-plan.md): never a change of its own.
+    const companion = exampleTagAfter(
+      input.table,
+      input.field,
+      stored.value,
+      row
+    );
     return {
       problems,
       planned: {
@@ -388,11 +408,15 @@ async function plan(
         newValue: stored.value,
         oldApplies: true,
         newApplies: true,
+        example: companion
+          ? { old: row[companion.tag] === true, new: companion.value }
+          : null,
         write: async () => {
           await handle
             .update(table)
             .set({
               [input.field]: stored.value,
+              ...(companion ? { [companion.tag]: companion.value } : {}),
               version: sql`${cols.version} + 1`,
             })
             .where(eq(cols.id, input.rowId));
@@ -709,8 +733,12 @@ async function applyPlanned(
         field: "field" in input ? input.field : null,
         childTable: "childTable" in input ? input.childTable : null,
         childRefId: "childRefId" in input ? input.childRefId : null,
-        oldValue: change.oldApplies ? wrap(change.oldValue) : null,
-        newValue: change.newApplies ? wrap(change.newValue) : null,
+        oldValue: change.oldApplies
+          ? wrap(change.oldValue, change.example?.old)
+          : null,
+        newValue: change.newApplies
+          ? wrap(change.newValue, change.example?.new)
+          : null,
         version: after!.version as number,
         undoesChangeId: change.undoesChangeId,
       });

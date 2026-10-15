@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Groundwork for BidRidge starter updates (nothing visible yet).** When
+  BidRidge changes a shipped price, hours or rate, the "Example" tag now
+  changes with it in the same step, so a number and its tag can never part.
+  The rules that will decide what a shop is offered now work per field, so
+  accepting one update can never hide another, and a field BidRidge changed
+  twice shows as one update rather than looking like the shop's own number.
+
 - **Tap a detail reference on a plan to go to that detail, and Back to
   return.** When a sheet says "SEE DETAIL 2/E004", tapping that reference
   now offers "Go to detail 2". Go opens sheet E004 zoomed to detail 2's own

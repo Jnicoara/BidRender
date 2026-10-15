@@ -229,6 +229,8 @@ describeDb("applyStarterChange (§ 10a.3)", () => {
     const shared = await sharedMaterial(probe.part);
     expect(shared.costPerUnit).toBe("6.0000");
     expect(shared.version).toBe(2);
+    // § 2.6: the Example tag came WITH the price, in the same change.
+    expect(shared.isExamplePrice).toBe(true);
 
     // X is pinned at the old price; its assembly reads exactly as before.
     const xPart = await materialFor(X);
@@ -249,10 +251,19 @@ describeDb("applyStarterChange (§ 10a.3)", () => {
       kind: "field",
       field: "costPerUnit",
       oldValue: { v: "4.0000" },
-      newValue: { v: "6.0000" },
+      newValue: { v: "6.0000", example: true },
       version: 2,
       undoesChangeId: null,
     });
+    // ONE change row: the tag is never logged as an offer of its own.
+    expect(
+      (
+        await database
+          .select()
+          .from(starterChanges)
+          .where(eq(starterChanges.batchId, result.batchId!))
+      ).map(c => c.field)
+    ).toEqual(["costPerUnit"]);
     const pins = await database
       .select()
       .from(starterChangePins)

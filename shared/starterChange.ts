@@ -285,3 +285,253 @@ export function acceptAllTakes<T extends { bucket: OfferBucket }>(
 ): T[] {
   return rows.filter(row => row.bucket === "offer");
 }
+
+// ─── One offer per FIELD, not per change (starter-offers-plan.md § 3a) ───────
+
+/**
+ * One logged change, as the offer read needs it: values unwrapped from the
+ * log's `{"v": …}`, and this company's answer to it, if any.
+ */
+export type LoggedOfferChange = {
+  id: number;
+  oldValue: unknown;
+  newValue: unknown;
+  answer: "accepted" | "ignored" | null;
+};
+
+export type CollapsedOffer = {
+  /** What BidRidge held when this company's copy was made. */
+  base: unknown;
+  /** BidRidge's value now: the LAST change's new value. */
+  latest: unknown;
+  bucket: OfferBucket;
+  /** The newest change: what the screen shows and what Accept must match. */
+  latestChangeId: number;
+  /** The changes an answer to this offer covers: every one not answered yet. */
+  unansweredIds: number[];
+  /** The answer to the newest change; "ignored" puts the offer in the fold. */
+  answer: "accepted" | "ignored" | null;
+};
+
+/**
+ * Every change to ONE field (or one recipe part) of one starter row since this
+ * company's copy was made, oldest first, collapsed into the one offer the shop
+ * sees — or null when there is nothing to say.
+ *
+ * ── Why per field, and why not `baselineVersion` (the fault this replaces) ──
+ * `baseline-screen-plan.md` § 10a.3 hid a change once the copy's
+ * `baselineVersion` passed it and compared the copy with ONE change's old
+ * value. `baselineVersion` is one number per ROW while changes are per FIELD,
+ * so accepting a row's hours change hid an unanswered price change on the
+ * same row, and a field changed twice (0.48 → 0.52 → 0.55) made a shop still
+ * at 0.48 read "own-value", as if it had typed a price. Here:
+ *
+ *   - the offer is about the NEWEST change; once that is answered it is
+ *     gone, and a newer change is a new offer (owner Q7);
+ *   - the company's value is "BidRidge's" when it equals ANY value the
+ *     starter held since the copy was made — the first change's old value or
+ *     an earlier change's new one (what an Accept wrote) — so neither an
+ *     ignored nor an accepted earlier change makes it read "own-value";
+ *   - it equals the latest: nothing to offer (an undo a shop never took).
+ */
+export function collapseOffer(
+  changes: readonly LoggedOfferChange[],
+  companyValue: unknown,
+  same: (a: unknown, b: unknown) => boolean = sameStarterValue
+): CollapsedOffer | null {
+  if (changes.length === 0) return null;
+  const last = changes[changes.length - 1];
+  const latest = last.newValue;
+  if (same(companyValue, latest)) return null;
+  const heldByStarter = [
+    changes[0].oldValue,
+    ...changes.slice(0, -1).map(c => c.newValue),
+  ];
+  const bucket: OfferBucket = heldByStarter.some(v => same(companyValue, v))
+    ? "offer"
+    : "own-value";
+  if (last.answer === "accepted") return null;
+  return {
+    base: changes[0].oldValue,
+    latest,
+    bucket,
+    latestChangeId: last.id,
+    unansweredIds: changes.filter(c => c.answer === null).map(c => c.id),
+    answer: last.answer,
+  };
+}
+
+/**
+ * Accepting and ignoring change a shop's library for everyone in it, so only
+ * the owner and admins may (owner Q1, 2026-10-14). Every member sees the count.
+ */
+export function canAnswerStarterOffers(role: string): boolean {
+  return role === "owner" || role === "admin";
+}
+
+// ─── The Example tag travels with its number (§ 2.6) ────────────────────────
+
+/**
+ * Which tag each shipped number carries. A change to one of these fields
+ * writes the tag in the SAME change — never as a change of its own, which
+ * would show a shop an offer "Example tag: off → on" that means nothing and
+ * could be accepted without its number.
+ */
+export const EXAMPLE_COMPANIONS: Partial<
+  Record<StarterTable, Record<string, string>>
+> = {
+  materials: {
+    costPerUnit: "isExamplePrice",
+    laborHours: "isExampleLaborHours",
+    fieldBendLaborHours: "isExampleLaborHours",
+  },
+  laborRates: {
+    hourlyCost: "isExampleRate",
+    annualSalary: "isExampleRate",
+    annualHours: "isExampleRate",
+    baseWage: "isExampleRate",
+    payrollTaxPct: "isExampleRate",
+    workersCompPct: "isExampleRate",
+    insurancePct: "isExampleRate",
+    benefitsPct: "isExampleRate",
+  },
+  assemblies: {
+    baseLaborHours: "isExampleHours",
+    overheadLaborHours: "isExampleHours",
+  },
+};
+
+/** The tag column a field's number carries, or null. */
+export function exampleTagOf(
+  table: StarterTable,
+  field: string
+): string | null {
+  return EXAMPLE_COMPANIONS[table]?.[field] ?? null;
+}
+
+/**
+ * The tag a starter row carries once `field` holds `value`, read with the
+ * row's OTHER numbers (`row`, before the change):
+ *
+ *   price  tagged only when it is above zero. A blank or $0 is "Not priced",
+ *          never a $0 "Example price" (owner, 2026-10-14 — the same rule as
+ *          `server/seed/materials/index.ts`).
+ *   hours  tagged while any of the row's hours that carry it is set.
+ *   rate   always tagged: every shipped rate is BidRidge's example.
+ */
+export function exampleTagAfter(
+  table: StarterTable,
+  field: string,
+  value: unknown,
+  row: Record<string, unknown>
+): { tag: string; value: boolean } | null {
+  const tag = exampleTagOf(table, field);
+  if (!tag) return null;
+  if (tag === "isExamplePrice") {
+    const n = value === null || value === undefined ? NaN : Number(value);
+    return { tag, value: Number.isFinite(n) && n > 0 };
+  }
+  if (tag === "isExampleRate") return { tag, value: true };
+  const siblings = Object.entries(EXAMPLE_COMPANIONS[table] ?? {})
+    .filter(([, t]) => t === tag)
+    .map(([f]) => (f === field ? value : row[f]));
+  return {
+    tag,
+    value: siblings.some(v => v !== null && v !== undefined && v !== ""),
+  };
+}
+
+// ─── Which offers re-count Drafts (§ 2.4, plan § 9 F1) ──────────────────────
+
+/**
+ * The offer fields an UNLOCKED Draft reads live, so accepting one re-counts
+ * the Drafts that use it. Everything else on a bid line is frozen when the
+ * line is added (price, hours, rate, modifier, labor-only — plan § 9a), so
+ * accepting it changes only the shop's NEXT lines.
+ *
+ *   materials   the raceway facts: stick length, strap spacing and distance
+ *               from a box, the joint (couplings).
+ *   assemblies  the mounting height type (drops and verticals).
+ *   runTypes    every part, count, waste % and make-up length.
+ */
+const RECOUNTS: Record<StarterTable, readonly string[]> = {
+  materials: [
+    "stickLengthFeet",
+    "strapSpacingFeet",
+    "strapFromBoxFeet",
+    "stickJoint",
+  ],
+  assemblies: ["mountHeightTypeKey"],
+  laborRates: [],
+  modifiers: [],
+  runTypes: [
+    "racewayMaterialId",
+    "conductorMaterialId",
+    "conductorCount",
+    "groundMaterialId",
+    "groundCount",
+    "fittingStyle",
+    "couplingMaterialId",
+    "connectorMaterialId",
+    "strapMaterialId",
+    "elbow90MaterialId",
+    "elbow45MaterialId",
+    "lbMaterialId",
+    "pullBoxMaterialId",
+    "conduitExtraPct",
+    "wireExtraPct",
+    "makeupDeviceInches",
+    "makeupPanelInches",
+    "makeupByKindInches",
+  ],
+};
+
+/**
+ * The offer fields that DO NOT re-count, each named on purpose — so a field
+ * added to `STARTER_FIELDS` later fails `server/starterChange.test.ts` until
+ * somebody decides which side it is on.
+ */
+export const DOES_NOT_RECOUNT: Record<StarterTable, readonly string[]> = {
+  materials: [
+    "name",
+    "costPerUnit",
+    "laborHours",
+    "fieldBendLaborHours",
+    "defaultQty",
+    "packQty",
+    "packLabel",
+  ],
+  assemblies: [
+    "name",
+    "baseLaborHours",
+    "overheadLaborHours",
+    "removeLaborHours",
+    "relocateLaborHours",
+    "laborRateId",
+    "laborOnly",
+    "materialByQuote",
+  ],
+  laborRates: [
+    "name",
+    "hourlyCost",
+    "annualSalary",
+    "annualHours",
+    "baseWage",
+    "payrollTaxPct",
+    "workersCompPct",
+    "insurancePct",
+    "benefitsPct",
+  ],
+  modifiers: ["name", "laborAdjustmentPct", "scope"],
+  runTypes: ["label"],
+};
+
+/** Does accepting this field re-count the shop's unlocked Drafts? */
+export function recountsDrafts(table: StarterTable, field: string): boolean {
+  return RECOUNTS[table].includes(field);
+}
+
+/** Every field the re-count rule names, for the test that nothing is missed. */
+export function recountClassified(table: StarterTable): string[] {
+  return [...RECOUNTS[table], ...DOES_NOT_RECOUNT[table]];
+}
