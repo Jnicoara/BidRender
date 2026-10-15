@@ -153,3 +153,37 @@ signed-in browser on bid 1728470; marks counted in the database after.
   in the crash mirror. (A first probe "went Back" to the about:blank page
   its own loader opens first, which unloads the whole document — not what a
   person does.)
+
+## Round 6 — touch (`pnpm device:touch`), the morning after
+
+Method: production build; a FRESH throwaway bid per run (the 18-sheet set,
+no marks); iPad both ways, phone 390, phone 375. The 2026-10-15 overnight
+run had flagged "Select + two taps" (morning question Q3).
+
+- **Not caused by the MarkLayer change.** Start-of-night code (d0152f60,
+  built in a worktree) fails the same step intermittently; the change stays.
+  A first comparison said otherwise only because it ran on a bid carrying
+  other runs' marks.
+- **Test fixed — it tapped where the marks HAD been.** Putting the count
+  down moved the drawing on a phone (the marks rose 25 px; measured from
+  their bounding boxes), so the remembered points missed. The script now
+  taps the nearest drawn mark; its phone branches cover every phone size
+  (it read "phone" only, so 375 looked for a tablet's Select button); a
+  failure names the locator it waited for.
+- **Fixed in the app — "Name this symbol" outlived a sheet change and a
+  Trace,** still showing the previous sheet's symbol, and covered the trace
+  bar's Finish on both iPad sizes. It now goes when a trace starts, a count
+  is armed, or the sheet changes (`@/lib/captureLifetime`, tested).
+- **Result:** iPad landscape, iPad portrait and phone 390 pass every check,
+  twice, on fresh bids.
+- **Open at 375 px only** (morning-questions-b.md Q3): (1) a mark re-placed
+  just after Undo is still pending when the script counts, so one of the two
+  marks cannot be selected yet; (2) the trace is already finished by the
+  time the script looks for Finish — a click on "Finish" is logged right
+  after the second point, and it is not yet known whether the second tap
+  landed on the floating Finish or the script's own tap did. Not a lost
+  mark or a wrong number; a finger at 375 px may end a trace one point
+  early. A double-click guard for fingers was tried and reverted: no
+  `dblclick` fired.
+- Noted: on a phone the drawing shifts 25 px when a count is put down (the
+  "Counting …" line above it goes away) — a jump, not a fault.

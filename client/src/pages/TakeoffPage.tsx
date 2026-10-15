@@ -112,6 +112,7 @@ import { StatusStrip } from "@/components/takeoff/StatusStrip";
 import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
 import { outlineNeeded } from "@/lib/planOutline";
+import { captureOutlived } from "@/lib/captureLifetime";
 import { planFailureText } from "@/lib/planFailure";
 import {
   isNetworkFailure,
@@ -8129,6 +8130,20 @@ export default function TakeoffPage({
       ),
     [bidCounts.data?.groups, allAssemblies, symbols]
   );
+
+  // "Name this symbol" goes when the person picks up another tool or changes
+  // sheet (@/lib/captureLifetime): it outlived both and covered the trace
+  // bar's Finish on a tablet (touch check, 2026-10-15).
+  useEffect(() => {
+    if (
+      captureOutlived(pendingCapture, {
+        tracing,
+        countArmed: armedGroup !== null,
+        sheetId: activeSheet?.id,
+      })
+    )
+      setPendingCapture(null);
+  }, [pendingCapture, tracing, armedGroup, activeSheet?.id]);
 
   /**
    * R re-arms the last count ("Count again", @/lib/countAgain). Only while

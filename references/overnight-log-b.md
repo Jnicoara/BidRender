@@ -121,3 +121,11 @@ beyond the plan, money, or anything irreversible go to
   Select-mode step fails on iPad portrait and phone — open,
   `morning-questions-b.md` Q3. Probes deleted; production server stopped;
   MySQL 3307 left running.
+
+## Morning follow-up — touch (Q3) (01:15)
+
+- MarkLayer cleared (start-of-night build in a worktree fails the same
+  step); the touch script fixed (tap marks where they are, every phone size,
+  named failures); "Name this symbol" now closes on a sheet change / Trace /
+  armed count (`@/lib/captureLifetime`). iPad both ways + phone 390 pass
+  twice; two steps open at 375 px (Q3). Worktree removed; server stopped.
