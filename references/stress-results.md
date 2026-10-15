@@ -117,5 +117,15 @@ answer SERVICE_UNAVAILABLE; a deleted person with the database up is still
 signed out — `server/sessionUnavailable.test.ts`, 4 cases), `AuthGuard`,
 `DashboardPage`, `LoadFailed` on Plans, Recently deleted and Bids search.
 
-Not yet drilled: file storage unreachable, AI unreachable or slow, a hang
-on a fresh page load (the hang step reused an open page and proved nothing).
+## Failure drills — file storage and AI
+
+| What failed                                   | BEFORE                                                                                                          | AFTER                                                                                                                                                                                                          |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A plan set whose file is missing from storage | Plans screen: "Gone set.pdf could not be opened · Could not fetch the plan (404)"; the rest of the screen works | Unchanged — already honest. Could say what to do ("upload it again"): Track B's screen, noted for B                                                                                                            |
+| AI service hangs ("Find it" helper)           | **361 s** (120 s × 3 tries), then "I'm not sure which screen you want" — blaming the question                   | **15 s**, then "The helper didn't answer just now. Every screen is in the sidebar, and "Where do I…?" finds them without it." (`timeoutMs` on `InvokeParams`, honoured by both AI paths, no retries inside it) |
+| AI service hangs (plan reader)                | Same provider default, up to ~6 min                                                                             | **Not changed** — its normal time on a big sheet is not measured, and a too-tight cap turns slow-but-working reads into failures. Morning question Q-AI1                                                       |
+
+Drilled with the AI client aimed at a local server that never answers (a
+fake key; nothing left this machine). Not drilled: a hang on a fresh page
+load (the hang step reused an open page and proved nothing), storage that
+refuses uploads.

@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **The "Find it" helper gives up after 15 seconds and says why.** When the AI
+  service was down or stuck, it could take six minutes and then claim it
+  didn't understand the question. Now it says the helper didn't answer and
+  points to the sidebar and "Where do I…?", which work without it.
+
 - **A database hiccup no longer looks like being signed out or losing
   everything.** If the server briefly can't reach its data, BidRidge now
   says "Can't reach BidRidge right now — you're still signed in and nothing

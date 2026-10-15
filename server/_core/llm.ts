@@ -74,6 +74,14 @@ export type InvokeParams = {
   model?: string;
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
+  /**
+   * Give up after this long, retries included, and fail the call (which the
+   * caller's catch turns into its graceful answer). For a BUTTON someone is
+   * watching. Unset keeps the provider default — 120 s a try, 2 retries —
+   * which the failure drill measured at 361 s before "Find it" answered a
+   * hung service (2026-10-14, references/stress-results.md).
+   */
+  timeoutMs?: number;
 };
 
 export type ToolCall = {
@@ -359,6 +367,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     reasoning,
     maxTokens,
     max_tokens,
+    timeoutMs,
   } = params;
 
   const payload: Record<string, unknown> = {
@@ -411,6 +420,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       authorization: `Bearer ${ENV.forgeApiKey}`,
     },
     body: JSON.stringify(payload),
+    // One deadline across every retry (fetchWithBackoff reuses the init).
+    ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
   });
 
   if (!response.ok) {
