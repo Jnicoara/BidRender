@@ -108,6 +108,21 @@ Vite and file watching. **Open:** measure a production build
 (`pnpm build && pnpm start`) over ~10 minutes of load before calling it
 either way.
 
+## Do the screens agree on the money? (`scripts/totalsCrossCheck.mjs`)
+
+After pricing the stress company for real (labor rates, 260 materials,
+10 % overhead and 15 % profit, a 9.35 % tax area on every third bid,
+per-bid overrides on others, 189 new lines frozen at those prices):
+
+- **151 bids, 44 with real totals: the Dashboard card, "Find a bid", the
+  bid page and the proposal agree to the cent on every one** — 0
+  disagreements.
+- **Each priced bid's own chain holds**: direct = material + labor +
+  charges; + material markup; + overhead; + profit; + tax; and the lines
+  add up to the direct cost — 44 of 44, 0 broken. (A first version read a
+  line field that does not exist and silently skipped the line rule; the
+  script now reports how many bids each rule was actually evaluated on.)
+
 ## Screens in a real browser (`scripts/stressScreens.mts`)
 
 Time from opening the address to the real content (first bid card, the
