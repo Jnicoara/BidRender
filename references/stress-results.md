@@ -471,6 +471,14 @@ Drilled with the AI client aimed at a local server that never answers (a
 fake key; nothing left this machine). Not drilled: a hang on a fresh page
 load (the hang step reused an open page and proved nothing).
 
+**Closed 2026-10-15 — there is nothing to hang on a page load.** Every AI
+call starts from a click: "Find it" from its submit
+(`NavigationHelper.tsx`), alias suggestions from a button
+(`AliasSuggestions.tsx`, which has no effects at all), and the plan reader
+is held to it by `server/aiCallsAreButtons.test.ts`. Those are the only
+three routers that call the model (`materials`, `navigation`,
+`planCopilot`). A screen's load never waits on the AI.
+
 ### Storage that refuses an upload (2026-10-15)
 
 Drilled on the production build by putting a plain FILE where the stress
