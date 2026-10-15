@@ -13,11 +13,19 @@ import { NewVersionBar } from "@/components/NewVersionBar";
 import { markPageOutOfDate } from "@/lib/versionCheck";
 import { withQueryDeadline } from "@/lib/queryDeadline";
 import { isPriceHistoryQuery, isStepBarQuery } from "@/lib/stepBarQuery";
+import {
+  SESSION_EXPIRED_KEY,
+  addressAfterExpiry,
+  expiryNote,
+} from "@/lib/sessionExpiry";
 import "./index.css";
 
 const queryClient = new QueryClient();
 
-const redirectToLoginIfUnauthorized = (error: unknown) => {
+const redirectToLoginIfUnauthorized = (
+  error: unknown,
+  fromMutation = false
+) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
 
@@ -25,7 +33,18 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  // Signed out mid-work: keep the address and say why on the sign-in form
+  // (client/src/lib/sessionExpiry.ts). This jumped to "/" with no word until
+  // 2026-10-15, dropping the change and the bid it was on.
+  try {
+    sessionStorage.setItem(SESSION_EXPIRED_KEY, expiryNote(fromMutation));
+  } catch {
+    // Storage blocked: the sign-in form simply shows no note.
+  }
+  window.location.href = addressAfterExpiry(getLoginUrl(), window.location);
+  // Same path and hash is not a navigation; reload so the app re-asks who
+  // is signed in.
+  if (getLoginUrl() === "/") window.location.reload();
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -53,7 +72,7 @@ queryClient.getMutationCache().subscribe(event => {
 queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
-    redirectToLoginIfUnauthorized(error);
+    redirectToLoginIfUnauthorized(error, true);
     console.error("[API Mutation Error]", error);
   }
 });

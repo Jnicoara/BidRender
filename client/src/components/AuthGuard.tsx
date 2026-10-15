@@ -6,6 +6,7 @@ import { isResetAddress } from "@/lib/resetLink";
 import LandingPageContainer from "@/pages/landing/LandingPageContainer";
 import { addressAfterSignOut, landingAfterSignIn } from "@/lib/signInLanding";
 import { Loader2 } from "lucide-react";
+import { SESSION_EXPIRED_KEY, expiryNotice } from "@/lib/sessionExpiry";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -47,8 +48,22 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     const timer = window.setInterval(() => refresh(), 10_000);
     return () => window.clearInterval(timer);
   }, [unavailable, refresh]);
+  /*
+    Signed out mid-work (client/src/lib/sessionExpiry.ts): read once, then
+    forgotten. With a note the sign-in form opens straight away, saying why,
+    instead of the marketing page.
+  */
+  const [expired] = useState(() => {
+    try {
+      const notice = expiryNotice(sessionStorage.getItem(SESSION_EXPIRED_KEY));
+      sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+      return notice;
+    } catch {
+      return null;
+    }
+  });
   /** A visitor asked to sign in, so the form replaces the marketing page. */
-  const [signingIn, setSigningIn] = useState(false);
+  const [signingIn, setSigningIn] = useState(expired !== null);
   /** Was this browser signed in at some point during this visit? */
   const wasSignedIn = useRef(false);
   /**
@@ -61,7 +76,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     isResetAddress(window.location.hash)
   );
   /** Said once on the sign-in form after a reset, then gone. */
-  const [signInNotice, setSignInNotice] = useState<string>();
+  const [signInNotice, setSignInNotice] = useState<string | undefined>(
+    expired ?? undefined
+  );
 
   useEffect(() => {
     const onHash = () => {

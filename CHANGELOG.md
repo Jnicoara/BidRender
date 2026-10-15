@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Signed out in the middle of work, you're told so and taken back.** If
+  your session ended while you worked (it expired, or you changed your
+  password on another device), BidRidge used to drop you on the public
+  home page without a word, and lose the bid you were on. Now the sign-in
+  form opens, says you were signed out (and that your last change wasn't
+  saved, when that's the case), and signing in takes you back to the same
+  screen.
+
 - **Number boxes understand "1,500" and "$12.50".** Typing a price with a
   dollar sign or a thousands comma used to make the box snap back and lose
   what you typed. It now saves what you meant. Things that aren't plain
