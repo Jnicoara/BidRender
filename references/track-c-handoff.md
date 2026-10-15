@@ -32,7 +32,10 @@ sheet in ~3.0 s and sheet 400 in ~2.5 s at laptop size — over the owner's
 2 s budget. Range loading is fine (7.2 MB / 2.1 MB); the time is the
 viewer's open + render. Numbers and method: `references/stress-results.md`.
 Also: a plan whose file is missing says "could not be opened … (404)" —
-honest, but it could say what to do ("upload it again").
+honest, but it could say what to do ("upload it again"). A CORRUPT file
+says "InvalidPDFException: Invalid PDF structure." — pdf.js's words; "This
+file isn't a readable PDF — delete it and upload it again" would serve a
+contractor (screenshot: `overnight-shots/drill-storage-corrupt-15s.png`).
 
 **Item 3 — guide mode: `references/guide-mode.md` (G1–G8).** A one-tip
 strip at the bottom of the main column (`GuideStrip`, mounted in
