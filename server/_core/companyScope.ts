@@ -26,10 +26,11 @@
  * query. Doing it here rather than in the SDK keeps the platform scaffolding
  * untouched.
  *
- * The create is racy by nature — two requests from a brand-new session can
- * arrive together — so it tolerates the duplicate and re-reads, the same
- * pattern the settings tables use after this app already lost 51 tests to that
- * exact race.
+ * The create is racy by nature — a brand-new session's first screen sends
+ * several requests together — so it runs under a per-user named lock and
+ * re-checks inside it. It used to "tolerate the duplicate" instead, but there
+ * was no key to collide on, and one live user got five companies
+ * (createPersonalCompany, 2026-10-14).
  *
  * ── Cost at scale ────────────────────────────────────────────────────────────
  * One indexed lookup per request on `company_members(userId)`, joined to
@@ -55,7 +56,7 @@ import {
   type CompanyRole,
   type FeatureId,
 } from "../../shared/permissions";
-import { getDb } from "../db";
+import { getDb, withNamedLock } from "../db";
 import { AI_FEATURE_IDS, aiFeaturesEnabled } from "../aiFeatures";
 import { isStarterEditor } from "../starterEditor/role";
 
@@ -80,18 +81,6 @@ export type RequestScope = {
   /** True when the actor is the company owner — the only single-seat role. */
   isOwner: boolean;
 };
-
-function isDuplicateKey(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    ("code" in error
-      ? (error as { code?: string }).code === "ER_DUP_ENTRY"
-      : false ||
-        ("cause" in error &&
-          isDuplicateKey((error as { cause: unknown }).cause)))
-  );
-}
 
 /**
  * The membership this user acts under.
@@ -162,32 +151,51 @@ async function hasAnyMembership(userId: number): Promise<boolean> {
   return Boolean(row);
 }
 
-/** Give a brand-new account the company of one it needs before its first query. */
+/**
+ * Give a brand-new account the company of one it needs before its first query
+ * — exactly ONE, however many first requests arrive at once.
+ *
+ * The guard is a MySQL named lock per user, and the membership check is asked
+ * again INSIDE it. The first request to get the lock creates the company; every
+ * request queued behind it finds that membership on its re-check and creates
+ * nothing. One database, so the lock holds across app instances too.
+ *
+ * This used to catch a duplicate key and say "another request for the same new
+ * user got there first". No key could collide: the only unique index is
+ * (companyId, userId), and each racing request inserted its OWN company, so
+ * every insert succeeded. User 3036 got five companies in one second on live
+ * (2026-10-14). server/personalCompanyRace.test.ts fires eight first requests
+ * at once and fails without the lock.
+ *
+ * Company and membership go in one transaction, so a failure between them
+ * cannot leave a company with nobody in it.
+ *
+ * Lock timeout: the holder's work is two inserts, so 10 s is only reached if
+ * the database is in trouble. Then this creates nothing and returns whatever
+ * membership exists — none means the caller fails closed, and the next request
+ * tries again. It never creates without the lock.
+ */
 async function createPersonalCompany(user: User) {
-  const db = await getDb();
-  if (!db) return undefined;
-
   const name = user.name?.trim() ? user.name.trim() : "My company";
-  try {
-    const [inserted] = await db
-      .insert(companies)
-      .values({ name, ownerUserId: user.id });
-    await db.insert(companyMembers).values({
-      companyId: inserted.insertId,
-      userId: user.id,
-      role: "owner",
-      status: "active",
+  await withNamedLock(`personal-company:${user.id}`, 10, async lockedDb => {
+    const [existing] = await lockedDb
+      .select({ id: companyMembers.id })
+      .from(companyMembers)
+      .where(eq(companyMembers.userId, user.id))
+      .limit(1);
+    if (existing) return;
+    await lockedDb.transaction(async tx => {
+      const [inserted] = await tx
+        .insert(companies)
+        .values({ name, ownerUserId: user.id });
+      await tx.insert(companyMembers).values({
+        companyId: inserted.insertId,
+        userId: user.id,
+        role: "owner",
+        status: "active",
+      });
     });
-  } catch (error) {
-    // WRONG, found on live 2026-10-14: this said "another request for the
-    // same new user got there first" — but no key can collide here. The only
-    // unique index is (companyId, userId), and each racing request inserts
-    // its OWN company, so every insert succeeds: user 3036 got five
-    // companies in one second. Not fixed yet (owner's call); the plan is in
-    // references/track-a-handoff.md session 43, and
-    // server/personalCompanyRace.test.ts reproduces it.
-    if (!isDuplicateKey(error)) throw error;
-  }
+  });
   return findMembership(user.id);
 }
 

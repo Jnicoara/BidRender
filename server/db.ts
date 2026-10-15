@@ -1553,6 +1553,52 @@ export async function withSeedLock(
 }
 
 /**
+ * Run `work` while holding a MySQL named lock, ON the connection that holds it.
+ *
+ * Same lock rules as `withSeedLock` above — one connection takes it and the
+ * same one lets it go — with one difference that matters under a burst: the
+ * work is handed that connection (`lockedDb`) instead of using the pool. Every
+ * request waiting for the lock is parked on a pooled connection of its own, so
+ * ten of them at once fill the pool, and a holder that then asked the pool for
+ * a connection to do its insert would wait behind its own waiters until their
+ * timeout. Working on the lock's connection, the holder never needs another.
+ *
+ * Returns `{ acquired: false }` on timeout, and `null` with no database, so
+ * the caller decides what "could not get the lock" means; it is never treated
+ * as permission to go ahead unguarded.
+ *
+ * Built for the personal company (server/_core/companyScope.ts), whose race
+ * gave one live user five companies in one second (2026-10-14).
+ */
+export async function withNamedLock<T>(
+  name: string,
+  timeoutSeconds: number,
+  work: (lockedDb: MySql2Database) => Promise<T>
+): Promise<{ acquired: true; value: T } | { acquired: false } | null> {
+  const db = await getDb();
+  if (!db || !_pool) return null;
+
+  const connection = await _pool.getConnection();
+  try {
+    const [rows] = await connection.query(
+      "SELECT GET_LOCK(?, ?) AS acquired",
+      [name, timeoutSeconds]
+    );
+    const acquired = (rows as unknown as Array<{ acquired: number | null }>)[0]
+      ?.acquired;
+    if (acquired !== 1) return { acquired: false };
+
+    try {
+      return { acquired: true, value: await work(drizzle(connection)) };
+    } finally {
+      await connection.query("SELECT RELEASE_LOCK(?)", [name]);
+    }
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Drop duplicate baseline rows left by a pre-lock race, keeping the lowest id
  * — and keeping any duplicate that something still points at (see below).
  *
