@@ -14,7 +14,7 @@ fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
 families, 62 COMMON, 2 SPECIALTY). No starter edit.
 
 **Item 2 — the last three shelves reviewed (read-only, source rule, nothing
-applied), from the owner's live workbook copy** (`C:devBidPhasepricing`,
+applied), from the owner's live workbook copy** (`C:\dev\BidPhase\pricing`,
 saved 19:29 on 2026-10-14; it already carries the owner's own pack fixes on
 rows 1598, 1602, 1666, 1688, 1693, 1719). All 138 names match
 `BASELINE_MATERIALS` one for one. **The sheet ends at row 1719: every shelf
