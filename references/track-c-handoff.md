@@ -13,8 +13,6 @@ fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
 (COMMON; `new-rows-source-check.md` marks them accepted — still 64
 families, 62 COMMON, 2 SPECIALTY). No starter edit.
 
-
-
 **Item 2 — the last three shelves reviewed (read-only, source rule, nothing
 applied), from the owner's live workbook copy** (`C:\dev\BidPhase\pricing`,
 saved 19:29 on 2026-10-14; it already carries the owner's own pack fixes on
@@ -35,6 +33,10 @@ now has a review.**
   need words, 3 owner picks; 7 rows used. No starter edit. 18 questions;
   M1–M2 proposed.
 - The 11 proposed rows are in `new-rows-source-check.md` as "waits for".
+
+**Item 3 — `pricing/morning-questions.md`**: the 63 open questions, ⚠ ones
+first (two starter edits: Equipment Q1 → PG19, Distribution Q15 → DV32).
+Later items append anything they park under "From the overnight build work".
 
 **Item 4 — merged `origin/local-dev` as `0c8e324f`** (A's 0157–0163,
 B's plan-reading help 1–5b and phone bottom bar). Conflict only in this
