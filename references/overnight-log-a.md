@@ -172,3 +172,6 @@ measurement, the cause (`bcryptjs` on the main thread), two fix options
   typed. Searched again for `samesite` everywhere: that was the only one.
   `dbDeadline.test.ts` passed in that run. Fixed; auth/cookie/rate tests
   23/23.
+- **Gate 38746107689 GREEN** on `30e45889` (full suite, Q-DB1 + A-S9b +
+  A-S12 + Q-AUTH1 note). Run 2 end **07:02**. No dev server started; MySQL
+  3307 left running (shared). Nothing pushed except `track-a-night`.

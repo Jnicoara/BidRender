@@ -4,7 +4,22 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-14 night, session 44: OVERNIGHT RUN on `track-a-night` (not local-dev)
+## NOW — 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
+
+Same branch, still not on local-dev. Gate **38746107689 green** on `30e45889`.
+
+- **Q-DB1 FIXED** (`q-db1-plan.md`): a query or connection wait past 30 s
+  destroys its connection (`server/dbDeadline.ts`, pool built in
+  `server/appPool.ts`); `GET /api/health` asks the database (3 s). Drill test
+  red without it. **Owner:** point App Platform’s health check at
+  `/api/health` (§ 3).
+- **Security** (`security-parked-a.md`): A-S9b fixed (cookie `Lax`); A-S12
+  switch `CLIENT_IP_FROM` ready, unset = unchanged, needs a live header look;
+  A-S13 not done (needs R2 proof); A-S14 fixed yesterday.
+- **Q-AUTH1** in `todo.md` under the stress tests.
+- Two Gates went red on the way, both test faults now fixed (log).
+
+## (earlier) 2026-10-14 night, session 44: OVERNIGHT RUN on `track-a-night` (not local-dev)
 
 Branch `track-a-night` from `origin/local-dev` `d0152f60`; pushed only
 there. Nothing touched staging/live, no deploy, no migration outside a
