@@ -41,6 +41,7 @@ import {
 } from "../pricing/starterSheetLayout";
 import { STARTER_LABOR_STEPS } from "./seed/starterLaborSteps";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
+import { STARTER_PACKS } from "./seed/materials/starterPacks";
 
 const current = new Map([
   ["Widget, new name", { unit: "each" }],
@@ -483,13 +484,24 @@ describe("per-foot pack labels (owner, 2026-10-12) — label only, no math", () 
     expect(pack("4/0 XHHW Aluminum")).toEqual([PER_FOOT_CUT, 1]);
     expect(pack("Cat6 cable Copper")).toEqual([PER_FOOT_BOX, 1]);
     expect(pack('1/2" EMT')).toEqual(["10 ft stick", 10]);
-    expect(pack("Surface raceway, 500 series")).toEqual(["per foot", 1]);
+    // Was "per foot" / 1 until the owner's pack answers of 2026-10-13
+    // (pack-label-scan.md): 500/700 raceway is a 10 ft length, flex a coil.
+    expect(pack("Surface raceway, 500 series")).toEqual(["10 ft length", 10]);
+    expect(pack('3/4" flexible metal conduit')).toEqual(["100 ft coil", 100]);
   });
 
-  it("every per-foot row is a pack of 1, except conduit's 10 ft stick", () => {
+  it("every per-foot row is a pack of 1, except a WRITTEN stick, length or coil", () => {
     const notOne = BASELINE_MATERIALS.filter(m => m.unitOfSale === "foot")
       .map(m => [m.name, ...packFor(m)] as const)
-      .filter(([, label, qty]) => qty !== 1 && label !== "10 ft stick");
+      .filter(
+        ([name, label, qty]) =>
+          qty !== 1 &&
+          !(
+            STARTER_PACKS[name] &&
+            /^\d+ ft (stick|length|coil)$/.test(label) &&
+            label.startsWith(`${qty} ft`)
+          )
+      );
     expect(notOne).toEqual([]);
   });
 });

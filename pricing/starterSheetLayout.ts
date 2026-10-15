@@ -11,6 +11,10 @@
  */
 import { BASELINE_MATERIALS } from "../server/seed/materials";
 import type { BaselineMaterial } from "../server/seed/materials/types";
+import {
+  PACK_NOT_CHECKED,
+  STARTER_PACKS,
+} from "../server/seed/materials/starterPacks";
 import { BASELINE_ASSEMBLIES } from "../server/seed/baselineAssemblies";
 import { BASELINE_RUN_TYPES } from "../server/seed/baselineRunTypes";
 import { starterPartName } from "../server/seed/starterParts";
@@ -387,10 +391,23 @@ export function assembliesInSheetOrder(): {
 }
 
 /**
- * The pack a row is usually bought in, and the number the per-unit price
- * divides by. A STARTING POINT the owner overwrites when he buys another
- * pack. Ported from pricing/writeWorkbook.cjs (packFor) with patterns for the
- * names frozen 2026-10-07 ("… Copper", "SER Aluminum", "bare stranded").
+ * The pack a row is bought in, and the number the per-unit price divides by.
+ * A STARTING POINT the owner overwrites when he buys another pack.
+ *
+ * ── A pack is WRITTEN DOWN per row, never guessed from words ────────────────
+ * Owner, 2026-10-14 (`pricing/pack-label-scan.md` § E). Until then this
+ * matched words ANYWHERE in a name — "nut", "pin", "washer", "connector",
+ * "strap", "EMT", "flex" — and gave 380 rows a box and 47 a 10 ft stick from
+ * them: "Dishwasher whip" was a box of 100 washers, "Pole anchor bolt kit" a
+ * box of 100 anchors, every flex coil a stick. A wrong pack divides the
+ * owner's typed price by the wrong number, on every bid.
+ *
+ * So: a pack bigger than one comes ONLY from `STARTER_PACKS`
+ * (`server/seed/materials/starterPacks.ts`), keyed by the exact name, with
+ * where it came from. A row with nothing written is `each` / 1 — and a
+ * per-foot row keeps a per-foot LABEL from the rules below, still qty 1, so
+ * a word there changes text, never a price. `server/starterPacks.test.ts`
+ * fails if anything else returns a pack above one.
  *
  * ── Per-foot rows: the price is PER FOOT, the pack is only a label ───────────
  * Owner, 2026-10-12: wire and cable are typed per foot (Pack qty 1), figured
@@ -400,7 +417,8 @@ export function assembliesInSheetOrder(): {
  *   #8 and bigger, big MC, SER/SEU,
  *   feeder wire                         "per foot (cut to length)"
  *   low voltage                         "per foot (from 1000 ft box)"
- * Conduit stays a 10 ft stick (Pack qty 10); surface raceway stays per foot.
+ * Conduit is a 10 ft stick (Pack qty 10) — written per row in STARTER_PACKS
+ * since 2026-10-14, as is every reel or length the rules below get wrong.
  * Until then wire was a 250 / 500 / 1000 pack the price divided by; the
  * owner had already set 120 of those rows to per foot / 1 by hand.
  */
@@ -417,49 +435,56 @@ const smallGauge = (name: string): boolean => {
   return n >= 10 && n <= 18;
 };
 
+/**
+ * The Notes text a row's pack needs in place of its description, or null.
+ * A written pack can carry a note; a row nobody could settle says so ON the
+ * row, where the owner types, not only in a list somewhere else.
+ */
+export function packNote(m: BaselineMaterial): string | null {
+  const written = STARTER_PACKS[m.name];
+  if (written?.sheetNote) return written.sheetNote;
+  const unsure = PACK_NOT_CHECKED[m.name];
+  if (unsure)
+    return `PACK NOT CHECKED — ${unsure}. Type the price of ONE, or set the pack you buy.`;
+  return null;
+}
+
+/** Where a row's pack came from — the build reports the count of each. */
+export type PackSource = "written" | "per-foot label" | "nothing written";
+
+export function packSource(m: BaselineMaterial): PackSource {
+  if (STARTER_PACKS[m.name]) return "written";
+  return m.unitOfSale === "foot" ? "per-foot label" : "nothing written";
+}
+
 export function packFor(m: BaselineMaterial): [string, number] {
-  const n = m.name;
-  if (m.unitOfSale === "foot") {
-    if (/\bSE[RU]\b|URD/i.test(n)) return [PER_FOOT_CUT, 1];
-    if (
-      /Cat5e|Cat6|coax|speaker|thermostat|security|control wire|fire alarm|fiber optic/i.test(
-        n
-      )
-    )
-      return [PER_FOOT_BOX, 1];
-    // Not wire, though the name says "cable".
-    if (/^Cable tray/i.test(n)) return ["per foot", 1];
-    // Locate wire is #14 single conductor; its name carries no gauge.
-    if (/^Tracer wire$/i.test(n)) return [PER_FOOT_ROLL, 1];
-    if (/EMT|rigid|PVC|IMC|flex|FMC|liquidtight/i.test(n))
-      return ["10 ft stick", 10];
-    if (/THHN/i.test(n))
-      return [smallGauge(n) ? PER_FOOT_SPOOL : PER_FOOT_CUT, 1];
-    if (/XHHW|USE-2/i.test(n)) return [PER_FOOT_CUT, 1]; // feeder wire
-    if (
-      /NM-B|UF-B|MC(-AP)? cable|AC cable|\bbare (solid|stranded)\b|wire|cable/i.test(
-        n
-      )
-    )
-      return [smallGauge(n) ? PER_FOOT_ROLL : PER_FOOT_CUT, 1];
-    return ["per foot", 1];
-  }
-  if (
-    /wire nut|push-in connector|staple|screw|anchor|washer|nut\b|zip tie|ferrule|clip\b|pin\b/i.test(
-      n
-    )
-  )
-    return ["box of 100", 100];
-  if (
-    /^(1[25]A|20A).*(receptacle|switch)/i.test(n) &&
-    !/GFCI|AFCI|dual|smart|USB/i.test(n)
-  )
-    return ["box of 10", 10];
-  if (
-    /wall plate|blank plate|mud ring|plaster ring|knockout|bushing|connector|coupling|strap|clamp|nail plate/i.test(
-      n
-    )
-  )
-    return ["box of 25", 25];
+  const written = STARTER_PACKS[m.name];
+  if (written) return [written.label, written.qty];
+  if (m.unitOfSale === "foot") return [perFootLabel(m.name), 1];
   return ["each", 1];
+}
+
+/**
+ * The LABEL of a per-foot row with no written pack. Text only: the qty is
+ * always 1, so a word matched here can never divide a price.
+ */
+function perFootLabel(n: string): string {
+  if (/\bSE[RU]\b|URD/i.test(n)) return PER_FOOT_CUT;
+  if (
+    /Cat5e|Cat6|coax|speaker|thermostat|security|control wire|fire alarm|fiber optic/i.test(
+      n
+    )
+  )
+    return PER_FOOT_BOX;
+  // Not wire, though the name says "cable".
+  if (/^Cable tray/i.test(n)) return "per foot";
+  if (/THHN/i.test(n)) return smallGauge(n) ? PER_FOOT_SPOOL : PER_FOOT_CUT;
+  if (/XHHW|USE-2/i.test(n)) return PER_FOOT_CUT; // feeder wire
+  if (
+    /NM-B|UF-B|MC(-AP)? cable|AC cable|\bbare (solid|stranded)\b|wire|cable/i.test(
+      n
+    )
+  )
+    return smallGauge(n) ? PER_FOOT_ROLL : PER_FOOT_CUT;
+  return "per foot";
 }
