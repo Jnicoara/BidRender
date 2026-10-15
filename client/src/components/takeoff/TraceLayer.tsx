@@ -43,7 +43,7 @@ import {
   runWidthInOverlay,
   type RunTypeColors,
 } from "@shared/takeoffMarks";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
@@ -742,6 +742,14 @@ export function TraceLayer({
     };
   }, []);
   const boxing = (shiftHeld || selectMode) && !tracing && !stamping;
+  // The latest onStampClick behind a callback that never changes, so the
+  // memoized MarkLayer is not re-rendered by a new arrow from the page.
+  const stampClickRef = useRef(onStampClick);
+  stampClickRef.current = onStampClick;
+  const stableStampClick = useCallback(
+    (id: number, additive: boolean) => stampClickRef.current(id, additive),
+    []
+  );
   const [box, setBox] = useState<{ from: PagePoint; to: PagePoint } | null>(
     null
   );
@@ -1450,141 +1458,26 @@ export function TraceLayer({
             symbols imitating the drawing: the job here is to see at a glance
             what HAS been counted against the plan underneath, and a marker
             that blends into the drawing defeats exactly that. */}
-        {stamps.map(placed => {
-          const at = toScreen({ x: placed.x, y: placed.y });
-          const isSelected = !placed.pending && selectedStampIds.has(placed.id);
-          const { shape, color, letter, status } = markAppearance(placed, pins);
-          const paint = markPaint(status, color);
-          // Below the size a letter can be read at, shape + colour remain.
-          const showLetter =
-            letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
-          /*
-            Sized in screen pixels and expressed in overlay units, because this
-            overlay is inside the zoom transform. Selection adds a fifth on top
-            of whatever the clamp allowed, so it reads as "this one" at every
-            zoom rather than only where there is room for it.
-          */
-          const r = markRadiusInOverlay(zoom) * (isSelected ? 1.2 : 1);
-          const stroke = markStrokeInOverlay(zoom);
-          return (
-            <g
-              key={`${placed.pending ? "pending" : "stamp"}-${placed.id}`}
-              opacity={markFocusOpacity(status.status, statusFocus)}
-              className={
-                tracing || placed.pending
-                  ? ""
-                  : "pointer-events-auto cursor-pointer"
-              }
-              /*
-                A press that starts ON a mark is a click on that mark, never
-                the start of a box: stopped here so the overlay's box does not
-                begin underneath it, and Shift-click can add or remove it.
-              */
-              onPointerDown={e => {
-                if (boxing && !placed.pending) e.stopPropagation();
-              }}
-              onClick={e =>
-                !tracing &&
-                !placed.pending &&
-                onStampClick(placed.id, e.shiftKey || selectMode)
-              }
-            >
-              {/*
-                STATUS (pin plan § 7, shared/takeoffMarks.ts `statusLook`):
-                new is filled; existing is HOLLOW with a SOLID outline — never
-                dashed, which is "unconfirmed"; remove adds an X; relocate an
-                arrow badge. The card says the same split in words.
-              */}
-              <path
-                d={markPath(shape, at.x, at.y, r)}
-                // Hollow is truly hollow: a white fill hid the plan symbol
-                // underneath (seen 2026-10-05), which § 4 forbids.
-                // Fill, outline weight and letter paint all come from
-                // `markPaint`, so filled and hollow differ in three places.
-                fill={status.filled ? color : "none"}
-                fillOpacity={paint.fillOpacity}
-                stroke={color}
-                strokeWidth={
-                  (isSelected ? stroke * 1.4 : stroke) * paint.strokeScale
-                }
-                strokeDasharray={
-                  status.dashed ? `${r * 0.45} ${r * 0.3}` : undefined
-                }
-                strokeLinejoin="round"
-              />
-              {status.cross && (
-                <path
-                  d={`M${at.x - r * 0.75},${at.y - r * 0.75}L${at.x + r * 0.75},${at.y + r * 0.75}M${at.x + r * 0.75},${at.y - r * 0.75}L${at.x - r * 0.75},${at.y + r * 0.75}`}
-                  stroke="#DC2626"
-                  strokeWidth={stroke * 1.4}
-                  strokeLinecap="round"
-                  pointerEvents="none"
-                />
-              )}
-              {status.arrow && (
-                /*
-                  A filled arrowhead on a dark disc: a thin stroked arrow
-                  read as a "+" at the size a pin is drawn (seen at 212%,
-                  2026-10-05).
-                */
-                <g pointerEvents="none">
-                  <circle
-                    cx={at.x + r * 0.9}
-                    cy={at.y - r * 0.9}
-                    r={r * 0.6}
-                    fill="#0b0b0b"
-                    stroke={color}
-                    strokeWidth={stroke * 0.8}
-                  />
-                  <path
-                    d={`M${at.x + r * 0.55},${at.y - r * 1.02}H${at.x + r * 0.95}V${at.y - r * 1.25}L${at.x + r * 1.32},${at.y - r * 0.9}L${at.x + r * 0.95},${at.y - r * 0.55}V${at.y - r * 0.78}H${at.x + r * 0.55}Z`}
-                    fill="#ffffff"
-                  />
-                </g>
-              )}
-              {/*
-                The centre dot is what makes a mark point at something. Kept at
-                a fixed fraction of the shape so it stays a dot rather than
-                becoming a filled shape at one zoom and vanishing at another.
-
-                Where the pin is big enough, the count's LETTER takes the dot's
-                place (shared/pinLetters.ts): it points just as well, and it
-                says which count this is on a print or to a colour-blind eye.
-                On a filled pin: dark text over a pale halo, so it reads on
-                white paper and on black linework alike. On a HOLLOW pin the
-                letter is in the count's color over a thin dark halo instead
-                (`markPaint`): the pale halo filled the inside back in, and
-                new and existing looked the same (2026-10-05).
-              */}
-              {showLetter ? (
-                <text
-                  x={at.x}
-                  y={at.y + letterFit(shape, r, letter).dy}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize={letterFit(shape, r, letter).size}
-                  fontWeight={700}
-                  fontFamily="ui-sans-serif, system-ui, sans-serif"
-                  fill={paint.letterFill}
-                  stroke={paint.letterHalo}
-                  strokeWidth={stroke * paint.letterHaloScale}
-                  paintOrder="stroke"
-                  pointerEvents="none"
-                >
-                  {letter}
-                </text>
-              ) : (
-                <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
-              )}
-              <title>
-                {(letter ? `${letter} — ${placed.name}` : placed.name) +
-                  (status.status === "new"
-                    ? ""
-                    : ` — ${MARK_STATUS_LABEL[status.status]}, not priced`)}
-              </title>
-            </g>
-          );
-        })}
+        {/*
+          The placed marks, in their OWN memoized layer (Track B stress pass,
+          2026-10-15): with 5,000 marks on a sheet every pan step and every
+          state change anywhere on the Plans screen re-rendered all of them,
+          about 250 ms a drag step in development. They depend only on the
+          props below, so a pan, a crosshair move or a panel opening no longer
+          touches them.
+        */}
+        <MarkLayer
+          stamps={stamps}
+          renderScale={renderScale}
+          selectedStampIds={selectedStampIds}
+          pins={pins}
+          zoom={zoom}
+          statusFocus={statusFocus}
+          tracing={tracing}
+          boxing={boxing}
+          selectMode={selectMode}
+          onStampClick={stableStampClick}
+        />
 
         {/* The Shift-drag selection box, while it is being dragged. */}
         {box &&
@@ -2586,3 +2479,177 @@ export function TraceLayer({
     </>
   );
 }
+
+/**
+ * Every placed mark on the sheet. Memoized, and fed only what a mark's look
+ * depends on, so the Plans screen's other state (a pan step, the crosshair,
+ * a panel) never re-renders thousands of marks. `onStampClick` must be
+ * STABLE for the memo to hold: TraceLayer passes `stableStampClick`.
+ */
+const MarkLayer = memo(function MarkLayer({
+  stamps,
+  renderScale,
+  selectedStampIds,
+  pins,
+  zoom,
+  statusFocus,
+  tracing,
+  boxing,
+  selectMode,
+  onStampClick,
+}: {
+  stamps: PlacedStamp[];
+  renderScale: number;
+  selectedStampIds: ReadonlySet<number>;
+  pins: ReadonlyMap<number, PinStyle> | undefined;
+  zoom: number;
+  statusFocus: MarkStatus | null;
+  tracing: boolean;
+  boxing: boolean;
+  selectMode: boolean;
+  onStampClick: (id: number, additive: boolean) => void;
+}) {
+  const toScreen = (p: PagePoint) => ({
+    x: p.x * renderScale,
+    y: p.y * renderScale,
+  });
+  return (
+    <>
+      {stamps.map(placed => {
+        const at = toScreen({ x: placed.x, y: placed.y });
+        const isSelected = !placed.pending && selectedStampIds.has(placed.id);
+        const { shape, color, letter, status } = markAppearance(placed, pins);
+        const paint = markPaint(status, color);
+        // Below the size a letter can be read at, shape + colour remain.
+        const showLetter =
+          letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
+        /*
+            Sized in screen pixels and expressed in overlay units, because this
+            overlay is inside the zoom transform. Selection adds a fifth on top
+            of whatever the clamp allowed, so it reads as "this one" at every
+            zoom rather than only where there is room for it.
+          */
+        const r = markRadiusInOverlay(zoom) * (isSelected ? 1.2 : 1);
+        const stroke = markStrokeInOverlay(zoom);
+        return (
+          <g
+            key={`${placed.pending ? "pending" : "stamp"}-${placed.id}`}
+            opacity={markFocusOpacity(status.status, statusFocus)}
+            className={
+              tracing || placed.pending
+                ? ""
+                : "pointer-events-auto cursor-pointer"
+            }
+            /*
+                A press that starts ON a mark is a click on that mark, never
+                the start of a box: stopped here so the overlay's box does not
+                begin underneath it, and Shift-click can add or remove it.
+              */
+            onPointerDown={e => {
+              if (boxing && !placed.pending) e.stopPropagation();
+            }}
+            onClick={e =>
+              !tracing &&
+              !placed.pending &&
+              onStampClick(placed.id, e.shiftKey || selectMode)
+            }
+          >
+            {/*
+                STATUS (pin plan § 7, shared/takeoffMarks.ts `statusLook`):
+                new is filled; existing is HOLLOW with a SOLID outline — never
+                dashed, which is "unconfirmed"; remove adds an X; relocate an
+                arrow badge. The card says the same split in words.
+              */}
+            <path
+              d={markPath(shape, at.x, at.y, r)}
+              // Hollow is truly hollow: a white fill hid the plan symbol
+              // underneath (seen 2026-10-05), which § 4 forbids.
+              // Fill, outline weight and letter paint all come from
+              // `markPaint`, so filled and hollow differ in three places.
+              fill={status.filled ? color : "none"}
+              fillOpacity={paint.fillOpacity}
+              stroke={color}
+              strokeWidth={
+                (isSelected ? stroke * 1.4 : stroke) * paint.strokeScale
+              }
+              strokeDasharray={
+                status.dashed ? `${r * 0.45} ${r * 0.3}` : undefined
+              }
+              strokeLinejoin="round"
+            />
+            {status.cross && (
+              <path
+                d={`M${at.x - r * 0.75},${at.y - r * 0.75}L${at.x + r * 0.75},${at.y + r * 0.75}M${at.x + r * 0.75},${at.y - r * 0.75}L${at.x - r * 0.75},${at.y + r * 0.75}`}
+                stroke="#DC2626"
+                strokeWidth={stroke * 1.4}
+                strokeLinecap="round"
+                pointerEvents="none"
+              />
+            )}
+            {status.arrow && (
+              /*
+                  A filled arrowhead on a dark disc: a thin stroked arrow
+                  read as a "+" at the size a pin is drawn (seen at 212%,
+                  2026-10-05).
+                */
+              <g pointerEvents="none">
+                <circle
+                  cx={at.x + r * 0.9}
+                  cy={at.y - r * 0.9}
+                  r={r * 0.6}
+                  fill="#0b0b0b"
+                  stroke={color}
+                  strokeWidth={stroke * 0.8}
+                />
+                <path
+                  d={`M${at.x + r * 0.55},${at.y - r * 1.02}H${at.x + r * 0.95}V${at.y - r * 1.25}L${at.x + r * 1.32},${at.y - r * 0.9}L${at.x + r * 0.95},${at.y - r * 0.55}V${at.y - r * 0.78}H${at.x + r * 0.55}Z`}
+                  fill="#ffffff"
+                />
+              </g>
+            )}
+            {/*
+                The centre dot is what makes a mark point at something. Kept at
+                a fixed fraction of the shape so it stays a dot rather than
+                becoming a filled shape at one zoom and vanishing at another.
+
+                Where the pin is big enough, the count's LETTER takes the dot's
+                place (shared/pinLetters.ts): it points just as well, and it
+                says which count this is on a print or to a colour-blind eye.
+                On a filled pin: dark text over a pale halo, so it reads on
+                white paper and on black linework alike. On a HOLLOW pin the
+                letter is in the count's color over a thin dark halo instead
+                (`markPaint`): the pale halo filled the inside back in, and
+                new and existing looked the same (2026-10-05).
+              */}
+            {showLetter ? (
+              <text
+                x={at.x}
+                y={at.y + letterFit(shape, r, letter).dy}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={letterFit(shape, r, letter).size}
+                fontWeight={700}
+                fontFamily="ui-sans-serif, system-ui, sans-serif"
+                fill={paint.letterFill}
+                stroke={paint.letterHalo}
+                strokeWidth={stroke * paint.letterHaloScale}
+                paintOrder="stroke"
+                pointerEvents="none"
+              >
+                {letter}
+              </text>
+            ) : (
+              <circle cx={at.x} cy={at.y} r={r * 0.28} fill={color} />
+            )}
+            <title>
+              {(letter ? `${letter} — ${placed.name}` : placed.name) +
+                (status.status === "new"
+                  ? ""
+                  : ` — ${MARK_STATUS_LABEL[status.status]}, not priced`)}
+            </title>
+          </g>
+        );
+      })}
+    </>
+  );
+});

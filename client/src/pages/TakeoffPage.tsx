@@ -8193,6 +8193,53 @@ export default function TakeoffPage({
     [layeredStamps, effectiveLayers]
   );
 
+  /*
+    The marks the drawing shows, as ONE array that only changes when the marks
+    do (Track B stress pass, 2026-10-15): it was built inline in the JSX, a
+    new array on every render, so the memoized MarkLayer re-rendered every
+    mark on every pan step — about 250 ms a step with 5,000 marks (dev).
+  */
+  const layerStamps = useMemo(
+    () => [
+      ...visibleStamps.map(st => ({
+        id: st.id,
+        name: st.name,
+        groupId: st.groupId,
+        assemblyId: st.assemblyId,
+        assemblyCategory: st.assemblyCategory ?? null,
+        x: st.x,
+        y: st.y,
+        status: st.status,
+      })),
+      /*
+                    Clicked and not yet saved, drawn the same way.
+
+                    Deliberately NOT put through the Layers filter above:
+                    these are the marks somebody is placing right now with
+                    that very count armed, and a mark that does not appear
+                    because a layer is hidden is indistinguishable from a
+                    click that missed.
+                  */
+      ...pendingMarks
+        // Held under a stand-in until the row arrives.
+        .filter(m => m.sheetId === drawnSheetId)
+        .map(m => ({
+          id: m.key,
+          name: m.name,
+          groupId: m.groupId,
+          assemblyId: m.assemblyId,
+          assemblyCategory: m.assemblyCategory,
+          x: m.x,
+          y: m.y,
+          // What "placing as" said when it was clicked, so
+          // an existing device is hollow before the reply.
+          status: m.status === "new" ? null : m.status,
+          pending: true,
+        })),
+    ],
+    [visibleStamps, pendingMarks, drawnSheetId]
+  );
+
   /** The selection's own height and left-off drops, for the pill. */
   const selectionDrops = useMemo(
     () => selectionDrop(stamps, selectedStampIds),
@@ -12139,43 +12186,7 @@ export default function TakeoffPage({
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}
                       statusFocus={statusFocus}
-                      stamps={[
-                        ...visibleStamps.map(st => ({
-                          id: st.id,
-                          name: st.name,
-                          groupId: st.groupId,
-                          assemblyId: st.assemblyId,
-                          assemblyCategory: st.assemblyCategory ?? null,
-                          x: st.x,
-                          y: st.y,
-                          status: st.status,
-                        })),
-                        /*
-                          Clicked and not yet saved, drawn the same way.
-
-                          Deliberately NOT put through the Layers filter above:
-                          these are the marks somebody is placing right now with
-                          that very count armed, and a mark that does not appear
-                          because a layer is hidden is indistinguishable from a
-                          click that missed.
-                        */
-                        ...pendingMarks
-                          // Held under a stand-in until the row arrives.
-                          .filter(m => m.sheetId === drawnSheetId)
-                          .map(m => ({
-                            id: m.key,
-                            name: m.name,
-                            groupId: m.groupId,
-                            assemblyId: m.assemblyId,
-                            assemblyCategory: m.assemblyCategory,
-                            x: m.x,
-                            y: m.y,
-                            // What "placing as" said when it was clicked, so
-                            // an existing device is hollow before the reply.
-                            status: m.status === "new" ? null : m.status,
-                            pending: true,
-                          })),
-                      ]}
+                      stamps={layerStamps}
                       proposals={proposals}
                       onDropStamp={queueStamp}
                       selectedStampIds={selectedStampIds}
