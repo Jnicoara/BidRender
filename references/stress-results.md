@@ -76,6 +76,21 @@ Over HTTP exactly as the browser calls (signed in, JSON), 10 runs each.
 - The line-quantity save probe picked a line fed by the plans, which is
   refused by design ("change it by marking"); the probe needs a hand line.
 
+**Saves with eleven companies saving at once** (30 s; each company drops
+a mark, removes it, renames its bid and re-reads it, in a loop):
+
+| Save            | calls | p50 ms | p95 ms | max ms |
+| --------------- | ----- | ------ | ------ | ------ |
+| Drop a mark     | 881   | 76     | 111    | 150    |
+| Remove it       | 881   | 81     | 115    | 164    |
+| Rename the bid  | 881   | 61     | 93     | 138    |
+| Re-read the bid | 881   | 134    | 185    | 236    |
+
+0 errors. (A first attempt changed the bid's status instead of its name;
+moving a bid to Active locks its quantities, so its later drops were —
+correctly — refused, and the run reported 1,398 "errors" that were the app
+working.)
+
 ## Screens in a real browser (`scripts/stressScreens.mts`)
 
 Time from opening the address to the real content (first bid card, the
