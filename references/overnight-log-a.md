@@ -60,3 +60,21 @@ files only (B and C also running). MySQL 3307 shared — left running.
   `--expect` exercised on `bidrender_test_localdev`. `pnpm check` clean.
 - Gate 38684649809 (preinstalled MySQL) **green**. SEEN lookup checked
   against the real API: 3854d2d5 → seen (run 38684649809), e03bead6 → full.
+
+## Item 4 — invite gate (server, OFF by default) — 00:30 → 01:45
+
+- **Found:** the gate's table already exists — 0107 `signup_invites`, live
+  since 10-10 — and the owner-answered plan lived only on `a-plans`. Copied
+  to `references/invite-gate-plan.md` with § 12 "BUILT".
+- Built: `server/signupInvites.ts` (switch `SIGNUP_INVITE_ONLY=on`, exact
+  word), `server/inviteCodes.ts` (shared generator/hash, companyRouter now
+  imports it), `auth.signup` takes `inviteCode`, `auth.inviteInfo`,
+  `auth.signupMode`, `signupInvitesRouter` (admin create/list/revoke/mode).
+- Not built: sign-in page / `#/signup` page / Admin panel / emails (UI
+  needs a visual check; no dev server tonight).
+- Drafted, not applied: `references/drafts/users-email-unique.sql`;
+  rehearsed on a throwaway schema; 0 duplicates on two local DBs.
+- Tests: `signupInviteGate.test.ts` 9/9; two mutations each turned exactly
+  their test red; auth.email, auth.logout, permissions, seats,
+  personalCompanyRace, scopeDiscipline (router listed), sourceHygiene: 121
+  green; `pnpm check` clean.

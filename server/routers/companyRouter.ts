@@ -23,7 +23,6 @@
  *     stored only as a SHA-256. Nothing can read a code back out afterwards,
  *     including this router.
  */
-import { randomBytes, createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -45,29 +44,9 @@ import {
 } from "../../shared/permissions";
 import { seatRefusal, seatSummary, seatsInUse } from "../../shared/seats";
 import * as db from "../db";
+import { generateInviteCode, hashInviteCode as hashCode } from "../inviteCodes";
 
 const manage = requireCapability("members.manage");
-
-/** A shared secret with 160 bits of entropy, in a shape a person can retype. */
-function generateInviteCode(): string {
-  // Crockford-ish: no I, L, O, U — the characters people mistype when reading
-  // a code off a phone screen to someone on a job site.
-  const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-  const bytes = randomBytes(20);
-  let code = "";
-  for (let i = 0; i < bytes.length; i++) {
-    code += alphabet[bytes[i] % alphabet.length];
-    if (i % 5 === 4 && i !== bytes.length - 1) code += "-";
-  }
-  return code;
-}
-
-/** Codes are compared by hash; the plaintext is never stored. */
-function hashCode(code: string): string {
-  return createHash("sha256")
-    .update(code.trim().toUpperCase().replace(/-/g, ""))
-    .digest("hex");
-}
 
 /**
  * The member this action targets, with their role as the DATABASE has it.

@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Invitation-only sign-up is ready behind a switch, and the switch is
+  off.** When the owner turns it on, a new account needs an invitation: one
+  from the owner creates a new company with the seats it names, and one from
+  a company joins that company directly, with no stray empty company. Until
+  then sign-up works exactly as before. The sign-up screens that go with it
+  are not built yet.
+
 - **A safe, checked way to remove the four empty duplicate companies one
   live sign-up was given.** It only ever removes a company with nothing in
   it but its owner, keeps the one the person actually works in, and refuses

@@ -1,0 +1,18 @@
+-- DRAFT — NOT IN drizzle/, NOT APPLIED ANYWHERE. Track A, 2026-10-14 night.
+-- Invite-gate plan § 7 / owner Q6: "users.email has no UNIQUE index" —
+-- signup's uniqueness is only a pre-check, so two signups at once can race.
+-- The invite gate narrows it (a new-company code is claimed first) but a
+-- company code or an open signup still races. Give it the next free number
+-- when the owner says go.
+--
+-- Kind: ADDITIVE, step 1. No UPDATE. Old code never relies on duplicates.
+-- NULLs never collide (OAuth-era rows with no email are unaffected).
+-- The column is utf8mb4_unicode_ci, so "A@x.com" and "a@x.com" ARE the same
+-- key — which is the point (signup lowercases, but not every old row did).
+--
+-- IT FAILS OUTRIGHT IF A DUPLICATE EXISTS. Count first, on the database it is
+-- about to run on, the same day (live had 0 on 2026-10-14, session 43):
+--   SELECT email, COUNT(*) FROM users WHERE email IS NOT NULL
+--    GROUP BY email HAVING COUNT(*) > 1;
+-- Any row: stop and find out why before going on.
+ALTER TABLE `users` ADD CONSTRAINT `users_email_unique` UNIQUE(`email`);

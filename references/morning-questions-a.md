@@ -57,3 +57,13 @@ finds differs; refuses any company with an invite, a second member, any
 other row pointing at it, or someone's active pointer). Runs after the
 day's verified backup, with the eight rows saved to JSON first
 (release plan step 10). Yes / no?
+
+## 5. Invite gate — when to switch it on (live)
+
+Server side built, OFF (`invite-gate-plan.md` § 12). Switching on = set
+`SIGNUP_INVITE_ONLY=on` on the live app (an env change, redeploys). **My
+recommendation: not until the sign-in page hides "Create account"** (not
+built — needed a visual check, no dev server tonight); otherwise strangers
+fill in the form and are refused only on submit. Also: apply the drafted
+`users.email` UNIQUE (`references/drafts/users-email-unique.sql`) in the
+same release? It is additive; count duplicates first.

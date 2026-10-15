@@ -47,6 +47,7 @@ import { aiUsageRouter } from "./routers/aiUsageRouter";
 import { searchMissesRouter } from "./routers/searchMissesRouter";
 import { pricingProblemsRouter } from "./routers/pricingProblemsRouter";
 import { seatLimitsRouter } from "./routers/seatLimitsRouter";
+import { signupInvitesRouter } from "./routers/signupInvitesRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -123,6 +124,7 @@ export const appRouter = router({
   pricingProblems: pricingProblemsRouter,
   // Admin-only. Seats per company, set by hand until billing exists.
   seatLimits: seatLimitsRouter,
+  signupInvites: signupInvitesRouter,
 });
 
 export type AppRouter = typeof appRouter;

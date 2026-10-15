@@ -29,6 +29,13 @@ import {
   createFailureLimiter,
   createRateLimiter,
 } from "../rateLimit";
+import {
+  INVITE_ONLY_MESSAGE,
+  findInvite,
+  inviteProblem,
+  signUpWithInvite,
+  signupInviteOnly,
+} from "../signupInvites";
 
 const SALT_ROUNDS = 12;
 
@@ -60,6 +67,16 @@ const overResetAddressLimit = createRateLimiter({
 const overResetSubmitLimit = createRateLimiter({
   windowMs: 60 * 60 * 1000,
   max: 20,
+});
+
+/*
+  Invite codes (invite-gate-plan.md § 4). A code is ~100 bits, so guessing is
+  not a real attack; an open unauthenticated endpoint with no limit is still a
+  finding in any review. Shared by inviteInfo and a signup that carries a code.
+*/
+const overInviteLimit = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
 });
 
 /*
@@ -111,22 +128,102 @@ export const authRouter = router({
    */
   me: publicProcedure.query(opts => toPublicUser(opts.ctx.user)),
 
-  /** Sign up with email + password */
+  /**
+   * Is signup invite-only? For the sign-in page, which offers "Create account"
+   * only when it is not. The server refuses either way (`signup` below).
+   */
+  signupMode: publicProcedure.query(() => ({
+    inviteOnly: signupInviteOnly(),
+  })),
+
+  /**
+   * What an invite code is, for the signup page reached from its link: the
+   * kind, the address it was sent to and the company, or why it cannot be
+   * used. Whoever holds the code already holds the way in, so this tells them
+   * nothing the code does not.
+   */
+  inviteInfo: publicProcedure
+    .input(z.object({ code: z.string().trim().min(4).max(64) }))
+    .query(async ({ input, ctx }) => {
+      if (overInviteLimit(clientKey(ctx.req), Date.now()))
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts. Wait an hour and try again.",
+        });
+      const found = await findInvite(input.code);
+      const problem = inviteProblem(found, null, new Date());
+      if (problem || !found) return { ok: false as const, message: problem };
+      return found.kind === "newCompany"
+        ? {
+            ok: true as const,
+            kind: found.kind,
+            email: found.invite.email,
+            companyName: null,
+          }
+        : {
+            ok: true as const,
+            kind: found.kind,
+            email: found.invite.email,
+            companyName: found.companyName,
+          };
+    }),
+
+  /**
+   * Sign up with email + password — and, with an invite code, straight into
+   * the company the code names (server/signupInvites.ts). While
+   * SIGNUP_INVITE_ONLY=on, a signup with no code is refused HERE: hiding the
+   * form stops nobody.
+   */
   signup: publicProcedure
     .input(
       z.object({
         email: z.string().email().max(320),
         password: newPassword,
         name: z.string().min(1).max(128).optional(),
+        inviteCode: z.string().trim().min(4).max(64).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
+      if (!input.inviteCode && signupInviteOnly()) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: INVITE_ONLY_MESSAGE,
+        });
+      }
       const existing = await db.getUserByEmail(input.email.toLowerCase());
       if (existing) {
         throw new TRPCError({
           code: "CONFLICT",
           message: "An account with this email already exists.",
         });
+      }
+
+      if (input.inviteCode) {
+        if (overInviteLimit(clientKey(ctx.req), Date.now()))
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many attempts. Wait an hour and try again.",
+          });
+        const now = new Date();
+        const found = await findInvite(input.inviteCode);
+        const problem = inviteProblem(found, input.email, now);
+        if (problem || !found)
+          throw new TRPCError({ code: "FORBIDDEN", message: problem! });
+        const user = await signUpWithInvite(found, {
+          email: input.email.toLowerCase(),
+          name: input.name ?? input.email.split("@")[0],
+          passwordHash: await bcrypt.hash(input.password, SALT_ROUNDS),
+          openId: `email_${nanoid(24)}`,
+          now,
+        });
+        const token = await sdk.createSessionToken(user.openId, {
+          name: user.name ?? "",
+        });
+        ctx.res.cookie(COOKIE_NAME, token, getSessionCookieOptions(ctx.req));
+        return {
+          success: true,
+          user: { id: user.id, email: user.email, name: user.name },
+        };
       }
 
       const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);

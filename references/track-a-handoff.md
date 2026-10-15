@@ -30,6 +30,11 @@ questions: `morning-questions-a.md`.
   change, pack fix, signup fix, then companies 5–8 via the new
   `scripts/removeRaceCompanies.mts` (dry run; `--apply --expect 5,6,7,8`).
   **Blocked on owner: the boot change vs Q1** (pricing load not in seed yet).
+- **4. Invite gate, server half BUILT, OFF** (`invite-gate-plan.md` § 12 —
+  the plan itself was only on `a-plans`; now in references). Table is 0107
+  (already live). `SIGNUP_INVITE_ONLY=on` closes open signup; codes work
+  either way. UI not built. `users.email` UNIQUE drafted in
+  `references/drafts/`.
 
 ## (earlier) 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
 
