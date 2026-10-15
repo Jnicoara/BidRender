@@ -123,6 +123,13 @@ per-bid overrides on others, 189 new lines frozen at those prices):
   line field that does not exist and silently skipped the line rule; the
   script now reports how many bids each rule was actually evaluated on.)
 
+**Second round, every pricing path exercised:** 25 assemblies given labor
+hours, roles and (on a third) a modifier; 126 more lines; company sales
+tax switched on for materials (it was off, and the bid page said so).
+Paths now covered — labor on 71 bids, the productivity factor on 12,
+modifiers on 43, sales tax on 10. **73 priced bids: still 0
+disagreements across the four screens, 0 broken rules.**
+
 ## Screens in a real browser (`scripts/stressScreens.mts`)
 
 Time from opening the address to the real content (first bid card, the
