@@ -1690,6 +1690,21 @@ Measurements: `references/code-first-ceiling.md` § d.
       release, so the scale check passes it clean there too. Other
       worktrees' `reader-accuracy/plans/Weld 1.pdf` copies are also old.
 
+### The Dashboard's "drops not priced" check under heavy load (Track C, 2026-10-15)
+
+- [ ] **Measured (references/stress-results.md):** with a count that drops on
+      62 of a 150-bid company's bids, `bids.dashboard` takes 683 ms alone and
+      **2.3 s (p50)** while ten other companies hammer the server (requests
+      back to back — roughly 200 real users' worth). Each of those bids runs
+      the bid page's whole drops calculation (~10 small queries, 8–13 ms),
+      four at a time, through a 10-connection pool. Bids with no drop kind
+      already skip it (`bidsWithADropKind`, 2.4 s → 0.4 s). Options, in
+      order of safety: share the company-wide height context across the list
+      instead of reloading it per bid; batch the per-bid reads (groups,
+      stamps, runs, scales) into one query each for the whole list; then,
+      only with Track A, a bigger pool (live connection limits). Never a
+      cache that could show yesterday's count.
+
 ### Number boxes in forms with a Save button read only plain numbers (Track C, 2026-10-15)
 
 - [ ] **`parseTypedNumber` (client/src/lib/inlineEdit.ts) is used by every

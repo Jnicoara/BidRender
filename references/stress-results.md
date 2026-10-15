@@ -36,6 +36,15 @@ drop heights on most of its bids still pays the full calculation for those
 bids — the same cost as before, no worse. If that is common, the next step
 is caching each bid's answer.
 
+**Then the case the fix does not cover**, measured: a count that drops
+on 62 of the 150 bids → Dashboard **683 ms alone, 2,339 ms (p50) under the
+eleven-company load** — over budget again. The per-bid drops calculation
+costs 8–13 ms (~10 queries), four bids at a time, through mysql2's default
+10-connection pool. The load here is requests back to back (~4 a second per
+worker — roughly two hundred real people), so this is the far end; it is
+written up in todo.md with the fixes in order of safety, not changed
+overnight.
+
 ## Server timings (`scripts/stressTime.mts`, after the fix)
 
 Over HTTP exactly as the browser calls (signed in, JSON), 10 runs each.
