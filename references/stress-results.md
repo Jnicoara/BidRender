@@ -123,7 +123,8 @@ JavaScript needed before the Dashboard shows (gzipped, as live serves it):
 the tab ONCE (driven: a 404 on the Bids file → one reload → Bids shown),
 never in a loop. A quiet "Loading…" only after 300 ms (`PageLoading`), and
 every page is fetched in the background 4 s after the first screen, so
-later clicks stay instant. Against the production build: newScreens + guide
+later clicks stay instant. The signed-out landing page was already lean:
+148 KB gzipped (~0.7 s) — the app's code was never on it. Against the production build: newScreens + guide
 
 - the smoke screens spec, 103 passed at four sizes.
 
