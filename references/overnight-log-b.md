@@ -88,3 +88,29 @@ beyond the plan, money, or anything irreversible go to
 - **Scaling note:** a preview is a dry run that pins every shop (69 here,
   1.1 s). With thousands of shops it grows linearly — measured in the
   stress pass.
+
+## Starter offers — a recipe part's quantity on the admin screen · `a8e3b2ef`
+
+- Pencil on each part row → "Quantity in this assembly" → Preview → Confirm
+  (a `part_field` change). Looked at on laptop.
+
+## Gate 38686356758 RED, fixed · `4a7dfca6`
+
+- `server/auth.email.test.ts` mocks `./db` without the fork functions; the
+  routers now import `starterChanges.ts`, whose registry read
+  `db.forkMaterial` at module load → 1 of 440 files red. The registry looks
+  each fork up when called. Reproduced red locally, then green.
+
+## Stress rounds 1–5 (see `stress-results-b.md`)
+
+| Round | Found                                                                                                            | Fixed in   |
+| ----- | ---------------------------------------------------------------------------------------------------------------- | ---------- |
+| 1     | every starter change visited every shop (414 ms/change at 306 shops); preview forked every shop (7.3 s at 2,006) | `07a96f74` |
+| 2     | every pan step re-rendered every mark (5.2 s / 20 steps at 5,000 marks, dev)                                     | `2dfc2a48` |
+| 3     | opening the 500-sheet set downloaded all 270 MB (schedule search read every page)                                | `d7245405` |
+| 4     | marks placed offline never retried; one failed sheet killed the plan                                             | `9150f9b1` |
+| 5     | two tabs, Back mid-save — held                                                                                   | notes only |
+
+- Gates: 38688083146 green (2dfc2a48), 38689454507 green (d7245405).
+- Servers: dev server stopped at the start of round 2; a PRODUCTION build on
+  3002 used for every measurement since (one server at a time).
