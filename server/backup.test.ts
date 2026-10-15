@@ -440,6 +440,10 @@ describe("stored files", () => {
           // step (`S05`), what the owner's sheet carries a minute by. An
           // identifier, not a file.
           "stepKey",
+          // material_price_history.materialKey (0163) — `materialItemKey`,
+          // the material a price change is for, as itemKey above. An id,
+          // not a file.
+          "materialKey",
         ].includes(column)
       ) {
         continue;

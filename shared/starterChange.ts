@@ -82,6 +82,13 @@ export const STARTER_FIELDS: Record<
       "strapFromBoxFeet",
       "stickJoint",
       "defaultQty",
+      // Pricing safety (0157/0158, PS-M1/M2; Track A's call 2026-10-14, C to
+      // confirm before step 6 seeds them): the pack size changes the
+      // purchase list and, later, the price band key, so a company is
+      // offered a new one. The label travels with it — a qty without its
+      // word misreads.
+      "packQty",
+      "packLabel",
     ],
     ["searchAliases", "category", "description", "isSpecialty"],
     ["unitOfSale"],
@@ -97,6 +104,11 @@ export const STARTER_FIELDS: Record<
       "brandNote",
       "supplierName",
       "priceUpdatedAt",
+      // 0159/0160 (PS-M3/M4): the company's own — a pack price as THEY typed
+      // it (a shipped row's stays NULL, PS § 2.4), and their "keep it" on the
+      // sanity warning.
+      "packPrice",
+      "priceCheckAcceptedAt",
     ]
   ),
   assemblies: kinds(

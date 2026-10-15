@@ -19,6 +19,18 @@ the Example-tag companion, the admin edit routes, and both sets of screens.
 **No migration is needed from A for this.** One fault in the offer spec has
 to be fixed before it's built (§ 3a).
 
+> **Owner, 2026-10-14 — two changes after this was written:**
+>
+> - **Q1–Q7 (§ 8) are answered: all YES, as suggested.** Nothing in the
+>   plan moves.
+> - **B now builds the WHOLE feature, including the parts marked C below**:
+>   the Example-tag companion in `applyStarterChange` (step 1), the offer
+>   read with § 3a's per-field collapse, Accept/Ignore and `recountsDrafts`
+>   (step 2), and the number tests. C stays on catalog reviews. Where this
+>   plan says "C's call", read "B's call, citing C's spec"
+>   (`baseline-screen-plan.md` § 10a). A still owns release order and
+>   `starterDrift --apply` (§ 5). Recorded in both track handoffs.
+
 ---
 
 ## 0. Decisions this builds on (searched before writing; none re-opened)
@@ -256,6 +268,10 @@ screen ("Seed file proposes 37 changes: Review", which reads A's
 
 ### Who does what, in one table
 
+> **Superseded 2026-10-14 (owner):** B builds steps 1–6, C's rows included;
+> C stays on catalog reviews. A's row is unchanged. The table below is the
+> original split, kept so the reassignment is visible.
+
 | Track | Work                                                                                                                                                                                                                         |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A** | **No migration**: every table exists (0152–0155, 0163). Release ordering (§ 5); `starterDrift --apply` once the companion exists; confirm with `scripts/schemaDrift.mts` that live has 0152–0156 before step 3's code ships. |
@@ -338,7 +354,10 @@ move, and only after an Accept.
 
 ---
 
-## 8. Owner questions — suggested answer after the dash
+## 8. Owner questions — ANSWERED 2026-10-14: all YES, as suggested
+
+The owner accepted every suggested answer below as written. They are now
+decisions; quote them, do not re-open them without saying why.
 
 1. **Who in a shop can accept or ignore updates?** — Owner and admins only;
    estimators and viewers see the count, not the buttons.

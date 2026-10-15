@@ -31,14 +31,17 @@
  * #1). Nothing calls this from a screen yet: the screen is Track B's and the
  * starter editor's login Track A's.
  *
- * ── Until Track A's boot change lands, the boot UNDOES a change to a seeded
- * field ─────────────────────────────────────────────────────────────────────
- * `seedBaselineMaterials` re-stamps shared rows from the seed files on every
- * start. A change here to, say, a shipped price is logged and pinned, and the
- * next boot writes the seed's price back over the shared row with no log.
- * Companies pinned by the change still hold the old value (correct); every
- * other company reads the seed's value again. So nothing may call this on a
- * shared database before the boot change (plan § 6, F2–F6).
+ * ── The boot no longer undoes a change here (Track A, 2026-10-13) ───────────
+ * Until then `seedBaselineMaterials` re-stamped shared rows from the seed files
+ * on every start, so a change logged here to, say, a shipped price was written
+ * back over by the next boot with no log — and this header said nothing may
+ * call this on a shared database until that changed. It has: a start now only
+ * INSERTS missing rows and applies finding fields as a logged `seed` batch;
+ * every other seed difference is proposed (server/seedProposal.ts) and a field
+ * logged here and still held is reported "live ahead", never overwritten
+ * (references/boot-seed-plan.md; server/bootLeavesStarterNumbers.test.ts T1).
+ * The boot change reaches LIVE one release after the end-of-pricing load
+ * (owner Q1) — until that release, live still re-stamps.
  */
 import {
   and,

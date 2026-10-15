@@ -1,0 +1,12 @@
+-- 0158 — WHAT A MATERIAL'S PACK IS CALLED (2026-10-14; Track C's PS-M2, word
+-- for word from references/pricing-safety-plan.md § 6). Track A owns the number.
+--
+--   materials.packLabel   the word on screen: roll, spool, stick, box.
+--                         NULL = "pack".
+--
+-- ── ADDITIVE. STEP 1. SAFE BEFORE THE CODE ─────────────────────────────────
+-- One nullable column with no default. No UPDATE, nothing reads it until C's
+-- pricing-safety steps ship, no number moves. Step 3 is EMPTY.
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `materials` ADD `packLabel` varchar(32) NULL;

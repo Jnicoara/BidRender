@@ -1,0 +1,15 @@
+-- 0160 — "IT'S RIGHT — KEEP IT" ON THE PRICE SANITY WARNING (2026-10-14;
+-- Track C's PS-M4, word for word from references/pricing-safety-plan.md § 6).
+-- Track A owns the number.
+--
+--   materials.priceCheckAcceptedAt   the PRICE the warning was accepted at —
+--                         a decimal, not a time, despite the name (C's word).
+--                         NULL = never dismissed. A different price is checked
+--                         again.
+--
+-- ── ADDITIVE. STEP 1. SAFE BEFORE THE CODE ─────────────────────────────────
+-- One nullable column with no default. No UPDATE, nothing reads it until C's
+-- shared/priceSanity.ts ships, no number moves. Step 3 is EMPTY.
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `materials` ADD `priceCheckAcceptedAt` decimal(10,4) NULL;

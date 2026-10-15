@@ -32,6 +32,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { BASELINE_RUN_TYPES } from "./seed/baselineRunTypes";
+import { seedProposal } from "./seedProposal";
 import {
   BASELINE_MATERIALS,
   RENAMED_BASELINE_MATERIALS,
@@ -266,17 +267,45 @@ withDb("the 500 rename on a database that holds the OLD rows", () => {
       .where(and(eq(materials.id, baseId), eq(materials.name, OLD_BASE_500)));
     if (INSERTED.cover !== undefined)
       await db.delete(materials).where(eq(materials.id, INSERTED.cover));
+    // A cover the database already held was retired; no start re-retires it
+    // since 2026-10-13, so the test does.
+    else
+      await db
+        .update(materials)
+        .set({ isActive: false })
+        .where(and(isNull(materials.userId), eq(materials.name, COVER_500)));
   });
 
-  it("renames the raceway IN PLACE (same id) and retires the cover, which still resolves", async () => {
+  /*
+    Until 2026-10-13 this asserted that a START renamed the raceway in place
+    and retired the cover. A start no longer does either
+    (references/boot-seed-plan.md): a name is an offer (Q17) and a retire is
+    a hide. What it must still never do is insert the new name as a SECOND
+    row beside the old one (§ 3.3a) — that is the half asserted here.
+  */
+  it("a start PROPOSES the rename (no second row) and HOLDS the cover's retire; both rows still resolve", async () => {
     await seedMaterials();
-    expect(await sharedRows(OLD_BASE_500)).toEqual([]);
-    expect(await sharedRows(RACEWAY_500)).toEqual([
-      { id: baseId, name: RACEWAY_500, isActive: true },
+    expect(await sharedRows(OLD_BASE_500)).toEqual([
+      { id: baseId, name: OLD_BASE_500, isActive: true },
     ]);
+    expect(await sharedRows(RACEWAY_500), "a duplicate was inserted").toEqual(
+      []
+    );
     const cover = await sharedRows(COVER_500);
     expect(cover).toHaveLength(1);
-    expect(cover[0].isActive).toBe(false);
+    expect(cover[0].isActive).toBe(true);
+
+    const proposal = await seedProposal();
+    expect(proposal.changes).toContainEqual({
+      table: "materials",
+      rowId: baseId,
+      kind: "field",
+      field: "name",
+      newValue: RACEWAY_500,
+    });
+    expect(
+      proposal.held.some(h => h.row.startsWith(`material #${cover[0].id} `))
+    ).toBe(true);
   });
 
   it("seeds the 500 type on that same row, with #12 THHN green as its ground", async () => {

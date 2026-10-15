@@ -1,5 +1,30 @@
 # Track C — handoff, 2026-10-06
 
+## FROM THE OWNER (2026-10-14, via Track B) — STARTER OFFERS MOVED TO B
+
+**Track B now builds the whole starter-offers feature**
+(`references/starter-offers-plan.md`), including the parts that plan and
+`baseline-screen-plan.md` § 10a marked C: the Example-tag companion in
+`applyStarterChange`, the offer read (with B's per-field fix to § 10a.3,
+plan § 3a), Accept/Ignore, `recountsDrafts` and the draft count. **C stays
+on catalog reviews.** Do not start any of those; B will touch
+`server/starterChanges.ts` and `shared/starterChange.ts`, so say so in your
+handoff before editing either. The owner answered that plan's Q1–Q7: all
+yes, as suggested.
+
+## FROM TRACK A (2026-10-14) — PS-M1..M6 = 0157–0162, PH-M1 = 0163, on local-dev + STAGING DB
+
+Built word for word, on `origin/local-dev` as `656b0fb8`, and applied to
+the **staging DB** (164, 205/205) before that push; not on live (152).
+Merge local-dev and migrate your DBs to 164 before building on them. Three
+calls A made for you to confirm or overturn:
+
+1. `STARTER_FIELDS.materials`: `packQty`, `packLabel` = **offer**;
+   `packPrice`, `priceCheckAcceptedAt` = **not-editable** (step 6 seeding).
+2. Forkable registry: `price_import_rows.materialId`,
+   `material_price_history.materialKey`, `.materialId` = **exempt**.
+3. PH-M1 `unitOfSale` = the enum from `MATERIAL_UNITS_OF_SALE`, not varchar.
+
 ## START HERE (2026-10-13, night) — F13 finished; applyStarterChange built; Switches answers recorded
 
 **State.** track-c merged local-dev at `dc08f1a2` (A's 0152–0156) as

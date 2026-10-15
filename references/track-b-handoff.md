@@ -1,5 +1,27 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-14 (merge), LOCAL-DEV MERGED; B OWNS ALL OF STARTER OFFERS
+
+- **Owner answered `starter-offers-plan.md` Q1–Q7: all YES, as
+  suggested.** Recorded in the plan's § 8 and header.
+- **Owner change: B now builds the WHOLE starter-offers feature**,
+  including what the plan marked C: the Example-tag companion in
+  `applyStarterChange`, the offer read with the per-field fix (§ 3a),
+  Accept/Ignore, `recountsDrafts` and the number tests. C stays on catalog
+  reviews. Noted in the plan, `baseline-screen-plan.md` § 10a.3 and
+  `track-c-handoff.md`. A still owns release order and
+  `starterDrift --apply`. **Building has NOT started** (next prompt).
+- **Merged `origin/local-dev` 22c30965** (A's boot change `d38f5930`,
+  0157–0163, `boot-seed-plan.md`) into track-b. One conflict, CHANGELOG
+  (both sides kept). B's write paths can now be built on the boot change.
+- **Migrated** `bidrender_local_b_new` and `bidrender_test_b`: 7 applied
+  (0157–0163), **164 migrations, 205 FKs** each; a re-run applies nothing.
+  Matches A's 164 / 205. If yours differ, stop and find out why.
+- **Tests:** the 13 test files the merge changed + `starterLibrary`,
+  `starterChanges`, `starterPinning`, `sourceHygiene` on `bidrender_test_b`:
+  17 files, 181 passed. `pnpm check` clean. Gate: see the commit after this
+  one / the summary. MySQL 3307 left running (shared); no dev server.
+
 ## WHERE B STANDS — 2026-10-14 (plan), STARTER EDITS AS OFFERS — PLAN ONLY
 
 - **`references/starter-offers-plan.md`** — plan only, no code, no

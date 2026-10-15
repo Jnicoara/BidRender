@@ -30,6 +30,14 @@ This is the human-readable companion to the git history — read this to see wha
   first-visit tip about tapping the drawing now shows on sheets that have
   note numbers.
 
+- **Groundwork for safer prices and a price history (nothing visible yet).**
+  The database can now hold a material's pack size and pack price (so a $120
+  roll of 250 ft can be typed as such instead of divided by hand), remember
+  when a "this price looks off" warning was accepted, keep a record of each
+  supplier price import so it can be undone, and keep a dated history of
+  every price change a company makes. Only the storage exists so far;
+  nothing reads or writes it yet, and no bid total moves.
+
 - **The first-visit tips on the Plans screen no longer get in the way.** The
   "Don't know a word?" card used to drop into the side panel, right on top of
   the Legend tab's Capture button and its symbol list, so neither could be
@@ -40,6 +48,17 @@ This is the human-readable companion to the git history — read this to see wha
   smoke test, which timed out on both a laptop and a sideways iPad.
 
 ## [2026-10-13]
+
+- **Restarting or updating the app no longer changes the shipped starter
+  library by itself.** Until now every server start copied prices, hours,
+  labor rates and run-type parts from the built-in starter files over the
+  shared starter, which changed what every company still using those values
+  saw on each update, and would have quietly undone any recorded starter
+  change. Now a start only adds new starter items and refreshes search words
+  and shelves (recorded). Any other difference is listed for the owner to
+  approve, and approving it keeps every existing company on its old values.
+  A brand-new database still gets the full starter. On the live site this
+  arrives one release after the final pricing load.
 
 - **A sheet's numbered notes, read for you, with no AI.** Under the Legend
   tab's More options, "Notes on this sheet" lists every numbered note the

@@ -32,6 +32,7 @@ import {
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import { seedProposal } from "./seedProposal";
 
 const hasDb = !!process.env.DATABASE_URL;
 const USER = 8834;
@@ -109,9 +110,13 @@ describe.skipIf(!hasDb)("example tags, end to end", () => {
     expect(pm.baseWage).toBeNull();
   });
 
-  it("a restart puts the tag back on a shipped row that lost it", async () => {
-    // The seed re-stamps shipped rows (never a company's); this is how the
-    // flag reaches every existing database with no migration backfill.
+  // Until 2026-10-13 "a restart puts the tag back on a shipped row that lost
+  // it": the seed re-stamped shipped rows, which is how the flag reached every
+  // existing database. A start no longer re-stamps a rate
+  // (references/boot-seed-plan.md); the difference is listed instead, HELD
+  // because the tag must travel with its number and applyStarterChange cannot
+  // write the tag yet.
+  it("a restart leaves a shipped row that lost its tag, and HOLDS the difference", async () => {
     const db = await getDb();
     const [row] = await db!
       .select()
@@ -121,13 +126,25 @@ describe.skipIf(!hasDb)("example tags, end to end", () => {
       .update(laborRates)
       .set({ isExampleRate: null, baseWage: null })
       .where(eq(laborRates.id, row.id));
-    await seedBaselineLaborRates();
-    const [after] = await db!
-      .select()
-      .from(laborRates)
-      .where(eq(laborRates.id, row.id));
-    expect(after.isExampleRate).toBe(true);
-    expect(Number(after.baseWage)).toBeCloseTo(26, 4);
+    try {
+      await seedBaselineLaborRates();
+      const [after] = await db!
+        .select()
+        .from(laborRates)
+        .where(eq(laborRates.id, row.id));
+      expect(after.isExampleRate, "a start re-stamped the tag").toBeNull();
+      expect(
+        (await seedProposal()).held.some(h =>
+          h.row.startsWith(`labor rate #${row.id} `)
+        )
+      ).toBe(true);
+    } finally {
+      // No start puts it back any more, so the test does.
+      await db!
+        .update(laborRates)
+        .set({ isExampleRate: row.isExampleRate, baseWage: row.baseWage })
+        .where(eq(laborRates.id, row.id));
+    }
   });
 
   // ─── 2. The shop's edit clears it ───────────────────────────────────────

@@ -365,31 +365,45 @@ describeDb(
         expect(shippedHeightType(a.mountsAt!)).not.toBeNull();
     });
 
-    it("an existing database gets it on the next start; an answer already given is kept", async () => {
+    // Until 2026-10-13 "an existing database gets it on the next start": a
+    // start FILLED a NULL Mounts at. Mounts at decides vertical footage, so a
+    // start now only PROPOSES the fill (references/boot-seed-plan.md B13).
+    it("an existing database gets it PROPOSED on the next start, never written; an answer already given is kept", async () => {
       const { seedBaselineAssemblies } = await import("./db");
+      const { seedProposal } = await import("./seedProposal");
       const { and, isNull } = await import("drizzle-orm");
       const database = (await getDb())!;
       const row = and(
         isNull(assemblies.userId),
         eq(assemblies.name, "Cable TV drop")
       );
-      const keyNow = async () =>
-        (await database.select().from(assemblies).where(row))[0]
-          ?.mountHeightTypeKey;
+      const current = async () =>
+        (await database.select().from(assemblies).where(row))[0];
+      const proposed = async (id: number) =>
+        (await seedProposal()).changes.some(
+          c =>
+            c.rowId === id && "field" in c && c.field === "mountHeightTypeKey"
+        );
       try {
         await database
           .update(assemblies)
           .set({ mountHeightTypeKey: null })
           .where(row);
         await seedBaselineAssemblies();
-        expect(await keyNow()).toBe("low-voltage");
+        const unset = await current();
+        expect(unset.mountHeightTypeKey, "a start filled it").toBeNull();
+        expect(await proposed(unset.id)).toBe(true);
 
         await database
           .update(assemblies)
           .set({ mountHeightTypeKey: "receptacle" })
           .where(row);
         await seedBaselineAssemblies();
-        expect(await keyNow()).toBe("receptacle");
+        const answered = await current();
+        expect(answered.mountHeightTypeKey).toBe("receptacle");
+        expect(await proposed(answered.id), "it offers over an answer").toBe(
+          false
+        );
       } finally {
         await database
           .update(assemblies)
