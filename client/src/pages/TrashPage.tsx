@@ -4,6 +4,7 @@ import { ArrowRight, RotateCcw, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { RETENTION_DAYS } from "@shared/retention";
+import { errorText } from "@/lib/errorText";
 
 /**
  * Recently deleted — ONE place to find and put back anything archived
@@ -44,7 +45,7 @@ export default function TrashPage({
   const clients = trpc.clients.list.useQuery({ archived: true });
 
   const done = (name: string) => toast.success(`${name} is back.`);
-  const failed = (error: { message: string }) => toast.error(error.message);
+  const failed = (error: { message: string }) => toast.error(errorText(error));
 
   const restoreBid = trpc.bids.restore.useMutation({
     onError: failed,

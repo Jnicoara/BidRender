@@ -43,6 +43,7 @@ import { ExtrasSection } from "@/components/ExtrasSection";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { formatElevation } from "@shared/takeoffHeights";
 import type { HeightRow } from "@shared/takeoffHeights";
+import { errorText } from "@/lib/errorText";
 
 /**
  * What to call the level a number came from, in the estimator's words.
@@ -185,7 +186,7 @@ export function HeightsSection() {
   const [newLabel, setNewLabel] = useState("");
 
   const refresh = () => utils.takeoffHeights.company.invalidate();
-  const onError = (error: { message: string }) => toast.error(error.message);
+  const onError = (error: { message: string }) => toast.error(errorText(error));
 
   const setDistribution =
     trpc.takeoffHeights.setCompanyDistribution.useMutation({

@@ -37,6 +37,7 @@ import {
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { PercentKindInput } from "@/components/PercentKindInput";
+import { errorText } from "@/lib/errorText";
 
 /** Fraction (0.1) → percent string ("10"). Blank stays blank. */
 const toPercent = (fraction: number | string | null | undefined) =>
@@ -63,7 +64,7 @@ export function BidPricingDefaultsSection() {
       // every Draft bid, so the offer on each has to be re-measured.
       void utils.bids.markupReapplyPreview.invalidate();
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   // Local text state so a half-typed percentage is not sent on every keystroke.

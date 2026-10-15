@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/select";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { combinedRatePct } from "@shared/salesTax";
+import { errorText } from "@/lib/errorText";
 
 type ComponentDraft = { label: string; ratePct: string };
 
@@ -269,7 +270,7 @@ export function SalesTaxSection() {
   };
 
   const setRules = trpc.salesTax.setRules.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const createArea = trpc.salesTax.create.useMutation({
@@ -278,25 +279,25 @@ export function SalesTaxSection() {
       setAdding(false);
       setDraft(emptyArea);
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const updateArea = trpc.salesTax.update.useMutation({
     onSuccess: () => setEditingId(null),
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const markVerified = trpc.salesTax.markVerified.useMutation({
     onSuccess: () => toast.success("Marked as checked today."),
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const archiveArea = trpc.salesTax.archive.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const restoreArea = trpc.salesTax.restore.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
 

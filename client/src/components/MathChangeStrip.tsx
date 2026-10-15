@@ -25,6 +25,7 @@ import {
   mathChangeSentence,
   mathUpdatePreviewSentence,
 } from "@shared/mathVersion";
+import { errorText } from "@/lib/errorText";
 
 export function MathChangeStrip({ bidId }: { bidId: number }) {
   const utils = trpc.useUtils();
@@ -47,7 +48,7 @@ export function MathChangeStrip({ bidId }: { bidId: number }) {
   };
 
   const dismiss = trpc.bids.dismissMathChanges.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: refresh,
   });
   const update = trpc.bids.updateMath.useMutation({
@@ -55,7 +56,7 @@ export function MathChangeStrip({ bidId }: { bidId: number }) {
       setConfirming(false);
       toast.success("This bid now uses the current math.");
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: refresh,
   });
 

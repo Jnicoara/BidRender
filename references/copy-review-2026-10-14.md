@@ -35,6 +35,10 @@ gaps are visible.
 - **The demo bid has three names:** "example bid", "sample", "the example
   job".
 
+## Raw error toasts — DONE later the same night (except the Plans screen)
+
+`client/src/lib/errorText.ts` (+ tests): 96 `toast.error(x.message)` sites in 41 files now `toast.error(errorText(x))`. A message the server wrote passes through (checked in the browser: the duplicate-material refusal reads word for word); offline, validation dumps and code-like internal errors become one plain sentence; the raw text goes to the console. **Not done: the 67 sites in `TakeoffPage.tsx` and `components/takeoff/`** — Track B's files, left to avoid conflicts with B's work; B can apply the same one-line change.
+
 ## Not fixed — a job of its own (listed, not started)
 
 - **~163 raw error toasts.** `onError: e => toast.error(e.message)` shows the

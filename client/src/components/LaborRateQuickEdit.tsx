@@ -35,6 +35,7 @@ import {
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { DEFAULT_ANNUAL_HOURS } from "@shared/pricing";
 import { money } from "@/lib/money";
+import { errorText } from "@/lib/errorText";
 
 export type QuickEditableRate = {
   id: number;
@@ -68,7 +69,7 @@ export function LaborRateQuickEdit({
   ).length;
 
   const update = trpc.laborRates.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(
         result?.forked

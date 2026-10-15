@@ -65,6 +65,7 @@ import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TotalDueCaption } from "@/components/TotalDueCaption";
 import { planCountLabel, recentPlanBids } from "@shared/planCounts";
+import { errorText } from "@/lib/errorText";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -141,7 +142,7 @@ export default function DashboardPage({
   const { data: archived = [] } = trpc.bids.archived.useQuery();
 
   const createBid = trpc.bids.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: bid => {
       if (bid) onOpenBid(bid.id);
     },
@@ -163,7 +164,7 @@ export default function DashboardPage({
   const startFromPlan = trpc.bids.create.useMutation({
     onError: error => {
       clearPendingPlan();
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSuccess: bid => {
       if (!bid) {
@@ -196,7 +197,7 @@ export default function DashboardPage({
    * is editable the moment the screen opens.
    */
   const startCounting = trpc.bids.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: bid => {
       if (bid) onCount(bid.id);
     },
@@ -250,7 +251,7 @@ export default function DashboardPage({
     onError: (error, _vars, context) => {
       if (context?.snapshot)
         utils.bids.dashboard.setData(undefined, context.snapshot);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSuccess: (_result, { id }, context) => {
       toast.success(
@@ -266,7 +267,7 @@ export default function DashboardPage({
   });
 
   const restoreBid = trpc.bids.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Back on your dashboard."),
     onSettled: () => {
       void utils.bids.dashboard.invalidate();

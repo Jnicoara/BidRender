@@ -59,6 +59,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { applyModifiersToHours } from "@shared/pricing";
+import { errorText } from "@/lib/errorText";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -387,7 +388,7 @@ export default function ModifiersPage() {
           context.previous as never
         );
       }
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     [utils]
   );
@@ -415,12 +416,12 @@ export default function ModifiersPage() {
   });
 
   const createModifier = trpc.modifiers.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
   });
 
   const revertModifier = trpc.modifiers.revert.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Restored the starter values"),
     onSettled: refreshBoth,
   });
@@ -434,12 +435,12 @@ export default function ModifiersPage() {
   });
 
   const restoreModifier = trpc.modifiers.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
   });
 
   const deleteForever = trpc.modifiers.deleteForever.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
   });
 

@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsRate } from "@shared/laborRatePricing";
 import { NavigationHelper } from "@/components/NavigationHelper";
+import { errorText } from "@/lib/errorText";
 
 export default function FirstRunPage() {
   const utils = trpc.useUtils();
@@ -37,10 +38,10 @@ export default function FirstRunPage() {
   const [savingId, setSavingId] = useState<number | null>(null);
 
   const setRate = trpc.onboarding.setStarterRate.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
   const complete = trpc.onboarding.completeFirstRun.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   /** Only the hourly roles. A salary needs two numbers and a conversation. */

@@ -48,6 +48,7 @@ import {
   type JobCostTileKey,
   tileByKey,
 } from "@/lib/jobCostTiles";
+import { errorText } from "@/lib/errorText";
 
 const PICK_NONE = "__none__";
 
@@ -137,7 +138,7 @@ export function BidExpensesSection({
     void utils.quoteApp.get.invalidate({ bidId });
   };
 
-  const onError = (e: { message: string }) => toast.error(e.message);
+  const onError = (e: { message: string }) => toast.error(errorText(e));
 
   const addExpense = trpc.bidExtras.expenses.addToBid.useMutation({
     onError,

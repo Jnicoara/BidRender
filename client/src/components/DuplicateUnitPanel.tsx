@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { errorText } from "@/lib/errorText";
 
 type Group = { source: string; count: string };
 
@@ -53,7 +54,7 @@ export function DuplicateUnitPanel({
   const sourceAt = (index: number) => groups[index].source || units[0] || "";
 
   const generate = trpc.bids.generateUnits.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       const made = result.created.length;
       toast.success(

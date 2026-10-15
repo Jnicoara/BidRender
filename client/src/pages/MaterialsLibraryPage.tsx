@@ -93,6 +93,7 @@ import {
   STICK_JOINTS,
   type StickJoint,
 } from "@shared/runFittings";
+import { errorText } from "@/lib/errorText";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -419,7 +420,7 @@ function MaterialRow({
       // A Draft bid's "Re-apply markup rules" offer counts on this.
       void utils.bids.markupReapplyPreview.invalidate();
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   const startEditing = (focus: NeedsField | null = null) => {
@@ -1192,7 +1193,7 @@ export default function MaterialsLibraryPage() {
     status: "archived",
   });
 
-  const onError = (e: { message: string }) => toast.error(e.message);
+  const onError = (e: { message: string }) => toast.error(errorText(e));
   const utils = trpc.useUtils();
   const refreshAll = () => {
     void utils.materials.list.invalidate();

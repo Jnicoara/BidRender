@@ -63,6 +63,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { searchClients, isCreatableClient } from "@/lib/clientPicker";
+import { errorText } from "@/lib/errorText";
 
 type ClientKind = "company" | "individual";
 
@@ -266,7 +267,7 @@ export default function ClientsPage() {
       setNewDraft(emptyDraft);
       invalidate();
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   const updateClient = trpc.clients.update.useMutation({
@@ -275,7 +276,7 @@ export default function ClientsPage() {
       invalidate();
     },
     onError: e => {
-      toast.error(e.message);
+      toast.error(errorText(e));
       invalidate();
     },
   });
@@ -283,7 +284,7 @@ export default function ClientsPage() {
   const archiveClient = trpc.clients.archive.useMutation({
     onSuccess: () => invalidate(),
     onError: e => {
-      toast.error(e.message);
+      toast.error(errorText(e));
       invalidate();
     },
   });
@@ -291,7 +292,7 @@ export default function ClientsPage() {
   const restoreClient = trpc.clients.restore.useMutation({
     onSuccess: () => invalidate(),
     onError: e => {
-      toast.error(e.message);
+      toast.error(errorText(e));
       invalidate();
     },
   });

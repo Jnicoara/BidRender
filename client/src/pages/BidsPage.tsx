@@ -166,6 +166,7 @@ import {
 } from "@shared/homerunFootage";
 import { homerunSummaryLine } from "@/lib/homerunText";
 import { frozenWarningsNote } from "@/lib/frozenWarnings";
+import { errorText } from "@/lib/errorText";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -551,12 +552,12 @@ export default function BidsPage({
       toast.success(
         `Markup rules re-applied — ${changed} line${changed === 1 ? "" : "s"} updated.`
       ),
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
   const addAssembly = trpc.bids.addAssembly.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
@@ -582,7 +583,7 @@ export default function BidsPage({
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: refresh,
   });
@@ -600,7 +601,7 @@ export default function BidsPage({
   const foldTwin = useFoldTwin(bidId, refresh);
 
   const updateBid = trpc.bids.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 

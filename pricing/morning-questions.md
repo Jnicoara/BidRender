@@ -109,6 +109,6 @@ Sketches and reasons: `references/overnight-parked.md`. None of these changes a 
 - C1 Copy: the library says **"Starter"** and bid lines say **"Example price"** for the same thing (one labor row shows both). One word everywhere — **"Example"**? → **Yes, "Example"** — it is what the bid, the banner and the first-run screen already say. Affects: words only.
 - C2 Copy: the Dashboard card says **"Quick bid"**, the bid's button says **"Count"**, the screen says "counting mode". One name — **"Count"**? → **Yes**, with the card reading "Count it — no plan needed". Affects: words only.
 - C3 Copy: the demo bid is "example bid", "sample" and "the example job". One name — **"sample bid"**? → **Yes.** Affects: words only.
-- C4 About 163 error toasts show the raw server/network text ("Failed to fetch"). Replace with one friendly sentence everywhere ("Couldn't reach BidRidge — check your connection and try again."), raw text to the console? → **Yes, as its own change** (~40 files). Affects: error wording only. List: `references/copy-review-2026-10-14.md`.
+- C4 (decided overnight, reversible — built) Error toasts no longer show raw text: `errorText` keeps every message the server wrote for a person and replaces only "Failed to fetch", validation dumps and code-like internal errors. 96 sites done; the 67 on the Plans screen are Track B's file and left for B. Different wording? → **Keep.** Affects: error wording only.
 
 (Items 6–11 add below.)

@@ -10,6 +10,7 @@ import { useCompany } from "@/hooks/useCompany";
 import { useStartBid } from "@/hooks/useStartBid";
 import { type PendingArchive } from "@/lib/archiveBid";
 import { RETENTION_DAYS } from "@shared/retention";
+import { errorText } from "@/lib/errorText";
 
 /**
  * Bids — every bid, as one searchable list (owner, 2026-10-14: "main nav =
@@ -48,7 +49,7 @@ export default function BidListPage({
   const utils = trpc.useUtils();
   const { data: archived = [] } = trpc.bids.archived.useQuery();
   const restoreBid = trpc.bids.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: () => {
       void utils.bids.search.invalidate();
       void utils.bids.dashboard.invalidate();
@@ -59,7 +60,7 @@ export default function BidListPage({
     // The name is read when the archive is asked for: by the time it succeeds
     // the dialog has closed and `confirmArchive` is null.
     onMutate: () => ({ name: confirmArchive?.name }),
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: (_result, { id }, context) => {
       toast.success(
         `${context?.name ?? "Bid"} archived — ${RETENTION_DAYS} days to change your mind.`,

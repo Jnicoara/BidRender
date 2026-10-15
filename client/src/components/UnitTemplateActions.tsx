@@ -32,6 +32,7 @@ import {
   type ConfirmCopy,
   type UnitState,
 } from "@/lib/unitLinks";
+import { errorText } from "@/lib/errorText";
 
 type Pending = { kind: "push" | "archive"; copy: ConfirmCopy };
 
@@ -47,7 +48,7 @@ export function UnitTemplateActions({
   const [pending, setPending] = useState<Pending | null>(null);
 
   const push = trpc.bids.pushToLinkedCopies.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(pushDoneCopy(result));
       onDone();
@@ -55,7 +56,7 @@ export function UnitTemplateActions({
   });
 
   const restore = trpc.bids.restoreUnits.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Copies restored.");
       onDone();
@@ -63,7 +64,7 @@ export function UnitTemplateActions({
   });
 
   const archive = trpc.bids.archiveLinkedCopies.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       // The undo lives in the toast rather than a Trash screen: this is a bulk
       // removal someone may regret within seconds, and the fastest correct

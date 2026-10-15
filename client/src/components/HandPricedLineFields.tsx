@@ -45,6 +45,7 @@ import {
   saveAsAssemblyRefusal,
 } from "@shared/handPricedLines";
 import { ASSEMBLY_CATEGORY_ORDER } from "@shared/assemblyCategories";
+import { errorText } from "@/lib/errorText";
 
 /**
  * The assembly shelves, as the Library screen lists them — the ONE shared
@@ -163,7 +164,7 @@ export function HandPricedLineFields({
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: onChanged,
   });
@@ -360,7 +361,7 @@ function LinkToLibrary({
       toast.success(`Priced from ${from}.`);
       setOpen(false);
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: onChanged,
   });
 
@@ -512,7 +513,7 @@ function SaveAsAssembly({
       void utils.assemblies.list.invalidate();
       void utils.materials.list.invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: onChanged,
   });
 

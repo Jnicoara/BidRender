@@ -37,6 +37,7 @@ import {
   type DraftStep,
   type LibraryStep,
 } from "@/lib/assemblyStepsDraft";
+import { errorText } from "@/lib/errorText";
 
 export function AssemblyStepsSection({
   steps,
@@ -67,14 +68,14 @@ export function AssemblyStepsSection({
   const [adding, setAdding] = useState<string>("");
   const utils = trpc.useUtils();
   const setMinutes = trpc.laborSteps.setMinutes.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: () => {
       void utils.laborSteps.list.invalidate();
       void utils.assemblies.get.invalidate();
     },
   });
   const acceptAll = trpc.laborSteps.acceptAll.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: ({ accepted }) =>
       toast.success(
         accepted === 1

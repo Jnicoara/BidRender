@@ -48,6 +48,7 @@ import {
   summarisePriceAges,
   type PriceAge,
 } from "@shared/priceStaleness";
+import { errorText } from "@/lib/errorText";
 
 type Material = {
   id: number;
@@ -101,7 +102,7 @@ export default function MaterialDatabasePage() {
   };
 
   const updateMaterial = trpc.materials.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => refresh(),
   });
 
@@ -499,7 +500,7 @@ function ImportPriceListDialog({
   } | null>(null);
 
   const importPrices = trpc.materials.importPrices.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: data => {
       setResult(data);
       toast.success(

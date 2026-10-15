@@ -37,6 +37,7 @@ import {
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { useCompany } from "@/hooks/useCompany";
 import type { CloseoutMode } from "@shared/closeout";
+import { errorText } from "@/lib/errorText";
 
 const hrs = (n: number) =>
   `${n.toLocaleString("en-US", { maximumFractionDigits: 2 })} h`;
@@ -107,7 +108,7 @@ export function CloseoutPanel({ bidId }: { bidId: number }) {
   }, [data?.lines]);
 
   const save = trpc.closeout.save.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSuccess: result => {
       void utils.closeout.get.invalidate({ bidId });
       void utils.closeout.suggestions.invalidate();
@@ -120,7 +121,7 @@ export function CloseoutPanel({ bidId }: { bidId: number }) {
   });
 
   const remove = trpc.closeout.remove.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSuccess: () => {
       void utils.closeout.get.invalidate({ bidId });
       void utils.closeout.suggestions.invalidate();

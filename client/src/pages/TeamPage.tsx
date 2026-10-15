@@ -47,6 +47,7 @@ import {
   roleLabel,
   type CompanyRole,
 } from "@shared/permissions";
+import { errorText } from "@/lib/errorText";
 
 const ROLE_BLURB: Record<CompanyRole, string> = {
   owner: "Everything, including who else is here.",
@@ -83,7 +84,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   };
 
   const invite = trpc.company.invite.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: data => {
       setFreshCode(data.code);
       setInviteEmail("");
@@ -92,7 +93,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   });
 
   const revoke = trpc.company.revokeInvite.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Invitation revoked.");
       refresh();
@@ -100,7 +101,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   });
 
   const setRole = trpc.company.setRole.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Role updated.");
       refresh();
@@ -108,7 +109,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   });
 
   const setStatus = trpc.company.setStatus.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => refresh(),
   });
 
@@ -116,7 +117,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const seatsFull = seats?.fullMessage ?? null;
 
   const accept = trpc.company.acceptInvite.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: data => {
       toast.success(`You have joined ${data.companyName}.`);
       setJoinCode("");

@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsBranding, missingBrandingFields } from "@shared/proposal";
+import { errorText } from "@/lib/errorText";
 
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -176,16 +177,16 @@ export function BrandingSection() {
   };
 
   const save = trpc.proposals.setBranding.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const ticket = trpc.proposals.createLogoUploadTicket.useMutation();
   const confirmLogo = trpc.proposals.confirmLogo.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const clearLogo = trpc.proposals.clearLogo.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
 

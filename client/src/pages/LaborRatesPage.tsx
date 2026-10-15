@@ -64,6 +64,7 @@ import {
   readParts,
   type LoadedParts,
 } from "@shared/loadedRate";
+import { errorText } from "@/lib/errorText";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -728,7 +729,7 @@ export default function LaborRatesPage() {
       if (context?.previous !== undefined) {
         utils.laborRates.list.setData(undefined, context.previous as never);
       }
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     [utils]
   );

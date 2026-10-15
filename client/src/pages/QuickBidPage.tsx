@@ -59,6 +59,7 @@ import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { BidExpensesSection } from "@/components/BidExpensesSection";
 import { MathChangeStrip } from "@/components/MathChangeStrip";
 import { matchJobCostTiles, type JobCostTileKey } from "@/lib/jobCostTiles";
+import { errorText } from "@/lib/errorText";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -132,12 +133,12 @@ export default function QuickBidPage({
   }, [utils, bidId]);
 
   const addAssembly = trpc.bids.addAssembly.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
   const addKit = trpc.bids.addKit.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(
         `Added ${result.kitName} — ${result.lineIds.length} line${result.lineIds.length === 1 ? "" : "s"}` +
@@ -168,7 +169,7 @@ export default function QuickBidPage({
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: refresh,
   });

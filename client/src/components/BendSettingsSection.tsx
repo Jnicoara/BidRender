@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { resolveBendSettings } from "@shared/runBends";
+import { errorText } from "@/lib/errorText";
 
 /** The value the picker uses for "go back to the shipped default". */
 const DEFAULT = "default";
@@ -72,7 +73,7 @@ export function BendSettingsSection() {
     onError: (error, _patch, context) => {
       if (context?.before)
         utils.takeoffHeights.bends.setData(undefined, context.before);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: () => {
       utils.takeoffHeights.bends.invalidate();

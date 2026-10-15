@@ -110,6 +110,7 @@ import {
   MaterialPicker,
   type PickableMaterial,
 } from "@/components/MaterialPicker";
+import { errorText } from "@/lib/errorText";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1500,12 +1501,12 @@ export default function AssembliesLibraryPage() {
   }, [utils]);
 
   const createAssembly = trpc.assemblies.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
   const updateAssembly = trpc.assemblies.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
@@ -1519,7 +1520,7 @@ export default function AssembliesLibraryPage() {
   });
 
   const revertAssembly = trpc.assemblies.revert.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Restored the starter recipe"),
     onSettled: () => {
       refresh();
@@ -1529,7 +1530,7 @@ export default function AssembliesLibraryPage() {
   });
 
   const duplicateAssembly = trpc.assemblies.duplicate.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: copy => {
       if (!copy) return;
       toast.success(`Created "${copy.name}" — an independent copy.`);
@@ -1539,20 +1540,20 @@ export default function AssembliesLibraryPage() {
   });
 
   const archiveAssembly = trpc.assemblies.archive.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () =>
       toast.success("Archived — restore it any time from the Archived tab"),
     onSettled: refresh,
   });
 
   const restoreAssembly = trpc.assemblies.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Back in the working list."),
     onSettled: refresh,
   });
 
   const deleteAssemblyForever = trpc.assemblies.deleteForever.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Deleted permanently."),
     onSettled: refresh,
   });

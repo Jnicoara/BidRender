@@ -61,6 +61,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { errorText } from "@/lib/errorText";
 
 /** A per-bid text field for the proposal: client, site address, opening note. */
 function BidField({
@@ -185,7 +186,7 @@ export default function ProposalPage({
   });
 
   const updateBid = trpc.bids.update.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.proposals.document.invalidate({ bidId });
       void utils.bids.get.invalidate({ id: bidId });

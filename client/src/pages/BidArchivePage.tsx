@@ -40,6 +40,7 @@ import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TotalDueCaption } from "@/components/TotalDueCaption";
 import { useCompany } from "@/hooks/useCompany";
+import { errorText } from "@/lib/errorText";
 
 /** Only a deadline worth acting on gets colour. The rest stays quiet. */
 const URGENCY_STYLE: Record<RetentionUrgency, string> = {
@@ -94,7 +95,7 @@ export default function BidArchivePage({
       toast.success(`${bid?.name ?? "Bid"} is back on your dashboard.`);
       invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
   });
 
   const deleteForever = trpc.bids.deleteForever.useMutation({
@@ -102,7 +103,7 @@ export default function BidArchivePage({
       toast.success("Bid deleted permanently.");
       invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
   });
 
   const deleteAll = trpc.bids.deleteAllArchived.useMutation({
@@ -113,7 +114,7 @@ export default function BidArchivePage({
       invalidate();
     },
     onError: error => {
-      toast.error(error.message);
+      toast.error(errorText(error));
       // The archive changed under the dialog — show what is there now.
       invalidate();
     },

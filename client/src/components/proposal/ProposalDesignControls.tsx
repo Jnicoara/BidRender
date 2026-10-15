@@ -44,6 +44,7 @@ import {
   type ProposalLayout,
   type ProposalSectionId,
 } from "@shared/proposal";
+import { errorText } from "@/lib/errorText";
 
 /**
  * A handful of accents that look right in print.
@@ -140,7 +141,7 @@ export function ProposalDesignControls({
   const { data: settings } = trpc.proposals.settings.useQuery();
 
   const save = trpc.proposals.setSettings.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.proposals.settings.invalidate();
       // The document is built server-side, so a layout change is a refetch.

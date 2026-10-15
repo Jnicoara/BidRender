@@ -71,6 +71,7 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { money } from "@/lib/money";
 import { hoursNotSetWords } from "@/lib/notPricedTotal";
+import { errorText } from "@/lib/errorText";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -136,7 +137,7 @@ function KitBuilder({
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
   /** An assembly's hours, set from the kit panel (never-stuck gap 6). */
   const setAssemblyHours = trpc.assemblies.update.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.kits.price.invalidate();
       void utils.assemblies.list.invalidate();
@@ -174,7 +175,7 @@ function KitBuilder({
   }, [utils, kitId]);
 
   const createKit = trpc.kits.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Kit created");
       onBack();
@@ -183,7 +184,7 @@ function KitBuilder({
   });
 
   const updateKit = trpc.kits.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(
         result?.forked
@@ -554,7 +555,7 @@ export default function KitsPage() {
   const visibleKits = useMemo(() => filterByScope(kits, scope), [kits, scope]);
 
   const duplicateKit = trpc.kits.duplicate.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: copy => {
       if (!copy) return;
       toast.success(`Created "${copy.name}" — an independent copy.`);
@@ -564,26 +565,26 @@ export default function KitsPage() {
   });
 
   const revertKit = trpc.kits.revert.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Restored the starter kit"),
     onSettled: refresh,
   });
 
   const archiveKit = trpc.kits.archive.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () =>
       toast.success("Archived — restore it any time from the Archived tab"),
     onSettled: refresh,
   });
 
   const restoreKit = trpc.kits.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Back in the working list."),
     onSettled: refresh,
   });
 
   const deleteKitForever = trpc.kits.deleteForever.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Deleted permanently."),
     onSettled: refresh,
   });
