@@ -107,6 +107,11 @@ export type StarterOffer = {
   recountsDrafts: boolean;
   /** The shop's unlocked Drafts that re-count on Accept. */
   draftBidIds: number[];
+  /**
+   * Names for the ids a reference field holds (a run type's raceway, an
+   * assembly's labor role), so the screen never shows a bare id.
+   */
+  valueNames: Record<string, string>;
 };
 
 export type StarterOffersRead = {
@@ -433,11 +438,13 @@ export async function starterOffersFor(
       recountsDrafts:
         ch.kind === "field" && recountsDrafts(ch.table, ch.field ?? ""),
       draftBidIds: [],
+      valueNames: {},
     };
     (offer.answer === "ignored" ? ignored : listed).push(offer);
   }
 
   await attachDrafts(ownerUserId, [...listed, ...ignored]);
+  await attachValueNames([...listed, ...ignored]);
   const order = (a: StarterOffer, b: StarterOffer) =>
     b.latestChangeId - a.latestChangeId;
   return { offers: listed.sort(order), ignored: ignored.sort(order) };
@@ -618,6 +625,50 @@ async function attachDrafts(ownerUserId: number, offers: StarterOffer[]) {
         if (g.assemblyId !== null && same.has(g.assemblyId)) hit.add(g.bidId);
     }
     offer.draftBidIds = Array.from(hit).sort((a, b) => a - b);
+  }
+}
+
+/** Names for every id a reference offer shows (yours, BidRidge's, the steps). */
+async function attachValueNames(offers: StarterOffer[]) {
+  const want = new Map<StarterTable, Set<number>>();
+  for (const o of offers) {
+    if (o.kind !== "field" || !o.field) continue;
+    const refTable = STARTER_REFERENCES[o.table]?.[o.field];
+    if (!refTable) continue;
+    const ids = [
+      o.yours,
+      o.base,
+      o.latest,
+      ...o.steps.flatMap(s => [s.from, s.to]),
+    ];
+    for (const v of ids)
+      if (typeof v === "number") {
+        if (!want.has(refTable)) want.set(refTable, new Set());
+        want.get(refTable)!.add(v);
+      }
+  }
+  const names = new Map<string, string>();
+  for (const [table, ids] of Array.from(want)) {
+    const cols = starterColumnsOf(table);
+    const nameCol = table === "runTypes" ? cols.label : cols.name;
+    const rows = (await (
+      await database()
+    )
+      .select({ id: cols.id, name: nameCol })
+      .from(starterTableOf(table))
+      .where(inArray(cols.id, Array.from(ids)))) as Array<{
+      id: number;
+      name: string;
+    }>;
+    for (const r of rows) names.set(`${table}:${r.id}`, r.name);
+  }
+  for (const o of offers) {
+    if (o.kind !== "field" || !o.field) continue;
+    const refTable = STARTER_REFERENCES[o.table]?.[o.field];
+    if (!refTable) continue;
+    for (const [key, name] of Array.from(names))
+      if (key.startsWith(`${refTable}:`))
+        o.valueNames[key.slice(refTable.length + 1)] = name;
   }
 }
 

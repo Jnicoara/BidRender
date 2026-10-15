@@ -13,6 +13,7 @@ import {
   routeToPath,
   RETIRED_PATHS,
   ASSEMBLY_VIEWS,
+  LABOR_RATE_VIEWS,
   MATERIALS_VIEWS,
   SETTINGS_SECTIONS,
 } from "./appRoutes";
@@ -100,6 +101,25 @@ describe("views", () => {
     for (const view of ASSEMBLY_VIEWS) {
       expect(pathToRoute(`#/library/assemblies?view=${view}`).view).toBe(view);
     }
+    for (const view of LABOR_RATE_VIEWS) {
+      expect(pathToRoute(`#/library/labor-rates?view=${view}`).view).toBe(view);
+    }
+  });
+
+  it("Updates is a view of every library screen, and round-trips (starter updates)", () => {
+    for (const route of [
+      "library-materials",
+      "library-assemblies",
+      "library-labor-rates",
+    ] as const) {
+      const path = routeToPath(route, { view: "updates" });
+      expect(path).toMatch(/\?view=updates$/);
+      expect(pathToRoute(`#${path}`)).toEqual({ route, view: "updates" });
+    }
+    // The default view keeps the short address.
+    expect(routeToPath("library-labor-rates", { view: "rates" })).toBe(
+      "/library/labor-rates"
+    );
   });
 
   it("falls back rather than trusting an invented view", () => {

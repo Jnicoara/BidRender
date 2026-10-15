@@ -37,6 +37,9 @@ export const STARTER_TABS = [
   "assemblies",
   "labor-rates",
   "run-types",
+  // Every starter change, newest first, with Undo (starter-offers-plan.md
+  // § 4 step 4).
+  "changes",
 ] as const;
 export type StarterTab = (typeof STARTER_TABS)[number];
 

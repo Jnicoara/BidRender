@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **BidRidge can now change its starter catalog without changing anyone's
+  numbers behind their back.** On the BidRidge starter screen a price,
+  hours, name, raceway fact or run-type waste can be changed one at a time:
+  it first says how many shops it reaches, then every shop already using the
+  item keeps its current value and sees "N starter updates available" on its
+  Dashboard, with an Updates tab on Materials, Assemblies and Labor rates.
+  Each update shows yours → BidRidge's new value; Accept, Accept all and
+  Ignore are for the owner and admins. Bids already priced never change,
+  sent and locked bids never move, and an update that would re-count draft
+  bids says how many before you accept. New shops simply start with the new
+  value. Every change is listed in a change log with Undo.
+
 - **Groundwork for BidRidge starter updates (nothing visible yet).** When
   BidRidge changes a shipped price, hours or rate, the "Example" tag now
   changes with it in the same step, so a number and its tag can never part.

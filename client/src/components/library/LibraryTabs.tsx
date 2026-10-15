@@ -20,6 +20,7 @@
  * of the route.
  */
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import { routeToPath, type Route } from "@/lib/appRoutes";
 
 type Tab = { view: string; label: string; title: string };
@@ -42,6 +43,16 @@ const GROUPS: Record<string, { route: Route; tabs: Tab[] }> = {
         view: "modifiers",
         label: "Modifiers",
         title: "Labor adjustments for job conditions",
+      },
+    ],
+  },
+  laborRates: {
+    route: "library-labor-rates",
+    tabs: [
+      {
+        view: "rates",
+        label: "Rates",
+        title: "What each role costs you per hour",
       },
     ],
   },
@@ -71,7 +82,30 @@ export function LibraryTabs({
   current: string;
 }) {
   const config = GROUPS[group];
+  /*
+    "Updates" (BidRidge starter updates, starter-offers-plan.md § 2.3) is a
+    tab only while there is something in it, or while it is open: an empty
+    tab on every library screen would be the nag CLAUDE.md rules out. The
+    count is the server list's own length (`starterOffers.count`).
+  */
+  const updates = trpc.starterOffers.count.useQuery(undefined, {
+    staleTime: 60_000,
+  });
   if (!config) return null;
+  const count = updates.data?.count ?? 0;
+  const tabs: Tab[] =
+    count > 0 || current === "updates"
+      ? [
+          ...config.tabs,
+          {
+            view: "updates",
+            label: count > 0 ? `Updates ${count}` : "Updates",
+            title: "Changes BidRidge made to starter items you use",
+          },
+        ]
+      : config.tabs;
+  // One tab is not a choice: Labor rates shows no strip until it has two.
+  if (tabs.length < 2) return null;
 
   return (
     <div
@@ -79,7 +113,7 @@ export function LibraryTabs({
       role="tablist"
       aria-label={group === "materials" ? "Material views" : "Library sections"}
     >
-      {config.tabs.map(tab => {
+      {tabs.map(tab => {
         const active = tab.view === current;
         return (
           <button

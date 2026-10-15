@@ -116,6 +116,8 @@ export const starterLibraryRouter = router({
       isExamplePrice: row.isExamplePrice === true,
       laborHours: decimalOrNull(row.laborHours),
       isExampleLaborHours: row.isExampleLaborHours === true,
+      stickLengthFeet: decimalOrNull(row.stickLengthFeet),
+      strapSpacingFeet: decimalOrNull(row.strapSpacingFeet),
       isSpecialty: row.isSpecialty === true,
       searchAliases: row.searchAliases,
       description: row.description,

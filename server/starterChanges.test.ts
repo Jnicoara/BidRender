@@ -670,4 +670,64 @@ describeDb("applyStarterChange (§ 10a.3)", () => {
     const database = (await getDb())!;
     await database.delete(bids).where(eq(bids.id, bid.id));
   });
+
+  it("undo puts an unpriced item back to unpriced: $0 → $2 → undo is $0 again, untagged", async () => {
+    // Found by eye 2026-10-14: the undo was refused ("must be a number above
+    // 0") because the above-zero rule is for NEW values, and an undo restores
+    // an old one exactly. Pricing an unpriced starter item could not be undone.
+    const database = (await getDb())!;
+    const [m] = await database.insert(materials).values({
+      name: `${PROBE} unpriced`,
+      unitOfSale: "each",
+      costPerUnit: "0.0000",
+      category: "Receptacles",
+      trade: "electrical",
+    });
+    try {
+      const priced = await applyStarterChange({
+        editorUserId: null,
+        source: "screen",
+        changes: [
+          {
+            table: "materials",
+            rowId: m.insertId,
+            kind: "field",
+            field: "costPerUnit",
+            newValue: 2,
+          },
+        ],
+      });
+      remember(priced.batchId);
+      expect((await sharedMaterial(m.insertId)).isExamplePrice).toBe(true);
+      const undone = await undoStarterChange({
+        changeId: priced.applied[0].changeId,
+        editorUserId: null,
+      });
+      remember(undone.batchId);
+      const back = await sharedMaterial(m.insertId);
+      expect(back.costPerUnit).toBe("0.0000");
+      expect(back.isExamplePrice).toBe(false);
+      // A NEW $0 is still refused: the rule stands for new values.
+      await expect(
+        applyStarterChange({
+          editorUserId: null,
+          source: "screen",
+          changes: [
+            {
+              table: "materials",
+              rowId: m.insertId,
+              kind: "field",
+              field: "laborHours",
+              newValue: 0,
+            },
+          ],
+        })
+      ).rejects.toBeInstanceOf(StarterChangeRefused);
+    } finally {
+      await database
+        .delete(materials)
+        .where(eq(materials.baselineId, m.insertId));
+      await database.delete(materials).where(eq(materials.id, m.insertId));
+    }
+  });
 });

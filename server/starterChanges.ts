@@ -368,7 +368,14 @@ type Planned = {
 
 async function plan(
   input: StarterChangeInput,
-  at: string
+  at: string,
+  /**
+   * An undo putting back a value the row HELD. The above-zero rule is for new
+   * numbers (the sheet refuses a $0 price); an undo restores an old one
+   * exactly, and a $0 "not priced" price was a real old value. Without this,
+   * pricing an unpriced item could never be undone (found 2026-10-14).
+   */
+  restoring = false
 ): Promise<{ planned?: Planned; skip?: true; problems: string[] }> {
   const problems: string[] = [];
   const refuse = (why: string) => {
@@ -389,9 +396,9 @@ async function plan(
     const why = starterChangeRefusal(input.table, input.field);
     if (why) return refuse(why);
     const column = columnsOf(input.table)[input.field];
-    const aboveZero = (ABOVE_ZERO_FIELDS[input.table] ?? []).includes(
-      input.field
-    );
+    const aboveZero =
+      !restoring &&
+      (ABOVE_ZERO_FIELDS[input.table] ?? []).includes(input.field);
     const stored = storedValue(column, input.newValue, aboveZero);
     if ("refused" in stored) return refuse(`${input.field} ${stored.refused}`);
     const refTable = STARTER_REFERENCES[input.table]?.[input.field];
@@ -716,7 +723,11 @@ async function applyPlanned(
         continue;
       }
       seen.add(key);
-      const result = await plan(c, `change ${i + 1}`);
+      const result = await plan(
+        c,
+        `change ${i + 1}`,
+        p.undoesChangeId !== null
+      );
       problems.push(...result.problems);
       if (result.skip) skipped += 1;
       if (result.planned)

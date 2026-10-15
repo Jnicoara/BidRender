@@ -1,5 +1,27 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-15 (overnight), STARTER OFFERS BUILT ON track-b
+
+- **Built, steps 1–6 of `starter-offers-plan.md` § 4**, on track-b only
+  (local-dev untouched since d0152f60). The plan's header lists where the
+  build differs from its text. Running notes: `overnight-log-b.md`; owner
+  questions: `morning-questions-b.md`.
+- **Server:** `collapseOffer` (per field — the § 3a fix), Example tag in the
+  same change (`exampleTagAfter`), `server/starterOffers.ts` (read, Accept,
+  Accept all, Ignore, un-ignore, draft re-count), `starterOffersRouter`
+  (owner/admin answer), admin routes previewEdit / applyEdit / changeLog /
+  undoBatch. No migration.
+- **Screens:** Dashboard card, one Updates view on Materials / Assemblies /
+  Labor rates (`?view=updates`), the admin edit dialog and Change log on
+  `/starter`. Looked at laptop, iPad both ways, phone 375.
+- **Not built:** labor-rate edits on the admin screen (wage and rate must
+  change together), a `starter_accepted` price-history row (no writer
+  exists), hide offers.
+- **For A:** `starterDrift --apply` may now stop holding tag splits where
+  the tag `exampleTagAfter` would write equals the seed's (§ 4 step 1).
+- **Step 0:** local-dev Gate for d0152f60 green after one re-run (image pull
+  rate limit): smoke 96/2, staging `/api/version` d0152f60.
+
 ## WHERE B STANDS — 2026-10-14 (merge), LOCAL-DEV MERGED; B OWNS ALL OF STARTER OFFERS
 
 - **Owner answered `starter-offers-plan.md` Q1–Q7: all YES, as

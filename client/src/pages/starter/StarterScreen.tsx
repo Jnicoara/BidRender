@@ -1,8 +1,8 @@
 /**
  * THE BASELINE SCREEN — what the shipped starter holds (baseline-screen-plan.md
- * § 1, § 3). Read only for now: every change to the starter has to be
- * pinned, logged and offered (§ 2, § 4), and the tables for that (BS-M3 to
- * BS-M6) are not applied yet. references/track-b-handoff.md lists what waits.
+ * § 1, § 3). Every change goes through the edit dialog (StarterEditing.tsx),
+ * which previews and then calls `applyStarterChange`: pinned, logged and
+ * offered (§ 2, § 4). The Change log tab lists every change with Undo.
  *
  * The band is the plan's wording, word for word, and stays on every tab.
  *
@@ -30,6 +30,8 @@ import {
 } from "@/lib/starterAddress";
 import { unitLabel } from "@shared/materialsList";
 import type { ExampleKind } from "@shared/exampleTags";
+import type { EditTable } from "@/lib/starterEdit";
+import { ChangeLogTab, EditButton, StarterEditDialog } from "./StarterEditing";
 
 /** What an Example tag means HERE: a number every new company starts on. */
 const STARTER_WHY: Record<ExampleKind, string> = {
@@ -45,6 +47,15 @@ const TAB_LABEL: Record<StarterTab, string> = {
   assemblies: "Assemblies",
   "labor-rates": "Labor rates",
   "run-types": "Run types",
+  changes: "Change log",
+};
+
+/** The row being changed in the edit dialog. */
+type Editing = {
+  table: EditTable;
+  rowId: number;
+  itemName: string;
+  current: Record<string, unknown>;
 };
 
 type Me = { name: string | null; email: string | null; sessionEndsAt: number };
@@ -116,7 +127,9 @@ export default function StarterScreen({
     assemblies: assemblies.data?.length,
     "labor-rates": laborRates.data?.length,
     "run-types": runTypes.data?.length,
+    changes: undefined,
   };
+  const [editing, setEditing] = useState<Editing | null>(null);
 
   return (
     <div className="h-dvh flex flex-col bg-background text-foreground">
@@ -169,19 +182,28 @@ export default function StarterScreen({
             )}
           </a>
         ))}
-        <span className="ml-auto hidden lg:block self-center pr-2 text-xs text-muted-foreground">
-          Read only for now — editing comes with the change log.
-        </span>
       </nav>
 
       {tab === "materials" ? (
-        <MaterialsTab rows={materials.data} />
+        <MaterialsTab rows={materials.data} onEdit={setEditing} />
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {tab === "assemblies" && <AssembliesTab rows={assemblies.data} />}
+          {tab === "assemblies" && (
+            <AssembliesTab rows={assemblies.data} onEdit={setEditing} />
+          )}
           {tab === "labor-rates" && <LaborRatesTab rows={laborRates.data} />}
-          {tab === "run-types" && <RunTypesTab rows={runTypes.data} />}
+          {tab === "run-types" && (
+            <RunTypesTab rows={runTypes.data} onEdit={setEditing} />
+          )}
+          {tab === "changes" && <ChangeLogTab />}
         </div>
+      )}
+      {editing && (
+        <StarterEditDialog
+          key={`${editing.table}:${editing.rowId}`}
+          {...editing}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );
@@ -191,7 +213,13 @@ export default function StarterScreen({
 
 type Filter = "all" | "notPriced" | "noHours";
 
-function MaterialsTab({ rows }: { rows: MaterialRow[] | undefined }) {
+function MaterialsTab({
+  rows,
+  onEdit,
+}: {
+  rows: MaterialRow[] | undefined;
+  onEdit: (e: Editing) => void;
+}) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const all = rows ?? [];
@@ -287,7 +315,17 @@ function MaterialsTab({ rows }: { rows: MaterialRow[] | undefined }) {
                       {m.category ?? "Uncategorized"}
                     </div>
                   )}
-                  <MaterialLine m={m} />
+                  <MaterialLine
+                    m={m}
+                    onEdit={() =>
+                      onEdit({
+                        table: "materials",
+                        rowId: m.id,
+                        itemName: m.name,
+                        current: m,
+                      })
+                    }
+                  />
                 </div>
               );
             })}
@@ -298,9 +336,9 @@ function MaterialsTab({ rows }: { rows: MaterialRow[] | undefined }) {
   );
 }
 
-function MaterialLine({ m }: { m: MaterialRow }) {
+function MaterialLine({ m, onEdit }: { m: MaterialRow; onEdit: () => void }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-b border-border/50 px-4 py-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 border-b border-border/50 pl-4 pr-2 py-2">
       <div className="min-w-0 flex-1 basis-64">
         <p className="text-sm">
           {m.name}
@@ -339,6 +377,7 @@ function MaterialLine({ m }: { m: MaterialRow }) {
           why={STARTER_WHY}
         />
       </div>
+      <EditButton onClick={onEdit} />
     </div>
   );
 }
@@ -374,47 +413,67 @@ function FilterChip({
 
 // ── Assemblies ───────────────────────────────────────────────────────────────
 
-function AssembliesTab({ rows }: { rows: AssemblyRow[] | undefined }) {
+function AssembliesTab({
+  rows,
+  onEdit,
+}: {
+  rows: AssemblyRow[] | undefined;
+  onEdit: (e: Editing) => void;
+}) {
   const [open, setOpen] = useState<number | null>(null);
   if (rows === undefined) return <Skeleton />;
   return (
     <ul>
       {rows.map(a => (
         <li key={a.id} className="border-b border-border/50">
-          <button
-            type="button"
-            onClick={() => setOpen(o => (o === a.id ? null : a.id))}
-            aria-expanded={open === a.id}
-            className="flex w-full flex-wrap items-baseline gap-x-4 gap-y-0.5 px-4 py-2.5 text-left hover:bg-muted/30"
-          >
-            <span className="flex min-w-0 flex-1 basis-64 items-baseline gap-1.5 text-sm">
-              {open === a.id ? (
-                <ChevronDown size={14} className="shrink-0 self-center" />
-              ) : (
-                <ChevronRight size={14} className="shrink-0 self-center" />
-              )}
-              {a.name}
-            </span>
-            <span className="text-xs text-muted-foreground">{a.category}</span>
-            <span className="flex w-40 items-baseline justify-end gap-2 text-sm tabular-nums">
-              {a.laborOnly ? (
-                <span className="text-xs text-muted-foreground">
-                  labor only ·
-                </span>
-              ) : null}
-              {a.baseLaborHours === null ? (
-                <span className="text-xs text-amber-400">hours not set</span>
-              ) : (
-                <span>
-                  {+(a.baseLaborHours + a.overheadLaborHours).toFixed(4)} h
-                </span>
-              )}
-              <ExampleTags
-                line={{ snapshotHoursWereExample: a.isExampleHours }}
-                why={STARTER_WHY}
-              />
-            </span>
-          </button>
+          <div className="flex items-center pr-2">
+            <button
+              type="button"
+              onClick={() => setOpen(o => (o === a.id ? null : a.id))}
+              aria-expanded={open === a.id}
+              className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-0.5 px-4 py-2.5 text-left hover:bg-muted/30"
+            >
+              <span className="flex min-w-0 flex-1 basis-64 items-baseline gap-1.5 text-sm">
+                {open === a.id ? (
+                  <ChevronDown size={14} className="shrink-0 self-center" />
+                ) : (
+                  <ChevronRight size={14} className="shrink-0 self-center" />
+                )}
+                {a.name}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {a.category}
+              </span>
+              <span className="flex w-40 items-baseline justify-end gap-2 text-sm tabular-nums">
+                {a.laborOnly ? (
+                  <span className="text-xs text-muted-foreground">
+                    labor only ·
+                  </span>
+                ) : null}
+                {a.baseLaborHours === null ? (
+                  <span className="text-xs text-amber-400">hours not set</span>
+                ) : (
+                  <span>
+                    {+(a.baseLaborHours + a.overheadLaborHours).toFixed(4)} h
+                  </span>
+                )}
+                <ExampleTags
+                  line={{ snapshotHoursWereExample: a.isExampleHours }}
+                  why={STARTER_WHY}
+                />
+              </span>
+            </button>
+            <EditButton
+              onClick={() =>
+                onEdit({
+                  table: "assemblies",
+                  rowId: a.id,
+                  itemName: a.name,
+                  current: a,
+                })
+              }
+            />
+          </div>
           {open === a.id && <AssemblyParts id={a.id} />}
         </li>
       ))}
@@ -465,48 +524,60 @@ function AssemblyParts({ id }: { id: number }) {
 function LaborRatesTab({ rows }: { rows: RateRow[] | undefined }) {
   if (rows === undefined) return <Skeleton />;
   return (
-    <ul>
-      {rows.map(r => (
-        <li
-          key={r.id}
-          className="flex flex-wrap items-baseline gap-x-4 border-b border-border/50 px-4 py-2.5"
-        >
-          <span className="flex-1 basis-48 text-sm">{r.name}</span>
-          <span className="text-xs text-muted-foreground">
-            {r.rateType === "salary" ? "salaried" : "hourly"} · {r.trade}
-          </span>
-          <span className="flex w-44 items-baseline justify-end gap-2 text-sm tabular-nums">
-            <span
-              className={cn(
-                r.needsRate &&
-                  !r.isExampleRate &&
-                  "text-amber-400 font-semibold"
-              )}
-            >
-              {money(r.hourlyRate)} / h
+    <>
+      <p className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
+        Rates aren’t changed on this screen yet: a rate is its wage times its
+        burden, and both have to change together.
+      </p>
+      <ul>
+        {rows.map(r => (
+          <li
+            key={r.id}
+            className="flex flex-wrap items-baseline gap-x-4 border-b border-border/50 px-4 py-2.5"
+          >
+            <span className="flex-1 basis-48 text-sm">{r.name}</span>
+            <span className="text-xs text-muted-foreground">
+              {r.rateType === "salary" ? "salaried" : "hourly"} · {r.trade}
             </span>
-            {r.needsRate && !r.isExampleRate && (
-              <span className="text-xs text-amber-400">rate not set</span>
-            )}
-            <ExampleTags
-              line={{ snapshotLaborRateWasExample: r.isExampleRate }}
-              why={STARTER_WHY}
-            />
-          </span>
-        </li>
-      ))}
-    </ul>
+            <span className="flex w-44 items-baseline justify-end gap-2 text-sm tabular-nums">
+              <span
+                className={cn(
+                  r.needsRate &&
+                    !r.isExampleRate &&
+                    "text-amber-400 font-semibold"
+                )}
+              >
+                {money(r.hourlyRate)} / h
+              </span>
+              {r.needsRate && !r.isExampleRate && (
+                <span className="text-xs text-amber-400">rate not set</span>
+              )}
+              <ExampleTags
+                line={{ snapshotLaborRateWasExample: r.isExampleRate }}
+                why={STARTER_WHY}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
-function RunTypesTab({ rows }: { rows: RunTypeRow[] | undefined }) {
+function RunTypesTab({
+  rows,
+  onEdit,
+}: {
+  rows: RunTypeRow[] | undefined;
+  onEdit: (e: Editing) => void;
+}) {
   if (rows === undefined) return <Skeleton />;
   return (
     <ul>
       {rows.map(t => (
         <li
           key={t.id}
-          className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-b border-border/50 px-4 py-2.5"
+          className="flex flex-wrap items-center gap-x-4 gap-y-0.5 border-b border-border/50 pl-4 pr-2 py-1.5"
         >
           <span className="flex-1 basis-48 text-sm">{t.label}</span>
           <span className="text-xs text-muted-foreground">
@@ -521,6 +592,16 @@ function RunTypesTab({ rows }: { rows: RunTypeRow[] | undefined }) {
               .filter(Boolean)
               .join(" · ")}
           </span>
+          <EditButton
+            onClick={() =>
+              onEdit({
+                table: "runTypes",
+                rowId: t.id,
+                itemName: t.label,
+                current: t,
+              })
+            }
+          />
         </li>
       ))}
     </ul>
