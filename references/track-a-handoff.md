@@ -35,6 +35,9 @@ questions: `morning-questions-a.md`.
   (already live). `SIGNUP_INVITE_ONLY=on` closes open signup; codes work
   either way. UI not built. `users.email` UNIQUE drafted in
   `references/drafts/`.
+- **5. Cleanup, measured** (`night-cleanup-2026-10-14.md`): drizzle snapshot
+  draft that makes `generate` honest again (0059–0163 hole; proved in scratch);
+  dead tables listed (11, nothing dropped); `scripts/` typecheck re-measured.
 
 ## (earlier) 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
 

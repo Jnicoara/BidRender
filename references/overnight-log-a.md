@@ -78,3 +78,21 @@ files only (B and C also running). MySQL 3307 shared — left running.
   their test red; auth.email, auth.logout, permissions, seats,
   personalCompanyRace, scopeDiscipline (router listed), sourceHygiene: 121
   green; `pnpm check` clean.
+
+## Item 5 — light cleanup (measured, drafts only) — 01:45 → 02:45
+
+`references/night-cleanup-2026-10-14.md`.
+
+- **Snapshot hole is 0059–0163, not 0059–0064** (0032, 0035 also missing).
+  Draft `references/drafts/drizzle-snapshot/0163_snapshot.json`, made in a
+  scratch dir: generate today = 338 statements re-adding live objects; with
+  the draft = "No schema changes"; draft vs a DB migrated 0000–0163 (pull,
+  read-only) = 0 real differences over 86 tables / 1,105 columns.
+  (A drizzle-kit absolute `out` landed in `C:\c\…`; moved my file out and
+  removed only my own folders there — that tree also holds Track C's.)
+- **Dead tables**: 11 listed with reach, row counts (local copy) and FKs;
+  only point at each other; `projects.pdfKey` is still in the backup's
+  file list. Nothing dropped.
+- **Type-check `scripts/`**: 589 errors / 56 files today; 5 / 2 files with
+  `target: ES2022`; app 0 with it. Not applied (todo.md: `target` affects
+  class-field compile) — numbers added to todo.md.
