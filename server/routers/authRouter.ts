@@ -24,6 +24,7 @@ import {
 } from "../passwordReset";
 import { RESET_LINK_UNUSABLE } from "@shared/resetLinkMessages";
 import { isStarterEditor } from "../starterEditor/role";
+import { LEAKED_PASSWORD_MESSAGE, isLeakedPassword } from "../leakedPasswords";
 import {
   clientKey,
   createFailureLimiter,
@@ -125,6 +126,19 @@ export function tooManySignIns(waitMs: number): string {
 export const SAME_AS_CURRENT_PASSWORD =
   "That is your current password. Choose a different one.";
 
+/**
+ * Refuses a password on a breach list (server/leakedPasswords.ts), at
+ * sign-up, change and reset alike. "Could not tell" (the service is down)
+ * allows it: the check protects people, it must not lock them out.
+ */
+async function refuseLeakedPassword(password: string): Promise<void> {
+  if ((await isLeakedPassword(password)) === true)
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: LEAKED_PASSWORD_MESSAGE,
+    });
+}
+
 const TOO_MANY_RESETS =
   "Too many password reset attempts. Wait an hour and try again.";
 
@@ -172,6 +186,7 @@ export const authRouter = router({
         });
       }
 
+      await refuseLeakedPassword(input.password);
       const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
       // Generate a stable openId for email/password users
       const openId = `email_${nanoid(24)}`;
@@ -291,7 +306,10 @@ export const authRouter = router({
     .input(
       z.object({
         currentPassword: z.string().min(1).max(1024),
-        newPassword: z.string().min(8).max(128),
+        // The same rules as sign-up and reset (security sweep 2026-10-14:
+        // this alone took any 8–128 characters, so a password the other two
+        // refuse could be set here).
+        newPassword,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -330,6 +348,7 @@ export const authRouter = router({
           message: SAME_AS_CURRENT_PASSWORD,
         });
 
+      await refuseLeakedPassword(input.newPassword);
       const newHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
       // Ends every session issued before now — this device's included…
       await db.updateUserPassword(user.id, newHash);
@@ -498,6 +517,8 @@ export const authRouter = router({
           code: "BAD_REQUEST",
           message: SAME_AS_CURRENT_PASSWORD,
         });
+      // Also before the claim, so a refused password leaves the link usable.
+      await refuseLeakedPassword(input.newPassword);
 
       const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
       const userId = await db.completePasswordReset(

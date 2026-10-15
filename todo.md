@@ -1425,7 +1425,14 @@ and `server/priceListParse.test.ts:202` pins that.
 
 ### Before beta: sign-in protection (owner, 2026-10-06)
 
-- [ ] **Block known-leaked passwords** at sign-up, password change and
+- [x] **DONE 2026-10-14 (C, overnight run #2, on track-c):**
+      `server/leakedPasswords.ts` — SHA-1 prefix (5 chars) to the HIBP range
+      API with padding, matched here; refused in plain words at sign-up,
+      change and reset (reset BEFORE its link is used); **fails open** after
+      2.5 s or any error; off in every test (`vitest.setup.ts`). Tests:
+      `leakedPasswords.test.ts`, `authLeaked.test.ts` (red without the
+      reset check). Change-password now uses the sign-up rules too. Was:
+      **Block known-leaked passwords** at sign-up, password change and
       reset: refuse a password found in a breach list (for example the
       k-anonymity range check against Have I Been Pwned: only the first five
       characters of the SHA-1 leave the server). The refusal says plainly

@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Passwords that have leaked in a data breach are refused** at sign-up,
+  password change and reset, with the reason. Only the first five letters
+  of a scrambled form of the password leave BidRidge to check it. If the
+  breach list can't be reached, sign-up still works.
+
 - **Guide mode for new users.** A slim strip along the bottom of the screen
   says the one next step for the bid you're on, in plain words: get the
   drawings in, set the scale, count the devices, trace runs if the job needs
