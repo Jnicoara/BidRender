@@ -46,6 +46,7 @@ import {
   useCrosshairSize,
   useShowNextSegment,
   useShowStepBar,
+  useGuideState,
 } from "@/hooks/useCrosshairColor";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -447,6 +448,7 @@ function DisplaySection() {
       <CrosshairColorSetting />
       <ShowNextSegmentSetting />
       <ShowStepBarSetting />
+      <GuideSetting />
     </div>
   );
 }
@@ -493,6 +495,44 @@ function ShowStepBarSetting() {
         </p>
       </div>
       <Switch id="show-step-bar" checked={show} onCheckedChange={setShow} />
+    </section>
+  );
+}
+
+/**
+ * Guide mode (client/src/lib/guide.ts): one tip at a time along the bottom,
+ * walking a bid from plans to print. On until turned off, here or from the
+ * strip; "show closed tips again" brings back every tip closed with ×.
+ */
+function GuideSetting() {
+  const [state, setState] = useGuideState();
+  return (
+    <section className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          <label htmlFor="guide-mode">Guide mode</label>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          One tip at a time along the bottom of the screen — upload, scale,
+          count, runs, review, print — and "Where do I…?" to find anything. Turn
+          it off once you know your way around.
+        </p>
+        {!state.off && state.hidden.length > 0 && (
+          <button
+            type="button"
+            className="mt-1.5 text-xs text-[#F5C518] hover:underline"
+            onClick={() => setState({ ...state, hidden: [] })}
+          >
+            Show the {state.hidden.length} closed tip
+            {state.hidden.length === 1 ? "" : "s"} again
+          </button>
+        )}
+      </div>
+      <Switch
+        id="guide-mode"
+        checked={!state.off}
+        onCheckedChange={on => setState({ ...state, off: !on })}
+      />
     </section>
   );
 }

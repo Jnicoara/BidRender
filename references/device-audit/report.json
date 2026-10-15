@@ -1,0 +1,146 @@
+{
+  "dashboard": {
+    "laptop": {
+      "innerWidth": 1536,
+      "innerHeight": 864,
+      "scrollWidth": 1536,
+      "sidewaysScroll": false,
+      "innerSideways": [],
+      "tooWide": [],
+      "overlaps": [],
+      "overflowRight": [],
+      "cutOffBelow": [],
+      "cutTabs": [],
+      "smallTargets": [
+        {
+          "label": "button.flex.items-center.gap-3 «Dashboard — every bid by stage, and where a new one starts»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Bids — every bid in one list, searchable»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Plans — every bid with drawings, and Upload a plan»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Clients — who the work is for»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Materials — the catalog, and your supplier's prices on it»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Assemblies — recipes, kits and job-condition modifiers»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Performance — win rate and what the work earned»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Labor rates — what an hour costs, by role»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Recently deleted — everything archived, with Restore»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Where do I…? — find where anything is done»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Settings — pricing defaults, branding, tax and display»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Crew — who can get into this company»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.flex.items-center.gap-3 «Admin»",
+          "w": 47,
+          "h": 40
+        },
+        {
+          "label": "button.underline.decoration-dotted.underline-offset-2 «Lines, parts and drops nobody has priced add nothing to this total. Open the bid to see each one and price it.»",
+          "w": 94,
+          "h": 17
+        },
+        {
+          "label": "button.inline-flex.items-center.justify-center «Recently deleted1»",
+          "w": 149,
+          "h": 32
+        },
+        {
+          "label": "button.inline-flex.items-center.justify-center «Empty bid»",
+          "w": 102,
+          "h": 32
+        },
+        {
+          "label": "a.text-sky-400.underline-offset-2.hover:underline «Set your own rates»",
+          "w": 509,
+          "h": 31
+        },
+        {
+          "label": "button.inline-flex.items-center.justify-center «Hide the getting started checklist»",
+          "w": 28,
+          "h": 28
+        },
+        {
+          "label": "a.flex.items-start.gap-3 «Price your first materialDone»",
+          "w": 1406,
+          "h": 36
+        },
+        {
+          "label": "a.flex.items-start.gap-3 «Build your first assemblyDone»",
+          "w": 1406,
+          "h": 36
+        },
+        {
+          "label": "a.flex.items-start.gap-3 «Complete your first bidDone»",
+          "w": 1406,
+          "h": 36
+        },
+        {
+          "label": "input.file:text-foreground.placeholder:text-muted-foreground.selection:bg-primary «Ask where to find something»",
+          "w": 507,
+          "h": 36
+        },
+        {
+          "label": "button.inline-flex.items-center.justify-center «Find it»",
+          "w": 61,
+          "h": 36
+        },
+        {
+          "label": "button.flex.items-center.gap-2 «Find a bid — by job name, client or addr»",
+          "w": 293,
+          "h": 34
+        },
+        {
+          "label": "button.underline.decoration-dotted.underline-offset-2 «Lines, parts and drops nobody has priced add nothing to this total. Open the bid to see each one and price it.»",
+          "w": 94,
+          "h": 15
+        }
+      ],
+      "controls": 32,
+      "covered": [],
+      "shot": "laptop-dashboard.jpg"
+    }
+  }
+}

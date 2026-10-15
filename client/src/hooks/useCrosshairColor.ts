@@ -12,6 +12,7 @@
  */
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { trpc } from "@/lib/trpc";
+import { GUIDE_DEFAULT, parseGuideState, type GuideState } from "@/lib/guide";
 import {
   asCrosshairColor,
   asCrosshairSize,
@@ -83,4 +84,19 @@ export function useShowStepBar(): [boolean, (show: boolean) => void] {
     true
   );
   return [stored !== false, setStored];
+}
+
+/**
+ * Guide mode (client/src/lib/guide.ts): on, and which tips were closed.
+ * Default ON and stays on until turned off (owner, 2026-10-14). Per person,
+ * on this browser, like the step bar — a view preference, never a company
+ * setting, and it renders fine with storage blocked.
+ */
+export function useGuideState(): [GuideState, (next: GuideState) => void] {
+  const id = useMeId();
+  const [stored, setStored] = useLocalStorage<unknown>(
+    `bp_guide:${id}`,
+    GUIDE_DEFAULT
+  );
+  return [parseGuideState(stored), setStored];
 }

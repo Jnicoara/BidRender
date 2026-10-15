@@ -74,7 +74,12 @@ import {
   Map as MapIcon,
   MoreHorizontal,
   Trash2,
+  HelpCircle,
 } from "lucide-react";
+import { GuideStrip } from "@/components/GuideStrip";
+import { HelpSearch } from "@/components/HelpSearch";
+import type { GuideScreen } from "@/lib/guide";
+import type { StepPlace } from "@shared/bidSteps";
 import {
   Popover,
   PopoverContent,
@@ -383,6 +388,12 @@ export default function BidRenderShell() {
       go: () => navigate("trash"),
     },
     {
+      label: "Where do I…?",
+      icon: HelpCircle,
+      active: false,
+      go: () => setHelpOpen(true),
+    },
+    {
       label: "Settings",
       icon: Settings,
       active: isInSettings,
@@ -406,6 +417,36 @@ export default function BidRenderShell() {
       : []),
   ];
   const moreActive = moreItems.some(item => item.active);
+
+  // ── Guide mode (client/src/lib/guide.ts) ────────────────────────────────
+  // "Where do I…?" opens from the guide strip, the sidebar and More.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const guideScreen: GuideScreen = isOnDashboard
+    ? "dashboard"
+    : isInBids && activeProjectId
+      ? "bid"
+      : isInTakeoff
+        ? "plans"
+        : isInCount
+          ? "count"
+          : isInProposal
+            ? "proposal"
+            : "other";
+  const guideBidId =
+    guideScreen !== "dashboard" && guideScreen !== "other" && activeProjectId
+      ? activeProjectId
+      : null;
+  const guideGo = (place: StepPlace) => {
+    if (!guideBidId) return;
+    navigate(
+      place === "plans"
+        ? "takeoff"
+        : place === "proposal"
+          ? "proposal"
+          : "bids",
+      { id: guideBidId }
+    );
+  };
   /** The phone's More menu, shut whenever the screen changes. */
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => setMoreOpen(false), [route, activeView]);
@@ -761,6 +802,14 @@ export default function BidRenderShell() {
               label="Recently deleted"
               title="Recently deleted — everything archived, with Restore"
             />
+            {/* Guide mode's help search: local, no AI (helpTopics.ts). */}
+            <NavBtn
+              onClick={() => setHelpOpen(true)}
+              isActive={false}
+              icon={HelpCircle}
+              label="Where do I…?"
+              title="Where do I…? — find where anything is done"
+            />
             <NavBtn
               onClick={() => navigate("settings")}
               isActive={isInSettings}
@@ -878,6 +927,15 @@ export default function BidRenderShell() {
         >
           {renderContent()}
         </div>
+
+        {/* Guide mode: one tip, under the work, never over it. */}
+        <GuideStrip
+          screen={guideScreen}
+          bidId={guideBidId}
+          onGo={guideGo}
+          onOpenHelp={() => setHelpOpen(true)}
+        />
+        <HelpSearch open={helpOpen} onOpenChange={setHelpOpen} />
 
         {/*
         ── Mobile Bottom Nav ──────────────────────────────────────────────────

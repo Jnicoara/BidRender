@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Guide mode for new users.** A slim strip along the bottom of the screen
+  says the one next step for the bid you're on, in plain words: get the
+  drawings in, set the scale, count the devices, trace runs if the job needs
+  them, check the bid, print it. It follows what you've actually done, so it
+  moves on by itself, and it never sits over the drawing or a button. Close
+  a tip with ×, or turn the guide off from the strip or in Settings ›
+  Display (it stays on until you do). **"Where do I…?"** (strip, sidebar,
+  phone More menu) finds any screen from plain words like "labor rate",
+  "logo" or "undo delete". It works with no internet, and no AI is used.
+
 - **The first tap on the menu works now.** The side menu (and the phone's
   bottom bar) was rebuilt from scratch whenever the app redrew, which
   happens several times as a screen loads, so a tap in the first moments

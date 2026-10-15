@@ -78,13 +78,18 @@ describe("what the prompt says", () => {
     expect(copy.title).toContain("Oak Street remodel");
   });
 
+  // The place and the end state in the words the app uses for them since
+  // 2026-10-14 (one name for deleted things: "Recently deleted", and
+  // "deleted for good" — references/copy-review-2026-10-14.md). Until then
+  // these read /archive/ and /permanently deleted/; the copy change missed
+  // this file, and the overnight log said no test pinned the strings.
   it("says where it goes", () => {
-    expect(copy.body).toMatch(/archive/i);
+    expect(copy.body).toMatch(/Recently deleted/);
   });
 
   it("states the window and what happens at the end of it", () => {
     expect(copy.body).toContain(String(RETENTION_DAYS));
-    expect(copy.body).toMatch(/permanently deleted/i);
+    expect(copy.body).toMatch(/deleted for good/i);
     expect(copy.body).toMatch(/restore/i);
   });
 

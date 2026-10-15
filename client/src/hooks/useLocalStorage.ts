@@ -9,6 +9,9 @@ import { useState, useEffect, useCallback } from "react";
  * component gets the correct persisted value for the new project rather
  * than keeping the previous project's in-memory state.
  */
+/** Sent in this tab when a value is written, so every reader of the key moves. */
+const SAME_TAB_EVENT = "bidridge:local-storage";
+
 export function useLocalStorage<T>(key: string, initialValue: T) {
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
@@ -42,6 +45,16 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
         } catch {
           /* quota exceeded — silently ignore */
         }
+        // Tell the OTHER hooks on this key in this tab. The browser's
+        // `storage` event only reaches other tabs, so a switch in Settings
+        // left an already-mounted reader (the guide strip in the shell)
+        // showing the old value until a reload (2026-10-14). After this
+        // update, not inside it: an updater must not set other state.
+        queueMicrotask(() =>
+          window.dispatchEvent(
+            new CustomEvent(SAME_TAB_EVENT, { detail: { key } })
+          )
+        );
         return next;
       });
     },
@@ -60,7 +73,21 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
       }
     };
     window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    // …and in this tab, from the event setValue sends.
+    const sameTab = (e: Event) => {
+      if ((e as CustomEvent<{ key: string }>).detail?.key !== key) return;
+      try {
+        const item = window.localStorage.getItem(key);
+        if (item !== null) setStoredValue(JSON.parse(item) as T);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener(SAME_TAB_EVENT, sameTab);
+    return () => {
+      window.removeEventListener("storage", handler);
+      window.removeEventListener(SAME_TAB_EVENT, sameTab);
+    };
   }, [key]);
 
   return [storedValue, setValue] as const;
