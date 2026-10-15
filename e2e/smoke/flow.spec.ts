@@ -186,14 +186,17 @@ test("3. symbols capture; a rename sticks and can be reset", async () => {
       { x: at.x - 30, y: at.y + 30 },
       { x: at.x + 30, y: at.y - 30 }
     );
-    const nameBox = page.locator("input:visible").last();
+    // By its label, not "the last input on the page": since the Legend tab
+    // got its own Look up box (2026-10-13) that was the search field, and
+    // the name went into search while Save stayed disabled (2026-10-14).
+    const nameBox = page.getByRole("textbox", { name: "Symbol name" });
     await nameBox.fill(name);
     await page.getByRole("button", { name: "Save symbol" }).click();
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
 
   await page.getByRole("button", { name: "Rename CI DUPLEX" }).click();
-  const box = page.locator("input:visible").last();
+  const box = page.getByRole("textbox", { name: "New name for CI DUPLEX" });
   await box.fill("CI DUPLEX RENAMED");
   await box.press("Enter");
   await expect(

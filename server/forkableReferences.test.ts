@@ -262,6 +262,23 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-10-13",
     why: "Migration 0154, exactly as materials.replacedById — the follow must go through resolveRunType.",
   },
+  // ── Pricing safety and price history (0162, 0163; Track C's PS-M6 and
+  //    PH-M1). Registered by Track A before their code exists. None is a
+  //    pointer that means "the item the company uses now": each records a
+  //    specific row or a key on purpose, so resolving it to a later fork
+  //    would be the bug. ────────────────────────────────────────────────────
+  "price_import_rows.materialId": {
+    kind: "exempt",
+    why: "Migration 0162 (pricing-safety-plan.md § 6): the company's own row the import WROTE — always the fork itself, never a shipped id. Undo restores that exact row; following it to a newer fork would restore the wrong one.",
+  },
+  "material_price_history.materialKey": {
+    kind: "exempt",
+    why: "Migration 0163 (price-history-plan.md § 3.2): materialItemKey (baselineId ?? id) BY DESIGN — it stores the shipped id for a shipped item so a fork, pin or re-fork never splits one item's history. It is a key read by equality, the same as supplier_prices.materialKey will be; resolving it to a fork is exactly what it exists to avoid.",
+  },
+  "material_price_history.materialId": {
+    kind: "exempt",
+    why: "Migration 0163 (price-history-plan.md § 3.2): audit of the row actually written at the time, SET NULL if it is deleted. History is read by materialKey, never through this.",
+  },
   "bid_line_items.assemblyId": {
     kind: "resolver",
     resolver: "getAssemblyFamilies",

@@ -11,7 +11,11 @@
  * could not show it.
  *
  * ── Why switching it back on is safe for a company ──────────────────────────
- * On a SHIPPED row, `isActive = false` has exactly one writer: the retire pass.
+ * On a SHIPPED row, `isActive = false` had exactly one writer: the retire pass.
+ * Since 2026-10-13 a start no longer runs it (a retire is a hide, HELD in the
+ * seed proposal — references/boot-seed-plan.md), so today it has NONE; the
+ * rows it switched off before then are what reactivation is for. The coming
+ * hide (`hideStarterItem`) writes `hiddenAt`, not `isActive`.
  * A company that edits, archives or deletes a starter does it to its OWN copy
  * (`archiveLibraryRow` forks first), and that copy is what hides the starter
  * from its list. So the reactivation touches `userId IS NULL` rows only, and
@@ -104,6 +108,15 @@ async function removeFixtureRows() {
     .where(and(eq(materials.name, FIXTURE.name), isNull(materials.userId)));
 }
 
+/** The shipped fixture switched off, as a pre-2026-10-13 start retired it. */
+async function retireByHand() {
+  const db = await getDb();
+  await db!
+    .update(materials)
+    .set({ isActive: false })
+    .where(and(eq(materials.name, FIXTURE.name), isNull(materials.userId)));
+}
+
 async function shippedFixture() {
   const db = await getDb();
   const rows = await db!
@@ -150,9 +163,14 @@ describe.skipIf(!hasDb)("a retired name put back in the catalog", () => {
     await seed(SHIPPING, NOT_RETIRING);
     expect((await shippedFixture()).isActive).toBe(true);
 
+    // Since 2026-10-13 a start no longer retires (a retire is a hide, HELD
+    // until hideStarterItem — references/boot-seed-plan.md)...
     await seed(NOT_SHIPPING, RETIRING);
+    expect((await shippedFixture()).isActive, "a start hid it").toBe(true);
+    // ...so the row is retired the way a database retired before then.
+    await retireByHand();
     const retired = await shippedFixture();
-    expect(retired.isActive, "the retire pass hid it").toBe(false);
+    expect(retired.isActive).toBe(false);
 
     await seed(SHIPPING, NOT_RETIRING);
     const back = await shippedFixture();
@@ -201,8 +219,9 @@ describe.skipIf(!hasDb)("a retired name put back in the catalog", () => {
         .orderBy(materials.id);
     const before = await companyRows();
 
-    // Retire the starter, then put it back.
+    // Retire the starter (by hand: a start no longer does), then put it back.
     await seed(NOT_SHIPPING, RETIRING);
+    await retireByHand();
     const back = await seed(SHIPPING, NOT_RETIRING);
     expect(back.reactivated, "the starter itself came back").toBe(1);
     expect((await shippedFixture()).isActive).toBe(true);

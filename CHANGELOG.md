@@ -4,8 +4,127 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-14]
+
+- **The pricing sheet no longer guesses pack sizes from words in an item's
+  name.** It used to call a "Dishwasher whip" a box of 100 washers and every
+  flex coil a 10 ft stick, which would have divided the owner's typed prices
+  by the wrong number on every bid. Each pack is now written down per item
+  with where it came from (the owner's decisions and a check of Home Depot,
+  Platt and Stoneway); 101 items nobody could settle are marked "PACK NOT
+  CHECKED" on the sheet. Every price already typed was kept exactly.
+- **A shipped item with no price can never show as a $0 "Example price".**
+  It stays "Not priced"; a price that would round to $0.0000 is refused when
+  the sheet is loaded.
+
+- **Groundwork for safer prices and a price history (nothing visible yet).**
+  The database can now hold a material's pack size and pack price (so a $120
+  roll of 250 ft can be typed as such instead of divided by hand), remember
+  when a "this price looks off" warning was accepted, keep a record of each
+  supplier price import so it can be undone, and keep a dated history of
+  every price change a company makes. Only the storage exists so far;
+  nothing reads or writes it yet, and no bid total moves.
+
+- **The first-visit tips on the Plans screen no longer get in the way.** The
+  "Don't know a word?" card used to drop into the side panel, right on top of
+  the Legend tab's Capture button and its symbol list, so neither could be
+  clicked or tapped until the tip was dismissed. Tips now sit over the edge
+  of the drawing, never over the toolbars or the panel. The first press
+  anywhere else puts them away for this visit, and they come back next time.
+  On a tablet or phone their buttons are finger-sized. Found by the staging
+  smoke test, which timed out on both a laptop and a sideways iPad.
+
 ## [2026-10-13]
 
+- **Restarting or updating the app no longer changes the shipped starter
+  library by itself.** Until now every server start copied prices, hours,
+  labor rates and run-type parts from the built-in starter files over the
+  shared starter, which changed what every company still using those values
+  saw on each update, and would have quietly undone any recorded starter
+  change. Now a start only adds new starter items and refreshes search words
+  and shelves (recorded). Any other difference is listed for the owner to
+  approve, and approving it keeps every existing company on its old values.
+  A brand-new database still gets the full starter. On the live site this
+  arrives one release after the final pricing load.
+
+- **A sheet's numbered notes, read for you, with no AI.** Under the Legend
+  tab's More options, "Notes on this sheet" lists every numbered note the
+  sheet prints (WORK NOTES, KEYED NOTES, GENERAL NOTES…) with its lines
+  joined into one readable sentence and how many times the drawing tags
+  it; tap a note to go to it on the sheet. A switch, off unless you turn it
+  on, rings every boxed note number on the drawing. Only boxed numbers that
+  match a note on the same sheet are ringed, so circuit and room numbers
+  are left alone. Nothing is saved and nothing costs anything.
+
+- **Tips the first time the Plans screen opens.** A small card points at
+  one control at a time — start with the notes sheet, what the sheet-kind
+  line is for, where to look up a word — with Next and "No more tips". It
+  never appears while a tool is in hand, and "Show tips again" / "Turn tips
+  off" sit under the Legend tab's More options.
+- **The sheet-kind line is now off by default on phones and on an iPad held
+  sideways**, where it cost a whole toolbar row of drawing; it stays on for
+  laptops and an upright iPad, and the More options switch turns it on
+  anywhere (owner's call).
+
+- **"What is this sheet?" on the Plans screen, with no AI.** Beside the
+  sheet name a short line now says what kind of sheet it is — "Lighting
+  plan · count fixtures and switches", "Panel schedule", "Demolition plan"
+  — read from the sheet's title. Tap it for a card: what to do on a sheet
+  like this and what to watch for, in words (no hours or prices). A title
+  naming two things ("lighting plan and luminaire schedule") shows both. A
+  sheet whose title says nothing shows no line at all, never a guess. A
+  schedule card can open the sheet's Schedules view. All ten kinds are
+  under the Legend tab's "More options", with a switch to hide the line. A
+  DRAFT for the owner's review before beta.
+- **Supplier pricing no longer scrolls sideways on a phone.** Its price-age
+  filters sat in a strip wider than the screen, so "No price" — the one
+  that finds every unpriced material — was off the edge. They now wrap onto
+  a second row.
+- **A symbol guide in "Look up", with no AI.** Type "plug", "can", "gfi"
+  or "home run" in the Plans screen's Legend tab and it shows the common
+  way that thing is drawn, what it is, how it is usually bid (in words —
+  never hours or prices), what to look out for beside it, and whether your
+  own library already has something like it. "Count these" starts an
+  ordinary count named for it ("Duplex receptacles") — no assembly needed;
+  runs like a home run are traced instead, so they have no button. All 38
+  symbols are under "More options". A DRAFT list for the owner's review
+  before beta.
+- **On a phone, the bottom icon bar no longer covers the last thing on the
+  screen.** It used to float over the page, so the bid page's "Pricing
+  settings" card stayed half hidden even scrolled all the way down (and the
+  last row of the Dashboard, Settings and others the same). The page now
+  ends where the bar starts. Also fixed: on long Count and Proposal screens
+  the whole app could be dragged up off a phone's screen, and the
+  "Backups have stopped" notice pushed the Dashboard's bottom rows out of
+  reach at every size.
+
+## [2026-10-12]
+
+- **Look up a plan abbreviation, with no AI.** The Plans screen's Legend tab
+  has a "Look up a word or symbol" box: type WP, AFF, HR, gfi or "home run"
+  and it says what it usually means in plain words, every meaning when
+  there is more than one (HR is a home run on a floor plan and an hour on a
+  fire-rated wall), and what it changes on the bid — in words, never hours
+  or prices. Anything in this set's own captured legend shows first. The
+  full list (136 abbreviations) is under "More options", and Copy text now
+  names the abbreviations in the words it read. The list is a DRAFT for the
+  owner's review before beta.
+- **"Who does this?" on the bid.** When a bid has lines for work that is
+  often someone else's — light fixtures, appliances, data, fire alarm
+  devices, HVAC controls, EV chargers, permits, trenching and patching —
+  the "Who does what" card asks about them, closed until opened. Pick We
+  install, Owner furnishes, By others or Excluded for the ticked lines (with
+  Undo), or "Don't ask on this bid". It never asks about our own circuits
+  or receptacles, never appears on a locked bid, and changes nothing until
+  you pick.
+- **The starter editor's sign-in page and a first, read-only baseline
+  screen**, at `/starter` (outside the company app). Sign in with the
+  password, then the authenticator code or a recovery code. The screen
+  shows the shipped starter as a new company gets it — materials (with the
+  same search estimators use), assemblies with their parts, labor rates and
+  run types — under the band "STARTER: changes reach NEW companies;
+  existing ones get an offer". Nothing can be edited yet: that waits for
+  the change log, so no company's prices or bids can move.
 - **The engine behind changing the shipped starter library (not switched on
   yet).** When BidRidge changes a starter price, recipe or rate, every
   existing company first gets its own copy of the old one, so nothing on

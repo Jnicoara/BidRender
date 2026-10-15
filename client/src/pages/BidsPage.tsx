@@ -1329,6 +1329,7 @@ export default function BidsPage({
               lines={lines}
               locked={bid.quantitiesLockedAt !== null}
               hasPlans={planSets.length > 0}
+              promptsDismissedAt={bid.scopePromptsDismissedAt}
               filter={scopeFilter}
               onFilter={setScopeFilterPick}
               refresh={refresh}

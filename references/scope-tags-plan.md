@@ -327,6 +327,27 @@ Tests: `server/lineScopeProposal.test.ts` (5 red on a40eb6f4),
   answered line does not); seed re-stamp leaves a fork alone (the
   `seedPreservesUserPrices` shape).
 
+**6a DONE 2026-10-12 (Track B); 6b still waits for S2.**
+`shared/scopePrompts.ts` (`SHIPPED_SCOPE_PROMPTS`, `matchScopePrompts`,
+`showScopePrompts`): whole-word matching on the line's name (plural "s"
+ignored), the assembly's category matching on its own, and `notWords`
+taking a line back out. The category reaches the screen as
+`assemblyCategory` on each `bids.get` line (`db.getAssemblyCategories`,
+forks followed — it shares `resolveStoredAssemblies` with
+`getAssemblyMountKinds`). `ScopePrompts.tsx` in the "Who does what" card:
+closed, "Who does this? — N items"; each item lists its lines ticked, and a
+chip tags the ticked ones through `useSetLineScope` (same Undo, refusals,
+refresh). "Don't ask on this bid" → `bids.setScopePromptsDismissed` (S3),
+with Undo and a quiet "Ask again" line. **Two decisions made at build, said
+here:** (1) Appliances and EV charger units leave out lines named for OUR
+wiring (circuit, receptacle, connection, whip, disconnect, conduit, stub,
+outlet) — the plan names the UNIT, and "owner furnishes?" on "EV charger
+circuit, 48A" invites a tag that takes our own wire off the price.
+(2) Light fixtures uses the Lighting category but leaves out controls and
+fans filed there (contactor, time clock, photocell, sensor, switch, dimmer,
+transformer, fan). Tests: `server/scopePrompts.test.ts` (rules, plus every
+shipped starter run through it), `server/scopePromptsDismiss.test.ts`.
+
 ### Step 7 — note finder (plain text, under "More options")
 
 - `shared/scopePhrases.ts` (new): BY OTHERS · FURNISHED BY OTHERS · BY

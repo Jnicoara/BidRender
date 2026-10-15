@@ -1,0 +1,14 @@
+-- 0157 — A MATERIAL'S REAL PACK SIZE (2026-10-14; Track C's PS-M1, word for
+-- word from references/pricing-safety-plan.md § 6). Track A owns the number.
+--
+--   materials.packQty   how many `unitOfSale` units are in the pack (a 250 ft
+--                       roll, a box of 100). NULL = sold singly / not known,
+--                       read as 1. One column for price entry, price bands
+--                       (material-markup D3) and the purchase list (0098 § 12).
+--
+-- ── ADDITIVE. STEP 1. SAFE BEFORE THE CODE ─────────────────────────────────
+-- One nullable column with no default. No UPDATE, nothing reads it until C's
+-- pricing-safety steps ship, no number moves. Step 3 is EMPTY.
+--
+-- Hand-written, not generated (CLAUDE.md: never run generated output unread).
+ALTER TABLE `materials` ADD `packQty` decimal(10,4) NULL;

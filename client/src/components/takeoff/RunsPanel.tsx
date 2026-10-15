@@ -1628,6 +1628,7 @@ export function RunsPanel({
               type="button"
               role="tab"
               aria-selected={active}
+              data-plan-tip={`tab-${t}`}
               onClick={() => onTab(t)}
               title={
                 warned ? `${PANEL_TAB_LABELS[t]} — needs a look` : undefined

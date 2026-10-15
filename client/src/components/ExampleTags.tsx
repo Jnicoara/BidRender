@@ -28,11 +28,17 @@ const WHY: Record<ExampleKind, string> = {
 export function ExampleTags({
   line,
   only,
+  why = WHY,
   className,
 }: {
   line: LineExampleFlags;
   /** Show just these kinds — e.g. the hours cell shows hours and rate. */
   only?: readonly ExampleKind[];
+  /**
+   * What the tag means WHERE it is shown. The default speaks to a shop; the
+   * starter screen (no shop, no Materials screen) passes its own words.
+   */
+  why?: Readonly<Record<ExampleKind, string>>;
   className?: string;
 }) {
   const kinds = lineExampleKinds(line).filter(k => !only || only.includes(k));
@@ -43,7 +49,7 @@ export function ExampleTags({
         // Tap or hover — a `title` alone never reaches a tablet.
         <TapExplain
           key={kind}
-          explanation={WHY[kind]}
+          explanation={why[kind]}
           className="rounded border border-sky-500/40 px-1 text-[10px] leading-4 text-sky-400 whitespace-nowrap no-underline"
         >
           {EXAMPLE_LABEL[kind]}

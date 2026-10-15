@@ -154,6 +154,17 @@ The controls, in the order they save money:
    removed" on check-my-marks. Code only, measured clean (59 on E-200). Useful
    the day it ships, because a missed (E) is a wrong number.
 2. **Heights beside marks**, offered (needs the § 10.6 column to store).
+
+   > **2026-10-12:** steps 3 and 4 have a first user —
+   > `plan-reading-help-plan.md` § 6 (tap a keyed note to read it, no AI)
+   > builds them as its step 5, to this plan's spec and red test.
+   >
+   > **2026-10-13: steps 3 and 4 BUILT (track-b)** —
+   > `client/src/lib/keyedNotes.ts`. E-200: 55 tags, none above 18, WORK
+   > NOTES 1–18 joined. Not yet shown beside the marks that carry them
+   > (this plan's step 4 wording); the help plan shows them as a list and
+   > as rings. Details: `plan-reading-help-plan.md` § 7 step 5.
+
 3. **Keynote tags** (closed-square test) → the note number on each mark.
 4. **Notes parser** (line joining) → the numbered notes as text, shown
    beside the marks that carry their number. Still no AI.

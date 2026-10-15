@@ -74,6 +74,7 @@ import { runSheetCheck } from "@/lib/sheetCheck";
 import { layerIdsFrom } from "@/lib/cadLayers";
 import { quarterArcRadii } from "@/lib/scaleCheck";
 import { readSchedules, type PanelSchedule } from "@/lib/panelSchedules";
+import { readKeyedNotes } from "@/lib/keyedNotes";
 import { readCircuitTags, readHomeruns } from "@/lib/homeruns";
 import { detectScaleFromText } from "@shared/planScale";
 import {
@@ -976,6 +977,40 @@ self.onmessage = async (e: MessageEvent) => {
         reqId,
         schedules: readSchedules(matchPage.words),
         scan: isScan(matchPage.geo),
+      });
+    } catch (err) {
+      self.postMessage({ type: "error", reqId, message: String(err) });
+    }
+    return;
+  }
+
+  if (msg.type === "keyedNotes") {
+    // The sheet's numbered notes and the boxed numbers that point at them
+    // (@/lib/keyedNotes). Read-only, no AI; measured at 80 ms on the densest
+    // sheet on hand, beside the page read it shares with schedules.
+    const { pageNum, hash, reqId } = msg as {
+      pageNum: number;
+      hash: string;
+      reqId: string;
+    };
+    if (!pdfDoc || loadedHash !== hash) {
+      self.postMessage({
+        type: "error",
+        reqId,
+        message: "PDF not loaded for this hash",
+      });
+      return;
+    }
+    try {
+      const matchPage = await readMatchPage(pdfDoc, hash, pageNum);
+      const scan = isScan(matchPage.geo);
+      self.postMessage({
+        type: "keyedNotes",
+        reqId,
+        read: scan
+          ? { lists: [], tags: [] }
+          : readKeyedNotes(matchPage.words, matchPage.geo),
+        scan,
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

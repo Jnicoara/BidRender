@@ -32,11 +32,21 @@ type Picked = { kind: "panel"; i: number } | { kind: "fixture"; i: number };
 export function SchedulesView({
   schedules,
   sheetName,
+  open: openFromPage,
+  onOpenChange,
 }: {
   schedules: SheetSchedules | null;
   sheetName: string;
+  /**
+   * Held by the page when given, so the "What is this sheet?" card can open
+   * this same view (plan-reading-help-plan.md § 4) rather than repeat it.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openHere, setOpenHere] = useState(false);
+  const open = openFromPage ?? openHere;
+  const setOpen = onOpenChange ?? setOpenHere;
   const [picked, setPicked] = useState<Picked>({ kind: "panel", i: 0 });
   if (!schedules) return null;
   const { panels, fixtures } = schedules;

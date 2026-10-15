@@ -107,8 +107,11 @@ import {
   hoursPer,
   materialKind,
   packFor,
+  packNote,
+  packSource,
   usedBy,
 } from "./starterSheetLayout";
+import { PACK_NOT_CHECKED } from "../server/seed/materials/starterPacks";
 
 const require = createRequire(import.meta.url);
 const ExcelJS = require("exceljs") as any;
@@ -473,7 +476,7 @@ if (want("prices")) {
     };
     row.getCell(col(C, "Price per unit")).numFmt = "$#,##0.0000";
     row.getCell(col(C, "Pack price")).numFmt = "$#,##0.00";
-    row.getCell(col(C, "Notes")).value = m.description ?? "";
+    row.getCell(col(C, "Notes")).value = packNote(m) ?? m.description ?? "";
     applyCarried(row, C, carriedFor("prices", m.name));
     for (const k of ["Pack price", "Pack size", "Pack qty"])
       row.getCell(col(C, k)).fill = YELLOW;
@@ -541,6 +544,13 @@ if (want("prices")) {
       "import this through Materials › Import prices — that prices YOUR company only, and every other shop gets nothing.",
     ],
   ]);
+  // Where every row's pack came from (owner, 2026-10-14: never from words).
+  const bySource = new Map<string, number>();
+  for (const m of priceRows)
+    bySource.set(packSource(m), (bySource.get(packSource(m)) ?? 0) + 1);
+  console.log(
+    `packs: ${Array.from(bySource, ([k, n]) => `${n} ${k}`).join(", ")}; ${priceRows.filter(m => PACK_NOT_CHECKED[m.name]).length} marked PACK NOT CHECKED`
+  );
   const out = path.join(HERE, PRICES_FILE);
   await stage("prices", wb, out);
   console.log(

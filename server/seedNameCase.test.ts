@@ -128,8 +128,9 @@ describe.skipIf(!hasDb)(
     it("keep both rows, the recipe line and the shipped row's state across restarts", async () => {
       const db = (await getDb())!;
 
-      // A database seeded before the retirement: the old spelling is a live
-      // shipped row, with a recipe pointing at it.
+      // A database whose old spelling was retired before 2026-10-13, when a
+      // start still retired rows itself (now a retire is HELD for a hide —
+      // references/boot-seed-plan.md): a shipped row, switched off.
       const [old] = await db.insert(materials).values({
         name: RETIRED_NAME,
         unitOfSale: "foot",
@@ -137,11 +138,12 @@ describe.skipIf(!hasDb)(
         category: "Wire & Cable",
         searchAliases: "",
         userId: null,
+        isActive: false,
       });
       expect(old.insertId).toBeGreaterThan(0);
 
       // First start on the new catalog: the new spelling is inserted (a
-      // higher id) and the old one retired.
+      // higher id) beside the old one, which stays off.
       await seed();
       const first = await fixtureRows();
       expect(first.shipped, "one shipped row").toHaveLength(1);

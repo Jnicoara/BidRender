@@ -35,6 +35,7 @@ import { appRouter } from "./routers";
 import { getDb, seedBaselineMaterials } from "./db";
 import { materials, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
+import { applySeedFindingFields, seedProposal } from "./seedProposal";
 
 /*
   This file had a 60 s limit from 2026-09-28 (a seed measured at 5.4 s). That
@@ -153,16 +154,22 @@ describe.skipIf(!hasDb)("a restart never touches a user's own price", () => {
     expect(Number(after.costPerUnit)).toBeCloseTo(41.25, 4);
   });
 
-  it("re-stamps the shipped row itself, which is the half that must keep working", async () => {
+  it("a start PROPOSES a shipped row's price and puts back only its finding fields, logged", async () => {
     /*
-      The mirror of the two above, and the reason the filter cannot simply be
-      "never write anything". Baseline rows ARE the seed file's to own: that is
-      what lets a corrected shelf, a new alias — and, once the pricing sheet
-      lands, an example price — reach every live database without a migration.
+      Until 2026-10-13 this asserted the opposite: "re-stamps the shipped row
+      itself, which is the half that must keep working". Baseline rows were
+      the seed file's to own, and a start wrote the seed's price back over
+      them — which also wrote it back over any change logged through
+      applyStarterChange, for every company without its own copy
+      (baseline-screen-plan.md F2). Now (references/boot-seed-plan.md):
 
-      So this asserts the pass is alive. If someone made the seeder timid to
-      protect user prices, these would go red rather than the protection
-      silently costing the catalog its updates.
+      - the PRICE differs from the seed → the start leaves it and the seed
+        proposal lists it, for a person to confirm;
+      - the ALIASES are a finding field → the start's logged `seed` batch
+        puts them back (owner Q3).
+
+      The "is the pass alive?" worry this test was written for still holds,
+      for the finding fields — so they are asserted to come back.
     */
     const db = await getDb();
     const [shipped] = await db!
@@ -175,17 +182,38 @@ describe.skipIf(!hasDb)("a restart never touches a user's own price", () => {
       .set({ costPerUnit: "999.0000", searchAliases: "wrong" })
       .where(eq(materials.id, shipped.id));
 
-    await seedBaselineMaterials();
+    try {
+      await seedBaselineMaterials();
+      await applySeedFindingFields(await seedProposal());
 
-    const [restored] = await db!
-      .select()
-      .from(materials)
-      .where(eq(materials.id, shipped.id));
-    expect(Number(restored.costPerUnit)).toBeCloseTo(
-      Number(shipped.costPerUnit),
-      4
-    );
-    expect(restored.searchAliases).toBe(shipped.searchAliases);
+      const [after] = await db!
+        .select()
+        .from(materials)
+        .where(eq(materials.id, shipped.id));
+      expect(Number(after.costPerUnit), "a start wrote the price").toBe(999);
+      expect(after.searchAliases).toBe(shipped.searchAliases);
+
+      const proposal = await seedProposal();
+      const named = [
+        ...proposal.changes.filter(
+          c =>
+            c.rowId === shipped.id && "field" in c && c.field === "costPerUnit"
+        ),
+        ...proposal.held.filter(h =>
+          h.row.startsWith(`material #${shipped.id} `)
+        ),
+      ];
+      expect(named, "the proposal does not name the price").toHaveLength(1);
+    } finally {
+      // No start puts it back any more, so the test does.
+      await db!
+        .update(materials)
+        .set({
+          costPerUnit: shipped.costPerUnit,
+          searchAliases: shipped.searchAliases,
+        })
+        .where(eq(materials.id, shipped.id));
+    }
   });
 });
 

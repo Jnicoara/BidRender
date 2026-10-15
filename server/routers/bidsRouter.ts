@@ -933,6 +933,13 @@ export const bidsRouter = router({
       */
       const fittingNotes = new Map<string, string>();
       const extraNotes = new Map<number, string>();
+      // What each line's assembly is filed under — the "Who does this?"
+      // prompts read it (shared/scopePrompts.ts). Returned with the lines
+      // so nothing extra needs refreshing.
+      const categories = await db.getAssemblyCategories(
+        lines.map(l => l.assemblyId),
+        ctx.scope.dataUserId
+      );
       const hasExtra = lines.some(l => l.runMaterialRole === "extra");
       const footage =
         hasExtra || lines.some(l => isFittingRole(l.runMaterialRole))
@@ -1019,6 +1026,11 @@ export const bidsRouter = router({
           ...line,
           breakdown,
           problem: reported.find(p => p.lineId === line.id) ?? null,
+          /** The line's assembly's category; null on a line from no assembly. */
+          assemblyCategory:
+            line.assemblyId === null
+              ? null
+              : (categories.get(line.assemblyId) ?? null),
           /** How a fitting line's quantity was counted; null on every other line. */
           fittingNote: isFittingRole(line.runMaterialRole)
             ? (fittingNotes.get(
@@ -1300,6 +1312,29 @@ export const bidsRouter = router({
       }));
       await db.setBidLineScopes(input.bidId, changes);
       return { previous, changes };
+    }),
+
+  /**
+   * "Don't ask on this bid" for the Who does this? prompts (S3, 0147;
+   * scope-tags-plan.md step 6a, owner Q10: per bid). Both ways — "Ask
+   * again" clears it, because a dismissal nobody can undo is not a choice.
+   * Prices nothing, so it is allowed on a locked bid like any other view
+   * preference; a locked bid shows no prompt anyway.
+   */
+  setScopePromptsDismissed: procedure
+    .input(
+      z.object({
+        bidId: z.number().int().positive(),
+        dismissed: z.boolean(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const at = input.dismissed ? new Date() : null;
+      await db.updateBid(input.bidId, ctx.scope.dataUserId, {
+        scopePromptsDismissedAt: at,
+      });
+      return { scopePromptsDismissedAt: at };
     }),
 
   /** Add an assembly to the bid, freezing its costs as they are right now. */

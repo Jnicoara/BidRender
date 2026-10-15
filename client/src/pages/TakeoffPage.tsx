@@ -498,6 +498,7 @@ import {
 } from "@/lib/legSnap";
 import type { TraceMode } from "@shared/traceMode";
 import { LegendPanel } from "@/components/takeoff/LegendPanel";
+import { LegendMoreOptions, PlanLookUp } from "@/components/takeoff/PlanLookUp";
 import { CoPilotPanel } from "@/components/takeoff/CoPilotPanel";
 import { snapshotPage } from "@/lib/planSnapshot";
 import {
@@ -550,6 +551,17 @@ import { describeScale, type ScaleCandidate } from "@shared/planScale";
 import { checkScale, type ScaleDoubt } from "@/lib/scaleCheck";
 import type { SheetSchedules } from "@/lib/panelSchedules";
 import { SchedulesView } from "@/components/takeoff/SchedulesView";
+import { SheetKindLine } from "@/components/takeoff/SheetKindLine";
+import {
+  useNoteTagOutlines,
+  usePlanTipsSeen,
+  useSheetKindLine,
+} from "@/lib/planHelpPrefs";
+import type { SheetNotesRead } from "@/lib/keyedNotes";
+import { NoteTagLayer } from "@/components/takeoff/SheetNotes";
+import { PlanTips } from "@/components/takeoff/PlanTips";
+import { markTipSeen, nextTip, turnTipsOff } from "@/lib/planTips";
+import { sheetKinds } from "@shared/planHelp/sheetKind";
 import {
   HomerunLayer,
   HomerunsToggle,
@@ -673,6 +685,14 @@ function usePdfWorker() {
       if (msg.type === "schedules") {
         pending.current.get(msg.reqId)?.resolve({
           schedules: msg.schedules,
+          scan: msg.scan,
+        });
+        pending.current.delete(msg.reqId);
+        return;
+      }
+      if (msg.type === "keyedNotes") {
+        pending.current.get(msg.reqId)?.resolve({
+          ...msg.read,
           scan: msg.scan,
         });
         pending.current.delete(msg.reqId);
@@ -882,6 +902,8 @@ function usePdfWorker() {
         }),
       homeruns: (pageNum: number, hash: string) =>
         ask<SheetHomeruns>({ type: "homeruns", pageNum, hash }),
+      keyedNotes: (pageNum: number, hash: string) =>
+        ask<SheetNotesRead>({ type: "keyedNotes", pageNum, hash }),
       circuits: (pageNum: number, hash: string) =>
         ask<SheetCircuitText>({ type: "circuits", pageNum, hash }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
@@ -1009,6 +1031,7 @@ function PlanPane({
   onScaleDoubt,
   onSchedules,
   onHomeruns,
+  onKeyedNotes,
   onCircuitText,
   controlsTarget,
   fitOnly = false,
@@ -1086,6 +1109,11 @@ function PlanPane({
    * with the set's panel schedules to tie them to. Code only, writes nothing.
    */
   onHomeruns?: (pageNumber: number, read: SheetHomeruns) => void;
+  /**
+   * The sheet's numbered notes and the boxed numbers on the drawing that
+   * point at them (@/lib/keyedNotes). Code only, no AI, writes nothing.
+   */
+  onKeyedNotes?: (pageNumber: number, read: SheetNotesRead) => void;
   /**
    * The page's words and the set's schedules, for grouping its marks by
    * circuit tag (@/lib/circuitGroups). Code only, writes nothing.
@@ -1263,6 +1291,7 @@ function PlanPane({
     scaleEvidence: scaleEvidenceOnPage,
     schedules: schedulesOnPage,
     homeruns: homerunsOnPage,
+    keyedNotes: keyedNotesOnPage,
     circuits: circuitsOnPage,
     sheetCheck: sheetCheckOnPage,
   } = usePdfWorker();
@@ -2514,6 +2543,28 @@ function PlanPane({
     };
   }, [page, pageCount, loading, error, hash, homerunsOnPage]);
 
+  /*
+    KEYED NOTES ON THIS SHEET, the same way: read once per page in the
+    worker from the cached page read. Measured before running it on open
+    (plan-reading-help-plan.md § 6): 4 ms on Weld 1 E-200, 80 ms on the
+    densest sheet on hand (weld2 p10, 61,746 words). Plain code, no AI.
+  */
+  const onKeyedNotesRef = useRef(onKeyedNotes);
+  onKeyedNotesRef.current = onKeyedNotes;
+  useEffect(() => {
+    if (loading || error || pageCount === 0) return;
+    let cancelled = false;
+    keyedNotesOnPage(page, hash)
+      .then(read => {
+        if (!cancelled) onKeyedNotesRef.current?.(page, read);
+      })
+      // A failed read shows no notes, which is what it found.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageCount, loading, error, hash, keyedNotesOnPage]);
+
   // CIRCUIT TAGS ON THIS SHEET, the same way — the grouping itself happens
   // in the page, where the marks are.
   const onCircuitTextRef = useRef(onCircuitText);
@@ -2687,7 +2738,11 @@ function PlanPane({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0">
+    // `data-plan-tip`: the drawing whose middle a tip must never cover.
+    <div
+      className="flex-1 flex flex-col min-h-0 min-w-0"
+      data-plan-tip="drawing"
+    >
       {controlsTarget ? (
         createPortal(zoomControls, controlsTarget)
       ) : (
@@ -3763,6 +3818,10 @@ export default function TakeoffPage({
   const activeSchedules = doc
     ? (schedulesByPage[`${doc.id}:${page}`] ?? null)
     : null;
+  /** Held here so the sheet-kind card can open the same Schedules view. */
+  const [schedulesOpen, setSchedulesOpen] = useState(false);
+  /** The sheet-kind line's switch, from the Legend tab's More options. */
+  const [sheetKindLine] = useSheetKindLine();
   const docIdForScale = doc?.id ?? null;
   const handleSchedules = useCallback(
     (pageNumber: number, read: { schedules: SheetSchedules }) => {
@@ -3770,6 +3829,23 @@ export default function TakeoffPage({
       setSchedulesByPage(prev => ({
         ...prev,
         [`${docIdForScale}:${pageNumber}`]: read.schedules,
+      }));
+    },
+    [docIdForScale]
+  );
+  /** Numbered notes and their tags, read off each page, keyed the same. */
+  const [notesByPage, setNotesByPage] = useState<
+    Record<string, SheetNotesRead>
+  >({});
+  const activeNotes = doc ? (notesByPage[`${doc.id}:${page}`] ?? null) : null;
+  /** The rings on note tags — More options, off unless turned on. */
+  const [noteOutlines] = useNoteTagOutlines();
+  const handleKeyedNotes = useCallback(
+    (pageNumber: number, read: SheetNotesRead) => {
+      if (docIdForScale === null) return;
+      setNotesByPage(prev => ({
+        ...prev,
+        [`${docIdForScale}:${pageNumber}`]: read,
       }));
     },
     [docIdForScale]
@@ -6295,6 +6371,55 @@ export default function TakeoffPage({
     [bidSummary.data, totals, bidCounts.data]
   );
 
+  /*
+    FIRST-OPEN TIPS (plan-reading-help-plan.md § 5, @/lib/planTips). Only
+    once this sheet is drawn, and never while a tool is in hand: a tip over
+    what the person is about to tap has cost them a tap. The ×  ends tips for
+    this visit; the rest come the next time the screen opens. So does any
+    press outside the card (PlanTips' `onAway`), without marking it seen —
+    a tip must never stand between the person and a control.
+  */
+  const [tipsSeen, setTipsSeen] = usePlanTipsSeen();
+  const [tipsClosedThisVisit, setTipsClosedThisVisit] = useState(false);
+  const notesSheetLabel = useMemo(() => {
+    const notes = sheets.find(s =>
+      sheetKinds(sheetDisplay(s, identities.get(s.pageNumber)).title).includes(
+        "notes"
+      )
+    );
+    if (!notes) return null;
+    const shown = sheetDisplay(notes, identities.get(notes.pageNumber));
+    return shown.number ?? shown.title;
+  }, [sheets, identities]);
+  const toolInHand =
+    Boolean(armedGroup) ||
+    tracing ||
+    calibrating ||
+    capturingSymbol ||
+    capturingLegend ||
+    selectingText ||
+    drawingArea ||
+    touchSelect ||
+    placingPanel !== null;
+  const tipSheet = {
+    hasNotesSheet: notesSheetLabel !== null,
+    sheetKindShown:
+      sheetKindLine &&
+      activeSheet !== null &&
+      sheetKinds(sheetDisplay(activeSheet, identities.get(page)).title).length >
+        0,
+    // Taps on the drawing are step 5 of the plan, not built yet.
+    tappable: false,
+  };
+  const tip =
+    doc &&
+    renderedPage === page &&
+    !toolInHand &&
+    !tipsClosedThisVisit &&
+    !(phone && phonePanelOpen)
+      ? nextTip(tipsSeen, tipSheet)
+      : null;
+
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
     { enabled: Boolean(activeSheet) && readerAvailable }
@@ -6744,6 +6869,32 @@ export default function TakeoffPage({
         });
     },
     [bidId, quantitiesLocked, armGroup, flushStamps, mirrorQueue, setPending]
+  );
+
+  /**
+   * "Count these" on a symbol in the Look up guide (plan-reading-help-plan.md
+   * § 3, Q11): an ordinary plain count under the symbol's name — the same
+   * path as an unlinked legend row, reused if the bid already has one.
+   * Undefined on a locked bid, so the button is not drawn at all.
+   */
+  const countThese = useMemo(
+    () =>
+      quantitiesLocked
+        ? undefined
+        : (label: string) =>
+            armWhileCreating(
+              label,
+              null,
+              null,
+              () =>
+                createGroup.mutateAsync({
+                  bidId,
+                  label,
+                  reuseExisting: true,
+                }),
+              () => void utils.takeoffGroups.list.invalidate({ bidId })
+            ),
+    [quantitiesLocked, armWhileCreating, createGroup, bidId, utils]
   );
 
   /**
@@ -9908,6 +10059,30 @@ export default function TakeoffPage({
             </DropdownMenu>
           )}
 
+          {/*
+            "What is this sheet?" (plan-reading-help-plan.md § 4) — from the
+            title the chip shows, so a corrected title flows through. Nothing
+            at all on a sheet whose title says nothing it recognises, or when
+            the Legend tab's More options turned it off.
+          */}
+          {activeSheet && sheetKindLine && (
+            <SheetKindLine
+              title={sheetDisplay(activeSheet, identities.get(page)).title}
+              phone={phone}
+              compact={compact}
+              tablet={tablet}
+              demoSet={activeWorkTag === "demo" || activeWorkTag === "both"}
+              onOpenSchedules={
+                !phone &&
+                activeSchedules &&
+                (activeSchedules.panels.length > 0 ||
+                  activeSchedules.fixtures.length > 0)
+                  ? () => setSchedulesOpen(true)
+                  : undefined
+              }
+            />
+          )}
+
           <div className="w-px h-4 bg-border" />
 
           {/*
@@ -10472,7 +10647,15 @@ export default function TakeoffPage({
             </>
           )}
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* Last on a tablet, so the sheet-kind line (order-last there too,
+              and earlier in the markup) lands just before it — see
+              SheetKindLine's `tablet` prop. */}
+          <div
+            className={cn(
+              "ml-auto flex flex-wrap items-center gap-2",
+              tablet && "order-last"
+            )}
+          >
             {/*
               ── CALIBRATE — beside the thing it changes, not among the tools ─
 
@@ -10596,6 +10779,8 @@ export default function TakeoffPage({
               <SchedulesView
                 schedules={activeSchedules}
                 sheetName={activeSheet.name}
+                open={schedulesOpen}
+                onOpenChange={setSchedulesOpen}
               />
             )}
 
@@ -11176,6 +11361,7 @@ export default function TakeoffPage({
               onScaleDoubt={handleScaleDoubt}
               onSchedules={handleSchedules}
               onHomeruns={handleHomeruns}
+              onKeyedNotes={handleKeyedNotes}
               onCircuitText={handleCircuitText}
               onPageRendered={handlePageRendered}
               /**
@@ -11865,6 +12051,16 @@ export default function TakeoffPage({
                         }}
                       />
                     )}
+                    {noteOutlines &&
+                      activeNotes &&
+                      activeNotes.tags.length > 0 && (
+                        <NoteTagLayer
+                          width={size.width}
+                          height={size.height}
+                          renderScale={size.renderScale}
+                          read={activeNotes}
+                        />
+                      )}
                     {showHomeruns &&
                       activeHomeruns &&
                       activeHomeruns.homeruns.length > 0 && (
@@ -12381,6 +12577,13 @@ export default function TakeoffPage({
                 }
                 legend={
                   <>
+                    {/* Look up at the top, More options at the bottom
+                        (plan-reading-help-plan.md § 1). */}
+                    <PlanLookUp
+                      symbols={symbols}
+                      assemblies={allAssemblies}
+                      onCountThese={countThese}
+                    />
                     <LegendPanel
                       symbols={symbols}
                       buildBidId={bidId}
@@ -12515,6 +12718,16 @@ export default function TakeoffPage({
                         );
                       }}
                     />
+                    <LegendMoreOptions
+                      assemblies={allAssemblies}
+                      onCountThese={countThese}
+                      notes={activeNotes}
+                      onShowNote={at => {
+                        // The phone's panel covers the drawing it moves.
+                        if (phone) setPhonePanelOpen(false);
+                        jumpTo(at);
+                      }}
+                    />
                   </>
                 }
                 totals={totals}
@@ -12578,6 +12791,8 @@ export default function TakeoffPage({
         <button
           type="button"
           onClick={() => setPhonePanelOpen(true)}
+          // On a phone every tip sits just above this bar (PlanTips).
+          data-plan-tip="phone-bar"
           className="flex h-12 shrink-0 items-center gap-2 border-t border-border bg-card px-3 text-left"
           aria-label="Open the panel: counts, runs, sheets and totals"
         >
@@ -12594,6 +12809,23 @@ export default function TakeoffPage({
           )}
           <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
         </button>
+      )}
+
+      {tip && (
+        <PlanTips
+          tip={tip}
+          phone={phone}
+          touch={phone || coarse}
+          notesSheetLabel={notesSheetLabel}
+          last={nextTip(markTipSeen(tipsSeen, tip), tipSheet) === null}
+          onNext={() => setTipsSeen(markTipSeen(tipsSeen, tip))}
+          onClose={() => {
+            setTipsSeen(markTipSeen(tipsSeen, tip));
+            setTipsClosedThisVisit(true);
+          }}
+          onAway={() => setTipsClosedThisVisit(true)}
+          onOff={() => setTipsSeen(turnTipsOff(tipsSeen))}
+        />
       )}
 
       {dragging && docs.length > 0 && (

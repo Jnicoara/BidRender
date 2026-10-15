@@ -1,5 +1,330 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)
+
+- **local-dev went to f4f61ed6 (the merge below) and its smoke went RED**
+  (run 38595716662: 83 passed, 2 failed, 2 skipped, 11 not run). Desktop
+  flow 3 timed out clicking **Capture**; tablet-landscape touch timed out
+  tapping **"CI TOUCH"**. Cause, from the failure screenshots: B's own
+  "Don't know a word?" tip. `placeTip` only kept the drawing's middle clear,
+  so the card sat in the side panel on top of Capture and the legend rows.
+- **App fix (fbc89ffb):** `placeTip` keeps the card inside the drawing's box,
+  never over toolbars or the panel. Any press outside the card puts tips
+  away for the visit without marking that one seen (`PlanTips` `onAway`),
+  because a tool's own popover ("Name this symbol") also opens over the
+  drawing. Tip buttons are 44 px on any touch screen (`touch = phone ||
+  coarse`). Recorded in `plan-reading-help-plan.md` § 5.
+- **Test fix (the test was wrong):** flow 3 found the name box as "the last
+  visible input". That became the Legend Look up box on 2026-10-13, so the
+  name went into search and Save stayed disabled. It now finds the box by
+  label ("Symbol name", "New name for CI DUPLEX"). Nothing else in
+  `e2e/smoke` uses a positional input locator.
+- **Proof, local dev server on 127.0.0.1:3002:** both steps failed before
+  the fix (same timeouts as CI) and passed after. Full local smoke: 95
+  passed / 3 skipped; the third skip is `version.spec`, which skips under
+  `pnpm dev` (no build stamp). Looked at laptop 1536×864, iPad 820×1180 and
+  1180×820, phone 375×667 (throwaway probe, deleted). `planTips.test` 17
+  passed on `bidrender_test_b`. `pnpm check` clean.
+- **Local MySQL 3307 was down after the shutdown.** Start it with
+  `C:\Users\15krp\BidRenderLocal\start-mysql.cmd`; stop it with
+  `stop-mysql.cmd`. It was stopped again at the end, along with the dev
+  server.
+- **Next:** once local-dev moves, check that its smoke is back to 96 passed
+  / 2 skips. Then step 5c (tap a tag → popover with the note).
+- **Gate GREEN on fbc89ffb** (run 38612509276: test 7120 passed / 6
+  skipped + drizzle-guard; smoke runs only on local-dev).
+- **Owner pushes local-dev:** `git push origin <this handoff commit>:refs/heads/local-dev`
+  (a descendant of fbc89ffb; handoff text only).
+
+## WHERE B STOOD — 2026-10-13 (merge), LOCAL-DEV b11abf2e MERGED INTO TRACK-B
+
+- **Merged `origin/local-dev` (C's b11abf2e — F13 frozen warnings,
+  `applyStarterChange`, the Q19 homerun/panel offers; A's 0152–0156) into
+  `track-b` as 91dcf7f5.** Conflicts were only `CHANGELOG.md` and this
+  file, text, both sides kept (A's "B may merge" note is below, under the
+  step 5a/5b section).
+- **`TakeoffPage.tsx` merged with no conflict.** C's changes there are the
+  "Add N new homerun circuits" / "Assign N panels from labels" toolbar
+  offers (hidden on a locked bid) and `create: false` / `by:` on the
+  homerun calls; C's F13 locked-bid warnings live in `BidsPage.tsx`. B's
+  Look up, More options (notes list, tag outlines), tips, sheet-kind line
+  and `NoteTagLayer` are all still in place. No B call to `placePanel` or
+  `syncHomeruns` was added, so C's now-required fields are not missed.
+  `pnpm check` clean.
+- **Migrated** `bidrender_test_b` and `bidrender_local_b_new`: 5 applied
+  (0152–0156), **157 migrations, 196/196 FKs** — what A said to expect.
+- **Tests (only the merged-in files + sourceHygiene, laptop low on
+  memory):** 13 files, 121 passed on `bidrender_test_b`. No full local run.
+- **Gate GREEN on 91dcf7f5** (run 38522761229: test 431/431 files +
+  drizzle-guard; deploy-staging and smoke skipped on track-b as usual —
+  smoke runs once local-dev moves, expect 96 passed / 2 planned skips).
+  Then the owner fast-forwards `local-dev`:
+  `git push origin 91dcf7f5:refs/heads/local-dev` (or this handoff
+  commit's sha — it is a descendant).
+- **Dev servers stopped** (none running).
+- **Next:** step 5c — tap a tag (no tool in hand) → popover with the note.
+
+## WHERE B STANDS — 2026-10-13 (latest), PLAN-READING HELP STEP 5a/5b (NOTE TAGS + NOTES LIST) BUILT
+
+On `track-b` only. **NOT merged to local-dev** — order agreed: A applies
+BS-M3..M6 + F13-M1 (done on local-dev as e689b918, 0152–0156), then C
+finishes F13 and merges, THEN B merges. **No migration, none needed.**
+
+- **What it is** (`plan-reading-help-plan.md` § 7 step 5, DONE with
+  details): `client/src/lib/keyedNotes.ts` reads a sheet's numbered note
+  lists (lines joined) and the boxed numbers on the drawing that point at
+  them (closed-square test), in the PDF worker on every sheet open, $0,
+  nothing saved. Seen only under the Legend tab's **More options**:
+  "Notes on this sheet" (tap a note → the drawing goes there; phone panel
+  closes first) and **"Outline note tags on the drawing" — OFF by
+  default** (this browser). Main screen unchanged.
+- **Measured:** 4 ms on E-200, 80 ms worst on the densest sheet on hand
+  (weld2 p10, 61,746 words) — fine to run on open. E-200: 18 notes, 55
+  tags, none above 18 (the red test); UNCC p3: 9 notes, 36 tags; sets with
+  boxed numbers but no list: 0 tags.
+- **Tests:** `client/src/lib/keyedNotes.test.ts` (18, real-page fixtures
+  from `scripts/keyedNotesFixture.mts`; every guard shown red),
+  `planHelpPrefs.test.ts` (+2). Touched tests (with planTips and
+  sourceHygiene): 4 files, 45 passed.
+- **Looked at** laptop, iPad portrait + landscape, phone 375/390/425 on
+  "Sheet numbers check" E-200 (set 648560, page 5): no sideways scroll at
+  any size; rings on the boxed numbers, not the boxed room numbers; note 7
+  jump works on each. Nothing written to the fixture bid.
+- **Gate green on ff1b7b98** (run 38469894328: test + drizzle-guard).
+- **Dev servers stopped** (none left with `BidPhase-B` in the command line).
+- **Next:** 5c — tap a tag (no tool in hand) → popover with the note; tip
+  3 switches on then.
+
+### Waiting on track-b to merge into local-dev (11 commits + this one)
+
+9ac82766 starter editor sign-in + read-only `/starter`; a24efc5a scope
+step 6a "Who does this?"; c52b5fd4 / 3f3c13ad plan-reading help plan +
+owner's picks; 7d232952 step 1 Look up; 80c648d0 phone bottom bar fix;
+ae7d3d28 step 2 symbol guide; b4a4a7ec step 3 sheet-kind line + pricing
+chips wrap; e330f675 step 4 tips; this commit step 5a/5b; plus the
+handoff-only commits between them. None carries a migration.
+
+### Conflicts expected with local-dev
+
+Trial merge (`git merge-tree`, 2026-10-13, local-dev at e689b918): **only
+`CHANGELOG.md` and `references/track-b-handoff.md`**, both text — keep
+both sides (local-dev's entries and B's). All code, including
+`MaterialDatabasePage.tsx` (both sides touched it), merges cleanly.
+**C's F13 merge is not in yet**: re-run
+`git merge-tree --write-tree --name-only HEAD origin/local-dev` after it
+lands; the likeliest new overlaps are `TakeoffPage.tsx` and `CHANGELOG.md`.
+B's work there is additive (new props, new state, one overlay).
+
+## WHERE B STOOD — 2026-10-13, PLAN-READING HELP STEP 4 (TIPS) BUILT; LINE DEFAULT BY SCREEN
+
+On `track-b` only. **NOT merged to local-dev** — A applies BS-M3..M6 +
+F13-M1 first. No migration, none needed.
+
+- **Sheet-kind line default (owner's answer):** OFF on phones (any width,
+  either way round) and iPad landscape; ON on laptop and iPad portrait;
+  the More options switch turns it on (or off) anywhere. Only a change
+  from the screen's default is stored. Proved at each size (playwright,
+  "Sheet numbers check" E-200, nothing stored): line shown = laptop yes,
+  iPad portrait yes, iPad landscape no, phone 375/390/425 no; forced on
+  and off works at every size. Cost of the line (drawing top, off → on):
+  phone 425 269 → 319 (a row), the rest unchanged on this sheet.
+  `client/src/lib/planHelpPrefs.test.ts` (6; guard shown red).
+- **Step 4, tips** (`plan-reading-help-plan.md` § 7 step 4, DONE with
+  details): notes sheet → sheet-kind line → (taps, skipped until step 5) →
+  Look up. Skipped ≠ seen. Never while a tool is in hand; × = rest next
+  visit; No more tips sticks; More options has Show tips again / Turn tips
+  off. **One honest exception:** on a phone the card sits just above the
+  bar and, at 375 x 667, covers the drawing's middle — the drawing is 300
+  px tall and the card 182, so no spot avoids it. Laptop/tablet: never over
+  the middle (measured). `client/src/lib/planTips.test.ts` (15; guard shown
+  red). Touched tests on `bidrender_test_b`: 21 files, 269 passed.
+- **`bidrender_test_b` rebuilt** (drop, create utf8mb4_unicode_ci, 152
+  migrations, `scripts/seedBaseline.mts` — the Gate's own recipe):
+  `starterAssembliesSeed.test.ts` passes, twice in a row.
+- **Gate green on e330f675** (run 38465706051: test + drizzle-guard).
+- **Dev servers stopped.**
+- **Next:** step 5a/5b — closed-square tags + notes parser (the legend
+  plan's steps 3–4), timed on the largest sheet before running on open.
+
+## WHERE B STOOD — 2026-10-13, PLAN-READING HELP STEP 3 BUILT; PRICING CHIPS WRAP
+
+On `track-b` only. **NOT merged to local-dev** — live release in progress,
+and A applies BS-M3..M6 + F13-M1 before B merges. No migration.
+
+- **Step 3, "What is this sheet?"** (`plan-reading-help-plan.md` § 7 step
+  3, DONE with details and deviations): the line after the sheet's "…"
+  menu ("Lighting plan · count fixtures and switches"), card = popover
+  (laptop/tablet) or a bottom sheet (phone); several kinds → lead + "Also
+  on this sheet"; schedule cards open the existing Schedules view; nothing
+  stored. More options: "All sheet kinds" + switch "Say what each sheet is,
+  beside its name" (ON, this browser). Card words are a DRAFT for the owner
+  with the lists (Q5). Proof: `server/planHelpSheetKind.test.ts` (43,
+  titles from the DB; guards shown red), `client/src/lib/planHelpPrefs.test.ts`.
+  Looked at laptop, iPad both ways, phone 375/390/425 on "Sheet numbers
+  check" (Old Blueridge stores no titles — the fixture bid shows no line):
+  no sideways scroll anywhere; switch hides/shows live.
+- **Owner question:** the line costs one toolbar row (50 px) on iPad
+  landscape and phone 425 — those bars were already full. iPad portrait
+  fixed by placing it before the scale/zoom group (209 → 209 px). Keep, or
+  hide it on phones by default?
+- **Supplier pricing at phone width:** chips wrap now (were a 596 px
+  sideways strip; "No price" was off-screen). `server/pricingChipStrip.test.ts`
+  (2, both red on the old code); `device:audit --only=pricing` sideways=no at
+  375/390/425/iPad/laptop.
+- **Gate green on b4a4a7ec** (run 38435775409). Locally, one failure in
+  `starterAssembliesSeed.test.ts` on `bidrender_test_b`: a material id
+  differs (23791 expected, 4928 found), i.e. a duplicate-name row in that
+  local test DB. This diff touches no seed code and the Gate (fresh DB)
+  passed. Rebuild `bidrender_test_b` before trusting a local full run.
+- **Dev servers stopped.**
+- **Next:** step 4, tips.
+
+## WHERE B STOOD — 2026-10-13, PHONE BOTTOM BAR FIXED; PLAN-READING HELP STEP 2 BUILT
+
+On `track-b` only. **NOT merged to local-dev — owner says when.** No
+migration.
+
+- **Phone bottom bar (80c648d0).** The icon bar was `fixed` over the
+  content, so at 375–425 px the last item of every screen sat under it
+  ("Pricing settings" on the bid page). It is now the last `shrink-0` row
+  of `<main>`'s column. Two more faults the new check found: the shell
+  root is now `relative` (sr-only labels made Count/Proposal's document
+  up to 2,124 px tall, so the whole app dragged off a phone), and the
+  Dashboard's backups banner is its own row (it pushed the Dashboard's
+  last rows off-screen at every size, admins only). Proof:
+  `server/phoneBottomBar.test.ts` (5, all red on the old shell);
+  `pnpm device:audit --sizes=phone-375,phone-425` — new sizes and a new
+  "covered" check (each scroll box scrolled to its end; is its last item
+  the thing on top?) — 8 faults on the old shell, 0 on every screen
+  after; phone 390, both iPads, laptop: no new fault. **Still open, not
+  this fix:** supplier pricing scrolls sideways at phone width (its
+  filter-chip strip; seen before the change).
+- **Step 1 redo:** Copy text's abbreviation line seen at iPad portrait
+  with a drag placed from the drawing canvas's own position (it read
+  "PVC … NEMA" off E0.01 and named both).
+- **Step 2, symbol guide** (`plan-reading-help-plan.md` § 7 step 2, DONE
+  with details): 38 symbols, DRAFT for the owner (Q5); "What it looks
+  like" in Look up, "All symbols" under More options; "Count these" =
+  plain count named in the PLURAL (the singulars are retired catalog
+  spellings); none for runs; none on a locked bid. Proof:
+  `server/planHelpSymbols.test.ts` (17; guards shown red: digit in "how
+  bid", singular count name, count on a run). Looked at laptop, both
+  iPads, phone 390; Count these armed "Duplex receptacles" (laptop) and
+  "GFCI receptacles" (phone — the panel closes, ready to tap); both test
+  counts deleted from "Bar layout check" afterwards (0 marks each).
+- **Next:** step 3 — DONE, see above.
+
+## WHERE B STOOD — 2026-10-12 (latest), PLAN-READING HELP STEP 1 BUILT
+
+On `track-b` only. **NOT merged to local-dev — frozen until the live
+release.** No migration.
+
+- **Look up** (`plan-reading-help-plan.md` § 7 step 1, marked DONE with the
+  details): "Look up a word or symbol" at the top of the Plans screen's
+  Legend tab; this set's captured legend first, then "Usually means" from
+  `shared/planHelp/abbreviations.ts`; the Legend tab's one "More options"
+  fold (closed) holds "All abbreviations"; Copy text's result names the
+  abbreviations in its words. No model, no server call, nothing saved.
+- **The list is a DRAFT — owner reviews before beta (Q5).** 136 entries;
+  `ABBREVIATIONS_REVIEW.status` stays `"draft"` (a test pins it) until he
+  has read it. Ambiguous ones list every meaning with its clue (HR, EM, AC,
+  DP, SP, CU, (R), REF…). No digits in "for the bid".
+- **Proof:** `server/planHelpLookUp.test.ts` (21; module new, so red
+  without the change). Guards removed one at a time and shown red: a
+  digit in "for the bid", a duplicate spelling, the brackets-only rule
+  for one letter, the capitals-only rule (that one needed a mixed-case
+  case added to go red — "Ex. cable. Hp motor."). Looked at laptop 1536,
+  iPad 820×1180 and 1180×820 via playwright on "Bar layout check": no
+  sideways scroll, box 44 px tall on iPad; Copy text line seen on laptop
+  and iPad landscape.
+- **Next:** step 2, symbol guide inside Look up with "Count these".
+
+## WHERE B STOOD — 2026-10-12 (plan only), PLAN-READING HELP PLANNED
+
+`references/plan-reading-help-plan.md`: abbreviation lookup, symbol guide,
+"What is this sheet?" cards, tips, keyed-note taps and detail links — no
+AI, **no migration needed to ship**. Two optional add-only drafts for A (H1
+`users.planTipsDoneAt`, H2 `bid_pdf_sheets.sheetKind`) only if the owner
+picks the account-side answers. **Owner approved all 11 picks (2026-10-12)**
+— so no migration at all, H1/H2 not wanted; owner reviews the abbreviation
+and symbol lists before beta (Q5). Build waits for the live release. No
+code; nothing merged; the scope work below is unchanged.
+
+## WHERE B STANDS — 2026-10-12 (last), SCOPE STEP 6a DONE; BASELINE GUARDS SHOWN RED
+
+On `track-b`, NOT merged (owner: the live release goes first). No
+migration: 6a uses S3 (0147), already applied.
+
+- **Step 6a — "Who does this?"** (details in `scope-tags-plan.md` step 6,
+  "6a DONE"): the eight shipped prompts in `shared/scopePrompts.ts`, shown
+  closed in the "Who does what" card on a bid with an unanswered matching
+  line; chips tag the ticked lines through `useSetLineScope` (Undo).
+  `bids.setScopePromptsDismissed` = "Don't ask on this bid" / "Ask again".
+  `bids.get` lines gain `assemblyCategory`. Never on a locked bid; moves no
+  number (shown: tagging is step 3's call).
+- **Proof:** `server/scopePrompts.test.ts`, `server/scopePromptsDismiss.test.ts`;
+  each guard removed in a throwaway worktree (deleted afterwards) and its
+  test shown red — see the commit message. Looked at laptop + both iPad
+  sizes on a temporary bid on user 1 (deleted): 5 items asked, the EV
+  circuit and lighting contactor not; answering one → 4 items and the
+  counts strip; Don't ask → "Ask again" → back.
+- **Baseline screen guards: now shown red**, all four, in a throwaway
+  worktree the owner allowed (deleted; track-b untouched at 9ac82766):
+  public builder on `materials` → scopeDiscipline + "every route refuses"
+  red; no `userId IS NULL` on materials → "no company rows" red; none on
+  assembly-by-id → NOT_FOUND red; `Number()` for hours → NULL test red.
+- **6b still waits for A's S2.**
+
+## WHERE B STOOD — 2026-10-12 (latest), BASELINE SCREEN: SIGN-IN + READ-ONLY SCREEN
+
+On `track-b`, NOT merged to local-dev (owner's go). No migration; works on 152. Built on A's login (§ "FROM TRACK A" below).
+
+- **`/starter`** — its own page, decided by PATHNAME in `App.tsx` before
+  AuthGuard (`client/src/lib/starterAddress.ts`), so the company app never
+  mounts for it. `pages/starter/`: `StarterSignInPage` (password → 6-digit
+  code, or "Use a recovery code instead"; A's error wording shown as is; a
+  password stage older than 5 minutes sends it back to step 1), `StarterApp`
+  (signed in = `starterAuth.me`; any "Sign in again." returns to the sign-in
+  with "Your session ended"), `StarterScreen` (the plan § 1 band word for
+  word, "Signs out at … if idle", Sign out; tabs Materials / Assemblies /
+  Labor rates / Run types; materials search = the app's own pipeline with no
+  usage, i.e. a brand-new company's search). No enrol page (A's note).
+- **`starterLibrary` router** (`server/routers/starterLibraryRouter.ts`),
+  every route `starterEditorProcedure`, READ ONLY: `materials`,
+  `assemblies`, `assembly({id})` (parts), `laborRates`, `runTypes`. db reads
+  in `server/db.ts` § "The starter, as the baseline screen reads it" are
+  `userId IS NULL` only. Registered in `STARTER_ONLY`; that check now also
+  fails a starter router using the public builder (except the sign-in).
+- **Tests:** `server/starterLibrary.test.ts` (every route refuses no
+  session, a password-only one and a company login; no company row in the
+  lists; a company assembly id is NOT_FOUND; unset hours stay NULL),
+  `client/src/lib/starterAddress.test.ts`. Shown red later the same day
+  (entry above).
+- **Looked at** laptop 1536, iPad 820×1180 and 1180×820 (playwright,
+  throwaway starter account made and deleted in bidrender_local_b_new):
+  layout audit clean at both iPad sizes; "romex" lists NM-B first. Fixed
+  from looking: $0 roles now say "rate not set". Note: that DB's 1,717
+  shared materials really are $0 with no hours (measured), so the screen
+  shows them all flagged.
+- **Local:** `.env` now has a `STARTER_TOTP_KEY` (local only).
+
+### Waits on A's BS-M3..M6 (and C's `applyStarterChange`)
+
+- **Every edit** — number fields (offer), finding fields, names: needs the
+  log (BS-M3), pins (BS-M4), `isPinnedCopy` (BS-M5) and C's function.
+- **Undo one / undo a batch**, the change log view, pending/accepted counts
+  (§ 4) — BS-M3/M4.
+- **Hide with replacement, "New" badge, Add** (§ 3) — BS-M5, BS-M6
+  (`starterSeenAt`).
+- **Updates tabs, "N starter updates available", accept / ignore** (§ 2) —
+  BS-M6 (`starter_offer_answers`).
+- **"My changes"** (§ 7) — needs `isPinnedCopy` (BS-M5) to keep pinned
+  copies out.
+- **Sheet upload, Download current values, Copy from my company, seed
+  drift / export** (§ 5–7) — C's shared checks and BS-M3.
+- Not dependent, not asked this round: the "Total changed because…" strip
+  (0148 is in) and F16's toast.
+
 ## FROM TRACK A — 2026-10-13 (session 39): BS-M3–M6 + F13-M1 are on local-dev — B may merge
 
 What you were waiting for is done: migrations **0152–0156** (C's BS-M3–M6
@@ -22,8 +347,7 @@ modifiers and takeoff_run_types. Nothing reads them yet.
 ## WHERE B STANDS — 2026-10-12 (late), SCOPE TAGS steps 5 and 7 DONE
 
 - **On track-b, not on local-dev yet**: steps 2–7 (less 6) with local-dev
-  c54416cc (A's 0150/0151, SER rename) merged in; B's two DBs migrated to
-  152. Gate green on 9beb9d95. The owner says when it goes to local-dev
+  c54416cc (A's 0150/0151, SER rename) merged in; B's two DBs migrated to 152. Gate green on 9beb9d95. The owner says when it goes to local-dev
   (C lands first).
 - **Step 5** — proposal: owner-furnished lines stay in the scope of work and
   are named with quantity under Includes; By others / Excluded leave the

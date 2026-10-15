@@ -224,16 +224,25 @@ export default function BidRenderShell() {
     [navigate]
   );
 
+  // A column: the banner is a fixed row and the Dashboard the part that
+  // gives. Side by side as siblings, the Dashboard's `h-full` was the whole
+  // tab tall BELOW the banner, so its last rows sat the banner's height past
+  // the bottom edge on every screen size (found 2026-10-13 by the device
+  // audit's covered-at-the-bottom check).
   const dashboard = (
-    <>
-      <BackupHealthBanner isAdmin={isAdmin} />
-      <DashboardPage
-        onOpenBid={openBid}
-        onOpenArchive={() => navigate("bid-archive")}
-        onOpenPlans={id => navigate("takeoff", { id })}
-        onCount={id => navigate("count", { id })}
-      />
-    </>
+    <div className="flex flex-col h-full">
+      <div className="shrink-0">
+        <BackupHealthBanner isAdmin={isAdmin} />
+      </div>
+      <div className="flex-1 min-h-0">
+        <DashboardPage
+          onOpenBid={openBid}
+          onOpenArchive={() => navigate("bid-archive")}
+          onOpenPlans={id => navigate("takeoff", { id })}
+          onCount={id => navigate("count", { id })}
+        />
+      </div>
+    </div>
   );
 
   // ── Content renderer ───────────────────────────────────────────────────────
@@ -420,8 +429,16 @@ export default function BidRenderShell() {
         overflow, which buys a horizontal scrollbar, which then eats a few
         pixels off the BOTTOM. w-full is the parent width, scrollbar already
         accounted for.
+
+        `relative`, because "the page itself never scrolls" was not true
+        until 2026-10-13. A `sr-only` label is position: absolute, and with
+        no positioned ancestor its box is placed against the DOCUMENT, past
+        every overflow-hidden in between — so a long Count or Proposal made
+        the document 2,000 px tall, and on a phone the whole app, bottom bar
+        and all, could be dragged up off the screen. Positioned here, they
+        are contained and clipped like everything else.
       */
-      className="flex h-dvh w-full overflow-hidden bg-background"
+      className="relative flex h-dvh w-full overflow-hidden bg-background"
       style={{ zoom: uiFontScale }}
     >
       {/* ── Desktop Sidebar ─────────────────────────────────────── */}
@@ -681,12 +698,14 @@ export default function BidRenderShell() {
         </header>
 
         {/* Tab content */}
-        <div className="flex-1 overflow-hidden tab-enter" key={routeKey}>
+        <div
+          className="flex-1 min-h-0 overflow-hidden tab-enter"
+          key={routeKey}
+        >
           {renderContent()}
         </div>
-      </main>
 
-      {/*
+        {/*
         ── Mobile Bottom Nav ──────────────────────────────────────────────────
         Five slots, and now they hold five of the eight real destinations
         rather than two choosers and three screens. Performance, Crew and Admin
@@ -696,73 +715,84 @@ export default function BidRenderShell() {
         It previously spent two of the five on Bids and Quick bid, which on the
         smallest screen was the most expensive place to put a "which one?".
       */}
-      {/*
+        {/*
         Not on the Plans screen (track-b-phone-and-readability-plan.md § 3):
         it has its own bar along the bottom, and this one, fixed on top of
         it, covered the bar's "This sheet" line and the way into the panel.
         "← Bid" in the screen's own header goes back.
       */}
-      <nav
-        className={cn(
-          "md:hidden fixed bottom-0 left-0 right-0 z-30 flex bg-sidebar border-t border-border",
-          isInTakeoff && "hidden"
-        )}
-        aria-label="Main"
-      >
-        {(
-          [
-            {
-              label: "Dashboard",
-              icon: LayoutDashboard,
-              active: isOnDashboard || isInBids || isInTakeoff,
-              go: () => navigate("dashboard"),
-            },
-            {
-              label: "Clients",
-              icon: Users,
-              active: isInClients,
-              go: () => navigate("clients"),
-            },
-            {
-              label: "Materials",
-              icon: Boxes,
-              active: isInLibraryMats,
-              go: () => navigate("library-materials"),
-            },
-            {
-              label: "Assemblies",
-              icon: Layers,
-              active: isInLibraryAsms,
-              go: () => navigate("library-assemblies"),
-            },
-            {
-              label: "Settings",
-              icon: Settings,
-              active: isInSettings,
-              go: () => navigate("settings"),
-            },
-          ] as const
-        ).map(item => (
-          <button
-            key={item.label}
-            onClick={item.go}
-            aria-label={item.label}
-            aria-current={item.active ? "page" : undefined}
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-colors duration-150 relative",
-              item.active ? "text-[#F5C518]" : "text-muted-foreground"
-            )}
-          >
-            <item.icon
-              size={18}
-              className={item.active ? "text-[#F5C518]" : ""}
-            />
-            {item.active && (
-              <span className="absolute top-0 left-0 right-0 h-0.5 bg-[#F5C518] rounded-b" />
-            )}
-          </button>
-        ))}
-      </nav>
+        {/*
+        A ROW OF THE COLUMN, NOT A FIXED BAR (2026-10-13). It used to be
+        `fixed bottom-0`, on top of a content area that ran to the bottom of
+        the window — so the last item of every screen, scrolled all the way
+        down, sat under it ("Pricing settings" on the bid page, half hidden).
+        As the column's last `shrink-0` row the content area above it ends
+        where the bar starts, by construction; no screen has to pad for it.
+        `server/phoneBottomBar.test.ts` keeps it that way, and
+        `pnpm device:audit` reports anything still covered at the bottom.
+      */}
+        <nav
+          className={cn(
+            "md:hidden shrink-0 flex bg-sidebar border-t border-border",
+            isInTakeoff && "hidden"
+          )}
+          aria-label="Main"
+        >
+          {(
+            [
+              {
+                label: "Dashboard",
+                icon: LayoutDashboard,
+                active: isOnDashboard || isInBids || isInTakeoff,
+                go: () => navigate("dashboard"),
+              },
+              {
+                label: "Clients",
+                icon: Users,
+                active: isInClients,
+                go: () => navigate("clients"),
+              },
+              {
+                label: "Materials",
+                icon: Boxes,
+                active: isInLibraryMats,
+                go: () => navigate("library-materials"),
+              },
+              {
+                label: "Assemblies",
+                icon: Layers,
+                active: isInLibraryAsms,
+                go: () => navigate("library-assemblies"),
+              },
+              {
+                label: "Settings",
+                icon: Settings,
+                active: isInSettings,
+                go: () => navigate("settings"),
+              },
+            ] as const
+          ).map(item => (
+            <button
+              key={item.label}
+              onClick={item.go}
+              aria-label={item.label}
+              aria-current={item.active ? "page" : undefined}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-colors duration-150 relative",
+                item.active ? "text-[#F5C518]" : "text-muted-foreground"
+              )}
+            >
+              <item.icon
+                size={18}
+                className={item.active ? "text-[#F5C518]" : ""}
+              />
+              {item.active && (
+                <span className="absolute top-0 left-0 right-0 h-0.5 bg-[#F5C518] rounded-b" />
+              )}
+            </button>
+          ))}
+        </nav>
+      </main>
     </div>
   );
 }

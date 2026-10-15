@@ -84,7 +84,16 @@ export function checkPriceRow(input: {
     problems.push(`${at}: pack qty is not a number above 0`);
     return { problems, value: null };
   }
-  return { problems, value: toStored4(packPrice / packQty) };
+  const value = toStored4(packPrice / packQty);
+  // Four places can round a real price to zero, which would ship as a $0
+  // "Example price". Refuse it rather than store it.
+  if (Number(value) <= 0) {
+    problems.push(
+      `${at}: ${packPrice} for a pack of ${packQty} stores as $0.0000 per unit — check the pack qty`
+    );
+    return { problems, value: null };
+  }
+  return { problems, value };
 }
 
 export type HoursEntry = { laborHours?: string; fieldBendLaborHours?: string };

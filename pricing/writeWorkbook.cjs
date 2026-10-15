@@ -141,42 +141,14 @@ const searchTerm = row => {
   return t.trim();
 };
 
-/** The pack a thing is sold in, and the NUMBER the per-unit formula divides by. */
-const packFor = row => {
-  const n = row.name;
-  if (row.unit === "foot") {
-    if (/NM-B|UF-B|SEU|SER cable/i.test(n)) return ["250 ft roll", 250];
-    if (/THHN|XHHW|USE-2|bare copper|tracer wire/i.test(n))
-      return ["500 ft spool", 500];
-    if (/MC cable|AC cable/i.test(n)) return ["250 ft coil", 250];
-    if (
-      /Cat5e|Cat6|coax|speaker|thermostat|security|control wire|doorbell/i.test(
-        n
-      )
-    )
-      return ["1000 ft box", 1000];
-    if (/EMT|rigid|PVC|flex|liquidtight/i.test(n)) return ["10 ft stick", 10];
-    return ["per foot", 1];
-  }
-  if (
-    /wire nut|push-in connector|staple|screw|anchor|washer|nut\b|zip tie|ferrule|clip\b|pin\b/i.test(
-      n
-    )
-  )
-    return ["box of 100", 100];
-  if (
-    /^(1[25]A|20A).*(receptacle|switch)/i.test(n) &&
-    !/GFCI|AFCI|dual|smart|USB/i.test(n)
-  )
-    return ["box of 10", 10];
-  if (
-    /wall plate|blank plate|mud ring|plaster ring|knockout|bushing|connector|coupling|strap|clamp|nail plate/i.test(
-      n
-    )
-  )
-    return ["box of 25", 25];
-  return ["each", 1];
-};
+/**
+ * The pack a thing is sold in, and the NUMBER the per-unit formula divides by.
+ * NEVER guessed from words in the name (owner, 2026-10-14, pack-label-scan.md
+ * § E): this used to give "Dishwasher whip" a box of 100 washers. This script
+ * is the old builder, kept for server/catalogScale.test.ts; the real sheet is
+ * built by pricing/buildStarterSheets.mts from the written pack table.
+ */
+const packFor = row => (row.unit === "foot" ? ["per foot", 1] : ["each", 1]);
 
 const wb = new ExcelJS.Workbook();
 wb.creator = "BidRidge";

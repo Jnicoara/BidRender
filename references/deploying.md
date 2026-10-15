@@ -124,6 +124,10 @@ code never arrived.
 GitHub nor your local checkout. **This is the fastest way out of a bad deploy**
 and the first thing to reach for.
 
+**Once the boot seed change is live, a rollback to a build WITHOUT it can undo
+logged starter changes** — run `scripts/starterDrift.mts` before and after
+(owner Q4, § 5b).
+
 Rolling back the code as well, when you want `main` to match what is running —
 **through `local-dev`, because `main` refuses a commit the gate has not seen**
 (the ruleset, § 4):
@@ -718,6 +722,32 @@ database is **already missing five foreign keys** from the 0004 incident in July
 exactly that reason.
 
 ### 5b. A catalog release IS a migration — it just runs at startup
+
+> **Changes with the boot seed change (built on local-dev 2026-10-13; reaches
+> live one release AFTER the end-of-pricing load, owner Q1 —
+> `references/boot-seed-plan.md`).** From the release that carries it, a
+> start no longer renames, retires or re-stamps an existing shared row; it
+> inserts new names and applies finding fields as one logged `seed` batch, and
+> logs one line: `[seed] starter: finding fields applied N; proposed P (not
+applied), held H, live ahead L`. **A seed edit then reaches live only by a
+> separate, owner-confirmed step after the deploy:**
+>
+> ```bash
+> DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/starterDrift.mts            # read: what would change
+> ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local \
+>   pnpm tsx scripts/starterDrift.mts --apply --note "<what and why>"                    # one batch, pins first
+> ```
+>
+> Rehearse the `--apply` on a copy exactly as below, with `bidTotals.mts`
+> before and after — it pins every company, so it must move no bid number.
+> Until that release, live still re-stamps and this section applies as written.
+>
+> **Rollback past that release (owner Q4): check drift before AND after.** A
+> build without the change re-stamps shared rows from ITS seed on its first
+> start, writing over every change logged through `applyStarterChange` for
+> every company without a copy — with no log. So run `starterDrift.mts`
+> (read-only) before the rollback, keep its output, and run it again after;
+> a "live ahead" line that disappears is a change the rollback undid.
 
 **Added 2026-09-26.** A release that only touches `server/seed/materials/`
 has nothing in `drizzle/`, so § 5a looks as if it does not apply. It does. The
@@ -1742,6 +1772,44 @@ link were refused.
   cause. Read the log line before changing settings.
 - Live needs its OWN key (`bidridge-live`), never staging's, and is set
   during the live release (`live-release-plan.md`).
+
+### Staging: migrations 0157–0163 — pack price, price check, price imports, price history (2026-10-14 UTC) — NOT on live
+
+`0157_material_pack_qty`, `0158_material_pack_label`,
+`0159_material_pack_price`, `0160_material_price_check_accepted` (four
+nullable `materials` columns), `0161_price_imports`,
+`0162_price_import_rows`, `0163_material_price_history` — C's PS-M1..M6
+(`pricing-safety-plan.md` § 6) and PH-M1 (`price-history-plan.md` § 6) word
+for word. No `UPDATE`, every new `materials` column nullable with no
+default: additive, step 1, step 3 empty. `schema.ts` selects the four
+`materials` columns on every materials read, so all seven MUST be on a
+database before code from `656b0fb8` on reaches it. Verified locally: the
+new code against the un-migrated local DB refused 7 owners.
+
+1. **Local first**: `bidrender_local` 157 → 164, FKs 191 → 200 (local's
+   known legacy-FK drift); re-run nothing; drift report unchanged; 4,386 /
+   4,386 totals unchanged, old and new code. `bidrender_test_localdev`
+   164 / 205.
+2. **Boot change pushed alone first** (`d38f5930`): Gate 38633682443
+   green, smoke 96 / 2 skips.
+3. **Backup**: `staging-2026-10-14T21-01-51Z-before-0157-0163.sql` (84
+   tables, 16,639 rows), restored to `bidrender_scratch_staging_0157`:
+   **84/84 counts equal**. Rehearsal on it: 157/196 → **164/205**, re-run
+   nothing.
+4. **Staging database**: 157/196 before; **7 applied**, 164; re-run
+   "Nothing to apply"; "matches", **205/205**. Totals: **1,357/1,357
+   unchanged** with old code (`d38f5930`) AND new code. JSONs
+   `staging-totals-{before,after-…-old,after-…-new}-0157-2026-10-14.json`.
+5. **Code**: `656b0fb8` pushed after step 4 — Gate 38637845427 red on one
+   test (`backup.test.ts` read `materialKey` as a file column), fixed in
+   `22c30965`. Gate 38640040867: test green, deploy-staging refused as
+   designed (`drizzle/` changed), so `local-dev:staging` pushed by hand and
+   the failed jobs re-run: **smoke 96 / 2 skips**; staging `/api/version`
+   `22c30965`, built 22:05:18 UTC.
+
+**Live**: 0152–0163 join the next release's batch, BEFORE the push of any
+code from `e689b918` on. Expect 164, 205/205 — **if what it prints does not
+match, stop and find out why before going on.**
 
 ### Staging: migrations 0152–0156 — starter change log, pins, hiding, offers; locked warnings (2026-10-13 UTC) — NOT on live
 

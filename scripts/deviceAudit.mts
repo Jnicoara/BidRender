@@ -51,6 +51,24 @@ export type DeviceSize = {
 
 export const SIZES: DeviceSize[] = [
   { name: "phone", width: 390, height: 844, touch: true, mobile: true, dpr: 3 },
+  // The narrow and wide ends of a phone (owner, 2026-10-13: the bottom bar
+  // covered the bid page's last card at 375–425 and not at 768).
+  {
+    name: "phone-375",
+    width: 375,
+    height: 667,
+    touch: true,
+    mobile: true,
+    dpr: 2,
+  },
+  {
+    name: "phone-425",
+    width: 425,
+    height: 900,
+    touch: true,
+    mobile: true,
+    dpr: 3,
+  },
   {
     name: "tablet-portrait",
     width: 820,
@@ -198,6 +216,113 @@ export type Measure = {
   smallTargets: { label: string; w: number; h: number }[];
   controls: number;
 };
+
+/**
+ * COVERED AT THE BOTTOM — scroll every scroll box to its end and ask whether
+ * its last item can be seen, or whether something on top of the box (a fixed
+ * bar) sits over it. Runs in the page, self-contained, and LAST on a screen:
+ * it moves the scroll.
+ *
+ * `cutOffBelow` cannot see this fault: it looks for text with no scrolling
+ * ancestor, and the bid page's "Pricing settings" card HAD one — it scrolled
+ * to the bottom of the box and the box's bottom was under the phone's fixed
+ * icon bar (2026-10-13). What a person loses is "the last thing, even
+ * scrolled all the way down", so that is what this measures.
+ */
+export function bottomCoveredInPage(scrollOnly: boolean): string[] {
+  // An open dialog is its own question: it covers the screen on purpose.
+  if (
+    Array.from(document.querySelectorAll("[role=dialog]")).some(
+      d => d.getBoundingClientRect().height > 1
+    )
+  )
+    return [];
+  const ih = window.innerHeight;
+  const iw = window.innerWidth;
+  const describe = (el: Element) =>
+    `${el.tagName.toLowerCase()} «${(el.getAttribute("aria-label") || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 40)}»`;
+  const shown = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    if (r.width <= 1 || r.height <= 1) return false;
+    const s = getComputedStyle(el);
+    return (
+      s.visibility !== "hidden" && s.display !== "none" && Number(s.opacity) > 0
+    );
+  };
+  const out: string[] = [];
+  const boxes = [
+    document.scrollingElement ?? document.documentElement,
+    ...Array.from(document.body.querySelectorAll("*")).filter(el => {
+      const s = getComputedStyle(el);
+      return (
+        (s.overflowY === "auto" || s.overflowY === "scroll") &&
+        shown(el) &&
+        el.getBoundingClientRect().height > 100 &&
+        !el.closest("[role=dialog], svg, canvas")
+      );
+    }),
+  ];
+  // Scroll first, measure on a later call: a virtualised list draws its last
+  // rows only after it has seen the scroll.
+  if (scrollOnly) {
+    for (const box of boxes) box.scrollTop = box.scrollHeight;
+    return [];
+  }
+  for (const box of boxes) {
+    const br = box.getBoundingClientRect();
+    const boxBottom = box === document.scrollingElement ? ih : br.bottom;
+    // The lowest visible leaf with text, or a control, inside this box.
+    let last: Element | null = null;
+    let lastBottom = -Infinity;
+    for (const el of Array.from(box.querySelectorAll("*"))) {
+      if (!shown(el) || el.closest("svg, canvas")) continue;
+      const leaf =
+        (el.children.length === 0 && (el.textContent || "").trim()) ||
+        el.matches("button, input, select, textarea, a[href]");
+      if (!leaf) continue;
+      // Only what scrolls with THIS box: not a box nested inside it, not a
+      // scaled preview (the proposal's paper), and not something a clipping
+      // parent already hides on purpose (a row cut at its own edge).
+      const r = el.getBoundingClientRect();
+      let p = el.parentElement;
+      let skip = false;
+      while (p && p !== box) {
+        const s = getComputedStyle(p);
+        if (s.overflowY === "auto" || s.overflowY === "scroll") skip = true;
+        else if (s.transform !== "none" || (s.zoom && s.zoom !== "1"))
+          skip = true;
+        else if (
+          s.overflowY !== "visible" &&
+          r.top >= p.getBoundingClientRect().bottom - 1
+        )
+          skip = true;
+        if (skip) break;
+        p = p.parentElement;
+      }
+      if (skip) continue;
+      if (r.right < 0 || r.left > iw) continue;
+      if (r.bottom > lastBottom) {
+        lastBottom = r.bottom;
+        last = el;
+      }
+    }
+    if (!last) continue;
+    const r = last.getBoundingClientRect();
+    const y = Math.min(r.bottom, boxBottom, ih) - 2;
+    const x = Math.min(iw - 1, Math.max(0, r.left + Math.min(r.width / 2, 20)));
+    const top = y > 0 ? document.elementFromPoint(x, y) : null;
+    const seen =
+      r.bottom <= Math.min(boxBottom, ih) + 1 &&
+      !!top &&
+      (top === last || last.contains(top) || top.contains(last));
+    if (!seen) {
+      const over =
+        top && !box.contains(top) ? ` under ${describe(top)}` : " past the end";
+      out.push(`${describe(last)}${over}`);
+    }
+  }
+  return out.slice(0, 12);
+}
 
 /** Runs in the page. Kept self-contained: it is serialised by playwright. */
 export function measureInPage(): Measure {
@@ -410,7 +535,7 @@ async function press(page: Page, size: DeviceSize, locator: Locator) {
 
 /** The plan viewer's right panel, open on a tab, in whatever layout. */
 async function openPlanTab(page: Page, size: DeviceSize, tab: RegExp) {
-  if (size.name === "phone")
+  if (size.name.startsWith("phone"))
     await press(
       page,
       size,
@@ -490,7 +615,10 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   const browser = await launchChrome();
-  const report: Record<string, Record<string, Measure & { shot: string }>> = {};
+  const report: Record<
+    string,
+    Record<string, Measure & { shot: string; covered?: string[] }>
+  > = {};
   let hard = 0;
   try {
     for (const size of sizes) {
@@ -574,18 +702,33 @@ async function main() {
             scale: "css",
           });
         }
-        (report[screen.key] ??= {})[size.name] = { ...m, shot };
+        // Last, because it scrolls every box to its end.
+        await page.evaluate(bottomCoveredInPage, true);
+        await page.waitForTimeout(300);
+        await page.evaluate(bottomCoveredInPage, true);
+        await page.waitForTimeout(300);
+        const covered = await page.evaluate(bottomCoveredInPage, false);
+        if (covered.length)
+          await page.screenshot({
+            path: path.join(outDir, shot.replace(".jpg", "-end.jpg")),
+            type: "jpeg",
+            quality: 60,
+            scale: "css",
+          });
+        (report[screen.key] ??= {})[size.name] = { ...m, covered, shot };
         if (
           m.sidewaysScroll ||
           m.overflowRight.length ||
           m.cutOffBelow.length ||
-          m.cutTabs.length
+          m.cutTabs.length ||
+          covered.length
         )
           hard++;
         const small = size.touch ? ` small=${m.smallTargets.length}` : "";
         console.log(
-          `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} overlap=${m.overlaps.length} cut=${m.cutOffBelow.length} tabsCut=${m.cutTabs.length}${small}/${m.controls}`
+          `${size.name.padEnd(17)} ${screen.key.padEnd(11)} sideways=${m.sidewaysScroll ? "YES" : "no"} offRight=${m.overflowRight.length} overlap=${m.overlaps.length} cut=${m.cutOffBelow.length} covered=${covered.length} tabsCut=${m.cutTabs.length}${small}/${m.controls}`
         );
+        for (const c of covered) console.log(`    covered: ${c}`);
       }
       await page.context().close();
     }

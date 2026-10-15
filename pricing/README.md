@@ -53,6 +53,17 @@ THAT back and checks every carried value is in it, and only then replaces
 the old file. `server/sheetCarryOver.test.ts` goes red if a typed value is
 lost — including a value typed under any old spelling in the real rename map.
 
+## Packs — written per row, never guessed (owner, 2026-10-14)
+
+Every row's "Pack size" / "Pack qty" comes from
+`server/seed/materials/starterPacks.ts`, by exact name, with where it came
+from. A row with nothing written is `each` / 1 (a per-foot row keeps a
+per-foot label at qty 1). A row whose pack a store check could not settle is
+in `PACK_NOT_CHECKED` and says "PACK NOT CHECKED" in its Notes. The build
+prints how many rows came from each. `server/starterPacks.test.ts` goes red
+if a pack above one comes from anywhere but the table. Record of the pass:
+`pricing/pack-pass-2026-10-14.md`.
+
 ## Building
 
 exceljs is not a dependency of this repo; it is loaded through `NODE_PATH`

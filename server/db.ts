@@ -373,6 +373,7 @@ import {
 } from "../shared/assemblyHoursSource";
 import { resolveForkedRow } from "../shared/forkedRows";
 import { isMissingTable } from "./schemaCheck";
+import { sameStarterValue } from "../shared/starterChange";
 import {
   markupDiffers,
   materialItemKey,
@@ -2180,114 +2181,6 @@ export type BaselineSeedReport = {
 };
 
 /**
- * Rename baseline rows whose catalog name has changed, in place.
- *
- * Matching by name is what makes the seed re-runnable, and it is also why a
- * rename cannot simply be typed into the seed file: the seeder would see an
- * unfamiliar name, insert a second row, and strand the original as an orphan
- * the user then sees twice with no way to tell them apart. Renaming here keeps
- * the id, which is the part that actually matters — assemblies, kits, project
- * items and takeoff stamps all point at material ids.
- *
- * Runs before matching, and only ever touches baseline rows: a user's fork
- * carries their own name and is none of the seeder's business.
- */
-async function renameBaselineMaterials(): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-
-  const entries = Object.entries(RENAMED_BASELINE_MATERIALS);
-  if (entries.length === 0) return;
-
-  // Matched in JS, exactly, and written BY ID: the column ignores case, so
-  // `WHERE name = from` would also rename a row whose name differs from
-  // `from` only in capitals (see dedupeBaselineRows).
-  const baselineRows = await db
-    .select({ id: materials.id, name: materials.name })
-    .from(materials)
-    .where(isNull(materials.userId));
-  const idsByName = new Map<string, number[]>();
-  for (const row of baselineRows) {
-    idsByName.set(row.name, [...(idsByName.get(row.name) ?? []), row.id]);
-  }
-  const baselineNames = new Set(idsByName.keys());
-
-  for (const [from, to] of entries) {
-    if (!baselineNames.has(from)) continue; // already renamed, or never existed
-    if (baselineNames.has(to)) {
-      // Both names present. That is a half-migrated database rather than
-      // anything this function can fix: merging them would have to pick which
-      // id survives, and every reference to the loser would break. Leaving the
-      // old row alone keeps a visible duplicate, which is recoverable; guessing
-      // is not.
-      console.warn(
-        `[seed] baseline material "${from}" cannot be renamed to "${to}" — both exist.`
-      );
-      continue;
-    }
-    const ids = idsByName.get(from) ?? [];
-    await db
-      .update(materials)
-      .set({ name: to })
-      .where(and(inArray(materials.id, ids), isNull(materials.userId)));
-    baselineNames.delete(from);
-    baselineNames.add(to);
-    idsByName.delete(from);
-    idsByName.set(to, ids);
-  }
-}
-
-/**
- * Withdraw baseline rows the catalog no longer ships.
- *
- * Sets `isActive = false` rather than deleting: the row leaves every list but
- * keeps its id, so a bid priced from it last month still resolves the part it
- * was priced from. See RETIRED_BASELINE_MATERIALS for when to use this at all
- * — a rename is not a retirement, and treating one as the other loses the row.
- *
- * Only baseline rows. A user who forked a retired material keeps their copy;
- * it is theirs, and the catalog dropping the original says nothing about
- * whether they still buy the part.
- */
-async function retireBaselineMaterials(retired: string[]): Promise<number> {
-  const db = await getDb();
-  if (!db) return 0;
-  if (retired.length === 0) return 0;
-
-  // The SQL match ignores case (utf8mb4_unicode_ci), so it is narrowed to the
-  // exact name here: retiring "4/0-3 SER aluminum" must not switch off a
-  // shipped "4/0-3 SER Aluminum" (see dedupeBaselineRows).
-  const exact = new Set(retired);
-  const due = (
-    await db
-      .select({ id: materials.id, name: materials.name })
-      .from(materials)
-      .where(
-        and(
-          isNull(materials.userId),
-          inArray(materials.name, retired),
-          eq(materials.isActive, true)
-        )
-      )
-  ).filter(row => exact.has(row.name));
-  if (due.length === 0) return 0;
-
-  await db
-    .update(materials)
-    .set({ isActive: false })
-    .where(
-      and(
-        isNull(materials.userId),
-        inArray(
-          materials.id,
-          due.map(row => row.id)
-        )
-      )
-    );
-  return due.length;
-}
-
-/**
  * Show a shipped row again when the catalog ships its name again.
  *
  * The other half of retireBaselineMaterials, and until 2026-09-26 it did not
@@ -2296,15 +2189,18 @@ async function retireBaselineMaterials(retired: string[]): Promise<number> {
  * row with it already existed. The catalog claimed a material no screen showed.
  *
  * Switching it back on is always right, because on a SHIPPED row
- * `isActive = false` has exactly one writer — the retire pass above. A company
- * that edits, archives or deletes a starter does it to its own copy
- * (archiveLibraryRow forks first), so this reaches `userId IS NULL` rows only
- * and a company's copy is never in it. Same row, same id, so every assembly,
- * kit, stamp and priced bid that pointed at it still does.
+ * `isActive = false` had exactly one writer — the retire pass a start ran
+ * until 2026-10-13. Since then a start retires nothing (a retire is a hide,
+ * HELD in the seed proposal — references/boot-seed-plan.md), so the rows this
+ * finds are ones switched off before then; the coming hide writes `hiddenAt`,
+ * not `isActive`. A company that edits, archives or deletes a starter does it
+ * to its own copy (archiveLibraryRow forks first), so this reaches
+ * `userId IS NULL` rows only and a company's copy is never in it. Same row,
+ * same id, so every assembly, kit, stamp and priced bid that pointed at it
+ * still does.
  *
- * Runs after the retire pass. The two lists cannot overlap — "never lists a
- * retired name as a current material" in materialsCatalog.test.ts — so the
- * order cannot flicker a row off and on within one start.
+ * A name still on the retired list is never switched back on: the caller
+ * filters the catalog by it.
  */
 async function reactivateBaselineMaterials(
   catalog: BaselineMaterial[]
@@ -2358,15 +2254,25 @@ export async function seedBaselineMaterialsFrom(
   if (!db) return report;
 
   await dedupeBaselineRows("materials");
-  await renameBaselineMaterials();
-  report.retired = await retireBaselineMaterials(retired);
-  report.reactivated = await reactivateBaselineMaterials(catalog);
+  // No rename and no retire here since 2026-10-13 (references/boot-seed-plan.md):
+  // a name is an offer (Q17) and a retire is a hide, so both are PROPOSED by
+  // server/seedProposal.ts and applied only when somebody confirms them.
+  // `retired` is still read: a retired name is never reactivated.
+  const retiredNames = new Set(retired);
+  report.reactivated = await reactivateBaselineMaterials(
+    catalog.filter(m => !retiredNames.has(m.name))
+  );
 
   const existing = await db
     .select({ name: materials.name })
     .from(materials)
     .where(isNull(materials.userId));
-  const alreadySeeded = new Set(existing.map(row => row.name));
+  const alreadySeeded = await namesTheStarterAlreadyHas(
+    "materials",
+    "name",
+    existing.map(row => row.name),
+    RENAMED_BASELINE_MATERIALS
+  );
 
   const missing = catalog
     .filter(m => !alreadySeeded.has(m.name))
@@ -2397,55 +2303,188 @@ export async function seedBaselineMaterialsFrom(
   }
   report.inserted = missing.length;
 
-  await backfillMaterialMetadata(catalog);
+  await stampMaterialTrade(catalog);
   return report;
 }
 
 /**
- * Bring catalog metadata — `category` and `searchAliases` — up to date on rows
- * that predate those columns.
+ * The names a starter table already holds, for the insert pass — plus the two
+ * kinds of "present under another name" that a frozen boot must not mistake
+ * for missing (references/boot-seed-plan.md § 3.3):
  *
- * ONE pass, idempotent and cheap enough to run on every startup: baseline rows
- * are re-stamped from BASELINE_MATERIALS unconditionally. They are app-owned
- * and read-only to users, so the seed file stays the authority — re-shelving a
- * material or adding slang to it there fixes live databases for free, with no
- * migration.
- *
- * ── There used to be a second pass, over COMPANIES' forks. Removed 2026-10-12 ─
- * It filled a fork's NULL category, aliases, default qty and raceway facts from
- * its baseline, on the theory that NULL meant "never set, inherit it". A stick
- * length going from NULL to 10 ft turns "not countable" into a coupling count
- * on an open bid that nobody chose (baseline-screen-plan.md § 9 F3), and the
- * owner's rule is that a start never writes a company's own row at all — the
- * shared starter changes through the loader, and a company's copy only through
- * the company. `server/bootLeavesCompanyRows.test.ts` goes red if it returns.
- * A fork that wants the starter's values gets them through revert, which is a
- * button.
- *
- * ── Price is re-stamped too, and THIS IS WHERE SHIPPED PRICES COME FROM ──────
- * The seed file is the source of truth for `costPerUnit` on a baseline row, so
- * this pass is how a catalog price reaches every existing database with no
- * migration and how a fresh one gets it on first boot. Decided 2026-09-21;
- * CLAUDE.md § "Where a priced catalog lands" has the whole rule, including why
- * nothing may type a price onto a baseline row by hand.
- *
- * Every shipped row is priced at zero today (see UNPRICED), so what the pass
- * currently does is drag a baseline still carrying one of the old estimate
- * prices back down. That is deliberate rather than incidental: a stale estimate
- * is indistinguishable on screen from a price the user checked, whereas zero is
- * flagged as needing one. When the pricing sheet lands the same mechanism
- * carries real numbers instead, unchanged.
- *
- * ── It cannot touch a user's own number, and that is ONE `WHERE` clause ──────
- * A user who edits a price is editing their FORK, and the query above is scoped
- * `isNull(materials.userId)`, so forks are not in this pass at all. Widening
- * that filter would walk over every price a contractor has typed, on every
- * startup, silently. `server/seedPreservesUserPrices.test.ts` goes red if it
- * ever does — proven red by deleting the filter, which returned the fixture's
- * $12.50 as $0.
+ * a. A PENDING rename: the seed says the new name, the database still has the
+ *    old one because the rename is a proposal nobody has confirmed. Inserting
+ *    the new name would strand every recipe on the old row.
+ * b. A LOGGED rename made on the screen / sheet / copy: the seed still says
+ *    the old name and the database has moved on. Inserting the old name again
+ *    would undo the change by duplicating it.
  */
+export async function namesTheStarterAlreadyHas(
+  sqlTable: string,
+  field: string,
+  present: readonly string[],
+  renames: Readonly<Record<string, string>> = {}
+): Promise<Set<string>> {
+  const have = new Set(present);
+  for (const [from, to] of Object.entries(renames))
+    if (have.has(from) && !have.has(to)) have.add(to);
+  for (const name of await namesLoggedAway(sqlTable, field)) have.add(name);
+  return have;
+}
+
+/**
+ * Old values of a name field that a NON-seed logged change moved away from,
+ * where the row still holds the change's new value. Empty before 0152.
+ */
+async function namesLoggedAway(
+  sqlTable: string,
+  field: string
+): Promise<string[]> {
+  const latest = await latestLoggedChanges(sqlTable, field);
+  const out: string[] = [];
+  for (const change of latest)
+    if (
+      change.source !== "seed" &&
+      typeof change.oldValue === "string" &&
+      change.rowHoldsNew
+    )
+      out.push(change.oldValue);
+  return out;
+}
+
+/** The five starter tables `starter_changes.targetTable` can name. */
+const STARTER_TABLES_BY_SQL_NAME: Record<
+  string,
+  | typeof materials
+  | typeof assemblies
+  | typeof laborRates
+  | typeof modifiers
+  | typeof takeoffRunTypes
+> = {
+  materials,
+  assemblies,
+  labor_rates: laborRates,
+  modifiers,
+  takeoff_run_types: takeoffRunTypes,
+};
+
+/**
+ * The LATEST logged field change per (row, field) of one starter table, with
+ * whether the row still holds that change's new value. The boot and the seed
+ * proposal read it to tell "the seed is behind" from "the seed is ahead"
+ * (references/boot-seed-plan.md § 3.3b). Before 0152 the log does not exist
+ * and this is empty: nothing has been logged, so nothing is ahead.
+ */
+export async function latestLoggedChanges(
+  sqlTable: string,
+  field?: string
+): Promise<
+  Array<{
+    rowId: number;
+    field: string;
+    source: string;
+    oldValue: unknown;
+    newValue: unknown;
+    rowHoldsNew: boolean;
+  }>
+> {
+  const db = await getDb();
+  if (!db) return [];
+  let rows: Array<Record<string, unknown>>;
+  try {
+    const [result] = (await db.execute(sql`
+      SELECT c.targetRowId AS rowId, c.field AS field, b.source AS source,
+             c.oldValue AS oldValue, c.newValue AS newValue
+      FROM starter_changes c
+      JOIN starter_change_batches b ON b.id = c.batchId
+      WHERE c.targetTable = ${sqlTable} AND c.kind = 'field'
+        ${field === undefined ? sql`` : sql`AND c.field = ${field}`}
+        AND c.id = (
+          SELECT MAX(c2.id) FROM starter_changes c2
+          WHERE c2.targetTable = c.targetTable AND c2.targetRowId = c.targetRowId
+            AND c2.kind = 'field' AND c2.field = c.field
+        )
+    `)) as unknown as [Array<Record<string, unknown>>];
+    rows = result;
+  } catch (err) {
+    if (isMissingTable(err)) return [];
+    throw err;
+  }
+  if (rows.length === 0) return [];
+  const unwrap = (v: unknown): unknown => {
+    const parsed = typeof v === "string" ? JSON.parse(v) : v;
+    return parsed && typeof parsed === "object" && "v" in parsed
+      ? (parsed as { v: unknown }).v
+      : null;
+  };
+  const ids = Array.from(new Set(rows.map(r => Number(r.rowId))));
+  // Through drizzle, not a raw SELECT, so a boolean reads as a boolean and
+  // compares equal to the logged `true` (a raw row hands back 1).
+  const table = STARTER_TABLES_BY_SQL_NAME[sqlTable];
+  if (!table) return [];
+  const current = (await db
+    .select()
+    .from(table)
+    .where(inArray(table.id, ids))) as Array<Record<string, unknown>>;
+  const byId = new Map(current.map(r => [Number(r.id), r]));
+  return rows.map(r => {
+    const newValue = unwrap(r.newValue);
+    const row = byId.get(Number(r.rowId));
+    const now = row?.[String(r.field)];
+    return {
+      rowId: Number(r.rowId),
+      field: String(r.field),
+      source: String(r.source),
+      oldValue: unwrap(r.oldValue),
+      newValue,
+      rowHoldsNew: row !== undefined && sameStarterValue(now, newValue),
+    };
+  });
+}
+
+/**
+ * The one field the boot still writes on an EXISTING shipped material by
+ * itself: `trade`, which the app keeps (`STARTER_FIELDS` "not-editable") and
+ * which moves no number.
+ *
+ * ── Until 2026-10-13 this was `backfillMaterialMetadata`, and it re-stamped
+ * price, labor hours, raceway facts, default qty and the Example tags from
+ * the seed on every start ─────────────────────────────────────────────────────
+ * That made the seed file the truth for every shared row on every database
+ * (CLAUDE.md § "Where a priced catalog lands", 2026-09-21), and it meant a
+ * deploy changed what every company without its own copy read — and wrote a
+ * seed value back over any change logged through applyStarterChange, with no
+ * log (baseline-screen-plan.md § 9 F2). Now those differences are a PROPOSAL
+ * (server/seedProposal.ts) that a person confirms, and the finding fields
+ * (category, aliases, description, Specialty) are applied by the boot as one
+ * logged `seed` batch (owner Q3, references/boot-seed-plan.md).
+ * `server/bootLeavesStarterNumbers.test.ts` goes red if a number pass returns.
+ *
+ * A brand-new database still gets every seed value: the INSERT above writes
+ * the whole row.
+ */
+async function stampMaterialTrade(catalog: BaselineMaterial[]): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const rows = await db
+    .select({ id: materials.id, name: materials.name, trade: materials.trade })
+    .from(materials)
+    .where(isNull(materials.userId));
+  const seedByName = new Map(catalog.map(m => [m.name, m]));
+  for (const row of rows) {
+    const intended = seedByName.get(row.name);
+    if (!intended) continue;
+    const want = intended.trade ?? "electrical";
+    if (row.trade !== want)
+      await db
+        .update(materials)
+        .set({ trade: want })
+        .where(and(eq(materials.id, row.id), isNull(materials.userId)));
+  }
+}
+
 /** The raceway facts of a seed row as column values — all NULL off a raceway. */
-function racewayColumns(m: BaselineMaterial): {
+export function racewayColumns(m: BaselineMaterial): {
   stickLengthFeet: string | null;
   stickJoint: string | null;
   strapSpacingFeet: string | null;
@@ -2460,112 +2499,6 @@ function racewayColumns(m: BaselineMaterial): {
     strapSpacingFeet: dec(r?.strapSpacingFeet),
     strapFromBoxFeet: dec(r?.strapFromBoxFeet),
   };
-}
-
-const RACEWAY_NUMBER_KEYS = [
-  "stickLengthFeet",
-  "strapSpacingFeet",
-  "strapFromBoxFeet",
-] as const;
-
-async function backfillMaterialMetadata(
-  catalog: BaselineMaterial[]
-): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-
-  const baselines = await db
-    .select({
-      id: materials.id,
-      name: materials.name,
-      category: materials.category,
-      searchAliases: materials.searchAliases,
-      defaultQty: materials.defaultQty,
-      description: materials.description,
-      trade: materials.trade,
-      costPerUnit: materials.costPerUnit,
-      stickLengthFeet: materials.stickLengthFeet,
-      stickJoint: materials.stickJoint,
-      strapSpacingFeet: materials.strapSpacingFeet,
-      strapFromBoxFeet: materials.strapFromBoxFeet,
-      laborHours: materials.laborHours,
-      fieldBendLaborHours: materials.fieldBendLaborHours,
-      isExamplePrice: materials.isExamplePrice,
-      isExampleLaborHours: materials.isExampleLaborHours,
-      isSpecialty: materials.isSpecialty,
-    })
-    .from(materials)
-    .where(isNull(materials.userId));
-
-  const seedByName = new Map(catalog.map(m => [m.name, m]));
-
-  for (const row of baselines) {
-    const intended = seedByName.get(row.name);
-    if (!intended) continue; // a baseline row no longer in the seed file
-
-    const patch: Partial<InsertMaterial> = {};
-    if (row.category !== intended.category) patch.category = intended.category;
-    if (row.searchAliases !== intended.searchAliases)
-      patch.searchAliases = intended.searchAliases;
-
-    const wantDescription = intended.description ?? null;
-    if (row.description !== wantDescription)
-      patch.description = wantDescription;
-
-    const wantTrade = intended.trade ?? "electrical";
-    if (row.trade !== wantTrade) patch.trade = wantTrade;
-
-    // Compared numerically: the column hands back "0.4000" where the seed says
-    // "0.0000", and a string compare would rewrite every row every startup.
-    if (Number(row.costPerUnit) !== Number(intended.costPerUnit)) {
-      patch.costPerUnit = intended.costPerUnit;
-    }
-
-    const wantQty =
-      intended.defaultQty != null ? intended.defaultQty.toFixed(4) : null;
-    if (row.defaultQty !== wantQty) patch.defaultQty = wantQty;
-
-    // The raceway facts the fitting count reads. Compared numerically for the
-    // same reason as the price: "10.00" against 10.
-    const wantRaceway = racewayColumns(intended);
-    for (const key of RACEWAY_NUMBER_KEYS) {
-      const have = row[key] === null ? null : Number(row[key]);
-      const want = wantRaceway[key] === null ? null : Number(wantRaceway[key]);
-      if (have !== want) patch[key] = wantRaceway[key];
-    }
-    if (row.stickJoint !== wantRaceway.stickJoint) {
-      patch.stickJoint = wantRaceway.stickJoint;
-    }
-
-    // Labor units, from the starter labor sheet (pricing/loadStarterSheets
-    // .mts) — re-stamped like the price, so a value loaded into the seed
-    // reaches every existing database on its next start. SHIPPED rows only,
-    // as everything in this pass: a company's own hours live on its fork and
-    // are never in this loop. Added 2026-10-07; measured that day, staging's
-    // 1,713 shipped rows held no hours at all, so the first run changes
-    // nothing. NULL compared as NULL, numbers numerically.
-    for (const key of ["laborHours", "fieldBendLaborHours"] as const) {
-      const want = intended[key] ?? null;
-      const have = row[key] === null ? null : Number(row[key]);
-      if (have !== (want === null ? null : Number(want))) patch[key] = want;
-    }
-    // The example tags travel with the numbers they describe (0132 / 0133).
-    // So does the Specialty tag (0140) — SHIPPED rows only, as everything in
-    // this pass: a company's copy is never tagged (catalog review
-    // 2026-10-08).
-    for (const key of [
-      "isExamplePrice",
-      "isExampleLaborHours",
-      "isSpecialty",
-    ] as const) {
-      const want = intended[key] ?? null;
-      if ((row[key] ?? null) !== want) patch[key] = want;
-    }
-
-    if (Object.keys(patch).length > 0) {
-      await db.update(materials).set(patch).where(eq(materials.id, row.id));
-    }
-  }
 }
 
 // ─── Labor Rates (Foundation library) ─────────────────────────────────────────
@@ -2766,15 +2699,20 @@ export async function seedBaselineLaborRates(): Promise<void> {
       .select({ name: laborRates.name })
       .from(laborRates)
       .where(isNull(laborRates.userId));
-    const alreadySeeded = new Set(existing.map(row => row.name));
+    const alreadySeeded = await namesTheStarterAlreadyHas(
+      "labor_rates",
+      "name",
+      existing.map(row => row.name)
+    );
 
     const missing = BASELINE_LABOR_RATES.filter(
       r => !alreadySeeded.has(r.name)
     ).map(r => ({ ...laborRateSeedColumns(r), userId: null }));
 
     if (missing.length > 0) await db.insert(laborRates).values(missing);
-
-    await backfillLaborRateAmounts();
+    // No re-stamp of an existing role's amounts since 2026-10-13: a rate is
+    // an offer (baseline-screen-plan.md F5), so a seed rate that differs is
+    // PROPOSED by server/seedProposal.ts, never written here.
   });
 }
 
@@ -2801,192 +2739,87 @@ export async function seedBaselineRunTypes(): Promise<void> {
     const db = await getDb();
     if (!db) return;
 
-    /*
-      Every material name a shipped type mentions.
-
-      The THIRD hand-written field list in this one function, and the third to
-      need the ground added by hand on 2026-09-20 — after `circuitWire` and
-      `forkRunType` had already been made structural for exactly this. Left as a
-      list here because each entry is a DIFFERENT KIND of link rather than a
-      row being copied wholesale, so there is nothing to spread; the cost is
-      that a fourth kind of material would have to be remembered in three
-      places. Worth revisiting if a fourth ever arrives.
-    */
-    const wanted = new Set(
-      BASELINE_RUN_TYPES.flatMap(t => [
-        t.racewayMaterialName,
-        t.conductorMaterialName,
-        t.groundMaterialName,
-        ...(t.extras ?? []).map(e => e.materialName),
-      ]).filter((n): n is string => Boolean(n))
-    );
-    const catalog =
-      wanted.size === 0
-        ? []
-        : await db
-            .select({ id: materials.id, name: materials.name })
-            .from(materials)
-            .where(
-              and(
-                isNull(materials.userId),
-                inArray(materials.name, Array.from(wanted))
-              )
-            );
+    // By name, through any rename still waiting to be confirmed — the run
+    // type names the seed's current spelling, the database may hold the old.
+    const materialIdByName = await shippedMaterialIdsByName();
     const materialId = (name: string | null) =>
-      name === null ? null : (catalog.find(m => m.name === name)?.id ?? null);
+      name === null ? null : (materialIdByName.get(name) ?? null);
 
     const existing = await db
       .select({
         id: takeoffRunTypes.id,
         label: takeoffRunTypes.label,
         pathType: takeoffRunTypes.pathType,
-        racewayMaterialId: takeoffRunTypes.racewayMaterialId,
-        conductorMaterialId: takeoffRunTypes.conductorMaterialId,
-        groundMaterialId: takeoffRunTypes.groundMaterialId,
       })
       .from(takeoffRunTypes)
       .where(isNull(takeoffRunTypes.userId));
 
     const key = (pathType: string, label: string) => `${pathType}:${label}`;
-    const alreadySeeded = new Map(
-      existing.map(row => [key(row.pathType, row.label), row])
+    const alreadySeeded = new Set(
+      existing.map(row => key(row.pathType, row.label))
+    );
+    // A label changed on the screen is not the seed's label missing
+    // (boot-seed-plan.md § 3.3b); `pathType` is a unit and never changes.
+    const labelsLoggedAway = new Set(
+      await namesLoggedAway("takeoff_run_types", "label")
     );
 
     const missing = BASELINE_RUN_TYPES.filter(
-      t => !alreadySeeded.has(key(t.pathType, t.label))
-    ).map(t => ({
-      userId: null,
-      label: t.label,
-      pathType: t.pathType,
-      racewayMaterialId: materialId(t.racewayMaterialName),
-      conductorMaterialId: materialId(t.conductorMaterialName),
-      conductorCount: t.conductorCount,
-      groundMaterialId: materialId(t.groundMaterialName),
-      groundCount: t.groundCount,
-    }));
-
-    if (missing.length > 0) await db.insert(takeoffRunTypes).values(missing);
+      t =>
+        !alreadySeeded.has(key(t.pathType, t.label)) &&
+        !labelsLoggedAway.has(t.label)
+    );
+    if (missing.length > 0)
+      await db.insert(takeoffRunTypes).values(
+        missing.map(t => ({
+          userId: null,
+          label: t.label,
+          pathType: t.pathType,
+          racewayMaterialId: materialId(t.racewayMaterialName),
+          conductorMaterialId: materialId(t.conductorMaterialName),
+          conductorCount: t.conductorCount,
+          groundMaterialId: materialId(t.groundMaterialName),
+          groundCount: t.groundCount,
+        }))
+      );
 
     /*
-      Repair a shipped row whose material link is empty because the catalog had
-      not seeded yet when it was written.
-
-      Only BASELINE rows, and only links that are NULL — a user's own fork is
-      invisible to this, and a link somebody deliberately changed is never
-      overwritten. Same boundary as the material price pass below.
+      ── What this no longer does on an EXISTING shipped type (2026-10-13) ──
+      It used to fill a NULL raceway / conductor / ground link, add a missing
+      extra, move links named in RUN_TYPE_MATERIAL_SWAPS and archive the types
+      in RETIRED_BASELINE_RUN_TYPES on every start. Each of those changes what
+      an existing type produces on a bid (baseline-screen-plan.md F4), so each
+      is now PROPOSED (server/seedProposal.ts) and applied only when somebody
+      confirms it. A type inserted just now gets its extras here, because it is
+      new: that is the brand-new database's path.
     */
-    for (const t of BASELINE_RUN_TYPES) {
-      const row = alreadySeeded.get(key(t.pathType, t.label));
-      if (!row) continue;
-      const patch: Record<string, number> = {};
-      const raceway = materialId(t.racewayMaterialName);
-      const conductor = materialId(t.conductorMaterialName);
-      const ground = materialId(t.groundMaterialName);
-      if (row.racewayMaterialId === null && raceway !== null)
-        patch.racewayMaterialId = raceway;
-      if (row.conductorMaterialId === null && conductor !== null)
-        patch.conductorMaterialId = conductor;
-      /*
-        The ground link, on the same NULL-only terms as the two above.
-
-        It matters more here than it looks: 0064 gave every shipped type a
-        ground COUNT and deliberately invented no ground WIRE, because a
-        migration cannot know which wire an existing type uses. The seed does
-        know — it is what we ship — so this is the pass that converges a
-        migrated database onto the same specification a fresh one is born with.
-        Without it, "+ ground" would stay unnameable on every existing install
-        for ever.
-      */
-      if (row.groundMaterialId === null && ground !== null)
-        patch.groundMaterialId = ground;
-      if (Object.keys(patch).length === 0) continue;
-      await db
-        .update(takeoffRunTypes)
-        .set(patch)
-        .where(eq(takeoffRunTypes.id, row.id));
-    }
-
-    await seedBaselineRunTypeExtras(db, materialId);
-    await swapBaselineRunTypeMaterials(db);
-    await retireBaselineRunTypes(db);
+    await seedBaselineRunTypeExtras(
+      db,
+      materialId,
+      new Set(missing.map(t => key(t.pathType, t.label)))
+    );
   });
 }
 
 /**
- * Move a SHIPPED run type's material link from one shipped row to another
- * (RUN_TYPE_MATERIAL_SWAPS, baselineRunTypes.ts). Only links that still name
- * the `from` row move — a re-pointed shipped type, and every company's own
- * type, are left as they are. Idempotent: once moved, nothing matches.
- *
- * A bid line already made from a moved link keeps its FROZEN material and
- * price (bid_line_items snapshots); only what the type buys from now on
- * changes.
+ * Every shipped material's id by name — plus, for a rename the seed already
+ * says but nobody has confirmed on this database, the NEW name pointing at the
+ * old row (references/boot-seed-plan.md § 3.3a). Exact, in JS: the column
+ * ignores case (see dedupeBaselineRows).
  */
-async function swapBaselineRunTypeMaterials(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
-): Promise<void> {
-  if (RUN_TYPE_MATERIAL_SWAPS.length === 0) return;
-  const names = RUN_TYPE_MATERIAL_SWAPS.flatMap(s => [s.from, s.to]);
+export async function shippedMaterialIdsByName(): Promise<Map<string, number>> {
+  const db = await getDb();
+  if (!db) return new Map();
   const rows = await db
     .select({ id: materials.id, name: materials.name })
     .from(materials)
-    .where(and(isNull(materials.userId), inArray(materials.name, names)));
-  // Exact, in JS: the column ignores case (see dedupeBaselineRows).
-  const idOf = (name: string) => rows.find(r => r.name === name)?.id;
-  const LINKS = [
-    "racewayMaterialId",
-    "conductorMaterialId",
-    "groundMaterialId",
-  ] as const;
-  for (const { from, to } of RUN_TYPE_MATERIAL_SWAPS) {
-    const fromId = idOf(from);
-    const toId = idOf(to);
-    if (fromId === undefined || toId === undefined) continue;
-    for (const link of LINKS) {
-      await db
-        .update(takeoffRunTypes)
-        .set({ [link]: toId })
-        .where(
-          and(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes[link], fromId))
-        );
-    }
+    .where(isNull(materials.userId));
+  const byName = new Map(rows.map(row => [row.name, row.id]));
+  for (const [from, to] of Object.entries(RENAMED_BASELINE_MATERIALS)) {
+    const id = byName.get(from);
+    if (id !== undefined && !byName.has(to)) byName.set(to, id);
   }
-}
-
-/**
- * Archive the SHIPPED run types the catalog no longer ships
- * (RETIRED_BASELINE_RUN_TYPES). Archived, not deleted: a run traced under one
- * resolves it still, and the palette stops offering it. Only an ACTIVE
- * shipped row is touched, so a second start changes nothing.
- */
-async function retireBaselineRunTypes(
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>
-): Promise<void> {
-  for (const { pathType, label } of RETIRED_BASELINE_RUN_TYPES) {
-    const due = (
-      await db
-        .select({ id: takeoffRunTypes.id, label: takeoffRunTypes.label })
-        .from(takeoffRunTypes)
-        .where(
-          and(
-            isNull(takeoffRunTypes.userId),
-            eq(takeoffRunTypes.pathType, pathType),
-            eq(takeoffRunTypes.label, label),
-            eq(takeoffRunTypes.status, "active")
-          )
-        )
-    ).filter(row => row.label === label);
-    if (due.length === 0) continue;
-    await db
-      .update(takeoffRunTypes)
-      .set({ status: "archived", archivedAt: new Date() })
-      .where(
-        inArray(
-          takeoffRunTypes.id,
-          due.map(row => row.id)
-        )
-      );
-  }
+  return byName;
 }
 
 /**
@@ -3005,13 +2838,18 @@ async function retireBaselineRunTypes(
  *
  * It never edits or deletes an existing shipped extra. Changing a shipped
  * extra's rate later is a deliberate seed change that needs its own pass.
+ *
+ * Since 2026-10-13 only for the types INSERTED in this same start (`newKeys`):
+ * an extra added to a type that already exists changes what that type
+ * produces on a bid, so it is proposed, not written (boot-seed-plan.md B17).
  */
 async function seedBaselineRunTypeExtras(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
-  materialId: (name: string | null) => number | null
+  materialId: (name: string | null) => number | null,
+  newKeys: ReadonlySet<string>
 ): Promise<void> {
   const shippedWithExtras = BASELINE_RUN_TYPES.filter(
-    t => (t.extras ?? []).length > 0
+    t => (t.extras ?? []).length > 0 && newKeys.has(`${t.pathType}:${t.label}`)
   );
   if (shippedWithExtras.length === 0) return;
 
@@ -3059,7 +2897,7 @@ async function seedBaselineRunTypeExtras(
  * A seed role as the columns it writes — named, not spread, so a field of
  * the seed type that is not a column (`example`) can never reach an insert.
  */
-function laborRateSeedColumns(r: BaselineLaborRate) {
+export function laborRateSeedColumns(r: BaselineLaborRate) {
   return {
     name: r.name,
     rateType: r.rateType,
@@ -3075,84 +2913,6 @@ function laborRateSeedColumns(r: BaselineLaborRate) {
     insurancePct: r.example?.insurancePct ?? null,
     benefitsPct: r.example?.benefitsPct ?? null,
   };
-}
-
-/**
- * Re-stamp shipped labor rates from the seed: the owner-approved EXAMPLE
- * loaded rates on the four field roles, $0 on the rest.
- *
- * Until 2026-10-07 this dragged every shipped rate back to $0: a plausible rate
- * nobody chose is indistinguishable on screen from one they did, and the rate
- * multiplies every line of a bid. It now writes the example rates — with
- * `isExampleRate` and the wage/burden parts in the SAME update, so a shipped
- * rate never exists without the flag that says what it is
- * (baselineLaborRates.ts).
- *
- * Only baseline rows. A user who has set a rate has set it on their own FORK,
- * which this cannot see — same boundary as the material price pass. A sent
- * bid never moves: its lines froze `snapshotLaborRate`.
- */
-async function backfillLaborRateAmounts(): Promise<void> {
-  const db = await getDb();
-  if (!db) return;
-
-  const rows = await db
-    .select({
-      id: laborRates.id,
-      name: laborRates.name,
-      hourlyCost: laborRates.hourlyCost,
-      annualSalary: laborRates.annualSalary,
-      annualHours: laborRates.annualHours,
-      isExampleRate: laborRates.isExampleRate,
-      baseWage: laborRates.baseWage,
-      payrollTaxPct: laborRates.payrollTaxPct,
-      workersCompPct: laborRates.workersCompPct,
-      insurancePct: laborRates.insurancePct,
-      benefitsPct: laborRates.benefitsPct,
-    })
-    .from(laborRates)
-    .where(isNull(laborRates.userId));
-
-  const intended = new Map(BASELINE_LABOR_RATES.map(r => [r.name, r]));
-
-  for (const row of rows) {
-    const want = intended.get(row.name);
-    if (!want) continue; // a starter role no longer shipped
-
-    const patch: Partial<InsertLaborRate> = {};
-    // Compared numerically: the column returns "22.0000" where the seed says
-    // "0.0000", and a string compare would rewrite every row every startup.
-    if (Number(row.hourlyCost) !== Number(want.hourlyCost)) {
-      patch.hourlyCost = want.hourlyCost;
-    }
-    if (Number(row.annualSalary ?? 0) !== Number(want.annualSalary ?? 0)) {
-      patch.annualSalary = want.annualSalary;
-    }
-    // Hours are NOT zeroed — see the note in baselineLaborRates.ts. They are
-    // still re-stamped so a row that lost them gets a usable divisor back.
-    if (Number(row.annualHours ?? 0) !== Number(want.annualHours ?? 0)) {
-      patch.annualHours = want.annualHours;
-    }
-    // The flag and the parts travel WITH the rate (0134).
-    const cols = laborRateSeedColumns(want);
-    if ((row.isExampleRate ?? null) !== cols.isExampleRate)
-      patch.isExampleRate = cols.isExampleRate;
-    for (const key of [
-      "baseWage",
-      "payrollTaxPct",
-      "workersCompPct",
-      "insurancePct",
-      "benefitsPct",
-    ] as const) {
-      const have = row[key] === null ? null : Number(row[key]);
-      const wantV = cols[key] === null ? null : Number(cols[key]);
-      if (have !== wantV) patch[key] = cols[key];
-    }
-
-    if (Object.keys(patch).length > 0) {
-      await db.update(laborRates).set(patch).where(eq(laborRates.id, row.id));
-    }
-  }
 }
 
 // ─── Modifiers (Foundation library) ───────────────────────────────────────────
@@ -3379,7 +3139,11 @@ export async function seedBaselineModifiers(): Promise<void> {
       .select({ name: modifiers.name })
       .from(modifiers)
       .where(isNull(modifiers.userId));
-    const alreadySeeded = new Set(existing.map(row => row.name));
+    const alreadySeeded = await namesTheStarterAlreadyHas(
+      "modifiers",
+      "name",
+      existing.map(row => row.name)
+    );
 
     const missing = BASELINE_MODIFIERS.filter(
       m => !alreadySeeded.has(m.name)
@@ -3822,12 +3586,45 @@ export async function getAssemblyMountKinds(
   userId: number
 ): Promise<Map<number, string>> {
   const kinds = new Map<number, string>();
+  (await resolveStoredAssemblies(storedIds, userId)).forEach((row, id) => {
+    if (row.mountHeightTypeKey !== null) kinds.set(id, row.mountHeightTypeKey);
+  });
+  return kinds;
+}
+
+/**
+ * The category of the assembly each STORED id means, forks followed like
+ * `getAssemblyMountKinds`. Read by the "Who does this?" prompts
+ * (shared/scopePrompts.ts): a troffer is a light fixture by its category
+ * even when its name never says "fixture".
+ */
+export async function getAssemblyCategories(
+  storedIds: readonly (number | null)[],
+  userId: number
+): Promise<Map<number, string>> {
+  const categories = new Map<number, string>();
+  (await resolveStoredAssemblies(storedIds, userId)).forEach((row, id) => {
+    categories.set(id, row.category);
+  });
+  return categories;
+}
+
+/**
+ * Each stored assembly id resolved to the row the company means: its own
+ * fork of a shipped row, or the row itself. Ids that resolve to nothing are
+ * left out. One query for any number of ids.
+ */
+async function resolveStoredAssemblies(
+  storedIds: readonly (number | null)[],
+  userId: number
+): Promise<Map<number, Assembly>> {
+  const resolved = new Map<number, Assembly>();
   const wanted = Array.from(
     new Set(storedIds.filter((id): id is number => id !== null))
   );
-  if (wanted.length === 0) return kinds;
+  if (wanted.length === 0) return resolved;
   const db = await getDb();
-  if (!db) return kinds;
+  if (!db) return resolved;
   const candidates = await db
     .select()
     .from(assemblies)
@@ -3846,10 +3643,10 @@ export async function getAssemblyMountKinds(
   // MERGE BEFORE RESOLVING, as getAssemblyForStoredReference does.
   const visible = mergeLibraryRows(candidates, userId);
   for (const id of wanted) {
-    const key = resolveAssembly(visible, id)?.mountHeightTypeKey ?? null;
-    if (key !== null) kinds.set(id, key);
+    const row = resolveAssembly(visible, id);
+    if (row) resolved.set(id, row);
   }
-  return kinds;
+  return resolved;
 }
 
 export async function getAssemblyDetail(
@@ -4173,18 +3970,18 @@ export async function createLaborStep(
 }
 
 /**
- * SEED the shipped step library and the starters' step lists (0143), on every
- * boot, after the starters themselves (server/seedShippedLibrary.ts).
+ * SEED the shipped step library (0143): insert a step the library does not
+ * have yet, with its seed minutes. Shared rows ONLY.
  *
- * Shared rows ONLY — every write is scoped `isNull(userId)`, so a company's
- * forked step or forked assembly is never touched (the seed rule in CLAUDE.md
- * § "Where a priced catalog lands"). Re-stamps only what differs, so a boot
- * with nothing changed writes nothing. Minutes come from the GENERATED
- * starterStepMinutes.ts, which ships empty: until the owner's sheet loads,
- * every shipped step is NOT SET and no number moves (plan § 13a).
- *
- * Also stamps the owner's overhead (Q2) and clears typed hours (Q7) for the
- * starters the loader listed — both empty today.
+ * ── Until 2026-10-13 it also re-stamped every existing step, retired steps,
+ * rewrote the starters' step lists and stamped overhead / cleared hours ──────
+ * Each of those changes the hours an existing starter prices at once minutes
+ * exist, so they are now PROPOSED (server/seedProposal.ts, "held" until
+ * applyStarterChange covers labor steps — baseline-screen-plan.md § 10a.1
+ * #1) and never written by a start (references/boot-seed-plan.md B20). A
+ * starter inserted in this start gets its step list from
+ * `seedBaselineAssemblies`, which is why this now runs BEFORE the assemblies
+ * (server/seedShippedLibrary.ts).
  *
  * Before 0143 the tables do not exist, and this does nothing.
  */
@@ -4192,141 +3989,87 @@ export async function seedStarterLaborSteps(): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await stepsTablesMissing(async () => {
-    // ── The library ──
     const shipped = await db
-      .select()
+      .select({ stepKey: laborSteps.stepKey })
       .from(laborSteps)
       .where(isNull(laborSteps.userId));
-    const byKey = new Map(
-      shipped.filter(r => r.stepKey !== null).map(r => [r.stepKey!, r])
-    );
-    const wantedKeys = new Set(STARTER_LABOR_STEPS.map(step => step.key));
-    for (const step of STARTER_LABOR_STEPS) {
-      const minutes = STARTER_STEP_MINUTES[step.key] ?? null;
-      const fields = {
-        name: step.name,
-        unit: step.unit,
-        reasoning: step.reasoning,
-        minutes: minutes === null ? null : Number(minutes).toFixed(2),
-        isExampleMinutes: minutes === null ? null : true,
-        isActive: true,
-      };
-      const row = byKey.get(step.key);
-      if (!row) {
-        const [result] = await db
-          .insert(laborSteps)
-          .values({ userId: null, stepKey: step.key, ...fields });
-        byKey.set(step.key, {
-          ...(fields as object),
-          id: result.insertId,
+    const have = new Set(shipped.map(r => r.stepKey));
+    const missing = STARTER_LABOR_STEPS.filter(step => !have.has(step.key));
+    if (missing.length === 0) return;
+    await db
+      .insert(laborSteps)
+      .values(
+        missing.map(step => ({
           userId: null,
-          baselineId: null,
           stepKey: step.key,
-        } as LaborStep);
-        continue;
-      }
-      const same =
-        row.name === fields.name &&
-        row.unit === fields.unit &&
-        row.reasoning === fields.reasoning &&
-        (row.minutes === null ? null : Number(row.minutes).toFixed(2)) ===
-          fields.minutes &&
-        (row.isExampleMinutes ?? null) === fields.isExampleMinutes &&
-        row.isActive === true;
-      if (!same)
-        await db
-          .update(laborSteps)
-          .set(fields)
-          .where(and(eq(laborSteps.id, row.id), isNull(laborSteps.userId)));
-    }
-    // Retire, never delete: an assembly pointing at it still resolves.
-    for (const row of shipped)
-      if (row.stepKey !== null && !wantedKeys.has(row.stepKey) && row.isActive)
-        await db
-          .update(laborSteps)
-          .set({ isActive: false })
-          .where(and(eq(laborSteps.id, row.id), isNull(laborSteps.userId)));
-
-    // ── The starters' step lists ──
-    const names = Object.keys(STARTER_ASSEMBLY_STEPS);
-    const starters =
-      names.length === 0
-        ? []
-        : await db
-            .select({ id: assemblies.id, name: assemblies.name })
-            .from(assemblies)
-            .where(
-              and(isNull(assemblies.userId), inArray(assemblies.name, names))
-            );
-    for (const starter of starters) {
-      const wanted = STARTER_ASSEMBLY_STEPS[starter.name].map(line =>
-        "cable" in line
-          ? { kind: "cable" as const, laborStepId: null, count: "1.00" }
-          : {
-              kind: "step" as const,
-              laborStepId: byKey.get(line.step)?.id ?? null,
-              count: line.count.toFixed(2),
-            }
+          ...starterStepFields(step),
+        }))
       );
-      // A key with no library row is a content fault; the test catches it.
-      if (wanted.some(l => l.kind === "step" && l.laborStepId === null))
-        continue;
-      const current = await db
-        .select()
-        .from(assemblyLaborSteps)
-        .where(eq(assemblyLaborSteps.assemblyId, starter.id))
-        .orderBy(asc(assemblyLaborSteps.sortOrder), asc(assemblyLaborSteps.id));
-      const same =
-        current.length === wanted.length &&
-        current.every(
-          (row, i) =>
-            row.kind === wanted[i].kind &&
-            (row.laborStepId ?? null) === wanted[i].laborStepId &&
-            Number(row.count).toFixed(2) === wanted[i].count
-        );
-      if (same) continue;
-      await db.transaction(async tx => {
-        await tx
-          .delete(assemblyLaborSteps)
-          .where(eq(assemblyLaborSteps.assemblyId, starter.id));
-        await tx.insert(assemblyLaborSteps).values(
-          wanted.map((line, i) => ({
-            assemblyId: starter.id,
-            kind: line.kind,
-            laborStepId: line.laborStepId,
-            count: line.count,
-            sortOrder: i,
-          }))
-        );
-      });
-    }
   }, undefined);
+}
 
-  // ── Owner Q2 / Q7, from the loader's generated file (empty today) ──
-  for (const [name, overhead] of Object.entries(STARTER_ASSEMBLY_OVERHEAD)) {
-    const hours = Number(overhead).toFixed(4);
+/** A shipped step's seed columns — the insert's, and the proposal's to compare. */
+export function starterStepFields(step: (typeof STARTER_LABOR_STEPS)[number]) {
+  const minutes = STARTER_STEP_MINUTES[step.key] ?? null;
+  return {
+    name: step.name,
+    unit: step.unit,
+    reasoning: step.reasoning,
+    minutes: minutes === null ? null : Number(minutes).toFixed(2),
+    isExampleMinutes: minutes === null ? null : true,
+    isActive: true,
+  };
+}
+
+/**
+ * A starter's seed step list as rows to write: `null` when a step key has no
+ * library row (a content fault; the content test catches it).
+ */
+export async function starterStepListLines(name: string): Promise<Array<{
+  kind: "cable" | "step";
+  laborStepId: number | null;
+  count: string;
+}> | null> {
+  const lines = STARTER_ASSEMBLY_STEPS[name];
+  if (!lines) return [];
+  const db = await getDb();
+  if (!db) return null;
+  const shipped = await db
+    .select({ id: laborSteps.id, stepKey: laborSteps.stepKey })
+    .from(laborSteps)
+    .where(isNull(laborSteps.userId));
+  const idOf = new Map(shipped.map(r => [r.stepKey, r.id]));
+  const wanted = lines.map(line =>
+    "cable" in line
+      ? { kind: "cable" as const, laborStepId: null, count: "1.00" }
+      : {
+          kind: "step" as const,
+          laborStepId: idOf.get(line.step) ?? null,
+          count: line.count.toFixed(2),
+        }
+  );
+  return wanted.some(l => l.kind === "step" && l.laborStepId === null)
+    ? null
+    : wanted;
+}
+
+/**
+ * Write a JUST-INSERTED starter's step list. Only the insert path calls this:
+ * a list on an existing starter is the proposal's business.
+ */
+async function writeNewStarterStepList(
+  assemblyId: number,
+  name: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await stepsTablesMissing(async () => {
+    const lines = await starterStepListLines(name);
+    if (!lines || lines.length === 0) return;
     await db
-      .update(assemblies)
-      .set({ overheadLaborHours: hours, isExampleHours: true })
-      .where(
-        and(
-          isNull(assemblies.userId),
-          eq(assemblies.name, name),
-          sql`(NOT (${assemblies.overheadLaborHours} <=> ${hours}) OR NOT (${assemblies.isExampleHours} <=> TRUE))`
-        )
-      );
-  }
-  if (STARTER_HOURS_CLEARED.length > 0)
-    await db
-      .update(assemblies)
-      .set({ baseLaborHours: null, isExampleHours: true })
-      .where(
-        and(
-          isNull(assemblies.userId),
-          inArray(assemblies.name, [...STARTER_HOURS_CLEARED]),
-          isNotNull(assemblies.baseLaborHours)
-        )
-      );
+      .insert(assemblyLaborSteps)
+      .values(lines.map((line, i) => ({ assemblyId, ...line, sortOrder: i })));
+  }, undefined);
 }
 
 /**
@@ -4675,196 +4418,26 @@ export async function seedBaselineAssemblies(
       )
       .limit(1);
 
-    /**
-     * Give the assemblies that shipped BEFORE this a role, too.
-     *
-     * The insert below only runs for assemblies not already present, so without
-     * this the fix would reach nobody who already has a database — including
-     * every existing account, where the silent $0 is happening right now.
-     *
-     * Deliberately narrow: baseline rows only (`userId IS NULL`) that have no
-     * role yet. A user's own assembly, and any baseline someone has already
-     * pointed at a different role, are left exactly as they are — this fills a
-     * gap, it does not overwrite a decision.
-     */
-    if (defaultRole) {
-      await db
-        .update(assemblies)
-        .set({ laborRateId: defaultRole.id })
-        .where(and(isNull(assemblies.userId), isNull(assemblies.laborRateId)));
-    }
-
-    /**
-     * Mark the branch whips on recipes that shipped BEFORE the flag existed.
-     *
-     * Same shape and same reason as the role repair above: **the insert below
-     * only runs for assemblies not already present**, so without this D18 would
-     * reach nobody who already has a database — the flag would be false
-     * everywhere, the per-job dial would move nothing, and the guard would have
-     * no branch wire to point at. It would look built and do nothing.
-     *
-     * Deliberately narrow, three ways. Baseline rows only (`userId IS NULL`),
-     * so a user's own recipe is never touched. Only the exact
-     * assembly-name/material-name pairs the seed file declares, so a line
-     * somebody added to a starter is left alone. And it only ever sets the flag
-     * TRUE — if an estimator has unmarked one of ours, that is a decision, and
-     * re-marking it on the next restart is the "fills a gap, does not overwrite
-     * a decision" line the role pass draws, crossed.
-     *
-     * Idempotent: running it twice marks the same rows.
-     */
-    const whipPairs = specs.flatMap(spec =>
-      spec.materials
-        .filter(line => line.branchWhip)
-        .map(line => ({
-          assembly: spec.name,
-          material: starterPartName(line.part),
-        }))
-    );
-    for (const pair of whipPairs) {
-      await db
-        .update(assemblyMaterials)
-        .set({ isBranchWhip: true })
-        .where(
-          and(
-            eq(assemblyMaterials.isBranchWhip, false),
-            inArray(
-              assemblyMaterials.assemblyId,
-              db
-                .select({ id: assemblies.id })
-                .from(assemblies)
-                .where(
-                  and(
-                    isNull(assemblies.userId),
-                    eq(assemblies.name, pair.assembly)
-                  )
-                )
-            ),
-            inArray(
-              assemblyMaterials.materialId,
-              db
-                .select({ id: materials.id })
-                .from(materials)
-                .where(
-                  and(
-                    isNull(materials.userId),
-                    eq(materials.name, pair.material)
-                  )
-                )
-            )
-          )
-        );
-    }
-
+    /*
+      ── What this no longer does on an EXISTING starter (2026-10-13) ──
+      It used to fill a NULL role, mark branch whips, re-stamp the
+      residential/commercial tag, re-stamp hours from the owner's hours sheet,
+      tick "Labor only" and fill "Mounts at" on every start. Each but the tag
+      changes what a starter prices or counts (baseline-screen-plan.md F6), so
+      they are PROPOSED by server/seedProposal.ts and applied only when
+      somebody confirms them; the tag is a finding field the boot applies as
+      a logged `seed` batch (owner Q3). A starter inserted below gets every one
+      of those values from the seed, which is the brand-new database's path.
+    */
     const existingRows = await db
       .select({ name: assemblies.name })
       .from(assemblies)
       .where(isNull(assemblies.userId));
-    const alreadySeeded = new Set(existingRows.map(row => row.name));
-
-    /**
-     * RE-STAMP the residential / commercial / both tag (`projectType`) on
-     * the SHARED starter rows from the seed, so a tag fixed in the seed file
-     * reaches databases already seeded (owner, 2026-10-07: DR1, DR2, DR16,
-     * DR17 → both). Same shape as the materials re-stamp of `category`:
-     * shared rows only (`userId IS NULL`) — a company's fork keeps its own
-     * tag — and only where it differs. Safe to repeat every start: the tag
-     * decides what a picker SHOWS, never what anything costs.
-     */
-    // One UPDATE per tag, not one per starter: this runs on every start.
-    const namesByTag = new Map<
-      NonNullable<BaselineAssembly["projectType"]>,
-      string[]
-    >();
-    for (const spec of specs) {
-      if (!alreadySeeded.has(spec.name) || spec.projectType === null) continue;
-      namesByTag.set(spec.projectType, [
-        ...(namesByTag.get(spec.projectType) ?? []),
-        spec.name,
-      ]);
-    }
-    for (const [tag, names] of Array.from(namesByTag.entries())) {
-      await db
-        .update(assemblies)
-        .set({ projectType: tag })
-        .where(
-          and(
-            isNull(assemblies.userId),
-            inArray(assemblies.name, names),
-            sql`NOT (${assemblies.projectType} <=> ${tag})`
-          )
-        );
-    }
-
-    /**
-     * RE-STAMP base hours from the owner's starter hours sheet
-     * (server/seed/starterAssemblyHours.ts, written by
-     * pricing/loadStarterSheets.mts) — for the starters LISTED there and no
-     * other, so a starter nobody filled in keeps whatever it has. Shared
-     * rows only; a company's fork has its own hours and is never in this
-     * pass. A sent bid never moves: its lines froze their hours. Inert while
-     * the map is empty (server/starterValues.test.ts keeps it empty until
-     * "Example hours" exists). Added 2026-10-07.
-     */
-    for (const spec of specs) {
-      const hours = STARTER_ASSEMBLY_HOURS[spec.name];
-      if (hours === undefined || !alreadySeeded.has(spec.name)) continue;
-      await db
-        .update(assemblies)
-        // The number and its "Example hours" tag together (0133).
-        .set({ baseLaborHours: hours, isExampleHours: true })
-        .where(
-          and(
-            isNull(assemblies.userId),
-            eq(assemblies.name, spec.name),
-            sql`(NOT (${assemblies.baseLaborHours} <=> ${hours}) OR NOT (${assemblies.isExampleHours} <=> TRUE))`
-          )
-        );
-    }
-
-    /**
-     * Tick "Labor only" on a shipped starter that ships ticked but was seeded
-     * before it did (0105). Same narrow shape as the role and whip passes:
-     * shared rows only, named in the seed, and only where NOTHING was said
-     * (`laborOnly IS NULL`) — a starter somebody unticked keeps their
-     * answer, and a company's fork is never touched.
-     */
-    const laborOnlyNames = specs
-      .filter(spec => spec.laborOnly === true)
-      .map(spec => spec.name);
-    if (laborOnlyNames.length > 0) {
-      await db
-        .update(assemblies)
-        .set({ laborOnly: true })
-        .where(
-          and(
-            isNull(assemblies.userId),
-            isNull(assemblies.laborOnly),
-            inArray(assemblies.name, laborOnlyNames)
-          )
-        );
-    }
-
-    /**
-     * "Mounts at" on a shipped starter seeded before it said one (owner,
-     * 2026-10-07: data / TV outlets). Same narrow shape as the passes above:
-     * shared rows only, named in the seed, and only where NOTHING was said —
-     * a company's fork, and a starter somebody already pointed elsewhere,
-     * keep their answer.
-     */
-    for (const spec of specs) {
-      if (!spec.mountsAt) continue;
-      await db
-        .update(assemblies)
-        .set({ mountHeightTypeKey: spec.mountsAt })
-        .where(
-          and(
-            isNull(assemblies.userId),
-            isNull(assemblies.mountHeightTypeKey),
-            eq(assemblies.name, spec.name)
-          )
-        );
-    }
+    const alreadySeeded = await namesTheStarterAlreadyHas(
+      "assemblies",
+      "name",
+      existingRows.map(row => row.name)
+    );
 
     /**
      * Starters the schema cannot hold yet wait, named, rather than seeding
@@ -4891,13 +4464,8 @@ export async function seedBaselineAssemblies(
     });
     if (pending.length === 0) return;
 
-    const baselineMaterialRows = await db
-      .select({ id: materials.id, name: materials.name })
-      .from(materials)
-      .where(isNull(materials.userId));
-    const materialIdByName = new Map(
-      baselineMaterialRows.map(row => [row.name, row.id])
-    );
+    // Through any rename the seed says and this database has not confirmed.
+    const materialIdByName = await shippedMaterialIdsByName();
 
     const baselineModifierRows = await db
       .select({ id: modifiers.id, name: modifiers.name })
@@ -4940,6 +4508,12 @@ export async function seedBaselineAssemblies(
         laborOnly: spec.laborOnly === true ? true : null,
         // The height type its device mounts at, when the seed says one.
         mountHeightTypeKey: spec.mountsAt ?? null,
+        // Owner Q2 / Q7 from the loader's generated file (empty today) — on
+        // the insert, where the old step pass stamped them a moment later.
+        ...newStarterOverheadAndClear(
+          spec.name,
+          starterHoursValue(spec) !== null
+        ),
       });
       const assemblyId = result.insertId;
 
@@ -4956,8 +4530,29 @@ export async function seedBaselineAssemblies(
         .map(name => modifierIdByName.get(name))
         .filter((id): id is number => id !== undefined);
       await setAssemblyModifiers(assemblyId, modifierIds);
+      // Its step list too: the step library is seeded first (0143).
+      await writeNewStarterStepList(assemblyId, spec.name);
     }
   });
+}
+
+/** A new starter's overhead (owner Q2) and cleared hours (Q7), from the seed. */
+function newStarterOverheadAndClear(
+  name: string,
+  hasHours: boolean
+): Partial<InsertAssembly> {
+  const out: Partial<InsertAssembly> = {};
+  const overhead = STARTER_ASSEMBLY_OVERHEAD[name];
+  if (overhead !== undefined) {
+    out.overheadLaborHours = Number(overhead).toFixed(4);
+    out.isExampleHours = true;
+  }
+  // As the old pass: only hours that are there are cleared (and tagged).
+  if (hasHours && STARTER_HOURS_CLEARED.includes(name)) {
+    out.baseLaborHours = null;
+    out.isExampleHours = true;
+  }
+  return out;
 }
 
 // ─── Pricing Defaults (company level) ─────────────────────────────────────────
@@ -16932,4 +16527,102 @@ export async function loadBidHomeruns(
     // Areas and sheet ceilings arrive in `heights.ceilings`, the one rule.
     heights,
   });
+}
+
+// ── The starter, as the baseline screen reads it (baseline-screen-plan.md) ──
+//
+// SHARED ROWS ONLY — `userId IS NULL` on every read. The starter editor has
+// no company (starterAuthRouter.ts), so there is no fork to merge and no
+// company row it may see: a company's own copy is that company's data. Each
+// read also says what it leaves out, so the screen's counts can be checked.
+
+/** Every shared material still in the catalog (retired rows left out). */
+export async function getStarterMaterials(): Promise<Material[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(materials)
+    .where(and(isNull(materials.userId), eq(materials.isActive, true)));
+}
+
+/** Every shared assembly still in the library. */
+export async function getStarterAssemblies(): Promise<Assembly[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(assemblies)
+    .where(and(isNull(assemblies.userId), eq(assemblies.isActive, true)))
+    .orderBy(asc(assemblies.name));
+}
+
+/** One SHARED assembly by id; a company's row answers undefined. */
+export async function getStarterAssemblyById(
+  id: number
+): Promise<Assembly | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select()
+    .from(assemblies)
+    .where(and(eq(assemblies.id, id), isNull(assemblies.userId)))
+    .limit(1);
+  return row;
+}
+
+/**
+ * A shared assembly's parts, joined to the material each line STORES. A
+ * shared recipe points at shared materials, so there is no fork to follow;
+ * the join is still limited to shared rows, so a line pointing anywhere else
+ * shows as a missing part rather than a company's item.
+ */
+export async function getStarterAssemblyParts(assemblyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      lineId: assemblyMaterials.id,
+      materialId: assemblyMaterials.materialId,
+      qty: assemblyMaterials.qty,
+      overrideLaborHours: assemblyMaterials.overrideLaborHours,
+      name: materials.name,
+      unitOfSale: materials.unitOfSale,
+      costPerUnit: materials.costPerUnit,
+      isExamplePrice: materials.isExamplePrice,
+    })
+    .from(assemblyMaterials)
+    .leftJoin(
+      materials,
+      and(
+        eq(materials.id, assemblyMaterials.materialId),
+        isNull(materials.userId)
+      )
+    )
+    .where(eq(assemblyMaterials.assemblyId, assemblyId))
+    .orderBy(asc(assemblyMaterials.id));
+}
+
+/** Every shared labor rate still in use. */
+export async function getStarterLaborRates(): Promise<LaborRate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(laborRates)
+    .where(and(isNull(laborRates.userId), eq(laborRates.isActive, true)))
+    .orderBy(asc(laborRates.name));
+}
+
+/** Every shared run type in the active list. */
+export async function getStarterRunTypes() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(takeoffRunTypes)
+    .where(
+      and(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes.status, "active"))
+    )
+    .orderBy(asc(takeoffRunTypes.label));
 }
