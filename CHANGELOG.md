@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Modifiers keep your typing when a save fails.** Editing a job condition
+  and losing the connection used to throw the change away; now the editor
+  opens again with what you typed. Adding one no longer says "Added" before
+  it actually is, and keeps the form filled in if it fails.
+
 - **"Fix this line" no longer turns "1,5" into 15.** Typing hours or a price
   with a comma as the decimal point used to be read as fifteen on the bid;
   now it's refused with "must be a number" so the line never takes a number

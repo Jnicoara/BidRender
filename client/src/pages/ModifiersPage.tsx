@@ -18,7 +18,7 @@
  * is intentionally not paginated: the starter set is five and this is a list a
  * user curates by hand, so it stays small by design.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { parseTypedNumber } from "@/lib/inlineEdit";
 import { toast } from "sonner";
@@ -162,7 +162,8 @@ function ModifierRow({
   onArchive,
 }: {
   modifier: Modifier;
-  onSave: (id: number, draft: Draft) => void;
+  /** Resolves false when the save was refused (its toast says why). */
+  onSave: (id: number, draft: Draft) => Promise<boolean>;
   onRevert: (modifier: Modifier) => void;
   onArchive: (modifier: Modifier) => void;
 }) {
@@ -175,8 +176,16 @@ function ModifierRow({
       toast.error(problem);
       return;
     }
-    onSave(modifier.id, draft);
+    // Closes at once (the change shows straight away, optimistically) — and
+    // reopens holding what was typed if the save is refused, rather than
+    // leaving the person to type it all again (todo.md, 2026-10-15).
+    const typed = draft;
     setEditing(false);
+    void onSave(modifier.id, typed).then(saved => {
+      if (saved) return;
+      setDraft(typed);
+      setEditing(true);
+    });
   };
 
   if (editing) {
@@ -425,6 +434,7 @@ export default function ModifiersPage() {
     onSettled: refreshBoth,
   });
 
+  const creating = useRef(false);
   const createModifier = trpc.modifiers.create.useMutation({
     onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
@@ -470,34 +480,60 @@ export default function ModifiersPage() {
 
   const handleSave = useCallback(
     (id: number, draft: Draft) => {
-      updateModifier.mutate({
-        id,
-        name: draft.name.trim(),
-        laborAdjustmentPct: toFraction(typedPercent(draft.percent)),
-      });
+      return updateModifier
+        .mutateAsync({
+          id,
+          name: draft.name.trim(),
+          laborAdjustmentPct: toFraction(typedPercent(draft.percent)),
+        })
+        .then(
+          () => true,
+          () => false
+        );
     },
     [updateModifier]
   );
 
   const handleCreate = useCallback(() => {
+    // One add at a time: the form now stays until the server answers, so a
+    // second Enter must not send a second one (a ref — set in this call).
+    if (creating.current) return;
     const problem = validateDraft(newDraft);
     if (problem) {
       toast.error(problem);
       return;
     }
-    createModifier.mutate({
-      name: newDraft.name.trim(),
-      laborAdjustmentPct: toFraction(typedPercent(newDraft.percent)),
-    });
-    toast.success(`Added "${newDraft.name.trim()}"`);
-    setNewDraft(emptyDraft);
-    setAdding(false);
+    creating.current = true;
+    const name = newDraft.name.trim();
+    // "Added" and the cleared form only once it IS added. Both happened at
+    // once until 2026-10-15, so a refused add said "Added" beside the error
+    // and threw away what was typed.
+    createModifier.mutate(
+      {
+        name,
+        laborAdjustmentPct: toFraction(typedPercent(newDraft.percent)),
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Added "${name}"`);
+          setNewDraft(emptyDraft);
+          setAdding(false);
+        },
+        onSettled: () => {
+          creating.current = false;
+        },
+      }
+    );
   }, [createModifier, newDraft]);
 
   const confirmDelete = useCallback(() => {
     if (!pendingDelete) return;
-    deleteForever.mutate({ id: pendingDelete.id });
-    toast.success(`Deleted "${pendingDelete.name}" permanently`);
+    const { id, name } = pendingDelete;
+    // Said once it is true, not before (2026-10-15).
+    deleteForever.mutate(
+      { id },
+      { onSuccess: () => toast.success(`Deleted "${name}" permanently`) }
+    );
     setPendingDelete(null);
   }, [deleteForever, pendingDelete]);
 
