@@ -16,6 +16,15 @@ questions: `morning-questions-a.md`.
   `personalCompanyRace.test.ts` is a normal test (12 parallel), red without
   the lock. DB rule drafted in `references/drafts/personal-company-unique.sql`
   (NOT in `drizzle/`), rehearsed on a throwaway schema.
+- **Gate OUTAGE fixed (on this branch only):** every track's Gate failed
+  tonight pulling MySQL from AWS's mirror ("Data limit exceeded"). Test job
+  now uses the runner's preinstalled MySQL. **B and C stay red until this
+  reaches local-dev** (owner's merge).
+- **2. Private repo** (`private-repo-plan.md`): measured ≈ 17,400 billed
+  min/month; Gate now FULL / DOCS / SEEN (+ drizzle-guard folded in) →
+  ≈ 10,000. Still ~5× the free 2,000 — **money decision in
+  `morning-questions-a.md` § 1 before the switch**, or Actions stop ≈ day 6.
+  DigitalOcean reads the repo through the GitHub app per our docs (check § 4).
 
 ## (earlier) 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
 

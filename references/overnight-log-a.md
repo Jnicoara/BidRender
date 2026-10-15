@@ -22,3 +22,24 @@ files only (B and C also running). MySQL 3307 shared — left running.
   owner). Rehearsed on a throwaway schema (dropped): re-run 0 rows,
   second personal company `ER_DUP_ENTRY`; MySQL 1093 measured for the naive
   form. Plan: `references/signup-race-plan.md`.
+
+## Item 2 — GitHub minutes / private repo — 22:20 → 23:40
+
+- **Outage found and fixed first:** every track's Gate failed tonight pulling
+  `public.ecr.aws/docker/library/mysql:8.0` ("toomanyrequests: Data limit
+  exceeded"; 38683716637 here, 38684208140 track-b). Test job now starts the
+  runner's preinstalled MySQL — no pull. Gate 38684649809 (that change).
+- **Measured** 633 runs / 13.25 days from the API, each job rounded up:
+  7,680 min → **≈ 17,400 / month**. 202 docs-only pushes (2,261 min), 102
+  re-tests of an already-green commit (927), drizzle-guard 374 for 8 s jobs.
+- **Gate change:** FULL / DOCS / SEEN modes in the test job; drizzle-guard
+  folded in; no deploy/smoke after DOCS. `.github/docs-only-tests.txt` +
+  `server/docsOnlyGate.test.ts` (red with an entry removed). Mode logic
+  dry-run in bash on real commits: docs-only `0a9d5709` → docs; code
+  commits, zero/unknown `before` → full.
+- **Replay** under the new rules: 7,680 → 4,429 → **≈ 10,000 / month (−42%)**.
+  Still ~5×; options + money question → morning question 1. Private repos
+  get a 2-CPU runner (vs 4), so the suite will be slower.
+- **DigitalOcean**: docs say GitHub integration + autodeploy → fine when
+  private; not verified against the dashboard (morning question 2).
+- Tests: docs list with no DB 29 passed / 6 DB-skipped; `pnpm check` clean.

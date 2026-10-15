@@ -3,7 +3,10 @@
 #
 # 1. Every push to local-dev, a track-* or an a-* branch, and every pull
 #    request, runs `pnpm check` and the full vitest suite against a brand-new
-#    MySQL migrated from drizzle/ and seeded the way the server seeds itself.
+#    MySQL migrated from drizzle/ and seeded the way the server seeds itself
+#    — or less, ONLY where less cannot change the answer: a docs-only push
+#    runs the doc-reading tests, and a commit that already passed the full
+#    suite is not re-tested (the "test" job's FULL / DOCS / SEEN, below).
 # 2. A green push to local-dev then pushes the same commit to `staging` —
 #    CODE ONLY: anything under drizzle/ that differs from what staging runs is
 #    refused, because migrations are applied by hand, with a backup, by
@@ -43,35 +46,6 @@ permissions:
   contents: read
 
 jobs:
-  # Migrations stay with Track A (plan § 2). A track branch whose OWN commits
-  # touch drizzle/ goes red here, before it can be merged.
-  #
-  # "Own" is the point: `git log --no-merges origin/local-dev..HEAD` lists the
-  # commits on this branch that local-dev does not have, leaving out merge
-  # commits. A's migrations that arrived by merging local-dev in are already on
-  # local-dev, so they never appear — a plain diff against local-dev would flag
-  # them, or flag a branch for merely being behind.
-  drizzle-guard:
-    if: startsWith(github.head_ref || github.ref_name, 'track-')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Refuse migrations written on a track branch
-        run: |
-          git fetch --no-tags origin local-dev
-          commits=$(git log --no-merges --format='%h %s' origin/local-dev..HEAD -- drizzle/)
-          if [ -n "$commits" ]; then
-            echo "::error::This track branch changes drizzle/. Migrations are Track A's: hand the column to A in todo.md instead."
-            echo "Commits on this branch that touch drizzle/:"
-            echo "$commits"
-            git log --no-merges --name-only --format='--- %h' origin/local-dev..HEAD -- drizzle/
-            exit 1
-          fi
-          echo "No commit of this branch touches drizzle/."
-
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -86,6 +60,29 @@ jobs:
     # GitHub's runners share IPs, so either limit is spent by strangers, and
     # the job failed before a single test ran. The preinstalled server cannot
     # be rate-limited and needs no secret.
+    #
+    # ── What this job runs: FULL, DOCS or SEEN (references/private-repo-plan.md)
+    # Since the repo went private every job-minute is billed, rounded UP per
+    # job. So the job first decides how much testing this push needs, and
+    # nothing that can change a result is ever tested less:
+    #
+    #   FULL  — the default: typecheck, migrate, seed, the whole suite.
+    #   DOCS  — every file this push changed is documentation (`*.md`, or
+    #           anything under references/). Runs only the tests that READ
+    #           documentation, listed in .github/docs-only-tests.txt, which
+    #           server/docsOnlyGate.test.ts keeps complete. No deploy follows:
+    #           staging gets the commit with the next code push.
+    #   SEEN  — this exact commit already passed the FULL suite in another
+    #           Gate run (a track tip fast-forwarded onto local-dev). Same
+    #           commit, same files, same result; the deploy and smoke still run.
+    #
+    # Anything it cannot classify — a pull request, a new branch, a force
+    # push whose `before` is gone, a failed API call — is FULL.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
     env:
       # Loopback, and `test` as its own word: what checkTestDatabase
       # (scripts/databaseGuard.ts) requires before the suite will run at all.
@@ -93,22 +90,86 @@ jobs:
       DATABASE_URL: mysql://root:root@127.0.0.1:3306/bidrender_test_ci
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history: the drizzle guard and the docs-only diff both need it.
+          fetch-depth: 0
+
+      - name: Decide FULL, DOCS or SEEN
+        id: mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          mode=full
+          if [ "${{ github.event_name }}" = "push" ] && [ -n "$BEFORE" ] &&
+             [ "$BEFORE" != "0000000000000000000000000000000000000000" ] &&
+             git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            code=$(printf '%s\n' "$changed" | grep -vE '(\.md$|^references/)' | grep -v '^$' || true)
+            if [ -n "$changed" ] && [ -z "$code" ]; then mode=docs; fi
+          fi
+          if [ "$mode" = full ]; then
+            # A run of this workflow on this commit whose "Test suite" step
+            # passed. Only that step counts: a DOCS or SEEN run is a success
+            # without having run the suite.
+            for id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&status=success&per_page=50" \
+                --jq ".workflow_runs[] | select(.name == \"$GITHUB_WORKFLOW\" and .id != $GITHUB_RUN_ID) | .id" 2>/dev/null || true); do
+              passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+                --jq '.jobs[] | select(.name == "test") | .steps[] | select(.name == "Test suite") | .conclusion' 2>/dev/null || true)
+              if [ "$passed" = success ]; then mode=seen; echo "Full suite already passed on this commit: run $id"; break; fi
+            done
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "::notice::Gate mode: $mode"
+
+      # Migrations stay with Track A (plan § 2). A track branch whose OWN
+      # commits touch drizzle/ goes red here, before it can be merged. Was its
+      # own job until 2026-10-14; a job is billed a whole minute for its 8 s.
+      #
+      # "Own" is the point: `git log --no-merges origin/local-dev..HEAD` lists
+      # the commits on this branch that local-dev does not have, leaving out
+      # merge commits. A's migrations that arrived by merging local-dev in are
+      # already on local-dev, so they never appear — a plain diff against
+      # local-dev would flag them, or flag a branch for merely being behind.
+      - name: Refuse migrations written on a track branch
+        if: startsWith(github.head_ref || github.ref_name, 'track-')
+        run: |
+          git fetch --no-tags origin local-dev
+          commits=$(git log --no-merges --format='%h %s' origin/local-dev..HEAD -- drizzle/)
+          if [ -n "$commits" ]; then
+            echo "::error::This track branch changes drizzle/. Migrations are Track A's: hand the column to A in todo.md instead."
+            echo "Commits on this branch that touch drizzle/:"
+            echo "$commits"
+            git log --no-merges --name-only --format='--- %h' origin/local-dev..HEAD -- drizzle/
+            exit 1
+          fi
+          echo "No commit of this branch touches drizzle/."
 
       - uses: pnpm/action-setup@v4
+        if: steps.mode.outputs.mode != 'seen'
 
       - uses: actions/setup-node@v4
+        if: steps.mode.outputs.mode != 'seen'
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install
+        if: steps.mode.outputs.mode != 'seen'
         run: pnpm install --frozen-lockfile
+
+      # No database: none of these needs one (server/docsOnlyGate.test.ts).
+      - name: Documentation tests (DOCS only)
+        if: steps.mode.outputs.mode == 'docs'
+        run: DATABASE_URL= npx vitest run $(grep -v '^#' .github/docs-only-tests.txt)
 
       # Cheapest check first, so a type error fails in a minute.
       - name: Typecheck (app and tests)
+        if: steps.mode.outputs.mode == 'full'
         run: pnpm check
 
       - name: Start MySQL (preinstalled on the runner)
+        if: steps.mode.outputs.mode == 'full'
         run: |
           sudo systemctl start mysql.service
           for i in $(seq 1 30); do
@@ -120,26 +181,33 @@ jobs:
       # utf8mb4_unicode_ci is not optional: a database created with the server
       # default dies at migration 0055 (ER_CANT_AGGREGATE_2COLLATIONS).
       - name: Create the test database
+        if: steps.mode.outputs.mode == 'full'
         run: >-
           mysql -h 127.0.0.1 -P 3306 -uroot -proot -e
           "CREATE DATABASE bidrender_test_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 
       # Every migration from zero — which also proves they still apply cleanly.
       - name: Migrate
+        if: steps.mode.outputs.mode == 'full'
         run: npx tsx scripts/migrate.mts
 
       # The server seeds the shipped library on start and the tests never do;
       # without this, 11 tests that need the shipped run types fail.
       - name: Seed the shipped library
+        if: steps.mode.outputs.mode == 'full'
         run: npx tsx scripts/seedBaseline.mts
 
+      # This step's NAME is read by the SEEN check above. Rename both together.
       - name: Test suite
+        if: steps.mode.outputs.mode == 'full'
         run: pnpm test
 
   # ── Piece 2: code-only auto-deploy to staging ────────────────────────────
   deploy-staging:
     needs: test
-    if: github.event_name == 'push' && github.ref_name == 'local-dev'
+    # Not after a DOCS run: nothing a person can see changed, and a staging
+    # rebuild plus a smoke is about ten billed minutes for it.
+    if: github.event_name == 'push' && github.ref_name == 'local-dev' && needs.test.outputs.mode != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

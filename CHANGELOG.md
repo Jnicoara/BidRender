@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **The automatic test run costs far fewer minutes, ahead of the code going
+  private.** A push that only changes notes now runs just the checks that
+  read notes, and a version that already passed every test is not tested
+  again; nothing that could change a result is skipped. The same change
+  fixes tonight's outage, where every test run failed because the public
+  source of its database software refused to hand it over.
+
 - **A new account now gets exactly one company, even when its first screen
   sends many requests at once.** One live sign-up had ended up owning five
   identical companies created in the same second, which quietly gave one
