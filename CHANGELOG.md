@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Another website can no longer act as you.** While you were signed in, a
+  page on any other site could quietly send BidRidge a request that cleared
+  your logo, removed the sample bid or accepted every labor-step
+  suggestion. The server now only takes changes from BidRidge's own screens.
+- **Only the owner or an admin changes the letterhead and proposal look.**
+  Estimators could change the company's branding and every proposal's
+  defaults, which their role was never meant to allow. They now see those
+  settings read-only, with a line saying who can change them.
+
 - **Closed security gaps found by an automated "attacker" test.** A new test
   signs in as a stranger from another company and calls every one of the
   server's 403 routes with the first company's ids. It found that saving an

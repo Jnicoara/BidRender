@@ -50,7 +50,14 @@ import {
 } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { inputsFor, type Pool } from "./attack/inputs";
-import { Db, idsOwnedBy, judge, type Finding } from "./attack/snapshot";
+import {
+  Db,
+  idsOwnedBy,
+  judge,
+  plantRow,
+  touched,
+  type Finding,
+} from "./attack/snapshot";
 
 const VICTIM = 9473;
 const VIEWER = 9474;
@@ -59,6 +66,9 @@ const STRANGER = 9476;
 const ALL = [VICTIM, VIEWER, ESTIMATOR, STRANGER];
 
 const MARKER = "VICTIMSECRET";
+/** The victim's planted number (prices, quantities, points). See inputs.ts. */
+const NUMBER = 87654.321;
+const NUMBER_TEXT = "87654.32";
 const hasDb = Boolean(process.env.DATABASE_URL);
 const describeDb = hasDb ? describe : describe.skip;
 
@@ -114,6 +124,61 @@ const SKIPPED: Record<string, string> = {
   "backup.run":
     "Platform-admin only (adminProcedure — the stranger is role 'user'), and it would stream the whole database to R2. Its gate is the same middleware as backup.status, which IS called.",
 };
+
+/**
+ * What an estimator's role leaves out, as the tables it would change:
+ * pricing.edit (company defaults, markup bands, tax areas, labor rates, the
+ * company's heights and extras), settings.edit (branding, proposal
+ * defaults), members.manage (members, invites, the company row).
+ */
+const OWNER_ONLY_TABLES = [
+  "pricing_defaults",
+  "markup_rules",
+  "tax_jurisdictions",
+  "labor_rates",
+  "takeoff_height_defaults",
+  "takeoff_extra_defaults",
+  "takeoff_bend_defaults",
+  "takeoff_mounting_heights",
+  "company_branding",
+  "proposal_settings",
+  "companies",
+  "company_members",
+  "company_invites",
+];
+
+/** Estimator changes to those tables that are not a role hole, with why. */
+const ESTIMATOR_EXPLAINED: Record<string, string> = {
+  "sample.remove bids":
+    "Removes the shipped EXAMPLE bid (isSample) and nothing else — a hard delete by design (sampleRouter: a finished-with sample should leave no trace). Not a real job, so not bids.delete.",
+};
+
+/** Tables a victim row is planted in when its flows did not make one. */
+const PLANTED = [
+  "assembly_hour_suggestions",
+  "assembly_modifiers",
+  "bid_closeout_lines",
+  "bid_height_areas",
+  "bid_math_changes",
+  "bid_panel_circuits",
+  "bid_pdf_legend_entries",
+  "bid_quotes",
+  "bid_unit_links",
+  "company_invites",
+  "master_assembly_items",
+  "plan_copilot_runs",
+  "plan_copilot_findings",
+  "plan_copilot_corrections",
+  "ai_correction_log",
+  "price_imports",
+  "price_import_rows",
+  "pricing_problem_reports",
+  "project_assembly_items",
+  "symbol_looks",
+  "takeoff_pull_points",
+  "takeoff_run_tees",
+  "user_materials_db",
+];
 
 /** Mutations that destroy: run LAST, so the victim's data is there for the rest. */
 const DESTRUCTIVE =
@@ -179,6 +244,12 @@ function leaks(
     text = JSON.stringify(reply) ?? "";
   } catch {
     text = String(reply);
+  }
+  if (text.includes(NUMBER_TEXT)) {
+    const at = text.indexOf(NUMBER_TEXT);
+    found.push(
+      `planted number: …${text.slice(Math.max(0, at - 80), at + 20)}…`
+    );
   }
   if (text.toUpperCase().includes(MARKER)) {
     const at = text.toUpperCase().indexOf(MARKER);
@@ -356,6 +427,7 @@ describeDb("an attacker with a normal login, against every route", () => {
           companies: [victimCompanyId],
         },
         marker: MARKER,
+        number: NUMBER,
       };
       for (const [path, proc] of Object.entries(PROCS)) {
         if (proc._def.type !== "mutation") continue;
@@ -371,6 +443,18 @@ describeDb("an attacker with a normal login, against every route", () => {
         }
       }
     }
+    // Tables the flows above did not reach get one planted row each, so
+    // nothing is out of the attack's reach just because the victim never
+    // used it. Twice, so a child can point at a parent planted first.
+    const planted: Record<string, string | null> = {};
+    for (let pass = 0; pass < 2; pass++) {
+      const now = idsOwnedBy(db, await db.snapshot(), VICTIM);
+      for (const table of PLANTED) {
+        if (now[table]?.length || planted[table] === null) continue;
+        planted[table] = await plantRow(db, table, VICTIM, now, MARKER, NUMBER);
+      }
+    }
+    report.planted = planted;
     const snap = await db.snapshot();
     const owned = idsOwnedBy(db, snap, VICTIM);
     pool = {
@@ -493,6 +577,35 @@ describeDb("an attacker with a normal login, against every route", () => {
       "viewer"
     );
     expect(result.writes).toEqual({});
+  }, 1_800_000);
+
+  /**
+   * An estimator builds bids and edits the library, and may NOT change the
+   * company's pricing, branding or members, or delete a bid for good
+   * (shared/permissions.ts). Their own edits are expected, so this judges
+   * only the tables those capabilities guard.
+   */
+  it("an estimator cannot reach what their role leaves out", async () => {
+    const estimator = await userRow(ESTIMATOR);
+    const found: Record<string, string[]> = {};
+    let before = await db.snapshot();
+    for (const path of ordered((_, proc) => proc._def.type === "mutation")) {
+      const { inputs } = inputsFor(
+        PROCS[path]._def.inputs[0],
+        pool,
+        sprayTables
+      );
+      for (const input of inputs) await call(estimator, path, input);
+      const after = await db.snapshot();
+      const moved = touched(before, after, OWNER_ONLY_TABLES, ["bids"]).filter(
+        f => !ESTIMATOR_EXPLAINED[`${path} ${f.table}`]
+      );
+      if (moved.length)
+        found[path] = moved.slice(0, 3).map(f => `${f.table} ${f.change}`);
+      before = after;
+    }
+    report.estimator = found;
+    expect(found).toEqual({});
   }, 1_800_000);
 
   it("signed out, only the deliberately public routes answer", async () => {

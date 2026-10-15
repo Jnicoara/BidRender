@@ -8,6 +8,7 @@ import { APP_VERSION } from "../../shared/version";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
+import { refuseForgeableTrpcPost } from "../csrfGuard";
 import { createContext } from "./context";
 import { ENV } from "./env";
 import { serveStatic, setupVite } from "./vite";
@@ -128,7 +129,9 @@ async function startServer() {
     // the mount, the registration command and the test cannot drift apart.
     app.post(BACKUP_PATH, backupToR2Handler);
   }
-  // tRPC API
+  // tRPC API. A change must arrive as JSON, which no other site can send
+  // with the session cookie attached — see server/csrfGuard.ts.
+  app.use("/api/trpc", refuseForgeableTrpcPost);
   app.use(
     "/api/trpc",
     createExpressMiddleware({

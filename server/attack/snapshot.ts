@@ -264,3 +264,131 @@ export function idsOwnedBy(
   for (const ids of Object.values(out)) ids.sort((a, b) => b - a);
   return out;
 }
+
+/**
+ * Every row added, changed or removed in `tables` — for a role sweep, where
+ * the caller may change the company's data in general but not THESE.
+ * `removedOnly` tables count only a disappearance (a bid may be edited by an
+ * estimator; only deleting one for good needs bids.delete).
+ */
+export function touched(
+  before: Snapshot,
+  after: Snapshot,
+  tables: readonly string[],
+  removedOnly: readonly string[] = []
+): Finding[] {
+  const findings: Finding[] = [];
+  for (const table of [...tables, ...removedOnly]) {
+    const onlyRemoved = removedOnly.includes(table);
+    const b = before.get(table) ?? new Map<string, Row>();
+    const a = after.get(table) ?? new Map<string, Row>();
+    for (const [key, row] of Array.from(a)) {
+      if (onlyRemoved) continue;
+      const old = b.get(key);
+      if (!old)
+        findings.push({ table, key, change: "added", why: "role", after: row });
+      else if (JSON.stringify(old) !== JSON.stringify(row))
+        findings.push({
+          table,
+          key,
+          change: "changed",
+          why: "role",
+          before: old,
+          after: row,
+        });
+    }
+    for (const [key, row] of Array.from(b))
+      if (!a.has(key))
+        findings.push({
+          table,
+          key,
+          change: "removed",
+          why: "role",
+          before: row,
+        });
+  }
+  return findings;
+}
+
+/**
+ * One row in `table` owned by `owner`, built from the column list alone: a
+ * foreign key points at `parentIds[parent][0]`, `userId`-like columns name
+ * the owner, text carries `marker`, decimals carry `number`. For tables the
+ * victim's own flows did not reach (AI findings, invites past a seat limit),
+ * so the attack has something there to aim at. Returns the error text when
+ * the row could not be made, never throws.
+ */
+export async function plantRow(
+  db: Db,
+  table: string,
+  owner: number,
+  parentIds: Record<string, number[]>,
+  marker: string,
+  number: number
+): Promise<string | null> {
+  const cols = (await db.query(
+    `SELECT column_name AS c, data_type AS t, column_type AS ct,
+            is_nullable AS n, column_default AS d, extra AS x,
+            character_maximum_length AS len
+       FROM information_schema.columns
+      WHERE table_schema = DATABASE() AND table_name = ?
+      ORDER BY ordinal_position`,
+    [table]
+  )) as {
+    c: string;
+    t: string;
+    ct: string;
+    n: string;
+    d: unknown;
+    x: string;
+    len: number | null;
+  }[];
+  const row: Record<string, unknown> = {};
+  for (const col of cols) {
+    if (/auto_increment/i.test(col.x)) continue;
+    const fk = db.fks.find(f => f.table === table && f.column === col.c);
+    if (fk) {
+      const id =
+        fk.parent === "users" ? owner : (parentIds[fk.parent] ?? [])[0];
+      if (id !== undefined) {
+        row[col.c] = id;
+        continue;
+      }
+    }
+    if (/^(userId|dataUserId|companyUserId|companyOwnerUserId)$/.test(col.c)) {
+      row[col.c] = owner;
+      continue;
+    }
+    if (col.n === "YES" || col.d !== null || /DEFAULT_GENERATED/.test(col.x))
+      continue;
+    if (col.t === "enum") {
+      row[col.c] = /'([^']*)'/.exec(col.ct)?.[1] ?? "";
+    } else if (/int$/.test(col.t))
+      row[col.c] = col.ct.startsWith("tinyint(1)") ? 0 : 1;
+    else if (col.t === "decimal" || col.t === "double" || col.t === "float")
+      row[col.c] =
+        /decimal\((\d+),(\d+)\)/.test(col.ct) &&
+        Number(/decimal\((\d+),(\d+)\)/.exec(col.ct)![1]) -
+          Number(/decimal\((\d+),(\d+)\)/.exec(col.ct)![2]) <
+          6
+          ? 1
+          : number;
+    else if (/char|text/.test(col.t))
+      row[col.c] = `${marker} ${col.c}`.slice(0, col.len ?? 200);
+    else if (/date|time/.test(col.t)) row[col.c] = new Date();
+    else if (col.t === "json") row[col.c] = JSON.stringify({ marker });
+    else if (/blob|binary/.test(col.t)) row[col.c] = Buffer.from(marker);
+    else row[col.c] = null;
+  }
+  const keys = Object.keys(row);
+  try {
+    await db.query(
+      `INSERT INTO \`${table}\` (${keys.map(k => `\`${k}\``).join(", ")})
+       VALUES (${keys.map(() => "?").join(", ")})`,
+      keys.map(k => row[k])
+    );
+    return null;
+  } catch (error) {
+    return (error as Error).message.slice(0, 160);
+  }
+}

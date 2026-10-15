@@ -26,7 +26,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { router, scoped } from "../_core/trpc";
+import { requireCapability, router, scoped } from "../_core/trpc";
 import { PROPOSAL_LAYOUTS } from "../../drizzle/schema";
 import { PROPOSAL_MODES } from "../../shared/bidExtras";
 import {
@@ -106,6 +106,16 @@ async function requireBid(id: number, userId: number) {
   return bid;
 }
 
+/**
+ * The company's letterhead and proposal defaults — what every customer sees.
+ * `settings.edit` (owner, admin), never this router's `bids.edit`: until the
+ * security sweep (2026-10-14) an estimator could rebrand the company and
+ * change every proposal's defaults, and the capability that says they may
+ * not existed in shared/permissions.ts with nothing checking it. Found by
+ * server/crossCompanyAttack.test.ts's estimator pass.
+ */
+const companySettings = requireCapability("settings.edit");
+
 export const proposalsRouter = router({
   // ── Branding ───────────────────────────────────────────────────────────────
 
@@ -134,7 +144,7 @@ export const proposalsRouter = router({
    * form can save field by field as the user leaves each one — the standing
    * rule for self-saving inputs (CLAUDE.md § Editing fields).
    */
-  setBranding: procedure
+  setBranding: companySettings
     .input(
       z.object({
         companyName: z.string().trim().max(255).optional(),
@@ -164,7 +174,7 @@ export const proposalsRouter = router({
    * logo on its own, but having one upload pattern in the app is worth more
    * than saving a round trip on a file people upload once.
    */
-  createLogoUploadTicket: procedure
+  createLogoUploadTicket: companySettings
     .input(
       z.object({
         filename: z.string().trim().min(1).max(255),
@@ -194,7 +204,7 @@ export const proposalsRouter = router({
    * check a caller could set their logo to any object in the bucket by naming
    * its key, including another contractor's.
    */
-  confirmLogo: procedure
+  confirmLogo: companySettings
     .input(z.object({ storageKey: z.string().min(1).max(1024) }))
     .mutation(async ({ input, ctx }) => {
       const expectedPrefix = `company-logos/${ctx.scope.dataUserId}/`;
@@ -221,7 +231,7 @@ export const proposalsRouter = router({
     }),
 
   /** Remove the logo. The document goes back to prompting for one. */
-  clearLogo: procedure.mutation(async ({ ctx }) => {
+  clearLogo: companySettings.mutation(async ({ ctx }) => {
     await setLogoReleasingOld(ctx.scope.dataUserId, {
       logoKey: null,
       logoUrl: null,
@@ -249,7 +259,7 @@ export const proposalsRouter = router({
    * price. Clicking through the three layouts on a finished bid is safe by
    * construction, not by care.
    */
-  setSettings: procedure
+  setSettings: companySettings
     .input(
       z.object({
         layout: z.enum(PROPOSAL_LAYOUTS).optional(),

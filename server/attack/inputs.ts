@@ -83,6 +83,12 @@ export type Pool = {
   ids: Record<string, number[]>;
   /** Written into every free-text string, so a reply carrying it is a leak. */
   marker: string;
+  /**
+   * Written into every non-integer number that is not an id, when it fits the
+   * field — a price, a quantity, a coordinate. A reply carrying it is a leak
+   * even when no name came with it.
+   */
+  number?: number;
 };
 
 type Choice = { spray?: { field: string; table: string } };
@@ -143,6 +149,10 @@ function stringFor(schema: Json, name: string, pool: Pool): string {
   if (fmt === "email" || /email/i.test(name))
     return `${pool.marker.toLowerCase()}@example.com`;
   if (fmt === "date-time") return "2026-01-02T03:04:05.000Z";
+  // A picture field is refined to a data URL in code, which JSON Schema
+  // cannot carry — without this the plan reader's four routes got no input.
+  if (/image|picture|thumbnail/i.test(name))
+    return "data:image/png;base64,iVBORw0KGgo=";
   if (fmt === "date") return "2026-01-02";
   if (fmt === "uri" || fmt === "url" || /url$/i.test(name))
     return "https://example.com/x";
@@ -178,6 +188,9 @@ function numberFor(
       ? choice.spray.table
       : tableForField(name);
   if (table && pool.ids[table]?.length) return pool.ids[table][0];
+  const hi0 = (schema.maximum as number | undefined) ?? Number.MAX_SAFE_INTEGER;
+  if (pool.number !== undefined && !integer && !table && pool.number <= hi0)
+    return pool.number;
   let lo = (schema.minimum as number | undefined) ?? 1;
   const exclusive = schema.exclusiveMinimum as number | undefined;
   if (exclusive !== undefined) lo = exclusive + (integer ? 1 : 0.5);
@@ -261,7 +274,15 @@ export function generate(
       const itemType = resolveRef(items, root).type;
       if (itemType === "integer" || itemType === "number") {
         const ids = sprayIdsFor(name, pool, options.choice);
-        if (ids) return ids;
+        if (ids) {
+          // Padded to the schema's minimum with the ids the pool has, so a
+          // route that wants "at least two" is still reached with one row.
+          const least = (schema.minItems as number | undefined) ?? 1;
+          const padded = [...ids];
+          for (let i = 0; padded.length < least; i++)
+            padded.push(ids[i % ids.length]);
+          return padded;
+        }
       }
       const min = (schema.minItems as number | undefined) ?? 1;
       const max = (schema.maxItems as number | undefined) ?? 3;
@@ -354,5 +375,25 @@ export function inputsFor(
     if (ok) inputs.push(named);
     else refused++;
   }
+  // Nothing parsed: a string refined in code (a picture's data URL) is the
+  // usual reason, and JSON Schema cannot say so. One retry with every free
+  // string as a tiny image.
+  if (inputs.length === 0)
+    for (const candidate of candidates) {
+      const pictured = asPictures(candidate, pool.marker);
+      if ((parser as z.ZodType).safeParse(pictured).success)
+        inputs.push(pictured);
+    }
   return { inputs, refused };
+}
+
+function asPictures(value: unknown, marker: string): unknown {
+  if (typeof value === "string" && value.startsWith(marker))
+    return "data:image/png;base64,iVBORw0KGgo=";
+  if (Array.isArray(value)) return value.map(v => asPictures(v, marker));
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, asPictures(v, marker)])
+    );
+  return value;
 }
