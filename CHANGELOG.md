@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A material's labor hours are now checked before they're saved.** A
+  mistyped entry used to be saved as some other number without a word; now
+  it's refused with a message ("between 0 and 12, or blank") and the editor
+  stays open. Pack quantities and conduit lengths read typed numbers the
+  same careful way.
+
 - **Modifier percentages accept "15%".** Typing the percent sign in a job
   condition's labor adjustment used to be refused; now "15%" saves as 15%,
   and a mistyped entry is refused instead of turning into a different number.

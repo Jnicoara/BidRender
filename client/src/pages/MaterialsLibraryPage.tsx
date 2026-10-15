@@ -166,7 +166,9 @@ const STICK_JOINT_LABELS: Record<StickJoint, string> = {
 
 const feetText = (value: string | null) =>
   value === null ? "" : String(Number(value));
-const feetValue = (text: string) => (text.trim() === "" ? null : Number(text));
+// Read as a person types it (parseTypedNumber): "0x10" is not 16 ft here.
+const feetValue = (text: string) =>
+  text.trim() === "" ? null : parseTypedNumber(text);
 
 /**
  * Ask for alias suggestions for a draft. Shared by the add form and the inline
@@ -270,6 +272,13 @@ function validateDraft(draft: Draft): string | null {
     return "Enter a cost.";
   if (cost < 0) return "Cost cannot be negative.";
   if (cost > MAX_COST) return "That cost is too large.";
+  // Labor hours: blank is NOT SET; anything typed must read as hours. Until
+  // 2026-10-15 nothing checked this box — "0x10" saved as 16 hours.
+  if (draft.laborHours.trim() !== "") {
+    const hours = parseTypedNumber(draft.laborHours);
+    if (!(hours >= 0 && hours <= MAX_LABOR_UNIT_HOURS))
+      return `Labor hours must be between 0 and ${MAX_LABOR_UNIT_HOURS}, or blank.`;
+  }
   if (draft.raceway) {
     const { stickLengthFeet, strapSpacingFeet, strapFromBoxFeet } =
       draft.raceway;
@@ -559,7 +568,7 @@ function MaterialRow({
             value={draft.costPerUnit}
             onChange={e => {
               const v = e.target.value;
-              const qty = Number(draft.packQty);
+              const qty = parseTypedNumber(draft.packQty ?? "");
               setDraft({
                 ...draft,
                 costPerUnit: v,
@@ -578,14 +587,14 @@ function MaterialRow({
             autoFocus={focusOnOpen(openedFor, "price")}
           />
           {/* The pack box — only once a pack size is set under More options. */}
-          {Number(draft.packQty) > 0 && (
+          {parseTypedNumber(draft.packQty ?? "") > 0 && (
             <>
               <span className="text-xs text-muted-foreground">or</span>
               <Input
                 value={draft.packPrice ?? ""}
                 onChange={e => {
                   const v = e.target.value;
-                  const qty = Number(draft.packQty);
+                  const qty = parseTypedNumber(draft.packQty ?? "");
                   setDraft({
                     ...draft,
                     packPrice: v,
@@ -615,7 +624,7 @@ function MaterialRow({
               <span className="text-xs text-muted-foreground">
                 per{" "}
                 {packPhrase(
-                  Number(draft.packQty),
+                  parseTypedNumber(draft.packQty ?? ""),
                   draft.unitOfSale,
                   draft.packLabel || null
                 )}
@@ -723,12 +732,12 @@ function MaterialRow({
               )}
             />
             More options
-            {Number(draft.packQty) > 0 && (
+            {parseTypedNumber(draft.packQty ?? "") > 0 && (
               <span className="text-muted-foreground/80">
                 {" "}
                 · sold by the{" "}
                 {packPhrase(
-                  Number(draft.packQty),
+                  parseTypedNumber(draft.packQty ?? ""),
                   draft.unitOfSale,
                   draft.packLabel || null
                 )}
@@ -1459,16 +1468,17 @@ export default function MaterialsLibraryPage() {
           // the server (shared/packPricing.ts), never here, so the stored
           // number has one source.
           ...(draft.priceTyped === "pack" &&
-          Number(draft.packQty) > 0 &&
+          parseTypedNumber(draft.packQty ?? "") > 0 &&
           (draft.packPrice ?? "").trim() !== ""
             ? { packPrice: parseTypedNumber(draft.packPrice ?? "") }
             : { costPerUnit: parseTypedNumber(draft.costPerUnit) }),
           ...(draft.packQty !== undefined
             ? {
                 packQty:
-                  draft.packQty.trim() === "" || !(Number(draft.packQty) > 0)
+                  draft.packQty.trim() === "" ||
+                  !(parseTypedNumber(draft.packQty ?? "") > 0)
                     ? null
-                    : Number(draft.packQty),
+                    : parseTypedNumber(draft.packQty ?? ""),
                 packLabel: draft.packLabel?.trim() || null,
               }
             : {}),
@@ -1487,7 +1497,9 @@ export default function MaterialsLibraryPage() {
             like it silently failed.
           */
           laborHours:
-            draft.laborHours.trim() === "" ? null : Number(draft.laborHours),
+            draft.laborHours.trim() === ""
+              ? null
+              : parseTypedNumber(draft.laborHours),
           category: draft.category,
           // Sent unconditionally now the editor shows it: blank means the user
           // cleared the field, which is a real edit, where omitting the key
