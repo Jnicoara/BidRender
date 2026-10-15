@@ -30,6 +30,7 @@ import {
   createRateLimiter,
 } from "../rateLimit";
 import {
+  INVITE_NOT_VALID,
   INVITE_ONLY_MESSAGE,
   findInvite,
   inviteProblem,
@@ -208,7 +209,10 @@ export const authRouter = router({
         const found = await findInvite(input.inviteCode);
         const problem = inviteProblem(found, input.email, now);
         if (problem || !found)
-          throw new TRPCError({ code: "FORBIDDEN", message: problem! });
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: problem ?? INVITE_NOT_VALID,
+          });
         const user = await signUpWithInvite(found, {
           email: input.email.toLowerCase(),
           name: input.name ?? input.email.split("@")[0],
