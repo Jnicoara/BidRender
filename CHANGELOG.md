@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **The menu is back on a phone turned sideways.** With the phone on its
+  side, the main menu (Dashboard, Bids, Plans and the rest) shrank to
+  nothing and only the bottom group showed. The whole menu now scrolls
+  together. The guide's tip also shrinks to one line on a short screen, so
+  the drawing keeps its room.
+
 - **Extreme numbers no longer crash a save.** A test now throws the biggest,
   most negative and longest values each screen allows at every save in the
   app. Five crashed instead of saying no, and now each gets a plain answer:

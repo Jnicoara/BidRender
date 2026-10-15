@@ -106,7 +106,11 @@ export function GuideStrip({
             className={cn(
               "text-xs text-muted-foreground mt-0.5",
               // The Plans screen is the tightest on a phone: one line there.
-              screen === "plans" && "hidden md:block"
+              screen === "plans" && "hidden md:block",
+              // A short screen (a phone turned sideways, 375 px tall): one
+              // line everywhere — the body took a fifth of the height and
+              // left the drawing a sliver (rotate drill, 2026-10-14).
+              "[@media(max-height:500px)]:hidden"
             )}
           >
             {tip.body}

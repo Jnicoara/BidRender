@@ -705,138 +705,148 @@ export default function BidRenderShell() {
           something is IN it — a permanent door to an empty room is a door to
           nowhere.
         */}
-        <nav
-          className="flex flex-col gap-1 p-2 flex-1 overflow-y-auto"
-          aria-label="Main"
-        >
-          <NavSection label="Work">
-            <NavBtn
-              onClick={() => navigate("dashboard")}
-              isActive={isOnDashboard}
-              icon={LayoutDashboard}
-              label="Dashboard"
-              title="Dashboard — every bid by stage, and where a new one starts"
-            />
-            <NavBtn
-              onClick={() => navigate("bid-list")}
-              isActive={bidsActive}
-              icon={FileStack}
-              label="Bids"
-              title="Bids — every bid in one list, searchable"
-            />
-            <NavBtn
-              onClick={() => navigate("plans-index")}
-              isActive={plansActive}
-              icon={MapIcon}
-              label="Plans"
-              title="Plans — every bid with drawings, and Upload a plan"
-            />
-            {/* Business data about people outside the company, not
+        {/*
+          ONE scroll area for both groups (2026-10-14). The Work/Library nav
+          used to be the part that gave, with the Company group pinned below
+          it: on a phone turned sideways (375 px tall) it gave everything, and
+          Dashboard, Bids, Plans, Clients, Materials and Assemblies shrank to
+          a zero-height box (found by the rotate drill). Now the Company group
+          is pushed to the bottom by mt-auto when there is room, and the
+          whole menu scrolls together when there is not.
+        */}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          <nav className="flex flex-col gap-1 p-2 shrink-0" aria-label="Main">
+            <NavSection label="Work">
+              <NavBtn
+                onClick={() => navigate("dashboard")}
+                isActive={isOnDashboard}
+                icon={LayoutDashboard}
+                label="Dashboard"
+                title="Dashboard — every bid by stage, and where a new one starts"
+              />
+              <NavBtn
+                onClick={() => navigate("bid-list")}
+                isActive={bidsActive}
+                icon={FileStack}
+                label="Bids"
+                title="Bids — every bid in one list, searchable"
+              />
+              <NavBtn
+                onClick={() => navigate("plans-index")}
+                isActive={plansActive}
+                icon={MapIcon}
+                label="Plans"
+                title="Plans — every bid with drawings, and Upload a plan"
+              />
+              {/* Business data about people outside the company, not
                 configuration — so it stays out here rather than going under
                 Company with the settings. */}
-            <NavBtn
-              onClick={() => navigate("clients")}
-              isActive={isInClients}
-              icon={Users}
-              label="Clients"
-              title="Clients — who the work is for"
-            />
-          </NavSection>
+              <NavBtn
+                onClick={() => navigate("clients")}
+                isActive={isInClients}
+                icon={Users}
+                label="Clients"
+                title="Clients — who the work is for"
+              />
+            </NavSection>
 
-          <NavSection label="Library">
-            {/* Materials carries its own supply-house lens as a tab. Two nav
+            <NavSection label="Library">
+              {/* Materials carries its own supply-house lens as a tab. Two nav
                 entries for one table meant an estimator had to know which
                 address owned the field they wanted to edit. */}
-            <NavBtn
-              onClick={() => navigate("library-materials")}
-              isActive={isInLibraryMats}
-              icon={Boxes}
-              label="Materials"
-              title="Materials — the catalog, and your supplier's prices on it"
-            />
-            {/* Kits and Modifiers are tabs in here: a kit contains assemblies
+              <NavBtn
+                onClick={() => navigate("library-materials")}
+                isActive={isInLibraryMats}
+                icon={Boxes}
+                label="Materials"
+                title="Materials — the catalog, and your supplier's prices on it"
+              />
+              {/* Kits and Modifiers are tabs in here: a kit contains assemblies
                 and nothing else, and a modifier adjusts an assembly's labor,
                 so neither means anything without this screen. */}
-            <NavBtn
-              onClick={() => navigate("library-assemblies")}
-              isActive={isInLibraryAsms}
-              icon={Layers}
-              label="Assemblies"
-              title="Assemblies — recipes, kits and job-condition modifiers"
-            />
-          </NavSection>
-        </nav>
-
-        {/* The bottom group sits outside the scrolling nav so it stays
-            reachable at the bottom however long the rest grows. Settings is
-            the anchor; what you set up once or read now and then sits with it. */}
-        <div className="flex flex-col gap-1 p-2 pt-0 shrink-0">
-          <NavSection label="Company">
-            {/* Only for those who hold the capability. */}
-            {canSeeAnalytics && (
               <NavBtn
-                onClick={() => navigate("analytics")}
-                isActive={isInAnalytics}
-                icon={BarChart3}
-                label="Performance"
-                title="Performance — win rate and what the work earned"
+                onClick={() => navigate("library-assemblies")}
+                isActive={isInLibraryAsms}
+                icon={Layers}
+                label="Assemblies"
+                title="Assemblies — recipes, kits and job-condition modifiers"
               />
-            )}
-            {/* Rare after setup, but the first onboarding step and the rate
+            </NavSection>
+          </nav>
+
+          {/* The bottom group: what you set up once or read now and then, with
+            Settings as the anchor. It sat OUTSIDE the scrolling nav, pinned,
+            until 2026-10-14 — which is what squeezed the nav above it to
+            nothing on a short screen. It now shares the one scroll area and
+            sits at the bottom by mt-auto (see the wrapper above). */}
+          <div className="flex flex-col gap-1 p-2 pt-0 shrink-0 mt-auto">
+            <NavSection label="Company">
+              {/* Only for those who hold the capability. */}
+              {canSeeAnalytics && (
+                <NavBtn
+                  onClick={() => navigate("analytics")}
+                  isActive={isInAnalytics}
+                  icon={BarChart3}
+                  label="Performance"
+                  title="Performance — win rate and what the work earned"
+                />
+              )}
+              {/* Rare after setup, but the first onboarding step and the rate
                 multiplies every line of every bid, so it keeps its own entry
                 rather than becoming a Settings tab. */}
-            <NavBtn
-              onClick={() => navigate("library-labor-rates")}
-              isActive={isInLaborRates}
-              icon={HardHat}
-              label="Labor rates"
-              title="Labor rates — what an hour costs, by role"
-            />
-            {/* Always shown, even empty (owner, 2026-10-14: "one easy-to-find
+              <NavBtn
+                onClick={() => navigate("library-labor-rates")}
+                isActive={isInLaborRates}
+                icon={HardHat}
+                label="Labor rates"
+                title="Labor rates — what an hour costs, by role"
+              />
+              {/* Always shown, even empty (owner, 2026-10-14: "one easy-to-find
                 place"). Unlike the old Archive entry, an empty page here
                 still says something useful: where deleted things go. */}
-            <NavBtn
-              onClick={() => navigate("trash")}
-              isActive={isInTrash}
-              icon={Trash2}
-              label="Recently deleted"
-              title="Recently deleted — everything archived, with Restore"
-            />
-            {/* Guide mode's help search: local, no AI (helpTopics.ts). */}
-            <NavBtn
-              onClick={() => setHelpOpen(true)}
-              isActive={false}
-              icon={HelpCircle}
-              label="Where do I…?"
-              title="Where do I…? — find where anything is done"
-            />
-            <NavBtn
-              onClick={() => navigate("settings")}
-              isActive={isInSettings}
-              icon={Settings}
-              label="Settings"
-              title="Settings — pricing defaults, branding, tax and display"
-            />
-            {/* Shown to every member whatever their role — a viewer needs to
-                be able to find out that they are a viewer. */}
-            <NavBtn
-              onClick={() => navigate("team")}
-              isActive={isInTeam}
-              icon={UsersRound}
-              label="Crew"
-              title="Crew — who can get into this company"
-            />
-            {/* Staff only, and last. */}
-            {isAdmin && (
               <NavBtn
-                onClick={() => navigate("admin")}
-                isActive={isInAdmin}
-                icon={Shield}
-                label="Admin"
-                title="Admin"
+                onClick={() => navigate("trash")}
+                isActive={isInTrash}
+                icon={Trash2}
+                label="Recently deleted"
+                title="Recently deleted — everything archived, with Restore"
               />
-            )}
-          </NavSection>
+              {/* Guide mode's help search: local, no AI (helpTopics.ts). */}
+              <NavBtn
+                onClick={() => setHelpOpen(true)}
+                isActive={false}
+                icon={HelpCircle}
+                label="Where do I…?"
+                title="Where do I…? — find where anything is done"
+              />
+              <NavBtn
+                onClick={() => navigate("settings")}
+                isActive={isInSettings}
+                icon={Settings}
+                label="Settings"
+                title="Settings — pricing defaults, branding, tax and display"
+              />
+              {/* Shown to every member whatever their role — a viewer needs to
+                be able to find out that they are a viewer. */}
+              <NavBtn
+                onClick={() => navigate("team")}
+                isActive={isInTeam}
+                icon={UsersRound}
+                label="Crew"
+                title="Crew — who can get into this company"
+              />
+              {/* Staff only, and last. */}
+              {isAdmin && (
+                <NavBtn
+                  onClick={() => navigate("admin")}
+                  isActive={isInAdmin}
+                  icon={Shield}
+                  label="Admin"
+                  title="Admin"
+                />
+              )}
+            </NavSection>
+          </div>
         </div>
 
         {/*
