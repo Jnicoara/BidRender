@@ -28,6 +28,7 @@ import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { packPhrase } from "@shared/packPricing";
 import { PRICE_LIST_IMPORT_SHOWN } from "@/lib/priceListImport";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -58,6 +59,10 @@ type Material = {
   supplierName: string | null;
   priceUpdatedAt: Date | string | null;
   searchAliases: string | null;
+  /** The pack it is bought in (0157–0159). NULL = sold singly / typed per unit. */
+  packQty: string | null;
+  packLabel: string | null;
+  packPrice: string | null;
 };
 
 const AGE_FILTERS: Array<{ key: PriceAge | "all"; label: string }> = [
@@ -368,7 +373,7 @@ export default function MaterialDatabasePage() {
                           />
                         </div>
 
-                        <div className="md:w-28 shrink-0 flex justify-end">
+                        <div className="md:w-28 shrink-0 flex flex-col items-end gap-1">
                           <InlineNumberField
                             value={Number(material.costPerUnit)}
                             ariaLabel={`Price for ${material.name}`}
@@ -381,6 +386,44 @@ export default function MaterialDatabasePage() {
                               })
                             }
                           />
+                          {/*
+                            By the pack, once a pack size is set (Materials ›
+                            edit › More options): type the roll or box price
+                            and the per-unit price above is worked out on the
+                            server, rounded up (pricing-safety-plan § 2).
+                          */}
+                          {material.packQty !== null &&
+                            Number(material.packQty) > 0 && (
+                              <div className="flex items-center gap-1">
+                                <InlineNumberField
+                                  value={
+                                    material.packPrice !== null
+                                      ? Number(material.packPrice)
+                                      : Number(
+                                          (
+                                            Number(material.costPerUnit) *
+                                            Number(material.packQty)
+                                          ).toFixed(2)
+                                        )
+                                  }
+                                  ariaLabel={`Price per ${packPhrase(Number(material.packQty), material.unitOfSale, material.packLabel)} for ${material.name}`}
+                                  className="h-6 w-20 text-[11px] text-right"
+                                  rules={{ min: 0, allowEmpty: false }}
+                                  onSave={next =>
+                                    updateMaterial.mutate({
+                                      id: material.id,
+                                      packPrice: next,
+                                    })
+                                  }
+                                />
+                                <span
+                                  className="text-[10px] text-muted-foreground whitespace-nowrap"
+                                  title={`Price for the whole ${packPhrase(Number(material.packQty), material.unitOfSale, material.packLabel)}`}
+                                >
+                                  /{material.packLabel?.trim() || "pack"}
+                                </span>
+                              </div>
+                            )}
                         </div>
 
                         <div

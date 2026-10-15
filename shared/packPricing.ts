@@ -69,3 +69,22 @@ export function packPriceShown(row: {
 export function packWord(label: string | null): string {
   return label?.trim() || "pack";
 }
+
+/**
+ * How a pack reads beside its price: "250 ft roll", "box of 100",
+ * "case of 12 boxes". The unit comes first for a length, last for a count,
+ * which is how the store shelf says it.
+ */
+export function packPhrase(
+  qty: number,
+  unitOfSale: string,
+  label: string | null
+): string {
+  const word = packWord(label);
+  const n = Number.isInteger(qty)
+    ? String(qty)
+    : String(Number(qty.toFixed(4)));
+  if (unitOfSale === "foot") return `${n} ft ${word}`;
+  if (unitOfSale === "box") return `${word} of ${n} boxes`;
+  return `${word} of ${n}`;
+}

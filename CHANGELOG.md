@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Type a price by the roll or box.** In a material's editor, "More
+  options" now holds the pack it's bought in ("10 in a bundle", "250 ft
+  roll"). Once set, you can type the price of the whole pack and the app
+  works out the per-foot or per-each price, rounded up. Supplier pricing
+  shows the pack price beside the unit price too.
+
 - **Every price change on a material is now remembered.** Typing a price,
   importing one, saving a bid line to the library, or going back to
   BidRidge's price each writes one line of price history (old price, new

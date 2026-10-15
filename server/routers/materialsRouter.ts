@@ -339,12 +339,26 @@ export const materialsRouter = router({
          * the bid reads as "Not priced" — never as a free bend.
          */
         fieldBendLaborHours: laborUnitSchema.optional(),
+        /**
+         * PRICE BY THE PACK (pricing-safety-plan § 2, step 5). `packPrice`
+         * is a price typed for the whole pack; the server divides it by the
+         * pack size (shared/packPricing.ts, rounded UP). Never sent with
+         * `costPerUnit` — one box was typed, not both.
+         * `packQty` / `packLabel`: the pack, under the editor's More
+         * options. Omitted leaves it; null clears it back to "sold singly".
+         */
+        packPrice: costSchema.optional(),
+        packQty: z.number().positive().max(100000).nullable().optional(),
+        packLabel: z.string().trim().max(32).nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const {
         id,
         costPerUnit,
+        packPrice,
+        packQty,
+        packLabel,
         laborHours,
         fieldBendLaborHours,
         stickLengthFeet,
@@ -366,6 +380,55 @@ export const materialsRouter = router({
           message: "Material not found.",
         });
 
+      if (packPrice !== undefined && costPerUnit !== undefined)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Send the price per unit or per pack, not both.",
+        });
+      // The pack this write divides by: the one sent, else the row's.
+      const qtyAfter =
+        packQty !== undefined
+          ? packQty
+          : target.packQty === null
+            ? null
+            : Number(target.packQty);
+      if (packPrice !== undefined && !(qtyAfter && qtyAfter > 0))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Set the pack size before typing a pack price.",
+        });
+
+      const write =
+        packPrice !== undefined
+          ? priceWrite({ typed: "pack", amount: packPrice, packQty: qtyAfter! })
+          : costPerUnit !== undefined &&
+              // The same per-unit price sent back (an editor saving a row it
+              // did not reprice) is not a price edit: it must not wipe a
+              // typed pack price with it.
+              !(
+                target.packPrice !== null &&
+                Number(target.costPerUnit) === Number(costPerUnit)
+              )
+            ? priceWrite({ typed: "unit", amount: costPerUnit })
+            : packQty !== undefined &&
+                packQty !== null &&
+                target.packPrice !== null &&
+                Number(target.packQty) !== packQty
+              ? // A new pack size under a typed pack price keeps the pack
+                // price (it is what was typed) and divides again (§ 2.2).
+                priceWrite({
+                  typed: "pack",
+                  amount: Number(target.packPrice),
+                  packQty,
+                })
+              : packQty === null && target.packPrice !== null
+                ? // No pack any more: the per-unit price stands, typed per unit.
+                  priceWrite({
+                    typed: "unit",
+                    amount: Number(target.costPerUnit),
+                  })
+                : null;
+
       const isBaseline = target.userId === null;
       const editableId = isBaseline
         ? await db.forkMaterial(id, ctx.scope.dataUserId)
@@ -373,12 +436,16 @@ export const materialsRouter = router({
 
       await db.updateMaterial(editableId, ctx.scope.dataUserId, {
         ...rest,
+        ...(packQty !== undefined
+          ? { packQty: packQty === null ? null : packQty.toFixed(4) }
+          : {}),
+        ...(packLabel !== undefined ? { packLabel: packLabel || null } : {}),
         // Through the price door (db.updateMaterial): the stored pair, the
         // `priceUpdatedAt` stamp and the history row, in one transaction.
-        ...(costPerUnit !== undefined
+        ...(write
           ? {
               price: {
-                write: priceWrite({ typed: "unit", amount: costPerUnit }),
+                write,
                 why: {
                   source: "typed" as const,
                   actorUserId: ctx.scope.actorUserId,
@@ -393,8 +460,7 @@ export const materialsRouter = router({
           form does not send leaves its flag alone (shared/exampleTags.ts).
         */
         ...materialFlagsClearedBy(target, {
-          costPerUnit:
-            costPerUnit === undefined ? undefined : toDecimal(costPerUnit),
+          costPerUnit: write ? write.costPerUnit : undefined,
           laborHours:
             laborHours === undefined
               ? undefined

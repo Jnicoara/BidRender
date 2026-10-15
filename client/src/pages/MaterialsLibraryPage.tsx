@@ -26,6 +26,7 @@ import {
   Archive as ArchiveIcon,
   Boxes,
   Check,
+  ChevronRight,
   CircleDollarSign,
   Clock,
   Loader2,
@@ -83,6 +84,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIsMobile } from "@/hooks/useMobile";
 import { unitCost } from "@/lib/money";
+import { packPhrase, priceWrite } from "@shared/packPricing";
 import { materialItemKey } from "@shared/materialMarkup";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { focusOnOpen, NEEDS_WHY, type NeedsField } from "@/lib/needsFix";
@@ -131,6 +133,10 @@ type Material = {
   strapFromBoxFeet: string | null;
   /** Raceway only — labor hours for one field bend (0084). NULL is not set. */
   fieldBendLaborHours: string | null;
+  /** The pack it is bought in (0157–0159). NULL = sold singly / typed per unit. */
+  packQty: string | null;
+  packLabel: string | null;
+  packPrice: string | null;
 };
 
 /**
@@ -229,6 +235,16 @@ type Draft = {
   brandNote: string;
   /** Only when editing a raceway; the add form never carries it. */
   raceway?: RacewayDraft;
+  /**
+   * PRICE BY THE PACK (pricing-safety-plan § 2, owner Q1). The pack size
+   * lives under the editor's More options; "" = sold singly, and the price
+   * row is the one box it always was. With a pack, the row shows both boxes
+   * and whichever was typed last is the one saved. Edit form only.
+   */
+  packQty?: string;
+  packLabel?: string;
+  packPrice?: string;
+  priceTyped?: "unit" | "pack";
 };
 
 const emptyDraft: Draft = {
@@ -377,6 +393,8 @@ function MaterialRow({
   markupOverride?: number;
 }) {
   const [editing, setEditing] = useState(false);
+  /** The editor's one "More options" fold (pack size). Shut each time it opens. */
+  const [moreOpen, setMoreOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   /*
     The markup is NOT part of the material draft, on purpose. Saving the draft
@@ -411,10 +429,21 @@ function MaterialRow({
         ? ""
         : String(Math.round(markupOverride * 10000) / 100)
     );
+    const qty = material.packQty === null ? 0 : Number(material.packQty);
     const opened: Draft = {
       name: material.name,
       unitOfSale: material.unitOfSale,
       costPerUnit: String(Number(material.costPerUnit)),
+      packQty: qty > 0 ? String(qty) : "",
+      packLabel: material.packLabel ?? "",
+      // The pack price as typed when there is one; else worked out to show.
+      packPrice:
+        material.packPrice !== null
+          ? String(Number(material.packPrice))
+          : qty > 0
+            ? (Number(material.costPerUnit) * qty).toFixed(2)
+            : "",
+      priceTyped: material.packPrice !== null ? "pack" : "unit",
       // Empty string for unset, so an untouched material opens with a blank
       // box rather than a 0 nobody typed. See the Draft field's own note.
       laborHours:
@@ -444,6 +473,7 @@ function MaterialRow({
     };
     setDraft(opened);
     setOpenedWith(opened);
+    setMoreOpen(false);
     setEditing(true);
   };
 
@@ -512,7 +542,19 @@ function MaterialRow({
           </Select>
           <Input
             value={draft.costPerUnit}
-            onChange={e => setDraft({ ...draft, costPerUnit: e.target.value })}
+            onChange={e => {
+              const v = e.target.value;
+              const qty = Number(draft.packQty);
+              setDraft({
+                ...draft,
+                costPerUnit: v,
+                priceTyped: "unit",
+                // The other box follows, so the two never disagree on screen.
+                ...(qty > 0 && v.trim() !== "" && !Number.isNaN(Number(v))
+                  ? { packPrice: (Number(v) * qty).toFixed(2) }
+                  : {}),
+              });
+            }}
             className="h-8 w-28 text-sm text-right"
             inputMode="decimal"
             onFocus={selectOnFocus}
@@ -520,6 +562,51 @@ function MaterialRow({
             aria-label="Price per unit"
             autoFocus={focusOnOpen(openedFor, "price")}
           />
+          {/* The pack box — only once a pack size is set under More options. */}
+          {Number(draft.packQty) > 0 && (
+            <>
+              <span className="text-xs text-muted-foreground">or</span>
+              <Input
+                value={draft.packPrice ?? ""}
+                onChange={e => {
+                  const v = e.target.value;
+                  const qty = Number(draft.packQty);
+                  setDraft({
+                    ...draft,
+                    packPrice: v,
+                    priceTyped: "pack",
+                    // Shown with the same round-up the server stores.
+                    ...(v.trim() !== "" && !Number.isNaN(Number(v))
+                      ? {
+                          costPerUnit: String(
+                            Number(
+                              priceWrite({
+                                typed: "pack",
+                                amount: Number(v),
+                                packQty: qty,
+                              }).costPerUnit
+                            )
+                          ),
+                        }
+                      : {}),
+                  });
+                }}
+                className="h-8 w-28 text-sm text-right"
+                inputMode="decimal"
+                onFocus={selectOnFocus}
+                placeholder="pack price"
+                aria-label="Price per pack"
+              />
+              <span className="text-xs text-muted-foreground">
+                per{" "}
+                {packPhrase(
+                  Number(draft.packQty),
+                  draft.unitOfSale,
+                  draft.packLabel || null
+                )}
+              </span>
+            </>
+          )}
           {/*
             Hours per unit of sale, and the PLACEHOLDER is doing real work:
             "hours" rather than "0.00", because an empty box here means unset
@@ -599,6 +686,84 @@ function MaterialRow({
             aria-label="Brand or part number"
             disabled={isBusy}
           />
+        </div>
+
+        {/*
+          MORE OPTIONS — one control, shut by default (CLAUDE.md §
+          "Customization available, but never in the way"). It holds the pack
+          size today; anything else per-material and rarely touched goes here
+          too, rather than growing a second disclosure.
+        */}
+        <div className="mt-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(o => !o)}
+          >
+            <ChevronRight
+              className={cn(
+                "w-3 h-3 transition-transform",
+                moreOpen && "rotate-90"
+              )}
+            />
+            More options
+            {Number(draft.packQty) > 0 && (
+              <span className="text-muted-foreground/80">
+                {" "}
+                · sold by the{" "}
+                {packPhrase(
+                  Number(draft.packQty),
+                  draft.unitOfSale,
+                  draft.packLabel || null
+                )}
+              </span>
+            )}
+          </button>
+          {moreOpen && (
+            <div className="mt-1.5 rounded-md border border-border p-2.5 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span>Bought by the pack:</span>
+                <Input
+                  value={draft.packQty ?? ""}
+                  onChange={e =>
+                    setDraft({ ...draft, packQty: e.target.value })
+                  }
+                  className="h-7 w-20 text-xs text-right"
+                  inputMode="decimal"
+                  onFocus={selectOnFocus}
+                  placeholder="how many"
+                  aria-label="How many in a pack"
+                  disabled={isBusy}
+                />
+                <span className="text-muted-foreground">
+                  {draft.unitOfSale === "foot"
+                    ? "ft in a"
+                    : draft.unitOfSale === "box"
+                      ? "boxes in a"
+                      : "in a"}
+                </span>
+                <Input
+                  value={draft.packLabel ?? ""}
+                  onChange={e =>
+                    setDraft({ ...draft, packLabel: e.target.value })
+                  }
+                  className="h-7 w-24 text-xs"
+                  placeholder="roll, box…"
+                  aria-label="What the pack is called"
+                  maxLength={32}
+                  disabled={isBusy}
+                />
+              </div>
+              <p className="text-[0.7rem] text-muted-foreground">
+                Then you can type the price of the whole{" "}
+                {draft.packLabel?.trim() || "pack"} and the price per{" "}
+                {draft.unitOfSale === "each" ? "one" : draft.unitOfSale} is
+                worked out for you, rounded up. Leave it blank if you buy them
+                one at a time.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Aliases are editable here for the same reason they are collected on
@@ -1256,7 +1421,23 @@ export default function MaterialsLibraryPage() {
           id,
           name: draft.name.trim(),
           unitOfSale: draft.unitOfSale,
-          costPerUnit: Number(draft.costPerUnit),
+          // The box typed last is the one sent: a pack price is divided on
+          // the server (shared/packPricing.ts), never here, so the stored
+          // number has one source.
+          ...(draft.priceTyped === "pack" &&
+          Number(draft.packQty) > 0 &&
+          (draft.packPrice ?? "").trim() !== ""
+            ? { packPrice: Number(draft.packPrice) }
+            : { costPerUnit: Number(draft.costPerUnit) }),
+          ...(draft.packQty !== undefined
+            ? {
+                packQty:
+                  draft.packQty.trim() === "" || !(Number(draft.packQty) > 0)
+                    ? null
+                    : Number(draft.packQty),
+                packLabel: draft.packLabel?.trim() || null,
+              }
+            : {}),
           /*
             A BLANK BOX CLEARS IT BACK TO UNSET, and that is the point of the
             nullable column rather than an oversight to tidy into a zero.

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { packPriceShown, priceWrite, roundUp4 } from "../shared/packPricing";
+import {
+  packPhrase,
+  packPriceShown,
+  priceWrite,
+  roundUp4,
+} from "../shared/packPricing";
 
 describe("priceWrite (pricing-safety-plan § 2.2)", () => {
   it("divides a pack price and rounds the unit price UP at the 4th decimal", () => {
@@ -61,5 +66,14 @@ describe("packPriceShown", () => {
     expect(
       packPriceShown({ costPerUnit: "0.48", packPrice: null, packQty: null })
     ).toBeNull();
+  });
+});
+
+describe("packPhrase", () => {
+  it("says a pack the way the shelf does", () => {
+    expect(packPhrase(250, "foot", "roll")).toBe("250 ft roll");
+    expect(packPhrase(100, "each", "box")).toBe("box of 100");
+    expect(packPhrase(12, "box", "case")).toBe("case of 12 boxes");
+    expect(packPhrase(25, "each", null)).toBe("pack of 25");
   });
 });

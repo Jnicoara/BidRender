@@ -231,4 +231,61 @@ describe.skipIf(!hasDb)("price history recording", () => {
     const stored = await getMaterialById(row!.id, USER);
     expect(stored).toMatchObject({ costPerUnit: "0.4000", packPrice: null });
   });
+
+  // pricing-safety-plan § 2.2, through the router the editor uses (step 5).
+  it("pack entry: divides, keeps the typed pack on a re-save, re-divides on a new pack size", async () => {
+    const id = await shippedId();
+    const c = caller();
+    const { material: m } = await c.materials.update({
+      id,
+      packQty: 250,
+      packLabel: "roll",
+      packPrice: 99.99,
+    });
+    expect(m).toMatchObject({
+      costPerUnit: "0.4000",
+      packPrice: "99.9900",
+      packLabel: "roll",
+    });
+    // An editor saving the row with the price it showed must not wipe the pack price.
+    const { material: same } = await c.materials.update({
+      id: m!.id,
+      costPerUnit: 0.4,
+    });
+    expect(same).toMatchObject({ packPrice: "99.9900" });
+    // A bigger spool: the typed pack price stays, the unit price is worked out again.
+    const { material: spool } = await c.materials.update({
+      id: m!.id,
+      packQty: 500,
+    });
+    expect(spool).toMatchObject({
+      costPerUnit: "0.2000",
+      packPrice: "99.9900",
+    });
+    // No pack any more: the per-unit price stands and the pack price goes.
+    const { material: single } = await c.materials.update({
+      id: m!.id,
+      packQty: null,
+    });
+    expect(single).toMatchObject({
+      costPerUnit: "0.2000",
+      packPrice: null,
+      packQty: null,
+    });
+  });
+
+  it("refuses a pack price with no pack size, and a price sent both ways", async () => {
+    const id = await shippedId();
+    await expect(
+      caller().materials.update({ id, packPrice: 10 })
+    ).rejects.toThrow(/pack size/);
+    await expect(
+      caller().materials.update({
+        id,
+        packQty: 10,
+        packPrice: 10,
+        costPerUnit: 1,
+      })
+    ).rejects.toThrow(/not both/);
+  });
 });
