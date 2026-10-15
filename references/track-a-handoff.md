@@ -4,7 +4,58 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-14, session 42: the PACK FIX (no DB, no migration)
+## NOW — 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
+
+**Nothing on live was changed or deleted.** Read with two throwaway
+SELECT-only scripts (`START TRANSACTION READ ONLY`, deleted after use).
+
+- **One user, five companies.** User **3036** (email login, the
+  burkedrainage… address; no duplicate emails anywhere in `users`). It owns
+  companies **4, 5, 6, 7, 8**, all named after the person, all
+  `seatLimit` 1, one `owner` membership each, all created **06:15:29 UTC
+  2026-10-14**, two seconds after signup (06:15:27). Memberships are
+  interleaved (membership 5 → company 6, 6 → 5): requests racing, not
+  retries. No other owner on live has more than one company. Live totals:
+  8 companies, 4 users.
+- **Account state:** email **not verified**; onboarding completed 06:16:05;
+  last sign-in 06:28:28; `activeCompanyId` NULL, so they work in company 4
+  (oldest membership). Added one material and one labor rate during
+  onboarding. **0** bids, plan files, marks, runs, groups, assemblies; **0**
+  AI calls (`ai_usage_daily`, plan-copilot tables); **0** early-access
+  signups; **0** invites; no other member in any of the five.
+- **Cause (`server/_core/companyScope.ts` `createPersonalCompany`).** The
+  first screen sends several requests at once; each `resolveScope` finds
+  no membership and inserts a company. The catch claimed a duplicate key
+  stops the second one — but the only unique key is (companyId, userId),
+  and each request inserts its own company, so nothing collides. Not a
+  retry or email-step bug: signup itself refuses a second account for an
+  address. **Reproduced locally: 8 parallel `resolveScope` → 8 companies,
+  3 runs of 3** (`server/personalCompanyRace.test.ts`, committed as
+  `it.fails` so the Gate stays green — flip to `it` with the fix). The
+  wrong comment is corrected in place (comment only).
+- **Isolation: no cross-account exposure.** All five companies have
+  `ownerUserId` 3036, so every request's `dataUserId` is 3036 whichever
+  company is picked; nobody else is a member. The real side effect is
+  **seats**: five companies × 1 seat = five invitable seats onto one data
+  set where the plan allows one. Nothing has been invited.
+- **Fix plan (owner decides; nothing built):**
+  1. **Code, no migration:** in `createPersonalCompany`, take a MySQL
+     named lock `GET_LOCK('personal-company:<userId>', 10)` on ONE pooled
+     connection, re-check `hasAnyMembership` inside it, insert, then
+     `RELEASE_LOCK`. Works across instances (one DB). Flip the test to
+     `it`; it must go green and stay green over repeated runs.
+  2. **Forcing function, later (additive migration, step 1):** a nullable
+     unique `companies.personalOwnerUserId`, set only on the personal
+     company, so the DATABASE refuses a second one and the duplicate-key
+     catch becomes true. Needs live's duplicates resolved first (it would
+     fail on 3036's five rows).
+  3. **Live repair (owner's call):** companies 5–8 hold nothing but their
+     own membership row (0 invites, 0 `activeCompanyId` pointers; data keys
+     on the user, not the company). Removing them = delete 4 membership
+     rows + 4 company rows, after a backup. Or leave them.
+- MySQL 3307 left running; no dev servers started.
+
+## (earlier) 2026-10-14, session 42: the PACK FIX (no DB, no migration)
 
 Record: `pricing/pack-pass-2026-10-14.md`.
 
