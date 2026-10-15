@@ -1800,7 +1800,12 @@ new code against the un-migrated local DB refused 7 owners.
    "Nothing to apply"; "matches", **205/205**. Totals: **1,357/1,357
    unchanged** with old code (`d38f5930`) AND new code. JSONs
    `staging-totals-{before,after-…-old,after-…-new}-0157-2026-10-14.json`.
-5. **Code**: `656b0fb8` pushed after step 4.
+5. **Code**: `656b0fb8` pushed after step 4 — Gate 38637845427 red on one
+   test (`backup.test.ts` read `materialKey` as a file column), fixed in
+   `22c30965`. Gate 38640040867: test green, deploy-staging refused as
+   designed (`drizzle/` changed), so `local-dev:staging` pushed by hand and
+   the failed jobs re-run: **smoke 96 / 2 skips**; staging `/api/version`
+   `22c30965`, built 22:05:18 UTC.
 
 **Live**: 0152–0163 join the next release's batch, BEFORE the push of any
 code from `e689b918` on. Expect 164, 205/205 — **if what it prints does not

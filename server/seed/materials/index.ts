@@ -255,7 +255,11 @@ export function withStarterValues(
   prices: Readonly<Record<string, string>> = STARTER_PRICES,
   laborUnits: typeof STARTER_LABOR_UNITS = STARTER_LABOR_UNITS
 ): BaselineMaterial {
-  const price = prices[m.name];
+  // Only a price above zero is a price. A zero (or anything unreadable)
+  // leaves the row unpriced and UNTAGGED — "Not priced", never a $0
+  // "Example price" (owner, 2026-10-14; server/starterValues.test.ts).
+  const typed = prices[m.name];
+  const price = typed !== undefined && Number(typed) > 0 ? typed : undefined;
   const labor = laborUnits[m.name];
   const hasHours =
     labor?.laborHours !== undefined || labor?.fieldBendLaborHours !== undefined;

@@ -21,6 +21,12 @@
   `starterChanges`, `starterPinning`, `sourceHygiene` on `bidrender_test_b`:
   17 files, 181 passed. `pnpm check` clean. Gate: see the commit after this
   one / the summary. MySQL 3307 left running (shared); no dev server.
+- **Merged local-dev again at `9a497c95`** (A's pack fix, no `drizzle/`
+  change, so no migration): CHANGELOG conflict only, both kept;
+  `sheetCarryOver`, `starterPacks`, `starterValues`, `sourceHygiene` 4 files,
+  43 passed; `pnpm check` clean. Gate on 01ba268f was green (38669536985,
+  after a re-run: the first attempt failed pulling the MySQL image,
+  "toomanyrequests", before any test ran).
 
 ## WHERE B STANDS — 2026-10-14 (plan), STARTER EDITS AS OFFERS — PLAN ONLY
 

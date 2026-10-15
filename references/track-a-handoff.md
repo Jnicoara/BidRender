@@ -4,7 +4,35 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-14, session 41: boot change + 0157–0163 on local-dev AND the staging DB (not live)
+## NOW — 2026-10-14, session 42: the PACK FIX (no DB, no migration)
+
+Record: `pricing/pack-pass-2026-10-14.md`.
+
+- **`packFor` never guesses from words.** A pack above one comes only from
+  `server/seed/materials/starterPacks.ts` (`STARTER_PACKS`, by exact name,
+  each with its source); nothing written → `each` / 1 or a per-foot label at
+  qty 1. `server/starterPacks.test.ts` (6) — 5 red with one word rule put
+  back. `writeWorkbook.cjs` (old builder) lost its word rule too.
+- **One pass, one rebuild** (`--only prices`): scan A–D, § E (on
+  `track-c`, not local-dev), C's shelf answers, and a store check (HD /
+  Platt / Stoneway via six read-only research agents). 363 written, 133
+  per-foot label, 1,221 each; **101 rows `PACK_NOT_CHECKED`** (each / 1,
+  Notes say so) — the owner's list is in the record. Before → after:
+  typed prices **109 → 109, all identical, no pack moved under one**; pack
+  qty 1 **1,291 → 1,552** (+289 −28); word box packs 380 → 0; sticks 44 → 36. Surface raceway couplings held NOT CHECKED (owner said 10, Platt
+  sells the 5701 each).
+- **Not-priced, never $0 Example** (step 4): local and
+  `bidrender_test_localdev` hold 0 tagged shipped rows (2,016 / 1,717 all
+  unpriced + untagged). Gap found and closed: `withStarterValues` tagged
+  any listed price, "0.0000" included, and the loader could store a price
+  that rounds to 0.0000. Both tests red on old code, green now
+  (`server/starterValues.test.ts`).
+- **No pack-size offer goes to shops until this pass has been through the
+  owner's sheet** (STARTER_FIELDS `packQty` / `packLabel` = offer, 0157).
+  Nothing writes `materials.packQty` / `packLabel` yet.
+- MySQL 3307 was already up; left running.
+
+## (earlier) 2026-10-14, session 41: boot change + 0157–0163 on local-dev AND the staging DB (not live)
 
 - **Rebased** onto `origin/local-dev` (B's `f22c12f2`); only CHANGELOG.md
   conflicted, both sides kept. `pnpm check` clean; 16 changed/affected test
@@ -30,8 +58,16 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
   skipped (staging kept serving `d38f5930` on the migrated DB — additive,
   so safe). **Missed locally because only the changed test files ran; that
   guard reads `schema.ts` as text.** Fixed by naming `materialKey` in its
-  exclusion list beside `itemKey`; pushed with this handoff. Check the new
-  Gate, then staging `/api/version` `commit` = the fix's sha.
+  exclusion list beside `itemKey`; pushed as `22c30965`.
+- **Gate 38640040867 on `22c30965`**: test green; deploy-staging REFUSED by
+  design (`drizzle/` differs from staging — migrations are A's by hand).
+  The DB was already migrated, so A pushed `local-dev:staging` by hand
+  (`d38f5930..22c30965`, fast-forward), then re-ran the failed jobs:
+  **deploy-staging, smoke all green, 96 passed / 2 skips**. Staging
+  `/api/version` **`22c30965`**, built 22:05:18 UTC.
+- **Lesson:** a push that changes `drizzle/` ALWAYS needs the hand push to
+  `staging` (`deploying.md` § "Staging first", item 0), then
+  `gh run rerun <id> --failed` to get the smoke.
 - **Local**: `bidrender_local` 164 / 200 (known legacy-FK drift),
   `bidrender_test_localdev` 164 / 205. 4,386/4,386 totals unchanged.
 - **Live (152) at the next release:** 0152–0163 all go on live BEFORE the
@@ -40,8 +76,11 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
   `bidrender_scratch_fresh_old`, `bidrender_scratch_fresh_new`,
   `bidrender_scratch_boot_copy`, and new `bidrender_scratch_staging_0157`.
   Worktree `../bidrender-before-0157` removed.
-- **MySQL 3307 stopped** (task kill — the `bidrender` user may not
-  SHUTDOWN; InnoDB recovers on the next start). No dev servers running.
+- **MySQL 3307 is DOWN** — A ended it (task kill; the `bidrender` user may
+  not SHUTDOWN, InnoDB recovers on the next start) on that job's
+  instruction, before the standing rule "leave shared MySQL running" was
+  written. Other tracks: start it with
+  `C:\Users\15krp\BidRenderLocal\start-mysql.cmd`. No dev servers running.
 
 ## (earlier) 2026-10-13, session 40: BOOT SEED CHANGE built on local-dev, NOT pushed
 

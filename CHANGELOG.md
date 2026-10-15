@@ -30,6 +30,17 @@ This is the human-readable companion to the git history — read this to see wha
   first-visit tip about tapping the drawing now shows on sheets that have
   note numbers.
 
+- **The pricing sheet no longer guesses pack sizes from words in an item's
+  name.** It used to call a "Dishwasher whip" a box of 100 washers and every
+  flex coil a 10 ft stick, which would have divided the owner's typed prices
+  by the wrong number on every bid. Each pack is now written down per item
+  with where it came from (the owner's decisions and a check of Home Depot,
+  Platt and Stoneway); 101 items nobody could settle are marked "PACK NOT
+  CHECKED" on the sheet. Every price already typed was kept exactly.
+- **A shipped item with no price can never show as a $0 "Example price".**
+  It stays "Not priced"; a price that would round to $0.0000 is refused when
+  the sheet is loaded.
+
 - **Groundwork for safer prices and a price history (nothing visible yet).**
   The database can now hold a material's pack size and pack price (so a $120
   roll of 250 ft can be typed as such instead of divided by hand), remember

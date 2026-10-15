@@ -23,6 +23,7 @@ import { STARTER_ASSEMBLY_HOURS } from "./seed/starterAssemblyHours";
 import { BASELINE_MATERIALS, withStarterValues } from "./seed/materials";
 import { BASELINE_ASSEMBLIES } from "./seed/baselineAssemblies";
 import { BASELINE_LABOR_RATES } from "./seed/baselineLaborRates";
+import { checkPriceRow } from "../shared/starterSheetChecks";
 
 const hasColumn = (name: string) => name in materials;
 
@@ -55,6 +56,39 @@ describe("a shipped number always says it is an example (0132–0134)", () => {
     const plain = withStarterValues(row, {}, {});
     expect(plain.isExamplePrice).toBeUndefined();
     expect(plain.isExampleLaborHours).toBeUndefined();
+  });
+
+  it("a starter row with NO price is unpriced, never a $0 Example price", () => {
+    // Owner, 2026-10-14: an unpriced shipped row must read "Not priced". A
+    // tag on $0 would say "Example price" over a zero — a number nobody
+    // chose, dressed as one somebody did.
+    const row = BASELINE_MATERIALS[0];
+    for (const zero of ["0", "0.0000", "-1.0000", "", "abc"]) {
+      const out = withStarterValues(row, { [row.name]: zero }, {});
+      expect(out.isExamplePrice, JSON.stringify(zero)).toBeUndefined();
+      expect(out.costPerUnit, JSON.stringify(zero)).toBe(row.costPerUnit);
+    }
+    for (const m of BASELINE_MATERIALS)
+      if (m.isExamplePrice)
+        expect(Number(m.costPerUnit) > 0, `${m.name}: $0 Example price`).toBe(
+          true
+        );
+  });
+
+  it("the loader refuses a price that stores as $0.0000 per unit", () => {
+    // $0.01 for a pack of 1,000 is 0.00001 a piece, which 4 places store as
+    // zero — and would ship tagged.
+    const checked = checkPriceRow({
+      at: "row",
+      name: BASELINE_MATERIALS[0].name,
+      item: BASELINE_MATERIALS[0],
+      unit: BASELINE_MATERIALS[0].unitOfSale,
+      packQty: 1000,
+      packPrice: 0.01,
+      seen: new Set(),
+    });
+    expect(checked.value).toBeNull();
+    expect(checked.problems.join(" ")).toMatch(/\$0\.0000/);
   });
 
   it("no shipped material carries a price without the tag", () => {
