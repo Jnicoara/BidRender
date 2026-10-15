@@ -50,6 +50,29 @@ This is the human-readable companion to the git history — read this to see wha
   settings now sit under the line items instead of in a long column on the
   right, so the bid total stays beside the lines while you scroll. Settings'
   four pricing cards sit two by two on a wide screen.
+- **Tap a detail reference on a plan to go to that detail, and Back to
+  return.** When a sheet says "SEE DETAIL 2/E004", tapping that reference
+  now offers "Go to detail 2". Go opens sheet E004 zoomed to detail 2's own
+  title, or says it couldn't find the detail on that sheet rather than
+  guessing. A "Back to E121" button in the drawing's bottom-left corner
+  returns to the exact sheet, zoom and spot you left. A reference only
+  becomes a link when the sheet it names really exists in this plan set, so
+  breaker sizes like "30/2" and architectural sheets that aren't in the set
+  are never links. It only works with no tool picked up, and a drag still
+  moves the sheet. No AI, nothing saved. The More options switches now cover
+  detail links too.
+
+- **Tap a note number on a plan to read the note.** On a sheet with keyed
+  notes ("WORK NOTES", "KEYED NOTES"), tapping one of the small boxed numbers
+  on the drawing now opens that note's text in a card beside it, with a
+  button that takes you to the note in its printed list. It only works with
+  no tool picked up, so counting and tracing behave exactly as before, and a
+  drag still moves the sheet. The card never sits on the number you tapped
+  or over a toolbar or the side panel. Fingers get a target at least 32
+  pixels across at any zoom. No AI, nothing saved. To turn it off, use
+  "Tap a note tag to read it" under the Legend tab's More options. The
+  first-visit tip about tapping the drawing now shows on sheets that have
+  note numbers.
 
 - **The pricing sheet no longer guesses pack sizes from words in an item's
   name.** It used to call a "Dishwasher whip" a box of 100 washers and every

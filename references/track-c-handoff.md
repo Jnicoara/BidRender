@@ -622,6 +622,17 @@ rows, read from a fresh copy of the workbook. Read-only.
   names it `project_assembly_items_projectAssemblyId_fk`, and that name
   worked. That is a small fault in `scripts/schemaDrift.mts`'s suggested
   SQL, for whoever next touches it.
+## FROM THE OWNER (2026-10-14, via Track B) — STARTER OFFERS MOVED TO B
+
+**Track B now builds the whole starter-offers feature**
+(`references/starter-offers-plan.md`), including the parts that plan and
+`baseline-screen-plan.md` § 10a marked C: the Example-tag companion in
+`applyStarterChange`, the offer read (with B's per-field fix to § 10a.3,
+plan § 3a), Accept/Ignore, `recountsDrafts` and the draft count. **C stays
+on catalog reviews.** Do not start any of those; B will touch
+`server/starterChanges.ts` and `shared/starterChange.ts`, so say so in your
+handoff before editing either. The owner answered that plan's Q1–Q7: all
+yes, as suggested.
 
 ## FROM TRACK A (2026-10-14) — PS-M1..M6 = 0157–0162, PH-M1 = 0163, on local-dev + STAGING DB
 

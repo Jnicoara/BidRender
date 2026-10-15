@@ -119,7 +119,7 @@ export function tipText(
     case "drawingTaps":
       return {
         title: "Tap the drawing to read it",
-        body: "Tap a note number or a detail bubble on the drawing to read the note or go to the detail.",
+        body: "Tap a boxed note number to read the note, or a detail reference like 2/E004 to go to it. Put any tool down first.",
       };
     case "lookUp":
       return {

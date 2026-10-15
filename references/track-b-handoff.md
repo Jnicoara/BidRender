@@ -1,6 +1,125 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)
+## WHERE B STANDS — 2026-10-14 (merge), LOCAL-DEV MERGED; B OWNS ALL OF STARTER OFFERS
+
+- **Owner answered `starter-offers-plan.md` Q1–Q7: all YES, as
+  suggested.** Recorded in the plan's § 8 and header.
+- **Owner change: B now builds the WHOLE starter-offers feature**,
+  including what the plan marked C: the Example-tag companion in
+  `applyStarterChange`, the offer read with the per-field fix (§ 3a),
+  Accept/Ignore, `recountsDrafts` and the number tests. C stays on catalog
+  reviews. Noted in the plan, `baseline-screen-plan.md` § 10a.3 and
+  `track-c-handoff.md`. A still owns release order and
+  `starterDrift --apply`. **Building has NOT started** (next prompt).
+- **Merged `origin/local-dev` 22c30965** (A's boot change `d38f5930`,
+  0157–0163, `boot-seed-plan.md`) into track-b. One conflict, CHANGELOG
+  (both sides kept). B's write paths can now be built on the boot change.
+- **Migrated** `bidrender_local_b_new` and `bidrender_test_b`: 7 applied
+  (0157–0163), **164 migrations, 205 FKs** each; a re-run applies nothing.
+  Matches A's 164 / 205. If yours differ, stop and find out why.
+- **Tests:** the 13 test files the merge changed + `starterLibrary`,
+  `starterChanges`, `starterPinning`, `sourceHygiene` on `bidrender_test_b`:
+  17 files, 181 passed. `pnpm check` clean. Gate: see the commit after this
+  one / the summary. MySQL 3307 left running (shared); no dev server.
+- **Merged local-dev again at `9a497c95`** (A's pack fix, no `drizzle/`
+  change, so no migration): CHANGELOG conflict only, both kept;
+  `sheetCarryOver`, `starterPacks`, `starterValues`, `sourceHygiene` 4 files,
+  43 passed; `pnpm check` clean. Gate on 01ba268f was green (38669536985,
+  after a re-run: the first attempt failed pulling the MySQL image,
+  "toomanyrequests", before any test ran).
+
+## WHERE B STANDS — 2026-10-14 (plan), STARTER EDITS AS OFFERS — PLAN ONLY
+
+- **`references/starter-offers-plan.md`** — plan only, no code, no
+  migration. Wires the admin starter screen so an edit goes through
+  `applyStarterChange`, existing shops get "N starter updates available"
+  offers, new shops read it directly, Drafts re-count only after Accept,
+  sent/locked bids never move, and the Example tag travels with its number.
+- **No migration from A:** 0152–0155 and 0163 already hold everything.
+  **C:** Example-tag companion, the offer read with the per-field collapse,
+  Accept/Ignore, `recountsDrafts`. **B:** admin write routes + edit UI +
+  change log; shop routes, Dashboard card, Updates tabs, one refresh helper.
+  **A:** release order (0152–0156 live → boot change live → this code).
+- **Fault found in C's offer spec (plan § 3a):** `baselineVersion` is per
+  row, changes are per field, so accepting one field's change can make an
+  unanswered change on another field vanish, and a field changed twice
+  reads as "own-value". Pointer added in `baseline-screen-plan.md` § 10a.3.
+  Tests 4 and 5 in the plan are red on the spec as written.
+- **Owner questions Q1–Q7** at the end of the plan, suggested answers given.
+- **New rule (owner, 2026-10-14): do NOT stop MySQL 3307 at the end of a
+  session** — all tracks share it; the owner stops it at end of day. It was
+  restarted after this session's earlier stop and left running.
+- **Not merged to local-dev** (A mid-push). Before building any write path,
+  local-dev (boot change `d38f5930`, 0157–0163) must be merged into
+  track-b.
+
+## WHERE B STANDS — 2026-10-14 (last), PLAN-READING HELP STEP 5d (DETAIL LINKS + BACK) BUILT
+
+- **5d built on `track-b`, NOT merged to local-dev** (A is pushing). No
+  AI, no migration. Tap "2/E004" on a sheet → "Detail 2 on E004 · Go to
+  detail 2" → E004 zoomed to detail 2's title bubble (or "not located") →
+  **Back to E121** (drawing's bottom-left) restores sheet, zoom and spot.
+  Full notes: `plan-reading-help-plan.md` § 7 step 5, "5d DONE".
+- **Code:** `client/src/lib/detailRefs.ts` (reader + link/title rules),
+  worker returns `refs` with the keyed notes; `SheetNotes.tsx` now has one
+  `DrawingTaps` layer and one `TapCard` shell for notes and links, plus
+  `DetailLinkCard`, `DetailBack`; PlanPane gained `viewNow`, `viewRequest`,
+  `drawingChrome`. Go and Back flush the mark queue themselves:
+  `setPage` does NOT (the plan said it did; corrected there).
+- **Three plan points overridden, recorded in § 6:** text links need a
+  letter in the sheet (breaker sizes 30/2 are everywhere); Back sits
+  bottom-left, not top (tool pills, Find/Check panels and fold buttons are
+  there); a title is the bubble naming its own sheet.
+- **Tests:** `detailRefs.test.ts` 16 (UNCC/Weld 1/Weld 2 real words, sheet
+  numbers from the app's title-block reader), every guard shown red. With
+  noteTagTap, planTips, planHelpPrefs, keyedNotes, planAddress,
+  sourceHygiene: 7 files, 97 passed. `pnpm check` clean. Reader 17 ms on
+  the densest sheet (was 1.5 s before indexing).
+- **Looked at** laptop, iPad both ways, phone 375 on UNCC E121: Go lands on
+  detail 2; Back returns to the same zoom and pixel; drag from a link
+  opens nothing. Not seen on screen: "not located" (no real case on hand).
+- **Dev server stopped.** MySQL 3307 was stopped then, and restarted the
+  same day under the owner's new rule: **never stop 3307 at the end of a
+  session — every track shares it; the owner stops it at end of day.**
+- **Gate GREEN on 2cc8f0b1** (run 38640420528: test + drizzle-guard;
+  deploy-staging and smoke skipped on track-b as usual).
+- **Next:** step 6 leftovers are done; plan-reading help is complete
+  except anything the owner adds. Then the open items below.
+
+## WHERE B STANDS — 2026-10-14 (later), PLAN-READING HELP STEP 5c (TAP A NOTE TAG) BUILT
+
+- **Smoke back to green on local-dev f22c12f2:** 96 passed / 2 skipped
+  (run 38615422125), so the tips fix (fbc89ffb) holds on staging.
+- **5c built on `track-b`, NOT merged to local-dev** (A is pushing; owner's
+  word). No migration. With no tool in hand, tapping a boxed note number on
+  the drawing opens a card beside it: "Note 8", the list it is in, the
+  text as printed, and **Show it in the notes list**. Details and every
+  decision: `plan-reading-help-plan.md` § 7 step 5, "5c DONE".
+- **Code:** `client/src/lib/noteTagTap.ts` (`tagTapRadius` ≥ 32 screen px,
+  `nearestTag`, `noteForTag`, `noteTapsOn`, `noteTapsLive`,
+  `placeNoteCard`); `SheetNotes.tsx` (`NoteTagTaps`, `NoteTagCard`,
+  `NoteTapsSwitch`); `planHelpPrefs.ts` (`useNoteTagTaps`); TakeoffPage
+  mounts the targets BELOW the marks layer and only with no tool / Find /
+  Check / legend naming going on; tip 3 is on (`tappable`) with words that
+  mention only note numbers until 5d.
+- **More options:** "Tap a note tag to read it", ON by default (it draws
+  nothing). The rings stay a separate switch, OFF.
+- **Tests:** `noteTagTap.test.ts` 20 passed, each guard removed and shown
+  red. With planTips, planHelpPrefs, keyedNotes, sourceHygiene: 5 files,
+  67 passed (pure files, run with `DATABASE_URL=` empty).
+  `pnpm check` clean. No smoke spec added: a boxed number on the smoke
+  plan would look like its SWITCH symbol to Find matching.
+- **Looked at** laptop, iPad both ways, phone 375 on "Sheet numbers check"
+  E-200 (throwaway probes in `scripts/`, deleted): card beside the tag,
+  inside the drawing, off toolbars/panel/phone bar; drag pans 40 px and
+  opens nothing; Copy text in hand → 0 targets; switch off → 0, survives a
+  reload; tip 3 shows inside the drawing.
+- **Dev server and MySQL 3307 stopped.**
+- **Gate GREEN on 5e73997e** (run 38635567651: test + drizzle-guard;
+  deploy-staging and smoke skipped on track-b as usual).
+- **Next:** 5d — detail links ("3/E5") with a Go popover and a Back pill.
+
+## WHERE B STOOD — 2026-10-14, STAGING SMOKE FIX (TIPS COVERED CONTROLS)
 
 - **local-dev went to f4f61ed6 (the merge below) and its smoke went RED**
   (run 38595716662: 83 passed, 2 failed, 2 skipped, 11 not run). Desktop
@@ -13,7 +132,7 @@
   away for the visit without marking that one seen (`PlanTips` `onAway`),
   because a tool's own popover ("Name this symbol") also opens over the
   drawing. Tip buttons are 44 px on any touch screen (`touch = phone ||
-  coarse`). Recorded in `plan-reading-help-plan.md` § 5.
+coarse`). Recorded in `plan-reading-help-plan.md` § 5.
 - **Test fix (the test was wrong):** flow 3 found the name box as "the last
   visible input". That became the Legend Look up box on 2026-10-13, so the
   name went into search and Save stayed disabled. It now finds the box by

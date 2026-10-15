@@ -179,8 +179,13 @@ async function createPersonalCompany(user: User) {
       status: "active",
     });
   } catch (error) {
-    // Another request for the same new user got there first. Re-reading is the
-    // whole recovery — the row it created is the one we wanted.
+    // WRONG, found on live 2026-10-14: this said "another request for the
+    // same new user got there first" — but no key can collide here. The only
+    // unique index is (companyId, userId), and each racing request inserts
+    // its OWN company, so every insert succeeds: user 3036 got five
+    // companies in one second. Not fixed yet (owner's call); the plan is in
+    // references/track-a-handoff.md session 43, and
+    // server/personalCompanyRace.test.ts reproduces it.
     if (!isDuplicateKey(error)) throw error;
   }
   return findMembership(user.id);

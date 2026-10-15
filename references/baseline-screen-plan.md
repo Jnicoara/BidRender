@@ -789,6 +789,18 @@ exactly like any change. **Pins already made are left in place** (§ 4).
 **Undo a batch:** a preview, then one undo batch of the changes still
 undoable, listing the rest (Q6).
 
+> **Fault found 2026-10-14 (Track B, `starter-offers-plan.md` § 3a) — fix
+> before building the offer read.** `baselineVersion` is one number per ROW
+> but changes are per FIELD. As written below, accepting a row's hours
+> change raises `baselineVersion` past an UNANSWERED price change on the same
+> row, and the price offer vanishes. And two changes to one field make a
+> shop that never touched it read as "own-value". The proposed fix
+> (collapse per row and field, base = the first change's old value, latest
+> = the last change's new value) and the tests that must go red on the text
+> below are in that file. **Owner, 2026-10-14: Track B now builds the
+> offer read, Accept/Ignore and the Example-tag companion** (C stays on
+> catalog reviews), so B makes this fix as part of building it.
+
 **Offers, read for one company** (owner `users.id` = `ctx.scope.dataUserId`):
 
 - **The candidates:** every logged `offer` / `part_*` change on a row this

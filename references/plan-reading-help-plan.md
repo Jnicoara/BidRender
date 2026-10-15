@@ -1,9 +1,8 @@
 # Plan-reading help, no AI — PLAN ONLY, 2026-10-12 (Track B)
 
-**Status: STEPS 1–4 and 5a/5b BUILT on track-b (2026-10-12/13, owner's
-go); 5c (tap a tag), 5d (detail links) and the rest of 6 not started
-(step 6's tips-again / off and the outlines switch are already in).** All 11 picks in § 9 approved. No migration. Not merged to
-local-dev (frozen until the live release). Step 1 notes are in § 7.
+**Status: STEPS 1–5 BUILT on track-b (2026-10-12/13/14, owner's go),
+5d (detail links + Back) included; of step 6 only "browse all" is
+already in with tips-again / off and the switches.** All 11 picks in § 9 approved. No migration. Step 1 notes are in § 7.
 
 **The ask (owner, 2026-10-12):** before beta, help a person read a plan set
 without any AI: an abbreviation lookup (WP, AFF, EM, GFI, HR…), a symbol
@@ -296,19 +295,33 @@ E5`.
   (`bid_pdf_sheet_identity.sheetNumber`, compared ignoring dots, dashes and
   case). This is what keeps `3/4` (a conduit size) and `1/2"` from becoming
   links — unless a sheet called "4" exists, which the test must cover.
+  **Overridden 2026-10-14 (5d):** the sheet half must start with a letter.
+  The sets on hand print breaker sizes (`20/2`, `30/2`, `60/3`) on every
+  panel schedule, and the app's sheet-number reader never stores a bare
+  number (`SHEET_NUMBER_PATTERN`), so a "sheet 4" link would only ever be
+  wrong. The test covers it the other way: `30/2` is not a link even in a
+  set with a sheet named "2". A number two sheets share is not a link either.
 - **Tap → popover, not a jump** (§ 9 Q2): "Detail 3 on E5.01 — Go". A jump on
   touch would fire on every accidental tap while panning.
 - **Go** opens that sheet and, if a detail title "3" is found on it (a
   number in a circle beside an underlined title, the biggest text near it),
   zooms to it; otherwise opens the whole sheet with "Detail 3 is on this
   sheet — not located". Never zooms to a guess.
+  **As built (5d):** the title is the split bubble on that sheet naming
+  ITSELF ("2 over E004" on E004) — the measured shape on every set on hand.
 - **Back:** a "Back to E2.01" pill at the top of the drawing, returning to
   the same sheet, zoom and position. One level of history only; a second jump
   replaces it.
+  **Moved 2026-10-14 (5d): bottom-left of the drawing, not the top.** The
+  top already holds the tool pills (centre), the Find / Check panels
+  (left) and the touch fold buttons (corners).
 - The jump reuses the sheet-change path the sheet list already uses, so
   whatever is queued (marks being sent) is flushed exactly as a sheet change
   flushes it today — read that path before trusting this sentence
   (CLAUDE.md, "a comment claiming that something else handles it").
+  **Read 2026-10-14: it does NOT.** `setPage` flushes nothing; the queue
+  flushes when a count is put down. So Go and Back call the flush
+  themselves (`flushStampsRef.current()`), a guard rather than a reliance.
 
 **Tests:** `keyedNotes.test.ts` (E-200's words: tags found are 1–18 only;
 notes joined into 18 texts), `detailRefs.test.ts` (a reference to a missing
@@ -452,7 +465,7 @@ from the real sheets via a script, not hand-typed.
    - **GENERAL NOTES are listed but never tagged**; any other "… NOTES",
      "NOTES" or "KEYNOTES" heading is keyed. A list ends at the first
      missing number. The list's own numbers are not tags.
-   - Tip 3 stays skipped until 5c builds the tap.
+   - Tip 3 stayed skipped until 5c built the tap (it is on since 5c).
      Results on the sets on hand: E-200 WORK NOTES 1–18, 55 tags, **none above
      18 before any list is consulted** (the legend plan's red test); UNCC p3
      ELECTRICAL NOTES 1–9, 36 tags; colusa, dundas: boxed numbers but no list,
@@ -463,6 +476,84 @@ from the real sheets via a script, not hand-typed.
      Looked at laptop, iPad both ways, phone 375/390/425 on "Sheet numbers
      check" E-200: no sideways scroll; rings sit on the boxed numbers and skip
      the boxed room numbers (006, 010); note 7 jumps and rings its number.
+     **5c DONE 2026-10-14 (track-b).** Tap a tag with no tool in hand → a card
+     beside it: the boxed number, "Note 8", "WORK NOTES · on this sheet", the
+     note's text as printed, and **Show it in the notes list** (the same jump
+     the notes list uses). No AI, no migration, nothing saved.
+     `client/src/lib/noteTagTap.ts` holds every decision; `SheetNotes.tsx` has
+     `NoteTagTaps` (invisible targets) and `NoteTagCard`. Details, on purpose:
+   - **Taps are ON unless turned off** ("Tap a note tag to read it", More
+     options, `bidrender.plans.noteTagTaps`, only "off" stored). They draw
+     nothing, so they cost no clutter; the RINGS stay a separate switch, off
+     (Q8). The tapped tag gets one yellow ring while its card is open.
+   - **No tool in hand** (`noteTapsLive`): the targets are not mounted
+     while a count, trace, calibrate, capture, Copy text, area, Select,
+     panel placing, Find or Check session or legend naming is going on.
+     Picking a tool up closes an open card.
+   - **Targets ≥ 32 screen px at any zoom** (`tagTapRadius`; the layer is
+     inside the zoom transform, so the radius is divided back out). Zoomed
+     out, neighbouring targets overlap, so **the nearest tag to the tap wins**
+     (`nearestTag`), not the circle drawn last.
+   - **Below the marks layer**, so a mark on a tag is still the mark's to
+     click. A press is not stopped: a drag from a tag pans, and the click
+     after a real pan is swallowed (`swallowNextClick`), so a pan never
+     opens a note (looked at: moved 40 px, no card).
+   - **The card is never on the tag, never off the drawing** (`placeNoteCard`):
+     below, above, right, left of the tag, slid into the drawing's box, then
+     the box's corners. It follows the tag every 200 ms and closes when the
+     tag leaves the drawing, on any press outside it, on Escape and on ×.
+     Buttons are 44 px on a touch screen.
+   - **Tip 3** is on: shown on a sheet with tags while taps are on. Its words
+     say only note numbers until 5d adds detail bubbles.
+   - **Not done:** "Note N not on this sheet → go to the notes sheet" (§ 6).
+     It cannot happen yet: a tag is only offered when its number IS in a
+     keyed list on the same sheet. It becomes real with cross-sheet notes.
+     Tests: `client/src/lib/noteTagTap.test.ts` (20, on E-200's real words;
+     each guard (32 px floor, keyed only, tool in hand, nearest wins, card
+     off the tag and inside the drawing) removed in turn and shown red).
+     Looked at: laptop 1536×864, iPad 820×1180 and 1180×820, phone 375×667 on
+     "Sheet numbers check" E-200: 55 targets, note 8 opens beside its tag
+     every time, no sideways scroll, no console errors; Copy text in hand →
+     0 targets, put down → 55; the switch off → 0, still off after reload;
+     tip 3 shows on E-200 inside the drawing.
+     **5d DONE 2026-10-14 (track-b).** A detail reference on the drawing is
+     a tap target beside the note tags (one layer, `DrawingTaps`; one card
+     shell, `TapCard`). Tap → "Detail 2 on E004", that sheet's title, **Go to
+     detail 2**. Go → that sheet, zoomed to the detail's title bubble once the
+     sheet is drawn AND read (a focus aimed at the old raster would be used
+     up), or "Detail 2 is on this sheet — not located". **Back to E121**
+     (bottom-left, × to stay) returns to the same sheet, zoom and position
+     (PlanPane `viewNow` / `viewRequest`, on `planAddress`'s tested
+     `rememberView` / `restoreView`). No AI, no migration, nothing saved.
+   - **Reader:** `client/src/lib/detailRefs.ts`, run in the PDF worker on
+     the words the note reader already has, returned in the same message
+     (`SheetNotesRead.refs`). Two forms: text ("2/E004.") and the split
+     bubble (label over sheet number, same centre line, similar type size).
+     **What it is depends on where it points:** another sheet in this set →
+     link; this sheet → a title (where Go lands); no sheet / two sheets →
+     nothing. Only this plan set; never across sets.
+   - **Measured on the sets on hand:** UNCC E121 → 2/E004, 3/E004 (links);
+     UNCC E004 has titles 1–3; Weld 1 E-200's A–D/E-200 are its own titles;
+     5/A1, 1/HE-62, T5/T8, 1/S201, A2/A2, D1/V1, 30/2, 60/3 are not links.
+     Time: first version 1.5 s on weld2 E3.1 (61,746 words, every word
+     against every word); now 17 ms (label words sorted across, halving).
+   - **Switches:** the existing ones now say "Tap note tags and detail
+     links" (on) and "Outline note tags and detail links" (off; links ring
+     blue, notes amber). Tip 3 names both.
+     Tests: `client/src/lib/detailRefs.test.ts` (16, fixtures from the real
+     sets by `scripts/detailRefsFixture.mts`, sheet numbers from the app's
+     own title-block reader). Each guard removed in turn and shown red:
+     sheet must exist, two-sheet number, own sheet is not a link, letter in
+     the sheet, bubble type size, title only on its own sheet.
+     `noteTagTap.test.ts` +1 (a sheet with only a link is live).
+     Looked at: laptop, iPad 820×1180 and 1180×820, phone 375×667 on UNCC
+     E121 (bid "Sheet numbers check"): zoomed and panned first, tap 2/E004 →
+     card beside it; Go → E004 at detail 2's title (66% laptop, 43% iPad
+     sideways); Back → E121 at the same zoom and the link at the same screen
+     pixel, every size; a drag from the link opened nothing; no sideways
+     scroll, no console errors. NOT looked at: the "not located" line (no
+     sheet on hand has a link without its title; unit-tested) and a mark
+     sitting on a link (layer order, as 5c).
 6. **More options:** browse all, outlines toggle, tips again / off.
 
 Each step: tests in `shared/` or `client/src/lib`, then **looked at** on a

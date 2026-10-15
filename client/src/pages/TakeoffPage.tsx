@@ -224,6 +224,7 @@ import {
   resolvePlanAddress,
   restoreView,
   writeRememberedView,
+  type RememberedView,
 } from "@/lib/planAddress";
 import { SheetIndex } from "@/components/takeoff/SheetIndex";
 import {
@@ -555,11 +556,26 @@ import { SchedulesView } from "@/components/takeoff/SchedulesView";
 import { SheetKindLine } from "@/components/takeoff/SheetKindLine";
 import {
   useNoteTagOutlines,
+  useNoteTagTaps,
   usePlanTipsSeen,
   useSheetKindLine,
 } from "@/lib/planHelpPrefs";
 import type { SheetNotesRead } from "@/lib/keyedNotes";
-import { NoteTagLayer } from "@/components/takeoff/SheetNotes";
+import {
+  DetailBack,
+  DetailLinkCard,
+  DrawingTaps,
+  NoteTagCard,
+  NoteTagLayer,
+  type TapSpot,
+} from "@/components/takeoff/SheetNotes";
+import { noteForTag, noteTapsLive } from "@/lib/noteTagTap";
+import {
+  findDetailTitle,
+  linksOnSheet,
+  type DetailLink,
+  type SetSheet,
+} from "@/lib/detailRefs";
 import { PlanTips } from "@/components/takeoff/PlanTips";
 import { markTipSeen, nextTip, turnTipsOff } from "@/lib/planTips";
 import { sheetKinds } from "@shared/planHelp/sheetKind";
@@ -1039,7 +1055,28 @@ function PlanPane({
   thumbnailWants,
   onThumbnail,
   focusRequest,
+  viewNow,
+  viewRequest,
+  drawingChrome,
 }: {
+  /**
+   * Where this pane is looking RIGHT NOW (null = fitted), kept current on
+   * every view change — what "Back" returns to after a detail jump (5d).
+   * The stored copy in @/lib/planAddress waits 300 ms and is for a refresh.
+   */
+  viewNow?: React.MutableRefObject<RememberedView | null>;
+  /**
+   * Put a sheet back exactly where it was: once, when `page` is showing and
+   * drawn. A null `view` means it was fitted. `seq` changes per request.
+   */
+  viewRequest?: {
+    setId: number;
+    page: number;
+    view: RememberedView | null;
+    seq: number;
+  } | null;
+  /** Controls that sit ON the drawing (the Back button), screen-sized. */
+  drawingChrome?: React.ReactNode;
   doc: Document;
   /**
    * The set's file, when it is on this machine — read from here instead of
@@ -1422,6 +1459,52 @@ function PlanPane({
     }, 300);
     return () => window.clearTimeout(timer);
   }, [view, doc.id, page, canvasSize.width, readBounds]);
+
+  /*
+    The same reading, kept current with no wait, for "Back" (5d) — and only
+    while THIS page is the one drawn, so a reading is never of one sheet's
+    raster under another sheet's number.
+  */
+  useEffect(() => {
+    if (!viewNow || drawnPage !== page) return;
+    const bounds = readBounds();
+    if (!bounds) return;
+    viewNow.current = viewIsFitted.current
+      ? null
+      : rememberView(doc.id, page, view, bounds);
+  }, [viewNow, view, doc.id, page, drawnPage, readBounds]);
+
+  /*
+    "Back": put the sheet back where it was, once it is drawn. Declared after
+    the fit on arrival, so on the commit where both run the fit goes first
+    and this wins. A view measured on a different raster is not restored
+    (`restoreView` checks); the sheet stays fitted, which is never wrong.
+  */
+  const handledViewRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (!viewRequest || handledViewRequest.current === viewRequest.seq) return;
+    if (viewRequest.setId !== doc.id || viewRequest.page !== page) return;
+    if (drawnPage !== page) return;
+    const bounds = readBounds();
+    if (!bounds) return;
+    handledViewRequest.current = viewRequest.seq;
+    const back = viewRequest.view
+      ? restoreView(viewRequest.view, doc.id, page, bounds)
+      : null;
+    if (back) {
+      viewIsFitted.current = false;
+      setView(back);
+    } else fitToView();
+  }, [
+    viewRequest,
+    doc.id,
+    page,
+    drawnPage,
+    canvasSize.width,
+    canvasSize.height,
+    readBounds,
+    fitToView,
+  ]);
 
   /**
    * "Show me on the drawing": centre the requested spot, zoomed in to at
@@ -2938,6 +3021,7 @@ function PlanPane({
           ref={setChromeLayer}
           className="absolute inset-0 pointer-events-none z-10"
         />
+        {drawingChrome}
       </div>
     </div>
   );
@@ -3841,6 +3925,75 @@ export default function TakeoffPage({
   const activeNotes = doc ? (notesByPage[`${doc.id}:${page}`] ?? null) : null;
   /** The rings on note tags — More options, off unless turned on. */
   const [noteOutlines] = useNoteTagOutlines();
+  /** Tapping a tag or detail link (5c, 5d) — on unless turned off. */
+  const [noteTaps] = useNoteTagTaps();
+  /** The spot whose card is open, by index into `tapSpots`. */
+  const [openTap, setOpenTap] = useState<number | null>(null);
+  /*
+    DETAIL LINKS (5d). The set's sheets as the app knows them — the number
+    typed or read for each page — so "2/E004" goes to the page called E004
+    (@/lib/detailRefs). Only this plan set: a link never changes sets.
+  */
+  const setSheets = useMemo<SetSheet[]>(
+    () =>
+      sheets.map(s => ({
+        page: s.pageNumber,
+        number: sheetDisplay(s, identities.get(s.pageNumber)).number,
+      })),
+    [sheets, identities]
+  );
+  const detailLinks = useMemo<DetailLink[]>(
+    () =>
+      activeNotes && !activeNotes.scan
+        ? linksOnSheet(activeNotes.refs, page, setSheets)
+        : [],
+    [activeNotes, page, setSheets]
+  );
+  /** Note tags first, then detail links: one list, one tap layer. */
+  const tapSpots = useMemo<TapSpot[]>(
+    () => [
+      ...(activeNotes?.tags ?? []).map(t => ({
+        x: t.x,
+        y: t.y,
+        r: t.r,
+        kind: "note" as const,
+        aria: `Note ${t.label}: read it`,
+      })),
+      ...detailLinks.map(l => ({
+        x: l.ref.x,
+        y: l.ref.y,
+        r: l.ref.r,
+        kind: "detail" as const,
+        aria: `Detail ${l.ref.label} on ${l.number}: go to it`,
+      })),
+    ],
+    [activeNotes, detailLinks]
+  );
+  /** Where Back goes: the sheet and the exact view before the last jump. */
+  const paneView = useRef<RememberedView | null>(null);
+  const [backTo, setBackTo] = useState<{
+    setId: number;
+    page: number;
+    view: RememberedView | null;
+    label: string;
+  } | null>(null);
+  const [viewRequest, setViewRequest] = useState<{
+    setId: number;
+    page: number;
+    view: RememberedView | null;
+    seq: number;
+  } | null>(null);
+  /** A jump waiting for its sheet to be drawn and read, to find the title. */
+  const [pendingDetail, setPendingDetail] = useState<{
+    setId: number;
+    page: number;
+    label: string;
+  } | null>(null);
+  /** "Detail 3 is on this sheet — not located", for the page it is about. */
+  const [detailNote, setDetailNote] = useState<{
+    page: number;
+    text: string;
+  } | null>(null);
   const handleKeyedNotes = useCallback(
     (pageNumber: number, read: SheetNotesRead) => {
       if (docIdForScale === null) return;
@@ -6409,8 +6562,8 @@ export default function TakeoffPage({
       activeSheet !== null &&
       sheetKinds(sheetDisplay(activeSheet, identities.get(page)).title).length >
         0,
-    // Taps on the drawing are step 5 of the plan, not built yet.
-    tappable: false,
+    // A note tag to tap (step 5c). Detail links (5d) join this when built.
+    tappable: noteTaps && tapSpots.length > 0,
   };
   const tip =
     doc &&
@@ -7243,6 +7396,110 @@ export default function TakeoffPage({
       current && current.sheetId !== activeSheet?.id ? null : current
     );
   }, [activeSheet?.id]);
+
+  /*
+    TAP A NOTE TAG (plan-reading-help-plan.md § 6, step 5c). The targets are
+    mounted only when nothing else wants the drawing — no tool in hand, no
+    Find or Check session, no legend being named — so counting and tracing
+    never change. The open card closes on a sheet change and the moment any
+    of that starts: a guard here, not a hope that the card is not in the way.
+  */
+  const noteTapsNow = noteTapsLive({
+    tapsOn: noteTaps,
+    toolInHand:
+      toolInHand ||
+      findSession !== null ||
+      checkSession !== null ||
+      legendDraft !== null,
+    spots: activeNotes ? tapSpots.length : null,
+  });
+  const tagCount = activeNotes?.tags.length ?? 0;
+  const openNote =
+    noteTapsNow && openTap !== null && openTap < tagCount && activeNotes
+      ? noteForTag(activeNotes, activeNotes.tags[openTap].label)
+      : null;
+  const openLink =
+    noteTapsNow && openTap !== null && openTap >= tagCount
+      ? (detailLinks[openTap - tagCount] ?? null)
+      : null;
+  useEffect(() => {
+    setOpenTap(null);
+  }, [doc?.id, page, noteTapsNow]);
+
+  /*
+    GO TO A DETAIL (5d). The same sheet change the sheet list makes
+    (`setPage`). Before it, the mark queue is flushed HERE rather than
+    trusted to be empty: with no tool in hand it should be, because putting
+    a count down flushes it (startSelectingText's note), but a guard costs
+    one line and a comment saying so costs a count (CLAUDE.md).
+  */
+  const goToDetail = (link: DetailLink) => {
+    if (!doc) return;
+    flushStampsRef.current();
+    const here = activeSheet
+      ? sheetDisplay(activeSheet, identities.get(page))
+      : null;
+    setBackTo({
+      setId: doc.id,
+      page,
+      view: paneView.current,
+      label: here?.number ?? here?.title ?? `sheet ${page}`,
+    });
+    setDetailNote(null);
+    setPendingDetail({ setId: doc.id, page: link.page, label: link.ref.label });
+    setOpenTap(null);
+    setPage(link.page);
+  };
+  const goBack = () => {
+    if (!backTo) return;
+    flushStampsRef.current();
+    setViewRequest(current => ({
+      setId: backTo.setId,
+      page: backTo.page,
+      view: backTo.view,
+      seq: (current?.seq ?? 0) + 1,
+    }));
+    setPendingDetail(null);
+    setDetailNote(null);
+    setBackTo(null);
+    setPage(backTo.page);
+  };
+  /*
+    Once the detail's sheet is DRAWN and READ, zoom to its title bubble — or
+    say it was not located. Waiting for the drawing matters: a focus request
+    measured against the last sheet's raster is used up before the new one
+    arrives, and the jump would silently land fitted.
+  */
+  useEffect(() => {
+    if (!pendingDetail) return;
+    if (!doc || doc.id !== pendingDetail.setId || page !== pendingDetail.page) {
+      setPendingDetail(null);
+      return;
+    }
+    if (renderedPage !== page) return;
+    const read = notesByPage[`${doc.id}:${page}`];
+    if (!read) return;
+    const title = read.scan
+      ? null
+      : findDetailTitle(read.refs, page, pendingDetail.label, setSheets);
+    if (title) jumpTo({ x: title.x, y: title.y });
+    setDetailNote(
+      title
+        ? null
+        : {
+            page,
+            text: `Detail ${pendingDetail.label} is on this sheet — not located`,
+          }
+    );
+    setPendingDetail(null);
+  }, [pendingDetail, doc, page, renderedPage, notesByPage, setSheets, jumpTo]);
+  const showBack =
+    backTo !== null &&
+    doc !== null &&
+    doc.id === backTo.setId &&
+    page !== backTo.page &&
+    checkSession === null &&
+    !(phone && phonePanelOpen);
   const startCheck = useCallback(() => {
     if (!activeSheet) return;
     setFindSession(null);
@@ -11350,6 +11607,26 @@ export default function TakeoffPage({
               sourceKey={planSource.sourceKey}
               page={page}
               focusRequest={focusRequest}
+              viewNow={paneView}
+              viewRequest={viewRequest}
+              drawingChrome={
+                showBack && backTo ? (
+                  <DetailBack
+                    sheetLabel={backTo.label}
+                    note={
+                      detailNote && detailNote.page === page
+                        ? detailNote.text
+                        : null
+                    }
+                    touch={phone || coarse}
+                    onBack={goBack}
+                    onDismiss={() => {
+                      setBackTo(null);
+                      setDetailNote(null);
+                    }}
+                  />
+                ) : null
+              }
               onPage={setPage}
               controlsTarget={zoomSlot}
               fitOnly={phone}
@@ -11793,6 +12070,21 @@ export default function TakeoffPage({
                         onRead={setConnectRead}
                       />
                     )}
+                    {/*
+                      Note tag taps (5c): BEFORE the marks layer, so a mark
+                      sitting on a tag is still the mark's to click.
+                    */}
+                    {noteTapsNow && (
+                      <DrawingTaps
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        zoom={size.zoom}
+                        spots={tapSpots}
+                        open={openNote || openLink ? openTap : null}
+                        onOpen={setOpenTap}
+                      />
+                    )}
                     <TraceLayer
                       width={size.width}
                       height={size.height}
@@ -12062,16 +12354,14 @@ export default function TakeoffPage({
                         }}
                       />
                     )}
-                    {noteOutlines &&
-                      activeNotes &&
-                      activeNotes.tags.length > 0 && (
-                        <NoteTagLayer
-                          width={size.width}
-                          height={size.height}
-                          renderScale={size.renderScale}
-                          read={activeNotes}
-                        />
-                      )}
+                    {noteOutlines && tapSpots.length > 0 && (
+                      <NoteTagLayer
+                        width={size.width}
+                        height={size.height}
+                        renderScale={size.renderScale}
+                        spots={tapSpots}
+                      />
+                    )}
                     {showHomeruns &&
                       activeHomeruns &&
                       activeHomeruns.homeruns.length > 0 && (
@@ -12733,6 +13023,7 @@ export default function TakeoffPage({
                       assemblies={allAssemblies}
                       onCountThese={countThese}
                       notes={activeNotes}
+                      detailLinks={detailLinks.length}
                       onShowNote={at => {
                         // The phone's panel covers the drawing it moves.
                         if (phone) setPhonePanelOpen(false);
@@ -12820,6 +13111,40 @@ export default function TakeoffPage({
           )}
           <PanelRight className="w-5 h-5 shrink-0 text-muted-foreground" />
         </button>
+      )}
+
+      {openNote && openTap !== null && (
+        <NoteTagCard
+          key={`${doc?.id}:${page}:${openTap}`}
+          index={openTap}
+          list={openNote.list}
+          note={openNote.note}
+          phone={phone}
+          touch={phone || coarse}
+          onShow={() => {
+            setOpenTap(null);
+            jumpTo(openNote.note.at);
+          }}
+          onClose={() => setOpenTap(null)}
+        />
+      )}
+      {openLink && openTap !== null && (
+        <DetailLinkCard
+          key={`${doc?.id}:${page}:${openTap}`}
+          index={openTap}
+          label={openLink.ref.label}
+          sheetNumber={openLink.number}
+          sheetTitle={(() => {
+            const to = sheets.find(s => s.pageNumber === openLink.page);
+            return to
+              ? sheetDisplay(to, identities.get(to.pageNumber)).title
+              : null;
+          })()}
+          phone={phone}
+          touch={phone || coarse}
+          onGo={() => goToDetail(openLink)}
+          onClose={() => setOpenTap(null)}
+        />
       )}
 
       {tip && (
