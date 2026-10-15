@@ -1,6 +1,47 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14, night — Connectors answers, Strut & Supports review
+## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
+
+**Standing rule: never stop MySQL 3307** (all tracks share it). No dev
+server, no database touched this round.
+
+**Moved to Track B (owner, 2026-10-14):** B owns the whole starter-offers
+build, including the queued rule that `applyStarterChange` writes the
+"Example" tag (§ "MOVED TO TRACK B" below, under the Service Entrance
+entry). **C does not build it.**
+
+**Strut & Supports: Q1–Q9 all YES as suggested**
+(`pricing/strut-supports-name-review.md` "Owner's answers"), nothing
+applied: channel `12 ga, pre-galvanized, slotted`; `{size} EMT strut
+strap`; `Strut channel nut, 3/8"-16, with spring`; fittings by shape and
+holes; `{size} EMT clip, rod/wire hanger`; `Temporary pole, 6x6 x 16 ft
+treated post` (PG20 by key); stiffener kept as a seismic brace; Q8 packs
+(straps, channel nut, wing fitting `each`); **M1 `3/8"-16 x 1" hex bolt,
+zinc` accepted** (COMMON, HD). No starter edit.
+
+**`pricing/fasteners-anchors-name-review.md`** — rows 1568–1581, 14 rows,
+fresh workbook copy (unchanged); matches `BASELINE_MATERIALS` one for one.
+Read-only, under the source rule.
+
+- **Counts:** 2 OK, 10 need words, 2 owner picks. 4 rows used (hanger wire
+  7 starters, wedge anchor 6, beam clamp 3, J-hook 3). No run type.
+- **Strut Q5 check:** `Rod hanger clip` is a rod-to-flange clip (Platt
+  Caddy 6TI24), NOT the Strut EMT clip — neither retires; Q9 renames it.
+- **Could price wrong:** hanger wire priced from a 100 ft roll (~8x low,
+  7 starters); a bare J-hook with no mount (3 data starters); ten anchors
+  and screws with no size; pins with no powder loads.
+- **Packs:** 10 guessed; beam clamp `each`, drop-in `box of 50`, drywall
+  anchor and Tapcon `pack of 75`, toggle `pack of 10`, rest read at the
+  three stores.
+- **Missing:** M1 `.27 cal` powder load (HD), M2/M3 3/4" and 1" conduit
+  hangers (Platt) — in `new-rows-source-check.md` as proposed (now 64
+  families, 62 COMMON, 2 SPECIALTY).
+- **Owner questions:** Q1–Q14, incl. Q7 retire `Plastic conduit clip`.
+  No starter edit proposed.
+
+**Next shelf in app order: Equipment & Appliances (from row 1582).**
+
+## 2026-10-14, night — Connectors answers, Strut & Supports review
 
 **Standing rule (owner, 2026-10-14): never stop MySQL 3307** — every track
 shares it; the owner stops it at end of day. Track C ran no dev server and
@@ -373,7 +414,10 @@ Read-only.
 
 **Next shelf in app order: Breakers (from row 1068).**
 
-### QUEUED — do NOT build yet: `applyStarterChange` writes the "Example" tag
+### MOVED TO TRACK B (owner, 2026-10-14) — `applyStarterChange` writes the "Example" tag
+
+**Track C does not build this.** B owns the whole starter-offers build, this
+rule included; the text below stays as the spec C handed over.
 
 When a starter change sets a price, hours or a rate, `applyStarterChange`
 writes the matching "Example" tag **in the same change**:

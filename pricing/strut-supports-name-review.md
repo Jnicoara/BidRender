@@ -165,3 +165,36 @@ fitting needs a bolt with its channel nut.
   "strut bolt".
 - If a recount finds a starter or run type using a row this review says is
   unused, stop and find out why before renaming it.
+
+## Owner's answers — 2026-10-14: Q1–Q9 all YES, as suggested
+
+For A's end-of-pricing job. Nothing applied here; no catalog row, seed or
+starter changed.
+
+1. **Q1 yes**: the five strut channel rows add `12 ga, pre-galvanized,
+   slotted`; "solid" comes out of the search words (S1).
+2. **Q2 yes**: `{size} EMT strut strap`; "pipe" comes out of the search
+   words (S2).
+3. **Q3 yes**: `Strut channel nut, 3/8"-16, with spring`; "1/4-20" comes
+   out (S3).
+4. **Q4 yes**: `Strut 90° angle fitting, 2-hole`, `Strut flat plate
+   fitting, 2-hole`, `Strut post base, single channel`; the wing fitting's
+   hole count from one listing A checks at the three stores.
+5. **Q5 yes**: `1/2" EMT clip, rod/wire hanger` and `3/4" EMT clip,
+   rod/wire hanger`. The check against `Rod hanger clip` is done in
+   `fasteners-anchors-name-review.md`: **not the same part** (that one is
+   a rod-to-flange clip), so neither row retires into the other.
+6. **Q6 yes**: `Temporary pole, 6x6 x 16 ft treated post` (PG20 follows by
+   key).
+7. **Q7 yes**: `Threaded rod stiffener` kept, described "Seismic brace —
+   clamps hanger rod to strut", priced by the source rule (SPECIALTY, price
+   blank, if A does not find it at Home Depot, Platt or Stoneway).
+8. **Q8 yes — the pack pass**: the strut straps, the channel nut and the
+   wing fitting `each` / 1; nuts, washers, MC straps, T-grid clips and the
+   conduit clips as A reads them at the three stores. **Before** the owner
+   types these prices.
+9. **Q9 yes**: M1 `3/8"-16 x 1" hex bolt, zinc` added, COMMON — Example
+   price from Home Depot (Everbilt 800820, 25-pack), per
+   `new-rows-source-check.md`.
+
+**Starter edits: none.**
