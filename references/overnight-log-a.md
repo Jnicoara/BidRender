@@ -166,3 +166,9 @@ measurement, the cause (`bcryptjs` on the main thread), two fix options
   read after the hang hit the 500 ms test deadline). Test now asks for
   recovery within 15 s with retries; red without the fix, green with it, and
   under parallel load 101/101. Pushed with items 2–3.
+- **Gate 38744046001 RED on `auth.logout.test.ts`**, which still expected
+  `sameSite: "none"`. Missed because the search for affected tests looked
+  for the function's NAME, not for `sameSite` — a grep measures the pattern
+  typed. Searched again for `samesite` everywhere: that was the only one.
+  `dbDeadline.test.ts` passed in that run. Fixed; auth/cookie/rate tests
+  23/23.
