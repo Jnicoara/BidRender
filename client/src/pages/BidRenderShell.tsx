@@ -21,6 +21,16 @@
  * The addresses they used to live at are not dead — see RETIRED_PATHS in
  * @/lib/appRoutes, which sends each to the screen that took its job and
  * rewrites the address bar so a bookmark heals itself.
+ *
+ * ── Changed 2026-10-14 (owner): daily work on top, setup at the bottom ──────
+ * Work is now Dashboard, Bids, Plans, Clients — the four things opened every
+ * day — and Library is Materials and Assemblies. Everything set up once and
+ * left alone sits in the bottom group, with Settings: Performance, Labor
+ * rates, Settings, Crew, and Admin for staff. Bids (/bids) and Plans (/plans)
+ * came back as SCREENS with content — a searchable list of every bid, and
+ * every bid with drawings — never as "which one?" choosers, which is what
+ * removed them before. On a phone the five bottom slots are Dashboard, Bids,
+ * Plans, Materials and More; More holds the rest.
  */
 import { useApp } from "@/contexts/AppContext";
 import { useState, useEffect, useCallback } from "react";
@@ -39,6 +49,8 @@ import QuickBidPage from "@/pages/QuickBidPage";
 import TakeoffPage from "@/pages/TakeoffPage";
 import ProposalPage from "@/pages/ProposalPage";
 import BidArchivePage from "@/pages/BidArchivePage";
+import BidListPage from "@/pages/BidListPage";
+import PlansIndexPage from "@/pages/PlansIndexPage";
 import KitsPage from "@/pages/KitsPage";
 import ClientsPage from "@/pages/ClientsPage";
 import TeamPage from "@/pages/TeamPage";
@@ -57,7 +69,15 @@ import {
   Users,
   UsersRound,
   BarChart3,
+  FileStack,
+  Map as MapIcon,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { APP_VERSION_LABEL } from "@shared/version";
 import { buildAgeLabel, buildStampLabel } from "@shared/buildStamp";
@@ -201,6 +221,70 @@ export default function BidRenderShell() {
   const isInCount = route === "count";
   const isOnWelcome = route === "welcome";
   const isInAdmin = route === "admin";
+  const isInBidList = route === "bid-list";
+  const isInPlansIndex = route === "plans-index";
+  /** Which Work entry a per-bid screen belongs to: the plans to Plans, the
+   *  rest of a bid (the bid, its count, its proposal) to Bids. */
+  const bidsActive = isInBidList || isInBids || isInCount || isInProposal;
+  const plansActive = isInPlansIndex || isInTakeoff;
+  /** What the phone's More menu holds — every destination that is not one
+   *  of the four daily slots, in the laptop's order. */
+  const moreItems = [
+    {
+      label: "Clients",
+      icon: Users,
+      active: isInClients,
+      go: () => navigate("clients"),
+    },
+    {
+      label: "Assemblies",
+      icon: Layers,
+      active: isInLibraryAsms,
+      go: () => navigate("library-assemblies"),
+    },
+    ...(canSeeAnalytics
+      ? [
+          {
+            label: "Performance",
+            icon: BarChart3,
+            active: isInAnalytics,
+            go: () => navigate("analytics"),
+          },
+        ]
+      : []),
+    {
+      label: "Labor rates",
+      icon: HardHat,
+      active: isInLaborRates,
+      go: () => navigate("library-labor-rates"),
+    },
+    {
+      label: "Settings",
+      icon: Settings,
+      active: isInSettings,
+      go: () => navigate("settings"),
+    },
+    {
+      label: "Crew",
+      icon: UsersRound,
+      active: isInTeam,
+      go: () => navigate("team"),
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Admin",
+            icon: Shield,
+            active: isInAdmin,
+            go: () => navigate("admin"),
+          },
+        ]
+      : []),
+  ];
+  const moreActive = moreItems.some(item => item.active);
+  /** The phone's More menu, shut whenever the screen changes. */
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [route, activeView]);
 
   /**
    * Send a brand-new account to the welcome screen instead of the Dashboard.
@@ -248,6 +332,23 @@ export default function BidRenderShell() {
   // ── Content renderer ───────────────────────────────────────────────────────
   const renderContent = () => {
     if (isOnDashboard) return dashboard;
+    if (isInBidList)
+      return (
+        <BidListPage
+          onOpenBid={openBid}
+          onOpenPlans={id => navigate("takeoff", { id })}
+          onCount={id => navigate("count", { id })}
+          onOpenArchive={() => navigate("bid-archive")}
+        />
+      );
+    if (isInPlansIndex)
+      return (
+        <PlansIndexPage
+          onOpenBid={openBid}
+          onOpenPlans={id => navigate("takeoff", { id })}
+          onCount={id => navigate("count", { id })}
+        />
+      );
     if (isInSettings)
       return (
         <SettingsPage section={(activeView ?? "pricing") as SettingsSection} />
@@ -266,9 +367,8 @@ export default function BidRenderShell() {
       if (activeView === "modifiers") return <ModifiersPage />;
       return <AssembliesLibraryPage />;
     }
-    // Keyed on the id so a fresh /bids/:id remounts into that bid. There is no
-    // list mode any more — /bids redirects to the Dashboard, which carried the
-    // same search and the same New bid all along.
+    // Keyed on the id so a fresh /bids/:id remounts into that bid. The bare
+    // /bids is the Bids list above (back since 2026-10-14).
     if (isInBids && activeProjectId)
       return (
         <BidsPage
@@ -492,28 +592,23 @@ export default function BidRenderShell() {
             <span className="text-[#F5C518]">Ridge</span>
           </span>
         </div>
-
         {/*
           Three groups, in the order a job goes: what you open every day, what
           you build once and reuse, and what you set up and forget.
 
-          ── What is deliberately absent ──────────────────────────────────────
-          Bids, Quick bid, Kits, Modifiers and Supplier Pricing are not hidden;
-          they are not destinations. The first two were choosers over lists the
-          Dashboard already shows, and the last three are views of the screen
-          above them in this list. Every one of their addresses still resolves
-          (see RETIRED_PATHS).
+          ── Changed 2026-10-14 (owner) ───────────────────────────────────────
+          Work is the daily work: Dashboard, Bids, Plans, Clients. Bids and
+          Plans are back as SCREENS — every bid as a searchable list, every
+          bid with drawings — so neither dead-ends on "which one?", the fault
+          that took the old Bids list and Quick bid's chooser out of here.
+          Labor rates and Performance moved down to the bottom group with
+          Settings: both are set up or read now and then, not used daily.
 
-          The Archive is not here either, and that is a change: it is offered on
-          the Dashboard and on a bid, but only once something is IN it. A
-          permanent entry to a room that is empty for most users most of the
-          time is a door to nowhere, and it was sitting in the group people
-          scan when they are lost.
-
-          Takeoff is absent for the original reason: it lives at /bids/:id/plans
-          and needs a bid to open, so a top-level entry would dead-end on
-          "which one?" — which is exactly the fault that removed Bids and Quick
-          bid from this list too.
+          Still absent on purpose: Quick bid, Kits, Modifiers and Supplier
+          Pricing (views of other screens; RETIRED_PATHS), and the Archive,
+          which is offered on the Dashboard, the Bids list and a bid only once
+          something is IN it — a permanent door to an empty room is a door to
+          nowhere.
         */}
         <nav
           className="flex flex-col gap-1 p-2 flex-1 overflow-y-auto"
@@ -522,15 +617,28 @@ export default function BidRenderShell() {
           <NavSection label="Work">
             <NavBtn
               onClick={() => navigate("dashboard")}
-              isActive={isOnDashboard || isInBids || isInTakeoff}
+              isActive={isOnDashboard}
               icon={LayoutDashboard}
               label="Dashboard"
               title="Dashboard — every bid by stage, and where a new one starts"
             />
+            <NavBtn
+              onClick={() => navigate("bid-list")}
+              isActive={bidsActive}
+              icon={FileStack}
+              label="Bids"
+              title="Bids — every bid in one list, searchable"
+            />
+            <NavBtn
+              onClick={() => navigate("plans-index")}
+              isActive={plansActive}
+              icon={MapIcon}
+              label="Plans"
+              title="Plans — every bid with drawings, and Upload a plan"
+            />
             {/* Business data about people outside the company, not
                 configuration — so it stays out here rather than going under
-                Company with the settings. It sits next to the Dashboard
-                because a bid is what it attaches to. */}
+                Company with the settings. */}
             <NavBtn
               onClick={() => navigate("clients")}
               isActive={isInClients}
@@ -538,18 +646,6 @@ export default function BidRenderShell() {
               label="Clients"
               title="Clients — who the work is for"
             />
-            {/* Last in Work, and only for those who hold the capability. The
-                one read-only screen in the app: reporting behind a
-                configuration menu is reporting nobody opens. */}
-            {canSeeAnalytics && (
-              <NavBtn
-                onClick={() => navigate("analytics")}
-                isActive={isInAnalytics}
-                icon={BarChart3}
-                label="Performance"
-                title="Performance — win rate and what the work earned"
-              />
-            )}
           </NavSection>
 
           <NavSection label="Library">
@@ -562,16 +658,6 @@ export default function BidRenderShell() {
               icon={Boxes}
               label="Materials"
               title="Materials — the catalog, and your supplier's prices on it"
-            />
-            {/* Rare after setup, but it is the first onboarding step and the
-                rate multiplies every line of every bid, so it stays findable
-                on its own rather than becoming a tab. */}
-            <NavBtn
-              onClick={() => navigate("library-labor-rates")}
-              isActive={isInLaborRates}
-              icon={HardHat}
-              label="Labor rates"
-              title="Labor rates — what an hour costs, by role"
             />
             {/* Kits and Modifiers are tabs in here: a kit contains assemblies
                 and nothing else, and a modifier adjusts an assembly's labor,
@@ -586,10 +672,31 @@ export default function BidRenderShell() {
           </NavSection>
         </nav>
 
-        {/* Company sits outside the scrolling nav so it stays reachable at the
-            bottom however long the Library grows. */}
+        {/* The bottom group sits outside the scrolling nav so it stays
+            reachable at the bottom however long the rest grows. Settings is
+            the anchor; what you set up once or read now and then sits with it. */}
         <div className="flex flex-col gap-1 p-2 pt-0 shrink-0">
           <NavSection label="Company">
+            {/* Only for those who hold the capability. */}
+            {canSeeAnalytics && (
+              <NavBtn
+                onClick={() => navigate("analytics")}
+                isActive={isInAnalytics}
+                icon={BarChart3}
+                label="Performance"
+                title="Performance — win rate and what the work earned"
+              />
+            )}
+            {/* Rare after setup, but the first onboarding step and the rate
+                multiplies every line of every bid, so it keeps its own entry
+                rather than becoming a Settings tab. */}
+            <NavBtn
+              onClick={() => navigate("library-labor-rates")}
+              isActive={isInLaborRates}
+              icon={HardHat}
+              label="Labor rates"
+              title="Labor rates — what an hour costs, by role"
+            />
             <NavBtn
               onClick={() => navigate("settings")}
               isActive={isInSettings}
@@ -597,10 +704,8 @@ export default function BidRenderShell() {
               label="Settings"
               title="Settings — pricing defaults, branding, tax and display"
             />
-            {/* Here rather than in Work: hiring is not a working rhythm, and
-                this screen is invite codes and role assignment. Shown to every
-                member whatever their role — a viewer needs to be able to find
-                out that they are a viewer. */}
+            {/* Shown to every member whatever their role — a viewer needs to
+                be able to find out that they are a viewer. */}
             <NavBtn
               onClick={() => navigate("team")}
               isActive={isInTeam}
@@ -608,8 +713,7 @@ export default function BidRenderShell() {
               label="Crew"
               title="Crew — who can get into this company"
             />
-            {/* Admin only, and last: nobody else has it, and those who do do
-                not need it above the things they use. */}
+            {/* Staff only, and last. */}
             {isAdmin && (
               <NavBtn
                 onClick={() => navigate("admin")}
@@ -670,29 +774,33 @@ export default function BidRenderShell() {
             <span>
               {isOnDashboard
                 ? "Dashboard"
-                : isInSettings
-                  ? "Settings"
-                  : isInLibraryMats
-                    ? activeView === "pricing"
-                      ? "Supplier pricing"
-                      : "Materials"
-                    : isInLibraryAsms
-                      ? activeView === "kits"
-                        ? "Kits"
-                        : activeView === "modifiers"
-                          ? "Modifiers"
-                          : "Assemblies"
-                      : isInLaborRates
-                        ? "Labor Rates"
-                        : isInClients
-                          ? "Clients"
-                          : isInTeam
-                            ? "Crew"
-                            : isInAnalytics
-                              ? "Performance"
-                              : isInAdmin
-                                ? "Admin"
-                                : "Bid"}
+                : isInBidList
+                  ? "Bids"
+                  : isInPlansIndex
+                    ? "Plans"
+                    : isInSettings
+                      ? "Settings"
+                      : isInLibraryMats
+                        ? activeView === "pricing"
+                          ? "Supplier pricing"
+                          : "Materials"
+                        : isInLibraryAsms
+                          ? activeView === "kits"
+                            ? "Kits"
+                            : activeView === "modifiers"
+                              ? "Modifiers"
+                              : "Assemblies"
+                          : isInLaborRates
+                            ? "Labor Rates"
+                            : isInClients
+                              ? "Clients"
+                              : isInTeam
+                                ? "Crew"
+                                : isInAnalytics
+                                  ? "Performance"
+                                  : isInAdmin
+                                    ? "Admin"
+                                    : "Bid"}
             </span>
           </div>
         </header>
@@ -707,13 +815,15 @@ export default function BidRenderShell() {
 
         {/*
         ── Mobile Bottom Nav ──────────────────────────────────────────────────
-        Five slots, and now they hold five of the eight real destinations
-        rather than two choosers and three screens. Performance, Crew and Admin
-        are reachable from Settings and are not things anyone does on a phone
-        in a truck.
+        Five slots (owner, 2026-10-14): the four daily ones — Dashboard, Bids,
+        Plans, Materials — and More, which opens everything else in one tap.
+        Each slot now shows its word under the icon; five bare glyphs were a
+        guessing game on the smallest screen.
 
-        It previously spent two of the five on Bids and Quick bid, which on the
-        smallest screen was the most expensive place to put a "which one?".
+        Until 2026-10-14 the slots were Dashboard, Clients, Materials,
+        Assemblies and Settings, and before that two of them were Bids and
+        Quick bid CHOOSERS. Bids and Plans are back as lists with content of
+        their own, which is the difference.
       */}
         {/*
         Not on the Plans screen (track-b-phone-and-readability-plan.md § 3):
@@ -743,32 +853,26 @@ export default function BidRenderShell() {
               {
                 label: "Dashboard",
                 icon: LayoutDashboard,
-                active: isOnDashboard || isInBids || isInTakeoff,
+                active: isOnDashboard,
                 go: () => navigate("dashboard"),
               },
               {
-                label: "Clients",
-                icon: Users,
-                active: isInClients,
-                go: () => navigate("clients"),
+                label: "Bids",
+                icon: FileStack,
+                active: bidsActive,
+                go: () => navigate("bid-list"),
+              },
+              {
+                label: "Plans",
+                icon: MapIcon,
+                active: plansActive,
+                go: () => navigate("plans-index"),
               },
               {
                 label: "Materials",
                 icon: Boxes,
                 active: isInLibraryMats,
                 go: () => navigate("library-materials"),
-              },
-              {
-                label: "Assemblies",
-                icon: Layers,
-                active: isInLibraryAsms,
-                go: () => navigate("library-assemblies"),
-              },
-              {
-                label: "Settings",
-                icon: Settings,
-                active: isInSettings,
-                go: () => navigate("settings"),
               },
             ] as const
           ).map(item => (
@@ -786,11 +890,57 @@ export default function BidRenderShell() {
                 size={18}
                 className={item.active ? "text-[#F5C518]" : ""}
               />
+              {item.label}
               {item.active && (
                 <span className="absolute top-0 left-0 right-0 h-0.5 bg-[#F5C518] rounded-b" />
               )}
             </button>
           ))}
+          {/* More: everything that is not daily work, in the same order as
+              the laptop's lower groups. One tap opens it; picking closes it
+              (the effect on route above). */}
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <button
+                aria-label="More"
+                aria-current={moreActive ? "page" : undefined}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-colors duration-150 relative",
+                  moreActive ? "text-[#F5C518]" : "text-muted-foreground"
+                )}
+              >
+                <MoreHorizontal
+                  size={18}
+                  className={moreActive ? "text-[#F5C518]" : ""}
+                />
+                More
+                {moreActive && (
+                  <span className="absolute top-0 left-0 right-0 h-0.5 bg-[#F5C518] rounded-b" />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              align="end"
+              className="w-56 p-1"
+              aria-label="More destinations"
+            >
+              {moreItems.map(item => (
+                <button
+                  key={item.label}
+                  onClick={item.go}
+                  aria-current={item.active ? "page" : undefined}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm text-left hover:bg-accent",
+                    item.active ? "text-[#F5C518]" : "text-foreground"
+                  )}
+                >
+                  <item.icon size={18} className="shrink-0" />
+                  {item.label}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
         </nav>
       </main>
     </div>

@@ -525,7 +525,13 @@ export default function SettingsPage({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
-        <div className="max-w-2xl">
+        {/* A readable form column, except Pricing on a wide screen: its four
+            cards sit two by two there, so a laptop does not show one narrow
+            column of cards with the right half of the window empty (owner,
+            2026-10-14, "dead space"). */}
+        <div
+          className={cn("max-w-2xl", section === "pricing" && "xl:max-w-6xl")}
+        >
           {section === "pricing" && <BidPricingDefaultsSection />}
           {section === "heights" && <HeightsSection />}
           {section === "branding" && <BrandingSection />}

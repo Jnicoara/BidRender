@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **The left menu is now daily work on top, setup at the bottom.** Bids and
+  Plans have their own entries again: Bids is every bid in one searchable
+  list, and Plans is every job with drawings plus an "Upload a plan" button.
+  Settings sits at the bottom with Crew, Labor rates, Performance and (for
+  staff) Admin. On a phone the bottom bar shows its words and has a "More"
+  button for everything else. Old links still open the right screen.
+- **Less empty screen.** On a bid, close-out, extra costs, tax and pricing
+  settings now sit under the line items instead of in a long column on the
+  right, so the bid total stays beside the lines while you scroll. Settings'
+  four pricing cards sit two by two on a wide screen.
+
 - **The pricing sheet no longer guesses pack sizes from words in an item's
   name.** It used to call a "Dishwasher whip" a box of 100 washers and every
   flex coil a 10 ft stick, which would have divided the owner's typed prices

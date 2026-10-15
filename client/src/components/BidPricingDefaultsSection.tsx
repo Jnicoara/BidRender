@@ -95,8 +95,8 @@ export function BidPricingDefaultsSection() {
   const isPercentage = defaults.overheadMode === "percentage";
 
   return (
-    <section className="space-y-4">
-      <div>
+    <section className="grid gap-4 xl:grid-cols-2 xl:items-start">
+      <div className="xl:col-span-2">
         <h3 className="text-sm font-semibold text-foreground">
           Bid pricing defaults
         </h3>

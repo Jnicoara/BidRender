@@ -333,7 +333,7 @@ Production is mostly test fixtures, so a small answer is not evidence that the c
 5. **Should the materials list follow the bid too**, with a line naming the runs it leaves out?
    - **Recommend yes.**
    - A supplier list ordering pipe the bid does not price is the same disagreement in a third place. The export already carries that note.
-6. **A Plans entry in the sidebar?**
+6. **A Plans entry in the sidebar?** — **Answered 2026-10-14 by the owner: yes, Phase 2 built** (`/plans`, with a `/bids` list beside it; CLAUDE.md § Architecture).
    - **Recommend Phase 1 now and Phase 2 only if plans still feel hidden after it.**
    - The chip and the Recent row put plans one click from the first screen without undoing the nav rule. Phase 2 is written up above and can follow straight on.
 7. **"Recent plans": by upload date, or by last opened?**

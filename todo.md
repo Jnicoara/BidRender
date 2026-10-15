@@ -3520,7 +3520,11 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       and a Plans chip on every card with drawings, both from
       `getDashboardBids`; Plans is the primary button on a bid; the bid's
       "Plans screen" mentions are links; a `plans` navigation target.
-- [ ] **Plans, Phase 2 — a Plans entry in the left menu — deferred by the
+- [x] **BUILT 2026-10-14 (Track C, owner's overnight queue item 5b): Plans
+      AND Bids entries in the left menu** — `/plans` (PlansIndexPage) and
+      `/bids` (BidListPage); CLAUDE.md § Architecture and the shell say so.
+      The entry below is kept as the record of the deferral it replaced.
+- [x] **Plans, Phase 2 — a Plans entry in the left menu — deferred by the
       owner (2026-09-27): "Phase 1 first, left-menu tab later".** The design
       is in `references/track-b-beta-plan.md` § 3 (a `/plans` index screen,
       not a dead end), and it means rewriting CLAUDE.md's "none of them is in
