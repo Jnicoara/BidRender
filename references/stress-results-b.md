@@ -137,3 +137,19 @@ change, then lets them through. Marks counted in the database afterwards.
   a rejected page promise, so re-asking failed again) — drawn after.
 - An 8 MB set behaves differently on purpose: under 50 MB it is fetched
   whole up front, so storage going down later changes nothing on screen.
+
+## Round 5 — two tabs on one bid; Back mid-save
+
+Method: `scripts/_tabsEye.mts` (throwaway), production build, two tabs of one
+signed-in browser on bid 1728470; marks counted in the database after.
+
+- **Two tabs: fine.** Tab A placed 3 marks; tab B showed them as soon as it
+  was switched back to (React Query refetches on `visibilitychange`; marks
+  are stale at once). An early probe said B stayed stale: it fired a
+  `focus` event, which React Query 5 does not listen to, then a
+  `visibilitychange` on `document`, which does not reach `window`.
+- **Back right after placing: fine.** 4 marks, then the app's own Back to
+  the bid page within the batch delay: **4 in the database**, nothing left
+  in the crash mirror. (A first probe "went Back" to the about:blank page
+  its own loader opens first, which unloads the whole document — not what a
+  person does.)
