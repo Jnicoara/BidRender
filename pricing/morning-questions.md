@@ -92,4 +92,12 @@ No starter edit. Q4, Q5 and Q7 rename rows a starter uses so the price is one tu
 
 ## From the overnight build work
 
-(Added below as items 5–11 park anything that needs you.)
+Sketches and reasons: `references/overnight-parked.md`. None of these changes a bid number.
+
+- P1 Slimmer Plans toolbar: one tool row on a laptop — scale shortened to a chip, Ceilings and the drop-heights warning moved to the right panel's "This sheet" line, Copy text into ⋯? → **Yes.** Saves a 36 px row on every visit; parked because two of the controls are Track B's and the warning must not get quieter. Affects: the Plans screen layout only.
+- P2 Tablet: tap places, drag pans, pinch zooms already works — add one first-open tip on touch devices saying so ("Tap to drop a point · drag to move the sheet · pinch to zoom")? → **Yes, Track B adds it** (the tips are B's). Affects: one tip.
+- P3 Sheet work tag: Track B built it as Not said / New work / Demo / "Demo and new". Rename the last to "Both"? → **No, keep "Demo and new"** — it also shows in banners where "Both" would not say both of what. Affects: one label.
+- D1 (decided, reversible) Sign-in page tagline now matches the landing page: "Electrical estimating, built by an electrician" (was "Electrical estimating for the field"). Different words? → **Keep.** Affects: one line.
+- D2 (decided, reversible) The Dashboard's help box now reads "Can't find something? Ask where it is — e.g. labor rates" with a "Find it" button (was a sample question and "Ask"). → **Keep.** Affects: wording.
+
+(Items 6–11 add below.)
