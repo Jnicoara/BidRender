@@ -100,6 +100,29 @@ import {
  * is what breaks quietly in a restructure — so the mapping is a table that can
  * be asserted without a browser rather than a switch statement in here.
  */
+/**
+ * Screens a bid can be opened FROM that its Back button should return to,
+ * with the word the button shows (owner, 2026-10-14: "Back returns where you
+ * were"). Anything else — a deep link, the welcome screen — goes back to the
+ * Dashboard as before.
+ */
+const BID_ORIGINS: Partial<Record<Route, string>> = {
+  dashboard: "Dashboard",
+  "bid-list": "Bids",
+  "plans-index": "Plans",
+  clients: "Clients",
+  analytics: "Performance",
+  "bid-archive": "Archive",
+  trash: "Recently deleted",
+};
+/** The screens that belong to one bid: moving between them keeps the origin. */
+const BID_SCREENS: ReadonlySet<Route> = new Set<Route>([
+  "bids",
+  "takeoff",
+  "count",
+  "proposal",
+]);
+
 function getCurrentRouteState(): RouteState {
   const hash = window.location.hash;
   if (hash && hash.length > 1) return pathToRoute(hash);
@@ -127,6 +150,8 @@ export default function BidRenderShell() {
     getCurrentRouteState()
   );
   const [previousRoute, setPreviousRoute] = useState<Route>("dashboard");
+  /** Where the current bid was opened from — see BID_ORIGINS. */
+  const [bidOrigin, setBidOrigin] = useState<Route>("dashboard");
   /** Whether the desktop nav is widened — see the aside for what opens it. */
   const [navOpen, setNavOpen] = useState(false);
 
@@ -155,6 +180,10 @@ export default function BidRenderShell() {
       const state = getCurrentRouteState();
       setRouteState(prev => {
         setPreviousRoute(prev.route);
+        // Entering a bid from outside it: remember where from. Moving
+        // between the bid, its plans, its count and its proposal does not.
+        if (BID_SCREENS.has(state.route) && !BID_SCREENS.has(prev.route))
+          setBidOrigin(BID_ORIGINS[prev.route] ? prev.route : "dashboard");
         return state;
       });
     };
@@ -393,7 +422,8 @@ export default function BidRenderShell() {
           key={activeProjectId}
           bidId={activeProjectId}
           fixLineId={routeState.fixLineId}
-          onBack={() => navigate("dashboard")}
+          backLabel={BID_ORIGINS[bidOrigin] ?? "Dashboard"}
+          onBack={() => navigate(bidOrigin)}
         />
       );
     if (isInTakeoff && activeProjectId) {

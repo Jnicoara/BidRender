@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Back goes back to where you were.** Open a bid from the Bids list or the
+  Plans list and its Back button now says "Bids" or "Plans" and takes you
+  there, instead of always going to the Dashboard.
+
 - **One "Recently deleted" page.** Everything you archive — bids, materials,
   assemblies, kits, modifiers and clients — is now listed in one place in the
   left menu, each with a Restore button. Before, each kind had its own

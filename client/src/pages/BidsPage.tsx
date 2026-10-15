@@ -355,22 +355,22 @@ function FixTheseButton({
 }
 
 /**
- * One bid. This file used to export a list-or-detail switch; the list is gone.
- *
- * It was a header, a New bid button, an archive entry and `BidSearchPanel` —
- * and the Dashboard rendered all four already, so /bids was a second door into
- * a room you were standing in. /bids now redirects there (see RETIRED_PATHS in
- * @/lib/appRoutes) and this screen always has a bid.
+ * One bid. This file used to export a list-or-detail switch; the list moved
+ * out. Since 2026-10-14 the Bids list is its own screen (BidListPage, /bids),
+ * and this screen always has a bid.
  */
 export default function BidsPage({
   bidId,
   fixLineId,
   onBack,
+  backLabel = "Dashboard",
 }: {
   bidId: number;
   /** `/bids/:id?fix=<lineId>` — open on that line's fix (gap 10). */
   fixLineId?: number;
   onBack: () => void;
+  /** The screen Back returns to — where this bid was opened from. */
+  backLabel?: string;
 }) {
   const [assemblyQuery, setAssemblyQuery] = useState("");
   const [addQty, setAddQty] = useState("1");
@@ -755,7 +755,7 @@ export default function BidsPage({
           className="gap-1.5"
           onClick={onBack}
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to the dashboard
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to {backLabel}
         </Button>
       </div>
     );
@@ -977,7 +977,7 @@ export default function BidsPage({
             className="h-8 gap-1.5 text-xs"
             onClick={onBack}
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" /> {backLabel}
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold truncate flex items-center gap-2">
