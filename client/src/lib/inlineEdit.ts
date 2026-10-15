@@ -47,6 +47,23 @@ export function formatForEdit(value: number): string {
 }
 
 /**
+ * A number as a person types it (break-it drill, 2026-10-15).
+ *
+ * Number() alone refused "1,500" and "$12.50" (the box snapped back and the
+ * contractor's price was gone) while ACCEPTING "0x10" as 16 and "0b11" as 3.
+ * So a leading dollar sign and correctly grouped thousands commas are read as
+ * meant, and anything that is not a plain decimal (hex, binary, two dots,
+ * "1,5" — a European decimal that would otherwise become 15) is NaN, which
+ * the caller reverts. Never a different number from the one on screen.
+ */
+export function parseTypedNumber(text: string): number {
+  let t = text.trim().replace(/^([+-]?)\$/, "$1");
+  if (/^[+-]?\d{1,3}(,\d{3})+(\.\d*)?$/.test(t)) t = t.replace(/,/g, "");
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t)) return NaN;
+  return Number(t);
+}
+
+/**
  * Decide what Enter or blur means for a numeric field.
  *
  * Invalid input REVERTS rather than erroring. An inline field has nowhere to
@@ -68,7 +85,7 @@ export function commitNumericEdit(
       : { action: "save", value: 0 };
   }
 
-  const parsed = Number(trimmed);
+  const parsed = parseTypedNumber(trimmed);
   if (!Number.isFinite(parsed))
     return { action: "revert", reason: "not a number" };
   if (min !== undefined && parsed < min)

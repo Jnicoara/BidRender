@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Number boxes understand "1,500" and "$12.50".** Typing a price with a
+  dollar sign or a thousands comma used to make the box snap back and lose
+  what you typed. It now saves what you meant. Things that aren't plain
+  numbers ("0x10", "1,5") are refused instead of turning into a different
+  number.
+
 - **Exports can't carry spreadsheet tricks.** A name typed as a formula (for
   example one starting with "=") could run as a formula when an export was
   opened in Excel. Exported text that looks like a formula is now kept as
