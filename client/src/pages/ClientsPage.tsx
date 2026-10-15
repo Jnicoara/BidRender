@@ -603,7 +603,9 @@ export default function ClientsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive “{pendingArchive?.name}”?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Archive “{pendingArchive?.name}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               They come off the working list and can be restored at any time.
               {pendingArchive && pendingArchive.bidCount > 0 ? (

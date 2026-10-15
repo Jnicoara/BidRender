@@ -9,10 +9,11 @@ This is the human-readable companion to the git history — read this to see wha
 - **The app opens about half a second sooner.** Every open used to sit
   idle for about 300 ms before asking for the Dashboard's data, waiting on
   a built-in pause in the screen library. The app's code now starts
-  arriving at once for anyone who has signed in before, and screens
-  already downloaded show without that pause — Dashboard from 879 ms to
-  about 400 ms on a test account with 151 bids. The signed-out landing
-  page is unchanged.
+  arriving at once for anyone who has signed in before, and screens no
+  longer wait on that pause even on the first sign-in on a new device —
+  Dashboard from about 890 ms to about 400 ms on a test account with 151
+  bids, laptop and phone alike. Every main screen now shows in under a
+  second. The signed-out landing page is unchanged.
 
 ## [2026-10-14]
 

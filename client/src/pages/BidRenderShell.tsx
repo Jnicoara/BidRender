@@ -40,63 +40,66 @@ import { useApp } from "@/contexts/AppContext";
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 const loadSettingsPage = reloadingImport(() => import("@/pages/SettingsPage"));
-const SettingsPage = preloadable(loadSettingsPage);
+const SettingsPage = preloadable(loadSettingsPage, PageLoading);
 const loadMaterialDatabasePage = reloadingImport(
   () => import("@/pages/MaterialDatabasePage")
 );
-const MaterialDatabasePage = preloadable(loadMaterialDatabasePage);
+const MaterialDatabasePage = preloadable(loadMaterialDatabasePage, PageLoading);
 import DashboardPage from "@/pages/DashboardPage";
 import { BackupHealthBanner } from "@/components/BackupHealthBanner";
 const loadAdminSettingsPage = reloadingImport(
   () => import("@/pages/AdminSettingsPage")
 );
-const AdminSettingsPage = preloadable(loadAdminSettingsPage);
+const AdminSettingsPage = preloadable(loadAdminSettingsPage, PageLoading);
 const loadMaterialsLibraryPage = reloadingImport(
   () => import("@/pages/MaterialsLibraryPage")
 );
-const MaterialsLibraryPage = preloadable(loadMaterialsLibraryPage);
+const MaterialsLibraryPage = preloadable(loadMaterialsLibraryPage, PageLoading);
 const loadLaborRatesPage = reloadingImport(
   () => import("@/pages/LaborRatesPage")
 );
-const LaborRatesPage = preloadable(loadLaborRatesPage);
+const LaborRatesPage = preloadable(loadLaborRatesPage, PageLoading);
 const loadModifiersPage = reloadingImport(
   () => import("@/pages/ModifiersPage")
 );
-const ModifiersPage = preloadable(loadModifiersPage);
+const ModifiersPage = preloadable(loadModifiersPage, PageLoading);
 const loadAssembliesLibraryPage = reloadingImport(
   () => import("@/pages/AssembliesLibraryPage")
 );
-const AssembliesLibraryPage = preloadable(loadAssembliesLibraryPage);
+const AssembliesLibraryPage = preloadable(
+  loadAssembliesLibraryPage,
+  PageLoading
+);
 const loadBidsPage = reloadingImport(() => import("@/pages/BidsPage"));
-const BidsPage = preloadable(loadBidsPage);
+const BidsPage = preloadable(loadBidsPage, PageLoading);
 const loadQuickBidPage = reloadingImport(() => import("@/pages/QuickBidPage"));
-const QuickBidPage = preloadable(loadQuickBidPage);
+const QuickBidPage = preloadable(loadQuickBidPage, PageLoading);
 const loadTakeoffPage = reloadingImport(() => import("@/pages/TakeoffPage"));
-const TakeoffPage = preloadable(loadTakeoffPage);
+const TakeoffPage = preloadable(loadTakeoffPage, PageLoading);
 const loadProposalPage = reloadingImport(() => import("@/pages/ProposalPage"));
-const ProposalPage = preloadable(loadProposalPage);
+const ProposalPage = preloadable(loadProposalPage, PageLoading);
 const loadBidArchivePage = reloadingImport(
   () => import("@/pages/BidArchivePage")
 );
-const BidArchivePage = preloadable(loadBidArchivePage);
+const BidArchivePage = preloadable(loadBidArchivePage, PageLoading);
 const loadBidListPage = reloadingImport(() => import("@/pages/BidListPage"));
-const BidListPage = preloadable(loadBidListPage);
+const BidListPage = preloadable(loadBidListPage, PageLoading);
 const loadPlansIndexPage = reloadingImport(
   () => import("@/pages/PlansIndexPage")
 );
-const PlansIndexPage = preloadable(loadPlansIndexPage);
+const PlansIndexPage = preloadable(loadPlansIndexPage, PageLoading);
 const loadTrashPage = reloadingImport(() => import("@/pages/TrashPage"));
-const TrashPage = preloadable(loadTrashPage);
+const TrashPage = preloadable(loadTrashPage, PageLoading);
 const loadKitsPage = reloadingImport(() => import("@/pages/KitsPage"));
-const KitsPage = preloadable(loadKitsPage);
+const KitsPage = preloadable(loadKitsPage, PageLoading);
 const loadClientsPage = reloadingImport(() => import("@/pages/ClientsPage"));
-const ClientsPage = preloadable(loadClientsPage);
+const ClientsPage = preloadable(loadClientsPage, PageLoading);
 const loadTeamPage = reloadingImport(() => import("@/pages/TeamPage"));
-const TeamPage = preloadable(loadTeamPage);
+const TeamPage = preloadable(loadTeamPage, PageLoading);
 const loadAnalyticsPage = reloadingImport(
   () => import("@/pages/AnalyticsPage")
 );
-const AnalyticsPage = preloadable(loadAnalyticsPage);
+const AnalyticsPage = preloadable(loadAnalyticsPage, PageLoading);
 import FirstRunPage from "@/pages/FirstRunPage";
 import { useCompany } from "@/hooks/useCompany";
 import { trpc } from "@/lib/trpc";

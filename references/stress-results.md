@@ -136,24 +136,37 @@ not LEAVE until ~360 ms. A timer trace put the wait in React's scheduler —
 React 19 reveals a Suspense boundary's content in ~300 ms batches, and the
 shell sat behind one.
 
-**Fixed:** `client/src/lib/preloadable.ts`. A browser that has been signed in
-before starts fetching the shell at once, in parallel with the "who am I"
-check; once a module is here, new mounts render it directly, with no
-boundary to throttle (a mounted page keeps the path it started on, so it
-never remounts mid-edit). The background prefetch uses the same `preload`,
-so a later page click also skips the boundary. A failed early fetch is
-forgotten, so the next ask tries again.
+**Fixed:** `client/src/lib/preloadable.ts`, in two passes.
 
-Production build, warm cache, stress account (151 bids),
-`waterfall.mjs`-style timing from navigation to the first "Stress job" row:
+1. A browser that has been signed in before starts fetching the shell at
+   once, in parallel with the "who am I" check, and a loaded module renders
+   directly. That fixed the returning user only — a re-measure with the
+   remembered user removed (every first sign-in on a device) still showed
+   data at ~368 ms and the screen at ~895 ms.
+2. So the loader no longer uses Suspense at all: until its code is here it
+   shows its own fallback (the shell's spinner, `PageLoading` for a page)
+   and swaps the page in with an ordinary state update, which React does
+   not throttle. A failed load is thrown to the error boundary as before.
 
-| Dashboard          | Data request leaves | Dashboard shown |
-| ------------------ | ------------------- | --------------- |
-| Before (one run)   | 368 ms              | 879 ms          |
-| After (three runs) | **78–87 ms**        | **388–417 ms**  |
+Production build, warm cache, stress account (151–154 bids), timing from
+navigation to the first "Stress job" row:
 
-Landing page unchanged: 148 KB gzipped, one file — a new visitor has no
-remembered user and fetches nothing extra.
+| Dashboard                       | Data request leaves | Dashboard shown |
+| ------------------------------- | ------------------- | --------------- |
+| Before, returning user (1 run)  | 368 ms              | 879 ms          |
+| Before, first sign-in (2 runs)  | 367–369 ms          | 893–898 ms      |
+| After, returning user (13 runs) | **67–84 ms**        | **386–421 ms**  |
+| After, first sign-in (3 runs)   | **80–83 ms**        | **367–419 ms**  |
+| After, phone 375 (3 runs)       | **68–73 ms**        | **394–413 ms**  |
+
+Two returning-user runs out of ~28 showed the screen ~500 ms AFTER the data
+had arrived (897, 930 ms). Not reproduced in 15 more runs; not explained.
+
+Re-driven on this build: a page file missing after a deploy reloads the tab
+once and shows Bids; a file that STAYS missing reloads once, then shows
+"BidRidge has been updated… Refresh" — no loop; a page file that takes 3 s
+shows nothing for the first 300 ms, then "Loading…" with the sidebar still
+there. Landing page unchanged: 148 KB gzipped, one file.
 
 ## 2,000 marks on ONE sheet (bid "Stress dense sheet", 4 counts × 500)
 
@@ -214,6 +227,27 @@ drawn sheet, the bid total…), 3 fresh loads each.
 - The ~0.9 s floor is the dev server loading unbundled modules; a
   production build is smaller. The 5.5 s first Dashboard is the dev server
   compiling for the very first browser visit; every load after it is 0.9 s.
+
+### The same screens on the production build (2026-10-15)
+
+`pnpm build` + `node dist/index.js`, after the loader fix above, 5 loads
+each, 154 bids:
+
+| Screen                                          | laptop first / median ms | phone 375 first / median ms |
+| ----------------------------------------------- | ------------------------ | --------------------------- |
+| Dashboard                                       | 412 / 382                | 399 / 370                   |
+| Bids list                                       | 239 / 258                | 261 / 259                   |
+| Plans list                                      | 352 / 374                | 364 / 378                   |
+| Bid page — big bid                              | 307 / 289                | 285 / 271                   |
+| Plans screen — big bid, sheet drawn (60 sheets) | 924 / 890                | 920 / 891                   |
+| Count screen — big bid                          | 270 / 264                | 267 / 271                   |
+| Proposal — big bid                              | 214 / 143                | 158 / 156                   |
+| Recently deleted                                | 84 / 107                 | 97 / 108                    |
+| Materials                                       | 100 / 178                | 110 / 146                   |
+
+Every screen under 1 s at both sizes. Before the loader fix the FIRST
+Dashboard load was 889–893 ms; it is now 399–412. The Plans screen is the
+slowest because its time includes drawing the sheet (B's viewer).
 
 ## The 500-sheet set (user 1's "Large set check", 270 MB, local disk)
 

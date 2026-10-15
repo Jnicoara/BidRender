@@ -26,16 +26,16 @@ import { reloadingImport } from "./lib/lazyPage";
  * to show a loading state while auth resolved.
  */
 const BidRenderShell = preloadable(
-  reloadingImport(() => import("./pages/BidRenderShell"))
+  reloadingImport(() => import("./pages/BidRenderShell")),
+  AppChunkFallback
 );
 
 /*
   A browser that has been signed in before starts fetching the app NOW, in
   parallel with the "who is signed in?" check, so the shell is usually here
-  before it is needed and renders without a Suspense boundary — saving the
-  ~300 ms React holds a boundary's reveal (@/lib/preloadable; measured
-  2026-10-15). `useAuth` keeps the last signed-in person in this key; a new
-  visitor has none and still downloads only the landing page.
+  before it is needed (@/lib/preloadable; measured 2026-10-15). `useAuth`
+  keeps the last signed-in person in this key; a new visitor has none and
+  still downloads only the landing page.
 */
 try {
   const last = localStorage.getItem("manus-runtime-user-info");
