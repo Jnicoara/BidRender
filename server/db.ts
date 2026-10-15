@@ -3996,15 +3996,13 @@ export async function seedStarterLaborSteps(): Promise<void> {
     const have = new Set(shipped.map(r => r.stepKey));
     const missing = STARTER_LABOR_STEPS.filter(step => !have.has(step.key));
     if (missing.length === 0) return;
-    await db
-      .insert(laborSteps)
-      .values(
-        missing.map(step => ({
-          userId: null,
-          stepKey: step.key,
-          ...starterStepFields(step),
-        }))
-      );
+    await db.insert(laborSteps).values(
+      missing.map(step => ({
+        userId: null,
+        stepKey: step.key,
+        ...starterStepFields(step),
+      }))
+    );
   }, undefined);
 }
 
@@ -5859,6 +5857,45 @@ export async function getSheetIdentities(
       )
     );
   return { pages, pagesRead: Number(count?.n ?? 0) };
+}
+
+/**
+ * The pages of a plan that could hold a PANEL SCHEDULE — their stored text
+ * (read once at upload) has a "CKT" header — or null when the stored text
+ * does not cover every page, so nothing can be ruled out.
+ *
+ * The viewer's worker used to find schedules by reading the text of EVERY
+ * page through pdf.js whenever the sheet on screen had a circuit tag: on the
+ * 500-sheet test set that pulled the whole 270 MB file over ~30 s, through the
+ * worker every sheet render waits on (Track B stress pass, 2026-10-15). The
+ * same text is already here. The worker still reads the pages named, exactly
+ * as before, so what counts as a schedule is decided in one place
+ * (`readSchedules`); this only rules pages out. "CKT" is the test the worker
+ * applies itself before it parses a page (`panelsInDoc`); LIKE is case-
+ * insensitive under this database's collation, as the worker's /CKT/i is.
+ */
+export async function schedulePagesOf(
+  bidPdfId: number,
+  userId: number,
+  pageCount: number
+): Promise<number[] | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const owned = and(
+    eq(bidPdfSheetText.bidPdfId, bidPdfId),
+    eq(bidPdfSheetText.userId, userId)
+  );
+  const [count] = await db
+    .select({ n: sql<number>`count(DISTINCT ${bidPdfSheetText.pageNumber})` })
+    .from(bidPdfSheetText)
+    .where(owned);
+  if (Number(count?.n ?? 0) < pageCount) return null;
+  const rows = await db
+    .selectDistinct({ pageNumber: bidPdfSheetText.pageNumber })
+    .from(bidPdfSheetText)
+    .where(and(owned, sql`${bidPdfSheetText.text} LIKE '%CKT%'`))
+    .orderBy(asc(bidPdfSheetText.pageNumber));
+  return rows.map(r => r.pageNumber);
 }
 
 /**

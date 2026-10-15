@@ -111,6 +111,7 @@ import {
 import { StatusStrip } from "@/components/takeoff/StatusStrip";
 import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
+import { outlineNeeded } from "@/lib/planOutline";
 import { formatElevation } from "@shared/takeoffHeights";
 import {
   HeightAreasLayer,
@@ -916,12 +917,25 @@ function usePdfWorker() {
           pageNum,
           hash,
         }),
-      homeruns: (pageNum: number, hash: string) =>
-        ask<SheetHomeruns>({ type: "homeruns", pageNum, hash }),
+      homeruns: (
+        pageNum: number,
+        hash: string,
+        schedulePages: readonly number[] | null
+      ) =>
+        ask<SheetHomeruns>({ type: "homeruns", pageNum, hash, schedulePages }),
       keyedNotes: (pageNum: number, hash: string) =>
         ask<SheetNotesRead>({ type: "keyedNotes", pageNum, hash }),
-      circuits: (pageNum: number, hash: string) =>
-        ask<SheetCircuitText>({ type: "circuits", pageNum, hash }),
+      circuits: (
+        pageNum: number,
+        hash: string,
+        schedulePages: readonly number[] | null
+      ) =>
+        ask<SheetCircuitText>({
+          type: "circuits",
+          pageNum,
+          hash,
+          schedulePages,
+        }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
           type: "connectPoints",
@@ -1032,6 +1046,8 @@ class PlanUrlExpired extends Error {
 }
 
 function PlanPane({
+  sheetPages,
+  schedulePages,
   doc,
   localFile = null,
   sourceKey,
@@ -1058,6 +1074,16 @@ function PlanPane({
   viewRequest,
   drawingChrome,
 }: {
+  /**
+   * Pages that already have a sheet row; null while not known. The outline
+   * is read only for pages that do not (`outlineNeeded`).
+   */
+  sheetPages: readonly number[] | null;
+  /**
+   * Pages whose stored text could hold a panel schedule (null = read them
+   * all; undefined = not known yet, so the reads that need it wait).
+   */
+  schedulePages: readonly number[] | null | undefined;
   /**
    * Where this pane is looking RIGHT NOW (null = fitted), kept current on
    * every view change — what "Back" returns to after a detail jump (5d).
@@ -2090,6 +2116,10 @@ function PlanPane({
   /** What the open document turned out to hold, for the re-announce. */
   const openedPages = useRef(0);
   const openedOutline = useRef<{ pageNumber: number; title: string }[]>([]);
+  // Read when the load finishes, not when it starts: the rows usually
+  // arrive while the document is still opening.
+  const sheetPagesRef = useRef(sheetPages);
+  sheetPagesRef.current = sheetPages;
 
   /*
     THE SAME FILE, A NEW ROW (Gap 6.1). An upload shown from this machine
@@ -2168,7 +2198,10 @@ function PlanPane({
           setPageCount(pages);
           setLoading(false);
           if (doc.pageCount !== pages) onPageCountRef.current(pages);
-          const entries = await outline(hash).catch(() => []);
+          // Only while a page still needs a sheet row (@/lib/planOutline).
+          const entries = outlineNeeded(pages, sheetPagesRef.current)
+            ? await outline(hash).catch(() => [])
+            : [];
           if (cancelled) return;
           openedOutline.current = entries;
           onDocumentReadyRef.current({ pageCount: pages, outline: entries });
@@ -2221,7 +2254,10 @@ function PlanPane({
         if (doc.pageCount !== pages) onPageCount(pages);
 
         // Best-effort: no outline is normal, and must not fail the open.
-        const entries = await outline(hash).catch(() => []);
+        // Only while a page still needs a sheet row (@/lib/planOutline).
+        const entries = outlineNeeded(pages, sheetPagesRef.current)
+          ? await outline(hash).catch(() => [])
+          : [];
         if (cancelled) return;
         openedOutline.current = entries;
         onDocumentReady({ pageCount: pages, outline: entries });
@@ -2614,8 +2650,11 @@ function PlanPane({
   onHomerunsRef.current = onHomeruns;
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
+    // Wait for the schedule pages: reading before they arrive reads every
+    // page of the set for schedules (`panelsInDoc`).
+    if (schedulePages === undefined) return;
     let cancelled = false;
-    homerunsOnPage(page, hash)
+    homerunsOnPage(page, hash, schedulePages)
       .then(read => {
         if (!cancelled) onHomerunsRef.current?.(page, read);
       })
@@ -2624,7 +2663,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [page, pageCount, loading, error, hash, homerunsOnPage]);
+  }, [page, pageCount, loading, error, hash, homerunsOnPage, schedulePages]);
 
   /*
     KEYED NOTES ON THIS SHEET, the same way: read once per page in the
@@ -2654,8 +2693,9 @@ function PlanPane({
   onCircuitTextRef.current = onCircuitText;
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
+    if (schedulePages === undefined) return; // as for homeruns, above
     let cancelled = false;
-    circuitsOnPage(page, hash)
+    circuitsOnPage(page, hash, schedulePages)
       .then(read => {
         if (!cancelled) onCircuitTextRef.current?.(page, read);
       })
@@ -2664,7 +2704,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [page, pageCount, loading, error, hash, circuitsOnPage]);
+  }, [page, pageCount, loading, error, hash, circuitsOnPage, schedulePages]);
 
   const onScaleDoubtRef = useRef(onScaleDoubt);
   onScaleDoubtRef.current = onScaleDoubt;
@@ -3817,6 +3857,18 @@ export default function TakeoffPage({
       { bidPdfId: doc?.id ?? 0 },
       { enabled: Boolean(doc) }
     );
+  // For PlanPane: which pages could hold a panel schedule, from the text
+  // stored at upload (server: bidPdfs.schedulePages).
+  const { data: schedulePagesData } = trpc.bidPdfs.schedulePages.useQuery(
+    { bidPdfId: doc?.id ?? 0 },
+    { enabled: Boolean(doc), staleTime: Infinity }
+  );
+  // For PlanPane: pages with a row, so an open skips the outline read once
+  // every page has one (@/lib/planOutline). Null while loading.
+  const sheetPagesKnown = useMemo(
+    () => (sheetsLoading ? null : sheets.map(sh => sh.pageNumber)),
+    [sheets, sheetsLoading]
+  );
 
   /**
    * Sheet numbers and titles read at upload (viewer piece 2), per page. A
@@ -11673,6 +11725,8 @@ export default function TakeoffPage({
                 if (doc) setPageCount.mutate({ id: doc.id, pageCount });
               }}
               onDocumentReady={handleDocumentReady}
+              sheetPages={sheetPagesKnown}
+              schedulePages={schedulePagesData?.pages}
               onSheetVisible={handleSheetVisible}
               scaleSet={
                 activeSheet?.scaleRatio != null && activeSheet.scaleText

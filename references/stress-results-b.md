@@ -71,3 +71,33 @@ open the sheet, then 10 wheel zooms in, a 20-step drag, 10 zooms out, with a
   fixture marks overlapped 6 pt apart and the second click hit the first.
 - Load to 5,000 marks visible: 6.8 s production, 4.7 s for the same sheet
   with 5 marks — the sheet's own render is most of it.
+
+## Round 3 — the 500-sheet set (270 MB), byte ranges and fast clicking
+
+Method: production build on 3002; playwright laptop. Requests to
+`/manus-storage/` logged with their Range header and time; a page-level
+wrapper on `Worker.prototype.postMessage` logged every job sent to the PDF
+worker. `scripts/_pdfBytes.mts` (Node, a counting range transport) measured
+pdf.js on its own. All throwaway, deleted.
+
+- **Fixed — opening the set downloaded all 270 MB in the background.**
+  Plan-viewer-overhaul § 17.3 measured this set opening on ~2.8 MB. Tonight,
+  after sheet 1 drew (1.3 s), range requests walked the WHOLE file, 0 →
+  270 MB in 1 MB steps, for ~30 s. pdf.js alone reads 4.1 MB for open +
+  page 1 + its text, drawing and outline (Node). The walk came from the
+  viewer's own `circuits` / `homeruns` jobs: when the sheet on screen has
+  anything that reads as a circuit tag — the COVER sheet did — the worker's
+  `panelsInDoc` read the text of every one of the 500 pages through pdf.js to
+  find panel schedules. Now the server names the pages whose stored upload
+  text has a "CKT" header (`bidPdfs.schedulePages`, 21 of 500 here) and the
+  worker reads only those; null (text not stored for every page) keeps the
+  old full read. Ranges after open: one sweep → **~35 requests, done at
+  3.7 s**.
+- **Also fixed, smaller:** the bookmark outline was read on EVERY open,
+  though it only names sheet rows that do not exist yet; now only while a
+  page lacks a row (`outlineNeeded`). It was not the walk (measured), but it
+  was work on every open.
+- **Fast clicking:** 20 "Next sheet" presses 60 ms apart land on sheet
+  21/500 in 3.5 s, one long task (57 ms). (An earlier probe read "Sheet 6":
+  its locator matched a sheet LIST row named "Sheet 6", not the chip.)
+- Heap 38 MB with the set open.
