@@ -53,6 +53,18 @@ Numbers and drills: `references/stress-results.md`; every change in
   2.4 s → 0.4 s under load.
 - **Sidebar**: one scroll area (the menu vanished on a sideways phone).
 
+**FOR TRACK B — smoke flow 3 fails locally, not from tonight's changes.**
+Run locally against `bidrender_local_c` (desktop): capturing "CI SWITCH"
+raises the look-alike check — "This look also matches 4 places a look of CI
+DUPLEX also finds on this sheet. Add it anyway?" — and the test does not
+expect it, so it waits for "CI SWITCH" and fails. Deterministic (2 of 2).
+Re-run with `takeoffStampsRouter.ts` put back to tonight's starting
+commit (13c4bcc2): same failure, so not C's `captureSymbol` change.
+Screenshot: `references/overnight-shots/smoke-flow3-lookalike-local.png`.
+Either the fixture's switch and duplex look alike to the matcher at local
+rendering, or the step should answer "Save anyway". Everything else in the
+smoke suite passed locally (127).
+
 **FOR TRACK B (from the stress run):** the 500-sheet set opens its first
 sheet in ~3.0 s and sheet 400 in ~2.5 s at laptop size — over the owner's
 2 s budget. Range loading is fine (7.2 MB / 2.1 MB); the time is the
