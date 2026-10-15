@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed counts being lost when two arrive at once.** On the Count screen,
+  counting the same item twice in quick succession — a double tap, two
+  people on one bid, or counts sent together when the signal came back —
+  could add only one of them to the line, so the bid showed fewer than
+  were counted. Every count now lands.
+
 - **Losing signal no longer loses your work.** When the connection drops,
   BidRidge now says "You're offline" and holds what you change, sending it
   when the signal is back. Before, opening a screen with no signal could

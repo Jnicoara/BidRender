@@ -7378,8 +7378,44 @@ export async function addAssemblyToBid(
    * each was counted. Callers wanting a fresh snapshot omit `merge` — the
    * default — and get a new line, which is what the Bids screen does.
    */
-  if (options.merge) {
-    const existing = await db
+  const insertLine = async (): Promise<{ id: number; merged: boolean }> => {
+    const conn = await getDb();
+    if (!conn) throw new Error("DB unavailable");
+    const snapshot = await snapshotForAssembly(userId, detail);
+    const [result] = await conn.insert(bidLineItems).values({
+      bidId,
+      assemblyId: detail.id,
+      name: detail.name,
+      qty: qty.toFixed(4),
+      unitLabel,
+      ...snapshot,
+      sortOrder: await nextBidSortOrder(bidId),
+    });
+    return { id: result.insertId, merged: false };
+  };
+
+  if (!options.merge) return insertLine();
+
+  /*
+    ONE MERGE PER BID AT A TIME (drill, 2026-10-15). Two counts of one
+    assembly arriving together — a fast double Enter, two people on one bid,
+    or counts held offline and sent the moment the signal came back — both
+    read the line's quantity and both wrote it plus one: a line at 1 counted
+    twice ended at 2, one count LOST without a word. On an empty bid both
+    found no line and both inserted, splitting one count into two lines.
+    Locking the bid row first makes the second wait, then find the first's
+    line and add to what it now holds. server/addMergeRace.test.ts.
+  */
+  return inOneTransaction(async () => {
+    const conn = await getDb();
+    if (!conn) throw new Error("DB unavailable");
+    await conn
+      .select({ id: bids.id })
+      .from(bids)
+      .where(and(eq(bids.id, bidId), eq(bids.userId, userId)))
+      .limit(1)
+      .for("update");
+    const existing = await conn
       .select()
       .from(bidLineItems)
       .where(
@@ -7399,26 +7435,14 @@ export async function addAssemblyToBid(
       // as a server error (weird-input sweep, 2026-10-14); now it is refused
       // in words, and the line keeps what it had.
       if (merged > LINE_QTY_MAX) throw new LineQuantityTooLarge(merged);
-      await db
+      await conn
         .update(bidLineItems)
         .set({ qty: merged.toFixed(4), updatedAt: new Date() })
         .where(eq(bidLineItems.id, existing[0].id));
       return { id: existing[0].id, merged: true };
     }
-  }
-
-  const snapshot = await snapshotForAssembly(userId, detail);
-
-  const [result] = await db.insert(bidLineItems).values({
-    bidId,
-    assemblyId: detail.id,
-    name: detail.name,
-    qty: qty.toFixed(4),
-    unitLabel,
-    ...snapshot,
-    sortOrder: await nextBidSortOrder(bidId),
+    return insertLine();
   });
-  return { id: result.insertId, merged: false };
 }
 
 /**
