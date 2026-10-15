@@ -86,6 +86,11 @@ Numbers and drills: `references/stress-results.md`; every change in
   server still accepts edits to an archived bid (`todo.md`). **For Track
   B:** the Plans screen does not show it — `<ArchivedBidNotice bidId
 archivedAt />` drops in anywhere the bid is loaded.
+- **Validation refusals now read as sentences** (`lib/errorText.ts`,
+  2026-10-15): a zod "too_big"/"too_small" on a string or number becomes
+  "The name is too long — 255 characters at most" and the like, from the
+  issue's path and limit. Anything else keeps the general line. Every
+  `toast.error(errorText(e))` on every track gets it with no change.
 - **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
   still first).
 
