@@ -12,6 +12,7 @@ import StagingBand from "@/components/StagingBand";
 import { NewVersionBar } from "@/components/NewVersionBar";
 import { markPageOutOfDate } from "@/lib/versionCheck";
 import { withQueryDeadline } from "@/lib/queryDeadline";
+import { isStepBarQuery } from "@/lib/stepBarQuery";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,19 @@ queryClient.getQueryCache().subscribe(event => {
     redirectToLoginIfUnauthorized(error);
     console.error("[API Query Error]", error);
   }
+});
+
+// The bid's step bar (BidStepBar) counts marks, runs, lines and sheets that
+// nearly every editing mutation on a bid moves. Rather than adding it to each
+// screen's refresh helper — and missing one, the stale-number fault CLAUDE.md
+// § "A test that calls the server cannot see a screen showing yesterday's
+// answer" describes — ANY successful mutation lets it go. It is one small
+// query, refetched only while a bar is on screen.
+queryClient.getMutationCache().subscribe(event => {
+  if (event.type === "updated" && event.action.type === "success")
+    void queryClient.invalidateQueries({
+      predicate: query => isStepBarQuery(query.queryKey),
+    });
 });
 
 queryClient.getMutationCache().subscribe(event => {

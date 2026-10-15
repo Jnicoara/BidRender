@@ -3996,15 +3996,13 @@ export async function seedStarterLaborSteps(): Promise<void> {
     const have = new Set(shipped.map(r => r.stepKey));
     const missing = STARTER_LABOR_STEPS.filter(step => !have.has(step.key));
     if (missing.length === 0) return;
-    await db
-      .insert(laborSteps)
-      .values(
-        missing.map(step => ({
-          userId: null,
-          stepKey: step.key,
-          ...starterStepFields(step),
-        }))
-      );
+    await db.insert(laborSteps).values(
+      missing.map(step => ({
+        userId: null,
+        stepKey: step.key,
+        ...starterStepFields(step),
+      }))
+    );
   }, undefined);
 }
 
@@ -6748,6 +6746,56 @@ async function storedBidLineItems(bidId: number): Promise<BidLineItem[]> {
  * "what it actually shows" — which is not a pending change and is why the router
  * only compares them when the bid is locked.
  */
+/**
+ * What the bid's step bar reads (shared/bidSteps.ts): how many plan pages,
+ * how many of them scaled, marks, runs and lines. Counts only — five small
+ * aggregates, each on an indexed bidId. The caller has already checked the
+ * bid belongs to the company.
+ */
+export async function getBidProgressCounts(bidId: number): Promise<{
+  sheets: number;
+  scaledSheets: number;
+  marks: number;
+  runs: number;
+  lines: number;
+}> {
+  const db = await getDb();
+  if (!db) return { sheets: 0, scaledSheets: 0, marks: 0, runs: 0, lines: 0 };
+  const [[sheetRow], [markRow], [runRow], [lineRow]] = await Promise.all([
+    db
+      .select({
+        sheets: sql<string>`COUNT(*)`,
+        scaled: sql<string>`COALESCE(SUM(CASE WHEN ${bidPdfSheets.scaleRatio} IS NOT NULL THEN 1 ELSE 0 END), 0)`,
+      })
+      .from(bidPdfSheets)
+      .innerJoin(bidPdfs, eq(bidPdfs.id, bidPdfSheets.bidPdfId))
+      .where(eq(bidPdfs.bidId, bidId)),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(takeoffStamps)
+      .where(eq(takeoffStamps.bidId, bidId)),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(takeoffRuns)
+      .where(eq(takeoffRuns.bidId, bidId)),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(bidLineItems)
+      // Live lines only: an archived line is off the bid (`archivedAt IS NULL`
+      // is the live test, schema.ts).
+      .where(
+        and(eq(bidLineItems.bidId, bidId), isNull(bidLineItems.archivedAt))
+      ),
+  ]);
+  return {
+    sheets: Number(sheetRow?.sheets ?? 0),
+    scaledSheets: Number(sheetRow?.scaled ?? 0),
+    marks: Number(markRow?.n ?? 0),
+    runs: Number(runRow?.n ?? 0),
+    lines: Number(lineRow?.n ?? 0),
+  };
+}
+
 export async function compareBidQuantitiesWithPlans(bidId: number): Promise<{
   lockedAt: Date | null;
   lines: {

@@ -88,6 +88,7 @@ import { BidExtrasPanel } from "@/components/BidExtrasPanel";
 import { CloseoutPanel } from "@/components/CloseoutPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
+import { BidStepBar } from "@/components/BidStepBar";
 import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { MathChangeStrip } from "@/components/MathChangeStrip";
@@ -1173,6 +1174,20 @@ export default function BidsPage({
             </SelectContent>
           </Select>
         </div>
+        {/* Where this bid is, and the one next step (shared/bidSteps.ts). */}
+        <BidStepBar
+          bidId={bid.id}
+          here="bid"
+          className="mt-3"
+          onGo={place => {
+            window.location.hash =
+              place === "plans"
+                ? `/bids/${bid.id}/plans`
+                : place === "proposal"
+                  ? `/bids/${bid.id}/proposal`
+                  : `/bids/${bid.id}`;
+          }}
+        />
       </div>
 
       <div className="shrink-0 md:shrink md:flex-1 md:overflow-y-auto px-4 md:px-6 py-5">

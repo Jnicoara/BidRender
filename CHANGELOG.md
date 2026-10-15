@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **A step bar on every bid.** Plans › Scale › Count › Runs › Review › Print,
+  with a tick on what's done and one yellow "Next" button for what to do
+  next. It's a guide, not a gate — any step can be done in any order, runs
+  are optional, and a bid counted by hand without plans skips straight past
+  Plans and Scale.
+- **New homerun icon**: an arrow with wire ticks, like a homerun on a
+  drawing, instead of a plug on each end.
+
 - **Back goes back to where you were.** Open a bid from the Bids list or the
   Plans list and its Back button now says "Bids" or "Plans" and takes you
   there, instead of always going to the Dashboard.

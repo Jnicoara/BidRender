@@ -1132,6 +1132,18 @@ export const bidsRouter = router({
    * every line sent before the last mark as a "change", which is a warning about
    * nothing on a screen that is already correct.
    */
+  /**
+   * The step bar's counts (shared/bidSteps.ts): plan pages, scaled pages,
+   * marks, runs, lines and status. Read-only; moves no number.
+   */
+  progress: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      const counts = await db.getBidProgressCounts(input.bidId);
+      return { ...counts, status: bid.status };
+    }),
+
   quantityLock: procedure
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
