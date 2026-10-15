@@ -140,6 +140,30 @@ describe("guideTip", () => {
     ).toBeNull();
   });
 
+  it("on the Count screen with nothing counted, talks about counting by hand", () => {
+    const tip = guideTip({ ...base, screen: "count" });
+    expect(tip?.id).toBe("count-by-hand");
+    expect(tip?.body).not.toMatch(/upload/i);
+    // Once something is counted, the usual next step (Print here).
+    expect(
+      guideTip({ ...base, screen: "count", progress: { ...fresh, lines: 2 } })
+        ?.id
+    ).toBe("step:print");
+  });
+
+  it("tells a viewer nothing: every step is one they cannot take", () => {
+    expect(guideTip({ ...base, screen: "bid", canEdit: false })).toBeNull();
+    expect(
+      guideTip({
+        ...base,
+        screen: "dashboard",
+        progress: null,
+        hasBids: false,
+        canEdit: false,
+      })
+    ).toBeNull();
+  });
+
   it("is quiet off the bid screens and while a bid is loading", () => {
     expect(guideTip({ ...base, screen: "other" })).toBeNull();
     expect(guideTip({ ...base, screen: "bid", progress: null })).toBeNull();

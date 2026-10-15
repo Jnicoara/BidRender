@@ -146,9 +146,14 @@ export function guideTip(input: {
    * does not repeat the button an inch below it.
    */
   stepBarShown?: boolean;
+  /**
+   * May this person change bids? A viewer is told nothing: every step is
+   * something they cannot do. (Where do I…? still works for them.)
+   */
+  canEdit?: boolean;
 }): GuideTip | null {
   const { screen, progress, hasBids, state } = input;
-  if (state.off) return null;
+  if (state.off || input.canEdit === false) return null;
   const visible = (tip: GuideTip | null) =>
     tip && !state.hidden.includes(tip.id) ? tip : null;
 
@@ -196,6 +201,17 @@ export function guideTip(input: {
       action: null,
     });
   }
+
+  // Counting by hand is the whole point of the Count screen: "get the
+  // drawings in" would tell this person to do what they chose not to.
+  if (screen === "count" && next === "plans")
+    return visible({
+      id: "count-by-hand",
+      stepLabel: null,
+      title: "Counting by hand",
+      body: 'Type what you need — "duplex", "2x4 troffer" — and how many. Each one goes on the bid. Drawings can come later, or never.',
+      action: null,
+    });
 
   const place = STEP_PLACE[next];
   const buttonAbove = input.stepBarShown === true && screen === "bid";

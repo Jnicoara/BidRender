@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { Compass, HelpCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { useCompany } from "@/hooks/useCompany";
 import { cn } from "@/lib/utils";
 import { guideTip, type GuideScreen } from "@/lib/guide";
 import { useGuideState, useShowStepBar } from "@/hooks/useCrosshairColor";
@@ -43,6 +44,7 @@ export function GuideStrip({
 }) {
   const [state, setState] = useGuideState();
   const [stepBarShown] = useShowStepBar();
+  const canEdit = useCompany().can("bids.edit");
   const on = !state.off;
 
   const progress = trpc.bids.progress.useQuery(
@@ -76,6 +78,7 @@ export function GuideStrip({
     state,
     planTipShowing,
     stepBarShown,
+    canEdit,
   });
   if (!tip) return null;
 
