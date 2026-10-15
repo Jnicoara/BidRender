@@ -1,5 +1,39 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-14 → 15, overnight run #2 — see `references/overnight-log.md`
+
+**Item 1 — security sweep: `references/security-sweep.md`.** 19 findings,
+11 fixed on track-c (not merged). The attacker test
+(`server/crossCompanyAttack.test.ts` + `server/attack/`) runs every route
+as a stranger, a viewer, an estimator and signed-out in ~90 s; every new
+route is attacked automatically.
+
+- **FOR TRACK A (parked, each needs a live look / R2 / changes live
+  behaviour):** A-S9b session cookie `SameSite=None` → `Lax`
+  (`_core/cookies.ts`; the CSRF guard already closes the form-POST hole);
+  A-S12 `clientKey` trusts the FIRST X-Forwarded-For entry — per-sender
+  limits are dodgeable until it reads what DO/Cloudflare actually append;
+  A-S13 signed upload URLs don't bind Content-Length and tickets are
+  unlimited (storage abuse); A-S14 the signup race (yours already).
+- **New guards other tracks will meet:** `server/libraryRefs.ts`
+  (`requireLibraryRefs`) — any route storing a material / assembly /
+  labor rate / modifier / work step / kit id must call it;
+  `server/csrfGuard.ts` — a non-JSON POST to `/api/trpc` is refused (our
+  client and scripts all send JSON); `proposals` writes need
+  `settings.edit`; legacy `masterAssemblies` item db functions take the
+  owner.
+- **For Track B:** `BidRenderShell.tsx` changed — `NavBtn` / `NavSection`
+  moved to module level (they were rebuilt on every render and ate the
+  first tap). `client/src/lib/shellNavStable.test.ts` now fails on ANY
+  component declared inside another in client/src.
+
+**Item 2 — e2e + screenshots.** `e2e/smoke/newScreens.spec.ts` (29 pass
+at laptop, iPad both ways, phone 375 — new `phone-375` project in
+`e2e/playwright.config.ts`). Shots: `references/overnight-shots/`. Local
+smoke account on `bidrender_local_c`: smoke-c@example.com (in the
+git-ignored `.env.test.local`), plus estimator-c@example.com as its
+estimator.
+
 ## (newest) 2026-10-14, overnight run — see `references/overnight-log.md`
 
 The owner's overnight queue (11 items) is worked in order; each item's
@@ -622,6 +656,7 @@ rows, read from a fresh copy of the workbook. Read-only.
   names it `project_assembly_items_projectAssemblyId_fk`, and that name
   worked. That is a small fault in `scripts/schemaDrift.mts`'s suggested
   SQL, for whoever next touches it.
+
 ## FROM THE OWNER (2026-10-14, via Track B) — STARTER OFFERS MOVED TO B
 
 **Track B now builds the whole starter-offers feature**
