@@ -87,3 +87,35 @@ describe("saves waiting to be sent", () => {
     expect(done).toBe(true);
   });
 });
+
+describe("reloadWhenSaved", () => {
+  it("waits for a save in flight, but never longer than its cap", async () => {
+    const { vi } = await import("vitest");
+    const { reloadWhenSaved, setPendingWrites } = await import("./dataReach");
+    vi.useFakeTimers();
+    const reload = vi.fn();
+    vi.stubGlobal("window", { location: { reload } });
+    try {
+      // A save in flight that finishes: reload right after it.
+      setPendingWrites(1);
+      reloadWhenSaved(10_000);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(reload).not.toHaveBeenCalled();
+      setPendingWrites(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reload).toHaveBeenCalledTimes(1);
+      // A save that is stuck: the person's Refresh still happens at the cap.
+      reload.mockClear();
+      setPendingWrites(1);
+      reloadWhenSaved(10_000);
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(reload).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      setPendingWrites(0);
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+});

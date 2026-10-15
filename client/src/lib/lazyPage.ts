@@ -15,7 +15,7 @@
  * passed on to the error boundary instead of reloading in a loop.
  */
 
-import { whenNoPendingWrites } from "./dataReach";
+import { reloadWhenSaved, whenNoPendingWrites } from "./dataReach";
 
 /** How long a reload counts as "just tried" — no second reload inside it. */
 export const CHUNK_RELOAD_WINDOW_MS = 30_000;
@@ -65,7 +65,8 @@ export function reloadingImport<T>(load: () => Promise<T>): () => Promise<T> {
       } catch {
         // See above.
       }
-      window.location.reload();
+      // After any save in flight — a reload would cancel it.
+      reloadWhenSaved();
       // Never settles: the page is going away.
       return new Promise<T>(() => {});
     });

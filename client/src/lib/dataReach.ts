@@ -85,6 +85,18 @@ export function setPendingWrites(n: number): void {
   writeListeners.forEach(l => l());
 }
 
+/**
+ * Reload the tab — after any save in flight or held has gone out, so the
+ * reload does not cancel it. Waits at most `capMs`: a save that is stuck
+ * must not stop a person's own "Refresh" from ever happening.
+ */
+export function reloadWhenSaved(capMs = 10_000): void {
+  const cap = new Promise<void>(resolve => setTimeout(resolve, capMs));
+  void Promise.race([whenNoPendingWrites(), cap]).then(() =>
+    window.location.reload()
+  );
+}
+
 /** Resolves once no save is waiting or in flight (at once if none is). */
 export function whenNoPendingWrites(): Promise<void> {
   if (pendingWrites === 0) return Promise.resolve();

@@ -27,6 +27,7 @@ import {
   readServerVersion,
   subscribeOutOfDate,
 } from "@/lib/versionCheck";
+import { reloadWhenSaved } from "@/lib/dataReach";
 
 export function NewVersionBar() {
   const [serverBuild, setServerBuild] = useState<BuildStamp | null>(null);
@@ -85,7 +86,8 @@ export function NewVersionBar() {
       </div>
       <button
         type="button"
-        onClick={() => window.location.reload()}
+        // Waits for a save in flight, which a reload would cancel.
+        onClick={() => reloadWhenSaved()}
         className="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-[#F5C518] px-3 py-1.5 text-xs font-semibold text-black hover:bg-[#F5C518]/90"
       >
         <RotateCcw className="w-3.5 h-3.5" />

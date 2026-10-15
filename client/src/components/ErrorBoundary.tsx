@@ -37,6 +37,7 @@ import {
   type CrashRecord,
 } from "@/lib/crashLog";
 import { isChunkLoadError, pageIsOutOfDate } from "@/lib/versionCheck";
+import { reloadWhenSaved } from "@/lib/dataReach";
 
 interface Props {
   children: ReactNode;
@@ -100,7 +101,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   private goToDashboard = () => {
     window.location.hash = "#/dashboard";
-    window.location.reload();
+    reloadWhenSaved();
   };
 
   render() {
@@ -119,10 +120,7 @@ class ErrorBoundary extends Component<Props, State> {
               needs. Refresh to carry on with the new version. Nothing you had
               already saved is affected.
             </p>
-            <Button
-              className="gap-2 mt-5"
-              onClick={() => window.location.reload()}
-            >
+            <Button className="gap-2 mt-5" onClick={() => reloadWhenSaved()}>
               <RotateCcw className="w-4 h-4" />
               Refresh
             </Button>
@@ -155,7 +153,7 @@ class ErrorBoundary extends Component<Props, State> {
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={() => window.location.reload()}
+                onClick={() => reloadWhenSaved()}
               >
                 <RotateCcw className="w-4 h-4" />
                 Try again
