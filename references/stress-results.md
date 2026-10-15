@@ -91,6 +91,14 @@ moving a bid to Active locks its quantities, so its later drops were —
 correctly — refused, and the run reported 1,398 "errors" that were the app
 working.)
 
+**Server memory across the load runs** (dev server, Windows working set):
+689 MB before → 1,001 MB after a 30 s write load → 1,008 → 1,019 MB after
+two more. A big first step then ~7–11 MB a round: consistent with caches
+warming and lazy garbage collection, NOT a verdict — the dev server carries
+Vite and file watching. **Open:** measure a production build
+(`pnpm build && pnpm start`) over ~10 minutes of load before calling it
+either way.
+
 ## Screens in a real browser (`scripts/stressScreens.mts`)
 
 Time from opening the address to the real content (first bid card, the
