@@ -59,6 +59,22 @@ the bid back. 1,872 rounds, **0 errors**.
 
 Data left as found: no bid still renamed, no mark at the drop point.
 
+## Sign-in burst (2026-10-15)
+
+11 sign-ins sent at once, production build, with an ordinary bid read
+polled every 50 ms from a session already signed in:
+
+| What                    | Result                                     |
+| ----------------------- | ------------------------------------------ |
+| Sign-ins                | 11 of 11 ok, each ~680 ms, all done 687 ms |
+| A bid read, quiet       | p50 42 ms, max 73 ms                       |
+| A bid read, during them | **701 ms** — and only 1 read got through   |
+
+`bcryptjs` (pure JavaScript, cost 12) hashes on the main thread; its
+"async" chunks did not let the read in. Not changed tonight — moving it
+off the main thread changes the server's dependencies or build (Track A):
+morning question Q-AUTH1.
+
 ## Server timings (`scripts/stressTime.mts`, after the fix)
 
 Over HTTP exactly as the browser calls (signed in, JSON), 10 runs each.
