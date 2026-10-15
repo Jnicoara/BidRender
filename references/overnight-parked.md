@@ -66,7 +66,7 @@ but one choice decides what the copy COSTS:
 Hand-priced lines and "by others" lines copy as they are either way. Lines
 that follow the drawing do not copy (no drawing on the copy).
 
-## P5. Price history screen (owner's request, 2026-10-14) — next after recording
+## P5. Price history screen — BUILT later the same night (item 11; see overnight-log 11d)
 
 Recording ships tonight (item 7). The panel — Materials editor › More
 options › "Price history" — is plan § 8 steps 2–3 (read query, cursor 50,
