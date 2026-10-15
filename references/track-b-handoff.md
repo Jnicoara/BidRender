@@ -1,5 +1,20 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-15 (morning), GATE GREEN ON e8993da2
+
+- **Gate 38704354488 green on e8993da2** — covers starter offers, stress
+  rounds 1–6 and the touch follow-up. (Runs 38690818780 / 38691805415 were
+  the MySQL image refusal, no test ran — morning question Q1.)
+- **Not merged to local-dev.** Nothing pushed but track-b.
+- **Stress fixes** (stress-results-b.md): starter pinning no longer visits
+  every shop; preview counts instead of forking; marks in a memoized layer
+  (pan); a big set no longer downloads whole looking for panel schedules;
+  offline marks retry with a standing message; one failed sheet no longer
+  kills the plan; "Name this symbol" closes on a sheet change / Trace.
+- **Open:** two touch steps at 375 px (Q3); zoom at 5,000 marks (~130–260
+  ms a wheel step, fine at 1,000); first starter edit at thousands of shops
+  (Q2). Server stopped; MySQL 3307 left running.
+
 ## WHERE B STANDS — 2026-10-15 (overnight), STARTER OFFERS BUILT ON track-b
 
 - **Built, steps 1–6 of `starter-offers-plan.md` § 4**, on track-b only
