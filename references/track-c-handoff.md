@@ -27,6 +27,16 @@ route is attacked automatically.
   first tap). `client/src/lib/shellNavStable.test.ts` now fails on ANY
   component declared inside another in client/src.
 
+**Item 3 — guide mode: `references/guide-mode.md` (G1–G8).** A one-tip
+strip at the bottom of the main column (`GuideStrip`, mounted in
+`BidRenderShell`) + a local "Where do I…?" (`HelpSearch`). **For Track B:**
+on the Plans screen the strip steps aside while a `PlanTips` card is on
+screen, detected by its **"No more tips"** button text — rename that button
+and update `planTipOnScreen()` in `GuideStrip.tsx` in the same commit.
+`e2e/smoke/guide.spec.ts` goes red if they drift. No TakeoffPage change.
+**`device:audit` now refuses to report when not signed in** (it had
+silently measured the landing page when the server's JWT_SECRET differed).
+
 **Item 2 — e2e + screenshots.** `e2e/smoke/newScreens.spec.ts` (29 pass
 at laptop, iPad both ways, phone 375 — new `phone-375` project in
 `e2e/playwright.config.ts`). Shots: `references/overnight-shots/`. Local
