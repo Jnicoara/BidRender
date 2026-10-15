@@ -1389,6 +1389,11 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       3,000:** page `materials.list` and move search to the server, or at
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
+      **Re-measured 2026-10-15** in a browser on the stress account (1,717
+      rows, production build): the Materials screen's `materials.list` reply
+      is **1.66 MB raw, 88 KB gzipped**; the Plans screen's first batch is
+      1.9 MB. Every other main screen is under 240 KB. Still fine behind
+      the edge; still the whole table.
 
 ### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
 
