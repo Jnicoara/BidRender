@@ -18,7 +18,7 @@
  * Card values come from bids.dashboard, which rolls each bid up through the
  * same code path the detail view uses. This screen formats; it never computes.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -131,6 +131,8 @@ export default function DashboardPage({
   onCount: (id: number) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  /** Set the instant a create is sent; see `start`. */
+  const creating = useRef(false);
   const [name, setName] = useState("");
   const [confirmArchive, setConfirmArchive] = useState<PendingArchive | null>(
     null
@@ -338,13 +340,32 @@ export default function DashboardPage({
   }, [groups]);
 
   const start = () => {
+    // The form now stays open until the bid exists, so a second Enter or a
+    // double click must not send a second create. A REF, set in this call:
+    // both clicks of a double click run this same function from one render,
+    // so `createBid.isPending` is still false for the second (drilled: two
+    // bids). The button's `disabled` covers the slower cases.
+    if (creating.current) return;
     if (!name.trim()) {
       toast.error("Give the bid a name.");
       return;
     }
-    createBid.mutate({ name: name.trim() });
-    setName("");
-    setAdding(false);
+    creating.current = true;
+    // The form clears only once the bid exists: a refused create (no
+    // connection, a name over the limit) keeps what was typed beside the
+    // message saying why. It cleared at once until 2026-10-15.
+    createBid.mutate(
+      { name: name.trim() },
+      {
+        onSuccess: () => {
+          setName("");
+          setAdding(false);
+        },
+        onSettled: () => {
+          creating.current = false;
+        },
+      }
+    );
   };
 
   return (
@@ -442,7 +463,12 @@ export default function DashboardPage({
               className="h-8 flex-1 min-w-[14rem] text-sm"
               autoFocus
             />
-            <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={start}>
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={start}
+              disabled={createBid.isPending}
+            >
               <Check className="w-3 h-3" /> Create
             </Button>
             <Button

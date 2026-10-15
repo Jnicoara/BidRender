@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Clearer messages when something you typed is refused.** Instead of
+  "Something in that wasn't valid", the app now says which box and what
+  the limit is — "The name is too long — 255 characters at most". And
+  starting a new bid keeps the name you typed if the create fails, so you
+  don't have to type it again.
+
 - **A deleted bid says so.** Open a bid that was moved to Recently deleted
   (in another tab, or from an old link) and it now says so at the top,
   with the date it will be deleted for good and a Restore button. Before,

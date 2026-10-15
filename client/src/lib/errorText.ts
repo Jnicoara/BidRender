@@ -34,6 +34,67 @@ export const INTERNAL_TEXT =
 const TECHNICAL =
   /\b(ER_[A-Z_]+|SQL|sqlMessage|undefined|null is not|Cannot read propert|is not a function|DB unavailable|ECONN|ETIMEDOUT|Unexpected token|TypeError|ReferenceError)\b/i;
 
+/** Field names whose words alone would read oddly. */
+const FIELD_WORDS: Record<string, string> = {
+  qty: "quantity",
+  costPerUnit: "price",
+  hourlyCost: "hourly rate",
+  annualSalary: "salary",
+};
+
+function fieldWords(path: unknown): string | null {
+  if (!Array.isArray(path)) return null;
+  const last = [...path].reverse().find(p => typeof p === "string");
+  if (typeof last !== "string" || last === "") return null;
+  return (
+    FIELD_WORDS[last] ??
+    last.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase()
+  );
+}
+
+/**
+ * The validation dump, said as a sentence — for the few refusals that are
+ * unambiguous and common. Found 2026-10-15: a 10,000-character name drew
+ * "Something in that wasn't valid", which names neither the field nor the
+ * limit, so the person can only paste the same thing again. Anything this
+ * does not recognise stays the general sentence.
+ */
+function validationSentence(message: string): string | null {
+  let issues: unknown;
+  try {
+    issues = JSON.parse(message);
+  } catch {
+    return null;
+  }
+  const issue = (Array.isArray(issues) ? issues[0] : null) as {
+    code?: unknown;
+    origin?: unknown;
+    maximum?: unknown;
+    minimum?: unknown;
+    path?: unknown;
+  } | null;
+  if (!issue) return null;
+  const words = fieldWords(issue.path);
+  const field = words ? `The ${words}` : "That";
+  const num = (n: unknown) =>
+    typeof n === "number" ? n.toLocaleString("en-US") : null;
+  if (issue.origin === "string") {
+    if (issue.code === "too_big" && num(issue.maximum))
+      return `${field} is too long — ${num(issue.maximum)} characters at most.`;
+    if (issue.code === "too_small" && issue.minimum === 1)
+      return `${field} can't be blank.`;
+    if (issue.code === "too_small" && num(issue.minimum))
+      return `${field} needs at least ${num(issue.minimum)} characters.`;
+  }
+  if (issue.origin === "number") {
+    if (issue.code === "too_big" && num(issue.maximum))
+      return `${field} is too large — ${num(issue.maximum)} at most.`;
+    if (issue.code === "too_small" && num(issue.minimum))
+      return `${field} can't be below ${num(issue.minimum)}.`;
+  }
+  return null;
+}
+
 type ErrorLike = {
   message?: unknown;
   data?: { code?: unknown } | null;
@@ -62,7 +123,8 @@ export function errorText(error: unknown): string {
     return message === "" ? INTERNAL_TEXT : message;
 
   if (message === "") return INTERNAL_TEXT;
-  if (message.startsWith("[") || message.startsWith("{")) return INVALID_TEXT;
+  if (message.startsWith("[") || message.startsWith("{"))
+    return validationSentence(message) ?? INVALID_TEXT;
   if (data.code === "INTERNAL_SERVER_ERROR" && TECHNICAL.test(message))
     return INTERNAL_TEXT;
   return message;

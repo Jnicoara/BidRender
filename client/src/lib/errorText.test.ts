@@ -50,6 +50,54 @@ describe("errorText", () => {
     );
   });
 
+  it("says WHICH field and WHAT limit, for the refusals that are clear", () => {
+    const say = (issue: object) =>
+      errorText({
+        message: JSON.stringify([issue], null, 2),
+        data: { code: "BAD_REQUEST" },
+      });
+    // The exact shape the server sent for a 10,000-character bid name.
+    expect(
+      say({
+        origin: "string",
+        code: "too_big",
+        maximum: 255,
+        inclusive: true,
+        path: ["name"],
+        message: "Too big: expected string to have <=255 characters",
+      })
+    ).toBe("The name is too long — 255 characters at most.");
+    expect(
+      say({
+        origin: "string",
+        code: "too_small",
+        minimum: 1,
+        path: ["clientName"],
+      })
+    ).toBe("The client name can't be blank.");
+    expect(
+      say({
+        origin: "number",
+        code: "too_big",
+        maximum: 999999,
+        path: ["lines", 0, "qty"],
+      })
+    ).toBe("The quantity is too large — 999,999 at most.");
+    expect(
+      say({ origin: "number", code: "too_small", minimum: 0, path: [] })
+    ).toBe("That can't be below 0.");
+  });
+
+  it("keeps the general sentence for anything it cannot say plainly", () => {
+    const say = (message: string) =>
+      errorText({ message, data: { code: "BAD_REQUEST" } });
+    expect(
+      say('[{"origin":"string","code":"invalid_format","path":["email"]}]')
+    ).toBe(INVALID_TEXT);
+    expect(say("[not json")).toBe(INVALID_TEXT);
+    expect(say("[]")).toBe(INVALID_TEXT);
+  });
+
   it("never shows code from an internal error", () => {
     for (const raw of [
       "ER_DUP_ENTRY: Duplicate entry '5' for key 'PRIMARY'",
