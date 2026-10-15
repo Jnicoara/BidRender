@@ -430,6 +430,8 @@ the claim's `acceptedAt IS NULL` condition removed, the two-at-once test
 fails. `scopeDiscipline.test.ts` lists the new router as ADMIN_ONLY and
 ACTOR_SCOPED (authorship), with reasons.
 
+**Known difference from § 2:** someone who already has an account and signs up again with a company code gets the existing "An account with this email already exists." — not yet "sign in and this invite will be waiting". That wording belongs with the signup page.
+
 **Left, in build order:** sign-in page (hide "Create account" when
 `inviteOnly`, the one line to the waitlist) + `#/signup?invite=` page using
 `inviteInfo` (+ `appRoutes.ts` and its test) → Admin panel beside
