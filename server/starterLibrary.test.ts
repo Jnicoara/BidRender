@@ -24,6 +24,7 @@ import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import {
   assemblies,
+  companies,
   laborRates,
   materials,
   starterChangeBatches,
@@ -220,12 +221,28 @@ withDb("the baseline screen's reads", () => {
         field: "costPerUnit",
         newValue: "2.5",
       };
+      // One shop already priced it itself: not pinned, but offered.
+      const [someShop] = await db
+        .select({ owner: companies.ownerUserId })
+        .from(companies)
+        .limit(1);
+      await db.insert(materials).values({
+        userId: someShop.owner,
+        baselineId: probe.id,
+        name: `starter-lib-test preview probe copy`,
+        unitOfSale: "each",
+        costPerUnit: "9.0000",
+      });
+      const companiesNow = (
+        await db.select({ id: companies.id }).from(companies)
+      ).length;
       const preview = await api.starterLibrary.previewEdit(edit);
       expect(preview.reach).toBe("offer");
-      expect(preview.pins).toBeGreaterThan(0);
-      expect(preview.offered).toBe(preview.pins);
+      expect(preview.pins).toBe(companiesNow - 1);
+      expect(preview.offered).toBe(preview.pins + 1);
       expect(preview.newValue).toBe("2.5000");
-      // The preview wrote nothing: the row and the forks are as they were.
+      // The preview wrote nothing: the row as it was, and no fork beyond the
+      // one made by hand above (a preview counts pins, it makes none).
       const [still] = await db
         .select()
         .from(materials)
@@ -236,7 +253,7 @@ withDb("the baseline screen's reads", () => {
           .select({ id: materials.id })
           .from(materials)
           .where(eq(materials.baselineId, probe.id))
-      ).toHaveLength(0);
+      ).toHaveLength(1); // only the copy made by hand above
 
       const applied = await api.starterLibrary.applyEdit(edit);
       batchIds.push(applied.batchId!);

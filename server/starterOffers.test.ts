@@ -567,6 +567,36 @@ describeDb("starter updates for a shop (starter-offers-plan.md § 6)", () => {
       .where(eq(assemblyMaterials.assemblyId, probe.assembly));
     expect(shared).toHaveLength(1);
   });
+
+  it("a shop whose only copy of a run type is ARCHIVED is still pinned (the pin filter never skips a shop the fork would not reuse)", async () => {
+    const database = (await getDb())!;
+    const mineNow = () =>
+      database
+        .select()
+        .from(takeoffRunTypes)
+        .where(
+          and(
+            eq(takeoffRunTypes.userId, A),
+            eq(takeoffRunTypes.baselineId, probe.runType)
+          )
+        );
+    const before = await mineNow();
+    expect(before.length).toBeGreaterThan(0);
+    await database
+      .update(takeoffRunTypes)
+      .set({ status: "archived" })
+      .where(
+        inArray(
+          takeoffRunTypes.id,
+          before.map(r => r.id)
+        )
+      );
+    await change("runTypes", probe.runType, "conduitExtraPct", "0.15");
+    const after = await mineNow();
+    const live = after.filter(r => r.status === "active");
+    expect(live).toHaveLength(1);
+    expect(live[0].isPinnedCopy).toBe(true);
+  });
 });
 
 // ─── The shop's routes (plan test 15, owner Q1) ──────────────────────────────

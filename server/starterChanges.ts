@@ -663,12 +663,8 @@ async function pinCompanies(
   const handle = await database();
   const { table: t, fork } = TABLES[table];
   const cols = columnsOf(table);
-  const owners = await handle
-    .select({ owner: companies.ownerUserId })
-    .from(companies)
-    .orderBy(asc(companies.ownerUserId));
   const pins: Array<{ owner: number; forkId: number }> = [];
-  for (const { owner } of owners) {
+  for (const owner of await unpinnedOwners(table, rowId)) {
     const before = (
       await handle
         .select({ id: cols.id })
@@ -686,6 +682,65 @@ async function pinCompanies(
   return pins;
 }
 
+/**
+ * Every shop with no copy the fork would REUSE — the shops a pin reaches.
+ * One query instead of two per shop: measured 2026-10-15 (Track B stress
+ * pass), a change to a row every shop already held took 414 ms at 306 shops
+ * (~4 s at 3,000; an hour for a 1,000-row sheet), and 10 ms after. The fork
+ * stays the authority for every shop listed here (`pinCompanies` still asks
+ * it): this only leaves out copies the fork reuses — any copy, and for run
+ * types an ACTIVE one (`forkRunType`) — so a shop is never wrongly skipped.
+ * The preview counts the same list (`countPins`), so its number is this one.
+ */
+async function unpinnedOwners(
+  table: StarterTable,
+  rowId: number
+): Promise<number[]> {
+  const handle = await database();
+  const cols = columnsOf(table);
+  const reuses =
+    table === "runTypes"
+      ? and(eq(cols.baselineId, rowId), eq(takeoffRunTypes.status, "active"))
+      : eq(cols.baselineId, rowId);
+  const covered = new Set(
+    (
+      await handle
+        .select({ owner: cols.userId })
+        .from(TABLES[table].table)
+        .where(reuses)
+    ).map(r => r.owner as number)
+  );
+  return (
+    await handle
+      .select({ owner: companies.ownerUserId })
+      .from(companies)
+      .orderBy(asc(companies.ownerUserId))
+  )
+    .map(r => r.owner)
+    .filter(o => !covered.has(o));
+}
+
+/**
+ * The preview's pins: the shops `pinCompanies` would fork, named by the SAME
+ * filter (`unpinnedOwners`) and not forked. A batch that changes one row
+ * twice (a rate's wage and rate) pins once, as the real call does: the first
+ * change's pins are remembered in `counted`.
+ */
+async function countPins(
+  table: StarterTable,
+  rowId: number,
+  counted: Map<string, Set<number>>
+): Promise<Array<{ owner: number; forkId: number }>> {
+  const key = `${table}:${rowId}`;
+  const already = counted.get(key) ?? new Set<number>();
+  const owners = (await unpinnedOwners(table, rowId)).filter(
+    o => !already.has(o)
+  );
+  for (const o of owners) already.add(o);
+  counted.set(key, already);
+  return owners.map(owner => ({ owner, forkId: 0 }));
+}
+
 // ─── The function ────────────────────────────────────────────────────────────
 
 async function applyPlanned(
@@ -696,8 +751,16 @@ async function applyPlanned(
     fileSha256?: string;
     note?: string;
   },
-  plans: Array<{ input: StarterChangeInput; undoesChangeId: number | null }>
+  plans: Array<{ input: StarterChangeInput; undoesChangeId: number | null }>,
+  /**
+   * "count" is the PREVIEW: it counts the shops a pin would reach, with the
+   * same filter, and forks nobody (2,006 forks made a preview take 7.3 s,
+   * measured 2026-10-15). Only `previewStarterChanges` passes it, inside a
+   * transaction it rolls back.
+   */
+  pinMode: "pin" | "count" = "pin"
 ): Promise<ApplyStarterResult> {
+  const counted = new Map<string, Set<number>>();
   return db.inOneTransaction(async () => {
     const handle = await database();
     const problems: string[] = [];
@@ -748,9 +811,11 @@ async function applyPlanned(
     const applied: ApplyStarterResult["applied"] = [];
     for (const change of planned) {
       const { input } = change;
-      const pins = change.pins
-        ? await pinCompanies(input.table, input.rowId)
-        : [];
+      const pins = !change.pins
+        ? []
+        : pinMode === "pin"
+          ? await pinCompanies(input.table, input.rowId)
+          : await countPins(input.table, input.rowId, counted);
       await change.write();
       const after = await lockedRow(input.table, input.rowId);
       const [logged] = await handle.insert(starterChanges).values({
@@ -770,7 +835,7 @@ async function applyPlanned(
         version: after!.version as number,
         undoesChangeId: change.undoesChangeId,
       });
-      if (pins.length > 0)
+      if (pins.length > 0 && pinMode === "pin")
         await handle.insert(starterChangePins).values(
           pins.map(pin => ({
             changeId: logged.insertId,
@@ -1062,9 +1127,15 @@ export async function previewStarterChanges(
 ): Promise<StarterPreview> {
   try {
     await db.inOneTransaction(async () => {
+      // The shops a pin would reach, read BEFORE the change (count mode forks
+      // nobody, so they still have no copy afterwards either).
+      const willPin = new Set(
+        await unpinnedOwners(changes[0].table, changes[0].rowId)
+      );
       const result = await applyPlanned(
         { editorUserId: null, source: "screen", note: "preview" },
-        changes.map(input => ({ input, undoesChangeId: null }))
+        changes.map(input => ({ input, undoesChangeId: null })),
+        "count"
       );
       const handle = await database();
       if (result.applied.length === 0)
@@ -1092,8 +1163,10 @@ export async function previewStarterChanges(
           c.kind === "field" &&
           starterFieldKind(c.table, c.field) === "everyone"
       );
+      // A pinned shop holds today's value, which the change differs from.
       let offered = 0;
       if (!everyone) {
+        offered = result.applied.some(a => a.pins > 0) ? willPin.size : 0;
         const cols = columnsOf(first.table);
         const copies = (await handle
           .select()
@@ -1108,7 +1181,8 @@ export async function previewStarterChanges(
           if (!owners.has(o)) owners.set(o, []);
           owners.get(o)!.push(c);
         }
-        for (const list of Array.from(owners.values())) {
+        for (const [owner, list] of Array.from(owners)) {
+          if (willPin.has(owner) && offered > 0) continue;
           const live =
             list.find(
               c =>

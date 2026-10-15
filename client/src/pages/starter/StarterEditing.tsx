@@ -305,7 +305,7 @@ export function StarterEditDialog({
               onClick={() => void confirm()}
               className="rounded-md bg-[#F5C518] px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
             >
-              Confirm
+              {apply.isPending || rate.isPending ? "Saving…" : "Confirm"}
             </button>
           ) : (
             <button
