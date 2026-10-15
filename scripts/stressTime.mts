@@ -14,7 +14,7 @@
  * quantity set and set back — the data ends where it started.
  */
 import "dotenv/config";
-import { STRESS } from "./stressSeed.mts";
+import { STRESS } from "./stressConfig.mts";
 
 const BASE = `http://127.0.0.1:${process.env.PORT ?? 3000}`;
 const arg = (name: string, fallback: number) =>
@@ -83,7 +83,10 @@ async function main() {
     await call<{ id: number; name: string }[]>(owner, "bids.dashboard", null)
   ).data;
   const big = bids.find(b => b.name.startsWith("Stress hospital wing"))!;
-  const small = bids.find(b => b.name.startsWith("Stress job"))!;
+  // A Draft bid: a Won or Lost one has its quantities locked.
+  const small = (bids as { name: string; status?: string; id: number }[]).find(
+    b => b.name.startsWith("Stress job") && b.status === "Draft"
+  )!;
   const pdfs = (
     await call<{ id: number }[]>(owner, "bidPdfs.list", { bidId: big.id })
   ).data;
@@ -165,8 +168,8 @@ async function main() {
       proc: "proposals.document",
       input: { bidId: big.id },
     },
-    { name: "Materials (whole catalog)", proc: "materials.list", input: null },
-    { name: "Assemblies", proc: "assemblies.list", input: null },
+    { name: "Materials (whole catalog)", proc: "materials.list", input: {} },
+    { name: "Assemblies", proc: "assemblies.list", input: {} },
     {
       name: "SAVE: drop one mark (big bid)",
       proc: "takeoffStamps.drop",

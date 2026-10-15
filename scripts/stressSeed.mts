@@ -36,22 +36,8 @@ import {
 } from "../drizzle/schema";
 import type { TrpcContext } from "../server/_core/context";
 
-export const STRESS = {
-  /** The busy company. */
-  ownerEmail: "stress-c@example.com",
-  password: "Stress-C-local-1!",
-  bids: 150,
-  sheetsPerBid: 6,
-  /** The three huge bids inside it. */
-  bigBids: 3,
-  bigSheets: 60,
-  bigMarks: 2500,
-  bigGroups: 20,
-  bigRuns: 40,
-  /** The other companies, using the app at the same time. */
-  others: 10,
-  otherBids: 10,
-} as const;
+import { STRESS } from "./stressConfig.mts";
+export { STRESS };
 
 const PAGE = { width: 2592, height: 1728 };
 const SMALL_KEY = "stress/plan-6-sheets.pdf";

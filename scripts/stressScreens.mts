@@ -12,7 +12,7 @@
  */
 import "dotenv/config";
 import { chromium, type Page } from "@playwright/test";
-import { STRESS } from "./stressSeed.mts";
+import { STRESS } from "./stressConfig.mts";
 
 const BASE = `http://127.0.0.1:${process.env.PORT ?? 3000}`;
 const arg = (name: string, fallback: string) =>

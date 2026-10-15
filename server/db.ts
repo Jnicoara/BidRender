@@ -15680,6 +15680,43 @@ export async function bidDropsNotPriced(
   return drops.reduce((n, d) => n + d.notPricedDrops, 0);
 }
 
+/** The bids in `bidIds` with at least one count that has a drop kind. */
+async function bidsWithADropKind(
+  bidIds: readonly number[],
+  userId: number
+): Promise<Set<number>> {
+  const out = new Set<number>();
+  if (bidIds.length === 0) return out;
+  const db = await getDb();
+  if (!db) return out;
+  const rows = await db
+    .select({
+      bidId: takeoffGroups.bidId,
+      dropKind: takeoffGroups.dropKind,
+      assemblyId: takeoffGroups.assemblyId,
+    })
+    .from(takeoffGroups)
+    .where(
+      and(
+        eq(takeoffGroups.userId, userId),
+        inArray(takeoffGroups.bidId, Array.from(new Set(bidIds)))
+      )
+    );
+  const itemKinds = await getAssemblyMountKinds(
+    rows.map(r => r.assemblyId),
+    userId
+  );
+  for (const r of rows)
+    if (
+      deviceKind(
+        r.dropKind,
+        r.assemblyId === null ? null : (itemKinds.get(r.assemblyId) ?? null)
+      ) !== null
+    )
+      out.add(r.bidId);
+  return out;
+}
+
 /**
  * `bidDropsNotPriced` for a LIST of bids — the dashboard cards, "Find a bid"
  * and analytics (owner, 2026-10-10: "N drops not priced", never $0). Only bids
@@ -15735,8 +15772,22 @@ export async function dropsNotPricedForBids(
   )
     .map(r => r.bidId)
     .filter(id => !frozenIds.has(id));
-  for (let i = 0; i < withMarks.length; i += 4) {
-    const batch = withMarks.slice(i, i + 4);
+  /*
+    ONLY A BID WITH A COUNT THAT DROPS CAN HAVE A DROP NOT PRICED (stress
+    test, 2026-10-14). A drop needs a kind — the count's own "drops to", or
+    its item's "mounts at" (`deviceKind`, as `loadGroupDrops` resolves it);
+    with none, `loadGroupDrops` answers "not answered" for every count. It
+    asked that only AFTER `bidDropsNotPriced` had loaded the bid's heights,
+    every run and every sheet scale — per marked bid, four at a time: 300 ms
+    of a 150-bid dashboard's 500, and 2.4 s with eleven companies at once
+    (references/stress-results.md). Asked here for the whole list in two
+    queries, with the same two functions, so it can only let a bid through
+    that has no drop (an off count is not filtered), never stop one that has.
+  */
+  const candidates = await bidsWithADropKind(withMarks, userId);
+  const asking = withMarks.filter(id => candidates.has(id));
+  for (let i = 0; i < asking.length; i += 4) {
+    const batch = asking.slice(i, i + 4);
     const counts = await Promise.all(
       batch.map(id => bidDropsNotPriced(id, userId))
     );

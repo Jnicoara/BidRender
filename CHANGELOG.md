@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **The Dashboard stays fast for a busy company.** With 150 bids and ten other
+  companies working at the same time, the Dashboard took 2.4 seconds to
+  load. It now takes 0.4. It had been doing the slow "drops not priced"
+  check on bids that cannot have any drops.
+
 - **Passwords that have leaked in a data breach are refused** at sign-up,
   password change and reset, with the reason. Only the first five letters
   of a scrambled form of the password leave BidRidge to check it. If the
