@@ -4,6 +4,15 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-15]
+
+- **The server now recovers by itself when the database comes back after a
+  network hiccup.** Before, a database that stopped answering for a while
+  could leave the app unable to read anything until it was restarted, while
+  still reporting itself as running. Now a stuck connection is thrown away
+  after 30 seconds and replaced, and a new health address says honestly
+  whether the server can reach its database.
+
 ## [2026-10-14]
 
 - **Invitation-only sign-up is ready behind a switch, and the switch is

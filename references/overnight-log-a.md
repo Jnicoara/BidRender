@@ -120,3 +120,21 @@ files only (B and C also running). MySQL 3307 shared — left running.
   Gate 38687906570 (items 4–5) green, mode full. Every code commit on the
   branch has a green FULL run. End 22:53. MySQL 3307 left running (shared);
   no dev server was started.
+
+---
+
+# Run 2 — 2026-10-15 (owner away; branch only)
+
+## Item 1 — Q-DB1, server stuck after the database comes back — 06:06 → 06:25
+
+- Plan + record: `references/q-db1-plan.md`.
+- `server/dbDeadline.ts`: a query (or the wait for a connection) past 30 s
+  DESTROYS its connection and fails with words; transaction connections too.
+  `server/appPool.ts` builds the pool for `db.ts` and the test alike.
+- `GET /api/health` (`server/health.ts`): `SELECT 1`, 3 s, 200 / 503; open
+  through the staging gate. Pointing App Platform at it = owner (§ 3).
+- Tests: `dbDeadline.test.ts` (TCP proxy swallows bytes; 12 reads > pool of
+  10): **red without the deadline** (reads never answer, pool dead after),
+  green with it; `health.test.ts` 3. Related 8 files 57/57 ×3. One earlier
+  `personalCompanyRace` failure (77 ms, message not captured) did not recur
+  in 16 runs — recorded in the plan. `pnpm check` 0.

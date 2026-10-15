@@ -18,9 +18,8 @@ import {
 } from "drizzle-orm";
 import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
-import { createPool } from "mysql2/promise";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { timePool } from "./slowRequests";
+import { createAppPool } from "./appPool";
 import {
   QUANTITY_MARK_STATUSES,
   isPricedMark,
@@ -32,7 +31,6 @@ import {
 } from "../shared/markStatus";
 import { foldedStatus } from "../shared/twinFold";
 import { CURRENT_MATH_VERSION } from "../shared/mathVersion";
-import { mysqlConnection } from "./databaseConnection";
 import {
   InsertUser,
   InsertProject,
@@ -410,7 +408,7 @@ let _db: MySql2Database | null = null;
  * can hold for the length of a lock. Every other query is happy with whichever
  * connection the pool hands out; a named lock is not.
  */
-let _pool: ReturnType<typeof createPool> | null = null;
+let _pool: ReturnType<typeof createAppPool> | null = null;
 
 /**
  * The transaction `inOneTransaction` is running, if any. While it is set,
@@ -443,10 +441,11 @@ export async function getDb() {
   if (inTransaction) return inTransaction;
   if (!_db && process.env.DATABASE_URL) {
     try {
-      // The pool is built from mysqlConnection rather than the URL directly, so
-      // a managed host's TLS certificate is honoured. See databaseConnection.ts.
-      // Timed per request, for the slow-request line (server/slowRequests.ts).
-      _pool = timePool(createPool(mysqlConnection(process.env.DATABASE_URL)));
+      // server/appPool.ts: TLS for a managed host (databaseConnection.ts), a
+      // query deadline that throws away a connection that stopped answering
+      // (dbDeadline.ts — Q-DB1, the server stuck after the database came
+      // back), and per-request timing (slowRequests.ts).
+      _pool = createAppPool(process.env.DATABASE_URL);
       _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
