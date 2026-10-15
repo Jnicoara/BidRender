@@ -13,6 +13,12 @@ fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
 (COMMON; `new-rows-source-check.md` marks them accepted — still 64
 families, 62 COMMON, 2 SPECIALTY). No starter edit.
 
+**Item 4 — merged `origin/local-dev` as `0c8e324f`** (A's 0157–0163,
+B's plan-reading help 1–5b and phone bottom bar). Conflict only in this
+file, both sides kept. **C's databases are at 164**: `bidrender_test_c`
+matches the schema, 205/205 FKs; `bidrender_local_c` migrated the same
+(still C's scratch copy, not exact — see below).
+
 
 ## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
 
