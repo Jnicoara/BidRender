@@ -50,3 +50,7 @@ a trace may end at its second point (a "Finish" click is logged right after
 it; not yet known whether a finger hit the floating Finish). Next step: put
 the trace pill's Finish out of the drawing's way at 375 px, or confirm it
 was the script's own tap — 30-minute box spent, so written up instead.
+
+## Q4. One real-finger check on your phone (2 minutes)
+
+On your phone, open any bid with a plan set → **Plans**, go to a drawing sheet. Tap **Count**, type any name, Enter; tap the drawing once, tap **Undo**, tap once more — after a second "This sheet:" should say **1 mark**. Then **… → Trace**, tap two points apart on the drawing, then tap **Finish** — one straight run should appear between your two taps (not stop early or add a third point), and "This sheet:" should show its feet. Staging is fine for this (use a throwaway bid); just tell me which step didn't do what's described.
