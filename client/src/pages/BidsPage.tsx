@@ -747,7 +747,12 @@ export default function BidsPage({
    * into a bid since the list was folded into the Dashboard, so there is no
    * surrounding screen left to notice you are stuck on.
    */
-  if (detailQuery.isError && isReachFailure(detailQuery.error)) {
+  // Out of reach is not gone. With the bid already on screen, a failed
+  // REFRESH keeps the page (the app-wide bar says why); before 2026-10-15 a
+  // save that failed in an outage refetched, failed, and swapped the whole
+  // bid for an error. Only a bid that never loaded gets this screen.
+  const outOfReach = detailQuery.isError && isReachFailure(detailQuery.error);
+  if (outOfReach && !detailQuery.data) {
     // Not "may have been deleted": the bid is fine and the DATA was out of
     // reach. Said otherwise, a contractor with the database blipping was
     // told their bid might be gone (drill, 2026-10-15; @/lib/dataReach).
@@ -765,7 +770,7 @@ export default function BidsPage({
       </div>
     );
   }
-  if (detailQuery.isError) {
+  if (detailQuery.isError && !outOfReach) {
     return (
       <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm text-muted-foreground">
@@ -1720,7 +1725,11 @@ export default function BidsPage({
                               <InlineNumberField
                                 value={Number(line.qty)}
                                 onSave={qty =>
-                                  updateLine.mutate({ bidId, id: line.id, qty })
+                                  updateLine.mutateAsync({
+                                    bidId,
+                                    id: line.id,
+                                    qty,
+                                  })
                                 }
                                 rules={{ min: 0, max: 999999 }}
                                 className="h-7 w-16 text-sm"
@@ -2974,7 +2983,7 @@ export default function BidsPage({
                       }
                       whenUnset={{ placeholder: "company default" }}
                       onSave={raw =>
-                        updateBid.mutate({
+                        updateBid.mutateAsync({
                           id: bid.id,
                           overheadValue:
                             bid.overheadMode === "flat"
@@ -3052,7 +3061,7 @@ export default function BidsPage({
                     }
                     whenUnset={{ placeholder: "company default" }}
                     onSave={raw =>
-                      updateBid.mutate({
+                      updateBid.mutateAsync({
                         id: bid.id,
                         profitValue: fromPercent(raw),
                       })
@@ -3120,7 +3129,7 @@ export default function BidsPage({
                     }
                     whenUnset={{ placeholder: "company default" }}
                     onSave={raw =>
-                      updateBid.mutate({
+                      updateBid.mutateAsync({
                         id: bid.id,
                         productivityPct: fromPercent(raw),
                       })
@@ -3168,7 +3177,7 @@ export default function BidsPage({
                   value={asPercent(Number(bid.whipAdjustPct))}
                   whenUnset="zero"
                   onSave={raw =>
-                    updateBid.mutate({
+                    updateBid.mutateAsync({
                       id: bid.id,
                       whipAdjustPct: fromPercent(raw),
                     })

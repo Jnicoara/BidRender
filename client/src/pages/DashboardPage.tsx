@@ -140,7 +140,9 @@ export default function DashboardPage({
   const {
     data: bids = [],
     isLoading,
-    isError,
+    // Failed with nothing to show; a failed REFRESH keeps the list (the
+    // app-wide bar speaks for it — @/lib/dataReach).
+    isLoadingError: isError,
     refetch: refetchBids,
   } = trpc.bids.dashboard.useQuery();
   /*

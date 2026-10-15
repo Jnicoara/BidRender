@@ -1486,7 +1486,7 @@ export default function AssembliesLibraryPage() {
   const {
     data: assemblies = [],
     isLoading,
-    isError: assembliesFailed,
+    isLoadingError: assembliesFailed,
     refetch: refetchAssemblies,
   } = trpc.assemblies.list.useQuery({
     status: view,

@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A number that didn't save no longer looks saved.** If a quantity,
+  rate or price can't be saved — the connection drops, say — the box no
+  longer flashes green. It turns red and keeps what you typed, so nothing
+  is lost and nothing pretends: press Enter to try again once you're back
+  online, or Esc to put back the saved value. Screens also stay put when
+  a background refresh fails, instead of swapping your bid for an error.
+
 - **A stalled connection is reported in 20 seconds, not 80.** When the
   database stops answering without failing, screens used to sit on
   "Loading…" for over a minute with no explanation. Now the "can't reach

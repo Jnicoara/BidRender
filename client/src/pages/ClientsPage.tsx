@@ -382,7 +382,9 @@ export default function ClientsPage() {
               >
                 {tab === "active" ? "Working list" : "Archived"}
                 <span className="ml-1.5 text-muted-foreground/70">
-                  {view === tab && !listQuery.isError ? visible.length : ""}
+                  {view === tab && !listQuery.isLoadingError
+                    ? visible.length
+                    : ""}
                 </span>
               </button>
             ))}
@@ -435,7 +437,7 @@ export default function ClientsPage() {
               />
             ))}
           </div>
-        ) : listQuery.isError ? (
+        ) : listQuery.isLoadingError ? (
           // Not "No clients yet" — a list that failed to load is not an
           // empty one (drill, 2026-10-15; LoadFailed.tsx).
           <LoadFailed

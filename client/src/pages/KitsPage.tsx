@@ -544,7 +544,7 @@ export default function KitsPage() {
   const {
     data: kits = [],
     isLoading,
-    isError: kitsFailed,
+    isLoadingError: kitsFailed,
     refetch: refetchKits,
   } = trpc.kits.list.useQuery({
     status: view,

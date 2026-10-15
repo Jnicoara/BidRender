@@ -381,7 +381,7 @@ export default function MaterialDatabasePage() {
                             className="h-7 w-24 text-xs text-right"
                             rules={{ min: 0, allowEmpty: false }}
                             onSave={next =>
-                              updateMaterial.mutate({
+                              updateMaterial.mutateAsync({
                                 id: material.id,
                                 costPerUnit: next,
                               })
@@ -411,7 +411,7 @@ export default function MaterialDatabasePage() {
                                   className="h-6 w-20 text-[11px] text-right"
                                   rules={{ min: 0, allowEmpty: false }}
                                   onSave={next =>
-                                    updateMaterial.mutate({
+                                    updateMaterial.mutateAsync({
                                       id: material.id,
                                       packPrice: next,
                                     })

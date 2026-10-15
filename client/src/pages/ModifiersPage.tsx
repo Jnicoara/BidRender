@@ -541,7 +541,7 @@ export default function ModifiersPage() {
             >
               {tab}
               <span className="ml-1.5 text-muted-foreground/70">
-                {(tab === "active" ? activeQuery : archivedQuery).isError
+                {(tab === "active" ? activeQuery : archivedQuery).isLoadingError
                   ? ""
                   : tab === "active"
                     ? active.length
@@ -642,7 +642,8 @@ export default function ModifiersPage() {
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading modifiers…
             </div>
-          ) : (view === "active" ? activeQuery : archivedQuery).isError ? (
+          ) : (view === "active" ? activeQuery : archivedQuery)
+              .isLoadingError ? (
             // A list that failed to load is not an empty one (drill, 2026-10-15).
             <div className="p-4">
               <LoadFailed

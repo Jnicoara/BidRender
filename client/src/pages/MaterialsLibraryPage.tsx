@@ -1211,7 +1211,7 @@ export default function MaterialsLibraryPage() {
   const {
     data: materials = [],
     isLoading,
-    isError: materialsFailed,
+    isLoadingError: materialsFailed,
     refetch,
   } = trpc.materials.list.useQuery({ status: view });
   const { data: archivedRows = [] } = trpc.materials.list.useQuery({

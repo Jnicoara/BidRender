@@ -52,7 +52,9 @@ export default function PlansIndexPage({
   const {
     data: bids = [],
     isLoading,
-    isError,
+    // Failed with nothing to show; a failed REFRESH keeps the list (the
+    // app-wide bar speaks for it — @/lib/dataReach).
+    isLoadingError: isError,
     refetch,
   } = trpc.bids.dashboard.useQuery();
   const withPlans = useMemo(() => recentPlanBids(bids, Infinity), [bids]);

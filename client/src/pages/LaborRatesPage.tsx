@@ -703,7 +703,7 @@ export default function LaborRatesPage() {
   const {
     data: rates = [],
     isLoading,
-    isError: ratesFailed,
+    isLoadingError: ratesFailed,
     refetch: refetchRates,
   } = trpc.laborRates.list.useQuery();
   const [scope, setScope] = useState<LibraryScope>("all");

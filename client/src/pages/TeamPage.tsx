@@ -65,7 +65,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const {
     data: members = [],
     isLoading,
-    isError: membersFailed,
+    isLoadingError: membersFailed,
     refetch: refetchMembers,
   } = trpc.company.members.useQuery();
   const { data: invites = [] } = trpc.company.invites.useQuery(undefined, {

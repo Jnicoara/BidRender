@@ -205,10 +205,10 @@ export function HandPricedLineFields({
               value={hours}
               whenUnset={{ placeholder: "not set" }}
               onSave={next =>
-                update.mutate({ bidId, id: line.id, laborHours: next })
+                update.mutateAsync({ bidId, id: line.id, laborHours: next })
               }
               onClear={() =>
-                update.mutate({ bidId, id: line.id, laborHours: null })
+                update.mutateAsync({ bidId, id: line.id, laborHours: null })
               }
               rules={{ min: 0, max: 99999 }}
               suffix="h"
@@ -259,10 +259,10 @@ export function HandPricedLineFields({
           value={price}
           whenUnset={{ placeholder: "no price" }}
           onSave={next =>
-            update.mutate({ bidId, id: line.id, materialCost: next })
+            update.mutateAsync({ bidId, id: line.id, materialCost: next })
           }
           onClear={() =>
-            update.mutate({ bidId, id: line.id, materialCost: null })
+            update.mutateAsync({ bidId, id: line.id, materialCost: null })
           }
           rules={{ min: 0, max: 99999999 }}
           className="h-7 w-24 text-sm"
@@ -275,10 +275,10 @@ export function HandPricedLineFields({
           value={hours}
           whenUnset={{ placeholder: "no hours" }}
           onSave={next =>
-            update.mutate({ bidId, id: line.id, laborHours: next })
+            update.mutateAsync({ bidId, id: line.id, laborHours: next })
           }
           onClear={() =>
-            update.mutate({ bidId, id: line.id, laborHours: null })
+            update.mutateAsync({ bidId, id: line.id, laborHours: null })
           }
           rules={{ min: 0, max: 99999 }}
           suffix="h"

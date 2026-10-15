@@ -293,7 +293,12 @@ export default function QuickBidPage({
 
   // A bid that did not load is not an empty bid: drawn anyway, this screen
   // said "Quick bid · 0 lines" under a database outage (drill, 2026-10-15).
-  if (detailQuery.isError) {
+  // …but a failed REFRESH of a bid already on screen keeps the screen; the
+  // app-wide bar says the data is out of reach (@/lib/dataReach).
+  if (
+    detailQuery.isError &&
+    !(isReachFailure(detailQuery.error) && detailQuery.data)
+  ) {
     return (
       <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6">
         <div className="w-full max-w-md">
@@ -724,7 +729,7 @@ export default function QuickBidPage({
                   <InlineNumberField
                     value={Number(line.qty)}
                     onSave={next =>
-                      updateLine.mutate({ bidId, id: line.id, qty: next })
+                      updateLine.mutateAsync({ bidId, id: line.id, qty: next })
                     }
                     rules={{ min: 0, max: 999999 }}
                     className="h-7 w-16 text-sm"

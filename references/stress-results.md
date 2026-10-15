@@ -388,6 +388,32 @@ database is back. And a health check that does not touch the database
 (like `/api/version`) would call that server healthy throughout — which
 check App Platform uses is not written down anywhere in `references/`.
 
+### Fourth round: a SAVE while the database is down (2026-10-15)
+
+A bid line's quantity (4), changed to 9 and Enter pressed with the database
+down, screen already open. Read every few hundred ms.
+
+| Moment                     | BEFORE                                                                                   | AFTER                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Enter pressed              | **Field flashed green — "saved"** — for a save that was refused                          | No green. Field turns **red, keeps the 9**, says "… not saved" aloud; toast says why |
+| A few seconds later        | Whole bid page swapped for "That bid could not be opened" (the save's refresh failed)    | Page stays; the top bar says the data is out of reach                                |
+| Database back              | (round-2 build) **field showed 9, database held 4** — a refused number that looked saved | Still red with the 9: visibly not saved                                              |
+| Enter again                | —                                                                                        | Saves: green, stored 9, red mark gone                                                |
+| Escape instead             | —                                                                                        | Back to the stored value, mark gone                                                  |
+| Database healthy (control) | Green, stored                                                                            | Same — green after the server answers                                                |
+
+**Fixes.** `InlineNumberField`'s `onSave` may return the save's promise:
+the tick waits for it, and a refusal marks the field unsaved instead of
+throwing the typed value away (wiping it would lose the person's change;
+keeping it unmarked is the wrong-number fault). Every call site outside
+`components/takeoff/` now returns `mutateAsync` — line quantity, hours and
+material cost on hand-priced lines, labor rates, work-step minutes, bid
+overhead/profit, the old catalog editor. A caller that returns nothing
+behaves as before. Separately, a failed REFRESH no longer replaces a page
+or list that already has its data (`isLoadingError`, not `isError`, on 11
+screens; the bid and Count pages keep the bid on screen) — that is what
+had swapped the bid page out.
+
 ## Failure drills — file storage and AI
 
 | What failed                                   | BEFORE                                                                                                          | AFTER                                                                                                                                                                                                          |

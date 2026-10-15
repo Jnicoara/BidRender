@@ -71,6 +71,16 @@ Numbers and drills: `references/stress-results.md`; every change in
   `lib/dataReach.ts` + `DataUnreachableBar` (top of the screen, clears
   itself). **For Track B:** the Plans screen (TakeoffPage) was NOT drilled
   — it is yours; `isReachFailure(error)` tells "out of reach" from "gone".
+- **`InlineNumberField` shows "saved" only for a save that landed**
+  (2026-10-15). Return the save's promise from `onSave`/`onClear`
+  (`mutateAsync`): the green tick waits for it, and a refused save turns
+  the field red with the typed value kept (Enter retries, Esc reverts).
+  A caller returning nothing still flashes at once — the old fault. **For
+  Track B:** the call sites in `components/takeoff/` (CountLaborNote,
+  HomerunControls, RunsPanel) are untouched; returning `mutateAsync`
+  there gives the Plans screen the same honesty. Also: a page or list
+  keeps its data when a background REFRESH fails — use `isLoadingError`
+  (nothing to show) rather than `isError` for "Couldn't load".
 - **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
   still first).
 

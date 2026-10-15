@@ -66,7 +66,7 @@ export default function AnalyticsPage({
   const {
     data: outcomes,
     isLoading: loadingOutcomes,
-    isError: outcomesFailed,
+    isLoadingError: outcomesFailed,
     refetch: refetchOutcomes,
   } = trpc.analytics.outcomes.useQuery(range, {
     enabled: canView,

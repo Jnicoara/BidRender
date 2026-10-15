@@ -250,10 +250,10 @@ export function AssemblyStepsSection({
                       ariaLabel={`Minutes for ${step.name} — shared by ${step.usedBy} assemblies`}
                       className="w-20"
                       onSave={next =>
-                        setMinutes.mutate({ id: step.id, minutes: next })
+                        setMinutes.mutateAsync({ id: step.id, minutes: next })
                       }
                       onClear={() =>
-                        setMinutes.mutate({ id: step.id, minutes: null })
+                        setMinutes.mutateAsync({ id: step.id, minutes: null })
                       }
                     />
                   ) : (
