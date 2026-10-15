@@ -15,6 +15,11 @@ route is attacked automatically.
   limits are dodgeable until it reads what DO/Cloudflare actually append;
   A-S13 signed upload URLs don't bind Content-Length and tickets are
   unlimited (storage abuse); A-S14 the signup race (yours already).
+- **FOR TRACK A (drill, 2026-10-15) — Q-DB1:** a database that stops
+  answering can wedge the server until restart: stuck pooled connections
+  are never thrown away (mysql2's `timeout` returns them out of step), and
+  `/api/version` still says 200. Fix + check App Platform's health check.
+  `references/stress-results.md` "Third round"; `todo.md`.
 - **New guards other tracks will meet:** `server/libraryRefs.ts`
   (`requireLibraryRefs`) — any route storing a material / assembly /
   labor rate / modifier / work step / kit id must call it;
