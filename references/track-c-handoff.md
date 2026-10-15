@@ -63,7 +63,7 @@ commit (13c4bcc2): same failure, so not C's `captureSymbol` change.
 Screenshot: `references/overnight-shots/smoke-flow3-lookalike-local.png`.
 Either the fixture's switch and duplex look alike to the matcher at local
 rendering, or the step should answer "Save anyway". Everything else in the
-smoke suite passed locally (127).
+smoke suite passed locally (127). With a local-only patch answering "Save anyway", flows 1–15 all pass.
 
 **FOR TRACK B (from the stress run):** the 500-sheet set opens its first
 sheet in ~3.0 s and sheet 400 in ~2.5 s at laptop size — over the owner's
