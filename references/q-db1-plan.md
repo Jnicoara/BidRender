@@ -90,3 +90,12 @@ Related files run together (`dbDeadline`, `health`, `databaseConnection`,
 `personalCompanyRace` fail once at 77 ms**; its message was not captured, and
 16 further runs (3 alone, 3 combined, 10 with `dbDeadline`) were all green.
 Recorded rather than dismissed — if it recurs, capture the message.
+
+**Gate 38741709348 went red on this test** (13:30 UTC): under the full
+suite's load in CI, the first read after the hang hit the test's 500 ms
+deadline — a pool slot was still held by a connection whose handshake was
+swallowed during the hang. The test asked the wrong question ("does the very
+first read win"); it now asks "does a read succeed within 15 s, asking every
+200 ms", which is what recovery means for a server whose requests keep
+arriving. Still red without the deadline (reads never answer), green with it
+3× alone and beside five heavy DB files (101/101).

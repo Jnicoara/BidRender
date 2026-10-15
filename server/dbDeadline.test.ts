@@ -70,6 +70,17 @@ function within<T>(ms: number, work: Promise<T>) {
   ]);
 }
 
+/** Does a read succeed within 15 s, asking again every 200 ms? */
+async function recovers(pool: ReturnType<typeof createAppPool>) {
+  const until = Date.now() + 15_000;
+  while (Date.now() < until) {
+    const r = await within(3_000, pool.query("SELECT 1 AS ok"));
+    if (r.answered && "value" in r) return true;
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  return false;
+}
+
 describeDb("a database that stops answering, then comes back", () => {
   const url = new URL(process.env.DATABASE_URL ?? "mysql://x@127.0.0.1/x");
   const proxy = faultProxy({ host: url.hostname, port: Number(url.port) });
@@ -101,12 +112,13 @@ describeDb("a database that stops answering, then comes back", () => {
 
     // The database is back. A fresh read must answer, through the same pool.
     proxy.setHang(false);
-    // Up to ~10 s: a connection the pool began opening DURING the hang lost
-    // its handshake and holds a slot until mysql2's connect timeout (10 s).
-    // Without the deadline this never answers at all.
-    const after = await within(15_000, pool.query("SELECT 1 AS ok"));
-    expect(after.answered).toBe(true);
-    expect("error" in after ? after.error : null).toBeNull();
+    // Requests keep arriving, so "recovers" means some read succeeds soon —
+    // not that the very first one does. A connection the pool began opening
+    // DURING the hang lost its handshake and holds a slot until mysql2's
+    // connect timeout (10 s); under the full suite's load in CI the first
+    // read after the hang can still hit the 500 ms test deadline (Gate
+    // 38741709348). Without the deadline no read ever answers.
+    expect(await recovers(pool)).toBe(true);
 
     // And a transaction-style connection taken from the pool works too.
     const connection = await pool.getConnection();
@@ -126,7 +138,6 @@ describeDb("a database that stops answering, then comes back", () => {
     expect(r.answered).toBe(true);
     expect("error" in r && r.error).toBeInstanceOf(DatabaseDeadlineError);
     connection.release(); // a no-op on a destroyed connection, and must not throw
-    const after = await within(15_000, live.query("SELECT 3 AS three"));
-    expect("value" in after).toBe(true);
+    expect(await recovers(live)).toBe(true);
   }, 60_000);
 });

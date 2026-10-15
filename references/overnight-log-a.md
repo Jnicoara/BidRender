@@ -161,3 +161,8 @@ files only (B and C also running). MySQL 3307 shared — left running.
 Under the stress-test items ("Before beta: speed of the summary…"): the
 measurement, the cause (`bcryptjs` on the main thread), two fix options
 (native `bcrypt` or a `worker_threads` pool), and a done-when.
+
+- **Gate 38741709348 RED on `dbDeadline.test.ts`** under CI load (first
+  read after the hang hit the 500 ms test deadline). Test now asks for
+  recovery within 15 s with retries; red without the fix, green with it, and
+  under parallel load 101/101. Pushed with items 2–3.
