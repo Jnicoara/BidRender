@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Exports can't carry spreadsheet tricks.** A name typed as a formula (for
+  example one starting with "=") could run as a formula when an export was
+  opened in Excel. Exported text that looks like a formula is now kept as
+  plain text. Real negative amounts stay numbers.
+
 - **Double-clicks no longer show false errors.** Sending a count to the bid,
   setting a material's own markup, or saving a job close-out twice in a row
   quickly could show an error even though it had worked. The count was
