@@ -68,6 +68,36 @@ export function dataIsUnreachable(): boolean {
   return unreachable;
 }
 
+/*
+  ── Saves waiting to be sent ────────────────────────────────────────────────
+  React Query PAUSES a save made while the browser is offline and sends it
+  when the connection is back — but only if the tab is still open. So
+  anything that would reload the tab waits for this to reach zero first
+  (lazyPage's offline path). main.tsx keeps the count from the mutation
+  cache; nothing here imports React Query.
+*/
+let pendingWrites = 0;
+const writeListeners = new Set<() => void>();
+
+export function setPendingWrites(n: number): void {
+  if (n === pendingWrites) return;
+  pendingWrites = n;
+  writeListeners.forEach(l => l());
+}
+
+/** Resolves once no save is waiting or in flight (at once if none is). */
+export function whenNoPendingWrites(): Promise<void> {
+  if (pendingWrites === 0) return Promise.resolve();
+  return new Promise(resolve => {
+    const check = () => {
+      if (pendingWrites !== 0) return;
+      writeListeners.delete(check);
+      resolve();
+    };
+    writeListeners.add(check);
+  });
+}
+
 export function subscribeDataReach(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

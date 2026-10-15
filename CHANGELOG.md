@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Losing signal no longer loses your work.** When the connection drops,
+  BidRidge now says "You're offline" and holds what you change, sending it
+  when the signal is back. Before, opening a screen with no signal could
+  reload the page into the browser's "no internet" screen, throwing away
+  the app and anything waiting to be saved — and it could wrongly claim a
+  new version was available.
+
 - **The app no longer piles up memory when you go back and forth to the
   plans.** Each visit to a busy drawing used to stay in memory for five
   minutes after you left — fifteen trips left the page using almost four

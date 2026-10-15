@@ -23,11 +23,28 @@ import { dataIsUnreachable, subscribeDataReach } from "@/lib/dataReach";
 
 const RETRY_MS = 15_000;
 
+/*
+  OFFLINE is its own case. While the browser says it is offline, React Query
+  PAUSES reads and saves instead of failing them, so nothing ever raises the
+  "can't reach" flag — a save just sat there looking done (drill,
+  2026-10-15). The browser's own online/offline signal drives this wording.
+*/
+const subscribeOnline = (cb: () => void) => {
+  window.addEventListener("online", cb);
+  window.addEventListener("offline", cb);
+  return () => {
+    window.removeEventListener("online", cb);
+    window.removeEventListener("offline", cb);
+  };
+};
+const isOffline = () => navigator.onLine === false;
+
 export function DataUnreachableBar({ retry }: { retry: () => void }) {
   const unreachable = useSyncExternalStore(
     subscribeDataReach,
     dataIsUnreachable
   );
+  const offline = useSyncExternalStore(subscribeOnline, isOffline);
 
   useEffect(() => {
     if (!unreachable) return;
@@ -35,6 +52,23 @@ export function DataUnreachableBar({ retry }: { retry: () => void }) {
     return () => window.clearInterval(timer);
   }, [unreachable, retry]);
 
+  if (offline)
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="bp-no-print fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-32px)] max-w-md rounded-lg border border-amber-500/60 bg-card shadow-lg px-3 py-2 flex items-center gap-3"
+      >
+        <WifiOff className="w-4 h-4 shrink-0 text-amber-500" aria-hidden />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">You're offline</p>
+          <p className="text-xs text-muted-foreground">
+            Changes you make are held and sent when the connection is back —
+            keep this tab open until then.
+          </p>
+        </div>
+      </div>
+    );
   if (!unreachable) return null;
   return (
     <div

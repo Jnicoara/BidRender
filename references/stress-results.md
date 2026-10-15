@@ -489,6 +489,31 @@ or list that already has its data (`isLoadingError`, not `isError`, on 11
 screens; the bid and Count pages keep the bid on screen) — that is what
 had swapped the bid page out.
 
+### Fifth round: the BROWSER goes offline — a laptop in a truck (2026-10-15)
+
+Not the database this time: Playwright's `setOffline`, phone 375. While the
+browser says it is offline, React Query PAUSES reads and saves rather than
+failing them — a different path from every round above.
+
+| Step                               | BEFORE                                                                                                | AFTER                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Change a quantity (4 → 6), offline | Field shows 6, nothing else — no bar, no word (the save is paused, never fails)                       | "You're offline — changes you make are held and sent when the connection is back" |
+| Open a screen not yet downloaded   | **The tab reloaded into the browser's "no internet" page — a white screen, app gone, held save gone** | No reload; the app stays, "Loading…" under the offline bar                        |
+| …and the bottom bar                | (after the first fix) **"A new version of BidRidge is available — Refresh"**, offline                 | Not shown — offline is not a deploy                                               |
+| Signal back                        | —                                                                                                     | Held save sent, THEN one reload; Clients shown in ~1.7 s                          |
+| The quantity typed offline         | —                                                                                                     | **Stored 6** (was 4 before the run)                                               |
+
+**Why the white screen.** `reloadingImport` read every failed page
+download as "a deploy replaced the file" and reloaded. Measured: Chrome
+also REMEMBERS a failed dynamic import — asking again never reaches the
+network — so waiting and retrying cannot work; only a reload fetches it.
+Now an offline failure waits for the `online` event, then for held saves to
+be sent (`whenNoPendingWrites`, fed from the mutation cache in
+`main.tsx`), then reloads once. The deploy case is unchanged and
+re-driven: one reload; a file that stays missing reloads once, no loop.
+Tests: `lazyPage.test.ts` (no reload offline, none while a save is held,
+exactly one after), `dataReach.test.ts`. Smoke: 140 passed.
+
 ## Failure drills — file storage and AI
 
 | What failed                                   | BEFORE                                                                                                          | AFTER                                                                                                                                                                                                          |

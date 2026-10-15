@@ -101,6 +101,12 @@ archivedAt />` drops in anywhere the bid is loaded.
   future `useMutationState` / `useIsMutating` would see no FINISHED
   mutations — pending ones are unaffected. `references/stress-results.md`
   "Memory".
+- **Offline is handled, not mistaken for a deploy** (2026-10-15).
+  `reloadingImport` no longer reloads while `navigator.onLine` is false:
+  it waits for `online`, then for held saves (`whenNoPendingWrites`), then
+  reloads once. The top bar says "You're offline". `vite:preloadError`
+  is ignored offline. Anything new that reloads the tab should wait on
+  `whenNoPendingWrites()` the same way.
 - **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
   still first).
 

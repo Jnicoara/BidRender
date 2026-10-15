@@ -15,6 +15,7 @@ import {
   noteNoAnswer,
   noteReadFailure,
   noteReadSuccess,
+  setPendingWrites,
 } from "@/lib/dataReach";
 import { markPageOutOfDate } from "@/lib/versionCheck";
 import { QUERY_DEADLINE_MS, withQueryDeadline } from "@/lib/queryDeadline";
@@ -98,6 +99,12 @@ queryClient.getMutationCache().subscribe(event => {
     });
 });
 
+// How many saves are in flight or held for a reconnect — paused ones count,
+// since they are still "pending". Read before any reload (@/lib/lazyPage).
+queryClient
+  .getMutationCache()
+  .subscribe(() => setPendingWrites(queryClient.isMutating()));
+
 queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
@@ -159,7 +166,14 @@ registerServiceWorker();
 // preventDefault()ed, so the import still fails into the error screen, which
 // then says "updated, refresh" instead of "stopped working" (ErrorBoundary).
 // Never reloads by itself; see @/lib/versionCheck for why.
-window.addEventListener("vite:preloadError", () => markPageOutOfDate());
+// Offline is not a deploy: a file that could not download with no signal
+// said "A new version is available — Refresh", and Refresh then would have
+// dropped any save held for the reconnect (drill, 2026-10-15). The page
+// loader reloads by itself once the connection is back (@/lib/lazyPage).
+window.addEventListener("vite:preloadError", () => {
+  if (navigator.onLine === false) return;
+  markPageOutOfDate();
+});
 
 // Before the first render, so no screen is ever drawn without room for the band.
 const isStaging = markStagingEnvironment(document);

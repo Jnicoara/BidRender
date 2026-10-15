@@ -69,3 +69,21 @@ describe("the app-wide flag", () => {
     expect(dataIsUnreachable()).toBe(false);
   });
 });
+
+describe("saves waiting to be sent", () => {
+  it("whenNoPendingWrites waits for the count to reach zero", async () => {
+    const { setPendingWrites, whenNoPendingWrites } = await import(
+      "./dataReach"
+    );
+    await whenNoPendingWrites(); // none: resolves at once
+    setPendingWrites(2);
+    let done = false;
+    void whenNoPendingWrites().then(() => (done = true));
+    setPendingWrites(1);
+    await Promise.resolve();
+    expect(done).toBe(false);
+    setPendingWrites(0);
+    await Promise.resolve();
+    expect(done).toBe(true);
+  });
+});
