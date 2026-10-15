@@ -177,7 +177,7 @@ function KitBuilder({
   const createKit = trpc.kits.create.useMutation({
     onError: error => toast.error(errorText(error)),
     onSuccess: () => {
-      toast.success("Kit created");
+      toast.success("Kit created.");
       onBack();
     },
     onSettled: refresh,
@@ -573,7 +573,7 @@ export default function KitsPage() {
   const archiveKit = trpc.kits.archive.useMutation({
     onError: error => toast.error(errorText(error)),
     onSuccess: () =>
-      toast.success("Archived — restore it any time from the Archived tab"),
+      toast.success("Archived — restore it any time from Recently deleted."),
     onSettled: refresh,
   });
 

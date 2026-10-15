@@ -1510,7 +1510,7 @@ export default function AssembliesLibraryPage() {
     onSuccess: result => {
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
-      else toast.success("Assembly saved");
+      else toast.success("Assembly saved.");
     },
     onSettled: () => {
       refresh();
@@ -1542,7 +1542,7 @@ export default function AssembliesLibraryPage() {
   const archiveAssembly = trpc.assemblies.archive.useMutation({
     onError: error => toast.error(errorText(error)),
     onSuccess: () =>
-      toast.success("Archived — restore it any time from the Archived tab"),
+      toast.success("Archived — restore it any time from Recently deleted."),
     onSettled: refresh,
   });
 

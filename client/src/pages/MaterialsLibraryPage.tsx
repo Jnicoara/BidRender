@@ -1208,7 +1208,7 @@ export default function MaterialsLibraryPage() {
   const archiveMaterial = trpc.materials.archive.useMutation({
     onError,
     onSuccess: () => {
-      toast.success("Archived — restore it any time from the Archived tab");
+      toast.success("Archived — restore it any time from Recently deleted.");
       refreshAll();
     },
   });
@@ -1489,7 +1489,7 @@ export default function MaterialsLibraryPage() {
             `Saved as your own copy — the starter "${result.material?.name}" is unchanged.`
           );
         } else {
-          toast.success("Material updated");
+          toast.success("Material updated.");
         }
         await refetch();
       } catch {
@@ -1544,7 +1544,7 @@ export default function MaterialsLibraryPage() {
       setBusyId(material.id);
       try {
         await revertMaterial.mutateAsync({ id: material.id });
-        toast.success("Restored the starter version");
+        toast.success("Restored the starter version.");
         await refetch();
       } catch {
         /* handled by onError */

@@ -591,7 +591,7 @@ export function SalesTaxSection() {
                         className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => archiveArea.mutate({ id: row.id })}
                         aria-label={`Archive ${row.name}`}
-                        title="Archive — bids pinned to it keep working"
+                        title="Archive — bids already using it keep their rate"
                       >
                         <Archive className="w-3.5 h-3.5" />
                       </Button>

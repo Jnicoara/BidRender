@@ -119,7 +119,7 @@ export function UnitTemplateActions({
         }
       >
         <ArrowDownToLine className="w-3 h-3" />
-        Push to {state.linkedCount}
+        Update {state.linkedCount} {state.linkedCount === 1 ? "copy" : "copies"}
       </Button>
       <Button
         size="sm"

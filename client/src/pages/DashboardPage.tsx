@@ -571,7 +571,7 @@ export default function DashboardPage({
                     </span>
                     <span
                       className="ml-auto font-mono text-xs text-muted-foreground"
-                      title={`Total due of the ${group.status} bids`}
+                      title={`Total due on ${group.status} bids`}
                     >
                       {/* A column summing a short bid is short too, and says
                           which way: can't be priced, or not priced yet. */}
