@@ -335,7 +335,7 @@ export function inviteRejection(
 export const CAPABILITY_LABEL: Record<Capability, string> = {
   "bids.view": "See bids and proposals",
   "bids.edit": "Build, price and send bids",
-  "bids.delete": "Delete archived bids for good",
+  "bids.delete": "Delete archived bids forever",
   "library.view": "See the library",
   "library.edit": "Change the library",
   "pricing.view": "See costs and prices",
