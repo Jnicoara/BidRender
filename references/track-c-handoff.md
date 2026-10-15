@@ -1,6 +1,16 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-14 → 15, overnight run #2 — see `references/overnight-log.md`
+## (newest) 2026-10-15, day — answers, before/after screenshots, two todo items
+
+- `references/morning-answers-c.md` (18 one-liners); screenshots in
+  `references/overnight-shots/before-after/` (README lists every pair).
+- todo done: number boxes read like every other (Assemblies, Modifiers,
+  Materials, Fix this line); optimistic forms keep a refused edit. Left of
+  the sweep: SeatLimitsPanel (admin) and B's plan-screen components.
+- **Gate is red from `docker pull mysql` being rate-limited** — before any
+  test runs. Re-run it once A's fix lands.
+
+## 2026-10-14 → 15, overnight run #2 — see `references/overnight-log.md`
 
 **Item 1 — security sweep: `references/security-sweep.md`.** 21 findings,
 13 fixed on track-c (not merged). The attacker test

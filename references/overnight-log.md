@@ -137,3 +137,14 @@ Times local. Gate = `pnpm check` (app + scripts). Started 21:38.
   `client/src/lib` 1,694, `pnpm check` clean, smoke 140 at four sizes,
   money cross-check 156 bids / 0 disagreements. Final full run stopped by
   memory pressure at 151 files, 0 failing.
+
+## 2026-10-15, day — unattended (after the memory stop)
+
+| What                     | End   | Result                                                                                                                                                                      |
+| ------------------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Morning answers          | 06:05 | `references/morning-answers-c.md`: 18 questions, one line each, bid-number ones first                                                                                       |
+| Before/after screenshots | 06:17 | `references/overnight-shots/before-after/` — 37 shots + README: before = `29f58481` built and served locally, after = today, same data and sizes                            |
+| todo: number boxes       | 06:26 | Assemblies hours, Modifiers percent ("15%" ok), Materials labor hours (now checked) / pack / lengths, Fix this line ("1,5" was 15 on a bid line) — each looked at on screen |
+| todo: optimistic forms   | 06:35 | Modifiers and Labor rates reopen a refused edit holding the typed values; Add says "Added" only once true; Kits Save guarded against a double click. Item closed            |
+
+Checks: `client/src/lib` 148 files / 1,696 passed, `pnpm check` clean. No full suite locally (memory). **Gate:** every run today fails BEFORE any test — the runner cannot pull MySQL (`toomanyrequests: Data limit exceeded`); waiting on A's fix, not chased. No server left running; MySQL untouched.
