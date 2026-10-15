@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-14]
 
+- **Every price change on a material is now remembered.** Typing a price,
+  importing one, saving a bid line to the library, or going back to
+  BidRidge's price each writes one line of price history (old price, new
+  price, who, how, supplier and pack). There is no screen for it yet; the
+  point of starting now is that history cannot be filled in afterwards.
+  Bids are untouched — they keep the prices they were built with.
+- **Pack prices round up, never down.** When a pack price is divided into a
+  per-foot or per-each price, the result rounds up at the fourth decimal, so
+  a converted price can never come out a hair low.
 - **A step bar on every bid.** Plans › Scale › Count › Runs › Review › Print,
   with a tick on what's done and one yellow "Next" button for what to do
   next. It's a guide, not a gate — any step can be done in any order, runs

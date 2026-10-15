@@ -10,6 +10,7 @@
  * user's own: `update` forks on demand and reports back which happened, so the
  * UI can say "you now have your own copy" without orchestrating it.
  */
+import { priceWrite } from "../../shared/packPricing";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
@@ -282,7 +283,10 @@ export const materialsRouter = router({
         userId: ctx.scope.dataUserId,
         name: input.name,
         unitOfSale: input.unitOfSale,
-        costPerUnit: toDecimal(input.costPerUnit),
+        price: {
+          write: priceWrite({ typed: "unit", amount: input.costPerUnit }),
+          why: { source: "typed", actorUserId: ctx.scope.actorUserId },
+        },
         // Absent stays NULL: a new material has no labor unit until somebody
         // says so, and NULL is what the flag and the filter look for.
         laborHours:
@@ -369,8 +373,18 @@ export const materialsRouter = router({
 
       await db.updateMaterial(editableId, ctx.scope.dataUserId, {
         ...rest,
+        // Through the price door (db.updateMaterial): the stored pair, the
+        // `priceUpdatedAt` stamp and the history row, in one transaction.
         ...(costPerUnit !== undefined
-          ? { costPerUnit: toDecimal(costPerUnit), priceUpdatedAt: new Date() }
+          ? {
+              price: {
+                write: priceWrite({ typed: "unit", amount: costPerUnit }),
+                why: {
+                  source: "typed" as const,
+                  actorUserId: ctx.scope.actorUserId,
+                },
+              },
+            }
           : {}),
         /*
           "Example price" / "Example hours" CLEAR when the shop edits that
@@ -470,7 +484,11 @@ export const materialsRouter = router({
         });
       }
 
-      await db.revertMaterialToBaseline(input.id, ctx.scope.dataUserId);
+      await db.revertMaterialToBaseline(
+        input.id,
+        ctx.scope.dataUserId,
+        ctx.scope.actorUserId
+      );
       return db.getMaterialById(input.id, ctx.scope.dataUserId);
     }),
 
@@ -635,7 +653,12 @@ export const materialsRouter = router({
         });
 
         await db.updateMaterial(editableId, ctx.scope.dataUserId, {
-          costPerUnit: toDecimal(row.costPerUnit),
+          price: {
+            write: priceWrite({ typed: "unit", amount: row.costPerUnit }),
+            // No import log row yet (PS-M5's preview/undo is step 4), so
+            // importId stays NULL; the history still says "imported".
+            why: { source: "imported", actorUserId: ctx.scope.actorUserId },
+          },
           supplierName: input.supplierName,
           priceUpdatedAt: stamped,
           // A supplier's price is the shop's own — never "Example price".

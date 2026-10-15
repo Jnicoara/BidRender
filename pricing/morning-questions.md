@@ -100,4 +100,7 @@ Sketches and reasons: `references/overnight-parked.md`. None of these changes a 
 - D1 (decided, reversible) Sign-in page tagline now matches the landing page: "Electrical estimating, built by an electrician" (was "Electrical estimating for the field"). Different words? → **Keep.** Affects: one line.
 - D2 (decided, reversible) The Dashboard's help box now reads "Can't find something? Ask where it is — e.g. labor rates" with a "Find it" button (was a sample question and "Ask"). → **Keep.** Affects: wording.
 
+- Q-PH1 Price history: "Reset to BidRidge's price" on a material is recorded as **typed** (the history's "how" kinds are typed / imported / import undone / starter accepted). Add a "reverted" kind? → **Yes, later** — it needs a one-word enum change from Track A (draft below); until then "typed" is true, a person did it. Affects: the history's wording only, never a price.
+  Draft for A (additive, step 1): ``ALTER TABLE `material_price_history` MODIFY `source` enum('typed','imported','import_undone','starter_accepted','reverted') NOT NULL;``
+
 (Items 6–11 add below.)

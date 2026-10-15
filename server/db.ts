@@ -48,6 +48,7 @@ import {
   InsertMaterial,
   Material,
   materials,
+  materialPriceHistory,
   type ASSEMBLY_CATEGORIES,
   InsertLaborRate,
   LaborRate,
@@ -374,6 +375,7 @@ import {
 import { resolveForkedRow } from "../shared/forkedRows";
 import { isMissingTable } from "./schemaCheck";
 import { sameStarterValue } from "../shared/starterChange";
+import { priceWrite, type PriceWrite } from "../shared/packPricing";
 import {
   markupDiffers,
   materialItemKey,
@@ -2013,12 +2015,119 @@ export async function getMaterialsByIds(
   return mergeLibraryRows(candidates, userId);
 }
 
-/** Create a material owned by the user. Returns the new row id. */
-export async function createMaterial(data: InsertMaterial): Promise<number> {
+// ─── THE MATERIAL PRICE DOOR ──────────────────────────────────────────────────
+//
+// Every write of a COMPANY material's price comes through updateMaterial or
+// createMaterial below, and they take it only as a `PricedWrite`: the stored
+// pair from shared/packPricing.ts `priceWrite` (so a per-unit price can never
+// leave a stale pack price beside it — references/pricing-safety-plan.md
+// § 2.2) together with WHY it changed (references/price-history-plan.md
+// § 3.1). `costPerUnit` and `packPrice` are not in the patch types at all, so
+// a write that says nothing about why does not compile.
+//
+// Recording happens HERE, in the same transaction as the write, so a price
+// and its history cannot disagree: one `material_price_history` row per price
+// that actually CHANGED (compared as numbers — "0.4000" and 0.4 are the same
+// price, and writing it back records nothing, as it flashes nothing).
+//
+// Shared (shipped) rows never come through here: `userId` must match, and a
+// shipped row's changes are logged in `starter_changes` (§ 3.4).
+// server/priceHistoryDoor.test.ts fails on any other code that writes
+// `costPerUnit` on materials.
+
+/** How a company's price came to change (price-history-plan § 3.3 "how"). */
+export type PriceWhy = {
+  source: "typed" | "imported" | "import_undone" | "starter_accepted";
+  /** The PERSON (ctx.scope.actorUserId) — never the company owner's id. */
+  actorUserId: number | null;
+  importId?: number | null;
+  starterChangeId?: number | null;
+  /** The date on a supplier's sheet, "YYYY-MM-DD". NULL = typed today. */
+  priceAsOf?: string | null;
+};
+
+/** A price, as stored, and why. The only way a price enters the door. */
+export type PricedWrite = { write: PriceWrite; why: PriceWhy };
+
+/**
+ * Everything a material patch may carry EXCEPT the price pair. `never`, not
+ * Omit: an Omit lets a conditional spread (`...(x ? { costPerUnit } : {})`)
+ * through unchecked, and that is exactly how the routers write a price.
+ */
+export type MaterialFields = Omit<
+  Partial<InsertMaterial>,
+  "costPerUnit" | "packPrice"
+> & { costPerUnit?: never; packPrice?: never };
+
+/** One history row for a price that changed on a company's material row. */
+async function recordPriceChange(
+  before: Material | null,
+  after: Material,
+  why: PriceWhy
+): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(materials).values(data);
-  return result.insertId;
+  if (after.userId === null) return; // a shipped row: starter_changes holds it
+  const previous = before === null ? null : Number(before.costPerUnit);
+  if (previous !== null && previous === Number(after.costPerUnit)) return;
+  await db.insert(materialPriceHistory).values({
+    userId: after.userId,
+    materialKey: materialItemKey(after),
+    materialId: after.id,
+    unitCost: after.costPerUnit,
+    previousUnitCost: before === null ? null : before.costPerUnit,
+    unitOfSale: after.unitOfSale,
+    packQty: after.packQty,
+    packLabel: after.packLabel,
+    packPrice: after.packPrice,
+    supplierName: after.supplierName,
+    priceAsOf: why.priceAsOf ? new Date(`${why.priceAsOf}T00:00:00Z`) : null,
+    source: why.source,
+    isExamplePrice: after.isExamplePrice ?? false,
+    changedByUserId: why.actorUserId,
+    importId: why.importId ?? null,
+    starterChangeId: why.starterChangeId ?? null,
+  });
+}
+
+/**
+ * Create a material owned by the user. Returns the new row id.
+ *
+ * A price above 0 is recorded (`previousUnitCost` NULL: there was none). A
+ * new row at 0 has no price to remember; its first real price records "was
+ * not priced" when it is set.
+ */
+export async function createMaterial(
+  data: Omit<InsertMaterial, "costPerUnit" | "packPrice"> & {
+    costPerUnit?: never;
+    packPrice?: never;
+    price?: PricedWrite;
+  }
+): Promise<number> {
+  const { price, ...fields } = data;
+  return inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    const [result] = await db.insert(materials).values({
+      ...fields,
+      ...(price
+        ? {
+            costPerUnit: price.write.costPerUnit,
+            packPrice: price.write.packPrice,
+          }
+        : {}),
+    });
+    const id = result.insertId;
+    if (price && Number(price.write.costPerUnit) > 0) {
+      const [row] = await db
+        .select()
+        .from(materials)
+        .where(eq(materials.id, id))
+        .limit(1);
+      if (row) await recordPriceChange(null, row, price.why);
+    }
+    return id;
+  });
 }
 
 /**
@@ -2027,24 +2136,60 @@ export async function createMaterial(data: InsertMaterial): Promise<number> {
  * Baseline rows have userId IS NULL and so can never match here — that is what
  * keeps them read-only. Ownership columns in `data` are ignored rather than
  * trusted, so a caller cannot reassign a row to another user.
+ *
+ * A `price` writes `costPerUnit` and `packPrice` together, stamps
+ * `priceUpdatedAt`, and records the change — all in one transaction.
  */
 export async function updateMaterial(
   id: number,
   userId: number,
-  data: Partial<InsertMaterial>
+  data: MaterialFields & { price?: PricedWrite }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const safe: Record<string, unknown> = { ...data };
+  const { price, ...fields } = data;
+  const safe: Record<string, unknown> = { ...fields };
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
-  await db
-    .update(materials)
-    .set({
-      ...safe,
-      isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(materials.id, id), eq(materials.userId, userId)));
+  const where = and(eq(materials.id, id), eq(materials.userId, userId));
+
+  if (!price) {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    await db
+      .update(materials)
+      .set({
+        ...safe,
+        isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
+        updatedAt: new Date(),
+      })
+      .where(where);
+    return;
+  }
+
+  await inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    // Read under a lock, so two writers cannot both record the same "before".
+    const [before] = await db
+      .select()
+      .from(materials)
+      .where(where)
+      .limit(1)
+      .for("update");
+    if (!before) return;
+    await db
+      .update(materials)
+      .set({
+        ...safe,
+        costPerUnit: price.write.costPerUnit,
+        packPrice: price.write.packPrice,
+        // An import stamps every row with one time; anything else, now.
+        priceUpdatedAt: (safe.priceUpdatedAt as Date | undefined) ?? new Date(),
+        isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
+        updatedAt: new Date(),
+      })
+      .where(where);
+    const [after] = await db.select().from(materials).where(where).limit(1);
+    if (after) await recordPriceChange(before, after, price.why);
+  });
 }
 
 /** Soft-delete one of the user's own materials — assemblies may still point at it. */
@@ -2118,37 +2263,54 @@ export async function forkMaterial(
  * The row id is kept rather than deleting and re-reading the baseline, so
  * anything already referencing this material keeps working.
  */
-export async function revertMaterialToBaseline(id: number, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
+export async function revertMaterialToBaseline(
+  id: number,
+  userId: number,
+  /** The person reverting — the price going back to the shipped one is recorded. */
+  actorUserId: number | null = null
+) {
+  return inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
 
-  const [fork] = await db
-    .select()
-    .from(materials)
-    .where(and(eq(materials.id, id), eq(materials.userId, userId)))
-    .limit(1);
-  if (!fork) throw new Error("Material not found");
-  if (fork.baselineId == null)
-    throw new Error(
-      "Material is fully custom — there is no original to revert to"
-    );
+    const [fork] = await db
+      .select()
+      .from(materials)
+      .where(and(eq(materials.id, id), eq(materials.userId, userId)))
+      .limit(1);
+    if (!fork) throw new Error("Material not found");
+    if (fork.baselineId == null)
+      throw new Error(
+        "Material is fully custom — there is no original to revert to"
+      );
 
-  const [baseline] = await db
-    .select()
-    .from(materials)
-    .where(and(eq(materials.id, fork.baselineId), isNull(materials.userId)))
-    .limit(1);
-  if (!baseline) throw new Error("Baseline material no longer exists");
+    const [baseline] = await db
+      .select()
+      .from(materials)
+      .where(and(eq(materials.id, fork.baselineId), isNull(materials.userId)))
+      .limit(1);
+    if (!baseline) throw new Error("Baseline material no longer exists");
 
-  await db
-    .update(materials)
-    .set({
-      ...materialContentFields(baseline),
-      // Re-stamp the version so any future "update available" check starts clean.
-      baselineVersion: baseline.version,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(materials.id, id), eq(materials.userId, userId)));
+    await db
+      .update(materials)
+      .set({
+        ...materialContentFields(baseline),
+        // Re-stamp the version so any future "update available" check starts clean.
+        baselineVersion: baseline.version,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(materials.id, id), eq(materials.userId, userId)));
+    // Going back to the shipped price is a change of the company's price, so
+    // it is recorded like one (price-history-plan § 3.1). Recorded as "typed":
+    // the history's `source` has no "reverted" yet — pricing/morning-questions.md.
+    const [after] = await db
+      .select()
+      .from(materials)
+      .where(and(eq(materials.id, id), eq(materials.userId, userId)))
+      .limit(1);
+    if (after)
+      await recordPriceChange(fork, after, { source: "typed", actorUserId });
+  });
 }
 
 /**
@@ -7852,6 +8014,8 @@ export async function saveLineAsAssembly(input: {
   laborRate: number;
   /** Whether that rate is BidRidge's example rate (0134) — frozen with it. */
   laborRateWasExample: boolean;
+  /** The person saving it, for the price history (never the owner's id). */
+  actorUserId: number;
 }): Promise<{ assemblyId: number; materialId: number | null }> {
   const { userId, bidId, line } = input;
   const cost = Number(line.snapshotMaterialCost);
@@ -7869,7 +8033,12 @@ export async function saveLineAsAssembly(input: {
           userId,
           name: line.name,
           unitOfSale: "each",
-          costPerUnit: cost.toFixed(4),
+          // "Save to library" from a bid IS recorded, as typed (price
+          // history Q3); a price on one bid line alone is not.
+          price: {
+            write: priceWrite({ typed: "unit", amount: cost }),
+            why: { source: "typed", actorUserId: input.actorUserId },
+          },
         })
       : null;
 

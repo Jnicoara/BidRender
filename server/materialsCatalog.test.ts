@@ -9,6 +9,7 @@
  * wrong thing. Most of these assertions loop over the whole catalog for exactly
  * that reason — they are the only reader it will ever get.
  */
+import { typedPrice } from "./typedPriceFixture";
 import { describe, it, expect, beforeAll } from "vitest";
 import { eq, isNull, sql } from "drizzle-orm";
 import {
@@ -853,7 +854,7 @@ describe.skipIf(!hasDb)("seeding the catalog into a live database", () => {
     const baseline = await baselineNamed('3/4" EMT');
     const forkId = await forkMaterial(baseline.id, USER);
 
-    await updateMaterial(forkId, USER, { costPerUnit: "1.4400" });
+    await updateMaterial(forkId, USER, { price: typedPrice(1.44, USER) });
     await seedBaselineMaterials();
 
     const fork = await getMaterialById(forkId, USER);
@@ -870,7 +871,7 @@ describe.skipIf(!hasDb)("seeding the catalog into a live database", () => {
     const before = countNeedingPricing(await getLibraryMaterials(USER));
 
     const forkId = await forkMaterial(baseline.id, USER);
-    await updateMaterial(forkId, USER, { costPerUnit: "0.0800" });
+    await updateMaterial(forkId, USER, { price: typedPrice(0.08, USER) });
 
     const priced = await getMaterialById(forkId, USER);
     expect(needsPricing(priced?.costPerUnit)).toBe(false);

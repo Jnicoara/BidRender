@@ -1843,6 +1843,7 @@ export const bidsRouter = router({
         laborRateId: input.laborRateId,
         laborRate,
         laborRateWasExample,
+        actorUserId: ctx.scope.actorUserId,
       });
     }),
 

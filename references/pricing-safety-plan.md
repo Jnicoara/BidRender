@@ -414,6 +414,14 @@ these values; there is no "not yet" state (multi-supplier § 6's argument).
 
 ## 7. Build order for C (once A's columns exist)
 
+> **Step 1 BUILT 2026-10-14 (overnight, Track C, on track-c):**
+> `shared/packPricing.ts` (`priceWrite`, round-up, `packPriceShown`) and the
+> door in `server/db.ts` — `updateMaterial` / `createMaterial` take a price
+> only as a `PricedWrite` (`costPerUnit?: never`, so a conditional spread is
+> caught too). Built together with price-history recording (that plan § 8
+> step 1), as § 6's note said they would travel. `server/packPricing.test.ts`
+> shown red on nearest-rounding.
+
 1. `shared/packPricing.ts` (`priceWrite`, round-up) + the `updateMaterial`
    union; tests red on round-down and on a stale `packPrice`.
 2. `parsePrice` + UOM column + the rewritten pinned test; `parseMoney`

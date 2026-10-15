@@ -326,6 +326,18 @@ Every count below is a **before-and-after of the same query** (CLAUDE.md
 
 ## 8. Build order for C (once PH-M1 exists)
 
+> **Step 1 (RECORDING) BUILT 2026-10-14 (overnight, Track C, on track-c).**
+> The door is `db.updateMaterial` / `createMaterial` (`PricedWrite` =
+> `priceWrite` pair + `PriceWhy`), one transaction, a row only when the
+> number changed. Writers: materials.update and .create (typed),
+> importPrices (imported; importId NULL until PS step 4), "save line as
+> assembly" (typed), revert to shipped (recorded as **typed** — the enum has
+> no "reverted"; morning question Q-PH1). Tests:
+> `priceHistoryRecording.test.ts` (8: tests 1, 2, 4, 8) and
+> `priceHistoryDoor.test.ts` (4; shown red with a planted write). Not yet:
+> tests 3 and 5 (the file says why), 6, and 9–12 (they belong to the read
+> query and the panel, steps 2–3).
+
 1. **Recording first** — the door (`priceWhy` union on `updateMaterial` /
    `createMaterial`), every caller in § 2 passing its `how`, tests 1–7. Ships
    alone: from that release on, history accumulates.
