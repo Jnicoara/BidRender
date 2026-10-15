@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Editing a material no longer loses your changes if the save fails.**
+  The editor used to close even when the save was refused, throwing away
+  everything you had typed; now it stays open so you can try again.
+
 - **A number that didn't save no longer looks saved.** If a quantity,
   rate or price can't be saved — the connection drops, say — the box no
   longer flashes green. It turns red and keeps what you typed, so nothing

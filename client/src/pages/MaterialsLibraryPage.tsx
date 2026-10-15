@@ -384,7 +384,8 @@ function MaterialRow({
   showCategory: boolean;
   /** Rendering the Archived view — different actions, no inline editing. */
   isArchived?: boolean;
-  onSave: (id: number, draft: Draft) => Promise<void>;
+  /** Resolves true once saved; false if refused (the toast says why). */
+  onSave: (id: number, draft: Draft) => Promise<boolean>;
   onSuggestAliases: SuggestAliases;
   onRevert: (material: Material) => void;
   onRemove: (material: Material) => void;
@@ -496,15 +497,22 @@ function MaterialRow({
       toast.error("Markup must be between 0% and 1000%.");
       return;
     }
+    // A refused save keeps the editor OPEN with everything typed in it.
+    // Until 2026-10-15 it closed anyway — the toast said "couldn't save"
+    // and the whole edit was gone (database-down drill).
     if (nextMarkup !== (markupOverride ?? null)) {
-      await setOverride.mutateAsync({
-        materialId: material.id,
-        markupPct: nextMarkup,
-      });
+      try {
+        await setOverride.mutateAsync({
+          materialId: material.id,
+          markupPct: nextMarkup,
+        });
+      } catch {
+        return; // its onError has said why
+      }
     }
     // Only when something ABOUT THE MATERIAL changed — see markupDraft above.
     if (JSON.stringify(draft) !== JSON.stringify(openedWith)) {
-      await onSave(material.id, draft);
+      if (!(await onSave(material.id, draft))) return;
     }
     setEditing(false);
   };
@@ -1517,8 +1525,10 @@ export default function MaterialsLibraryPage() {
           toast.success("Material updated.");
         }
         await refetch();
+        return true;
       } catch {
-        // onError already surfaced it
+        // onError already surfaced it; the editor stays open with the edit.
+        return false;
       } finally {
         setBusyId(null);
       }

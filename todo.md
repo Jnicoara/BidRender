@@ -1409,6 +1409,15 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       is restarted. Morning question Q-DB1; numbers in
       `references/stress-results.md` ("Third round").
 
+- [ ] **An optimistic Save form drops the typed edit when the save is
+      refused** (drill, 2026-10-15). Labor rates, Kits and Modifiers close
+      their row editor at once and roll back on error — CLAUDE.md §
+      Responsiveness rule 1, and the toast does say it failed — but the
+      person must retype the whole edit. Materials did the same with an
+      AWAITED save (closed even after a refusal); fixed: its editor now
+      stays open with the edit. A better shape for the optimistic ones:
+      on error, reopen the editor holding the draft that failed.
+
 ### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
 
 A pack or bulk price stored as a per-unit price does not look broken. It
