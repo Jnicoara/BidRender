@@ -13,6 +13,8 @@ fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
 (COMMON; `new-rows-source-check.md` marks them accepted — still 64
 families, 62 COMMON, 2 SPECIALTY). No starter edit.
 
+
+
 **Item 2 — the last three shelves reviewed (read-only, source rule, nothing
 applied), from the owner's live workbook copy** (`C:\dev\BidPhase\pricing`,
 saved 19:29 on 2026-10-14; it already carries the owner's own pack fixes on

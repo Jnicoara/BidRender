@@ -1,0 +1,95 @@
+# Morning questions — overnight run 2026-10-14 → 15 (Track C)
+
+One question per line: **the question → suggested answer. Why. What it
+affects.** Answer "all yes" or list the ones you want different. Nothing
+below has been applied: the name reviews are read-only, and anything that
+changes a bid number or a starter waits for you.
+
+Every EARLIER review (Conduit through Fasteners & Anchors) is fully
+answered; the only open item there is Breakers Q9, which waits for the
+brand-variants pass by design and needs nothing from you now.
+
+## ⚠ AT THE TOP — these change a starter or what a bid line counts
+
+1. ⚠ **STARTER EDIT** — Equipment Q1: in PG19 (standby generator hookup), swap the `Generator battery charger` line for a new `Generator battery, 12V Group 26R` row? → **Yes.** The generator ships with a charger built in, so PG19 prices a part already in the box and leaves out the battery. Affects: PG19's lines; adds one COMMON row (Platt, Generac 0H3421S). A confirms on a current spec sheet first.
+2. ⚠ **STARTER EDIT** — Distribution Q15: rename the poke-throughs to `4" poke-through, dual service, prewired duplex` / `4" poke-through, 2 prewired duplex`, and take the separate `20A duplex receptacle` line out of DV32? → **Yes.** The prewired unit already includes its receptacle, so DV32 prices one receptacle too many. Affects: DV32 loses one line.
+3. ⚠ **CHANGES WHAT A LINE COUNTS** — Equipment Q11: make `EVSE pedestal` the charger on its pedestal, `Level 2 EV charger, pedestal mount, commercial`? → **Yes.** It is CW2's only equipment line, so as a bare mount CW2 "Commercial Level 2 EV charger" has no charger in it. Affects: what CW2's one line is priced from (no line added or removed). The other choice — keep it a mount and add a charger line — is a starter edit.
+4. ⚠ **LINES WILL SAY "NOT PRICED"** — Distribution Q12: `Hood suppression micro-switch` gets no Example price, described "Specialty - price from your supplier."? → **Yes.** It comes from the hood-suppression contractor and is at none of the three stores. Affects: CS15's line reads "Not priced" until you type a price — true rather than made up.
+5. ⚠ **LINES WILL SAY "NOT PRICED"** — Distribution Q13: `Furniture feed connector` and both `Modular furniture whip` rows get no Example price, Specialty description? → **Yes.** Each fits one furniture maker's system; none is at the three stores. Affects: CS10's line reads "Not priced".
+6. ⚠ **MAY BECOME A STARTER EDIT** — Distribution Q14: `Tele-power pole, 10 ft, 2 duplex receptacles` (CS9), the 15 ft one, and `Power pole fitting kit` → `Power pole accessory pack, trim plates and hanger clamp`? → **Yes.** All three are at Platt (Wiremold). Affects: if A finds the pole already ships with the trim pack, A stops and asks before pricing CS9 (the pack would be counted twice).
+7. ⚠ **CHANGES WHAT A LINE IS PRICED FROM** — Equipment Q7: rename `Dishwasher whip` to `Dishwasher power cord kit, 5 ft`? → **Yes.** It is the only product for this job at the three stores (HD Everbilt 98250). Affects: RS4's line is priced from a cord kit; a shop that hardwires deletes the line on the job.
+8. ⚠ **PRICE PER FOOT** — Distribution Q6: rename the four cable-tray rows (aluminum, 4" deep, 9" rungs; bend; tee; wall bracket) and price the tray per foot as the 12 ft section ÷ 12? → **Yes.** Platt sells 12 ft sections. Affects: the per-foot tray number (no starter uses tray).
+9. ⚠ **NO EXAMPLE PRICE** — Distribution Q1: `Busway`, `Busway elbow`, the 400/600/800A switchboards and the unsized `208V 3-phase panelboard` get no Example price (Specialty description; the 208V row keeps its own note)? → **Yes.** Each is quoted per job. Affects: any bid using them says "Not priced" until the supplier's number is typed (no starter uses them).
+
+## Equipment & Appliances (`equipment-appliances-name-review.md`, rows 1582–1646)
+
+(Q1, Q7 and Q11 are at the top.)
+
+- Q2: `30A 6-circuit manual transfer switch, switch only`, drop "10" and "inlet" from its search words? → **Yes.** CW10 already counts the inlet and cord, so the price must be the switch alone. Affects: the name and search.
+- Q3: `Attic fan, gable mount, 1300 CFM`, drop "whole house" and "thermostat"? → **Yes.** The common gable fan at HD; roof-mount is another product. Affects: RS20's priced product.
+- Q4: `Baseboard heater, 1500W 240V, 6 ft` and `Baseboard heater thermostat, line voltage, double-pole, wall mount`? → **Yes.** Cadet at HD and Platt. Affects: the two names.
+- Q5: `Bath exhaust fan, heater/light combo, 80 CFM, 1300W` and `Bath exhaust fan, LED light combo, 80 CFM`, drop "humidity" from the four sized fans? → **Yes.** Matches RS7's 80 CFM fan (Broan at HD). Affects: names and search.
+- Q6: `Cord reel, 12/3, 50 ft, ceiling mount`? → **Yes.** The common shop reel (HD). Affects: the name; no starter.
+- Q8: `Doorbell transformer, 16V 30VA`? → **Yes.** Runs a chime and a video doorbell, so RS10 and RS11 can share it. Affects: the name.
+- Q9: `Dryer cord, 3-wire, 30A, 6 ft`, `Dryer cord, 4-wire, 30A, 6 ft`, `Range cord, 3-wire, 50A, 6 ft`? → **Yes.** All three at HD; matches the existing 4-wire range cord. Affects: names.
+- Q10: `32A EV charger, plug-in, NEMA 14-50`, `40A EV charger, plug-in, NEMA 14-50`, `48A EV charger, hardwired`, drop "tesla"? → **Yes.** 48A must be hardwired (what RS12 says). Affects: names and search.
+- Q12: `Floor heating mat, 120V, 30 sq ft, mat only`? → **Yes.** CK22 counts its own thermostat, so the mat is priced without one. Affects: the name.
+- Q13: `Foil duct tape, 1.89" x 50 yd` and `6" inline duct fan, 240 CFM`? → **Yes.** Common at HD; no starter uses them. Affects: names.
+- Q14: `Garbage disposal cord kit, 3 ft`? → **Yes.** The kit at HD. Affects: the name.
+- Q15: `30A generator cord, L14-30, 25 ft`; `50A generator cord, 14-50P to CS6364, 25 ft`; `30A power inlet box, L14-30`; `50A power inlet box, CS6375`? → **Yes.** Each cord now plugs into its inlet. Affects: names; A confirms the PB50 connector (Platt's pages disagree).
+- Q16: Keep one `Generator interlock kit, 150–225A main`, described "Fits one panel family - match the panel's brand and series"? → **Yes, for now.** Brand variants here would widen the panels-and-breakers brand rule. Affects: name and description.
+- Q17: `Generator pad, 54" x 31" x 3", 9–26 kW air-cooled`? → **Yes.** Generac's standard pad (Platt). Affects: the name.
+- Q18: Retire `Pump control relay`? → **Yes (hide, never delete).** Names no one product; no starter uses it. Affects: it leaves the pickers.
+- Q19: `Range hood, 30" under-cabinet, ducted`, drop "downdraft"? → **Yes.** The common hood (Broan at HD); RS6 keeps the line. Affects: the name.
+- Q20: Keep `Replacement fan grille`, described "Generic placeholder: a grille fits one fan model - price the one you buy"? → **Yes.** Useful on a service call; no one price fits. Affects: description.
+- Q21: `Snow melt controller, automatic, 120V`, and add M4 `Roof de-icing cable, 120V, 60 ft`? → **Yes.** Both at Platt. Affects: name; one new COMMON row.
+- Q22: `Spa bonding lug, direct burial, #8 solid`? → **Yes.** RS14/RS15 bond with #8 solid. Affects: the name.
+- Q23: `Well pump pressure switch, 40/60 psi` and `Submersible pump splice kit, heat shrink, #14-#10`? → **Yes.** The common setting and kit. Affects: names.
+- Q24: `Whole-house surge protector, hardwired, 120/240V`? → **Yes.** Keeps it apart from the breaker-style SPD. Affects: the name.
+- Q25: Add M2 `AC whip, 1/2" x 6 ft liquidtight, #10`, no starter change? → **Yes.** COMMON at HD; swapping is the shop's call per job. Affects: one new row.
+- Q26: Add M3 `Mechanical time switch, 24-hour, 240V 40A, indoor`? → **Yes.** COMMON (Intermatic T104). Affects: one new row.
+
+## Distribution Equipment (`distribution-equipment-name-review.md`, rows 1647–1691)
+
+(Q1, Q6, Q12, Q13, Q14 and Q15 are at the top.)
+
+- Q2: `480V 3-phase panelboard` → `225A panelboard, 480Y/277V 3-phase main-lug, 42-space`, described "Complete: box, interior and cover"? → **Yes.** What Platt stocks; takes the accepted H1/H2 breakers. Affects: name and description.
+- Q3: `30A 8-pole lighting contactor, electrically held, 120V coil, NEMA 1`, drop the placeholder note (CS2)? → **Yes.** The common enclosed one (Eaton at Platt). Affects: CS2's priced product.
+- Q4: `Time clock, astronomic, 7-day, 1-circuit, 120–277V`, drop the note (CS2)? → **Yes.** Intermatic ET8015C. Affects: CS2's priced product.
+- Q5: `200A automatic transfer switch, service-rated, NEMA 3R, 120/240V`, drop the note (PG19)? → **Yes.** The house-generator switch (Generac at Platt). Affects: PG19's priced product.
+- Q7: `400A fused disconnect, NEMA 1, 240V` and `600A fused disconnect, NEMA 1, 240V`, moved to the Panels shelf? → **Yes.** Same pattern as the smaller disconnects. Affects: names and shelf (ids kept).
+- Q8: `Motor starter, size {0,1,2}, NEMA 1, 120V coil` and `Combination motor starter, size 1, fusible, NEMA 1, 120V coil` (MH10)? → **Yes.** Enclosure and coil set the price as much as size. Affects: names.
+- Q9: `Current transformer cabinet` → `CT cabinet, 48" x 36" x 11", NEMA 3R`? → **Yes.** The common Milbank size. Affects: the name.
+- Q10: `Panel-mount surge protective device, Type 2, 208Y/120V 3-phase, 50 kA`, drop the note (PG18)? → **Yes.** PG18 feeds it from a 3-pole breaker. Affects: PG18's priced product.
+- Q11: `Equipment shut-off relay, enclosed, 20A SPDT, dry-contact input` (CS15) and `Hood control interface relay, enclosed, 20A DPDT, 120V coil`, drop "suppression" from the first? → **Yes.** Both at Platt; stay two rows. Affects: names.
+- Q16: Keep `Desk grommet outlet`, `Floor monument, 2-gang`, `Raised floor box` with no Example price and the Specialty description; drop "pop up"? → **Yes.** Countable, not one product at the three stores. Affects: price blank; no starter.
+- Q17: Wireway renames (`4x4 wireway coupling`, `4x4 wireway elbow, 90-degree`, `4x4 / 6x6 wireway, 5 ft, NEMA 1, hinged cover`) and add M1–M4 (closure plates, 6x6 coupling and elbow)? → **Yes.** A coupling fits one size; a run needs end plates. Affects: names; four new COMMON rows.
+- Q18: Add M5 `Cable tray splice plates, 12" ladder, aluminum, 4" deep, pair`? → **Yes.** Every tray joint takes a pair; SPECIALTY if A finds no part. Affects: one new row.
+- Q19: Shelf moves — the four floor rows to Boxes, the seven furniture rows to Surface Raceway, the three hood parts to Equipment & Appliances? → **Yes.** None is distribution gear. Affects: the shelf only; ids and starters unchanged.
+
+## Consumables (`consumables-name-review.md`, rows 1692–1719)
+
+No starter edit. Q4, Q5 and Q7 rename rows a starter uses so the price is one tube or block, not a carton.
+
+- Q1: `Electrical tape, black, 3/4" x 66 ft`, and `Phase tape, {colour}, 3/4" x 66 ft` for all 8 colours? → **Yes.** The full-size roll (HD, Platt). Affects: nine names.
+- Q2: `Rubber splicing tape, 3/4" x 30 ft`? → **Yes.** The Scotch 23 roll. Affects: the name.
+- Q3: `Mastic tape, 2" x 10 ft`, drop "pad"? → **Yes.** "Pad" is another row's name. Affects: name and search.
+- Q4: `Duct seal, 1 lb`? → **Yes.** One block per condenser; a carton priced as one would be 10x high. Affects: the starter's priced product.
+- Q5: `Firestop caulk, 10.1 oz tube`, drop "putty"? → **Yes.** A quarter tube per penetration is only right per tube. Affects: the starter's priced product.
+- Q6: `Electrical putty pad, 7" x 7"`? → **Yes.** The size every maker sells. Affects: the name.
+- Q7: `Silicone sealant, clear, 10.1 oz tube`? → **Yes.** The wall-pack starters take one tube each. Affects: the starters' priced product.
+- Q8: `Expanding foam, gaps and cracks, 12 oz can`? → **Yes.** Keeps it apart from fire-block foam. Affects: the name.
+- Q9: `PVC cement, gray, 8 oz`, drop "primer purple"? → **Yes.** Primer is a different product. Affects: name and search.
+- Q10: `Pulling lube, 1 qt`? → **Yes.** The common bottle; a gallon is another price. Affects: the name.
+- Q11: `Anti-oxidant compound, 4 oz`? → **Yes.** The Noalox bottle. Affects: the name.
+- Q12: `Underground splice kit, UF cable, 14-8 AWG`? → **Yes.** A checks whether Platt's price is one kit or six. Affects: the name.
+- Q13: `Heat shrink tubing assortment, 160-piece`, drop "sleeve"? → **Yes.** One size can't cover the use. Affects: the name.
+- Q14: `Thread seal tape (PTFE), 1/2" x 520"`, drop "pipe dope"? → **Yes.** One row can't be both. Affects: the name.
+- Q15: `Wire pulling grip, 0.75"-0.99" cable`? → **Yes.** A grip holds one cable range. Affects: the name.
+- Q16: Packs — keep `each` on every row except arc flash (pack of 5) and zip ties (bag of 100), which you already set? → **Yes.** Sold one at a time. Affects: packs.
+- Q17: Add M1 `Wire marker booklet, 0-9`? → **Yes.** COMMON at HD. Affects: one new row.
+- Q18: Add M2 `Zip ties, 14", bag of 100`? → **Yes.** COMMON at HD. Affects: one new row.
+
+## From the overnight build work
+
+(Added below as items 5–11 park anything that needs you.)
