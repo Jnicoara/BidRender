@@ -112,6 +112,12 @@ import { StatusStrip } from "@/components/takeoff/StatusStrip";
 import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
 import { outlineNeeded } from "@/lib/planOutline";
+import { planFailureText } from "@/lib/planFailure";
+import {
+  isNetworkFailure,
+  markRetryDelay,
+  unsavedMarksMessage,
+} from "@/lib/markRetry";
 import { formatElevation } from "@shared/takeoffHeights";
 import {
   HeightAreasLayer,
@@ -2088,6 +2094,20 @@ function PlanPane({
     page,
   });
   const [error, setError] = useState<string | null>(null);
+  /*
+    ONE sheet that could not be drawn — not the document. It used to set
+    `error`, which replaced the whole pane and stopped every later render
+    (each effect returns while `error` is set), so a sheet that failed while
+    the connection was down left the plan dead until a reload, even after the
+    connection came back (failure drill, 2026-10-15). Now it is this sheet's,
+    shown over the drawing with Try again; another sheet is unaffected.
+  */
+  const [sheetFailure, setSheetFailure] = useState<{
+    page: number;
+    message: string;
+  } | null>(null);
+  // Bumped by "Try again" on a document that could not be opened.
+  const [openNonce, setOpenNonce] = useState(0);
   /**
    * Pages whose text has been DELIVERED for scale detection, so it runs once
    * each — counted on delivery, not on asking (@/lib/pageTextRead).
@@ -2296,7 +2316,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [source, hash, load, loadUrl, loadFile, outline]);
+  }, [source, hash, load, loadUrl, loadFile, outline, openNonce]);
 
   // Paint the backdrop: the whole sheet, once per page, at RENDER_SCALE.
   useEffect(() => {
@@ -2329,15 +2349,15 @@ function PlanPane({
         setDrawnScale(scale);
         bitmap.close();
         setRendering(false);
+        setSheetFailure(f => (f && f.page === page ? null : f));
         onPageRendered?.(page, canvas, scale);
       })
       .catch(err => {
         if (cancelled) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : "That page could not be drawn. Move to another sheet and back."
-        );
+        setSheetFailure({
+          page,
+          message: err instanceof Error ? err.message : String(err),
+        });
         setRendering(false);
       });
 
@@ -2790,9 +2810,19 @@ function PlanPane({
         <div className="text-center max-w-sm">
           <FileText className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
           <p className="text-sm font-medium">
-            {doc.filename} could not be opened
+            {planFailureText("open", doc.filename, error).title}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">{error}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {planFailureText("open", doc.filename, error).detail}
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={() => setOpenNonce(n => n + 1)}
+          >
+            Try again
+          </Button>
         </div>
       </div>
     );
@@ -2887,6 +2917,49 @@ function PlanPane({
         style={{ touchAction: "none" }}
         onPointerDown={beginPlainPan}
       >
+        {sheetFailure && sheetFailure.page === page && (
+          <div
+            // OPAQUE: under it is the previous sheet's picture, and a dimmed
+            // wrong sheet read as this one in the drill (2026-10-15).
+            className="absolute inset-0 z-30 flex items-center justify-center bg-background p-6"
+            // Its own: a press here is not the start of a pan.
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <div className="text-center max-w-sm" role="alert">
+              <FileText className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm font-medium">
+                {
+                  planFailureText("sheet", doc.filename, sheetFailure.message)
+                    .title
+                }
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {
+                  planFailureText("sheet", doc.filename, sheetFailure.message)
+                    .detail
+                }
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  setSheetFailure(null);
+                  /*
+                    REOPEN, not re-ask: pdf.js keeps a page's promise once
+                    asked, a rejected one included, so asking for the same
+                    sheet again failed again even after the connection came
+                    back (measured in the drill). Reopening the document is
+                    about a second on the 500-sheet set and starts clean.
+                  */
+                  setOpenNonce(n => n + 1);
+                }}
+              >
+                Try again
+              </Button>
+            </div>
+          </div>
+        )}
         {/*
           Opening, then drawing sheet N, then the sheet — one panel for both
           waits, so nothing shows until the sheet can be shown whole and fitted
@@ -5368,7 +5441,11 @@ export default function TakeoffPage({
   );
 
   const dropStamps = trpc.takeoffStamps.drop.useMutation({
-    onError: e => toast.error(e.message),
+    // A dropped connection is said by the message that STAYS while marks
+    // wait (`unsavedMarksMessage`), not by a four-second "Failed to fetch".
+    onError: e => {
+      if (!isNetworkFailure(e)) toast.error(e.message);
+    },
     onSettled: refreshStamps,
   });
 
@@ -6794,6 +6871,41 @@ export default function TakeoffPage({
   );
 
   const flushTimer = useRef<number | null>(null);
+  /*
+    Marks a batch could not SEND are retried on their own (@/lib/markRetry):
+    they used to go out again only on the next click, so ten marks placed
+    while the connection was down stayed unsaved after it came back, with
+    nothing on screen to say so (failure drill, 2026-10-15).
+  */
+  const markRetry = useRef<{ attempt: number; timer: number | null }>({
+    attempt: 0,
+    timer: null,
+  });
+  const UNSAVED_TOAST = "marks-not-saved";
+  const scheduleMarkRetry = useCallback(() => {
+    const r = markRetry.current;
+    const unsent = pendingStamps.current.filter(m => !m.sent).length;
+    toast.warning(unsavedMarksMessage(Math.max(1, unsent)), {
+      id: UNSAVED_TOAST,
+      duration: Infinity,
+    });
+    if (r.timer !== null) return; // one retry waiting is enough
+    r.timer = window.setTimeout(() => {
+      r.timer = null;
+      flushStampsRef.current();
+    }, markRetryDelay(r.attempt));
+    r.attempt += 1;
+  }, []);
+  useEffect(() => {
+    // Back online: send now rather than at the next back-off step.
+    const onOnline = () => flushStampsRef.current();
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      const r = markRetry.current;
+      if (r.timer !== null) window.clearTimeout(r.timer);
+    };
+  }, []);
   /** What the server said about each provisional count (`armWhileCreating`). */
   const provisionalOutcomes = useRef(new Map<number, ProvisionalOutcome>());
 
@@ -6899,6 +7011,9 @@ export default function TakeoffPage({
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
           mirrorQueue(sheetId);
+          markRetry.current.attempt = 0;
+          if (pendingStamps.current.every(m => m.sent))
+            toast.dismiss(UNSAVED_TOAST);
         })
         /*
           Back in the queue, and still on the drawing. A failed request must
@@ -6906,15 +7021,26 @@ export default function TakeoffPage({
           OWN batch, whatever is queued behind it — and survives a reload in
           the mirror either way. The hook's onError has already said why.
         */
-        .catch(() => {
+        .catch(err => {
           setPending(
             pendingStamps.current.map(m =>
               keys.has(m.key) ? { ...m, sent: false } : m
             )
           );
+          // No answer at all: try again on its own (@/lib/markRetry). A
+          // refusal keeps its own message and waits for the person.
+          if (isNetworkFailure(err)) scheduleMarkRetry();
         });
     }
-  }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
+  }, [
+    bidId,
+    dropStamps,
+    mirrorQueue,
+    setPending,
+    utils,
+    pushUndo,
+    scheduleMarkRetry,
+  ]);
   flushStampsRef.current = flushStamps;
   /**
    * Take a click: draw it now, send it shortly after.

@@ -101,3 +101,39 @@ pdf.js on its own. All throwaway, deleted.
   21/500 in 3.5 s, one long task (57 ms). (An earlier probe read "Sheet 6":
   its locator matched a sheet LIST row named "Sheet 6", not the chip.)
 - Heap 38 MB with the set open.
+
+## Round 4 — failure drills on the Plans screen
+
+Method: `scripts/_drillEye.mts` (throwaway), production build, laptop. "API
+down": playwright aborts every tRPC POST (`internetdisconnected`) while a
+fresh plain count places 10 marks, then lets them through. "Storage down":
+it aborts every `/manus-storage/` request on the 500-sheet set, then a sheet
+change, then lets them through. Marks counted in the database afterwards.
+
+- **Fixed — marks placed while the server was unreachable were never
+  retried.** Before: 2 sends failed, a "Failed to fetch" toast for ~4 s, the
+  10 marks stayed drawn, and 15 s after the connection came back the crash
+  mirror still held all 10 — nothing would send them until another click or
+  a reload. Now a send with no answer is retried on its own (2 s, 4 s, 8 s,
+  16 s, then every 30 s, and at once on the browser's `online` event), and a
+  message STAYS while marks wait: "10 marks are not saved yet — no
+  connection… kept on this device… sent when the connection is back".
+  After: 4 tries while down, sent and the message gone within 8 s of the
+  connection returning; **database: exactly 10 marks** (the run before the
+  fix: 0, its marks left in a browser profile the probe then discarded). A
+  server REFUSAL (a locked bid) is not retried and keeps its own message.
+  Not new, written down: a send that reached the server but lost its reply
+  would be sent twice by a retry — the old "next click" resend had the same
+  exposure.
+- **Fixed — one sheet failing to load left the whole plan dead.** A failed
+  sheet render set the DOCUMENT's error, which replaced the pane, and every
+  render waited on that error clearing — which nothing did. With storage back,
+  Next still showed "Large set 500 sheets.pdf could not be opened —
+  UnknownErrorException: Failed to fetch". Now a failed sheet is that sheet's:
+  "Couldn't load this sheet — The plan storage didn't answer — usually the
+  connection. Your takeoff is saved. Press Try again once you're back
+  online." over the drawing (opaque: the previous sheet showed through and
+  read as this one), Next works, and Try again REOPENS the plan (pdf.js keeps
+  a rejected page promise, so re-asking failed again) — drawn after.
+- An 8 MB set behaves differently on purpose: under 50 MB it is fetched
+  whole up front, so storage going down later changes nothing on screen.
