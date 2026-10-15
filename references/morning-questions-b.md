@@ -35,3 +35,16 @@ too), and the preview is 27 ms.
 pin means writing each table's copy rules a second time in SQL, and two
 copies of those rules disagreeing is the money bug `shared/forkedRows.ts`
 was written about. Not a number on anyone's bid either way.
+
+## Q3. OPEN — touch "Select + two taps picks two" fails on iPad portrait and phone
+
+`pnpm device:touch` (2026-10-15, production build, fresh bid 1728472): every
+tap / drag / pinch / two-finger / undo check passes at all four sizes, but
+"Select + two taps picks two" fails (no pill / 1 selected) on tablet-portrait
+and phone, and the next step times out. NOT yet known whether the overnight
+MarkLayer change (2dfc2a48, marks in a memoized layer) caused it — a mouse
+click and Shift-click still select correctly (checked). The comparison run
+with the old TraceLayer was cut off by the usage limit. **Next step: rebuild
+with `git show 07a96f74:client/src/components/takeoff/TraceLayer.tsx` in
+place and run `npx tsx scripts/deviceTouch.mts --bid=1728472
+--sizes=phone`.** If it passes there, revert 2dfc2a48's TraceLayer half.

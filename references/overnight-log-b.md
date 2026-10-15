@@ -114,3 +114,10 @@ beyond the plan, money, or anything irreversible go to
 - Gates: 38688083146 green (2dfc2a48), 38689454507 green (d7245405).
 - Servers: dev server stopped at the start of round 2; a PRODUCTION build on
   3002 used for every measurement since (one server at a time).
+
+## Stopped — usage limit (round 6, touch)
+
+- Touch check: all gestures pass at iPad both ways, phone, phone-375; the
+  Select-mode step fails on iPad portrait and phone — open,
+  `morning-questions-b.md` Q3. Probes deleted; production server stopped;
+  MySQL 3307 left running.
