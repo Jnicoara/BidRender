@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Tracing on a small phone leaves the drawing half as tall again.** At
+  375 px the trace toolbar took five rows (one of them a lone divider) and
+  the tracing panel two; now the toolbar is two rows (mode, scale and Fit;
+  then From/to) and the panel one row. The drawing went from 237 to 351 px
+  tall. Laptop is unchanged.
+
 - **An unpriced starter item no longer shows "$0.00".** The starter editor,
   its change log and a shop's starter Updates now say "not priced" (and
   "rate not set" for a labor rate) instead of a dollar amount that reads as

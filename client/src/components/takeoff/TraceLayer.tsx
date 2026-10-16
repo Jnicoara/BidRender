@@ -53,7 +53,14 @@ import {
   useCrosshairSize,
   useShowNextSegment,
 } from "@/hooks/useCrosshairColor";
-import { Check, Ruler, TriangleAlert, Undo2, X } from "lucide-react";
+import {
+  Check,
+  GitBranchPlus,
+  Ruler,
+  TriangleAlert,
+  Undo2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeightFields } from "@/components/HeightFields";
 import { traceReadout } from "@/lib/traceReadout";
@@ -2352,8 +2359,8 @@ export function TraceLayer({
             */
             <div
               className={cn(
-                "absolute left-1/2 -translate-x-1/2 flex items-center gap-2 border border-border bg-card/95 px-3 py-1.5 shadow-lg pointer-events-none",
-                coarse ? "bottom-3" : "top-3",
+                "absolute left-1/2 -translate-x-1/2 flex items-center border border-border bg-card/95 py-1.5 shadow-lg pointer-events-none",
+                coarse ? "bottom-3 gap-1.5 px-2" : "top-3 gap-2 px-3",
                 pillShape
               )}
             >
@@ -2394,14 +2401,25 @@ export function TraceLayer({
                 The pill is the same width for the whole run, and nothing in
                 it can push or cover anything else.
               */}
-              <span className="text-[0.7rem] text-muted-foreground">
-                {/* No scale: the path is still worth drawing, and its length
+              {/* With a finger the number stands alone: one row at 375 px. */}
+              {(!coarse || ratio === null) && (
+                <span className="text-[0.7rem] text-muted-foreground">
+                  {/* No scale: the path is still worth drawing, and its length
                     is typed in the run panel once it is finished (§ 4c). */}
-                {ratio === null
-                  ? "no scale — type the length when finished"
-                  : "Run total"}
-              </span>
-              <span className="font-mono text-sm tabular-nums inline-block min-w-[9ch] text-right">
+                  {ratio === null
+                    ? coarse
+                      ? "no scale"
+                      : "no scale — type the length when finished"
+                    : "Run total"}
+                </span>
+              )}
+              <span
+                className={cn(
+                  "font-mono text-sm tabular-nums inline-block text-right",
+                  coarse ? "min-w-[7ch]" : "min-w-[9ch]"
+                )}
+                aria-label={coarse ? "Run total" : undefined}
+              >
                 {readout.runTotal === null
                   ? "—"
                   : formatFeetInches(readout.runTotal)}
@@ -2445,13 +2463,15 @@ export function TraceLayer({
                 </>
               )}
 
-              <div className="w-px h-4 bg-border" />
+              {!coarse && <div className="w-px h-4 bg-border" />}
 
               {/*
                 SNAP / FREE, the finger's Alt. Only where there is no Alt key
-                to hold; on a laptop the pill stays as it was.
+                to hold; on a laptop the pill stays as it was. Only while a
+                new leg's start is being picked — the one tap it changes — so
+                the rest of the time the pill is one row on a 375 px phone.
               */}
-              {coarse && onToggleFreePoints && legs && (
+              {coarse && onToggleFreePoints && legs?.active && legs.pending && (
                 <Button
                   size="sm"
                   variant={freePoints ? "default" : "outline"}
@@ -2472,12 +2492,13 @@ export function TraceLayer({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-6 text-xs pointer-events-auto"
+                  className="h-6 gap-1 text-xs pointer-events-auto"
                   onClick={() => legs.onNewLeg()}
                   disabled={points.length < 2 || legs.busy}
                   title="Keep this leg and start another on the same run — a branch if you start on the run (Shift-click the next start)"
+                  aria-label="New leg"
                 >
-                  New leg
+                  {coarse ? <GitBranchPlus className="w-4 h-4" /> : "New leg"}
                 </Button>
               )}
 

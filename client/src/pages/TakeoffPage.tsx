@@ -2885,8 +2885,11 @@ function PlanPane({
         onClick={fitToView}
         disabled={loading}
         title="Fit the whole sheet (0)"
+        aria-label="Fit"
       >
-        <Maximize2 className="w-3.5 h-3.5" /> Fit
+        <Maximize2 className="w-3.5 h-3.5" />
+        {/* The phone keeps the icon: its toolbar row has no room for words. */}
+        {!fitOnly && "Fit"}
       </Button>
     </div>
   );
@@ -11202,13 +11205,21 @@ export default function TakeoffPage({
                     locked={tracePoints.length > 0}
                   />
                 )}
-                <TraceEndsPickers
-                  bidId={bidId}
-                  value={traceEnds}
-                  onChange={updateTraceEnds}
-                  quantity={activeTraceMode === "quantity"}
-                />
-                <div className="w-px h-4 bg-border" />
+                {/*
+                  On the phone the pickers take the second row to themselves
+                  (order-last, full width) and the mode, scale and Fit share the
+                  first: two rows, not five, so the drawing keeps its height.
+                  The divider alone took a row of its own there.
+                */}
+                <div className={cn(phone && "order-last basis-full")}>
+                  <TraceEndsPickers
+                    bidId={bidId}
+                    value={traceEnds}
+                    onChange={updateTraceEnds}
+                    quantity={activeTraceMode === "quantity"}
+                  />
+                </div>
+                {!phone && <div className="w-px h-4 bg-border" />}
               </>
             )}
 
@@ -11242,6 +11253,7 @@ export default function TakeoffPage({
             {activeSheet && (!phone || tracing) && (
               <ScaleControl
                 sheet={activeSheet}
+                compact={phone}
                 wanted={
                   !measurability?.ok && (reachingForMeasure || calibrating)
                 }
