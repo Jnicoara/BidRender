@@ -49,13 +49,21 @@ jobs:
         id: kind
         env:
           BEFORE: ${{ github.event.before }}
+        # A NEW branch has no usable `before` (all zeros): its push carries
+        # the branch's code and the Gate runs for it, so it counts as code.
+        # Found 2026-10-16: a-n5's first push (code + notes) went red here,
+        # checking its own code commit while that commit's Gate was running.
+        # And if the newest commit itself changed code, the Gate is testing
+        # exactly that commit — nothing for this workflow to vouch for.
         run: |
-          kind=notes
+          kind=code
           if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] &&
              git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
             code=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -vE '(\.md$|^references/)' | grep -v '^$' || true)
-            if [ -n "$code" ]; then kind=code; fi
+            if [ -z "$code" ]; then kind=notes; fi
           fi
+          last_code=$(git log -1 --first-parent --format=%H HEAD -- . ':!*.md' ':!references/')
+          if [ "$last_code" = "$GITHUB_SHA" ]; then kind=code; fi
           echo "kind=$kind" >> "$GITHUB_OUTPUT"
           if [ "$kind" = code ]; then echo "::notice::This push changes code too; the Gate tests it. Nothing to do here."; fi
 

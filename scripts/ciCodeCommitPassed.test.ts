@@ -103,6 +103,16 @@ describe("the two workflows stay apart (gate.yml / docs-gate.yml)", () => {
     expect(docs).toMatch(/node scripts\/ciCodeCommitPassed\.mts/);
   });
 
+  it("a push with no usable `before` (a new branch) counts as code, and so does one whose newest commit changed code", () => {
+    // a-n5's first push (2026-10-16) went red: counted as notes, it checked
+    // its own code commit while that commit's Gate was still running.
+    expect(docs).toMatch(/^\s*kind=code\s*$/m);
+    expect(docs).toMatch(/if \[ -z "\$code" \]; then kind=notes; fi/);
+    expect(docs).toMatch(
+      /if \[ "\$last_code" = "\$GITHUB_SHA" \]; then kind=code; fi/
+    );
+  });
+
   it("the step name the verdict reads is the one gate.yml runs the suite in", () => {
     expect(gate).toMatch(/- name: Test suite\n/);
   });
