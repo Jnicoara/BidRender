@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **The sign-in page is ready for invite-only sign-up (still switched off).**
+  While the switch is off, nothing changes. When the owner turns it on, a
+  stranger sees no "Create account" form, just a line pointing to the
+  early-access list. Someone with an invite link sees who invited them, and
+  their address is filled in. A bad or used link says why. Someone accepting
+  an invite to a company that has no free seat is now told to ask whoever
+  invited them, instead of being told to remove someone.
+
 - **Many people signing in at once no longer freezes the app for everyone
   else.** Checking a password is deliberately slow work. It used to run on
   the same thread that answers every request, so a handful of sign-ins

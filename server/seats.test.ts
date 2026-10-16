@@ -258,9 +258,12 @@ describeDb("seat limits on a real company", () => {
     // Written straight to the row: the admin route refuses this, which is the
     // point — accept has to hold even when something got round that rule.
     await setLimit(2);
+    // In the joiner's words — they cannot remove anyone (INVITEE_SEATS_FULL).
     await expect(
       callerFor(JOINER_A).company.acceptInvite({ code: created.code })
-    ).rejects.toThrow("All 2 seats are in use. Remove someone or add a seat.");
+    ).rejects.toThrow(
+      "This company has no free seat for you right now. Ask whoever invited you to free one or add a seat, then use the same link again."
+    );
 
     // Nobody joined, and the code was NOT spent — it works once there's room.
     expect((await memberIds()).map(m => m.userId)).not.toContain(JOINER_A);

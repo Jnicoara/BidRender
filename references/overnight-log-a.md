@@ -237,3 +237,24 @@ Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
   `./passwordHashing` with identical fakes — no assertion changed.
 - Not done: C's burst script against a production build (needs a server;
   memory). Recommended on staging after merge.
+- Item 2 Gate 38854852318 **green** (d75970b1).
+
+## Item 5 — invite sign-up screens — 23:20 → 00:05
+
+- Free memory 3.8 GB before starting. ONE dev server (port 3017, test DB
+  `bidrender_test_localdev`, `SIGNUP_INVITE_ONLY=on`), stopped after: its
+  whole cmd/cross-env/tsx tree killed, port 3017 free, verified.
+- Built: `client/src/lib/signupLink.ts` + test (9), `LoginPage`, `AuthGuard`
+  (`#/signup?invite=`). Switch OFF = page unchanged.
+- Screenshots `references/overnight-shots/a/` 1–5 × laptop 1366×768 /
+  iPad 820×1180 / phone 390×844 (+ 6, dashboard after an invite sign-up).
+  None scrolls sideways. Looked at: 1 laptop, 2 phone, 3 phone, 5 iPad.
+- Driven in the browser: the new-company link signed up and landed on the
+  dashboard, code gone from the address; the waitlist link went to the
+  landing form (`#early-access`, field visible).
+- **Found by using it:** a company-code sign-up refused for seats told the
+  INVITEE "Remove someone or add a seat." Now `INVITEE_SEATS_FULL` (both
+  accept paths are the invitee's); `seats.test.ts` assertion moved to the
+  new words, still exact. (The refusal itself came from my fixture: the
+  invite was inserted past the seat check. The seat rule is right.)
+- Throwaway invites/users removed from the test DB afterwards.

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { CLOSED_LINE, signupView } from "@/lib/signupLink";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,15 +24,47 @@ interface LoginPageProps {
   initialMode?: Mode;
   /** A line shown above the form, e.g. "Password changed — sign in with it." */
   notice?: string;
+  /** The code from an invite link (`#/signup?invite=…`, @/lib/signupLink). */
+  inviteCode?: string | null;
+  /** Back to the landing page's early-access form. */
+  onJoinWaitlist?: () => void;
 }
 
 export default function LoginPage({
   onSuccess,
   initialMode = "login",
   notice,
+  inviteCode = null,
+  onJoinWaitlist,
 }: LoginPageProps) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
+
+  /*
+    Invite-only sign-up (invite-gate-plan.md § 4). The server refuses a
+    sign-up with no code while SIGNUP_INVITE_ONLY is on; this only stops a
+    stranger filling in a form that would be refused. What to show is decided
+    in @/lib/signupLink, where it is tested.
+  */
+  const signupMode = trpc.auth.signupMode.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+  const inviteInfo = trpc.auth.inviteInfo.useQuery(
+    { code: inviteCode ?? "" },
+    { enabled: Boolean(inviteCode), retry: false, staleTime: Infinity }
+  );
+  const view = signupView({
+    inviteOnly: signupMode.data?.inviteOnly,
+    code: inviteCode,
+    info: inviteInfo.data,
+    infoError: inviteInfo.error?.message ?? null,
+  });
+  const lockedEmail = view.kind === "invited" ? view.lockedEmail : null;
+  const suggestedEmail = view.kind === "invited" ? view.suggestedEmail : null;
+  useEffect(() => {
+    if (lockedEmail) setEmail(lockedEmail);
+    else if (suggestedEmail) setEmail(current => current || suggestedEmail);
+  }, [lockedEmail, suggestedEmail]);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -71,6 +104,7 @@ export default function LoginPage({
         email,
         password,
         name: name.trim() || undefined,
+        ...(view.kind === "invited" && inviteCode ? { inviteCode } : {}),
       });
     }
   };
@@ -91,28 +125,50 @@ export default function LoginPage({
       />
     );
 
+  // Invite-only with no code: no "Create account" tab at all — one line
+  // instead, under the sign-in form (§ 4). On #/signup it is the whole card.
+  if (view.kind === "closed" && mode === "signup")
+    return (
+      <AuthShell>
+        <div className="p-6 space-y-4">
+          <ClosedSignupLine onJoinWaitlist={onJoinWaitlist} />
+          <button
+            type="button"
+            onClick={() => switchTo("login")}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft size={14} /> Already have an account? Sign in
+          </button>
+        </div>
+      </AuthShell>
+    );
+
+  if (mode === "signup" && view.kind !== "open" && view.kind !== "invited")
+    return (
+      <AuthShell>
+        <SignupTabs mode={mode} onSwitch={switchTo} />
+        <div className="p-6 space-y-4">
+          {view.kind === "refused" && (
+            <>
+              <FormError message={view.message} />
+              <button
+                type="button"
+                onClick={() => switchTo("login")}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft size={14} /> Sign in instead
+              </button>
+            </>
+          )}
+          {/* "waiting": nothing — it is a fast question, and a spinner on
+              it would read as the app being slow (CLAUDE.md § Responsiveness 3). */}
+        </div>
+      </AuthShell>
+    );
+
   return (
     <AuthShell footer="Your data is private and never shared with other users.">
-      {/* Tab switcher */}
-      <div className="grid grid-cols-2 border-b border-border/50">
-        {(["login", "signup"] as const).map(m => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => {
-              if (mode !== m) switchTo(m);
-            }}
-            className={cn(
-              "py-3.5 text-sm font-semibold transition-colors",
-              mode === m
-                ? "bg-background text-foreground border-b-2 border-[#F5C518]"
-                : "bg-muted/30 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {m === "login" ? "Sign in" : "Create account"}
-          </button>
-        ))}
-      </div>
+      {view.kind !== "closed" && <SignupTabs mode={mode} onSwitch={switchTo} />}
 
       {/* Form body */}
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -120,6 +176,13 @@ export default function LoginPage({
           <div className="flex items-start gap-2 rounded-lg bg-green-500/10 border border-green-500/25 px-3 py-2.5 text-sm text-green-400">
             <MailCheck size={14} className="shrink-0 mt-0.5" />
             <span>{notice}</span>
+          </div>
+        )}
+
+        {mode === "signup" && view.kind === "invited" && (
+          <div className="flex items-start gap-2 rounded-lg bg-[#F5C518]/10 border border-[#F5C518]/30 px-3 py-2.5 text-sm text-foreground">
+            <MailCheck size={14} className="shrink-0 mt-0.5 text-[#F5C518]" />
+            <span>{view.heading}</span>
           </div>
         )}
 
@@ -159,8 +222,19 @@ export default function LoginPage({
             required
             autoComplete={mode === "login" ? "username" : "email"}
             disabled={isPending}
-            className="h-10"
+            // A new-company invite is bound to its address (owner Q2): the
+            // server refuses any other, so the box does not offer one.
+            readOnly={mode === "signup" && Boolean(lockedEmail)}
+            className={cn(
+              "h-10",
+              mode === "signup" && lockedEmail && "bg-muted/40"
+            )}
           />
+          {mode === "signup" && lockedEmail && (
+            <p className="text-xs text-muted-foreground">
+              The invite was sent to this address, so the account uses it.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -236,11 +310,71 @@ export default function LoginPage({
         >
           {mode === "login" ? "Sign in" : "Create account"}
         </SubmitButton>
+
+        {view.kind === "closed" && (
+          <div className="pt-2 border-t border-border/50">
+            <ClosedSignupLine onJoinWaitlist={onJoinWaitlist} />
+          </div>
+        )}
       </form>
     </AuthShell>
   );
 }
 
+function SignupTabs({
+  mode,
+  onSwitch,
+}: {
+  mode: Mode;
+  onSwitch: (next: Mode) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 border-b border-border/50">
+      {(["login", "signup"] as const).map(m => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => {
+            if (mode !== m) onSwitch(m);
+          }}
+          className={cn(
+            "py-3.5 text-sm font-semibold transition-colors",
+            mode === m
+              ? "bg-background text-foreground border-b-2 border-[#F5C518]"
+              : "bg-muted/30 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {m === "login" ? "Sign in" : "Create account"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The one line that replaces "Create account" while sign-up is invite-only. */
+function ClosedSignupLine({ onJoinWaitlist }: { onJoinWaitlist?: () => void }) {
+  return (
+    <p className="text-sm text-muted-foreground">
+      {CLOSED_LINE}{" "}
+      {onJoinWaitlist ? (
+        <button
+          type="button"
+          onClick={onJoinWaitlist}
+          className="font-medium text-[#F5C518] hover:underline"
+        >
+          Join the early-access list
+        </button>
+      ) : (
+        <a
+          href="/#early-access"
+          className="font-medium text-[#F5C518] hover:underline"
+        >
+          Join the early-access list
+        </a>
+      )}
+    </p>
+  );
+}
 /**
  * "Forgot password?" — ask for a reset link.
  *

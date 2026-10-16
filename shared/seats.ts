@@ -58,6 +58,16 @@ export function seatSummary(usage: SeatUsage): string {
 }
 
 /**
+ * The same refusal as the INVITED person reads it, accepting a code after
+ * the company's seats were cut (`acceptInviteWithinSeats`). They cannot
+ * remove anyone or add a seat, so `seatsFullMessage`'s advice is not theirs;
+ * the code is not spent, so the link works again once there is room. Found
+ * 2026-10-15 by signing up through an invite link in the browser.
+ */
+export const INVITEE_SEATS_FULL =
+  "This company has no free seat for you right now. Ask whoever invited you to free one or add a seat, then use the same link again.";
+
+/**
  * The refusal when every seat is taken. Also shown on the Team page before
  * anyone clicks, so the button and the server say the same thing.
  */
