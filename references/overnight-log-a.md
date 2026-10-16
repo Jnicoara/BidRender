@@ -481,3 +481,11 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   turns the track-branch Gate red by design, and on local-dev it stops the
   staging auto-deploy until staging matches. Recommended: ride the next
   live release.
+
+## Item 12 — release plan updated — 00:44
+
+- `next-live-release-plan.md` § "Since 2026-10-15": items 7–18 (Q-DB1,
+  cookie, CLIENT_IP_FROM, Q-AUTH1, invite screens, tests, find message,
+  markReplay, upload guard, typed packs, snapshot N2, end-of-pricing list),
+  each with where it is, what the day needs, and whether it moves a total;
+  the backup drill and bidTotalsDump as day checks. Doc only.
