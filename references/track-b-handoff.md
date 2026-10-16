@@ -1,5 +1,13 @@
 # Track B handoff — 2026-10-05
 
+## FOR TRACK A, 2026-10-16 04:15 — the smoke run is longer now (Gate is yours)
+
+- Five new smoke specs from B tonight (`plans`, `marks`, `pdfs`, `demo`
+  specs; projects in `e2e/playwright.config.ts`). Locally the whole smoke
+  went **6.3 → 12.5 min** (218 passed, 6 skipped). Staging will be slower.
+  If that is too long for the Gate's smoke job, the place to trim is
+  `pdfs.spec.ts` (laptop only, 13 uploads) — say so and B will split it.
+
 ## FOR TRACK A, 2026-10-16 03:50 — "a legend link does not reach the count already made": FIXED
 
 - `takeoffStamps.linkSymbol` takes the bid (`bidId`, sent by the Plans
