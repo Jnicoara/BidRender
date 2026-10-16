@@ -4,10 +4,11 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## C ready e9dfc0ff (2026-10-16 14:35, Gate 38968275571 green, full code run)
+## C ready 0f7206a7 (2026-10-16 15:00; code = e9dfc0ff, Gate 38968275571 green, full code run)
 
-`git push origin e9dfc0ff:local-dev` (fast-forward: contains local-dev
-`0628f8c9`). **No `drizzle/` change.** What it adds on top of local-dev:
+`git push origin 0f7206a7:local-dev` (fast-forward: contains local-dev
+`907f289d`; 0f7206a7 only merges your notes over e9dfc0ff — no code
+differs). **No `drizzle/` change.** What it adds on top of local-dev:
 ONE `DraftNumberInput` (B's API + C's `parseTypedNumber` reading and
 show-what-is-held on blur; C's copy deleted, all tests kept); Q-IMP1 built
 (a price list naming one material at two prices refuses it); the
