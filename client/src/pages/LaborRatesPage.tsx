@@ -23,7 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { selectOnFocus } from "@/lib/selectOnFocus";
-import { parseTypedNumber } from "@/lib/inlineEdit";
+import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
 import { ScopeFilter } from "@/components/library/LibraryControls";
 import {
   filterByScope,
@@ -164,9 +164,11 @@ const breakdownDraftFrom = (rate: LaborRate): BreakdownDraft | null => {
 
 /** The typed parts as numbers (burdens as fractions), or null if any is bad. */
 function breakdownParts(b: BreakdownDraft): LoadedParts | null {
-  const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
-  const wage = num(b.baseWage);
-  const pcts = BURDEN_FIELDS.map(([key]) => num(b[key]) / 100);
+  // The app's readers: "$32.50" and "7.65%" as meant, "0x10" not as 16.
+  const wage = b.baseWage.trim() === "" ? NaN : parseTypedNumber(b.baseWage);
+  const pcts = BURDEN_FIELDS.map(([key]) =>
+    b[key].trim() === "" ? NaN : parseTypedPercent(b[key]) / 100
+  );
   if (!Number.isFinite(wage) || wage < 0 || wage > MAX_HOURLY) return null;
   if (pcts.some(p => !Number.isFinite(p) || p < 0 || p > 2)) return null;
   return {
