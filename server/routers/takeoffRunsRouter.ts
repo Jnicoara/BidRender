@@ -674,7 +674,21 @@ export const takeoffRunsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
+      /*
+        The sheet must be on THIS bid, not merely the company's: a run saved
+        with this bid's id onto another bid's sheet was counted on neither
+        and drawn on the other, past this bid's lock (server/sheetOnBid.test.ts).
+      */
+      const sheet = await db.getBidPdfSheetOnBid(
+        input.sheetId,
+        input.bidId,
+        ctx.scope.dataUserId
+      );
+      if (!sheet)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Sheet not found on this bid.",
+        });
       /*
         Both a new run and a re-save of an existing one. The autosave of a
         trace in progress goes through here too, which is why the Plans screen

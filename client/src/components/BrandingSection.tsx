@@ -23,6 +23,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ImageUp, Trash2, TriangleAlert } from "lucide-react";
@@ -31,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsBranding, missingBrandingFields } from "@shared/proposal";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -165,7 +168,12 @@ function BrandingField({
 
 export function BrandingSection() {
   const utils = trpc.useUtils();
-  const { data: branding } = trpc.proposals.branding.useQuery();
+  // The letterhead is the company's, so settings.edit (owner, admin) —
+  // the server refuses anyone else (proposalsRouter, security sweep
+  // 2026-10-14). Shown to everyone, editable by them only.
+  const canEdit = useCompany().can("settings.edit");
+  const brandingQuery = trpc.proposals.branding.useQuery();
+  const branding = brandingQuery.data;
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -176,20 +184,27 @@ export function BrandingSection() {
   };
 
   const save = trpc.proposals.setBranding.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const ticket = trpc.proposals.createLogoUploadTicket.useMutation();
   const confirmLogo = trpc.proposals.confirmLogo.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const clearLogo = trpc.proposals.clearLogo.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
 
-  if (!branding) return null;
+  // Not blank: a section that failed to load says so (drill, 2026-10-15).
+  if (!branding)
+    return brandingQuery.isError ? (
+      <LoadFailed
+        what="your letterhead"
+        onRetry={() => void brandingQuery.refetch()}
+      />
+    ) : null;
 
   const missing = missingBrandingFields(branding);
   const missingKeys = new Set(missing.map(f => f.key));
@@ -259,132 +274,146 @@ export function BrandingSection() {
               Still needed: {missing.map(f => f.label).join(", ")}. Until then a
               proposal prints a visible prompt in place of each one, so nothing
               can be sent looking blank by mistake.
+              {!canEdit && " Ask the owner or an admin to fill it in."}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Logo ───────────────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div>
-          <Label className="text-sm">Logo</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            PNG, JPG, WebP or SVG, under 5 MB. Printed at about 1.5 inches wide.
-          </p>
-        </div>
+      {!canEdit && (
+        <p className="text-xs text-muted-foreground">
+          Only the company owner or an admin can change the letterhead.
+        </p>
+      )}
 
-        <div className="flex items-center gap-4">
-          <div
-            className={cn(
-              "w-36 h-20 rounded-md border flex items-center justify-center overflow-hidden shrink-0",
-              branding.logoUrl
-                ? "border-border bg-white"
-                : "border-dashed border-[#F5C518]/50 bg-[#F5C518]/10"
-            )}
-          >
-            {branding.logoUrl ? (
-              <img
-                src={branding.logoUrl}
-                alt="Your company logo"
-                className="max-w-full max-h-full object-contain"
-              />
-            ) : (
-              <span className="text-[11px] text-[#F5C518] italic px-2 text-center">
-                No logo yet
-              </span>
-            )}
+      {/* fieldset: one switch for every input and button below. */}
+      <fieldset
+        disabled={!canEdit}
+        className="space-y-4 min-w-0 disabled:opacity-60"
+      >
+        {/* ── Logo ───────────────────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div>
+            <Label className="text-sm">Logo</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              PNG, JPG, WebP or SVG, under 5 MB. Printed at about 1.5 inches
+              wide.
+            </p>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <input
-              ref={fileInput}
-              type="file"
-              accept={LOGO_TYPES.join(",")}
-              className="hidden"
-              onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) void uploadLogo(file);
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs"
-              disabled={uploading}
-              onClick={() => fileInput.current?.click()}
+          <div className="flex items-center gap-4">
+            <div
+              className={cn(
+                "w-36 h-20 rounded-md border flex items-center justify-center overflow-hidden shrink-0",
+                branding.logoUrl
+                  ? "border-border bg-white"
+                  : "border-dashed border-[#F5C518]/50 bg-[#F5C518]/10"
+              )}
             >
-              <ImageUp className="w-3.5 h-3.5" />
-              {uploading
-                ? "Uploading…"
-                : branding.logoUrl
-                  ? "Replace logo"
-                  : "Upload logo"}
-            </Button>
-            {branding.logoUrl && (
+              {branding.logoUrl ? (
+                <img
+                  src={branding.logoUrl}
+                  alt="Your company logo"
+                  className="max-w-full max-h-full object-contain"
+                />
+              ) : (
+                <span className="text-[11px] text-[#F5C518] italic px-2 text-center">
+                  No logo yet
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileInput}
+                type="file"
+                accept={LOGO_TYPES.join(",")}
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (file) void uploadLogo(file);
+                }}
+              />
               <Button
                 size="sm"
-                variant="ghost"
-                className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
-                onClick={() => clearLogo.mutate()}
+                variant="outline"
+                className="h-8 gap-1.5 text-xs"
+                disabled={uploading}
+                onClick={() => fileInput.current?.click()}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Remove
+                <ImageUp className="w-3.5 h-3.5" />
+                {uploading
+                  ? "Uploading…"
+                  : branding.logoUrl
+                    ? "Replace logo"
+                    : "Upload logo"}
               </Button>
-            )}
+              {branding.logoUrl && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() => clearLogo.mutate()}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remove
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* ── Details ────────────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <BrandingField
-          label="Company name"
-          value={branding.companyName}
-          placeholder="e.g. Ridgeline Electric LLC"
-          missing={missingKeys.has("companyName")}
-          onSave={companyName => save.mutate({ companyName })}
-        />
-        <BrandingField
-          label="License number"
-          hint="Stated on the proposal — on most electrical work it has to be."
-          value={branding.licenseNumber}
-          placeholder="e.g. EC-118240"
-          missing={missingKeys.has("licenseNumber")}
-          onSave={licenseNumber => save.mutate({ licenseNumber })}
-        />
-        <BrandingField
-          label="Address"
-          hint="Shift+Enter for a second line."
-          value={branding.address}
-          placeholder={"1420 Foundry Rd\nAsheville, NC 28801"}
-          multiline
-          missing={missingKeys.has("address")}
-          onSave={address => save.mutate({ address })}
-        />
-        <BrandingField
-          label="Phone"
-          value={branding.phone}
-          placeholder="(828) 555-0148"
-          missing={missingKeys.has("phone")}
-          onSave={phone => save.mutate({ phone })}
-        />
-        <BrandingField
-          label="Email"
-          hint="Optional — left off the document when empty."
-          value={branding.email}
-          placeholder="estimating@example.com"
-          missing={false}
-          onSave={email => save.mutate({ email })}
-        />
-        <BrandingField
-          label="Website"
-          hint="Optional."
-          value={branding.website}
-          placeholder="ridgelineelectric.com"
-          missing={false}
-          onSave={website => save.mutate({ website })}
-        />
-      </div>
+        {/* ── Details ────────────────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <BrandingField
+            label="Company name"
+            value={branding.companyName}
+            placeholder="e.g. Ridgeline Electric LLC"
+            missing={missingKeys.has("companyName")}
+            onSave={companyName => save.mutate({ companyName })}
+          />
+          <BrandingField
+            label="License number"
+            hint="Stated on the proposal — on most electrical work it has to be."
+            value={branding.licenseNumber}
+            placeholder="e.g. EC-118240"
+            missing={missingKeys.has("licenseNumber")}
+            onSave={licenseNumber => save.mutate({ licenseNumber })}
+          />
+          <BrandingField
+            label="Address"
+            hint="Shift+Enter for a second line."
+            value={branding.address}
+            placeholder={"1420 Foundry Rd\nAsheville, NC 28801"}
+            multiline
+            missing={missingKeys.has("address")}
+            onSave={address => save.mutate({ address })}
+          />
+          <BrandingField
+            label="Phone"
+            value={branding.phone}
+            placeholder="(828) 555-0148"
+            missing={missingKeys.has("phone")}
+            onSave={phone => save.mutate({ phone })}
+          />
+          <BrandingField
+            label="Email"
+            hint="Optional — left off the document when empty."
+            value={branding.email}
+            placeholder="estimating@example.com"
+            missing={false}
+            onSave={email => save.mutate({ email })}
+          />
+          <BrandingField
+            label="Website"
+            hint="Optional."
+            value={branding.website}
+            placeholder="ridgelineelectric.com"
+            missing={false}
+            onSave={website => save.mutate({ website })}
+          />
+        </div>
+      </fieldset>
     </section>
   );
 }

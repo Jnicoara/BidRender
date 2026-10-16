@@ -35,6 +35,7 @@ import {
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { DEFAULT_ANNUAL_HOURS } from "@shared/pricing";
 import { money } from "@/lib/money";
+import { errorText } from "@/lib/errorText";
 
 export type QuickEditableRate = {
   id: number;
@@ -68,7 +69,7 @@ export function LaborRateQuickEdit({
   ).length;
 
   const update = trpc.laborRates.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(
         result?.forked
@@ -131,7 +132,7 @@ export function LaborRateQuickEdit({
                 }
                 whenUnset="zero"
                 onSave={annualSalary =>
-                  update.mutate({ id: rate.id, annualSalary })
+                  update.mutateAsync({ id: rate.id, annualSalary })
                 }
                 rules={{ min: 0 }}
                 className="h-8 w-32 text-sm"
@@ -146,7 +147,7 @@ export function LaborRateQuickEdit({
               <InlineNumberField
                 value={Number(rate.annualHours ?? DEFAULT_ANNUAL_HOURS)}
                 onSave={annualHours =>
-                  update.mutate({ id: rate.id, annualHours })
+                  update.mutateAsync({ id: rate.id, annualHours })
                 }
                 rules={{ min: 0.01, max: 8760 }}
                 className="h-8 w-32 text-sm"
@@ -170,7 +171,9 @@ export function LaborRateQuickEdit({
             </span>
             <InlineNumberField
               value={Number(rate.hourlyCost)}
-              onSave={hourlyCost => update.mutate({ id: rate.id, hourlyCost })}
+              onSave={hourlyCost =>
+                update.mutateAsync({ id: rate.id, hourlyCost })
+              }
               rules={{ min: 0 }}
               className="h-8 w-32 text-sm"
               ariaLabel={`${rate.name} hourly rate`}

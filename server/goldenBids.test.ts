@@ -665,6 +665,23 @@ describe.skipIf(!hasDb)("golden bids", () => {
         ).toBe(true);
       }
 
+      // The LISTS price a bid without opening it — the Dashboard card and
+      // "Find a bid" (2026-10-16: they load every listed bid's lines in a
+      // few queries rather than a few per bid). Each must say what the bid
+      // screen says, on every golden shape.
+      const card = (await c.bids.dashboard()).find(row => row.id === bidId);
+      expect(card, `${b.key} on the Dashboard`).toBeDefined();
+      expect(cents(card!.totalDue), `${b.key} Dashboard total due`).toBe(
+        cents(screen.totalDue)
+      );
+      const found = (await c.bids.search({ pageSize: 100 })).items.find(
+        row => row.id === bidId
+      );
+      expect(found, `${b.key} in Find a bid`).toBeDefined();
+      expect(cents(found!.totalDue), `${b.key} Find a bid total due`).toBe(
+        cents(screen.totalDue)
+      );
+
       const sheet = await c.takeoffExport.get({ bidId, includePrices: true });
       const f = sheet.prices!;
       expect(cents(f.directCost), `${b.key} spreadsheet direct cost`).toBe(

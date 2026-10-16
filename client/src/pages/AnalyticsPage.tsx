@@ -35,6 +35,7 @@ import {
   rangeForPreset,
   type RangePreset,
 } from "@/lib/analyticsChart";
+import { LoadFailed } from "@/components/LoadFailed";
 
 const PRESETS: RangePreset[] = ["12m", "24m", "ytd", "all"];
 
@@ -62,14 +63,18 @@ export default function AnalyticsPage({
     [preset, earliestBid]
   );
 
-  const { data: outcomes, isLoading: loadingOutcomes } =
-    trpc.analytics.outcomes.useQuery(range, {
-      enabled: canView,
-      staleTime: 60_000,
-      // Keeping the previous window on screen while a new one loads stops the
-      // whole page collapsing to skeletons every time a preset is clicked.
-      placeholderData: previous => previous,
-    });
+  const {
+    data: outcomes,
+    isLoading: loadingOutcomes,
+    isLoadingError: outcomesFailed,
+    refetch: refetchOutcomes,
+  } = trpc.analytics.outcomes.useQuery(range, {
+    enabled: canView,
+    staleTime: 60_000,
+    // Keeping the previous window on screen while a new one loads stops the
+    // whole page collapsing to skeletons every time a preset is clicked.
+    placeholderData: previous => previous,
+  });
 
   if (outcomes && outcomes.earliestBid !== earliestBid) {
     setEarliestBid(outcomes.earliestBid);
@@ -135,7 +140,15 @@ export default function AnalyticsPage({
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
-        {loading && !outcomes ? (
+        {outcomesFailed && !outcomes ? (
+          // Not blank: figures that did not load say so (drill, 2026-10-15).
+          <div className="max-w-md">
+            <LoadFailed
+              what="your figures"
+              onRetry={() => void refetchOutcomes()}
+            />
+          </div>
+        ) : loading && !outcomes ? (
           <LoadingSkeleton />
         ) : (
           <div className="mx-auto max-w-6xl space-y-8">

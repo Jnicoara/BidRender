@@ -216,3 +216,12 @@ cap". Each must surface its own row first, and "warning tape" must surface
 the non-detectable row (the one the run types price) above U2. If a recount
 finds a starter or a run type using any of rows 660–669 other than the
 warning tape, stop and find out why first.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

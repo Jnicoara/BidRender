@@ -53,7 +53,8 @@ export function LineCost({
   */
   if (line.breakdown === null) {
     const why =
-      line.problem?.message ?? "The pricing engine refused this line.";
+      line.problem?.message ??
+      "This line can't be priced — open it to see what's missing.";
     return (
       <TapExplain
         explanation={why}

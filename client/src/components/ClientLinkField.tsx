@@ -46,6 +46,7 @@ import {
   searchClients,
   type PickableClient,
 } from "@/lib/clientPicker";
+import { errorText } from "@/lib/errorText";
 
 export function ClientLinkField({
   bid,
@@ -98,7 +99,7 @@ export function ClientLinkField({
       toast.success(`${created.name} added and attached.`);
       reset();
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   const reset = () => {

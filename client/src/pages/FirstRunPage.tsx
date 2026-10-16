@@ -26,10 +26,12 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, Check, HardHat, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsRate } from "@shared/laborRatePricing";
 import { resolveLaborRate } from "@shared/laborRateLookup";
 import { NavigationHelper } from "@/components/NavigationHelper";
+import { errorText } from "@/lib/errorText";
 
 export default function FirstRunPage() {
   const utils = trpc.useUtils();
@@ -38,10 +40,10 @@ export default function FirstRunPage() {
   const [savingId, setSavingId] = useState<number | null>(null);
 
   const setRate = trpc.onboarding.setStarterRate.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
   const complete = trpc.onboarding.completeFirstRun.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   /** Only the hourly roles. A salary needs two numbers and a conversation. */
@@ -58,7 +60,7 @@ export default function FirstRunPage() {
 
   const save = async (id: number) => {
     const raw = drafts[id];
-    const value = Number(raw);
+    const value = parseTypedNumber(raw ?? "");
     if (
       raw === undefined ||
       raw.trim() === "" ||

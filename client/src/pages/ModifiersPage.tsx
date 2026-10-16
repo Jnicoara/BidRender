@@ -18,8 +18,9 @@
  * is intentionally not paginated: the starter set is five and this is a list a
  * user curates by hand, so it stays small by design.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { parseTypedPercent } from "@/lib/inlineEdit";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -59,6 +60,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { applyModifiersToHours } from "@shared/pricing";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -71,6 +76,8 @@ type Modifier = {
   laborAdjustmentPctValue: number;
   status: "active" | "archived" | "deleted";
   archivedAt: Date | string | null;
+  /** When the row was last saved; the editor sends it back (staleEdit.ts). */
+  updatedAt: Date;
 };
 
 /** Mirrors the router bounds: −100% to +1000%. */
@@ -104,9 +111,15 @@ const formatArchivedAt = (value: Modifier["archivedAt"]) => {
 type Draft = { name: string; percent: string };
 const emptyDraft: Draft = { name: "", percent: "" };
 
+/**
+ * The box as a person types it: "15", "15%", "+15" all mean 15 — the app's
+ * one percent reader (Number() took "0x10" as 16).
+ */
+const typedPercent = parseTypedPercent;
+
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return "Give the modifier a name.";
-  const percent = Number(draft.percent);
+  const percent = typedPercent(draft.percent);
   if (draft.percent.trim() === "" || Number.isNaN(percent))
     return "Enter a percentage.";
   if (percent < MIN_PCT)
@@ -151,12 +164,19 @@ function ModifierRow({
   onArchive,
 }: {
   modifier: Modifier;
-  onSave: (id: number, draft: Draft) => void;
+  /** Resolves false when the save was refused (its toast says why). */
+  onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onRevert: (modifier: Modifier) => void;
   onArchive: (modifier: Modifier) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  /** The row as saved when the editor opened — sent with Save. */
+  const [openedAt, setOpenedAt] = useState<Date>(modifier.updatedAt);
+  // Leaving the screen asks before an open edit is dropped
+  // (@/lib/unsavedGuard); Cancel does not — it says discard.
+  const [openedWith, setOpenedWith] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(editing && !sameToSave(draft, openedWith));
 
   const save = () => {
     const problem = validateDraft(draft);
@@ -164,8 +184,16 @@ function ModifierRow({
       toast.error(problem);
       return;
     }
-    onSave(modifier.id, draft);
+    // Closes at once (the change shows straight away, optimistically) — and
+    // reopens holding what was typed if the save is refused, rather than
+    // leaving the person to type it all again (todo.md, 2026-10-15).
+    const typed = draft;
     setEditing(false);
+    void onSave(modifier.id, typed, openedAt).then(saved => {
+      if (saved) return;
+      setDraft(typed);
+      setEditing(true);
+    });
   };
 
   if (editing) {
@@ -243,10 +271,13 @@ function ModifierRow({
           variant="ghost"
           className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
           onClick={() => {
-            setDraft({
+            const opened = {
               name: modifier.name,
               percent: String(toPercent(modifier.laborAdjustmentPctValue)),
-            });
+            };
+            setDraft(opened);
+            setOpenedWith(opened);
+            setOpenedAt(modifier.updatedAt);
             setEditing(true);
           }}
           title={
@@ -331,7 +362,7 @@ function ArchivedRow({
           className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-destructive"
           onClick={() => onDeleteForever(modifier)}
         >
-          <Trash2 className="w-3.5 h-3.5" /> Delete Forever
+          <Trash2 className="w-3.5 h-3.5" /> Delete forever
         </Button>
       </div>
     </div>
@@ -344,6 +375,7 @@ export default function ModifiersPage() {
   const [view, setView] = useState<"active" | "archived">("active");
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(adding && !sameToSave(newDraft, emptyDraft));
   const [pendingDelete, setPendingDelete] = useState<Modifier | null>(null);
 
   const utils = trpc.useUtils();
@@ -387,7 +419,7 @@ export default function ModifiersPage() {
           context.previous as never
         );
       }
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     [utils]
   );
@@ -408,19 +440,29 @@ export default function ModifiersPage() {
       ),
     onError: (error, _vars, context) => rollbackActive(context, error),
     onSuccess: result => {
+      // The saved row, new `updatedAt` and all, straight into the list: a
+      // reopen before the refetch lands would otherwise carry the old one,
+      // and the stale-save guard would refuse this person's own next save
+      // (seen with a slow connection, 2026-10-15; shared/staleEdit.ts).
+      const saved = result?.modifier;
+      if (saved)
+        utils.modifiers.list.setData({ status: "active" }, old =>
+          old?.map(row => (row.id === saved.id ? saved : row))
+        );
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
     },
     onSettled: refreshBoth,
   });
 
+  const creating = useRef(false);
   const createModifier = trpc.modifiers.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
   });
 
   const revertModifier = trpc.modifiers.revert.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Restored the starter values"),
     onSettled: refreshBoth,
   });
@@ -434,12 +476,12 @@ export default function ModifiersPage() {
   });
 
   const restoreModifier = trpc.modifiers.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
   });
 
   const deleteForever = trpc.modifiers.deleteForever.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refreshBoth,
   });
 
@@ -458,35 +500,62 @@ export default function ModifiersPage() {
   }, [active]);
 
   const handleSave = useCallback(
-    (id: number, draft: Draft) => {
-      updateModifier.mutate({
-        id,
-        name: draft.name.trim(),
-        laborAdjustmentPct: toFraction(Number(draft.percent)),
-      });
+    (id: number, draft: Draft, openedAt: Date) => {
+      return updateModifier
+        .mutateAsync({
+          id,
+          openedAt,
+          name: draft.name.trim(),
+          laborAdjustmentPct: toFraction(typedPercent(draft.percent)),
+        })
+        .then(
+          () => true,
+          () => false
+        );
     },
     [updateModifier]
   );
 
   const handleCreate = useCallback(() => {
+    // One add at a time: the form now stays until the server answers, so a
+    // second Enter must not send a second one (a ref — set in this call).
+    if (creating.current) return;
     const problem = validateDraft(newDraft);
     if (problem) {
       toast.error(problem);
       return;
     }
-    createModifier.mutate({
-      name: newDraft.name.trim(),
-      laborAdjustmentPct: toFraction(Number(newDraft.percent)),
-    });
-    toast.success(`Added "${newDraft.name.trim()}"`);
-    setNewDraft(emptyDraft);
-    setAdding(false);
+    creating.current = true;
+    const name = newDraft.name.trim();
+    // "Added" and the cleared form only once it IS added. Both happened at
+    // once until 2026-10-15, so a refused add said "Added" beside the error
+    // and threw away what was typed.
+    createModifier.mutate(
+      {
+        name,
+        laborAdjustmentPct: toFraction(typedPercent(newDraft.percent)),
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Added "${name}"`);
+          setNewDraft(emptyDraft);
+          setAdding(false);
+        },
+        onSettled: () => {
+          creating.current = false;
+        },
+      }
+    );
   }, [createModifier, newDraft]);
 
   const confirmDelete = useCallback(() => {
     if (!pendingDelete) return;
-    deleteForever.mutate({ id: pendingDelete.id });
-    toast.success(`Deleted "${pendingDelete.name}" permanently`);
+    const { id, name } = pendingDelete;
+    // Said once it is true, not before (2026-10-15).
+    deleteForever.mutate(
+      { id },
+      { onSuccess: () => toast.success(`Deleted "${name}" permanently`) }
+    );
     setPendingDelete(null);
   }, [deleteForever, pendingDelete]);
 
@@ -539,7 +608,11 @@ export default function ModifiersPage() {
             >
               {tab}
               <span className="ml-1.5 text-muted-foreground/70">
-                {tab === "active" ? active.length : archived.length}
+                {(tab === "active" ? activeQuery : archivedQuery).isLoadingError
+                  ? ""
+                  : tab === "active"
+                    ? active.length
+                    : archived.length}
               </span>
             </button>
           ))}
@@ -635,6 +708,15 @@ export default function ModifiersPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading modifiers…
+            </div>
+          ) : (view === "active" ? activeQuery : archivedQuery)
+              .isLoadingError ? (
+            // A list that failed to load is not an empty one (drill, 2026-10-15).
+            <div className="p-4">
+              <LoadFailed
+                what="your modifiers"
+                onRetry={() => void refreshBoth()}
+              />
             </div>
           ) : view === "active" ? (
             active.length === 0 ? (

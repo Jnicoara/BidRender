@@ -42,6 +42,19 @@ describe("a draft number field keeps what was typed", () => {
     expect(typeDraftNumber(draftNumberFrom(3), "-2", 100).value).toBe(0);
   });
 
+  it("reads the number a person meant, and nothing else", () => {
+    // Plain Number() took "0x10" as 16 and refused "1,500" (track-c's copy
+    // of this box read through parseTypedNumber; the merged one does too).
+    const from3 = draftNumberFrom(3);
+    expect(typeDraftNumber(from3, "0x10", 1e6)).toEqual({
+      text: "0x10",
+      value: 3,
+    });
+    expect(typeDraftNumber(from3, "1,5", 1e6).value).toBe(3);
+    expect(typeDraftNumber(from3, "1,500", 1e6).value).toBe(1500);
+    expect(typeDraftNumber(from3, "$2.50", 1e6).value).toBe(2.5);
+  });
+
   it("an opened stored value shows as typed", () => {
     expect(draftNumberFrom(2.5).text).toBe("2.5");
   });

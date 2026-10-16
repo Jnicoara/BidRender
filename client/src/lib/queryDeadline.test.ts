@@ -40,6 +40,43 @@ describe("a read that does not answer", () => {
     expect(await outcome).toMatch(/No answer from the server/);
   });
 
+  it("says so when the DEADLINE gives up — and only then", async () => {
+    let gaveUp = 0;
+    const onGiveUp = () => gaveUp++;
+    // Answered in time: no word.
+    const quick = hangingFetch();
+    const ok = withQueryDeadline(
+      quick.impl,
+      QUERY_DEADLINE_MS,
+      onGiveUp
+    )("/api/trpc/bids.get");
+    quick.calls[0].answer();
+    await ok;
+    await vi.advanceTimersByTimeAsync(QUERY_DEADLINE_MS * 2);
+    // Cancelled by the caller: not the server's silence, no word.
+    const cancelled = hangingFetch();
+    const caller = new AbortController();
+    const read = withQueryDeadline(
+      cancelled.impl,
+      QUERY_DEADLINE_MS,
+      onGiveUp
+    )("/api/trpc/bids.get", { signal: caller.signal });
+    caller.abort(new Error("unmounted"));
+    await read.catch(() => {});
+    await vi.advanceTimersByTimeAsync(QUERY_DEADLINE_MS * 2);
+    expect(gaveUp).toBe(0);
+    // No answer by the deadline: one word.
+    const silent = hangingFetch();
+    const stalled = withQueryDeadline(
+      silent.impl,
+      QUERY_DEADLINE_MS,
+      onGiveUp
+    )("/api/trpc/bids.get");
+    stalled.catch(() => {});
+    await vi.advanceTimersByTimeAsync(QUERY_DEADLINE_MS);
+    expect(gaveUp).toBe(1);
+  });
+
   it("is not cut once it has answered", async () => {
     const { impl, calls } = hangingFetch();
     const read = withQueryDeadline(impl)("/api/trpc/bids.get", {

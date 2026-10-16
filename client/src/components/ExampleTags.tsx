@@ -22,7 +22,7 @@ const WHY: Record<ExampleKind, string> = {
     "Priced from BidRidge's example price for this item, not one you set. Set your own on the Materials screen.",
   hours:
     "Uses BidRidge's example labor hours, not yours. Set your own hours on the item or assembly.",
-  rate: "Uses BidRidge's example labor rate, not your shop's. Set your own loaded rate in Settings › Labor rates.",
+  rate: "Uses BidRidge's example labor rate, not your shop's. Set your own loaded rate on the Labor rates screen.",
 };
 
 export function ExampleTags({

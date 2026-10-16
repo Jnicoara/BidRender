@@ -4,6 +4,81 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## FOR A — S2 `scope_prompts` (scope-tags step 6b), FINAL 2026-10-16 (Track C)
+
+Replaces the 2026-10-12 S2 draft in `track-b-handoff.md`. Additive, step 1
+(a new table; nothing existing is read differently), step 3 empty.
+Rehearsed on a throwaway DB (`bidrender_test_c_s2`: migrated 0000–0163,
+seeded, this applied, then dropped): applies clean, FK and both unique
+keys present; with it, `goldenBids` + `goldenBidsCompare` pass unchanged
+and C's 10 new tests pass. The 6b code (`c-scope-prompts`, local to C, not
+pushed — C pushes track-c only) also RUNS WITHOUT the table: bids ask the
+shipped list, the editor says changes arrive with the next DB update. So
+the table can go to staging/live before or after the code. Changes from
+the 10-12 draft: `notWords` (6a's prompts have them), `shippedKey` (seed
+matches by key), `sortOrder`, two unique keys, no `version` /
+`baselineVersion`.
+
+```sql
+CREATE TABLE `scope_prompts` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int,
+	`baselineId` int,
+	`shippedKey` varchar(64),
+	`name` varchar(255) NOT NULL,
+	`matchWords` varchar(2048) NOT NULL,
+	`notWords` varchar(1024) NOT NULL DEFAULT '',
+	`matchCategories` varchar(1024) NOT NULL DEFAULT '',
+	`isActive` boolean NOT NULL DEFAULT true,
+	`sortOrder` int NOT NULL DEFAULT 0,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `scope_prompts_id` PRIMARY KEY(`id`),
+	CONSTRAINT `scope_prompts_shippedKey_unique` UNIQUE(`shippedKey`),
+	CONSTRAINT `scope_prompts_user_baseline_unique` UNIQUE(`userId`,`baselineId`)
+);
+--> statement-breakpoint
+ALTER TABLE `scope_prompts` ADD CONSTRAINT `scope_prompts_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+CREATE INDEX `scope_prompts_baselineId_idx` ON `scope_prompts` (`baselineId`);
+```
+
+`drizzle/schema.ts` declaration (append; C's code imports `scopePrompts`
+and `ScopePromptRow` by these names):
+
+```ts
+export const scopePrompts = mysqlTable(
+  "scope_prompts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").references(() => users.id, { onDelete: "cascade" }),
+    baselineId: int("baselineId"),
+    /** The shipped prompt's stable key; NULL on every company row. */
+    shippedKey: varchar("shippedKey", { length: 64 }),
+    name: varchar("name", { length: 255 }).notNull(),
+    matchWords: varchar("matchWords", { length: 2048 }).notNull(),
+    notWords: varchar("notWords", { length: 1024 }).default("").notNull(),
+    matchCategories: varchar("matchCategories", { length: 1024 })
+      .default("")
+      .notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    sortOrder: int("sortOrder").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    unique("scope_prompts_shippedKey_unique").on(t.shippedKey),
+    unique("scope_prompts_user_baseline_unique").on(t.userId, t.baselineId),
+    index("scope_prompts_baselineId_idx").on(t.baselineId),
+  ]
+);
+
+export type ScopePromptRow = typeof scopePrompts.$inferSelect;
+export type InsertScopePromptRow = typeof scopePrompts.$inferInsert;
+```
+
+When S2 is on local-dev, C merges it and lands 6b on track-c.
+
 ## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
 
 **Never replace, restore, re-copy or drop a shared local database
@@ -13,6 +88,107 @@ and the owner work against the same MySQL on 3307, so an unannounced swap
 reads to everyone else as a fault in their code. Throwaway databases you
 create and drop yourself are exempt. (Prompted by A's own false alarm on
 2026-10-16 — nobody had replaced `bidrender_local`; see session 48.)
+
+## FROM B — 2026-10-16: Bid methods + prevailing wage, SQL drafts BM-M1..M10 for A
+
+**Owner: "BUILD BID METHODS + PREVAILING WAGE … put final SQL drafts
+(BM-M1..M9) in track-a-handoff.md for A."** The plan is
+`references/bid-methods-plan.md` (all 16 picks approved 2026-10-12); its
+§ 9 also has BM-M10 (owner Q15), so ten drafts. **B has written no file in
+`drizzle/`** (the Gate refuses that on a track branch). Number them, add the
+schema, apply them; B wires the code after local-dev is merged in
+(`todo.md` § "Bid methods — wiring left").
+
+**Tested by B, 2026-10-16, on a throwaway DB** (`bidrender_test_bm_throwaway`,
+created, migrated 0000–0163 from zero — 164 applied — then dropped):
+
+- All ten applied cleanly, in the order below, as written.
+- Every new column NULL, no default (except `sortOrder` 0, and the two
+  timestamps), so **all ten are ADDITIVE: step 1, migrate first. Step 3 is
+  empty.** No `UPDATE` anywhere; NULL is the old meaning everywhere (NULL
+  `pricingMethod` = the old stacked math, so no existing bid moves).
+- **Foreign keys 205 → 209** (+4: `wage_rate_sets_userId_fk`,
+  `wage_rate_set_rates_setId_fk`, `wage_rate_set_rates_laborRateId_fk`,
+  `bids_wageRateSetId_fk`). If your count before is not 205, stop and find
+  out why before going on.
+- Deletes checked on probe rows: deleting the role → its set row's
+  `laborRateId` NULL; deleting the set → the bid's `wageRateSetId` NULL and
+  the set's rows gone; deleting the user → its sets gone. (A set is archived,
+  never deleted, in the app; the FK is a backstop.)
+- BM-M10 needs BM-M6's table. Fold `fringePaidAsCash` into BM-M6's CREATE if
+  they ship together; B tested them apart.
+- Not tested: re-running a file (the journal prevents it; a plain `ADD`
+  dies on `Duplicate column` by design).
+
+```sql
+-- BM-M1  a bid's method; NULL = priced before methods existed (stacked)
+ALTER TABLE `bids` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;
+
+-- BM-M2  the company's method for NEW bids; NULL = cost_op
+ALTER TABLE `pricing_defaults` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;
+
+-- BM-M3  flat % or brackets at the company level; NULL = flat
+ALTER TABLE `pricing_defaults` ADD `materialMarkupMode` enum('flat','brackets') NULL;
+
+-- BM-M4  the hourly charge rate per role (method A); NULL = not set
+ALTER TABLE `labor_rates` ADD `chargeRate` decimal(10,4) NULL;
+
+-- BM-M5  the charge rate frozen on the line; NULL = none (every line before)
+ALTER TABLE `bid_line_items` ADD `snapshotChargeRate` decimal(10,4) NULL;
+
+-- BM-M6  prevailing wage sets
+CREATE TABLE `wage_rate_sets` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `userId` int NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `wageDeterminationNumber` varchar(128) NULL,
+  `dateSet` date NOT NULL,
+  `archivedAt` timestamp NULL,
+  `createdAt` timestamp NOT NULL DEFAULT (now()),
+  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `wage_rate_sets_id` PRIMARY KEY(`id`),
+  CONSTRAINT `wage_rate_sets_userId_fk` FOREIGN KEY (`userId`)
+    REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+
+-- BM-M7  one row per classification in a set
+CREATE TABLE `wage_rate_set_rates` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `setId` int NOT NULL,
+  `classification` enum('journeyman','apprentice','trainee','other') NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `laborRateId` int NULL,
+  `baseWage` decimal(10,4) NOT NULL,
+  `fringe` decimal(10,4) NOT NULL,
+  `sortOrder` int NOT NULL DEFAULT 0,
+  CONSTRAINT `wage_rate_set_rates_id` PRIMARY KEY(`id`),
+  CONSTRAINT `wage_rate_set_rates_setId_fk` FOREIGN KEY (`setId`)
+    REFERENCES `wage_rate_sets`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `wage_rate_set_rates_laborRateId_fk` FOREIGN KEY (`laborRateId`)
+    REFERENCES `labor_rates`(`id`) ON DELETE SET NULL
+);
+
+-- BM-M8  the bid's wage set and the apprentice answer;
+--        NULL set = no prevailing wage; NULL answer = not asked = journeyman rate
+ALTER TABLE `bids` ADD `wageRateSetId` int NULL;
+ALTER TABLE `bids` ADD `registeredApprentices` boolean NULL;
+ALTER TABLE `bids` ADD CONSTRAINT `bids_wageRateSetId_fk`
+  FOREIGN KEY (`wageRateSetId`) REFERENCES `wage_rate_sets`(`id`) ON DELETE SET NULL;
+
+-- BM-M9  building area for the $/sq ft sanity line; NULL = not given
+ALTER TABLE `bids` ADD `buildingSqFt` decimal(12,2) NULL;
+
+-- BM-M10 (owner Q15) fringe paid as cash, so payroll tax applies to it too;
+--        NULL = not ticked = fringe is not taxed
+ALTER TABLE `wage_rate_sets` ADD `fringePaidAsCash` boolean NULL;
+```
+
+**What B built on track-b without them** (no number moves; golden bids
+unchanged): the engine with one pricer per method and no stacking by type
+(`shared/bidMethods.ts`), the charge rate per line, the prevailing-wage and
+bracket arithmetic, and two lines under Total due on every bid ("Priced the
+old way: …", "Effective margin …"). `bidPricingMethod()` in
+`server/bidPricing.ts` returns NULL for every bid until BM-M1 exists.
 
 ## NOW — 2026-10-16 day, session 48: owner's answers built (N4, N1, N2)
 

@@ -25,6 +25,11 @@
 import { pointerMovedHighlight } from "@/lib/pointerHighlight";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useMutationState } from "@tanstack/react-query";
+import { getMutationKey } from "@trpc/react-query";
+import { isReachFailure } from "@/lib/dataReach";
+import { LoadFailed } from "@/components/LoadFailed";
+import { ArchivedBidNotice } from "@/components/bid/ArchivedBidNotice";
 import { toast } from "sonner";
 import { useRemoveBidLine } from "@/hooks/useRemoveBidLine";
 import { cn } from "@/lib/utils";
@@ -43,6 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { DuplicateUnitPanel } from "@/components/DuplicateUnitPanel";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { snapshotHoursFor } from "@shared/assemblyHours";
@@ -59,6 +65,7 @@ import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { BidExpensesSection } from "@/components/BidExpensesSection";
 import { MathChangeStrip } from "@/components/MathChangeStrip";
 import { matchJobCostTiles, type JobCostTileKey } from "@/lib/jobCostTiles";
+import { errorText } from "@/lib/errorText";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -131,13 +138,27 @@ export default function QuickBidPage({
     void utils.bids.list.invalidate();
   }, [utils, bidId]);
 
+  /*
+    Counts held for the connection. Offline, a count is PAUSED, not failed,
+    and the line does not exist yet — so the header said "0 lines" after two
+    counts, inviting a third (drill, 2026-10-15). Only paused ones: a count
+    in flight online takes a tenth of a second and needs no word.
+  */
+  const waitingToSend = useMutationState({
+    filters: {
+      mutationKey: getMutationKey(trpc.bids.addAssembly),
+      predicate: m => m.state.status === "pending" && m.state.isPaused,
+    },
+    select: m => (m.state.variables as { bidId?: number } | undefined)?.bidId,
+  }).filter(id => id === bidId).length;
+
   const addAssembly = trpc.bids.addAssembly.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
   const addKit = trpc.bids.addKit.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(
         `Added ${result.kitName} — ${result.lineIds.length} line${result.lineIds.length === 1 ? "" : "s"}` +
@@ -168,7 +189,7 @@ export default function QuickBidPage({
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: refresh,
   });
@@ -227,7 +248,7 @@ export default function QuickBidPage({
 
   const add = useCallback(
     (assemblyId: number) => {
-      const amount = Number(qty);
+      const amount = parseTypedNumber(qty);
       if (!Number.isFinite(amount) || amount <= 0) {
         toast.error("Enter a quantity greater than zero.");
         return;
@@ -288,6 +309,36 @@ export default function QuickBidPage({
   // Newest first: what you just counted is what you want to check.
   const recent = [...lines].reverse();
 
+  // A bid that did not load is not an empty bid: drawn anyway, this screen
+  // said "Quick bid · 0 lines" under a database outage (drill, 2026-10-15).
+  // …but a failed REFRESH of a bid already on screen keeps the screen; the
+  // app-wide bar says the data is out of reach (@/lib/dataReach).
+  if (
+    detailQuery.isError &&
+    !(isReachFailure(detailQuery.error) && detailQuery.data)
+  ) {
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6">
+        <div className="w-full max-w-md">
+          {isReachFailure(detailQuery.error) ? (
+            <LoadFailed
+              what="this bid"
+              onRetry={() => void detailQuery.refetch()}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center">
+              That bid could not be opened — it may have been archived or
+              deleted.
+            </p>
+          )}
+        </div>
+        <Button size="sm" variant="ghost" className="gap-1.5" onClick={onBack}>
+          <ArrowLeft className="w-3.5 h-3.5" /> Bid
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="page-header border-b border-border px-6 py-4">
@@ -306,7 +357,16 @@ export default function QuickBidPage({
               {detail?.bid.name ?? "Quick bid"}
             </h1>
             <p className="text-xs text-muted-foreground">
-              {lines.length} line{lines.length === 1 ? "" : "s"} · counting mode
+              {detail
+                ? `${lines.length} line${lines.length === 1 ? "" : "s"}`
+                : "…"}{" "}
+              · counting mode
+              {waitingToSend > 0 && (
+                <span className="text-amber-500">
+                  {" "}
+                  · {waitingToSend} waiting to send
+                </span>
+              )}
             </p>
           </div>
           {/* On a phone .page-header drops this block to its own line, flush
@@ -336,6 +396,10 @@ export default function QuickBidPage({
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="max-w-4xl space-y-4">
+          <ArchivedBidNotice
+            bidId={bidId}
+            archivedAt={detail?.bid.archivedAt}
+          />
           {/* Same strip as the bid screen (owner Q14, Q22). */}
           <MathChangeStrip bidId={bidId} />
           {/* The loop: type, arrow, Enter */}
@@ -385,7 +449,7 @@ export default function QuickBidPage({
                 query={buildingFrom}
                 target={{
                   kind: "line",
-                  qty: Number(qty),
+                  qty: parseTypedNumber(qty),
                   unitLabel: unitLabel.trim() || null,
                   merge: true,
                 }}
@@ -600,11 +664,18 @@ export default function QuickBidPage({
                   <button
                     key={kit.id}
                     onClick={() => {
-                      const amount = Number(qty);
+                      // Refused like an assembly add. It used to put the
+                      // kit on at 1 when the quantity could not be read —
+                      // a different number from the one on screen.
+                      const amount = parseTypedNumber(qty);
+                      if (!Number.isFinite(amount) || amount <= 0) {
+                        toast.error("Enter a quantity greater than zero.");
+                        return;
+                      }
                       addKit.mutate({
                         bidId,
                         kitId: kit.id,
-                        qty: Number.isFinite(amount) && amount > 0 ? amount : 1,
+                        qty: amount,
                         unitLabel: unitLabel.trim() || null,
                       });
                       focusSearch();
@@ -693,7 +764,7 @@ export default function QuickBidPage({
                   <InlineNumberField
                     value={Number(line.qty)}
                     onSave={next =>
-                      updateLine.mutate({ bidId, id: line.id, qty: next })
+                      updateLine.mutateAsync({ bidId, id: line.id, qty: next })
                     }
                     rules={{ min: 0, max: 999999 }}
                     className="h-7 w-16 text-sm"

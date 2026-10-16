@@ -2,6 +2,12 @@
  * A number box in a DRAFT form (one with its own Save button) that keeps the
  * text as typed. Every box that rebuilt its text from the number dropped the
  * point in "2." and turned "2.5" into 25 — see lib/draftNumberText.ts.
+ *
+ * On blur the box shows the number actually HELD, so text that was clamped
+ * ("250" in a 0–100 box), refused ("0x10") or declined by the caller (a step
+ * count of 0) changes in front of the person instead of sitting there looking
+ * saved. Tracks B and C each built one of these on 2026-10-15; this is the
+ * merge of the two (B's blank-aware API, C's parsing and blur).
  */
 import { useState, type ComponentProps } from "react";
 import { Input } from "@/components/ui/input";
@@ -24,6 +30,7 @@ export function DraftNumberInput({
   onValue,
   min = 0,
   max = Number.POSITIVE_INFINITY,
+  onBlur,
   ...rest
 }: Props) {
   const [draft, setDraft] = useState<DraftNumber>(() => draftNumberFrom(value));
@@ -52,6 +59,11 @@ export function DraftNumberInput({
           setEcho(true);
           onValue(next.value);
         }
+      }}
+      onBlur={e => {
+        setDraft(draftNumberFrom(value));
+        setEcho(false);
+        onBlur?.(e);
       }}
     />
   );

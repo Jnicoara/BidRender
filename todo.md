@@ -3,6 +3,37 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Bid methods — wiring left (Track B, 2026-10-16, waits for A's BM-M1..M10)
+
+`references/bid-methods-plan.md`, all 16 picks approved. **Built on track-b
+2026-10-16, no column needed:** the engine (`shared/bidMethods.ts`: one
+pricer per method, the no-stacking type, `lineMethodTerms`, the A charge
+uplift), a per-line charge rate in `calculateLineItem` (`laborMarkup`,
+`laborNotPriced`), the "how bid" line and effective margin under Total due,
+the prevailing-wage and bracket arithmetic (`shared/prevailingWage.ts`,
+`shared/markupBrackets.ts`). Tests: `server/bidMethods.test.ts` and siblings.
+
+**Every bid prices by the old math until these land, and that is enforced in
+one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL. The
+SQL drafts are in `references/track-a-handoff.md` § "Bid methods". After A
+applies them and local-dev is merged into track-b:
+
+1. `bidPricingMethod(bid)` reads `bids.pricingMethod` (BM-M1).
+2. `priceLine` reads `snapshotChargeRate` (BM-M5) instead of `null`, and
+   adding a line freezes the role's `chargeRate` (BM-M4) into it.
+3. The SQL sums the Dashboard uses (`costSums` in `server/db.ts`) must learn
+   the method: zero material markup on Cost + O&P, add labor markup on A.
+   `server/bidPriceSurfaces.test.ts` gets an A bid and a B bid so a card and
+   its bid cannot disagree.
+4. `lineNotPriced` counts a NULL charge rate on an A line as labor not priced.
+5. Screens: the per-bid method toggle (old → new shown, Draft only), the
+   old-math offer on Drafts, greyed "Not used in …" settings, the company
+   method on `/settings/pricing` and the new-shop "How do you usually bid?"
+   step, charge rate per role on Labor Rates, wage sets in Labor, the
+   apprentice question, the re-check and below-PW warnings.
+6. Freeze `pricingMethod` with the rest when a bid leaves Draft
+   (`freezeBidSettings`).
+
 ## Smoke takes 13 min, was 6.3 — how to get it back near 6 without dropping a test (Track B, 2026-10-16, NOT done)
 
 **Measured 2026-10-16**, full local smoke on track-b after merging local-dev
@@ -649,7 +680,8 @@ receptacle` (+ `Weatherproof in-use cover, 30A/50A power receptacle`
       with it, at laptop and tablet. Staging (`06791ea`): "No flash" at
       both sizes, the renewal landing after sheet 1 was drawn.
       Original item:
-- [ ] **FIRST: the white box at the top-left when a plan opens** (owner,
+- [x] **DONE by Track B in `14fead91`** (planCanvasStep forgets the drawn page on a load; planLoadState reads the drawn page) — this entry was left open; found stale 2026-10-14. Was:
+      **FIRST: the white box at the top-left when a plan opens** (owner,
       2026-10-07). **Reproduced on staging** at laptop and tablet
       (1180x820, touch) with `scripts/stagingOpenFlash.mts`, which prints
       `FLASH` today. Screencast frame:
@@ -1338,6 +1370,61 @@ All additive and nullable. Specs are in the plans named.
       their soft picture, because a re-capture never replaces an existing
       thumbnail; remove the symbol and capture it again to get a sharp one.
 
+### LOST DATA: two people saving the same library item — DONE for all five library editors (Track C, 2026-10-15 night)
+
+- [x] **A whole-form Save from a screen opened before someone else's save puts
+      their change back, silently.** Seen on screen on the assembly editor: A
+      set a quantity to 4 and saved; B (opened earlier) renamed and saved;
+      the quantity went back to 1 and B was told "Assembly saved." **Fixed for
+      assemblies** (`shared/staleEdit.ts`: the editor sends `openedAt`, the
+      server refuses with "Someone saved this after you opened it…" and
+      changes nothing; `server/assemblyStaleEdit.test.ts`, red without the
+      guard; shots `two-editors-{before,after}.png`). Whole seconds (the
+      column's precision) — two saves inside one second slip through.
+      **Kits guarded too** (same night; `server/staleEdit.test.ts`, red
+      without it; `two-kit-editors-after.png`) **and Materials** (the row
+      editor; a price kept, `two-material-editors-after.png` — rows have no
+      self-saving price box, so a person's own row edit cannot trip it).
+      **Labor rates and Modifiers too** — all five editors now send
+      `openedAt` (`server/staleEdit.test.ts`, 9 cases, each red without its
+      guard). **Found by measuring, then fixed:** with a slow connection a
+      person who saved and reopened at once was refused by their OWN first
+      save (the list still held the old timestamp); every editor now writes
+      the saved row into its cache on success — checked on screen with every
+      refetch held 4 s, all five editors, two saves each, none refused.
+      **Clients too** (00:37; the address is what tax is matched from).
+      Not guarded: proposal text and bid notes (text boxes that save on
+      their own) — same check if one ever shows the symptom.
+
+### Library editors drop a half-made edit without asking (Track C, 2026-10-15 night) — DONE for every library editor and Clients (2026-10-16)
+
+- [x] **BUILT 2026-10-16 (Track C):** `@/lib/unsavedGuard` (tested) +
+      `useUnsavedGuard(dirty)` + one `UnsavedChangesDialog` in the shell.
+      The assembly and kit editors compare what Save would send against
+      the saved row; with a difference, their Back, any nav link, the
+      browser's Back and a reload/close all ask "Discard your changes?"
+      (Keep editing / Discard changes). An untouched or just-saved editor
+      leaves without asking. Checked on screen, laptop and phone
+      (`overnight-shots/unsaved-*.png`). **Materials too** (row editor and
+      the add form; leaving the screen asks, its Cancel does not — Cancel
+      says discard). **Labor rates, Modifiers and Clients too** (same
+      rule; each checked on screen untouched vs edited). Was:
+- [x] **DONE 2026-10-16 (track-c, `0f92dbae`…`5ebb921f`):** a shell-level
+      guard (`lib/unsavedGuard.ts`, `hooks/useUnsavedGuard`, one dialog in
+      `BidRenderShell`) asks "Discard your changes?" on Back, a nav link,
+      browser Back or reload, on every library editor and Clients; Cancel
+      still cancels. Seen on screen. One rough edge, seen once on a cold dev
+      server: leaving within a second of Save, before the save's reply came
+      back, asked anyway (the editor still compared against the old copy) —
+      safe, but a needless question; not reproduced on four later runs.
+- [x] **Back, or any nav link, from the assembly / kit / material editors
+      throws away what was typed, with no "Discard changes?".** The Plans
+      screen guards its unsaved trace (`beforeunload`, TakeoffPage), the
+      library editors do not — and their own Back button discards silently
+      too, so it reads as a choice rather than a slip. Worth deciding: a
+      shell-level `useUnsavedGuard(dirty)` that `navigate` (BidRenderShell)
+      consults would cover every editor at once.
+
 ### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed
 
 **Found** rehearsing the LT1/LT2 repair: adding a $0 fixture line to the
@@ -1440,6 +1527,67 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       3,000:** page `materials.list` and move search to the server, or at
       least off the main thread. The scale test's budgets are the alarm; do
       not loosen them to get past it.
+      **Re-measured 2026-10-15** in a browser on the stress account (1,717
+      rows, production build): the Materials screen's `materials.list` reply
+      is **1.66 MB raw, 88 KB gzipped**; the Plans screen's first batch is
+      1.9 MB. Every other main screen is under 240 KB. Still fine behind
+      the edge; still the whole table.
+
+### A database that stops answering can wedge the server (drill, 2026-10-15)
+
+- [ ] **Pooled connections stuck on a reply that never comes are never
+      thrown away** (Track A — `server/db.ts`, `server/slowRequests.ts`).
+      Drilled with `scripts/dbFaultProxy.mts`: three hangs of 8 reads each
+      used all 10 mysql2 connections, and every later database read waited
+      forever — sign-in dead until a restart, `/api/version` still 200.
+      mysql2's per-query `timeout` only reports; it returns the connection
+      to the pool still waiting for the old reply. Fix: a time limit that
+      DESTROYS the connection, never applied to the backup's long reads;
+      plus a health check that touches the database so a wedged instance
+      is restarted. Morning question Q-DB1; numbers in
+      `references/stress-results.md` ("Third round").
+
+- [x] **An optimistic Save form drops the typed edit when the save is
+      refused** (drill, 2026-10-15). Labor rates, Kits and Modifiers close
+      their row editor at once and roll back on error — CLAUDE.md §
+      Responsiveness rule 1, and the toast does say it failed — but the
+      person must retype the whole edit. Materials did the same with an
+      AWAITED save (closed even after a refusal); fixed: its editor now
+      stays open with the edit. A better shape for the optimistic ones:
+      on error, reopen the editor holding the draft that failed.
+      **Done for Modifiers (2026-10-15 day):** the row editor reopens with
+      the typed values; Add keeps its form and no longer says "Added" (or
+      "Deleted permanently") before the server agrees. **Labor rates too**
+      (same day): reopens on refusal; Add says "Added" only once true, and
+      sends the number its check read (Number() would have sent "$45" as
+      NaN — from reading the code). **Kits** needed no reopen (its editor
+      closes only on success); its Save is now guarded so a double click
+      sends one create (drilled: 1 request, 1 kit). Item done.
+
+- [ ] **The server accepts edits to an ARCHIVED bid** (drill, 2026-10-15).
+      Archive in one tab and the other tab's `updateLine`, `addAssembly`,
+      `update` and `removeLine` all succeed — onto a bid that is deleted for
+      good when its 30 days run out. The bid page and Count screen now say
+      so ("This bid is in Recently deleted … Restore",
+      `components/bid/ArchivedBidNotice.tsx`), and a tab picks it up when
+      it is shown again. Refusing the edits server-side needs ONE guard in
+      every route that writes under a bid, the plan-screen routes (Track B)
+      included — or an owner decision that editing in the trash is fine.
+
+### Price-list import: one material at two prices is REFUSED (owner, 2026-10-16, Q-IMP1)
+
+- [x] **DONE 2026-10-16 (track-c):** `importPrices` returns `refused`
+      (name + both prices) in place of `conflicts`, writes nothing for that
+      material, and the import result says "Not changed — fix the sheet".
+      The "last price stands" case became "two prices are refused, not the
+      last price" plus a one-price case that still forks once.
+- [x] **Build:** a sheet naming one material twice at different prices
+      changes nothing for that material and lists it as refused ("named at
+      $3 and $4 — not changed, fix the sheet"). Today the last row wins and
+      the import reports it. Change the "last price stands" case in
+      `server/supplierPricing.test.ts` to the new rule in the same commit
+      (owner decision, `pricing/morning-questions.md` Q-IMP1). Import
+      screen is hidden (`PRICE_LIST_IMPORT_SHOWN = false`), so no urgency.
 
 ### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
 
@@ -1476,7 +1624,14 @@ and `server/priceListParse.test.ts:202` pins that.
 
 ### Before beta: sign-in protection (owner, 2026-10-06)
 
-- [ ] **Block known-leaked passwords** at sign-up, password change and
+- [x] **DONE 2026-10-14 (C, overnight run #2, on track-c):**
+      `server/leakedPasswords.ts` — SHA-1 prefix (5 chars) to the HIBP range
+      API with padding, matched here; refused in plain words at sign-up,
+      change and reset (reset BEFORE its link is used); **fails open** after
+      2.5 s or any error; off in every test (`vitest.setup.ts`). Tests:
+      `leakedPasswords.test.ts`, `authLeaked.test.ts` (red without the
+      reset check). Change-password now uses the sign-up rules too. Was:
+      **Block known-leaked passwords** at sign-up, password change and
       reset: refuse a password found in a breach list (for example the
       k-anonymity range check against Have I Been Pwned: only the first five
       characters of the SHA-1 leave the server). The refusal says plainly
@@ -1676,15 +1831,44 @@ Design: `references/homerun-footage-plan.md` § 4.
       § 3, guard 3). The tap-to-place path stays as it is.
       `references/device-audit.md` § "Left to do".
 
+### Starter offers: Drafts listed from runs on DELETED plan sets (for Track B, found by C 2026-10-16)
+
+- [ ] **`server/starterOffers.ts` `attachDrafts`** reads the Drafts' runs
+      with `inArray(takeoffRuns.bidId, draftIds)` and no live-sheet rule,
+      so a run left on a deleted plan set can list a Draft as "would
+      re-count" when nothing on it would move. Every quantity read filters
+      `onLivePlanSheet(…)`; the list form is
+      `onLivePlanSheet(takeoffRuns.sheetId, takeoffRuns.bidId)` (correlated,
+      added for the Dashboard's list reads). Found when
+      `quantitiesIgnoreDeletedPlans.test.ts` learned to see `inArray` reads;
+      it names this file as its one KNOWN gap and goes red when the gap is
+      fixed, so remove the entry in the same commit.
+
 ### Plans: a plan that cannot be opened leaves the counts panel saying "loading…" (Track B, 2026-10-16)
 
-- [ ] Only a damaged or password-protected set attached BEFORE 2026-10-16
+- [x] **DONE 2026-10-16 (B):** PlanPane reports `onOpenFailed`; the line
+      says "This sheet: the plan could not be opened" and the Counts / Runs
+      empty states say why (`sheetLine`'s `planUnopened`,
+      `client/src/lib/panelTabs.test.ts`, red without it). Looked at on a
+      throwaway bid at laptop, iPad and phone
+      (`references/overnight-shots/b/plans-unopenable-*.png`). Was:
+      Only a damaged or password-protected set attached BEFORE 2026-10-16
       can show it (the upload now refuses those — `probePlanFile`). The
       drawing says what is wrong, but no sheet rows exist, so the sheet's
       mark list never loads and the line reads "This sheet: loading…" for
       ever. Fix: route PlanPane's open error up and let the panel say "This
       plan could not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts`
       work.
+
+### Plans: a mouse in an ~820 px window leaves the drawing ~80 px wide (Track B, 2026-10-16, NOT fixed — layout policy)
+
+- [ ] `plansLayout` gives a mouse at 768 px or wider the laptop layout, with
+      the sheet list AND the panel open beside the drawing. At 820 x 1180
+      the drawing gets about 80 px, and a damaged plan's message wraps one
+      word per line (`references/overnight-shots/b/plans-unopenable-ipad.png`).
+      A real iPad has a finger and gets the phone layout, so this is a
+      narrow laptop window (split screen). Not fixed: whether to start a
+      panel folded below some width is a layout decision, not a fault fix.
 
 ### Before beta: speed of the summary, and two missing Undos
 
@@ -1721,7 +1905,19 @@ Design: `references/homerun-footage-plan.md` § 4.
       row — then `drop` inserts with `INSERT … ON DUPLICATE KEY` semantics
       and reads the ids back. **Done when** `markReplay.test.ts` passes with
       the in-memory map cleared between the two sends.
-- [ ] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
+- [x] **DONE 2026-10-16 (Track C):** the lists (Dashboard, Find a bid,
+      archive) read every listed bid's lines, groups, mark counts and
+      charges in a few queries for the whole list
+      (`db.getRollupLinesForBids`; each single-bid read is now the list
+      read with one id, and the counts are laid on by the same
+      `applyPlanCounts`). An unlocked bid with traced-run lines still goes
+      the single-bid way (its footage is a dozen reads deep). Measured with
+      `speedBigData.test.ts` raised to **250 bids**, same laptop, same
+      fixture: Dashboard median **460 ms → 85 ms** (61 bids: 114 → 36 ms).
+      The test now holds the Dashboard to 1 s at 250 bids, and
+      `goldenBids.test.ts` holds the Dashboard card and Find a bid to the
+      bid screen's total due on all nine golden bids.
+- [x] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
       measured).** `server/speedBigData.test.ts` (`SPEED_BIG_DATA=1`): 61
       bids → `bids.dashboard` + `archived` median **493 ms**; 1 bid → 39 ms
       in the Gate. About 8 ms a bid, so ≈ 2 s near 250 bids for one company.
@@ -1811,9 +2007,70 @@ Measurements: `references/code-first-ceiling.md` § d.
       release, so the scale check passes it clean there too. Other
       worktrees' `reader-accuracy/plans/Weld 1.pdf` copies are also old.
 
+### The Dashboard's "drops not priced" check under heavy load (Track C, 2026-10-15)
+
+- [ ] **Measured (references/stress-results.md):** with a count that drops on
+      62 of a 150-bid company's bids, `bids.dashboard` takes 683 ms alone and
+      **2.3 s (p50)** while ten other companies hammer the server (requests
+      back to back — roughly 200 real users' worth). Each of those bids runs
+      the bid page's whole drops calculation (~10 small queries, 8–13 ms),
+      four at a time, through a 10-connection pool. Bids with no drop kind
+      already skip it (`bidsWithADropKind`, 2.4 s → 0.4 s). Options, in
+      order of safety: share the company-wide height context across the list
+      instead of reloading it per bid; batch the per-bid reads (groups,
+      stamps, runs, scales) into one query each for the whole list; then,
+      only with Track A, a bigger pool (live connection limits). Never a
+      cache that could show yesterday's count.
+      **Step 1 DONE 2026-10-16 (Track C):** the company's half of the
+      heights (`companyHeights`: defaults, heights, extra defaults, run
+      types) is read once per list, not per bid. Measured on the local copy
+      with one dropping count on each of 163 marked bids:
+      `dropsNotPricedForBids` 521 → 395–424 ms (alone, no load). The same
+      four reads, so the same answers (155 bids compared, and the five
+      drops-count test files pass). Next, if needed: batch groups, stamps,
+      runs and scales per list.
+
+### Number boxes in forms with a Save button read only plain numbers (Track C, 2026-10-15)
+
+- [ ] **`parseTypedNumber` (client/src/lib/inlineEdit.ts) is used by every
+      self-saving number box and the Materials editor's price boxes.** The
+      other forms with their own Save button (~38 `Number(draft…)` /
+      `parseFloat` sites in client/src/pages and components) still read
+      "$12.50" and "1,500" as not-a-number (refused with a message — honest)
+      and "0x10" as 16 (a wrong number, if anyone ever typed it). Move them to
+      the same reader, one screen per commit, and look at each.
+      **Done so far:** Labor rates and Materials price (2026-10-15 night);
+      the Assemblies editor's labor and overhead hours (2026-10-15 day —
+      check, preview and save all read the box the same way; "$1.5" saves
+      1.5, "0x10" is refused instead of saved as 16). Modifiers' percent
+      (check, save and add; also accepts a trailing "%": "15%" saves 15%). Materials' labor
+      hours (now checked: 0–12 or blank), pack quantity and raceway lengths. Fix
+      this line (hours and prices): it stripped EVERY comma, so "1,5" became
+      15 on a bid line — now refused in words. **Night 3 (2026-10-15 → 16,
+      Track C):** assembly material qty and kit item qty stored 2.25 as 225
+      when typed key by key (`String(qty)` re-rendered "2." as "2") — now
+      `DraftNumberInput`; also assembly steps' "How many"; Remove/Relocate
+      hours; Count screen quantity (a kit added at 1 when the quantity could
+      not be read — now refused); build-from-parts; first-run rate;
+      material markup ("15%" accepted, `parseTypedPercent`); duplicate
+      units; SeatLimitsPanel. **2026-10-16: the `ExtraDraftField` fault below
+      was fixed by Track B (`88a35407`) with its own `DraftNumberInput`; the
+      merge into track-c kept ONE component (B's API, C's
+      `parseTypedNumber` reading and show-what-is-held on blur), so every
+      draft number box reads "1,500" / "$2.50" / "0x10" the same way.**
+      **Left — B's Plans-screen files, for Track B:** - **`takeoff/RunTypePicker.tsx` `ExtraDraftField` (line ~302) — SAME
+      dropped-dot fault, a WRONG NUMBER:** `value={String(value)}` with
+      `Number(raw)` on each key, so typing a 2.5 % extra or 1.5 in makeup
+      saves 25 / 15. Fix like `DraftNumberInput` (it holds the text; this
+      one is nullable, so keep its blank = "company"). `CountField` (~367)
+      floors, so a dot is dropped harmlessly, but "0x10" reads as 16. - `takeoff/GroupDrop.tsx` ~164, `takeoff/HomerunControls.tsx` ~274:
+      `<select>`s of ids (checked) — fine. - `takeoff/SheetIndex.tsx` ~266 typed sheet number — text, probably
+      fine; `SheetCheck.tsx` ~503 and `TraceLayer.tsx` ~2210 are id
+      `<select>`s (fine).
+
 ### Flaky tests — fix in a batch before beta
 
-- [ ] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
+- [x] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
       2026-10-06) — treat as a possible REAL bug, not a test flake: a
       person who reloads the Plans screen and sees nothing for a minute
       would believe their plans were gone.** Smoke flow 9, "a refresh keeps
@@ -1889,12 +2146,18 @@ Measurements: `references/code-first-ceiling.md` § d.
       holds are one-shot (1.5 s, 1.2 s), so they cannot starve a refresh,
       and both sit far under the new 20 s read deadline. Local: 4 of 4
       green with the changes above.
-- [ ] **`server/materialsList.test.ts` "does not contain the actual costs"
+- [x] **FIXED 2026-10-05 (`f8fdec3f`), this line left open until
+      2026-10-16:** the fixture cost 1.42 was inside the document's
+      `preparedOn` time ("05:54:01.424Z"); `asAFigure` now matches a cost
+      only as a standalone figure. Not seen red since.
+- [x] **`server/materialsList.test.ts` "does not contain the actual costs"
       failed once in CI** (run 37420713101, `6877993`): "expected
       '{"bidName":"Matlist bid 1791266041322…' not to contain '1.42'". Looks
       like a fixture price that can also appear inside a generated
       timestamp-or-id string. Not investigated; noted so the next red run is
-      recognised.
+      recognised. **FIXED (f8fdec3f):** the cost is matched as a standalone
+      figure; the failure was `preparedOn` "05:54:01.424Z" containing "1.42".
+      Ticked 2026-10-16 (B).
 
 Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
@@ -3661,7 +3924,11 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       and a Plans chip on every card with drawings, both from
       `getDashboardBids`; Plans is the primary button on a bid; the bid's
       "Plans screen" mentions are links; a `plans` navigation target.
-- [ ] **Plans, Phase 2 — a Plans entry in the left menu — deferred by the
+- [x] **BUILT 2026-10-14 (Track C, owner's overnight queue item 5b): Plans
+      AND Bids entries in the left menu** — `/plans` (PlansIndexPage) and
+      `/bids` (BidListPage); CLAUDE.md § Architecture and the shell say so.
+      The entry below is kept as the record of the deferral it replaced.
+- [x] **Plans, Phase 2 — a Plans entry in the left menu — deferred by the
       owner (2026-09-27): "Phase 1 first, left-menu tab later".** The design
       is in `references/track-b-beta-plan.md` § 3 (a `/plans` index screen,
       not a dead end), and it means rewriting CLAUDE.md's "none of them is in
@@ -3729,8 +3996,8 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
   - **2026-09-26: 124 → 4**, one commit per file (21 commits, `db116dd`..`72c11fa`), each with that file's test count identical before and after, no cast / `any` / `@ts-ignore`, no assertion weakened. The recurring causes were fixtures behind a type that grew (`separateGround`, `productivityPct`, `materialMarkup`, four `User` columns), `Partial` being shallow, read-backs typed `| undefined`, a nullable `breakdown` (from `88270df`), and the missing `target` below.
   - [x] **`server/takeoffBridgeFlow.test.ts` — fixed 2026-09-26, `3e8e973`.** The fork assertion read `forked!.id`, `undefined` because `assemblies.update` returns `{ assembly, forked }`, so that one assertion could never fail; it is now `expect(forked.assembly?.id).not.toBe(baselineId)`. **Correcting what was written here before:** "the test proves nothing" was too strong. Measured against an update made never to fork, the OLD test still went red — two assertions later, on a snapshot-hours mismatch (`expected 0.5 to be 1.25`), blaming the wrong thing. The new line fails at the fork itself (`expected 14391 not to be 14391`). The missing `category` was stated as `"Devices"`, which is what MySQL had been storing (measured, even under strict mode).
   - [x] **`server/permissions.test.ts` — the shipped type defect, fixed and deployed 2026-09-26, `e899092`.** The two `as unknown as [CompanyRole, …]` casts in `companyRouter.ts` are gone; `role: "owner"` is now a compile error and the `@ts-expect-error` lines are used. **Correcting the fix proposed here before:** no literal tuple was needed and `shared/permissions.ts` did not change — the cast was a zod 3 workaround, and zod 4's `z.enum` takes the already-correctly-typed filtered array. Emitted JS for the file is byte-identical, so the runtime refusal is the same code; checked live before and after the deploy (owner refused by `invalid_value` against `["admin","estimator","viewer"]`, the three normal roles invite).
-  - [ ] **`tsconfig.json` sets no `target`.** Its only visible effect so far: iterating a Set, Map or `matchAll`, and top-level `await`, do not compile, so the codebase uses `Array.from(...)` (now in tests too). Deliberately not changed in passing: Vite and esbuild read `target` (it sets the default for `useDefineForClassFields`), so it can change how shipped classes compile. Decide it on purpose. **It is also what keeps `scripts/` out of `pnpm check`:** measured 2026-09-26, including all of `scripts/` reports 43 errors in 11 files, 42 of them this (39 top-level `await`, 2 iterations, 1 top-level `for await`) and 1 ordinary type error (TS2345). `migrate.mts` and `schemaDrift.mts`, both run against production during a deploy, are among them. Settle `target`, fix the one, then add `scripts/**/*` to `include`.
-        **Re-measured 2026-10-14 (Track A night, `references/night-cleanup-2026-10-14.md` § 3):** the gap has grown — `scripts/` now adds **589 errors in 56 files** (564 top-level `await`, 11 iterations); with `target: ES2022` that falls to **5 real errors in 2 stale one-off scripts** (`rehearseBackfill.mts`, `groundShareImpact.mts`), and the app's own check stays at **0** with `ES2022`. The `useDefineForClassFields` question above is still the decision to make first. Measure with `--incremental false`: the shared `tsBuildInfoFile` otherwise hands one config's answer to another.
+  - [ ] **`tsconfig.json` sets no `target`.** Its only visible effect so far: iterating a Set, Map or `matchAll`, and top-level `await`, do not compile, so the codebase uses `Array.from(...)` (now in tests too). Deliberately not changed in passing: Vite and esbuild read `target` (it sets the default for `useDefineForClassFields`), so it can change how shipped classes compile. Decide it on purpose. **It is also what keeps `scripts/` out of `pnpm check`:** measured 2026-09-26, including all of `scripts/` reports 43 errors in 11 files, 42 of them this (39 top-level `await`, 2 iterations, 1 top-level `for await`) and 1 ordinary type error (TS2345). `migrate.mts` and `schemaDrift.mts`, both run against production during a deploy, are among them. Settle `target`, fix the one, then add `scripts/**/*` to `include`. **Scripts half DONE 2026-10-14 (Track C):** `tsconfig.scripts.json` (extends this one, adds only `target: ES2022`) is the second pass of `pnpm check`; the 63 tools compile, after fixing two real drifts (rehearseBackfill renamed fields, groundShareImpact hand-built run). The ROOT `target` (shipped code) is still undecided — this item stays open for that.
+        **Re-measured 2026-10-14 (Track A night, before Track C added `tsconfig.scripts.json` the same day, which fixed both of those scripts; `references/night-cleanup-2026-10-14.md` § 3):** the gap has grown — `scripts/` now adds **589 errors in 56 files** (564 top-level `await`, 11 iterations); with `target: ES2022` that falls to **5 real errors in 2 stale one-off scripts** (`rehearseBackfill.mts`, `groundShareImpact.mts`), and the app's own check stays at **0** with `ES2022`. The `useDefineForClassFields` question above is still the decision to make first. Measure with `--incremental false`: the shared `tsBuildInfoFile` otherwise hands one config's answer to another.
   - [x] **Flipped the exclusion — 2026-09-26.** `pnpm check` now compiles every test file (`server/**`, `client/src/**`, `scripts/**/*.test.ts`) under the same `compilerOptions`. Verified: clean on the codebase (534 files, up from 379 — the 151 tests, the 2 scripts they import, a JSON fixture and `pricing/movedFromSheet.ts`, both imported by tests); a planted error in a test fails it (exit 2, naming the line); warm run ~3.8 s → ~4.2 s, cold unchanged within noise; shipped output byte-identical once the build timestamp and the filename hashes it feeds are normalised (23/23 files, old config vs new).
 
 ## Material markup (references/material-markup.md)
@@ -4025,7 +4292,8 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       sweep has none of these queries, which is why it passed. Planned, with
       the risk to other count searches: `references/track-c-next-batch-plan.md`
       § S1.
-- [ ] **`aliases()` drops a repeated word, which silently breaks alias
+- [x] **AUDITED 2026-10-14 (Track C, overnight): 269 count phrases dropped in 190 shipped rows, and every one still searches right** (the name carries the count; search maps number words) — measured, left as is, the false comment in `types.ts` corrected. Was:
+      **`aliases()` drops a repeated word, which silently breaks alias
       PHRASES.** `server/seed/materials/types.ts`: it de-duplicates word by
       word, so "one hole 1 hole two hole 2 hole" was stored as "one hole 1
       two 2" and "2 hole strap" could not find `EMT strap`; my own "3 hole 5

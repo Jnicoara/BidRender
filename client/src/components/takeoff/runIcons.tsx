@@ -118,6 +118,26 @@ export function CableIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 /**
+ * HOMERUN — the drawing's own homerun symbol: a SOLID line ending in an
+ * arrowhead, with conductor tick marks across it (owner, 2026-10-14: "new
+ * homerun icon, not plug-on-each-end" — lucide's `Cable`, a patch lead).
+ *
+ * Solid on purpose, never dashed: references/homerun-patent-notes.md § 3
+ * removed the dashed display line, and an icon teaching a dashed homerun
+ * would be a picture of the thing we took out.
+ */
+export function HomerunIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M2 12h18" />
+      <path d="M16 8l4 4-4 4" />
+      <path d="M5 9l2 6" />
+      <path d="M9 9l2 6" />
+    </svg>
+  );
+}
+
+/**
  * ── There are no tint constants here any more, and that is the point ────────
  *
  * There used to be two — conduit yellow, cable emerald — and the comment above

@@ -385,5 +385,10 @@ export function toQuickBooksCsv(doc: AccountingExport): string {
 
 /** A filename that says which bid and when, for a downloads folder. */
 export function accountingFilename(doc: AccountingExport): string {
-  return `${doc.invoiceNo}-quickbooks-${doc.invoiceDate.toISOString().slice(0, 10)}.csv`;
+  // The LOCAL date, the same one the invoice inside carries
+  // (formatQuickBooksDate). toISOString() is UTC, so an export made on an
+  // American evening was named after tomorrow (2026-10-15).
+  const d = doc.invoiceDate;
+  const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${doc.invoiceNo}-quickbooks-${ymd}.csv`;
 }

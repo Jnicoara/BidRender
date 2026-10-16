@@ -259,3 +259,12 @@ priced keep their snapshots; only new lines change.
 "tesla" R2 ahead of 818, and "pop up floor" must not surface the countertop
 row first. If a recount finds a starter using 802, 816 or 817 that this
 review did not list, stop and find out why before retiring them.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

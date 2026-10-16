@@ -21,6 +21,7 @@ import { TRADE_ALL } from "../../shared/trades";
 import { loadedRate } from "../../shared/loadedRate";
 import { changed } from "../../shared/exampleTags";
 import * as db from "../db";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 
 /**
  * This router's gate: a query needs `pricing.view`, a mutation needs `pricing.edit`.
@@ -198,6 +199,8 @@ export const laborRatesRouter = router({
     .input(
       rateBodySchema.partial().extend({
         id: z.number().int().positive(),
+        /** When the editor took its draft (shared/staleEdit.ts). */
+        openedAt: z.date().optional(),
         name: nameSchema.optional(),
         /**
          * The LOADED rate as its parts (0134): wage + payroll taxes +
@@ -210,7 +213,7 @@ export const laborRatesRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, breakdown, ...rest } = input;
+      const { id, breakdown, openedAt, ...rest } = input;
 
       const target = await db.getLaborRateById(id, ctx.scope.dataUserId);
       if (!target)
@@ -218,6 +221,10 @@ export const laborRatesRouter = router({
           code: "NOT_FOUND",
           message: "Labor rate not found.",
         });
+      // The row editor saves its whole form, so a save from a screen opened
+      // before somebody else's would put their change back (staleEdit.ts).
+      if (savedSinceOpened(target.updatedAt, openedAt))
+        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline

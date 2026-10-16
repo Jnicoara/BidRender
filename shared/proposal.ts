@@ -446,6 +446,13 @@ export type BuildProposalInput = {
   /** Passed in, never read from the clock — see shared/retention.ts for why. */
   now: Date;
   /**
+   * The reader's time zone (an IANA name, from their browser), for the date
+   * on the quote and its "good through". Built on the server, these used
+   * the SERVER's zone — UTC on live — so a quote prepared on an American
+   * evening was dated tomorrow (2026-10-15). Omitted: the server's zone.
+   */
+  timeZone?: string;
+  /**
    * Lines and parts the totals count as $0 because nobody priced them
    * (`countNotPriced`). Required, not optional: a caller that could leave it
    * out would print a short total as if it were the price.
@@ -584,8 +591,11 @@ const DATE_FORMAT: Intl.DateTimeFormatOptions = {
   day: "numeric",
 };
 
-function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", DATE_FORMAT);
+function formatDate(date: Date, timeZone?: string): string {
+  return date.toLocaleDateString("en-US", {
+    ...DATE_FORMAT,
+    ...(timeZone ? { timeZone } : {}),
+  });
 }
 
 function addDays(date: Date, days: number): Date {
@@ -717,6 +727,7 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
     branding,
     design,
     now,
+    timeZone,
     salesTax,
     taxExemptReason,
     expenses = [],
@@ -869,13 +880,13 @@ export function buildProposal(input: BuildProposalInput): ProposalDocument {
     },
     summary: {
       projectName: bid.name,
-      dateLabel: formatDate(now),
+      dateLabel: formatDate(now, timeZone),
       // "This price is good through …" is a claim about a price. On a
       // scope-only document there is none, so the line is suppressed rather
       // than left promising something the page does not contain.
       validUntilLabel:
         mode !== "scope-only" && validDays > 0
-          ? formatDate(addDays(now, validDays))
+          ? formatDate(addDays(now, validDays), timeZone)
           : null,
       note: blank(bid.proposalNote) ? null : bid.proposalNote!.trim(),
     },

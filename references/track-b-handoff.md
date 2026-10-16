@@ -35,7 +35,27 @@ gate", which is red unless the code commit under them passed its full suite
 (`scripts/ciCodeCommitPassed.mts`). Rule: wait for your code commit's Gate
 before pushing notes.
 
-## WHERE B STANDS — 2026-10-16 (fourth night, done 04:08), track-b only
+**B checked, 2026-10-16 13:58 PDT:** Gate 38961289110 on `230c18f5` green
+(test, deploy-staging, smoke 223 passed, 14.3 min); staging `/api/version`
+commit `230c18f5`, built 20:19 UTC. Landed.
+
+## WHERE B STANDS — 2026-10-16 day session, track-b
+
+- **Correction:** the fourth night's "Gate green through 303d86bf" below was
+  wrong. Each code commit's Gate was cancelled by the notes push after it;
+  the last real run had failed on B's own `stampIdsInGroup`. Fixed in
+  `8ebf6c2e`; since then every code Gate is read for "Test Files N passed".
+- **Bid methods + prevailing wage** (`bid-methods-plan.md`): everything
+  that needs no column is built and green (`35728e56`, Gate 478 files).
+  The engine prices by method with no stacking by type; every bid stays on
+  the old math until A applies BM-M1..M10 (drafts tested, in
+  `track-a-handoff.md` § "FROM B"). Then: `todo.md` § "Bid methods —
+  wiring left" (six steps, all screens included).
+- **Plans break-it:** two faults fixed red-first (`4eff32e5`): a mark or
+  run could be saved onto another bid's sheet, past that bid's lock; an
+  unopenable plan left the panel on "loading…" for ever.
+
+## WHERE B STOOD — 2026-10-16 (fourth night, done 04:08), track-b only
 
 - Q5 label built; A's two Plans faults fixed (resent marks, legend link);
   Plans deep test (16 tools x 4 sizes), marks-never-vanish test (found and

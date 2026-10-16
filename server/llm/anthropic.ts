@@ -284,6 +284,7 @@ export async function invokeAnthropic(
     toolChoice,
     tool_choice,
     thinking,
+    timeoutMs,
     // ── Not honoured. Named so they throw rather than vanish ──
     outputSchema,
     output_schema,
@@ -366,29 +367,34 @@ export async function invokeAnthropic(
    * the shape a caller chose fails the call, which lands in that caller's
    * existing catch and degrades gracefully — visible, not silent.
    */
-  const message = await client().messages.create({
-    model,
-    max_tokens: maxTokens,
-    ...(system ? { system } : {}),
-    messages: turns,
-    ...(anthropicTools ? { tools: anthropicTools } : {}),
-    // Only alongside tools: Anthropic rejects a tool_choice with nothing to
-    // choose from, and a caller that sets one without tools has made a mistake
-    // the model should not be asked to interpret.
-    ...(anthropicToolChoice && anthropicTools
-      ? { tool_choice: anthropicToolChoice }
-      : {}),
-    // Cast through `unknown`: the caller's shape is an open record by design
-    // (see _core/llm.ts), and the SDK's union covers only the shapes the
-    // pinned version knows about. Narrowing it here would mean this file
-    // having an opinion about which thinking modes exist, which is the one
-    // thing the translation layer is supposed not to have.
-    ...(thinking
-      ? {
-          thinking: thinking as unknown as Anthropic.ThinkingConfigParam,
-        }
-      : {}),
-  });
+  const message = await client().messages.create(
+    {
+      model,
+      max_tokens: maxTokens,
+      ...(system ? { system } : {}),
+      messages: turns,
+      ...(anthropicTools ? { tools: anthropicTools } : {}),
+      // Only alongside tools: Anthropic rejects a tool_choice with nothing to
+      // choose from, and a caller that sets one without tools has made a mistake
+      // the model should not be asked to interpret.
+      ...(anthropicToolChoice && anthropicTools
+        ? { tool_choice: anthropicToolChoice }
+        : {}),
+      // Cast through `unknown`: the caller's shape is an open record by design
+      // (see _core/llm.ts), and the SDK's union covers only the shapes the
+      // pinned version knows about. Narrowing it here would mean this file
+      // having an opinion about which thinking modes exist, which is the one
+      // thing the translation layer is supposed not to have.
+      ...(thinking
+        ? {
+            thinking: thinking as unknown as Anthropic.ThinkingConfigParam,
+          }
+        : {}),
+    },
+    // A caller's deadline is the WHOLE wait: no retries inside it, or three
+    // tries of it would be three times what the caller asked for.
+    timeoutMs ? { timeout: timeoutMs, maxRetries: 0 } : undefined
+  );
 
   return toInvokeResult(message);
 }

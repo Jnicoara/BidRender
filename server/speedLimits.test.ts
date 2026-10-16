@@ -24,6 +24,7 @@
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import { priceWrite } from "../shared/packPricing";
 import * as db from "./db";
 import {
   as,
@@ -291,8 +292,13 @@ describe.skipIf(!hasDb)("speed limits", () => {
     const parts: Record<string, (i: number) => Promise<unknown>> = {
       getMaterialById: () => db.getMaterialById(f.materialId, USER),
       updateMaterial: i =>
+        // Through the one price door (track-c: a price reaches the row only
+        // as a PricedWrite, shared/packPricing.ts) — what the route does.
         db.updateMaterial(f.materialId, USER, {
-          costPerUnit: (3 + i / 100).toFixed(4),
+          price: {
+            write: priceWrite({ typed: "unit", amount: 3 + i / 100 }),
+            why: { source: "typed", actorUserId: USER },
+          },
         }),
       "materials.update (whole)": i =>
         f.c.materials.update({ id: f.materialId, costPerUnit: 3.5 + i / 100 }),

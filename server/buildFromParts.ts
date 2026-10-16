@@ -159,14 +159,21 @@ export async function buildFromParts(
       savedToLibrary: true,
     };
 
-  const { id: lineId, merged } = await db.addAssemblyToBid(
-    input.bidId,
-    userId,
-    assembly.id,
-    input.qty,
-    input.unitLabel,
-    { merge: input.merge }
-  );
+  const { id: lineId, merged } = await db
+    .addAssemblyToBid(
+      input.bidId,
+      userId,
+      assembly.id,
+      input.qty,
+      input.unitLabel,
+      { merge: input.merge }
+    )
+    .catch(error => {
+      // Same words as bids.addAssembly (db.LineQuantityTooLarge).
+      if (error instanceof db.LineQuantityTooLarge)
+        throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+      throw error;
+    });
 
   if (!input.saveToLibrary) await library.archive({ id: assembly.id });
 

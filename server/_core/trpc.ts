@@ -1,4 +1,8 @@
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
+import {
+  DATA_UNAVAILABLE_MSG,
+  NOT_ADMIN_ERR_MSG,
+  UNAUTHED_ERR_MSG,
+} from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -20,6 +24,12 @@ const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
 
   if (!ctx.user) {
+    // A valid session the database could not load is not "signed out".
+    if (ctx.sessionUnavailable)
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: DATA_UNAVAILABLE_MSG,
+      });
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
 
@@ -88,6 +98,12 @@ import { hasFeature } from "@shared/permissions";
 const withScope = t.middleware(async opts => {
   const { ctx, next } = opts;
   if (!ctx.user) {
+    // A valid session the database could not load is not "signed out".
+    if (ctx.sessionUnavailable)
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: DATA_UNAVAILABLE_MSG,
+      });
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
   // Derived from the session alone. Nothing the client sent participates.

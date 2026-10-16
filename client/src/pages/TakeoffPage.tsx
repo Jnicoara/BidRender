@@ -40,6 +40,7 @@
  * scale still opens, still lists every sheet, and still measures once the user
  * sets a scale by hand.
  */
+import { BidStepBar } from "@/components/BidStepBar";
 import {
   useCallback,
   useEffect,
@@ -1067,6 +1068,7 @@ function PlanPane({
   onPageCount,
   onPage,
   onDocumentReady,
+  onOpenFailed,
   onSheetVisible,
   onPageRendered,
   overlay,
@@ -1164,6 +1166,14 @@ function PlanPane({
     pageCount: number;
     outline: { pageNumber: number; title: string }[];
   }) => void;
+  /**
+   * True while the DOCUMENT could not be opened (a damaged file, a password),
+   * false once an open starts or succeeds. Not for one sheet failing to draw
+   * (`sheetFailure`), which leaves the rest of the plan working. The panel
+   * reads it: with no sheet rows its lists never arrive, and it must say why
+   * rather than "loading…" for ever (todo.md, 2026-10-16).
+   */
+  onOpenFailed: (failed: boolean) => void;
   /** Fires when a page is shown, with its extracted text, for scale detection. */
   onSheetVisible: (pageNumber: number, text: string) => void;
   /**
@@ -2135,6 +2145,13 @@ function PlanPane({
   // below repeats.
   const onDocumentReadyRef = useRef(onDocumentReady);
   onDocumentReadyRef.current = onDocumentReady;
+  const onOpenFailedRef = useRef(onOpenFailed);
+  onOpenFailedRef.current = onOpenFailed;
+  // `error` is set only when the document cannot be opened, and cleared as
+  // each open starts — so this follows it exactly, both ways.
+  useEffect(() => {
+    onOpenFailedRef.current(error !== null);
+  }, [error]);
   const onPageCountRef = useRef(onPageCount);
   onPageCountRef.current = onPageCount;
   const onPageRenderedRef = useRef(onPageRendered);
@@ -5124,6 +5141,13 @@ export default function TakeoffPage({
     old data, so this goes false only for a sheet not yet fetched.
   */
   const sheetLoaded = runsData !== undefined && stampsData !== undefined;
+  /*
+    The plan could not be opened (PlanPane's `onOpenFailed`). A set attached
+    before uploads refused unopenable files has no sheet rows, so the lists
+    above are never asked for — and the panel said "loading…" for ever
+    (todo.md, 2026-10-16). With this it says the plan could not be opened.
+  */
+  const [planOpenFailed, setPlanOpenFailed] = useState(false);
   /*
     CIRCUITS ON THIS SHEET (@/lib/circuitGroups): its marks grouped by the
     circuit tag beside each, read-only. Derived from `stamps` here, so a mark
@@ -10495,12 +10519,22 @@ export default function TakeoffPage({
               {/* Laptop only: on a tablet or phone it was two or three lines
                   of height taken from the drawing on every visit, to say what
                   the screen is for (device audit, 2026-10-01). */}
+              {/* The bid's steps and the one next step, in the line the
+                  blurb used ("Set each sheet's scale, then mark and trace…"),
+                  which the bar now says step by step (owner, 2026-10-14).
+                  Laptop only, for the reason above. */}
               {!compact && (
-                <p className="text-xs text-muted-foreground">
-                  Set each sheet&apos;s scale, then mark and trace what is on
-                  it. Counts you send to the bid change its price; the rest stay
-                  here until you do.
-                </p>
+                <BidStepBar
+                  bidId={bidId}
+                  here="plans"
+                  className="mt-0.5"
+                  onGo={place => {
+                    window.location.hash =
+                      place === "proposal"
+                        ? `/bids/${bidId}/proposal`
+                        : `/bids/${bidId}`;
+                  }}
+                />
               )}
             </div>
             {/*
@@ -12093,6 +12127,7 @@ export default function TakeoffPage({
                 if (doc) setPageCount.mutate({ id: doc.id, pageCount });
               }}
               onDocumentReady={handleDocumentReady}
+              onOpenFailed={setPlanOpenFailed}
               sheetPages={sheetPagesKnown}
               schedulePages={schedulePagesData?.pages}
               onSheetVisible={handleSheetVisible}
@@ -13005,6 +13040,7 @@ export default function TakeoffPage({
                 }))}
                 stampGroups={stampGroups}
                 sheetLoaded={sheetLoaded}
+                planUnopened={planOpenFailed && Boolean(doc)}
                 groupDrops={groupDropsById}
                 onSetGroupDrop={(groupId, patch) =>
                   setGroupDrop.mutate({ id: groupId, ...patch })
@@ -13526,6 +13562,7 @@ export default function TakeoffPage({
           <ThisSheetLine
             stampGroups={sheetLoaded ? stampGroups : null}
             runs={sheetLoaded ? visibleRuns : null}
+            planUnopened={planOpenFailed && Boolean(doc)}
             className="min-w-0 flex-1 truncate text-sm"
           />
           {warnedTabs.size > 0 && (

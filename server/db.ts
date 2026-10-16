@@ -47,6 +47,7 @@ import {
   InsertMaterial,
   Material,
   materials,
+  materialPriceHistory,
   type ASSEMBLY_CATEGORIES,
   InsertLaborRate,
   LaborRate,
@@ -374,6 +375,7 @@ import {
 import { resolveForkedRow } from "../shared/forkedRows";
 import { isMissingTable } from "./schemaCheck";
 import { sameStarterValue } from "../shared/starterChange";
+import { priceWrite, type PriceWrite } from "../shared/packPricing";
 import {
   markupDiffers,
   materialItemKey,
@@ -457,6 +459,29 @@ export async function getDb() {
     }
   }
   return _db;
+}
+
+/**
+ * Can the database answer right now? A `SELECT 1`, given up on after
+ * `timeoutMs` (a database that hangs is as unreachable as one that refuses).
+ * Asked only on the rare path where a valid session could not load its
+ * person (server/_core/context.ts), never per request.
+ */
+export async function databaseReachable(timeoutMs = 3000): Promise<boolean> {
+  try {
+    const db = await getDb();
+    if (!db) return false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<false>(resolve => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
+    const ping = db.execute(sql`SELECT 1`).then(() => true);
+    const answer = await Promise.race([ping, timeout]);
+    clearTimeout(timer);
+    return answer;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -1090,28 +1115,96 @@ export async function deleteMasterAssembly(id: number, userId: number) {
     );
 }
 
-export async function addItemToMasterAssembly(data: InsertMasterAssemblyItem) {
+/**
+ * The legacy assembly-item writers take the OWNER and check it themselves
+ * (security sweep, 2026-10-14). Until then they took a row id and nothing
+ * else, so any signed-in user could add to, change or delete the items of
+ * ANY company's legacy assembly by id — found by
+ * server/crossCompanyAttack.test.ts. Nothing in client/src calls them; the
+ * API did.
+ */
+async function ownsMasterAssembly(
+  assemblyId: number,
+  userId: number
+): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  await db.insert(masterAssemblyItems).values(data);
+  const [row] = await db
+    .select({ id: masterAssemblies.id })
+    .from(masterAssemblies)
+    .where(
+      and(
+        eq(masterAssemblies.id, assemblyId),
+        eq(masterAssemblies.userId, userId)
+      )
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
+/** The item's assembly id when that assembly is `userId`'s, else null. */
+async function ownedMasterAssemblyItem(
+  id: number,
+  userId: number
+): Promise<number | null> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ id: masterAssemblyItems.id })
+    .from(masterAssemblyItems)
+    .innerJoin(
+      masterAssemblies,
+      eq(masterAssemblies.id, masterAssemblyItems.assemblyId)
+    )
+    .where(
+      and(eq(masterAssemblyItems.id, id), eq(masterAssemblies.userId, userId))
+    )
+    .limit(1);
+  return row ? row.id : null;
+}
+
+/** False when the assembly or the item is not `userId`'s; nothing written. */
+export async function addItemToMasterAssembly(
+  data: InsertMasterAssemblyItem,
+  userId: number
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  if (!(await ownsMasterAssembly(data.assemblyId, userId))) return false;
+  if (!(await getMasterItemById(data.masterItemId, userId))) return false;
+  await db.insert(masterAssemblyItems).values(data);
+  return true;
+}
+
+/** False when the item's assembly is not `userId`'s; nothing written. */
 export async function updateMasterAssemblyItem(
   id: number,
+  userId: number,
   data: Partial<InsertMasterAssemblyItem>
-) {
+): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  if ((await ownedMasterAssemblyItem(id, userId)) === null) return false;
+  // Never re-pointed at somebody else's assembly or item through the patch.
+  const { assemblyId: _a, masterItemId: _m, id: _i, ...safe } = data;
+  if (Object.keys(safe).length === 0) return true;
   await db
     .update(masterAssemblyItems)
-    .set(data)
+    .set(safe)
     .where(eq(masterAssemblyItems.id, id));
+  return true;
 }
 
-export async function removeItemFromMasterAssembly(id: number) {
+/** False when the item's assembly is not `userId`'s; nothing deleted. */
+export async function removeItemFromMasterAssembly(
+  id: number,
+  userId: number
+): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
+  if ((await ownedMasterAssemblyItem(id, userId)) === null) return false;
   await db.delete(masterAssemblyItems).where(eq(masterAssemblyItems.id, id));
+  return true;
 }
 
 // ─── Master Labor Rates ───────────────────────────────────────────────────────
@@ -2182,12 +2275,119 @@ export async function getMaterialsByIds(
   return mergeLibraryRows(candidates, userId);
 }
 
-/** Create a material owned by the user. Returns the new row id. */
-export async function createMaterial(data: InsertMaterial): Promise<number> {
+// ─── THE MATERIAL PRICE DOOR ──────────────────────────────────────────────────
+//
+// Every write of a COMPANY material's price comes through updateMaterial or
+// createMaterial below, and they take it only as a `PricedWrite`: the stored
+// pair from shared/packPricing.ts `priceWrite` (so a per-unit price can never
+// leave a stale pack price beside it — references/pricing-safety-plan.md
+// § 2.2) together with WHY it changed (references/price-history-plan.md
+// § 3.1). `costPerUnit` and `packPrice` are not in the patch types at all, so
+// a write that says nothing about why does not compile.
+//
+// Recording happens HERE, in the same transaction as the write, so a price
+// and its history cannot disagree: one `material_price_history` row per price
+// that actually CHANGED (compared as numbers — "0.4000" and 0.4 are the same
+// price, and writing it back records nothing, as it flashes nothing).
+//
+// Shared (shipped) rows never come through here: `userId` must match, and a
+// shipped row's changes are logged in `starter_changes` (§ 3.4).
+// server/priceHistoryDoor.test.ts fails on any other code that writes
+// `costPerUnit` on materials.
+
+/** How a company's price came to change (price-history-plan § 3.3 "how"). */
+export type PriceWhy = {
+  source: "typed" | "imported" | "import_undone" | "starter_accepted";
+  /** The PERSON (ctx.scope.actorUserId) — never the company owner's id. */
+  actorUserId: number | null;
+  importId?: number | null;
+  starterChangeId?: number | null;
+  /** The date on a supplier's sheet, "YYYY-MM-DD". NULL = typed today. */
+  priceAsOf?: string | null;
+};
+
+/** A price, as stored, and why. The only way a price enters the door. */
+export type PricedWrite = { write: PriceWrite; why: PriceWhy };
+
+/**
+ * Everything a material patch may carry EXCEPT the price pair. `never`, not
+ * Omit: an Omit lets a conditional spread (`...(x ? { costPerUnit } : {})`)
+ * through unchecked, and that is exactly how the routers write a price.
+ */
+export type MaterialFields = Omit<
+  Partial<InsertMaterial>,
+  "costPerUnit" | "packPrice"
+> & { costPerUnit?: never; packPrice?: never };
+
+/** One history row for a price that changed on a company's material row. */
+async function recordPriceChange(
+  before: Material | null,
+  after: Material,
+  why: PriceWhy
+): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(materials).values(data);
-  return result.insertId;
+  if (after.userId === null) return; // a shipped row: starter_changes holds it
+  const previous = before === null ? null : Number(before.costPerUnit);
+  if (previous !== null && previous === Number(after.costPerUnit)) return;
+  await db.insert(materialPriceHistory).values({
+    userId: after.userId,
+    materialKey: materialItemKey(after),
+    materialId: after.id,
+    unitCost: after.costPerUnit,
+    previousUnitCost: before === null ? null : before.costPerUnit,
+    unitOfSale: after.unitOfSale,
+    packQty: after.packQty,
+    packLabel: after.packLabel,
+    packPrice: after.packPrice,
+    supplierName: after.supplierName,
+    priceAsOf: why.priceAsOf ? new Date(`${why.priceAsOf}T00:00:00Z`) : null,
+    source: why.source,
+    isExamplePrice: after.isExamplePrice ?? false,
+    changedByUserId: why.actorUserId,
+    importId: why.importId ?? null,
+    starterChangeId: why.starterChangeId ?? null,
+  });
+}
+
+/**
+ * Create a material owned by the user. Returns the new row id.
+ *
+ * A price above 0 is recorded (`previousUnitCost` NULL: there was none). A
+ * new row at 0 has no price to remember; its first real price records "was
+ * not priced" when it is set.
+ */
+export async function createMaterial(
+  data: Omit<InsertMaterial, "costPerUnit" | "packPrice"> & {
+    costPerUnit?: never;
+    packPrice?: never;
+    price?: PricedWrite;
+  }
+): Promise<number> {
+  const { price, ...fields } = data;
+  return inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    const [result] = await db.insert(materials).values({
+      ...fields,
+      ...(price
+        ? {
+            costPerUnit: price.write.costPerUnit,
+            packPrice: price.write.packPrice,
+          }
+        : {}),
+    });
+    const id = result.insertId;
+    if (price && Number(price.write.costPerUnit) > 0) {
+      const [row] = await db
+        .select()
+        .from(materials)
+        .where(eq(materials.id, id))
+        .limit(1);
+      if (row) await recordPriceChange(null, row, price.why);
+    }
+    return id;
+  });
 }
 
 /**
@@ -2196,24 +2396,60 @@ export async function createMaterial(data: InsertMaterial): Promise<number> {
  * Baseline rows have userId IS NULL and so can never match here — that is what
  * keeps them read-only. Ownership columns in `data` are ignored rather than
  * trusted, so a caller cannot reassign a row to another user.
+ *
+ * A `price` writes `costPerUnit` and `packPrice` together, stamps
+ * `priceUpdatedAt`, and records the change — all in one transaction.
  */
 export async function updateMaterial(
   id: number,
   userId: number,
-  data: Partial<InsertMaterial>
+  data: MaterialFields & { price?: PricedWrite }
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const safe: Record<string, unknown> = { ...data };
+  const { price, ...fields } = data;
+  const safe: Record<string, unknown> = { ...fields };
   for (const field of LIBRARY_OWNERSHIP_FIELDS) delete safe[field];
-  await db
-    .update(materials)
-    .set({
-      ...safe,
-      isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(materials.id, id), eq(materials.userId, userId)));
+  const where = and(eq(materials.id, id), eq(materials.userId, userId));
+
+  if (!price) {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    await db
+      .update(materials)
+      .set({
+        ...safe,
+        isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
+        updatedAt: new Date(),
+      })
+      .where(where);
+    return;
+  }
+
+  await inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    // Read under a lock, so two writers cannot both record the same "before".
+    const [before] = await db
+      .select()
+      .from(materials)
+      .where(where)
+      .limit(1)
+      .for("update");
+    if (!before) return;
+    await db
+      .update(materials)
+      .set({
+        ...safe,
+        costPerUnit: price.write.costPerUnit,
+        packPrice: price.write.packPrice,
+        // An import stamps every row with one time; anything else, now.
+        priceUpdatedAt: (safe.priceUpdatedAt as Date | undefined) ?? new Date(),
+        isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
+        updatedAt: new Date(),
+      })
+      .where(where);
+    const [after] = await db.select().from(materials).where(where).limit(1);
+    if (after) await recordPriceChange(before, after, price.why);
+  });
 }
 
 /** Soft-delete one of the user's own materials — assemblies may still point at it. */
@@ -2281,37 +2517,54 @@ export async function forkMaterialFor(
  * The row id is kept rather than deleting and re-reading the baseline, so
  * anything already referencing this material keeps working.
  */
-export async function revertMaterialToBaseline(id: number, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
+export async function revertMaterialToBaseline(
+  id: number,
+  userId: number,
+  /** The person reverting — the price going back to the shipped one is recorded. */
+  actorUserId: number | null = null
+) {
+  return inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
 
-  const [fork] = await db
-    .select()
-    .from(materials)
-    .where(and(eq(materials.id, id), eq(materials.userId, userId)))
-    .limit(1);
-  if (!fork) throw new Error("Material not found");
-  if (fork.baselineId == null)
-    throw new Error(
-      "Material is fully custom — there is no original to revert to"
-    );
+    const [fork] = await db
+      .select()
+      .from(materials)
+      .where(and(eq(materials.id, id), eq(materials.userId, userId)))
+      .limit(1);
+    if (!fork) throw new Error("Material not found");
+    if (fork.baselineId == null)
+      throw new Error(
+        "Material is fully custom — there is no original to revert to"
+      );
 
-  const [baseline] = await db
-    .select()
-    .from(materials)
-    .where(and(eq(materials.id, fork.baselineId), isNull(materials.userId)))
-    .limit(1);
-  if (!baseline) throw new Error("Baseline material no longer exists");
+    const [baseline] = await db
+      .select()
+      .from(materials)
+      .where(and(eq(materials.id, fork.baselineId), isNull(materials.userId)))
+      .limit(1);
+    if (!baseline) throw new Error("Baseline material no longer exists");
 
-  await db
-    .update(materials)
-    .set({
-      ...materialContentFields(baseline),
-      // Re-stamp the version so any future "update available" check starts clean.
-      baselineVersion: baseline.version,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(materials.id, id), eq(materials.userId, userId)));
+    await db
+      .update(materials)
+      .set({
+        ...materialContentFields(baseline),
+        // Re-stamp the version so any future "update available" check starts clean.
+        baselineVersion: baseline.version,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(materials.id, id), eq(materials.userId, userId)));
+    // Going back to the shipped price is a change of the company's price, so
+    // it is recorded like one (price-history-plan § 3.1). Recorded as "typed":
+    // the history's `source` has no "reverted" yet — pricing/morning-questions.md.
+    const [after] = await db
+      .select()
+      .from(materials)
+      .where(and(eq(materials.id, id), eq(materials.userId, userId)))
+      .limit(1);
+    if (after)
+      await recordPriceChange(fork, after, { source: "typed", actorUserId });
+  });
 }
 
 /**
@@ -4815,7 +5068,7 @@ function newStarterOverheadAndClear(
  * all. Losing the race is not an error: the row the caller wanted now exists,
  * so the right response is to read it back.
  */
-function isDuplicateKey(error: unknown): boolean {
+export function isDuplicateKey(error: unknown): boolean {
   return (
     typeof error === "object" &&
     error !== null &&
@@ -5432,6 +5685,28 @@ export async function getBidExpenseLines(
     taxable: row.taxable,
     markedUp: row.markedUp,
   }));
+}
+
+/** `getBidExpenseLines` for a list of bids, one query, the same order. */
+export async function getBidExpenseLinesForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, ExpenseLine[]>> {
+  const byBid = new Map<number, ExpenseLine[]>(bidIds.map(id => [id, []]));
+  const db = await getDb();
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
+    .select()
+    .from(bidExpenses)
+    .where(inArray(bidExpenses.bidId, [...bidIds]))
+    .orderBy(asc(bidExpenses.sortOrder), asc(bidExpenses.id));
+  for (const row of rows)
+    byBid.get(row.bidId)?.push({
+      name: row.name,
+      amount: Number(row.amount),
+      taxable: row.taxable,
+      markedUp: row.markedUp,
+    });
+  return byBid;
 }
 
 /**
@@ -6140,6 +6415,34 @@ export async function getBidPdfSheet(
   return row;
 }
 
+/**
+ * The sheet, only when its plan set is attached to `bidId`. For a WRITE that
+ * names a bid and a sheet separately: without it a mark sent with one bid's
+ * id onto another bid's sheet was written — counted on neither, drawn on the
+ * other — and passed the first bid's lock check (server/sheetOnBid.test.ts).
+ */
+export async function getBidPdfSheetOnBid(
+  id: number,
+  bidId: number,
+  userId: number
+): Promise<BidPdfSheet | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select({ sheet: bidPdfSheets })
+    .from(bidPdfSheets)
+    .innerJoin(bidPdfs, eq(bidPdfs.id, bidPdfSheets.bidPdfId))
+    .where(
+      and(
+        eq(bidPdfSheets.id, id),
+        eq(bidPdfSheets.userId, userId),
+        eq(bidPdfs.bidId, bidId)
+      )
+    )
+    .limit(1);
+  return row?.sheet;
+}
+
 // ─── Sheet numbers, titles and page text (read at upload) ─────────────────────
 
 /** One page's number and title, as the client sees them. */
@@ -6602,27 +6905,45 @@ function markIsQuantity() {
 }
 
 async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
+  return (await stampCountsForBids([bidId])).get(bidId) ?? new Map();
+}
+
+/**
+ * `stampCountsForBid` for a LIST of bids in one query (the Dashboard and
+ * "Find a bid", 2026-10-16) — the single-bid read is this with one id, so the
+ * two cannot count a different set of marks. The live-sheet rule is the
+ * correlated form: each mark against its OWN bid's plan sets.
+ */
+async function stampCountsForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, Map<number, number>>> {
+  const byBid = new Map<number, Map<number, number>>();
   const db = await getDb();
-  if (!db) return new Map();
+  if (!db || bidIds.length === 0) return byBid;
   const rows = await db
-    .select({ groupId: takeoffStamps.groupId, total: sql<number>`count(*)` })
+    .select({
+      bidId: takeoffStamps.bidId,
+      groupId: takeoffStamps.groupId,
+      total: sql<number>`count(*)`,
+    })
     .from(takeoffStamps)
     .where(
       and(
-        eq(takeoffStamps.bidId, bidId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.bidId, [...bidIds]),
+        onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId),
         // Every bid line's live quantity comes from here: new marks only.
         markIsQuantity()
       )
     )
-    .groupBy(takeoffStamps.groupId);
+    .groupBy(takeoffStamps.bidId, takeoffStamps.groupId);
 
-  const counts = new Map<number, number>();
   for (const row of rows) {
     if (row.groupId === null) continue;
+    const counts = byBid.get(row.bidId) ?? new Map<number, number>();
     counts.set(row.groupId, Number(row.total));
+    byBid.set(row.bidId, counts);
   }
-  return counts;
+  return byBid;
 }
 
 /**
@@ -6634,10 +6955,19 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
 async function stampRoleCountsForBid(
   bidId: number
 ): Promise<Map<number, RoleCounts>> {
+  return (await stampRoleCountsForBids([bidId])).get(bidId) ?? new Map();
+}
+
+/** `stampRoleCountsForBid` for a list of bids, one query (see stampCountsForBids). */
+async function stampRoleCountsForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, Map<number, RoleCounts>>> {
+  const byBid = new Map<number, Map<number, RoleCounts>>();
   const db = await getDb();
-  if (!db) return new Map();
+  if (!db || bidIds.length === 0) return byBid;
   const rows = await db
     .select({
+      bidId: takeoffStamps.bidId,
       groupId: takeoffStamps.groupId,
       status: takeoffStamps.status,
       total: sql<number>`count(*)`,
@@ -6645,21 +6975,22 @@ async function stampRoleCountsForBid(
     .from(takeoffStamps)
     .where(
       and(
-        eq(takeoffStamps.bidId, bidId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.bidId, [...bidIds]),
+        onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId),
         inArray(takeoffStamps.status, [...LABOR_ROLES])
       )
     )
-    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
-  const counts = new Map<number, RoleCounts>();
+    .groupBy(takeoffStamps.bidId, takeoffStamps.groupId, takeoffStamps.status);
   for (const row of rows) {
     if (row.groupId === null) continue;
+    const counts = byBid.get(row.bidId) ?? new Map<number, RoleCounts>();
     const entry = counts.get(row.groupId) ?? { remove: 0, relocate: 0 };
     if (row.status === "remove" || row.status === "relocate")
       entry[row.status] += Number(row.total);
     counts.set(row.groupId, entry);
+    byBid.set(row.bidId, counts);
   }
-  return counts;
+  return byBid;
 }
 
 /**
@@ -6973,26 +7304,36 @@ export async function resolveBidLinesFromPlans(
 }
 
 /** The three fields resolving a bid's lines needs, in one read. */
-async function getBidResolutionContext(bidId: number): Promise<
-  | {
-      userId: number;
-      distributionHeightInches: number | null;
-      quantitiesLockedAt: Date | null;
-    }
-  | undefined
-> {
+type BidResolutionContext = {
+  userId: number;
+  distributionHeightInches: number | null;
+  quantitiesLockedAt: Date | null;
+};
+
+async function getBidResolutionContext(
+  bidId: number
+): Promise<BidResolutionContext | undefined> {
+  return (await getBidResolutionContexts([bidId])).get(bidId);
+}
+
+/** `getBidResolutionContext` for a list of bids, one query. */
+async function getBidResolutionContexts(
+  bidIds: readonly number[]
+): Promise<Map<number, BidResolutionContext>> {
+  const byBid = new Map<number, BidResolutionContext>();
   const db = await getDb();
-  if (!db) return undefined;
-  const [bid] = await db
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
     .select({
+      id: bids.id,
       userId: bids.userId,
       distributionHeightInches: bids.distributionHeightInches,
       quantitiesLockedAt: bids.quantitiesLockedAt,
     })
     .from(bids)
-    .where(eq(bids.id, bidId))
-    .limit(1);
-  return bid;
+    .where(inArray(bids.id, [...bidIds]));
+  for (const { id, ...context } of rows) byBid.set(id, context);
+  return byBid;
 }
 
 async function resolveAgainstPlans(
@@ -7018,6 +7359,22 @@ async function resolveAgainstPlans(
       : new Map<number, RoleCounts>(),
     getGroupsForBidUnscoped(bidId),
   ]);
+  return applyPlanCounts(rows, counted, roleCounted, groups, options);
+}
+
+/**
+ * The second half of `resolveAgainstPlans`: the counts, read, laid onto the
+ * lines. Its own function so the LIST read (`getRollupLinesForBids`) lays
+ * them on with this same code rather than a copy of it.
+ */
+function applyPlanCounts(
+  rows: BidLineItem[],
+  counted: Map<number, number>,
+  roleCounted: Map<number, RoleCounts>,
+  groups: readonly TakeoffGroup[],
+  options: { quantities: boolean }
+): BidLineItem[] {
+  if (!rows.some(row => row.takeoffGroupId !== null)) return rows;
   const labels = new Map(groups.map(group => [group.id, group.label]));
 
   /*
@@ -7094,13 +7451,28 @@ export async function getBidLineItems(bidId: number): Promise<BidLineItem[]> {
  * stored quantity escaping to a screen is a bid disagreeing with its own plans.
  */
 async function storedBidLineItems(bidId: number): Promise<BidLineItem[]> {
+  return (await storedBidLineItemsForBids([bidId])).get(bidId) ?? [];
+}
+
+/** `storedBidLineItems` for a list of bids, one query, each bid's own order. */
+async function storedBidLineItemsForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, BidLineItem[]>> {
+  const byBid = new Map<number, BidLineItem[]>(bidIds.map(id => [id, []]));
   const db = await getDb();
-  if (!db) return [];
-  return db
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
     .select()
     .from(bidLineItems)
-    .where(and(eq(bidLineItems.bidId, bidId), isNull(bidLineItems.archivedAt)))
+    .where(
+      and(
+        inArray(bidLineItems.bidId, [...bidIds]),
+        isNull(bidLineItems.archivedAt)
+      )
+    )
     .orderBy(asc(bidLineItems.sortOrder), asc(bidLineItems.id));
+  for (const row of rows) byBid.get(row.bidId)?.push(row);
+  return byBid;
 }
 
 /**
@@ -7116,6 +7488,69 @@ async function storedBidLineItems(bidId: number): Promise<BidLineItem[]> {
  * "what it actually shows" — which is not a pending change and is why the router
  * only compares them when the bid is locked.
  */
+/**
+ * What the bid's step bar reads (shared/bidSteps.ts): how many plan pages,
+ * how many of them scaled, marks, runs and lines. Counts only — five small
+ * aggregates, each on an indexed bidId. The caller has already checked the
+ * bid belongs to the company.
+ */
+export async function getBidProgressCounts(bidId: number): Promise<{
+  sheets: number;
+  scaledSheets: number;
+  marks: number;
+  runs: number;
+  lines: number;
+}> {
+  const db = await getDb();
+  if (!db) return { sheets: 0, scaledSheets: 0, marks: 0, runs: 0, lines: 0 };
+  const [[sheetRow], [markRow], [runRow], [lineRow]] = await Promise.all([
+    db
+      .select({
+        sheets: sql<string>`COUNT(*)`,
+        scaled: sql<string>`COALESCE(SUM(CASE WHEN ${bidPdfSheets.scaleRatio} IS NOT NULL THEN 1 ELSE 0 END), 0)`,
+      })
+      .from(bidPdfSheets)
+      .innerJoin(bidPdfs, eq(bidPdfs.id, bidPdfSheets.bidPdfId))
+      .where(eq(bidPdfs.bidId, bidId)),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(takeoffStamps)
+      .where(
+        and(
+          eq(takeoffStamps.bidId, bidId),
+          // Marks on a plan set that was deleted are not on the bid any
+          // more; counting them ticked "Count" for drawings that are gone
+          // (fixed 2026-10-14, caught by quantitiesIgnoreDeletedPlans).
+          onLivePlanSheet(takeoffStamps.sheetId, bidId)
+        )
+      ),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(takeoffRuns)
+      .where(
+        and(
+          eq(takeoffRuns.bidId, bidId),
+          onLivePlanSheet(takeoffRuns.sheetId, bidId)
+        )
+      ),
+    db
+      .select({ n: sql<string>`COUNT(*)` })
+      .from(bidLineItems)
+      // Live lines only: an archived line is off the bid (`archivedAt IS NULL`
+      // is the live test, schema.ts).
+      .where(
+        and(eq(bidLineItems.bidId, bidId), isNull(bidLineItems.archivedAt))
+      ),
+  ]);
+  return {
+    sheets: Number(sheetRow?.sheets ?? 0),
+    scaledSheets: Number(sheetRow?.scaled ?? 0),
+    marks: Number(markRow?.n ?? 0),
+    runs: Number(runRow?.n ?? 0),
+    lines: Number(lineRow?.n ?? 0),
+  };
+}
+
 export async function compareBidQuantitiesWithPlans(bidId: number): Promise<{
   lockedAt: Date | null;
   lines: {
@@ -7285,9 +7720,22 @@ export async function markBidMathChangesSeen(
 
 /** Groups on a bid, without the user filter — see `stampCountsForBid`. */
 async function getGroupsForBidUnscoped(bidId: number): Promise<TakeoffGroup[]> {
+  return (await getGroupsForBidsUnscoped([bidId])).get(bidId) ?? [];
+}
+
+/** `getGroupsForBidUnscoped` for a list of bids, one query. */
+async function getGroupsForBidsUnscoped(
+  bidIds: readonly number[]
+): Promise<Map<number, TakeoffGroup[]>> {
+  const byBid = new Map<number, TakeoffGroup[]>(bidIds.map(id => [id, []]));
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(takeoffGroups).where(eq(takeoffGroups.bidId, bidId));
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
+    .select()
+    .from(takeoffGroups)
+    .where(inArray(takeoffGroups.bidId, [...bidIds]));
+  for (const row of rows) byBid.get(row.bidId)?.push(row);
+  return byBid;
 }
 
 /** Archived lines only — for showing what a bulk archive removed, and undoing it. */
@@ -7393,6 +7841,18 @@ async function nextBidSortOrder(bidId: number): Promise<number> {
  * library assembly afterwards has no effect on this bid, which is the whole
  * point (ASSEMBLIES_PLAN.md § PROJECT ESTIMATES).
  */
+/** The most one bid line's quantity column can hold (decimal(10,4)). */
+export const LINE_QTY_MAX = 999_999.9999;
+
+/** Adding to a line would take it past what the column can hold. */
+export class LineQuantityTooLarge extends Error {
+  constructor(readonly wouldBe: number) {
+    super(
+      `That would put ${wouldBe.toLocaleString("en-US")} on one line — more than a line can hold (999,999). Add it as a separate line instead.`
+    );
+  }
+}
+
 export async function addAssemblyToBid(
   bidId: number,
   userId: number,
@@ -7420,8 +7880,44 @@ export async function addAssemblyToBid(
    * each was counted. Callers wanting a fresh snapshot omit `merge` — the
    * default — and get a new line, which is what the Bids screen does.
    */
-  if (options.merge) {
-    const existing = await db
+  const insertLine = async (): Promise<{ id: number; merged: boolean }> => {
+    const conn = await getDb();
+    if (!conn) throw new Error("DB unavailable");
+    const snapshot = await snapshotForAssembly(userId, detail);
+    const [result] = await conn.insert(bidLineItems).values({
+      bidId,
+      assemblyId: detail.id,
+      name: detail.name,
+      qty: qty.toFixed(4),
+      unitLabel,
+      ...snapshot,
+      sortOrder: await nextBidSortOrder(bidId),
+    });
+    return { id: result.insertId, merged: false };
+  };
+
+  if (!options.merge) return insertLine();
+
+  /*
+    ONE MERGE PER BID AT A TIME (drill, 2026-10-15). Two counts of one
+    assembly arriving together — a fast double Enter, two people on one bid,
+    or counts held offline and sent the moment the signal came back — both
+    read the line's quantity and both wrote it plus one: a line at 1 counted
+    twice ended at 2, one count LOST without a word. On an empty bid both
+    found no line and both inserted, splitting one count into two lines.
+    Locking the bid row first makes the second wait, then find the first's
+    line and add to what it now holds. server/addMergeRace.test.ts.
+  */
+  return inOneTransaction(async () => {
+    const conn = await getDb();
+    if (!conn) throw new Error("DB unavailable");
+    await conn
+      .select({ id: bids.id })
+      .from(bids)
+      .where(and(eq(bids.id, bidId), eq(bids.userId, userId)))
+      .limit(1)
+      .for("update");
+    const existing = await conn
       .select()
       .from(bidLineItems)
       .where(
@@ -7437,26 +7933,18 @@ export async function addAssemblyToBid(
 
     if (existing[0]) {
       const merged = Number(existing[0].qty) + qty;
-      await db
+      // decimal(10,4): the most one line can hold. Past it the UPDATE failed
+      // as a server error (weird-input sweep, 2026-10-14); now it is refused
+      // in words, and the line keeps what it had.
+      if (merged > LINE_QTY_MAX) throw new LineQuantityTooLarge(merged);
+      await conn
         .update(bidLineItems)
         .set({ qty: merged.toFixed(4), updatedAt: new Date() })
         .where(eq(bidLineItems.id, existing[0].id));
       return { id: existing[0].id, merged: true };
     }
-  }
-
-  const snapshot = await snapshotForAssembly(userId, detail);
-
-  const [result] = await db.insert(bidLineItems).values({
-    bidId,
-    assemblyId: detail.id,
-    name: detail.name,
-    qty: qty.toFixed(4),
-    unitLabel,
-    ...snapshot,
-    sortOrder: await nextBidSortOrder(bidId),
+    return insertLine();
   });
-  return { id: result.insertId, merged: false };
 }
 
 /**
@@ -7637,6 +8125,89 @@ async function liveUnpricedParts(
 /** A bid's lines, resolved for the rollup — what every pricing read loads. */
 export async function getRollupLines(bidId: number, userId: number) {
   return withUnpricedParts(await getBidLineItems(bidId), userId);
+}
+
+export type RollupLine = Awaited<ReturnType<typeof getRollupLines>>[number];
+
+/**
+ * `getRollupLines` for a LIST of bids — the Dashboard and "Find a bid" price
+ * every listed bid the bid screen's way, and did it with about six queries
+ * per bid (todo.md, "Dashboard time grows with the number of bids").
+ *
+ * The same steps as `getBidLineItems` → `withPlanCounts` →
+ * `resolveAgainstPlans` → `withUnpricedParts`, each read made once for the
+ * list by the `…ForBids` form the single-bid read itself calls, and the
+ * counts laid on by the same `applyPlanCounts`. One exception, on purpose:
+ * an UNLOCKED bid with traced-run lines measures its runs through
+ * `withTracedFootage`, a dozen reads deep, so it goes the single-bid way —
+ * the same function, not a copy. `server/goldenBids.test.ts` holds every
+ * listed card to its bid screen.
+ */
+export async function getRollupLinesForBids(
+  bidIds: readonly number[],
+  userId: number
+): Promise<Map<number, RollupLine[]>> {
+  const stored = await storedBidLineItemsForBids(bidIds);
+  const following = bidIds.filter(id => stored.get(id)!.some(followsDrawing));
+  const contexts = await getBidResolutionContexts(following);
+
+  const resolved = new Map<number, BidLineItem[]>(stored);
+  const oneByOne: number[] = [];
+  const together: number[] = [];
+  for (const id of following) {
+    const context = contexts.get(id);
+    if (!context) continue;
+    const measuresRuns =
+      context.quantitiesLockedAt === null &&
+      stored.get(id)!.some(row => row.takeoffRunTypeId !== null);
+    (measuresRuns ? oneByOne : together).push(id);
+  }
+
+  const live = together.filter(
+    id => contexts.get(id)!.quantitiesLockedAt === null
+  );
+  const [counted, roleCounted, groups] = await Promise.all([
+    stampCountsForBids(live),
+    stampRoleCountsForBids(
+      live.filter(id => stored.get(id)!.some(row => isLaborRoleLine(row)))
+    ),
+    getGroupsForBidsUnscoped(
+      together.filter(id =>
+        stored.get(id)!.some(row => row.takeoffGroupId !== null)
+      )
+    ),
+    Promise.all(
+      oneByOne.map(async id =>
+        resolved.set(
+          id,
+          await resolveAgainstPlans(id, contexts.get(id)!, stored.get(id)!, {
+            quantities: true,
+          })
+        )
+      )
+    ),
+  ]);
+  for (const id of together) {
+    resolved.set(
+      id,
+      applyPlanCounts(
+        stored.get(id)!,
+        counted.get(id) ?? new Map(),
+        roleCounted.get(id) ?? new Map(),
+        groups.get(id) ?? [],
+        { quantities: contexts.get(id)!.quantitiesLockedAt === null }
+      )
+    );
+  }
+
+  // One recipe read per distinct assembly across every listed bid.
+  const all = await withUnpricedParts(
+    bidIds.flatMap(id => resolved.get(id) ?? []),
+    userId
+  );
+  const byBid = new Map<number, RollupLine[]>(bidIds.map(id => [id, []]));
+  for (const line of all) byBid.get(line.bidId)?.push(line);
+  return byBid;
 }
 
 // ─── Material markup: the rules, and what a line freezes ─────────────────────
@@ -7938,12 +8509,23 @@ export async function setItemMarkupOverride(
       .where(eq(markupRules.id, existing.id));
     return;
   }
-  await db.insert(markupRules).values({
-    userId,
-    kind: "item",
-    itemKey,
-    markupPct: markupPct.toFixed(6),
-  });
+  try {
+    await db.insert(markupRules).values({
+      userId,
+      kind: "item",
+      itemKey,
+      markupPct: markupPct.toFixed(6),
+    });
+  } catch (error) {
+    // Two saves at once (a double-click): the other one made the row a
+    // moment ago, so this one is an update of it, not a server error
+    // (twice-at-once sweep, 2026-10-14).
+    if (!isDuplicateKey(error)) throw error;
+    await db
+      .update(markupRules)
+      .set({ markupPct: markupPct.toFixed(6) })
+      .where(where);
+  }
 }
 
 /**
@@ -8175,6 +8757,8 @@ export async function saveLineAsAssembly(input: {
   laborRate: number;
   /** Whether that rate is BidRidge's example rate (0134) — frozen with it. */
   laborRateWasExample: boolean;
+  /** The person saving it, for the price history (never the owner's id). */
+  actorUserId: number;
 }): Promise<{ assemblyId: number; materialId: number | null }> {
   const { userId, bidId, line } = input;
   const cost = Number(line.snapshotMaterialCost);
@@ -8192,7 +8776,12 @@ export async function saveLineAsAssembly(input: {
           userId,
           name: line.name,
           unitOfSale: "each",
-          costPerUnit: cost.toFixed(4),
+          // "Save to library" from a bid IS recorded, as typed (price
+          // history Q3); a price on one bid line alone is not.
+          price: {
+            write: priceWrite({ typed: "unit", amount: cost }),
+            why: { source: "typed", actorUserId: input.actorUserId },
+          },
         })
       : null;
 
@@ -9396,7 +9985,12 @@ export async function getRunsForSheet(
  */
 function onLivePlanSheet(
   sheetId: typeof takeoffRuns.sheetId | typeof takeoffStamps.sheetId,
-  bidId: number
+  /**
+   * The bid, or — for a read across a LIST of bids — the row's own bid
+   * column, which makes the subquery correlated: each mark or run against
+   * its own bid's plan sets, exactly what the one-bid form asks.
+   */
+  bidId: number | typeof takeoffRuns.bidId | typeof takeoffStamps.bidId
 ) {
   return sql`${sheetId} IN (SELECT ${bidPdfSheets.id} FROM ${bidPdfSheets} INNER JOIN ${bidPdfs} ON ${bidPdfs.id} = ${bidPdfSheets.bidPdfId} WHERE ${bidPdfs.bidId} = ${bidId})`;
 }
@@ -10619,6 +11213,13 @@ export async function updateRunTypeExtra(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const { feetPerFoot, ...rest } = patch;
+  // Nothing to change is not an error: an UPDATE with no columns is one
+  // (weird-input sweep, 2026-10-14 — a 500 for an empty edit).
+  if (
+    feetPerFoot === undefined &&
+    Object.values(rest).every(v => v === undefined)
+  )
+    return;
   await db
     .update(takeoffRunTypeExtras)
     .set({
@@ -13013,6 +13614,32 @@ export async function saveCloseout(
       actualHours: string;
     }>;
   }
+): Promise<number> {
+  /*
+    ONE SAVE PER BID AT A TIME (twice-at-once sweep, 2026-10-14). Two saves
+    together both found no close-out, both inserted, and the second hit the
+    unique key as a server error — and a plain retry would not do, because
+    each save also REPLACES the lines, so two interleaved saves could leave
+    both sets of lines behind. Locking the bid row first makes the second
+    save wait for the first and then update it.
+  */
+  return inOneTransaction(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    await db
+      .select({ id: bids.id })
+      .from(bids)
+      .where(and(eq(bids.id, bidId), eq(bids.userId, userId)))
+      .limit(1)
+      .for("update");
+    return saveCloseoutLocked(bidId, userId, data);
+  });
+}
+
+async function saveCloseoutLocked(
+  bidId: number,
+  userId: number,
+  data: Parameters<typeof saveCloseout>[2]
 ): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -15615,25 +16242,23 @@ export async function refreshRunTypeLineQty(
 export async function heightContextForBid(
   bidId: number,
   userId: number,
-  bidDistributionInches: number | null
+  bidDistributionInches: number | null,
+  /**
+   * The company's half, when a caller asking about MANY bids has already
+   * loaded it once (`dropsNotPricedForBids`). The same four reads either
+   * way — only how often they run changes.
+   */
+  shared?: CompanyHeights
 ): Promise<HeightContext> {
   const [
-    defaults,
-    company,
+    { defaults, company, extraDefaults, runTypes },
     job,
-    extraDefaults,
-    runTypes,
     linkedMarks,
     sheetCeilings,
     heightAreas,
   ] = await Promise.all([
-    getHeightDefaults(userId),
-    getMountingHeights(userId),
+    shared ?? companyHeights(userId),
     getBidMountingHeights(bidId, userId),
-    // Extra and makeup ride on this context so no caller can load the heights
-    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
-    getExtraDefaults(userId),
-    getRunTypesFor(userId, true),
     // A linked run end reads its mark's height (vertical-drops-plan § 2).
     getMarksLinkedByRuns(bidId, userId),
     // The ceiling at every box: sheet heights and height areas
@@ -15653,6 +16278,25 @@ export async function heightContextForBid(
     heightAreas,
   });
 }
+
+/**
+ * The height settings every bid of one company reads alike: the shop's
+ * defaults and heights, its extra/makeup defaults and its run types. Loaded
+ * once for a whole list of bids instead of once per bid (todo.md "The
+ * Dashboard's drops not priced check under heavy load").
+ */
+export async function companyHeights(userId: number) {
+  const [defaults, company, extraDefaults, runTypes] = await Promise.all([
+    getHeightDefaults(userId),
+    getMountingHeights(userId),
+    // Extra and makeup ride on this context so no caller can load the heights
+    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
+    getExtraDefaults(userId),
+    getRunTypesFor(userId, true),
+  ]);
+  return { defaults, company, extraDefaults, runTypes };
+}
+export type CompanyHeights = Awaited<ReturnType<typeof companyHeights>>;
 
 /** Each sheet's own ceiling on a bid (0109). NULL follows the job. */
 export async function getSheetCeilings(bidId: number, userId: number) {
@@ -15751,17 +16395,56 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
  */
 export async function bidDropsNotPriced(
   bidId: number,
-  userId: number
+  userId: number,
+  /** Loaded once by a caller asking about many bids — see heightContextForBid. */
+  shared?: CompanyHeights
 ): Promise<number> {
   const bid = await getBidById(bidId, userId);
   if (!bid) return 0;
   const [heights, runs, scales] = await Promise.all([
-    heightContextForBid(bidId, userId, bid.distributionHeightInches),
+    heightContextForBid(bidId, userId, bid.distributionHeightInches, shared),
     getRunsForBid(bidId, userId),
     getSheetScalesForBid(bidId, userId),
   ]);
   const drops = await loadGroupDrops(bidId, userId, heights, runs, scales);
   return drops.reduce((n, d) => n + d.notPricedDrops, 0);
+}
+
+/** The bids in `bidIds` with at least one count that has a drop kind. */
+async function bidsWithADropKind(
+  bidIds: readonly number[],
+  userId: number
+): Promise<Set<number>> {
+  const out = new Set<number>();
+  if (bidIds.length === 0) return out;
+  const db = await getDb();
+  if (!db) return out;
+  const rows = await db
+    .select({
+      bidId: takeoffGroups.bidId,
+      dropKind: takeoffGroups.dropKind,
+      assemblyId: takeoffGroups.assemblyId,
+    })
+    .from(takeoffGroups)
+    .where(
+      and(
+        eq(takeoffGroups.userId, userId),
+        inArray(takeoffGroups.bidId, Array.from(new Set(bidIds)))
+      )
+    );
+  const itemKinds = await getAssemblyMountKinds(
+    rows.map(r => r.assemblyId),
+    userId
+  );
+  for (const r of rows)
+    if (
+      deviceKind(
+        r.dropKind,
+        r.assemblyId === null ? null : (itemKinds.get(r.assemblyId) ?? null)
+      ) !== null
+    )
+      out.add(r.bidId);
+  return out;
 }
 
 /**
@@ -15875,16 +16558,35 @@ export async function dropsNotPricedForBids(
       .where(
         and(
           eq(takeoffStamps.userId, userId),
-          inArray(takeoffStamps.bidId, Array.from(new Set(bidIds)))
+          inArray(takeoffStamps.bidId, Array.from(new Set(bidIds))),
+          // Only a pre-filter (the drops check below reads live sheets), but
+          // a mark on a deleted plan set should not even let a bid through.
+          onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId)
         )
       )
   )
     .map(r => r.bidId)
     .filter(id => !frozenIds.has(id));
-  for (let i = 0; i < withMarks.length; i += 4) {
-    const batch = withMarks.slice(i, i + 4);
+  /*
+    ONLY A BID WITH A COUNT THAT DROPS CAN HAVE A DROP NOT PRICED (stress
+    test, 2026-10-14). A drop needs a kind — the count's own "drops to", or
+    its item's "mounts at" (`deviceKind`, as `loadGroupDrops` resolves it);
+    with none, `loadGroupDrops` answers "not answered" for every count. It
+    asked that only AFTER `bidDropsNotPriced` had loaded the bid's heights,
+    every run and every sheet scale — per marked bid, four at a time: 300 ms
+    of a 150-bid dashboard's 500, and 2.4 s with eleven companies at once
+    (references/stress-results.md). Asked here for the whole list in two
+    queries, with the same two functions, so it can only let a bid through
+    that has no drop (an off count is not filtered), never stop one that has.
+  */
+  const candidates = await bidsWithADropKind(withMarks, userId);
+  const asking = withMarks.filter(id => candidates.has(id));
+  // The company's heights are the same for every bid here: read once.
+  const shared = asking.length > 0 ? await companyHeights(userId) : undefined;
+  for (let i = 0; i < asking.length; i += 4) {
+    const batch = asking.slice(i, i + 4);
     const counts = await Promise.all(
-      batch.map(id => bidDropsNotPriced(id, userId))
+      batch.map(id => bidDropsNotPriced(id, userId, shared))
     );
     batch.forEach((id, k) => {
       if (counts[k] > 0) out.set(id, counts[k]);

@@ -22,6 +22,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +147,10 @@ export function BidSearchPanel({
             placeholder="Search bids — job name, client, address…"
             className="pl-9 h-9"
             aria-label="Search bids"
+            // The server's own limit (bids.search, 200). Past it the search
+            // was refused, and the list said it couldn't load — blaming the
+            // connection for a long paste (break-it drill, 2026-10-15).
+            maxLength={200}
           />
           {text && (
             <button
@@ -187,6 +192,7 @@ export function BidSearchPanel({
               value={client}
               onChange={e => setClient(e.target.value)}
               placeholder="Who it was for"
+              maxLength={200}
               className="h-8 text-sm"
             />
           </label>
@@ -197,6 +203,7 @@ export function BidSearchPanel({
               value={address}
               onChange={e => setAddress(e.target.value)}
               placeholder="Where the job was"
+              maxLength={200}
               className="h-8 text-sm"
             />
           </label>
@@ -294,11 +301,17 @@ export function BidSearchPanel({
 
       {/* ── What is being shown, in words ── */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>
-          {rows.length}
-          {query.hasNextPage ? "+" : ""} bid{rows.length === 1 ? "" : "s"}
-          {summary ? ` ${summary}` : ""}
-        </span>
+        {/* No count over a list that failed to load: "0 bids" above
+            "Couldn't load your bids" contradicts it (drill, 2026-10-15).
+            Nor over one still LOADING: "0 bids" above the skeleton rows
+            stated a number nobody had counted yet (slow connection). */}
+        {!(query.isError && rows.length === 0) && !query.isPending && (
+          <span>
+            {rows.length}
+            {query.hasNextPage ? "+" : ""} bid{rows.length === 1 ? "" : "s"}
+            {summary ? ` ${summary}` : ""}
+          </span>
+        )}
         {filtered && (
           <button
             onClick={clearAll}
@@ -319,6 +332,8 @@ export function BidSearchPanel({
             />
           ))}
         </div>
+      ) : query.isError && rows.length === 0 ? (
+        <LoadFailed what="your bids" onRetry={() => void query.refetch()} />
       ) : rows.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border/60 py-12 text-center">
           <p className="text-sm font-medium">No bids match</p>

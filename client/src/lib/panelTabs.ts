@@ -152,9 +152,19 @@ export function sheetLine(input: {
         feet: number | null;
       }[]
     | null;
+  /**
+   * The plan itself could not be opened (damaged, or a password), so this
+   * sheet's lists are never coming: no sheet row exists to ask for them.
+   * "loading…" there was a promise nothing would keep (todo.md, 2026-10-16).
+   * Only read while a list is null; a sheet whose lists did arrive says what
+   * is on it.
+   */
+  planUnopened?: boolean;
 }): string {
   if (input.counts === null || input.runs === null) {
-    return "This sheet: loading…";
+    return input.planUnopened
+      ? "This sheet: the plan could not be opened"
+      : "This sheet: loading…";
   }
   const marks = input.counts.reduce((n, c) => n + c.placed, 0);
   const real = input.runs.filter(r => !r.isSuggestion);

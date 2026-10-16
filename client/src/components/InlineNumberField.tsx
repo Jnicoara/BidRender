@@ -65,8 +65,14 @@ import {
 const FLASH_MS = 1100;
 
 type BaseProps = {
-  /** Called only when the draft is valid AND different. */
-  onSave: (next: number) => void;
+  /**
+   * Called only when the draft is valid AND different. Return the save's
+   * promise (`mutateAsync`) and the green tick waits for it — and never
+   * shows if it fails. Return nothing and the tick shows at once, which
+   * claims a write that may not happen: drilled 2026-10-15, a quantity
+   * flashed "saved" while the database was down and the save was refused.
+   */
+  onSave: (next: number) => void | Promise<unknown>;
   rules?: NumericFieldRules;
   className?: string;
   ariaLabel: string;
@@ -97,7 +103,7 @@ type BaseProps = {
    * Without it, emptying a nullable field reverts to whatever was there — which
    * is right when there is no way to express unset, and wrong when there is.
    */
-  onClear?: () => void;
+  onClear?: () => void | Promise<unknown>;
 };
 
 /*
@@ -148,6 +154,8 @@ export function InlineNumberField({
     blankWhenUnset ? "" : formatForEdit(shown)
   );
   const [flash, setFlash] = useState(false);
+  /** The last save was refused: what is typed is NOT what is stored. */
+  const [unsaved, setUnsaved] = useState(false);
   const editing = useRef(false);
   const flashTimer = useRef<number | null>(null);
   // Set when a keystroke has already settled the field, so the blur that
@@ -155,12 +163,16 @@ export function InlineNumberField({
   // fire a duplicate write. Any further typing clears it — see onChange.
   const settledByKey = useRef(false);
 
-  // Follow the saved value when it changes underneath us — a refetch, an
-  // optimistic rollback — but never while the user is mid-edit, which would
-  // yank the text out from under them.
+  // Follow the saved value when it changes underneath us — a refetch, say —
+  // but never while the user is mid-edit, which would yank the text out from
+  // under them. NOT enough for a failed save: when the rollback lands on the
+  // value this effect last saw, nothing "changes" and the typed text stays.
+  // Drilled 2026-10-15: a refused 9 stayed on screen over a stored 4, looking
+  // saved. So a failed save marks the field UNSAVED (confirmWhenWritten).
   useEffect(() => {
     if (editing.current) return;
     setDraft(blankWhenUnset ? "" : formatForEdit(shown));
+    setUnsaved(false);
   }, [shown, blankWhenUnset]);
 
   useEffect(
@@ -176,6 +188,22 @@ export function InlineNumberField({
     flashTimer.current = window.setTimeout(() => setFlash(false), FLASH_MS);
   }, []);
 
+  /**
+   * The tick, only for a write that landed. A refused save keeps what was
+   * typed — wiping it would lose the person's change — and marks the field
+   * UNSAVED (red, and said aloud) instead: Enter or leaving the field tries
+   * again, Escape puts back what is stored. The caller's onError says why.
+   */
+  const confirmWhenWritten = useCallback(
+    (result: void | Promise<unknown>) => {
+      setUnsaved(false);
+      if (result && typeof (result as Promise<unknown>).then === "function")
+        (result as Promise<unknown>).then(showFlash, () => setUnsaved(true));
+      else showFlash();
+    },
+    [showFlash]
+  );
+
   const commit = useCallback(() => {
     /*
       The DECISION is in @/lib/inlineEdit, which the suite can reach; this is
@@ -183,32 +211,38 @@ export function InlineNumberField({
       emptied box in placeholder mode never becomes a zero — the trapdoor this
       change exists to close, and the one that has now shipped twice.
     */
+    // A percent box takes a trailing "%" as meant, like every other percent
+    // box since 2026-10-15 (Settings, markup, tax) — it used to refuse "15%".
+    const typed =
+      percentKind || suffix?.includes("%")
+        ? draft.trim().replace(/%$/, "")
+        : draft;
     const outcome =
       whenUnset === undefined
-        ? commitNumericEdit(draft, shown, rules)
-        : commitNullableEdit(draft, value, whenUnset, rules);
+        ? commitNumericEdit(typed, shown, rules)
+        : commitNullableEdit(typed, value, whenUnset, rules);
 
     if (outcome.action === "save") {
-      onSave(outcome.value);
+      confirmWhenWritten(onSave(outcome.value));
       setDraft(formatForEdit(outcome.value));
-      showFlash();
       return;
     }
     if (outcome.action === "clear") {
       // Nothing to clear TO if the caller cannot express unset, so the field
       // goes back to what is stored rather than writing a number nobody typed.
       if (onClear) {
-        onClear();
-        showFlash();
+        confirmWhenWritten(onClear());
         setDraft("");
         return;
       }
       setDraft(blankWhenUnset ? "" : revertToSaved(shown));
+      setUnsaved(false);
       return;
     }
     // Both "revert" and "none" put the field back in step with what is stored.
     // Neither flashes: nothing was written, and a tick would claim otherwise.
     setDraft(blankWhenUnset ? "" : revertToSaved(shown));
+    setUnsaved(false);
   }, [
     draft,
     shown,
@@ -218,7 +252,9 @@ export function InlineNumberField({
     onClear,
     rules,
     onSave,
-    showFlash,
+    confirmWhenWritten,
+    percentKind,
+    suffix,
   ]);
 
   const caption = percentKind ? otherPercentCaption(percentKind, draft) : null;
@@ -270,6 +306,7 @@ export function InlineNumberField({
             // whatever encloses it; closing is this field's call to make, below.
             e.stopPropagation();
             setDraft(blankWhenUnset ? "" : revertToSaved(shown));
+            setUnsaved(false);
             editing.current = false;
             settledByKey.current = true;
             if (plan.dismiss) {
@@ -292,9 +329,17 @@ export function InlineNumberField({
           // it cannot be clipped by a scrolling row, it shifts no layout, and it
           // is unmissable next to the number that just changed.
           data-saved={flash ? "true" : undefined}
+          data-unsaved={unsaved ? "true" : undefined}
+          aria-invalid={unsaved || undefined}
+          title={
+            unsaved
+              ? "Not saved — press Enter to try again, or Esc to put back the saved value"
+              : undefined
+          }
           className={cn(
             "text-right transition-colors duration-200",
             flash && "border-emerald-500 bg-emerald-500/10 text-emerald-300",
+            unsaved && "border-red-500 bg-red-500/10 text-red-300",
             className,
             // Room for the word inside, after the caller's width.
             percentKind && "pr-[4.25rem]"
@@ -319,7 +364,7 @@ export function InlineNumberField({
       )}
       {/* Announce the save to assistive tech, which cannot see the colour. */}
       <span className="sr-only" role="status" aria-live="polite">
-        {flash ? `${ariaLabel} saved` : ""}
+        {flash ? `${ariaLabel} saved` : unsaved ? `${ariaLabel} not saved` : ""}
       </span>
     </span>
   );

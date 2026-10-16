@@ -10,6 +10,16 @@ preselected. The Q15 column is BM-M10 (§ 9). **Build order: after scope tags
 and the baseline screen**, and after the bid-protection work (math version,
 quantity lock, frozen O&P/tax) that this plan's § 7 relies on.
 
+**2026-10-16, Track B: build started** (owner: "BUILD BID METHODS +
+PREVAILING WAGE … all 16 picks approved"). Built with no column: § 1's
+engine (`shared/bidMethods.ts`, no stacking by type, the four-way 0%/50%
+test in `server/bidMethods.test.ts`), § 2's charge rate per line, § 3's
+bracket check (`shared/markupBrackets.ts`), § 4's effective margin and
+§ 7's "how bid" line under Total due, § 5's arithmetic
+(`shared/prevailingWage.ts`). The SQL in § 9 was applied to a throwaway DB
+and handed to A (`track-a-handoff.md` § "FROM B"). What waits for the
+columns: `todo.md` § "Bid methods — wiring left".
+
 **The owner's request, in one line:** each bid picks ONE way of pricing.
 **(A) Markup + charge rate** prices material at cost plus a markup and labor
 at an hourly charge rate. **(B) Cost + O&P** prices material and labor at

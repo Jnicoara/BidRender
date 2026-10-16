@@ -112,6 +112,18 @@ export type LineItemInput = {
    * reads as (shared/materialMarkup.ts, `storedMarkupPct`).
    */
   materialMarkupPct?: number;
+  /**
+   * The hourly CHARGE rate this line's labor is billed at, on a bid priced
+   * by Markup + charge rate (references/bid-methods-plan.md § 2). The labor
+   * still COSTS `laborRate`; the difference is `laborMarkup`, so cost and
+   * price stay two numbers and the effective margin can be read off them.
+   *
+   *   undefined  labor is billed at cost — Cost + O&P and the old math;
+   *   a number   billed at that rate;
+   *   null       the role has no charge rate: the labor is NOT PRICED and
+   *              adds nothing, never falls back to cost (owner Q5).
+   */
+  chargeRate?: number | null;
 };
 
 export type LineItemBreakdown = {
@@ -127,6 +139,15 @@ export type LineItemBreakdown = {
    * existed (references/material-markup.md § The five places).
    */
   costWithMarkup: number;
+  /**
+   * Labor billed at the charge rate minus labor at cost, whole cents. 0 unless
+   * the line was priced with a `chargeRate`. Part of `costWithMarkup`, beside
+   * the material markup. Negative when the charge rate is below cost: that is
+   * a real number, and the bid warns about it rather than hiding it.
+   */
+  laborMarkup: number;
+  /** A charge rate was asked for and the role has none (`chargeRate: null`). */
+  laborNotPriced: boolean;
   /** The assembly's overhead hours as applied. 0 when unset. */
   overheadLaborHours: number;
   /**
@@ -248,6 +269,13 @@ export type CompanyPricingDefaults = {
   profitValue: number;
   /** Company-wide labor adjustment as a fraction. 0 = no adjustment. */
   productivityPct: number;
+  /**
+   * The company's flat material markup, as a fraction. Read ONLY by a bid
+   * priced Markup + charge rate, whose "Marked up" charges take it (owner Q6,
+   * shared/bidMethods.ts). Lines carry their own frozen markup, so nothing
+   * else reads this. Undefined = 0.
+   */
+  materialMarkupPct?: number;
 };
 
 /**
@@ -596,7 +624,23 @@ export function calculateLineItem(input: LineItemInput): LineItemBreakdown {
       `laborQuantity cannot be negative, received: ${laborQuantity}`
     );
   const totalLaborHours = hours * laborQuantity;
-  const laborCents = toCents(totalLaborHours * input.laborRate);
+  /*
+    Charge rate (method A). NULL is "Not priced": the labor adds nothing to
+    cost or price — the same as hours that were never set — and says so,
+    rather than quietly billing at cost with no margin (owner Q5).
+  */
+  const chargeRate = input.chargeRate;
+  const laborNotPriced = chargeRate === null;
+  const laborCents = laborNotPriced
+    ? 0
+    : toCents(totalLaborHours * input.laborRate);
+  let laborMarkupCents = 0;
+  if (typeof chargeRate === "number") {
+    assertFinite(chargeRate, "chargeRate");
+    if (chargeRate < 0)
+      throw new Error(`chargeRate cannot be negative, received: ${chargeRate}`);
+    laborMarkupCents = toCents(totalLaborHours * chargeRate) - laborCents;
+  }
 
   // Material markup, on the LINE's material cents after quantity, rounded to a
   // whole cent here for the reason the material is: it is a money amount the
@@ -616,7 +660,11 @@ export function calculateLineItem(input: LineItemInput): LineItemBreakdown {
     materialCost: fromCents(materialCents),
     materialMarkupPct,
     materialMarkup: fromCents(markupCents),
-    costWithMarkup: fromCents(materialCents + laborCents + markupCents),
+    costWithMarkup: fromCents(
+      materialCents + laborCents + markupCents + laborMarkupCents
+    ),
+    laborMarkup: fromCents(laborMarkupCents),
+    laborNotPriced,
     overheadLaborHours,
     baseHoursWithOverhead,
     modifierPct,
@@ -657,22 +705,29 @@ export function sumLineCosts(lines: LineItemBreakdown[]): {
   laborCost: number;
   directCost: number;
   materialMarkup: number;
+  /** Labor at charge rate minus labor at cost (method A). 0 otherwise. */
+  laborMarkup: number;
   costWithMarkup: number;
 } {
   let materialCents = 0;
   let laborCents = 0;
   let markupCents = 0;
+  let laborMarkupCents = 0;
   for (const line of lines) {
     materialCents += toCents(line.materialCost);
     laborCents += toCents(line.laborCost);
     markupCents += toCents(line.materialMarkup);
+    laborMarkupCents += toCents(line.laborMarkup);
   }
   return {
     materialCost: fromCents(materialCents),
     laborCost: fromCents(laborCents),
     directCost: fromCents(materialCents + laborCents),
     materialMarkup: fromCents(markupCents),
-    costWithMarkup: fromCents(materialCents + laborCents + markupCents),
+    laborMarkup: fromCents(laborMarkupCents),
+    costWithMarkup: fromCents(
+      materialCents + laborCents + markupCents + laborMarkupCents
+    ),
   };
 }
 

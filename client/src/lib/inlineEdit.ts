@@ -47,6 +47,52 @@ export function formatForEdit(value: number): string {
 }
 
 /**
+ * A number as a person types it (break-it drill, 2026-10-15).
+ *
+ * Number() alone refused "1,500" and "$12.50" (the box snapped back and the
+ * contractor's price was gone) while ACCEPTING "0x10" as 16 and "0b11" as 3.
+ * So a leading dollar sign and correctly grouped thousands commas are read as
+ * meant, and anything that is not a plain decimal (hex, binary, two dots,
+ * "1,5" — a European decimal that would otherwise become 15) is NaN, which
+ * the caller reverts. Never a different number from the one on screen.
+ */
+export function parseTypedNumber(text: string): number {
+  let t = text.trim().replace(/^([+-]?)\$/, "$1");
+  if (/^[+-]?\d{1,3}(,\d{3})+(\.\d*)?$/.test(t)) t = t.replace(/,/g, "");
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t)) return NaN;
+  return Number(t);
+}
+
+/**
+ * A percent box as a person types it: "15", "15%", "+15" all mean 15.
+ * parseTypedNumber plus a trailing "%", which in a percent box says what it
+ * means (Modifiers, and a material's markup — where "15%" was refused with
+ * "must be between 0% and 1000%" until 2026-10-15).
+ */
+export function parseTypedPercent(text: string): number {
+  return parseTypedNumber(text.trim().replace(/%$/, ""));
+}
+
+/**
+ * What a half-typed number in a form box means right now (2026-10-15).
+ *
+ * The component quantity boxes rendered `String(qty)` straight from the
+ * number, so "2." re-rendered as "2" and the dot was gone before the next key:
+ * typing 2.25 stored 225. The box now holds the TEXT (`DraftNumberInput`) and
+ * only hands a number on when the text is one the person could mean — null
+ * for blank, a trailing dot's partial ("2." is 2, the same number, so
+ * nothing moves), or anything `parseTypedNumber` refuses or `accept` rejects.
+ */
+export function draftNumber(
+  text: string,
+  accept: (n: number) => boolean = n => n >= 0
+): number | null {
+  if (text.trim() === "") return null;
+  const n = parseTypedNumber(text);
+  return Number.isFinite(n) && accept(n) ? n : null;
+}
+
+/**
  * Decide what Enter or blur means for a numeric field.
  *
  * Invalid input REVERTS rather than erroring. An inline field has nowhere to
@@ -68,7 +114,7 @@ export function commitNumericEdit(
       : { action: "save", value: 0 };
   }
 
-  const parsed = Number(trimmed);
+  const parsed = parseTypedNumber(trimmed);
   if (!Number.isFinite(parsed))
     return { action: "revert", reason: "not a number" };
   if (min !== undefined && parsed < min)
@@ -81,6 +127,32 @@ export function commitNumericEdit(
   if (nearlyEqual(parsed, savedValue, epsilon)) return { action: "none" };
 
   return { action: "save", value: parsed };
+}
+
+/**
+ * `commitNumericEdit` for a box that shows a PERCENT of a stored FRACTION
+ * ("15" on screen, 0.15 stored). A trailing "%" is read as meant, and the
+ * outcome's value is the fraction to store.
+ *
+ * Settings › Pricing used `(Number(text) || 0) / 100` until 2026-10-15, so
+ * "15%", "1,5" and an emptied box all saved the COMPANY profit / overhead /
+ * productivity as 0% — with "Company default saved" — re-pricing every Draft
+ * bid that follows it. Blank and unreadable now revert, and nothing moves.
+ */
+export function commitPercentEdit(
+  draft: string,
+  savedFraction: number,
+  rules: NumericFieldRules = {}
+): CommitOutcome {
+  const savedPct = Math.round(savedFraction * 1e6) / 1e4;
+  const outcome = commitNumericEdit(
+    draft.trim().replace(/%$/, ""),
+    savedPct,
+    rules
+  );
+  return outcome.action === "save"
+    ? { action: "save", value: outcome.value / 100 }
+    : outcome;
 }
 
 /**

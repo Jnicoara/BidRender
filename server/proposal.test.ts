@@ -570,6 +570,24 @@ describe("what leaves the building", () => {
     expect(doc.summary.validUntilLabel).toContain("September");
   });
 
+  it("dates the quote by the reader's calendar, not the server's", () => {
+    // 7 pm on Oct 15 in Los Angeles is already Oct 16 in UTC — the live
+    // server's zone. Built there with no zone, the quote said "October 16"
+    // (2026-10-15).
+    const evening = new Date("2026-10-16T02:00:00Z");
+    const la = buildProposal(
+      input({
+        now: evening,
+        timeZone: "America/Los_Angeles",
+        design: { ...input().design, validDays: 30 },
+      })
+    );
+    expect(la.summary.dateLabel).toBe("October 15, 2026");
+    expect(la.summary.validUntilLabel).toContain("November 14, 2026");
+    const utc = buildProposal(input({ now: evening, timeZone: "UTC" }));
+    expect(utc.summary.dateLabel).toBe("October 16, 2026");
+  });
+
   it("says nothing about validity when it is switched off", () => {
     const doc = buildProposal(
       input({ design: { ...input().design, validDays: 0 } })

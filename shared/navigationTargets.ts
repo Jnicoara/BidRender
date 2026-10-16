@@ -43,18 +43,14 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
   },
   {
     /**
-     * Kept pointing at the Dashboard, which absorbed the Bids list.
-     *
-     * The id stays `bids` even though the path moved: the id is what the model
-     * names, "take me to my bids" is one of the likeliest things a lost user
-     * says, and retiring the id would turn the app's most common navigation
-     * request into a text-only answer.
+     * The Bids list, back in the nav since 2026-10-14 (owner). It pointed at
+     * the Dashboard while the list was folded into it; the id never changed.
      */
     id: "bids",
     label: "Bids",
-    path: "#/dashboard",
+    path: "#/bids",
     purpose:
-      "Find one bid out of hundreds by job name, client or address. See what is in draft, out for bid, won or lost.",
+      "Every bid in one list. Find one bid out of hundreds by job name, client or address, and filter by draft, out for bid, won or lost.",
   },
   {
     /**
@@ -72,16 +68,15 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
   },
   {
     /**
-     * Plans live on each bid (/bids/:id/plans), which needs a bid and so
-     * cannot be linked to from here. Since 2026-09-27 the Dashboard answers
-     * the question directly: a "Recent plans" row, and a Plans chip on every
-     * card whose bid has drawings.
+     * The Plans list (/plans), in the nav since 2026-10-14 (owner): every bid
+     * with drawings, and Upload a plan. Each bid's own plans stay at
+     * /bids/:id/plans.
      */
     id: "plans",
     label: "Plans",
-    path: "#/dashboard",
+    path: "#/plans",
     purpose:
-      "Your plan drawings and PDFs — open the plans for a job to count and trace on them, or upload a new plan set. Find them under Recent plans on the Dashboard, or the Plans button on any bid.",
+      "Your plan drawings and PDFs — every job with plans in one list, to open them and count and trace, or upload a new plan set.",
   },
   {
     id: "clients",
@@ -138,6 +133,14 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
     path: "#/archive",
     purpose:
       "Archived bids, and where to restore one that was removed by mistake before it is permanently deleted.",
+  },
+  {
+    /** Every archived thing in one place, with Restore (owner, 2026-10-14). */
+    id: "trash",
+    label: "Recently deleted",
+    path: "#/trash",
+    purpose:
+      "Trash: everything you deleted or archived — bids, materials, assemblies, kits, modifiers and clients — in one place, with a Restore button to bring any of it back.",
   },
   {
     /**

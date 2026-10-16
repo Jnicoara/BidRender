@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 /**
  * First-run state and the getting-started checklist.
  *
@@ -111,6 +112,13 @@ export const onboardingRouter = router({
     .mutation(async ({ input, ctx }) => {
       // Goes through the same fork-on-edit path as the Labor Rates screen, so
       // a starter role edited here behaves exactly as it would there.
+      // A rate that is not this company's (or not there) is a 404, not a
+      // server error (weird-input sweep, 2026-10-14).
+      if (!(await db.getLaborRateById(input.id, ctx.scope.dataUserId)))
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Labor rate not found.",
+        });
       return db.setLaborRateHourlyCost(
         input.id,
         ctx.scope.dataUserId,

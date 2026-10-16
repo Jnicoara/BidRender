@@ -42,9 +42,13 @@ import {
 import { useCompany } from "@/hooks/useCompany";
 import {
   INVITABLE_ROLES,
+  CAPABILITY_LABEL,
   capabilitiesFor,
+  roleLabel,
   type CompanyRole,
 } from "@shared/permissions";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 const ROLE_BLURB: Record<CompanyRole, string> = {
   owner: "Everything, including who else is here.",
@@ -58,7 +62,12 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const access = useCompany();
   const canManage = access.can("members.manage");
 
-  const { data: members = [], isLoading } = trpc.company.members.useQuery();
+  const {
+    data: members = [],
+    isLoading,
+    isLoadingError: membersFailed,
+    refetch: refetchMembers,
+  } = trpc.company.members.useQuery();
   const { data: invites = [] } = trpc.company.invites.useQuery(undefined, {
     enabled: canManage,
   });
@@ -81,7 +90,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   };
 
   const invite = trpc.company.invite.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: data => {
       setFreshCode(data.code);
       setInviteEmail("");
@@ -90,7 +99,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   });
 
   const revoke = trpc.company.revokeInvite.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Invitation revoked.");
       refresh();
@@ -98,7 +107,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   });
 
   const setRole = trpc.company.setRole.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Role updated.");
       refresh();
@@ -106,7 +115,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   });
 
   const setStatus = trpc.company.setStatus.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => refresh(),
   });
 
@@ -114,7 +123,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
   const seatsFull = seats?.fullMessage ?? null;
 
   const accept = trpc.company.acceptInvite.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: data => {
       toast.success(`You have joined ${data.companyName}.`);
       setJoinCode("");
@@ -148,7 +157,10 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
           </div>
           {access.role && (
             <span className="text-xs text-muted-foreground shrink-0">
-              You are {access.isOwner ? "the owner" : `an ${access.role}`}
+              You are{" "}
+              {access.isOwner
+                ? "the owner"
+                : `${/^[aeiou]/i.test(access.role) ? "an" : "a"} ${access.role}`}
             </span>
           )}
         </div>
@@ -232,7 +244,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                   <SelectContent>
                     {INVITABLE_ROLES.map(role => (
                       <SelectItem key={role} value={role}>
-                        {role}
+                        {roleLabel(role)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -273,7 +285,8 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
         <section className="space-y-2">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-sm font-semibold">
-              In this company ({members.length})
+              {/* A crew that did not load is not a crew of 0 (drill, 2026-10-15). */}
+              In this company{membersFailed ? "" : ` (${members.length})`}
             </h2>
             {/* Members plus pending invitations; suspended people hold no
                 seat. The rule is shared/seats.ts. */}
@@ -290,6 +303,11 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
           </div>
           {isLoading ? (
             <div className="h-20 rounded bg-muted/40 animate-pulse" />
+          ) : membersFailed ? (
+            <LoadFailed
+              what="your crew"
+              onRetry={() => void refetchMembers()}
+            />
           ) : (
             <div className="border border-border rounded-lg divide-y divide-border/60">
               {members.map(member => {
@@ -325,8 +343,8 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                       )}
                     >
                       {member.status === "suspended"
-                        ? "suspended"
-                        : member.role}
+                        ? "Suspended"
+                        : roleLabel(member.role)}
                     </span>
 
                     {canManage && member.role !== "owner" && !isSelf && (
@@ -346,7 +364,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                           <SelectContent>
                             {INVITABLE_ROLES.map(role => (
                               <SelectItem key={role} value={role}>
-                                {role}
+                                {roleLabel(role)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -392,7 +410,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                     {item.email ?? "(no email noted)"}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {item.role}
+                    {roleLabel(item.role)}
                   </span>
                   <span className="text-xs shrink-0">
                     {/* From inviteStatus (shared/permissions.ts). This used
@@ -460,9 +478,7 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
             <h2 className="text-sm font-semibold">What your role covers</h2>
             <ul className="text-xs text-muted-foreground grid grid-cols-2 gap-x-6 gap-y-0.5">
               {capabilitiesFor(access.role).map(capability => (
-                <li key={capability} className="font-mono">
-                  {capability}
-                </li>
+                <li key={capability}>{CAPABILITY_LABEL[capability]}</li>
               ))}
             </ul>
           </section>

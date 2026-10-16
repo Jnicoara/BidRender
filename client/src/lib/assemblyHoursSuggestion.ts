@@ -16,7 +16,7 @@
  * Pure and in `client/src/lib` so the suite can hold the rule: the editor is
  * a component, which vitest cannot reach.
  */
-import { assemblyHours } from "@shared/assemblyHours";
+import { parseTypedNumber } from "./inlineEdit";
 import {
   defaultLaborHoursFor,
   type LaborHourDefault,
@@ -37,7 +37,8 @@ export type HoursOffer = {
 /** The grey offer beside the hours box. */
 export function hoursOffer(name: string, draftHours: string): HoursOffer {
   const suggestion = defaultLaborHoursFor(name);
-  const typed = assemblyHours(draftHours);
+  // The same reading the save makes, so the offer and the save agree.
+  const typed = hoursToSave(draftHours);
   return {
     suggestion,
     canUse: typed === null || Math.abs(typed - suggestion.hours) > 1e-9,
@@ -55,5 +56,10 @@ export function suggestedHoursDraft(offer: HoursOffer): string {
  * click.
  */
 export function hoursToSave(draftHours: string): number | null {
-  return assemblyHours(draftHours);
+  // Read as a person types it (parseTypedNumber): "1,5" or "0x10" is not a
+  // number here, where Number() made the second 16. The page refuses those
+  // before saving, so NaN never reaches the save as "not set".
+  if (draftHours.trim() === "") return null;
+  const hours = parseTypedNumber(draftHours);
+  return Number.isFinite(hours) ? hours : null;
 }

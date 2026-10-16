@@ -26,10 +26,12 @@ import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import * as db from "../db";
 import { requireKnownKind } from "../knownHeightKind";
+import { requireLibraryRefs } from "../libraryRefs";
 import { heightList } from "../../shared/takeoffHeights";
 import { MOST_USED_WINDOW_DAYS, rankMostUsed } from "../../shared/mostUsed";
 import { resolveAssembly } from "../../shared/assemblyLookup";
 import { changed } from "../../shared/exampleTags";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -99,6 +101,11 @@ const createSchema = z.object({
 
 const updateSchema = z.object({
   id: z.number().int().positive(),
+  /**
+   * The `updatedAt` the editor opened with. Sent, a save is refused if the
+   * assembly was saved since (shared/staleEdit.ts); omitted, never refused.
+   */
+  openedAt: z.date().optional(),
   name: nameSchema.optional(),
   category: z.enum(ASSEMBLY_CATEGORIES).optional(),
   trade: tradeSchema.optional(),
@@ -233,6 +240,13 @@ export const assembliesRouter = router({
       input.mountHeightTypeKey ?? null,
       ctx.scope.dataUserId
     );
+    // Every stored reference must be this company's or shared — see
+    // server/libraryRefs.ts for the price book this used to leak.
+    await requireLibraryRefs(ctx.scope.dataUserId, {
+      materials: input.materials.map(line => line.materialId),
+      modifiers: input.modifierIds,
+      laborRates: [input.laborRateId],
+    });
     const existing = await db.getLibraryAssemblies(ctx.scope.dataUserId);
     const clash = existing.find(
       a => a.name.toLowerCase() === input.name.toLowerCase()
@@ -277,7 +291,7 @@ export const assembliesRouter = router({
    * and callers must use what comes back.
    */
   update: procedure.input(updateSchema).mutation(async ({ input, ctx }) => {
-    const { id, materials, modifierIds, steps, ...rest } = input;
+    const { id, materials, modifierIds, steps, openedAt, ...rest } = input;
 
     const target = await db.getAssemblyById(id, ctx.scope.dataUserId);
     if (!target)
@@ -285,8 +299,21 @@ export const assembliesRouter = router({
         code: "NOT_FOUND",
         message: "Assembly not found.",
       });
+    // The editor saves its whole form, so a save from a screen opened before
+    // somebody else's would put their change back (shared/staleEdit.ts).
+    if (savedSinceOpened(target.updatedAt, openedAt))
+      throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
 
-    // Checked BEFORE the fork, so a refused key leaves no fork behind.
+    // Checked BEFORE the fork, so a refusal leaves no fork behind. Every
+    // stored reference must be this company's or shared (libraryRefs.ts).
+    await requireLibraryRefs(ctx.scope.dataUserId, {
+      materials: materials?.map(line => line.materialId),
+      modifiers: modifierIds,
+      laborRates: [rest.laborRateId],
+      laborSteps: steps?.map(step =>
+        step.kind === "step" ? step.laborStepId : null
+      ),
+    });
     if (rest.mountHeightTypeKey != null)
       await requireKnownKind(rest.mountHeightTypeKey, ctx.scope.dataUserId);
     // Resolved BEFORE the fork, so a refused "not set" leaves no fork behind.
@@ -333,9 +360,10 @@ export const assembliesRouter = router({
           ? null
           : toDecimal(rest.relocateLaborHours);
 
-    if (Object.keys(patch).length > 0) {
-      await db.updateAssembly(editableId, ctx.scope.dataUserId, patch);
-    }
+    // Called even with an empty patch: updateAssembly stamps `updatedAt`, and
+    // a save that changed only the recipe (child rows) must still read as a
+    // save to the next editor's guard (shared/staleEdit.ts).
+    await db.updateAssembly(editableId, ctx.scope.dataUserId, patch);
 
     // Children are replaced only when the caller sent them. Omitting the key
     // means "leave the recipe alone"; sending [] means "empty the recipe".

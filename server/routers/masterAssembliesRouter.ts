@@ -81,13 +81,21 @@ export const masterAssembliesRouter = router({
         sortOrder: z.number().int().default(0),
       })
     )
-    .mutation(async ({ input }) => {
-      await db.addItemToMasterAssembly({
-        assemblyId: input.assemblyId,
-        masterItemId: input.masterItemId,
-        qty: String(input.qty),
-        sortOrder: input.sortOrder,
-      });
+    .mutation(async ({ input, ctx }) => {
+      const added = await db.addItemToMasterAssembly(
+        {
+          assemblyId: input.assemblyId,
+          masterItemId: input.masterItemId,
+          qty: String(input.qty),
+          sortOrder: input.sortOrder,
+        },
+        ctx.scope.dataUserId
+      );
+      if (!added)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Assembly not found.",
+        });
       return { success: true };
     }),
 
@@ -99,22 +107,36 @@ export const masterAssembliesRouter = router({
         sortOrder: z.number().int().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, qty, sortOrder } = input;
       const data: Record<string, unknown> = {};
       if (qty !== undefined) data.qty = String(qty);
       if (sortOrder !== undefined) data.sortOrder = sortOrder;
-      await db.updateMasterAssemblyItem(
+      const updated = await db.updateMasterAssemblyItem(
         id,
-        data as Parameters<typeof db.updateMasterAssemblyItem>[1]
+        ctx.scope.dataUserId,
+        data as Parameters<typeof db.updateMasterAssemblyItem>[2]
       );
+      if (!updated)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Assembly item not found.",
+        });
       return { success: true };
     }),
 
   removeItem: procedure
     .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ input }) => {
-      await db.removeItemFromMasterAssembly(input.id);
+    .mutation(async ({ input, ctx }) => {
+      const removed = await db.removeItemFromMasterAssembly(
+        input.id,
+        ctx.scope.dataUserId
+      );
+      if (!removed)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Assembly item not found.",
+        });
       return { success: true };
     }),
 });
