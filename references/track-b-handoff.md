@@ -1,6 +1,11 @@
 # Track B handoff — 2026-10-05
 
-## WHERE B STANDS — 2026-10-15 (third night, running)
+## WHERE B STANDS — 2026-10-15 (third night, done 23:30)
+
+- All eight items worked, track-b only, local-dev not pushed. Plans only:
+  `user-levels-plan.md` (L1–L6, T1–T6). Break-it found four faults in the
+  new Unassigned count, all fixed with tests. Morning questions Q5, Q6 new;
+  Q2 closed. Servers stopped; MySQL 3307 running.
 
 - **Done, pushed to track-b only:** unpriced starter prices read "not
   priced", never $0.00 (`893c4bcf`, Gate green); 375 px trace toolbar two

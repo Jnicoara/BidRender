@@ -223,7 +223,7 @@ start.
   bids.dashboard measured 240/440/840 ms at 50/100/200 marked bids
   (`90fcb4fc`, no code change).
 
-## Item 8 — break-it pass on starter offers + Plans (23:25–23:45)
+## Item 8 — break-it pass on starter offers + Plans (23:25–23:30)
 
 - Starter offers' Accept path read through: stale picks refused, one
   transaction, answers upserted; nothing found.
