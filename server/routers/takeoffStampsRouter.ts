@@ -104,6 +104,7 @@ import {
   restoreStamps,
   type StampSnapshot,
 } from "../takeoffRestore";
+import { placedBefore, rememberPlaced } from "../markReplay";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -335,32 +336,44 @@ export const takeoffStampsRouter = router({
    */
   drop: procedure
     .input(
-      z.object({
-        bidId: z.number().int().positive(),
-        sheetId: z.number().int().positive(),
-        /**
-         * What these marks are counting.
-         *
-         * Required, and the only thing that says what a mark IS. The assembly
-         * columns on the row below are filled FROM the group rather than passed
-         * in, so a caller cannot place a mark that says one thing and belongs
-         * to another. An assembly is armed through takeoffGroups.forAssembly,
-         * which is one call and makes this path the only path.
-         */
-        groupId: z.number().int().positive(),
-        /** Where these ones sit. Optional — tagging can happen after placing. */
-        location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
-        /**
-         * What these ones ARE (shared/markStatus.ts). Omitted or null is new,
-         * which is what every mark was before the column existed.
-         */
-        status: z.enum(USER_MARK_STATUSES).nullable().default(null),
-        /** One entry per click. Bounded so a runaway loop cannot flood a sheet. */
-        at: z
-          .array(z.object({ x: coordSchema, y: coordSchema }))
-          .min(1)
-          .max(500),
-      })
+      z
+        .object({
+          bidId: z.number().int().positive(),
+          sheetId: z.number().int().positive(),
+          /**
+           * What these marks are counting.
+           *
+           * Required, and the only thing that says what a mark IS. The assembly
+           * columns on the row below are filled FROM the group rather than passed
+           * in, so a caller cannot place a mark that says one thing and belongs
+           * to another. An assembly is armed through takeoffGroups.forAssembly,
+           * which is one call and makes this path the only path.
+           */
+          groupId: z.number().int().positive(),
+          /** Where these ones sit. Optional — tagging can happen after placing. */
+          location: z.enum(TAKEOFF_LOCATIONS).nullable().default(null),
+          /**
+           * What these ones ARE (shared/markStatus.ts). Omitted or null is new,
+           * which is what every mark was before the column existed.
+           */
+          status: z.enum(USER_MARK_STATUSES).nullable().default(null),
+          /** One entry per click. Bounded so a runaway loop cannot flood a sheet. */
+          at: z
+            .array(z.object({ x: coordSchema, y: coordSchema }))
+            .min(1)
+            .max(500),
+          /**
+           * The screen's key for each click, one for one with `at`. A key
+           * already placed on this bid is not placed again, so a batch resent
+           * after a lost answer counts once (server/markReplay.ts). Optional:
+           * an older screen and the crash-recovery queue send none.
+           */
+          keys: z.array(z.string().min(1).max(64)).max(500).optional(),
+        })
+        .refine(i => !i.keys || i.keys.length === i.at.length, {
+          message: "Each mark needs exactly one key.",
+          path: ["keys"],
+        })
     )
     .mutation(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
@@ -398,9 +411,27 @@ export const takeoffStampsRouter = router({
         assemblyCategory = assembly?.category ?? null;
       }
 
+      /*
+        A resent batch: the clicks whose key already placed a mark on this bid
+        are not placed again. Their earlier ids go back in their place, so
+        the screen's undo covers exactly the marks it drew.
+      */
+      const now = Date.now();
+      const earlier = input.at.map((_, i) =>
+        input.keys ? placedBefore(input.bidId, input.keys[i], now) : null
+      );
+      const fresh = input.at
+        .map((point, i) => ({ point, i }))
+        .filter(({ i }) => earlier[i] === null);
+      if (fresh.length === 0)
+        return {
+          dropped: 0,
+          ids: earlier.filter((id): id is number => id !== null),
+        };
+
       // The ids go back so the screen can offer "undo: N marks placed".
       const ids = await db.createStampsReturningIds(
-        input.at.map(point => ({
+        fresh.map(({ point }) => ({
           bidId: input.bidId,
           sheetId: input.sheetId,
           userId: ctx.scope.dataUserId,
@@ -428,7 +459,28 @@ export const takeoffStampsRouter = router({
         groupId: group.id,
       });
 
-      return { dropped: input.at.length, ids: confirmed };
+      // Remembered only when every id is confirmed as this insert's own:
+      // pairing a key with a guessed id would make a later resend skip a
+      // mark that was never written.
+      if (input.keys && confirmed.length === fresh.length)
+        rememberPlaced(
+          input.bidId,
+          fresh.map(({ i }, k) => ({
+            key: input.keys![i],
+            stampId: confirmed[k],
+          })),
+          now
+        );
+      if (earlier.every(id => id === null))
+        return { dropped: input.at.length, ids: confirmed };
+      // In click order: the earlier id where a key had placed one, else the
+      // new one. All or nothing, as above — no ids if any is unconfirmed.
+      let next = 0;
+      const all =
+        confirmed.length === fresh.length
+          ? earlier.map(id => id ?? confirmed[next++])
+          : [];
+      return { dropped: fresh.length, ids: all };
     }),
 
   /**

@@ -530,6 +530,7 @@ import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
 import { UNASSIGNED_COUNT_NAME } from "@shared/unassignedCount";
+import { MARK_SESSION, markKey } from "@/lib/markKeys";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import {
@@ -7015,6 +7016,12 @@ export default function TakeoffPage({
           sheetId,
           groupId,
           at: batch.map(m => ({ x: m.x, y: m.y })),
+          // One per click: a batch resent after a LOST answer (the server
+          // wrote it, the reply never came) places each mark once, not
+          // twice (server/markReplay.ts; Track A's counting deep test).
+          // Never the bare queue number, which restarts every page load:
+          // see @/lib/markKeys.
+          keys: batch.map(m => markKey(MARK_SESSION, m.key)),
           status,
         })
         /*
