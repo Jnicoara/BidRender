@@ -498,20 +498,45 @@ export const takeoffStampsRouter = router({
    */
   moveToGroup: procedure
     .input(
-      z.object({
-        ids: z.array(z.number().int().positive()).min(1).max(2000),
-        groupId: z.number().int().positive(),
-      })
+      z
+        .object({
+          ids: z.array(z.number().int().positive()).max(2000).default([]),
+          /**
+           * Every mark in THIS count, on every sheet, instead of `ids` — how
+           * the Unassigned count is assigned in one go
+           * (references/count-first-plan.md). The screen only holds one
+           * sheet's marks, so it cannot list them itself.
+           */
+          fromGroupId: z.number().int().positive().optional(),
+          groupId: z.number().int().positive(),
+        })
+        .refine(v => v.ids.length > 0 || v.fromGroupId !== undefined, {
+          message: "Pick some marks to move.",
+        })
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
-      const ids = Array.from(new Set(input.ids));
       const group = await db.getGroupById(input.groupId, userId);
       if (!group)
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "That count was not found.",
         });
+      let ids = Array.from(new Set(input.ids));
+      if (input.fromGroupId !== undefined) {
+        const from = await db.getGroupById(input.fromGroupId, userId);
+        if (!from || from.bidId !== group.bidId)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That count was not found.",
+          });
+        ids = await db.stampIdsInGroup(from.id, userId, from.bidId);
+        if (ids.length === 0)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "There are no marks in that count to move.",
+          });
+      }
       const bid = await requireBid(group.bidId, userId);
       if (bid.quantitiesLockedAt !== null)
         throw new TRPCError({

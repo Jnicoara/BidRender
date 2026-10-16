@@ -394,6 +394,7 @@ import {
   type WarningCounts,
 } from "../shared/lockedWarnings";
 import type { PlanRemovalImpact } from "../shared/planRemoval";
+import { UNASSIGNED_COUNT_LABEL } from "../shared/unassignedCount";
 import {
   quantityCircuit,
   traceModeOf,
@@ -15676,6 +15677,55 @@ export async function bidDropsNotPriced(
   ]);
   const drops = await loadGroupDrops(bidId, userId, heights, runs, scales);
   return drops.reduce((n, d) => n + d.notPricedDrops, 0);
+}
+
+/** Every mark in one count on one bid, any sheet and status — for a move. */
+export async function stampIdsInGroup(
+  groupId: number,
+  userId: number,
+  bidId: number
+): Promise<number[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ id: takeoffStamps.id })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.groupId, groupId),
+        eq(takeoffStamps.userId, userId),
+        eq(takeoffStamps.bidId, bidId)
+      )
+    );
+  return rows.map(r => r.id);
+}
+
+/**
+ * How many marks on this bid's live sheets sit in its UNASSIGNED count —
+ * marks nobody has said what they are (references/count-first-plan.md).
+ * Every status, not only new marks: an unnamed "existing" or "remove" mark
+ * is just as unanswered. A priced print is blocked while this is above 0.
+ */
+export async function bidUnassignedMarks(
+  bidId: number,
+  userId: number
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [row] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(takeoffStamps)
+    .innerJoin(takeoffGroups, eq(takeoffGroups.id, takeoffStamps.groupId))
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        eq(takeoffStamps.userId, userId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        eq(takeoffGroups.kind, "plain"),
+        eq(takeoffGroups.label, UNASSIGNED_COUNT_LABEL)
+      )
+    );
+  return Number(row?.n ?? 0);
 }
 
 /**

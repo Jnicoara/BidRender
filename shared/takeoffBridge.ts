@@ -41,6 +41,7 @@ import {
   type ExtraRun,
 } from "./runExtrasPerFoot";
 import { laborRolesToAdd, type LaborRole, type RoleCounts } from "./roleLines";
+import { isUnassignedCount } from "./unassignedCount";
 
 /** A counted group, as the bridge needs it. */
 export type BridgeGroup = {
@@ -104,6 +105,8 @@ export type Sendability =
   | { sendable: false; reason: "already-on-bid" }
   | { sendable: false; reason: "nothing-counted" }
   | { sendable: false; reason: "no-price" }
+  /** The bid's Unassigned count: its marks need a name first. */
+  | { sendable: false; reason: "unassigned" }
   | { sendable: false; reason: "unsupported-level" };
 
 export function sendability(
@@ -135,6 +138,13 @@ export function sendability(
   // line. The refusal existed so that no count could reach money unpriced
   // SILENTLY; that is still true, by a different route. See
   // references/plan-viewer-overhaul.md § 5f.4.
+  //
+  // Except the bid's UNASSIGNED count (references/count-first-plan.md): its
+  // marks have no name, so a line from it is a line nobody could price.
+  // They block a priced print instead, until somebody says what they are.
+  if (isUnassignedCount(group)) {
+    return { sendable: false, reason: "unassigned" };
+  }
   if (group.kind === "plain") {
     return { sendable: true };
   }
@@ -182,6 +192,7 @@ export function laborRolesWaiting(
   lines: readonly BridgeLine[]
 ): LaborRole[] {
   if (!group.roleCounts) return [];
+  if (isUnassignedCount(group)) return [];
   if (
     !(
       group.kind === "plain" ||

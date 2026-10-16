@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Groundwork for "just count, pick the item later" (server side).** A bid
+  can now hold one "Unassigned" count for marks nobody has named yet. It
+  never goes onto the bid, its marks will block printing a priced proposal
+  until they are assigned, and all of them can be moved into a real count
+  in one step. Nobody can name a count of their own "Unassigned". The
+  screens come next.
+
 - **The first BidRidge starter change no longer takes seconds per thousand
   shops.** Protecting every existing shop from a starter change means giving
   each its own copy first; that was done one shop at a time (6 s for a

@@ -522,6 +522,16 @@ export const proposalsRouter = router({
          * shows a tag.
          */
         examples: exampleSummary(lines),
+        /**
+         * Marks in the bid's Unassigned count (references/count-first-plan.md):
+         * they block a priced print, like a line not priced, until somebody
+         * says what they are. Not in the not-priced TALLY, so the bid's total
+         * reads as it did (count-first-plan.md Q2).
+         */
+        unassignedMarks: await db.bidUnassignedMarks(
+          bid.id,
+          ctx.scope.dataUserId
+        ),
       };
     }),
 });

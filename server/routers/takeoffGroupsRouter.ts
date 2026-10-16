@@ -29,6 +29,12 @@ import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
 import { refuseUnknownKinds } from "../extrasInput";
+import {
+  UNASSIGNED_COUNT_LABEL,
+  countDisplayName,
+  isReservedLabel,
+  isUnassignedCount,
+} from "../../shared/unassignedCount";
 import { refuseSendIfLocked } from "../lockGuard";
 import {
   deleteGroupWithSnapshot,
@@ -92,11 +98,17 @@ const procedure = scoped("bids.view", "bids.edit");
  * "Exit signs" are the same thing to the person typing them and two rows in a
  * panel to everybody else.
  */
-const labelSchema = z
+export const labelSchema = z
   .string()
   .trim()
   .min(1, "Give it a name — that is what the count is called.")
-  .max(255);
+  .max(255)
+  // `__…` is reserved for the bid's Unassigned count (shared/unassignedCount.ts):
+  // a typed one would quietly join the holding pen.
+  .refine(label => !isReservedLabel(label), {
+    message:
+      "That name is kept for marks nobody has named yet — call it something else.",
+  });
 
 /**
  * Why a count cannot go to the bid, in words the estimator can act on.
@@ -110,10 +122,13 @@ function refusalMessage(
     | "already-on-bid"
     | "nothing-counted"
     | "no-price"
+    | "unassigned"
     | "unsupported-level",
   label: string
 ): string {
   switch (reason) {
+    case "unassigned":
+      return "These marks are unassigned. Pick what they are on the Plans screen, and they go over as that.";
     case "already-on-bid":
       return `"${label}" is already on the bid, and its line follows these marks.`;
     case "nothing-counted":
@@ -235,6 +250,8 @@ export const takeoffGroupsRouter = router({
 
       const rows = groups.map(group => ({
         id: group.id,
+        // The STORED label: the bridge below recognises the Unassigned count
+        // by it. The name a person reads is swapped in on the way out.
         label: group.label,
         kind: group.kind,
         assemblyId: group.assemblyId,
@@ -274,6 +291,16 @@ export const takeoffGroupsRouter = router({
       return {
         groups: rows.map((row, i) => ({
           ...row,
+          /*
+            Every screen reads counts from here, so the Unassigned count is
+            named once, here — AFTER the bridge has read the stored label.
+            Mapped before it, `sendability` saw "Unassigned", did not know
+            it, and offered the holding pen to the bid (caught by
+            server/unassignedCountFlow.test.ts).
+          */
+          label: countDisplayName(row.label),
+          /** The bid's Unassigned count (references/count-first-plan.md). */
+          unassigned: isUnassignedCount(row),
           /** Verticals on these marks (§ 3). */
           drop: dropOf(groups[i]),
           /**
@@ -439,6 +466,41 @@ export const takeoffGroupsRouter = router({
         kind: "plain",
       });
       return { id, label: input.label, kind: "plain" as const, count: 0 };
+    }),
+
+  /**
+   * The bid's ONE Unassigned count — found, or made
+   * (references/count-first-plan.md). "Just count" in the Count picker arms
+   * it, so marks land with nothing named yet and are assigned later.
+   */
+  unassigned: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .mutation(async ({ input, ctx }) => {
+      await requireBid(input.bidId, ctx.scope.dataUserId);
+      const existing = await db.findGroupByLabel(
+        input.bidId,
+        ctx.scope.dataUserId,
+        UNASSIGNED_COUNT_LABEL
+      );
+      if (existing)
+        return {
+          id: existing.id,
+          label: countDisplayName(existing.label),
+          kind: existing.kind,
+          count: 0,
+        };
+      const id = await db.createTakeoffGroup({
+        bidId: input.bidId,
+        userId: ctx.scope.dataUserId,
+        label: UNASSIGNED_COUNT_LABEL,
+        kind: "plain",
+      });
+      return {
+        id,
+        label: countDisplayName(UNASSIGNED_COUNT_LABEL),
+        kind: "plain" as const,
+        count: 0,
+      };
     }),
 
   /**
