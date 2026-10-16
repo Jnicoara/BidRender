@@ -33,6 +33,7 @@ import { Check, Lock } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
   DEFAULT_ACCENT,
@@ -392,7 +393,9 @@ export function ProposalDesignControls({
               onChange={e => setValidDraft(e.target.value)}
               onFocus={selectOnFocus}
               onBlur={() => {
-                const days = Number(validDraft);
+                // A blank box was 0 days ("valid for 0 days" on the quote).
+                const days =
+                  validDraft.trim() === "" ? NaN : parseTypedNumber(validDraft);
                 if (!Number.isFinite(days) || days < 0 || days > 365) {
                   setValidDraft(String(settings.validDays));
                   return;

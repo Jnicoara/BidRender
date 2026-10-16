@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { parseTypedPercent } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 
 /** Matches bids.update's tax fields. */
@@ -66,7 +67,8 @@ export function BidTaxControls({
       if (rateOverridePct !== null) onChange({ taxRateOverridePct: null });
       return;
     }
-    const value = Number(trimmed);
+    // "6.25%" is 6.25 (it quietly reverted), "0x10" is not 16.
+    const value = parseTypedPercent(trimmed);
     if (!Number.isFinite(value) || value < 0 || value > 25) {
       // Invalid reverts rather than erroring — an inline field has nowhere to
       // put a message (CLAUDE.md § Editing fields).

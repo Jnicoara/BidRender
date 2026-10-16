@@ -72,7 +72,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { InlineNumberField } from "@/components/InlineNumberField";
-import { asPercent, fromPercent } from "@/lib/inlineEdit";
+import { asPercent, fromPercent, parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { DuplicateUnitPanel } from "@/components/DuplicateUnitPanel";
 import { UnitLinkBadge } from "@/components/UnitLinkBadge";
@@ -684,7 +684,7 @@ export default function BidsPage({
    */
   const addHighlighted = useCallback(
     (assemblyId: number) => {
-      const qty = Number(addQty);
+      const qty = parseTypedNumber(addQty);
       if (!(qty > 0)) {
         toast.error("Enter a quantity greater than zero.");
         return;

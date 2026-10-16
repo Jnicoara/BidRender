@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { money } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -165,8 +166,18 @@ export function BidExpensesSection({
   const expensesTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
 
   const submitExpense = () => {
-    const amount = Number(expenseAmount);
-    if (!expenseName.trim() || !Number.isFinite(amount) || amount < 0) return;
+    // Said, not silent: Number() made a blank amount a $0 expense and
+    // "$250" or "1,250" made Add do nothing at all (break-it, 2026-10-15).
+    if (!expenseName.trim()) {
+      toast.error("Give the expense a name.");
+      return;
+    }
+    const amount =
+      expenseAmount.trim() === "" ? NaN : parseTypedNumber(expenseAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.error("Enter the amount — for example 250.");
+      return;
+    }
     addExpense.mutate({
       bidId,
       name: expenseName.trim(),

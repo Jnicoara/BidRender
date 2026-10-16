@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: an extra cost with no amount went on the bid at $0, and "$250"
+  did nothing.** Additional expenses now ask for the amount and read "$250"
+  and "1,250" as typed. Emptying the quote's "Price good for" no longer
+  saves 0 days, a bid's own tax rate takes "6.25%", and the bid's add
+  box no longer reads "0x10" as 16.
+
 - **Fixed: Job close-out recorded empty boxes as 0 hours.** Leaving the
   total blank recorded "the job took 0 hours", and in By assembly every
   line left blank was recorded as taking no time, which made Performance
