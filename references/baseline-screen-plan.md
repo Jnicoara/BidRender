@@ -377,6 +377,12 @@ Active / Won / Lost, `drizzle/schema.ts:2069`. Owner Q14 (2026-10-12): Active, W
    meaning" pattern, lifted to the bid. The old branch stays in the code for
    as long as any bid sits on that version. That is the cost, and it is
    paid on purpose.
+   **Added 2026-10-16 (owner, morning-questions-a.md N4): a change may be
+   BUTTON-ONLY** (`buttonOnly` in the registry). The release step stops
+   below it (`releaseTargetFor`), so a Draft takes it only when somebody
+   presses "Update to the current math" and has seen old → new. Version 2,
+   the traced-run labor rate, is the first: it writes the company's run rate
+   onto a Draft's $0 run lines (`shared/runRateRepair.ts`).
 3. **New bids start at the current version.**
 4. **A release step (Track A, after the deploy):** `scripts/applyMathVersion.mts`.
    For every bid below the current version:

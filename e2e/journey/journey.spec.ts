@@ -38,9 +38,10 @@
  *      hours are priced at $0/h on every bid, and the bid's own advice ("press
  *      Fix this line") is not offered on run lines (shared/lineFix.ts gives
  *      run lines no `rate` gap). FIXED 2026-10-16: Settings › Pricing "Labor
- *      rate for traced runs" sets it, and this test picks Journeyman there,
- *      so RUN_LINE_RATE is the $60 rate. Lines sent BEFORE a rate is picked
- *      still freeze at $0 (morning question N4).
+ *      rate for traced runs" sets it, and a new account starts on Journeyman
+ *      (owner, N4), whose $60 this test types on the first-run screen — so
+ *      RUN_LINE_RATE is the $60 rate. A Draft holding lines sent at $0
+ *      before that takes the rate only by "Update to the current math".
  *   2. A symbol linked from the LEGEND does not link the count already made
  *      from it on this bid; the count stays "by name" (no assembly, Not priced
  *      on the bid) until the symbol happens to be armed again. That is why the
@@ -507,14 +508,20 @@ test("a new account bids a whole job, and every printed number matches hand math
           ).profitValue
       )
       .toBe((PROFIT_PCT / 100).toFixed(4));
-    // Fault 1, FIXED 2026-10-16: the traced-run labor rate is now set here,
-    // the way a person would (BidPricingDefaultsSection "Labor rate for
-    // traced runs"). Unset, the screen says run hours are priced at $0.
+    // Fault 1, FIXED 2026-10-16: the traced-run labor rate is set here
+    // (BidPricingDefaultsSection "Labor rate for traced runs"). Since the
+    // owner's N4 answer a NEW account already starts on Journeyman — and the
+    // $60 typed for Journeyman on the first-run screen forked it, so the
+    // picker must follow the fork: Journeyman, no "Not set", no $0 warning,
+    // and no "Example rate" (it is the shop's own $60 now).
     const runRate = page.locator("#run-labor-rate");
     await runRate.scrollIntoViewIfNeeded();
+    await expect(runRate.locator("option:checked")).toHaveText("Journeyman");
     await expect(
-      page.getByText(/Not set — the hours on traced runs/)
-    ).toBeVisible();
+      page.getByText(/Not set — the hours on traced runs|has no rate yet/)
+    ).toHaveCount(0);
+    await expect(page.getByText(/^Example rate \$59\.22/)).toHaveCount(0);
+    // Picking it again by hand changes nothing and still says nothing.
     await runRate.selectOption({ label: "Journeyman" });
     await expect(
       page.getByText(/Not set — the hours on traced runs/)

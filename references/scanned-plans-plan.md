@@ -377,6 +377,14 @@ worker, opencv.js fetched on the first search). Every number here is from
   E1.02 would have counted the 18 existing receptacles as new. Only the AI's
   answer takes it off. **Cost:** with AI off, a scan is confirmed one find at
   a time (Next walks them). Owner question 6 below.
+  **Narrowed 2026-10-16 by the owner (morning-questions-a.md N1):** a find
+  the AI's "same" made clear no longer goes straight in. When any find
+  Confirm all would take was cleared by the AI, Confirm all first opens a
+  REVIEW GRID — every one as a small picture, side by side; tap to drop the
+  look-alikes; one tap counts the rest. Nothing AI-found counts until that
+  review (`findMatchingSession.ts` `confirmAllNeedsReview`,
+  `reviewedDecisions`; `FindMatching.tsx`). Shots
+  `references/overnight-shots/a/11-review-grid-*`.
 - **"Bigger shape wins" became a score flag.** It needs two shapes searched
   together; the product searches one. Measured instead: the 2x2's own 13
   scored 0.87–1.00, the 81 halves of 2x4s 0.71–0.80, so under 0.85 is "a

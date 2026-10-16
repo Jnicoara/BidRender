@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsRate } from "@shared/laborRatePricing";
+import { resolveLaborRate } from "@shared/laborRateLookup";
 import { NavigationHelper } from "@/components/NavigationHelper";
 
 export default function FirstRunPage() {
@@ -49,6 +50,11 @@ export default function FirstRunPage() {
   // Shipped example rates (0134) price labor at BidRidge's number until the
   // shop types its own — so "skip" is not $0 any more, it is someone else's.
   const anyExample = rates.some(r => r.isExampleRate === true);
+  // Which role prices traced conduit and wire. A new company starts on the
+  // shipped Journeyman (owner, N4, 2026-10-16); said here so the rate typed
+  // above is known to reach runs too, and where to change the role.
+  const { data: pricing } = trpc.bids.pricingDefaults.useQuery();
+  const runRole = resolveLaborRate(rates, pricing?.defaultLaborRateId ?? null);
 
   const save = async (id: number) => {
     const raw = drafts[id];
@@ -189,6 +195,17 @@ export default function FirstRunPage() {
               })
             )}
           </div>
+
+          {runRole && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              Conduit and wire you trace on the plans are priced at{" "}
+              <span className="text-foreground">{runRole.name}</span>'s rate
+              {runRole.isExampleRate
+                ? " — BidRidge's example until you set it above."
+                : "."}{" "}
+              You can pick another role in Settings › Pricing.
+            </p>
+          )}
         </div>
 
         <div className="mt-6 flex items-center gap-3">

@@ -21,7 +21,10 @@ import { extractVectorGeometry } from "./vectorGeometry";
 import {
   applyAiAnswers,
   clearOpen,
+  confirmAllNeedsReview,
+  decide,
   matchItems,
+  reviewedDecisions,
   summary,
   type ScanFindAnswer,
 } from "./findMatchingSession";
@@ -305,9 +308,10 @@ describe("counting deep test — the same sheet as a scan", () => {
     expect(take.some(p => p.x === 300 && p.y === 220)).toBe(false);
   }, 120_000);
 
-  it("a WRONG 'same' makes that copy clear — the person's Confirm all is the decision", async () => {
-    // Recorded, not endorsed: references/morning-questions-a.md asks whether
-    // an AI-cleared scan find should stay out of Confirm all.
+  it("a WRONG 'same' gets a GFCI only as far as the review grid — the person taps it away (N1)", async () => {
+    // Owner, N1 2026-10-16: on a scan, Confirm all first shows every find
+    // as a picture when any was cleared by the AI; nothing the AI cleared is
+    // counted until that review.
     const r = await searchScan(0, [6, 6]);
     const items = matchItems(r.matches, [], new Set());
     const answers = new Map(
@@ -316,10 +320,50 @@ describe("counting deep test — the same sheet as a scan", () => {
         return [i.id, sym === "gfci" ? ("same" as const) : fakeAnswer(sym)];
       })
     );
-    const take = clearOpen(applyAiAnswers(items, answers)).map(
-      i => placedAt(i).symbol
+    const after = applyAiAnswers(items, answers);
+    const clear = clearOpen(after);
+    // The wrong "same" still makes the 3 GFCIs clear — and marks them as
+    // the AI's doing, so Confirm all must open the grid, not count.
+    expect(clear.filter(i => placedAt(i).symbol === "gfci")).toHaveLength(3);
+    expect(clear.every(i => i.aiCleared)).toBe(true);
+    expect(confirmAllNeedsReview(after)).toBe(true);
+    expect(summary(after).confirmed).toBe(0);
+
+    // The person sees all of them and taps the 3 GFCIs away: one tap counts
+    // the 9 duplexes, sets the GFCIs aside, and no look-alike gets in.
+    const shown = clear.map(i => i.id);
+    const dropped = new Set(
+      clear.filter(i => placedAt(i).symbol === "gfci").map(i => i.id)
     );
-    expect(take.filter(s => s === "gfci")).toHaveLength(3);
-    expect(summary(applyAiAnswers(items, answers)).confirmed).toBe(0);
+    const { confirm, reject } = reviewedDecisions(after, shown, dropped);
+    expect(confirm.map(id => placedAt(after[id]).symbol)).toEqual(
+      Array(9).fill("duplex")
+    );
+    expect(reject).toHaveLength(3);
+    const decided = decide(
+      decide(after, reject, "rejected"),
+      confirm,
+      "confirmed"
+    );
+    expect(summary(decided).confirmed).toBe(9);
+    expect(confirmAllNeedsReview(decided)).toBe(false);
+  }, 120_000);
+
+  it("a find decided while the grid was open is left as it is; an ordinary sheet never needs the grid", async () => {
+    const r = await searchScan(0, [6, 6]);
+    const items = matchItems(r.matches, [], new Set());
+    // No AI asked: nothing is AI-cleared, so no grid.
+    expect(confirmAllNeedsReview(items)).toBe(false);
+    const answers = new Map(
+      items.map(i => [i.id, fakeAnswer(placedAt(i).symbol)])
+    );
+    const after = applyAiAnswers(items, answers);
+    const shown = clearOpen(after).map(i => i.id);
+    // One shown find is set aside from its ring while the grid is open.
+    const moved = decide(after, [shown[0]], "rejected");
+    const { confirm, reject } = reviewedDecisions(moved, shown, new Set());
+    expect(confirm).not.toContain(shown[0]);
+    expect(reject).toEqual([]);
+    expect(confirm).toHaveLength(shown.length - 1);
   }, 120_000);
 });

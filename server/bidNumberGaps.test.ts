@@ -258,11 +258,14 @@ describe.skipIf(!hasDb)("bid-number gaps", () => {
     const screen = await c.bids.get({ id: bid.id });
     expect(screen.totals.directCost).toBe(card.directCost);
   });
-  it("a traced run's labor is priced at the rate the company sets — $0/h until one is set (N4)", async () => {
-    // A company of its own, so the run rate starts unset as on a real account.
+  it("a traced run's labor is priced at the rate the company sets — $0/h while none is set (N4)", async () => {
+    // A company of its own. Since 2026-10-16 a NEW company starts on the
+    // shipped Journeyman (server/runRateRepair.test.ts); every company
+    // before that had no run rate, which is the state cleared to here.
     const OWN = 9923;
     await freshUser(OWN);
     const o = as(OWN);
+    await o.bids.setPricingDefaults({ defaultLaborRateId: null });
     const role = await rate(o, "Gaps run role", 60);
     const type = await emtType(o, "Gaps EMT rate");
     const { bidId, sheetId } = await bidWithSheet(o, OWN, "Gaps run rate");

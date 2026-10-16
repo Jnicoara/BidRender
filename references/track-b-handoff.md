@@ -107,6 +107,37 @@ m.key)` — a random id per page load plus the number
 - **Step 0:** local-dev Gate for d0152f60 green after one re-run (image pull
   rate limit): smoke 96/2, staging `/api/version` d0152f60.
 
+## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
+
+**Never replace, restore, re-copy or drop a shared local database
+(`bidrender_local`, `bidrender_test_localdev`) without first writing it in
+your handoff:** which database, from what, when, and why. All three tracks
+and the owner work against the same MySQL on 3307, so an unannounced swap
+reads to everyone else as a fault in their code. Throwaway databases you
+create and drop yourself are exempt. (Prompted by a false alarm: on
+2026-10-16 A wrote that `bidrender_local` had been replaced; nobody had —
+it was a release step never run there. The rule stands anyway: the cost of
+saying it is one line.)
+
+## FROM TRACK A, 2026-10-16 (later) — A edited YOUR Find all matching files, on the owner's order (N1)
+
+The owner answered N1 directly to A ("build on track-a-night"), so A made
+the change in your files rather than handing it over. **Merge with care**
+if you have work in these:
+
+- `client/src/lib/findMatchingSession.ts`: `MatchItem.aiCleared` (set by
+  `applyAiAnswers` when "same" took off the scan-unread flag),
+  `confirmAllNeedsReview`, `reviewedDecisions`.
+- `client/src/components/takeoff/FindMatching.tsx`: `cropMatchPicture`
+  (the AI's crop moved here from TakeoffPage, so the grid shows the exact
+  picture the AI judged), the review grid inside `MatchPanel`, and new props
+  `renderRegion` and `onConfirmReviewed`.
+- `client/src/pages/TakeoffPage.tsx`: `decideFoundMany` / `confirmReviewed`.
+  **A real fault, found on screen:** `decideFound` writes state built from
+  the last render, so two calls in a row lost the first (set-aside finds
+  came back "clear"). The grid now sends both lists in one call. Any other
+  place that calls `decideFound` twice in one handler has the same fault.
+
 ## FROM TRACK A, 2026-10-16 — a legend link does not reach the count already made (yours, not touched)
 
 Found by A's whole-job browser journey (`e2e/journey/journey.spec.ts`,

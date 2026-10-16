@@ -1,5 +1,5 @@
 {
-  "about": "Every recorded owner answer from the shelf name reviews (boxes, conduit, underground, receptacles, switches, surface raceway) and the pack scan, as one change list for the end-of-pricing job. Extracted 2026-10-16 by Track A from pricing/*-name-review.md \"Owner's answers\" and pricing/pack-label-scan.md; every name checked against BASELINE_MATERIALS. Read by pricing/endOfPricing.mts (dry run). Each entry quotes the sentence that decides it.",
+  "about": "Every recorded owner answer from the shelf name reviews (boxes, conduit, underground, receptacles, switches, surface raceway) and the pack scan, as one change list for the end-of-pricing job. Extracted 2026-10-16 by Track A from pricing/*-name-review.md \"Owner's answers\" and pricing/pack-label-scan.md; every name checked against BASELINE_MATERIALS. Read by pricing/endOfPricing.mts (dry run). Each entry quotes the sentence that decides it. OPEN answers: all 16 resolved by the owner 2026-10-16 (\"YES to all 16 of A's picks\"), each recorded as a \"decided\" entry followed by the changes it produces. Item 9, the 30 mud rings, is recorded with \"pendingApproval\": true — listed in the dry run for the owner's approval and NOT counted in the change list.",
   "changes": [
     {
       "kind": "rename",
@@ -728,11 +728,34 @@
       "quote": "If a recount in the end-of-pricing job gives a different number, stop and find out why before changing anything"
     },
     {
-      "kind": "open",
-      "what": "Row 735 \"Siding mounting block\" splits into \"Vinyl siding mounting block, light fixture, round (box built in)\" and \"Vinyl siding box kit, 1-gang receptacle, GFCI depth (box built in)\". The split is decided, but which name the existing row (its id) is renamed to, and which is added new, is not stated.",
+      "kind": "decided",
+      "pick": 1,
+      "what": "the existing row becomes the light-fixture mounting block; the GFCI box kit is added as a new row.",
+      "results": "1 rename + 1 new row (starter edits DV8/LT15 were already recorded)",
       "review": "pricing/boxes-name-review.md",
       "q": "Row 735",
-      "quote": "rename row 735 in place to ONE of the two names through RENAMED_BASELINE_MATERIALS, so the row keeps its id, and add the other as a new material."
+      "quote": "Owner 2026-10-16: YES to A's pick 1 — the existing row becomes the light-fixture mounting block; the GFCI box kit is added as a new row."
+    },
+    {
+      "kind": "rename",
+      "from": "Siding mounting block",
+      "to": "Vinyl siding mounting block, light fixture, round (box built in)",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Row 735",
+      "quote": "Owner 2026-10-16: YES to A's pick 1 — the existing row becomes the light-fixture mounting block; the GFCI box kit is added as a new row. Review: \"rename row 735 in place to ONE of the two names through RENAMED_BASELINE_MATERIALS, so the row keeps its id, and add the other as a new material.\""
+    },
+    {
+      "kind": "addRow",
+      "ref": "Row 735 (second product)",
+      "name": "Vinyl siding box kit, 1-gang receptacle, GFCI depth (box built in)",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Row 735",
+      "quote": "Owner 2026-10-16: YES to A's pick 1 — the existing row becomes the light-fixture mounting block; the GFCI box kit is added as a new row. Arlington 8081 (15.5 cu in). (No search words given in the review; trade slang still to write.)"
     },
     {
       "kind": "starterEdit",
@@ -765,60 +788,1071 @@
       "quote": "Check before shipping: the 8141 fixture block is 6.8 cu in... confirm the fill when the name is made final."
     },
     {
-      "kind": "open",
-      "what": "Row 730 \"Retrofit bar hanger\": the review proposes renaming it in place to \"Adjustable bar hanger, steel, 16–24\\\" (for a 4\\\" octagon or square box)\" and dropping the \"can recessed\" aliases, but the answers table records only \"Proposed name below\" - no owner yes.",
+      "kind": "decided",
+      "pick": 2,
+      "what": "rename it to the adjustable bar hanger and drop the \"can recessed\" search words.",
+      "results": "1 rename + 1 search-word removal",
       "review": "pricing/boxes-name-review.md",
       "q": "Row 730",
-      "quote": "Row 730, no real product | Proposed name below"
+      "quote": "Owner 2026-10-16: YES to A's pick 2 — rename it to the adjustable bar hanger and drop the \"can recessed\" search words."
     },
     {
-      "kind": "open",
-      "what": "Floor box covers (rows 688-693: \"Floor box cover, blank\" / \"data\" / \"decorator\" / \"duplex\" / \"duplex and data\" / \"single receptacle\"): owner said BOTH plastic and brass (12 rows). Not encodable: which material keeps each existing row (and the \"Floor box receptacle (slab)\" starter on \"duplex\") is still to pick, and the exact plastic/brass names are not written.",
+      "kind": "rename",
+      "from": "Retrofit bar hanger",
+      "to": "Adjustable bar hanger, steel, 16–24\" (for a 4\" octagon or square box)",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Row 730",
+      "quote": "Owner 2026-10-16: YES to A's pick 2 — rename it to the adjustable bar hanger and drop the \"can recessed\" search words. Review: \"Rename row 730 in place (no starter uses it) and drop the \"can recessed\" aliases, which belong to a recessed-can accessory.\""
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Retrofit bar hanger",
+      "words": ["can", "recessed"],
+      "review": "pricing/boxes-name-review.md",
+      "q": "Row 730",
+      "quote": "Owner 2026-10-16: YES to A's pick 2 — rename it to the adjustable bar hanger and drop the \"can recessed\" search words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "decided",
+      "pick": 3,
+      "what": "brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\".",
+      "results": "6 renames + 6 new rows; no starter edit",
       "review": "pricing/boxes-name-review.md",
       "q": "Floor box covers (rows 688-693)",
-      "quote": "Which one keeps the existing row (and so the \"Floor box receptacle (slab)\" starter) is still to pick. Plastic matches the nonmetallic box in row 694."
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\"."
     },
     {
-      "kind": "open",
-      "what": "Per-row rename proposals NOT answered by the owner (\"no bracket\"/\"steel\"/\"knockouts\" on steel boxes, 8 rows): Double-gang welded metal box, 2-1/2\" deep -> Double-gang welded steel box, 2-1/2\" deep, no bracket | Triple-gang welded metal box, 2-1/2\" deep -> Triple-gang welded steel box, 2-1/2\" deep, no bracket | Single-gang metal box, 2-1/2\" deep -> Single-gang gangable switch box, steel, 2-1/2\" deep, no bracket | Octagon box, metal, 1-1/2\" deep -> 4\" octagon box, steel, 1-1/2\" deep, knockouts, no bracket | Octagon box, metal, 2-1/8\" deep -> 4\" octagon box, steel, 2-1/8\" deep, knockouts, no bracket | 4\" square box, 1-1/2\" deep -> 4\" square box, steel, 1-1/2\" deep, knockouts, no bracket | 4\" square box, 2-1/8\" deep -> 4\" square box, steel, 2-1/8\" deep, knockouts, no bracket | 4-11/16\" square box, 2-1/8\" deep -> 4-11/16\" square box, steel, 2-1/8\" deep, knockouts, no bracket",
+      "kind": "rename",
+      "from": "Floor box cover, blank",
+      "to": "Floor box cover, brass, blank",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". Owner 2026-10-12: \"Both. Each of the 6 covers becomes a plastic row and a brass row.\""
+    },
+    {
+      "kind": "rename",
+      "from": "Floor box cover, data",
+      "to": "Floor box cover, brass, data",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". Owner 2026-10-12: \"Both. Each of the 6 covers becomes a plastic row and a brass row.\""
+    },
+    {
+      "kind": "rename",
+      "from": "Floor box cover, decorator",
+      "to": "Floor box cover, brass, decorator",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". Owner 2026-10-12: \"Both. Each of the 6 covers becomes a plastic row and a brass row.\""
+    },
+    {
+      "kind": "rename",
+      "from": "Floor box cover, duplex",
+      "to": "Floor box cover, brass, duplex",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". Owner 2026-10-12: \"Both. Each of the 6 covers becomes a plastic row and a brass row.\""
+    },
+    {
+      "kind": "rename",
+      "from": "Floor box cover, duplex and data",
+      "to": "Floor box cover, brass, duplex and data",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". Owner 2026-10-12: \"Both. Each of the 6 covers becomes a plastic row and a brass row.\""
+    },
+    {
+      "kind": "rename",
+      "from": "Floor box cover, single receptacle",
+      "to": "Floor box cover, brass, single receptacle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". Owner 2026-10-12: \"Both. Each of the 6 covers becomes a plastic row and a brass row.\""
+    },
+    {
+      "kind": "addRow",
+      "ref": "Floor cover (plastic)",
+      "name": "Floor box cover, plastic, blank",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". (No search words given; trade slang still to write.)"
+    },
+    {
+      "kind": "addRow",
+      "ref": "Floor cover (plastic)",
+      "name": "Floor box cover, plastic, data",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". (No search words given; trade slang still to write.)"
+    },
+    {
+      "kind": "addRow",
+      "ref": "Floor cover (plastic)",
+      "name": "Floor box cover, plastic, decorator",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". (No search words given; trade slang still to write.)"
+    },
+    {
+      "kind": "addRow",
+      "ref": "Floor cover (plastic)",
+      "name": "Floor box cover, plastic, duplex",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". (No search words given; trade slang still to write.)"
+    },
+    {
+      "kind": "addRow",
+      "ref": "Floor cover (plastic)",
+      "name": "Floor box cover, plastic, duplex and data",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". (No search words given; trade slang still to write.)"
+    },
+    {
+      "kind": "addRow",
+      "ref": "Floor cover (plastic)",
+      "name": "Floor box cover, plastic, single receptacle",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Floor box covers (rows 688-693)",
+      "quote": "Owner 2026-10-16: YES to A's pick 3 — brass keeps each existing row (the slab floor box starter keeps its duplex cover); plastic is added new, named \"Floor box cover, plastic, …\". (No search words given; trade slang still to write.)"
+    },
+    {
+      "kind": "decided",
+      "pick": 4,
+      "what": "yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed.",
+      "results": "8 renames",
       "review": "pricing/boxes-name-review.md",
       "q": "Existing rows table (row verdicts)",
-      "quote": "The answers cover only floor covers, WP holes, fan box, M1-M17, 4\" square supports, rows 735 and 730; names go in \"with the owner's yes on the final list\"."
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed."
     },
     {
-      "kind": "open",
-      "what": "Per-row rename proposals NOT answered by the owner (\"1-gang\" on FD/FS cast boxes, 6 rows): 1/2\" FD cast box -> 1/2\" FD cast box, 1-gang | 3/4\" FD cast box -> 3/4\" FD cast box, 1-gang | 1\" FD cast box -> 1\" FD cast box, 1-gang | 1/2\" FS cast box -> 1/2\" FS cast box, 1-gang | 3/4\" FS cast box -> 3/4\" FS cast box, 1-gang | 1\" FS cast box -> 1\" FS cast box, 1-gang",
+      "kind": "rename",
+      "from": "Double-gang welded metal box, 2-1/2\" deep",
+      "to": "Double-gang welded steel box, 2-1/2\" deep, no bracket",
+      "keepOldAsSearchWord": false,
       "review": "pricing/boxes-name-review.md",
       "q": "Existing rows table (row verdicts)",
-      "quote": "The answers cover only floor covers, WP holes, fan box, M1-M17, 4\" square supports, rows 735 and 730; names go in \"with the owner's yes on the final list\"."
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"Double-gang welded steel box, 2-1/2\" deep, no bracket\"."
     },
     {
-      "kind": "open",
-      "what": "Per-row rename proposals NOT answered by the owner (\"steel, screw cover, NEMA 1\" on pull boxes, 6 rows): 4x4x4 pull box -> 4x4x4 pull box, steel, screw cover, NEMA 1 | 6x6x4 pull box -> 6x6x4 pull box, steel, screw cover, NEMA 1 | 8x8x4 pull box -> 8x8x4 pull box, steel, screw cover, NEMA 1 | 12x12x4 pull box -> 12x12x4 pull box, steel, screw cover, NEMA 1 | 16x16x6 pull box -> 16x16x6 pull box, steel, screw cover, NEMA 1 | 24x24x6 pull box -> 24x24x6 pull box, steel, screw cover, NEMA 1",
+      "kind": "rename",
+      "from": "Triple-gang welded metal box, 2-1/2\" deep",
+      "to": "Triple-gang welded steel box, 2-1/2\" deep, no bracket",
+      "keepOldAsSearchWord": false,
       "review": "pricing/boxes-name-review.md",
       "q": "Existing rows table (row verdicts)",
-      "quote": "The answers cover only floor covers, WP holes, fan box, M1-M17, 4\" square supports, rows 735 and 730; names go in \"with the owner's yes on the final list\"."
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"Triple-gang welded steel box, 2-1/2\" deep, no bracket\"."
     },
     {
-      "kind": "open",
-      "what": "Per-row rename proposals NOT answered by the owner (\"1/2\\\" raised\" on raised covers (rows 753-771), 19 rows): 4\" square raised cover, duplex -> 4\" square raised cover, 1/2\" raised, duplex | 4\" square raised cover, single toggle -> 4\" square raised cover, 1/2\" raised, single toggle | 4\" square raised cover, decorator -> 4\" square raised cover, 1/2\" raised, decorator | 4\" square raised cover, two toggle -> 4\" square raised cover, 1/2\" raised, two toggle | 4-11/16\" square raised cover, 2-gang decorator -> 4-11/16\" square raised cover, 1/2\" raised, 2-gang decorator | 4-11/16\" square raised cover, two duplex -> 4-11/16\" square raised cover, 1/2\" raised, two duplex | 4\" square raised cover, single receptacle -> 4\" square raised cover, 1/2\" raised, single receptacle | 4\" square raised cover, duplex and toggle -> 4\" square raised cover, 1/2\" raised, duplex and toggle | 4\" square raised cover, decorator and toggle -> 4\" square raised cover, 1/2\" raised, decorator and toggle | 4\" square raised cover, decorator and duplex -> 4\" square raised cover, 1/2\" raised, decorator and duplex | 4-11/16\" square raised cover, duplex -> 4-11/16\" square raised cover, 1/2\" raised, duplex | 4-11/16\" square raised cover, single toggle -> 4-11/16\" square raised cover, 1/2\" raised, single toggle | 4-11/16\" square raised cover, decorator -> 4-11/16\" square raised cover, 1/2\" raised, decorator | 4-11/16\" square raised cover, single receptacle -> 4-11/16\" square raised cover, 1/2\" raised, single receptacle | 4-11/16\" square raised cover, two toggle -> 4-11/16\" square raised cover, 1/2\" raised, two toggle | 4-11/16\" square raised cover, duplex and toggle -> 4-11/16\" square raised cover, 1/2\" raised, duplex and toggle | 4-11/16\" square raised cover, decorator and toggle -> 4-11/16\" square raised cover, 1/2\" raised, decorator and toggle | 4-11/16\" square raised cover, decorator and duplex -> 4-11/16\" square raised cover, 1/2\" raised, decorator and duplex | 4-11/16\" square raised cover, 30A/50A power receptacle -> 4-11/16\" square raised cover, 1/2\" raised, 30A/50A power receptacle",
+      "kind": "rename",
+      "from": "Single-gang metal box, 2-1/2\" deep",
+      "to": "Single-gang gangable switch box, steel, 2-1/2\" deep, no bracket",
+      "keepOldAsSearchWord": false,
       "review": "pricing/boxes-name-review.md",
       "q": "Existing rows table (row verdicts)",
-      "quote": "The answers cover only floor covers, WP holes, fan box, M1-M17, 4\" square supports, rows 735 and 730; names go in \"with the owner's yes on the final list\"."
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"Single-gang gangable switch box, steel, 2-1/2\" deep, no bracket\"."
     },
     {
-      "kind": "open",
-      "what": "Per-row rename proposals NOT answered by the owner (other single-row word additions, 14 rows): Box support bracket -> Stud-to-stud box support bracket, steel, 16\" OC | Ceiling fan brace box, 1-1/2\" deep -> Fan-rated brace and box, old work (expandable bar), 1-1/2\" deep | Double-gang box extender -> Double-gang box extender, plastic, adjustable | Single-gang box extender -> Single-gang box extender, plastic, adjustable | Drywall repair ring -> Drywall repair ring, single-gang | Floor box carpet flange -> Floor box carpet flange, for 1-gang nonmetallic floor box | Low-voltage mounting bracket, 1-gang -> Low-voltage mounting bracket, old work, 1-gang | Low-voltage mounting bracket, 2-gang -> Low-voltage mounting bracket, old work, 2-gang | Old work ceiling box, plastic, 18 cu in -> Old work round ceiling box, plastic, 18 cu in, swing clamp | 4\" round blank cover -> 4\" round/octagon blank cover, steel | Round ceiling box, plastic, 20 cu in -> Round fixture box, new work, plastic, nail-on, 20 cu in (not fan-rated) | Shallow round box, 1/2\" deep -> Pancake box, steel, 4\" round, 1/2\" deep | Steel stud grommet -> Steel stud grommet, 1-3/8\" hole (1\" KO) | Weatherproof lampholder cover -> Weatherproof lampholder cover, 4\" round, 2 lampholders",
+      "kind": "rename",
+      "from": "Octagon box, metal, 1-1/2\" deep",
+      "to": "4\" octagon box, steel, 1-1/2\" deep, knockouts, no bracket",
+      "keepOldAsSearchWord": false,
       "review": "pricing/boxes-name-review.md",
       "q": "Existing rows table (row verdicts)",
-      "quote": "The answers cover only floor covers, WP holes, fan box, M1-M17, 4\" square supports, rows 735 and 730; names go in \"with the owner's yes on the final list\"."
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"4\" octagon box, steel, 1-1/2\" deep, knockouts, no bracket\"."
     },
     {
-      "kind": "open",
-      "what": "Mud rings (rows 748-752): \"already decided\" elsewhere (raises 1/2\"-1-1/4\" x 1-gang/2-gang/fixture x 4\" and 4-11/16\" = 30 rings, 25 new), but this review does not give the exact names, so they are not encoded here.",
+      "kind": "rename",
+      "from": "Octagon box, metal, 2-1/8\" deep",
+      "to": "4\" octagon box, steel, 2-1/8\" deep, knockouts, no bracket",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"4\" octagon box, steel, 2-1/8\" deep, knockouts, no bracket\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square box, 1-1/2\" deep",
+      "to": "4\" square box, steel, 1-1/2\" deep, knockouts, no bracket",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"4\" square box, steel, 1-1/2\" deep, knockouts, no bracket\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square box, 2-1/8\" deep",
+      "to": "4\" square box, steel, 2-1/8\" deep, knockouts, no bracket",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"4\" square box, steel, 2-1/8\" deep, knockouts, no bracket\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square box, 2-1/8\" deep",
+      "to": "4-11/16\" square box, steel, 2-1/8\" deep, knockouts, no bracket",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 4 — yes to \"steel\", \"knockouts\", \"no bracket\" on the 8 steel boxes, as proposed. Review's proposed name: \"4-11/16\" square box, steel, 2-1/8\" deep, knockouts, no bracket\"."
+    },
+    {
+      "kind": "decided",
+      "pick": 5,
+      "what": "yes, add \"1-gang\" to the 6 FD/FS cast boxes.",
+      "results": "6 renames",
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes."
+    },
+    {
+      "kind": "rename",
+      "from": "1/2\" FD cast box",
+      "to": "1/2\" FD cast box, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes. Review's proposed name: \"1/2\" FD cast box, 1-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "1/2\" FS cast box",
+      "to": "1/2\" FS cast box, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes. Review's proposed name: \"1/2\" FS cast box, 1-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "3/4\" FD cast box",
+      "to": "3/4\" FD cast box, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes. Review's proposed name: \"3/4\" FD cast box, 1-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "3/4\" FS cast box",
+      "to": "3/4\" FS cast box, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes. Review's proposed name: \"3/4\" FS cast box, 1-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "1\" FD cast box",
+      "to": "1\" FD cast box, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes. Review's proposed name: \"1\" FD cast box, 1-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "1\" FS cast box",
+      "to": "1\" FS cast box, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 5 — yes, add \"1-gang\" to the 6 FD/FS cast boxes. Review's proposed name: \"1\" FS cast box, 1-gang\"."
+    },
+    {
+      "kind": "decided",
+      "pick": 6,
+      "what": "yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes.",
+      "results": "6 renames",
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes."
+    },
+    {
+      "kind": "rename",
+      "from": "4x4x4 pull box",
+      "to": "4x4x4 pull box, steel, screw cover, NEMA 1",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes. Review's proposed name: \"4x4x4 pull box, steel, screw cover, NEMA 1\"."
+    },
+    {
+      "kind": "rename",
+      "from": "6x6x4 pull box",
+      "to": "6x6x4 pull box, steel, screw cover, NEMA 1",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes. Review's proposed name: \"6x6x4 pull box, steel, screw cover, NEMA 1\"."
+    },
+    {
+      "kind": "rename",
+      "from": "8x8x4 pull box",
+      "to": "8x8x4 pull box, steel, screw cover, NEMA 1",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes. Review's proposed name: \"8x8x4 pull box, steel, screw cover, NEMA 1\"."
+    },
+    {
+      "kind": "rename",
+      "from": "12x12x4 pull box",
+      "to": "12x12x4 pull box, steel, screw cover, NEMA 1",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes. Review's proposed name: \"12x12x4 pull box, steel, screw cover, NEMA 1\"."
+    },
+    {
+      "kind": "rename",
+      "from": "16x16x6 pull box",
+      "to": "16x16x6 pull box, steel, screw cover, NEMA 1",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes. Review's proposed name: \"16x16x6 pull box, steel, screw cover, NEMA 1\"."
+    },
+    {
+      "kind": "rename",
+      "from": "24x24x6 pull box",
+      "to": "24x24x6 pull box, steel, screw cover, NEMA 1",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 6 — yes, add \"steel, screw cover, NEMA 1\" to the 6 pull boxes. Review's proposed name: \"24x24x6 pull box, steel, screw cover, NEMA 1\"."
+    },
+    {
+      "kind": "decided",
+      "pick": 7,
+      "what": "yes, add \"1/2\" raised\" to the 19 raised covers.",
+      "results": "19 renames",
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, duplex",
+      "to": "4\" square raised cover, 1/2\" raised, duplex",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, duplex\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, single toggle",
+      "to": "4\" square raised cover, 1/2\" raised, single toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, single toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, decorator",
+      "to": "4\" square raised cover, 1/2\" raised, decorator",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, decorator\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, two toggle",
+      "to": "4\" square raised cover, 1/2\" raised, two toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, two toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, single receptacle",
+      "to": "4\" square raised cover, 1/2\" raised, single receptacle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, single receptacle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, duplex and toggle",
+      "to": "4\" square raised cover, 1/2\" raised, duplex and toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, duplex and toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, decorator and toggle",
+      "to": "4\" square raised cover, 1/2\" raised, decorator and toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, decorator and toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square raised cover, decorator and duplex",
+      "to": "4\" square raised cover, 1/2\" raised, decorator and duplex",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4\" square raised cover, 1/2\" raised, decorator and duplex\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, 2-gang decorator",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, 2-gang decorator",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, 2-gang decorator\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, two duplex",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, two duplex",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, two duplex\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, duplex",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, duplex",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, duplex\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, single toggle",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, single toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, single toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, decorator",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, decorator",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, decorator\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, single receptacle",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, single receptacle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, single receptacle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, two toggle",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, two toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, two toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, duplex and toggle",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, duplex and toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, duplex and toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, decorator and toggle",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, decorator and toggle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, decorator and toggle\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, decorator and duplex",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, decorator and duplex",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, decorator and duplex\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square raised cover, 30A/50A power receptacle",
+      "to": "4-11/16\" square raised cover, 1/2\" raised, 30A/50A power receptacle",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 7 — yes, add \"1/2\" raised\" to the 19 raised covers. Review's proposed name: \"4-11/16\" square raised cover, 1/2\" raised, 30A/50A power receptacle\"."
+    },
+    {
+      "kind": "decided",
+      "pick": 8,
+      "what": "yes, all 14 other box and part renames as proposed.",
+      "results": "14 renames",
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed."
+    },
+    {
+      "kind": "rename",
+      "from": "Box support bracket",
+      "to": "Stud-to-stud box support bracket, steel, 16\" OC",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Stud-to-stud box support bracket, steel, 16\" OC\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Ceiling fan brace box, 1-1/2\" deep",
+      "to": "Fan-rated brace and box, old work (expandable bar), 1-1/2\" deep",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Fan-rated brace and box, old work (expandable bar), 1-1/2\" deep\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Double-gang box extender",
+      "to": "Double-gang box extender, plastic, adjustable",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Double-gang box extender, plastic, adjustable\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Single-gang box extender",
+      "to": "Single-gang box extender, plastic, adjustable",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Single-gang box extender, plastic, adjustable\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Drywall repair ring",
+      "to": "Drywall repair ring, single-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Drywall repair ring, single-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Floor box carpet flange",
+      "to": "Floor box carpet flange, for 1-gang nonmetallic floor box",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Floor box carpet flange, for 1-gang nonmetallic floor box\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Low-voltage mounting bracket, 1-gang",
+      "to": "Low-voltage mounting bracket, old work, 1-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Low-voltage mounting bracket, old work, 1-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Low-voltage mounting bracket, 2-gang",
+      "to": "Low-voltage mounting bracket, old work, 2-gang",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Low-voltage mounting bracket, old work, 2-gang\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Old work ceiling box, plastic, 18 cu in",
+      "to": "Old work round ceiling box, plastic, 18 cu in, swing clamp",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Old work round ceiling box, plastic, 18 cu in, swing clamp\"."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" round blank cover",
+      "to": "4\" round/octagon blank cover, steel",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"4\" round/octagon blank cover, steel\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Round ceiling box, plastic, 20 cu in",
+      "to": "Round fixture box, new work, plastic, nail-on, 20 cu in (not fan-rated)",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Round fixture box, new work, plastic, nail-on, 20 cu in (not fan-rated)\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Shallow round box, 1/2\" deep",
+      "to": "Pancake box, steel, 4\" round, 1/2\" deep",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Pancake box, steel, 4\" round, 1/2\" deep\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Steel stud grommet",
+      "to": "Steel stud grommet, 1-3/8\" hole (1\" KO)",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Steel stud grommet, 1-3/8\" hole (1\" KO)\"."
+    },
+    {
+      "kind": "rename",
+      "from": "Weatherproof lampholder cover",
+      "to": "Weatherproof lampholder cover, 4\" round, 2 lampholders",
+      "keepOldAsSearchWord": false,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Existing rows table (row verdicts)",
+      "quote": "Owner 2026-10-16: YES to A's pick 8 — yes, all 14 other box and part renames as proposed. Review's proposed name: \"Weatherproof lampholder cover, 4\" round, 2 lampholders\"."
+    },
+    {
+      "kind": "decided",
+      "pick": 9,
+      "what": "A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list.",
+      "results": "30 names WAITING FOR APPROVAL (5 renames + 25 new rows), not in the change list",
       "review": "pricing/boxes-name-review.md",
       "q": "Mud rings",
-      "quote": "Mud rings — already decided, listed only ... The decided set is 5 × 3 × 2 = 30 rings, so 25 are new."
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list."
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square mud ring",
+      "to": "4\" square mud ring, 1-gang, 1/2\" raise",
+      "keepOldAsSearchWord": true,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Keeps row 4\" square mud ring's id (and its starters) — A's proposal: today's row becomes the 1/2\" raise.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 1-gang, 5/8\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 1-gang, 3/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 1-gang, 1\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 1-gang, 1-1/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square mud ring, 2-gang",
+      "to": "4\" square mud ring, 2-gang, 1/2\" raise",
+      "keepOldAsSearchWord": true,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Keeps row 4\" square mud ring, 2-gang's id (and its starters) — A's proposal: today's row becomes the 1/2\" raise.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 2-gang, 5/8\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 2-gang, 3/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 2-gang, 1\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, 2-gang, 1-1/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "rename",
+      "from": "4\" square mud ring, fixture",
+      "to": "4\" square mud ring, fixture, 1/2\" raise",
+      "keepOldAsSearchWord": true,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Keeps row 4\" square mud ring, fixture's id (and its starters) — A's proposal: today's row becomes the 1/2\" raise.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, fixture, 5/8\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, fixture, 3/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, fixture, 1\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4\" square mud ring, fixture, 1-1/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square mud ring",
+      "to": "4-11/16\" square mud ring, 1-gang, 1/2\" raise",
+      "keepOldAsSearchWord": true,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Keeps row 4-11/16\" square mud ring's id (and its starters) — A's proposal: today's row becomes the 1/2\" raise.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 1-gang, 5/8\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 1-gang, 3/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 1-gang, 1\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 1-gang, 1-1/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "rename",
+      "from": "4-11/16\" square mud ring, 2-gang",
+      "to": "4-11/16\" square mud ring, 2-gang, 1/2\" raise",
+      "keepOldAsSearchWord": true,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Keeps row 4-11/16\" square mud ring, 2-gang's id (and its starters) — A's proposal: today's row becomes the 1/2\" raise.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 2-gang, 5/8\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 2-gang, 3/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 2-gang, 1\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, 2-gang, 1-1/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, fixture, 1/2\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, fixture, 5/8\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, fixture, 3/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, fixture, 1\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
+    },
+    {
+      "kind": "addRow",
+      "ref": "Mud ring",
+      "name": "4-11/16\" square mud ring, fixture, 1-1/4\" raise",
+      "shelf": "Boxes",
+      "unitOfSale": "each",
+      "aliases": [],
+      "description": null,
+      "review": "pricing/boxes-name-review.md",
+      "q": "Mud rings",
+      "quote": "Owner 2026-10-16: YES to A's pick 9 — A writes the 30 names in one pattern (\"4\" square mud ring, 1-gang, 1/2\" raise\") for the owner to approve as one list. Decided set: raises 1/2\"–1-1/4\" × 1-gang/2-gang/round fixture × 4\" and 4-11/16\" square.",
+      "pendingApproval": true
     },
     {
       "kind": "check",
@@ -3397,11 +4431,29 @@
       "quote": "Pack box of 100 / 100 if the row is priced from the box."
     },
     {
-      "kind": "open",
-      "what": "Tracer wire access box (Q7): the answer says \"red lid\" but the new name does not include it and no description or search word is given for it - where \"red lid\" goes is not stated.",
+      "kind": "decided",
+      "pick": 10,
+      "what": "put \"red lid\" in the description and the search words, not the name.",
+      "results": "1 description + 1 search word",
       "review": "pricing/underground-name-review.md",
       "q": "Q7",
-      "quote": "667 becomes Tracer wire access box, grade level, light duty, red lid."
+      "quote": "Owner 2026-10-16: YES to A's pick 10 — put \"red lid\" in the description and the search words, not the name."
+    },
+    {
+      "kind": "describe",
+      "name": "Tracer wire access box",
+      "description": "Red lid.",
+      "review": "pricing/underground-name-review.md",
+      "q": "Q7",
+      "quote": "Owner 2026-10-16: YES to A's pick 10 — put \"red lid\" in the description and the search words, not the name. Q7: \"667 becomes Tracer wire access box, grade level, light duty, red lid.\" (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "addAlias",
+      "name": "Tracer wire access box",
+      "words": ["red lid"],
+      "review": "pricing/underground-name-review.md",
+      "q": "Q7",
+      "quote": "Owner 2026-10-16: YES to A's pick 10 — put \"red lid\" in the description and the search words, not the name. (Current name; renamed in this job.)"
     },
     {
       "kind": "addRow",
@@ -3582,20 +4634,20 @@
     {
       "kind": "rename",
       "from": "15A 250V receptacle, NEMA 6-15R",
-      "to": "15A 250V single receptacle, NEMA 6-15R",
+      "to": "15A 250V single receptacle, NEMA 6-15R, standard",
       "keepOldAsSearchWord": true,
       "review": "pricing/receptacles-name-review.md",
       "q": "Q1, row 788",
-      "quote": "Q1 Names: Every \"Needs words\" row is renamed to the proposed name through RENAMED_BASELINE_MATERIALS, each old name kept as a search word on its row."
+      "quote": "Owner 2026-10-16: YES to A's pick 11 — Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row. Was: Q1 Names: Every \"Needs words\" row is renamed to the proposed name through RENAMED_BASELINE_MATERIALS, each old name kept as a search word on its row."
     },
     {
       "kind": "rename",
       "from": "20A 250V receptacle, NEMA 6-20R",
-      "to": "20A 250V single receptacle, NEMA 6-20R",
+      "to": "20A 250V single receptacle, NEMA 6-20R, standard",
       "keepOldAsSearchWord": true,
       "review": "pricing/receptacles-name-review.md",
       "q": "Q1, row 789",
-      "quote": "Row 789: Needs a word: `20A 250V single receptacle, NEMA 6-20R`. Q1: every Needs words row is renamed to the proposed name."
+      "quote": "Owner 2026-10-16: YES to A's pick 11 — Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row. Was: Row 789: Needs a word: `20A 250V single receptacle, NEMA 6-20R`. Q1: every Needs words row is renamed to the proposed name."
     },
     {
       "kind": "rename",
@@ -3771,11 +4823,11 @@
     {
       "kind": "rename",
       "from": "20A red emergency receptacle",
-      "to": "20A duplex receptacle, red, commercial grade",
+      "to": "20A duplex receptacle, standard, red, tamper-resistant, commercial grade",
       "keepOldAsSearchWord": true,
       "review": "pricing/receptacles-name-review.md",
       "q": "Q1, row 821",
-      "quote": "Row 821: Needs words: `20A duplex receptacle, red, commercial grade` ... \"emergency\" stays a search word."
+      "quote": "Owner 2026-10-16: YES to A's pick 11 — Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row. Was: Row 821: Needs words: `20A duplex receptacle, red, commercial grade` ... \"emergency\" stays a search word."
     },
     {
       "kind": "addAlias",
@@ -3788,20 +4840,20 @@
     {
       "kind": "rename",
       "from": "15A single receptacle",
-      "to": "15A single receptacle, tamper-resistant",
+      "to": "15A single receptacle, standard, tamper-resistant",
       "keepOldAsSearchWord": true,
       "review": "pricing/receptacles-name-review.md",
       "q": "Q2, row 823",
-      "quote": "Row 823: Needs a word (Q2): `15A single receptacle, tamper-resistant`. Single receptacles are one face."
+      "quote": "Owner 2026-10-16: YES to A's pick 11 — Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row. Was: Row 823: Needs a word (Q2): `15A single receptacle, tamper-resistant`. Single receptacles are one face."
     },
     {
       "kind": "rename",
       "from": "20A single receptacle",
-      "to": "20A single receptacle, tamper-resistant, commercial grade",
+      "to": "20A single receptacle, standard, tamper-resistant, commercial grade",
       "keepOldAsSearchWord": true,
       "review": "pricing/receptacles-name-review.md",
       "q": "Q4, row 824",
-      "quote": "Q4 Commercial grade: 824 `20A single receptacle, tamper-resistant, commercial grade`."
+      "quote": "Owner 2026-10-16: YES to A's pick 11 — Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row. Was: Q4 Commercial grade: 824 `20A single receptacle, tamper-resistant, commercial grade`."
     },
     {
       "kind": "rename",
@@ -4003,11 +5055,13 @@
       "quote": "If a recount finds a starter using 802, 816 or 817 that this review did not list, stop and find out why before retiring them."
     },
     {
-      "kind": "open",
-      "what": "Q3 answer says 'Duplex, single and quad rows say \"standard\"', but the explicit proposed names for the single rows (823, 824, and the 250V singles 788/789) and for 821 (red duplex) carry no 'standard' (and 821 no tamper-resistant, though Q2 says TR on every 15A/20A 125V row; 821 is not in Q2's list). Encoded as the explicit proposed names; owner should confirm.",
+      "kind": "decided",
+      "pick": 11,
+      "what": "Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row.",
+      "results": "5 existing renames edited (rows 788, 789, 821, 823, 824)",
       "review": "pricing/receptacles-name-review.md",
       "q": "Q3 vs rows 788/789/821/823/824",
-      "quote": "Q3 Yes: Duplex, single and quad rows say \"standard\". GFCI, AFCI, USB and surge rows get no face word."
+      "quote": "Owner 2026-10-16: YES to A's pick 11 — Q3 wins: the single rows and 821 also say \"standard\", and 821 gets tamper-resistant like every 15A/20A 125V row."
     },
     {
       "kind": "rename",
@@ -4397,11 +5451,85 @@
       "quote": "Q2: rocker/decora come off the toggle rows. Q4: \"commercial spec grade\" leaves their search words (831, 833, 855)."
     },
     {
-      "kind": "open",
-      "what": "Q2 says rocker/decora come off 'the toggle rows' via SWITCH_SLANG and go 'onto W1 only', but SWITCH_SLANG ('light toggle device rocker decora 15 amp') also sits on rows Q2 does not name: Pilot-light, Momentary contact (both renamed '…toggle'), Key, Door jamb, Smart switch, Occupancy/Vacancy/Dual-tech sensor switches, and Weatherproof toggle switch (becoming a cover, where 'light device rocker decora 15 amp' is also wrong). Which of these lose the words is not stated.",
+      "kind": "decided",
+      "pick": 12,
+      "what": "rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words.",
+      "results": "9 search-word removals",
       "review": "pricing/switches-name-review.md",
       "q": "Q2",
-      "quote": "\"rocker\" and \"decora\" come off the toggle rows (`SWITCH_SLANG`) and go onto W1 only."
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words."
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Pilot-light switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Momentary contact switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Key switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Door jamb switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Smart switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Occupancy sensor switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Vacancy sensor switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Dual-tech occupancy sensor switch",
+      "words": ["rocker", "decora"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. (Current name; renamed in this job.)"
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Weatherproof toggle switch",
+      "words": ["light", "device", "rocker", "decora", "15", "amp"],
+      "review": "pricing/switches-name-review.md",
+      "q": "Q2",
+      "quote": "Owner 2026-10-16: YES to A's pick 12 — rocker/decora come off every row except W1 (the toggle-type rows Q2 did not name), and the weatherproof cover loses all the switch words. It becomes \"Weatherproof toggle switch cover, single-gang\". (Current name; renamed in this job.)"
     },
     {
       "kind": "addRow",
@@ -4511,11 +5639,21 @@
       "quote": "Q3: ADD `Surface raceway device box, 1-gang, 500/700 series, 1-3/8\" deep` (V5747) as a new row, with \"shallow\" as a search word."
     },
     {
-      "kind": "open",
-      "what": "Row 644 (becoming the 1-3/4\" DEEP box) currently carries the search word 'shallow', while the new 1-3/8\" row gets 'shallow' (Q3). The review never says to remove 'shallow' from 644; left as is it would compete with the new shallow row in a 'shallow' search (the review's check wants 'shallow' to surface its own row first).",
+      "kind": "decided",
+      "pick": 13,
+      "what": "take \"shallow\" off row 644, so it does not compete with the new shallow box.",
+      "results": "1 search-word removal",
       "review": "pricing/surface-raceway-name-review.md",
       "q": "Q3, row 644",
-      "quote": "Run scripts/searchSpotCheck.mts with ... \"shallow\" ... Each must surface its own row first."
+      "quote": "Owner 2026-10-16: YES to A's pick 13 — take \"shallow\" off row 644, so it does not compete with the new shallow box."
+    },
+    {
+      "kind": "removeAlias",
+      "name": "Surface raceway device box, 500/700 series",
+      "words": ["shallow"],
+      "review": "pricing/surface-raceway-name-review.md",
+      "q": "Q3, row 644",
+      "quote": "Owner 2026-10-16: YES to A's pick 13 — take \"shallow\" off row 644, so it does not compete with the new shallow box. (Current name; becomes the 1-3/4\" deep box in this job.)"
     },
     {
       "kind": "hide",
@@ -4627,14 +5765,6 @@
     },
     {
       "kind": "describe",
-      "name": "Raceway conduit connector",
-      "description": "Ivory (the standard V part). White and gray cost more.",
-      "review": "pricing/surface-raceway-name-review.md",
-      "q": "Q7",
-      "quote": "Q7: Description on every 500/700 row. (Becomes the 500/700 offset connector in this job.)"
-    },
-    {
-      "kind": "describe",
       "name": "Raceway fixture box",
       "description": "Ivory (the standard V part). White and gray cost more.",
       "review": "pricing/surface-raceway-name-review.md",
@@ -4738,26 +5868,30 @@
       "quote": "Q7: Description on every 500/700 row. (Becomes the 500/700 entrance end in this job.)"
     },
     {
-      "kind": "describe",
-      "name": "Surface raceway support clip, 500/700 series",
-      "description": "Ivory (the standard V part). White and gray cost more.",
-      "review": "pricing/surface-raceway-name-review.md",
-      "q": "Q7",
-      "quote": "Q7: Description on every 500/700 row: \"Ivory (the standard V part). White and gray cost more.\" (V5703 is steel; see open.)"
-    },
-    {
-      "kind": "open",
-      "what": "Q7 'description on every 500/700 row' collides with Q5 on the plate (646 gets 'Any standard 1-gang duplex plate…', and it is not a Wiremold V part), so the plate is given only the Q5 text. Also unconfirmed: whether the ivory sentence fits the support clip (V5703, steel, not a coloured part) and the offset connector. Owner/A to confirm the row set.",
+      "kind": "decided",
+      "pick": 14,
+      "what": "the plate gets only the Q5 text; the ivory sentence goes only on colored parts, not the steel support clip or the offset connector.",
+      "results": "2 ivory descriptions taken off (offset connector, support clip); the plate keeps the Q5 text only",
       "review": "pricing/surface-raceway-name-review.md",
       "q": "Q5 vs Q7",
-      "quote": "Q7: Description on every 500/700 row: \"Ivory (the standard V part). White and gray cost more.\" No new rows."
+      "quote": "Owner 2026-10-16: YES to A's pick 14 — the plate gets only the Q5 text; the ivory sentence goes only on colored parts, not the steel support clip or the offset connector."
     },
     {
-      "kind": "open",
-      "what": "2400D (Surface raceway, 2400D series (divided)) description: Q6's text 'Divided base (10 ft) plus cover (5 ft lengths); price both per foot.' was overridden by the pack-scan answer (5 ft length / 5), which says the description 'changes to say so' but gives no exact words. The pack (5 ft length / 5) and a sheetNote are already in STARTER_PACKS; the catalog description text still needs the owner's words.",
+      "kind": "decided",
+      "pick": 15,
+      "what": "the 2400D description reads \"Divided base and cover, sold in 5 ft lengths; price per foot.\"",
+      "results": "1 description",
       "review": "pricing/pack-label-scan.md + pricing/pack-pass-2026-10-14.md",
       "q": "Pick: Surface raceway lengths; surface raceway Q6",
-      "quote": "657 (2400D) `5 ft length` / 5 ... Its description changes to say so (Q6 had \"price both per foot\")."
+      "quote": "Owner 2026-10-16: YES to A's pick 15 — the 2400D description reads \"Divided base and cover, sold in 5 ft lengths; price per foot.\""
+    },
+    {
+      "kind": "describe",
+      "name": "Surface raceway, 2400D series (divided)",
+      "description": "Divided base and cover, sold in 5 ft lengths; price per foot.",
+      "review": "pricing/pack-label-scan.md + pricing/pack-pass-2026-10-14.md",
+      "q": "Pick: Surface raceway lengths; surface raceway Q6",
+      "quote": "Owner 2026-10-16: YES to A's pick 15 — the 2400D description reads \"Divided base and cover, sold in 5 ft lengths; price per foot.\" Pack scan: 657 (2400D) \"5 ft length\" / 5; \"Its description changes to say so\"."
     },
     {
       "kind": "addRow",
@@ -4813,11 +5947,29 @@
       "quote": "Q8: S4 (the 2400D coupling, 2401D) is wanted because Q6 keeps 2400D."
     },
     {
-      "kind": "open",
-      "what": "Rows 641/642 (Surface raceway coupling, 500 series / 700 series): the row table proposes adding 'connection cover' as a search word, but no owner question covers it and the answers do not mention it (the check list does query 'connection cover'). Also S4 carries 'connection cover', so the three rows would share it. Needs the owner's yes.",
+      "kind": "decided",
+      "pick": 16,
+      "what": "yes, add \"connection cover\" to both couplings.",
+      "results": "2 search-word additions",
       "review": "pricing/surface-raceway-name-review.md",
       "q": "rows 641, 642",
-      "quote": "Put \"connection cover\" on both rows as a search word."
+      "quote": "Owner 2026-10-16: YES to A's pick 16 — yes, add \"connection cover\" to both couplings."
+    },
+    {
+      "kind": "addAlias",
+      "name": "Surface raceway coupling, 500 series",
+      "words": ["connection cover"],
+      "review": "pricing/surface-raceway-name-review.md",
+      "q": "rows 641, 642",
+      "quote": "Owner 2026-10-16: YES to A's pick 16 — yes, add \"connection cover\" to both couplings. Row table: \"Put \"connection cover\" on both rows as a search word.\""
+    },
+    {
+      "kind": "addAlias",
+      "name": "Surface raceway coupling, 700 series",
+      "words": ["connection cover"],
+      "review": "pricing/surface-raceway-name-review.md",
+      "q": "rows 641, 642",
+      "quote": "Owner 2026-10-16: YES to A's pick 16 — yes, add \"connection cover\" to both couplings. Row table: \"Put \"connection cover\" on both rows as a search word.\""
     },
     {
       "kind": "check",

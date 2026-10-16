@@ -10,7 +10,9 @@
  *
  * "Confirm all" confirms only the CLEAR ones: no flag, not already counted.
  * A copy the matcher was unsure of is confirmed one at a time or not at all;
- * a button that swept those in would make every flag decorative.
+ * a button that swept those in would make every flag decorative. And on a
+ * scan, a copy the AI made clear goes in only through the review grid
+ * (`confirmAllNeedsReview`, owner N1 2026-10-16).
  */
 import type { Match } from "./findMatching";
 import { SCAN_UNREAD_REASON } from "./scanMatching";
@@ -33,6 +35,13 @@ export type MatchItem = Match & {
    * reason, never a decision.
    */
   ai: ScanFindAnswer | "noAnswer" | null;
+  /**
+   * The AI moved this SCAN find from flagged to clear: it answered "same"
+   * and that took off the only reason it needed a look (the tag beside it
+   * not being read). Owner, N1, 2026-10-16: such a find never goes in by
+   * "Confirm all" without the review grid first (`confirmAllNeedsReview`).
+   */
+  aiCleared: boolean;
   /**
    * The untrusted looks that alone found it (`newLooksOf`); empty for an
    * ordinary find. Non-empty means it needs a look.
@@ -67,6 +76,7 @@ export function matchItems(
       state: "open",
       alreadyCounted: on?.name ?? null,
       ai: null,
+      aiCleared: false,
       newLooks: newLooksOf(m, trustedLooks),
     };
   });
@@ -261,6 +271,46 @@ export function applyAiAnswers(
       };
     if (a === "otherLabel" || a === "notThis")
       return { ...i, ai: a, needsLook: [...read, AI_REASONS[a]] };
-    return { ...i, ai: a, needsLook: read };
+    return {
+      ...i,
+      ai: a,
+      needsLook: read,
+      // "Same" took the unread flag off: if that was the only thing keeping
+      // it out of Confirm all, it is the AI that made it clear.
+      aiCleared:
+        i.aiCleared ||
+        (i.needsLook.includes(SCAN_UNREAD_REASON) && read.length === 0),
+    };
   });
+}
+
+/**
+ * THE REVIEW GRID (owner, N1, 2026-10-16). On a scan, when any find "Confirm
+ * all" would take was made clear by the AI, the button first shows EVERY one
+ * of them as a small picture side by side; the person taps away the
+ * look-alikes, and one tap confirms the rest. Nothing the AI cleared is
+ * counted until that review — it is the AI's word, and a wrong "same" on a
+ * GFCI would otherwise count it as a duplex in one click.
+ */
+export function confirmAllNeedsReview(items: readonly MatchItem[]): boolean {
+  return clearOpen(items).some(i => i.aiCleared);
+}
+
+/**
+ * What the review's one tap does: of the finds that were SHOWN, the ones
+ * still open and clear are confirmed unless dropped, and the dropped ones
+ * are set aside. A find decided elsewhere while the grid was open is left
+ * as it is, and nothing that was not shown is touched.
+ */
+export function reviewedDecisions(
+  items: readonly MatchItem[],
+  shownIds: readonly number[],
+  droppedIds: ReadonlySet<number>
+): { confirm: number[]; reject: number[] } {
+  const stillClear = new Set(clearOpen(items).map(i => i.id));
+  const shown = shownIds.filter(id => stillClear.has(id));
+  return {
+    confirm: shown.filter(id => !droppedIds.has(id)),
+    reject: shown.filter(id => droppedIds.has(id)),
+  };
 }

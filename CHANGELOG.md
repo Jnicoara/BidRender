@@ -14,6 +14,46 @@ This is the human-readable companion to the git history — read this to see wha
   wait through three retries and then say the plans "could not load — try
   again", which read as a connection problem. It now says the bid doesn't
   exist (deleted, or a wrong link) and offers the way back to your bids.
+- **A bid now says when profit or overhead was never set.** A company that
+  has never set its profit or overhead has them at 0, so every bid
+  following those defaults adds nothing for either while looking complete.
+  The bid now shows an amber "Profit not set" or "Overhead not set" line,
+  with a button to Settings › Pricing. It changes no number. A value
+  typed on the bid itself, 0 included, counts as a decision and is never
+  flagged.
+- **The 16 open pricing-name answers are recorded, and the 30 mud ring names
+  wait for approval.** The end-of-pricing dry run now holds every decision:
+  626 changes, 0 problems. It is still a dry run only.
+
+- **Fixing a Draft whose traced runs were priced at $0 an hour is now one
+  button, and a new company's runs start priced.** The owner chose no
+  automatic re-pricing. A Draft still holding such runs offers "Update to
+  the current math", which shows the old and new total first. Sent, won
+  and locked bids never move, and the release step never applies it on
+  its own. A new company's traced runs start at the shipped Journeyman's
+  example rate ($59.22, tagged "Example rate"), and the first-run screen
+  says so. Settings › Pricing now also warns when the picked role itself
+  has no rate. Before, it showed the role and said nothing while runs
+  priced at $0.
+- **On a scanned plan, "Confirm all" now shows every match as a small
+  picture first when the AI cleared any of them.** Tap away the
+  look-alikes, and one tap counts the rest. Nothing the AI found counts
+  until a person has looked at it. A wrong "same" from the AI once let a
+  GFCI be counted as a duplex in one click. Found while building it:
+  setting finds aside and counting the rest in one go lost the set-aside
+  ones; both now land together.
+
+- **The labor on traced conduit and wire can now be priced.** The hours on
+  runs traced on the plans were priced at $0 an hour, because nothing in
+  the app could choose their labor rate. The bid warned about it, but the
+  total came up short. Settings › Pricing now has "Labor rate for traced
+  runs", which says plainly when it is not set. Runs sent after it is set
+  are priced at that rate. Runs already on a bid keep what they were sent
+  with, pending the owner's decision.
+- **A browser test now does a whole job as a brand-new customer would**: sign
+  up, upload a plan, count, trace, add drops and a homerun, tag a line,
+  print the proposal and download the spreadsheet. It checks every printed
+  number against hand math, on a laptop, an iPad and a phone.
 
 - **After uploading plans, demolition sheets are offered their tag.** When a
   sheet's title says DEMOLITION, a bar above the drawing names it and offers
@@ -68,6 +108,12 @@ This is the human-readable companion to the git history — read this to see wha
   after the server saved a batch of marks but before the reply arrived, the
   screen sent them again and they were saved twice (3 receptacles became 6).
   Each mark now carries a key the server recognises, so a resend counts once.
+- **The migration tool's record of the database is complete again.** Its
+  saved picture of the tables stopped at migration 0058, so asking it for
+  one new column wrote 339 statements that re-added what every database
+  already has. A picture as of 0163 is now saved, and the tool reports "no
+  schema changes". It's one metadata file: no SQL runs and no database
+  changes (owner, N2).
 
 ## [2026-10-15]
 

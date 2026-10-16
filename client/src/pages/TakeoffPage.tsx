@@ -451,6 +451,7 @@ import {
   type ScanFindAnswer,
 } from "@/lib/findMatchingSession";
 import {
+  cropMatchPicture,
   MatchLayer,
   MatchPanel,
   type MatchPanelState,
@@ -7598,21 +7599,33 @@ export default function TakeoffPage({
   );
 
   /** Record decisions and move the selection on to what is still open. */
-  const decideFound = useCallback(
-    (ids: number[], state: MatchItem["state"]) => {
+  /*
+    Several decisions as ONE state write. The new state is built from the
+    `findSession` of the last render, so two calls in a row would each start
+    from the same items and the second would undo the first — which is what
+    the review grid's "set these aside, count the rest" did on screen
+    (2026-10-16: the two left out came back as "clear"). So the grid hands
+    both lists over together.
+  */
+  const decideFoundMany = useCallback(
+    (decisions: { ids: number[]; state: MatchItem["state"] }[]) => {
       if (!findSession || findSession.panel.phase !== "results") return;
       const panel = findSession.panel;
-      let items = decide(panel.items, ids, state);
-      // A find confirmed by hand trusts the new look that alone made it, and
-      // its other finds become ordinary ones (findMatchingSession, trustLooks).
-      if (state === "confirmed") {
-        const t = trustLooks(items, ids);
-        items = t.items;
-        rememberTrustedLooks(browserStorage(), t.trusted);
+      let items = panel.items;
+      for (const { ids, state } of decisions) {
+        items = decide(items, ids, state);
+        // A find confirmed by hand trusts the new look that alone made it,
+        // and its other finds become ordinary ones (trustLooks).
+        if (state === "confirmed") {
+          const t = trustLooks(items, ids);
+          items = t.items;
+          rememberTrustedLooks(browserStorage(), t.trusted);
+        }
       }
       // After one decision, on to the next; after Confirm all, stay put.
+      const only = decisions.length === 1 ? decisions[0].ids : [];
       const next =
-        ids.length === 1 ? nextToLookAt(items, panel.selectedId) : null;
+        only.length === 1 ? nextToLookAt(items, panel.selectedId) : null;
       setFindSession({
         ...findSession,
         panel: { ...panel, items, selectedId: next?.id ?? null },
@@ -7620,6 +7633,11 @@ export default function TakeoffPage({
       if (next) jumpTo({ x: next.x, y: next.y });
     },
     [findSession, jumpTo]
+  );
+  const decideFound = useCallback(
+    (ids: number[], state: MatchItem["state"]) =>
+      decideFoundMany([{ ids, state }]),
+    [decideFoundMany]
   );
 
   const confirmFound = useCallback(
@@ -7633,6 +7651,24 @@ export default function TakeoffPage({
       decideFound(ids, "confirmed");
     },
     [findSession, findItems, queueMarksFor, decideFound]
+  );
+
+  /** The review grid's one tap (owner N1): count the kept, set the rest aside. */
+  const confirmReviewed = useCallback(
+    (confirm: number[], reject: number[]) => {
+      if (!findSession || !findItems) return;
+      const chosen = findItems.filter(i => confirm.includes(i.id));
+      if (chosen.length > 0)
+        queueMarksFor(
+          findSession.group,
+          chosen.map(i => ({ x: i.x, y: i.y }))
+        );
+      decideFoundMany([
+        { ids: reject, state: "rejected" },
+        { ids: confirm, state: "confirmed" },
+      ]);
+    },
+    [findSession, findItems, queueMarksFor, decideFoundMany]
   );
 
   /*
@@ -8050,40 +8086,13 @@ export default function TakeoffPage({
             : s
         );
       setAi({ busy: true, message: null });
-      // 180 dpi (2.5 px a point), a crop of 52–68 pt round the spot and a
-      // red box on the symbol: the sizes measured in scanned-plans-plan.md
-      // § 4.
-      const scale = 2.5;
-      const crop = async (
+      // The same picture the review grid shows (FindMatching.tsx).
+      const crop = (
         x: number,
         y: number,
         halfWidth: number,
         halfHeight: number
-      ) => {
-        const half = Math.max(26, 1.6 * Math.max(halfWidth, halfHeight));
-        const { bitmap } = await renderRegion(
-          { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
-          scale
-        );
-        const canvas = document.createElement("canvas");
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext("2d")!;
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(bitmap, 0, 0);
-        bitmap.close();
-        const k = canvas.width / (2 * half);
-        ctx.strokeStyle = "#e11d48";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          (half - halfWidth - 2) * k,
-          (half - halfHeight - 2) * k,
-          (2 * halfWidth + 4) * k,
-          (2 * halfHeight + 4) * k
-        );
-        return canvas.toDataURL("image/jpeg", 0.85);
-      };
+      ) => cropMatchPicture(renderRegion, x, y, halfWidth, halfHeight);
       try {
         const picked = await crop(
           b.x + b.width / 2,
@@ -12719,6 +12728,7 @@ export default function TakeoffPage({
                             onAskAi={() =>
                               void askAboutScanFinds(size.renderRegion)
                             }
+                            renderRegion={size.renderRegion}
                             savedLooks={{
                               total: findSession.looks.length,
                               thisSet: findSession.looks.filter(
@@ -12729,6 +12739,7 @@ export default function TakeoffPage({
                               void runFind(null, size.findMatching)
                             }
                             onConfirm={confirmFound}
+                            onConfirmReviewed={confirmReviewed}
                             onConfirmExisting={ids =>
                               void confirmFoundExisting(ids)
                             }
