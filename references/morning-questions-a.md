@@ -66,6 +66,25 @@ draft closes the gap exactly.
 
 It is a metadata file only: no SQL runs, and no database changes.
 
+### N3. End-of-pricing job: 16 answers are not clear enough to apply
+
+`pricing/end-of-pricing-dry-run.md` (dry run on the local copy, nothing
+applied) has every recorded name-review answer as one change list: **560
+changes, 0 problems** (79 renames, 77 new rows, 54 starter edits, 192
+descriptions, 90 search-word changes, 12 rows hidden, 12 packs). Its
+**OPEN** section lists 16 answers that need your word before the load can
+run. Examples:
+
+- Boxes: 53 per-row renames that were never answered.
+- Boxes row 735's split: which name keeps the existing row?
+- Floor box covers (688–693): which material keeps each row?
+- The 2400D description: no words were given.
+- Receptacles Q3: "standard" in four of the proposed names.
+
+Its **CHECK** section lists 27 conditions you attached, for example "after
+A checks whether the L5-20 fits the cover". The load waits for both lists
+and for your go.
+
 ## 1. GitHub minutes once the repo is private — needs a money decision BEFORE switching
 
 Measured: the Gate used **≈ 17,400 billed minutes / month**; tonight's change

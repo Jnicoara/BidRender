@@ -499,3 +499,16 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   typed length (now `tracedRunOf(row)`), pricing builder's brand rows had
   no Type. `pnpm check` = both configs (72 s locally). CLAUDE.md paragraph
   updated (it said these were not covered).
+
+## Item 11 — end-of-pricing job prep — 00:53 → 00:51
+
+- Two agents turned every recorded owner answer (6 shelf reviews + pack
+  scan) into `pricing/end-of-pricing-answers.json` — 560 changes, each with
+  its quote; every name checked against BASELINE_MATERIALS.
+- `pricing/endOfPricing.mts`: dry run only (`--apply` refuses — the apply
+  IS the end-of-pricing load); checks names, rename collisions (case
+  ignored), chains, new-row clashes; then the LOCAL DB read-only
+  (`bidrender_local`, guard on): row present/active, company copies.
+  **0 problems** after folding one new row's pack into its add entry.
+  Report `pricing/end-of-pricing-dry-run.md`. 16 OPEN + 27 CHECK →
+  morning question N3. Nothing applied.
