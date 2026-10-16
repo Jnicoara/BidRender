@@ -13,9 +13,9 @@ This is the human-readable companion to the git history — read this to see wha
   with a button to Settings › Pricing. It changes no number. A value
   typed on the bid itself, 0 included, counts as a decision and is never
   flagged.
-- **The 16 open pricing-name answers are recorded, and the 30 mud ring names
-  wait for approval.** The end-of-pricing dry run now holds every decision:
-  626 changes, 0 problems. It is still a dry run only.
+- **The 16 open pricing-name answers are recorded, and the owner approved
+  all 30 mud ring names.** The end-of-pricing dry run now holds every
+  decision: 656 changes, 0 problems. It is still a dry run only.
 
 - **Fixing a Draft whose traced runs were priced at $0 an hour is now one
   button, and a new company's runs start priced.** The owner chose no
