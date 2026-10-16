@@ -669,6 +669,16 @@ function AssemblyBuilder({
   const { data: modifiers = [] } = trpc.modifiers.list.useQuery({
     status: "active",
   });
+  const { data: archivedModifiers = [] } = trpc.modifiers.list.useQuery({
+    status: "archived",
+  });
+  // Conditions still on the recipe that have since been archived. They are
+  // not applied to new bid lines, and the chips below list only active ones,
+  // so they were on the recipe with nothing on screen saying so (break-it,
+  // 2026-10-15).
+  const archivedOnRecipe = archivedModifiers.filter(m =>
+    draft.modifierIds.includes(m.id)
+  );
 
   /**
    * The picker's own search box, so focus can be handed back to it.
@@ -1471,6 +1481,29 @@ function AssemblyBuilder({
                       </button>
                     );
                   })}
+                </div>
+              )}
+              {archivedOnRecipe.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[#F5C518]">
+                  <span>
+                    Archived, so not applied to new bid lines:{" "}
+                    {archivedOnRecipe.map(m => m.name).join(", ")}.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs"
+                    onClick={() =>
+                      setDraft(d => ({
+                        ...d,
+                        modifierIds: d.modifierIds.filter(
+                          id => !archivedOnRecipe.some(m => m.id === id)
+                        ),
+                      }))
+                    }
+                  >
+                    Take off this recipe
+                  </Button>
                 </div>
               )}
             </div>

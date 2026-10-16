@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **An archived job condition on an assembly is now shown.** Archiving a
+  condition (like "Working at height") stops it applying to new bid lines,
+  but the assembly editor only listed active conditions, so it sat on the
+  recipe unseen. The editor now names it, says it no longer applies, and
+  offers to take it off.
+
 - **An assembly whose labor role was removed now says so.** Removing a role
   from Labor rates left every assembly that used it with a blank role box
   and a $0.00 labor preview, with nothing saying why — and new bid lines

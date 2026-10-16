@@ -37,6 +37,15 @@ brand-variants pass by design and needs nothing from you now.
   list on live of tax-area parts at exactly 0 %, for you to check.** A 0
   typed on purpose is fine; a blank that became 0 means bids in that area
   are missing that tax.
+- **Q-MOD1 ⚠ CHANGES WHAT NEW BID LINES COUNT** — archiving a job condition
+  (say "Working at height +50%") stops it applying to NEW bid lines from
+  every assembly that has it, silently; lines already on bids keep it.
+  Measured: the same assembly added before and after the archive priced
+  2 h × 1.5 then 2 h × 1.0. The editor now SAYS so ("Archived, so not
+  applied to new bid lines" + "Take off this recipe";
+  `archived-modifier-assembly-editor-{before,after}.png`). → **Keep it
+  (archive = retired, stop using it)** — but you may prefer "keep applying
+  until taken off the recipe". Affects: labor hours on new lines only.
 - **Q-QTY2** — same bug, assembly WORK STEPS "How many" box (×N): fixed by
   the same component; not shown on screen (needs a work step set up) —
   unit-tested only. → **Nothing to decide**; noted so you know it was
