@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Eight "golden" bids now guard every number the bid screen shows.** Each
+  test run builds the same eight bids, covering counts, runs, drops, remove
+  and relocate, scope tags, labor-only work, hand-typed prices, overhead,
+  profit, tax and expenses. Every line and total is compared with a saved
+  copy. If any number moves, the check fails and names the line. A change
+  on purpose has to be saved with a written reason. The saved numbers have
+  not been checked by hand yet: `references/golden-bids-to-check.md` is the
+  calculator list for that.
+
 - **The sign-in cookie can no longer be used by another website.** It was
   set so that pages on other sites could send requests carrying a signed-in
   person’s session; now only BidRidge’s own pages, and links into it, carry

@@ -175,3 +175,29 @@ measurement, the cause (`bcryptjs` on the main thread), two fix options
 - **Gate 38746107689 GREEN** on `30e45889` (full suite, Q-DB1 + A-S9b +
   A-S12 + Q-AUTH1 note). Run 2 end **07:02**. No dev server started; MySQL
   3307 left running (shared). Nothing pushed except `track-a-night`.
+
+# Run 3 — 2026-10-15 night
+
+## Step 1 — land track-a-night on local-dev — 22:01
+
+`origin/local-dev` (d0152f60) was an ancestor of `track-a-night`, so
+`--ff-only` went through: `d0152f60..a4c97280 local-dev -> local-dev`.
+No `drizzle/` change in the 17 commits. Gate 38853660685 on local-dev.
+
+## Item 2 — golden bids — 22:05 → 22:40
+
+- 8 fixture bids built through the routers (fixture users 9906, 9907):
+  counts, homerun, drops, remove-relocate, scope-tags, labor-only,
+  free-count (a typed price stands in for a quote item), op-and-tax
+  (overhead, profit, productivity, markup, 8% tax, two expenses, Active).
+- Every line field and total from `bids.get` plus the screen's not-priced
+  tally pinned in `server/fixtures/goldenBids.json`. A moved number fails,
+  naming bid · line · field: old → new. On-purpose updates need
+  `GOLDEN_UPDATE_REASON`, are refused under CI, and are hash-checked, so a
+  hand edit fails too.
+- **Proof it bites:** the first draft cleared the run height before reading
+  the drops bid, which pinned 60 ft. Fixing the fixture made the compare fail
+  with 20 named diffs (60 → 94 ft, $252.61 → $365.83). Then regenerated from
+  scratch; 2 further runs identical.
+- **Quoted lines not covered:** no router writes them and pricing ignores
+  them. Listed in `golden-bids-to-check.md`.

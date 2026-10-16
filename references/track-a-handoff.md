@@ -4,9 +4,24 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
+## NOW — 2026-10-15 night, session 46: overnight queue on `track-a-night`
 
-Same branch, still not on local-dev. Gate **38746107689 green** on `30e45889`.
+Step 1 done: `track-a-night` landed on local-dev at `a4c97280` (ff, 22:01),
+Gate 38853660685. Queue (owner's order): 2 golden bids → 3 speed limits →
+4 Q-AUTH1 fix → 5 invite sign-up screens → 6 A-S13 plan + fake-storage test →
+7 safe todo items. Progress per item in `overnight-log-a.md`.
+
+- **2 GOLDEN BIDS — built.** `server/goldenBids.test.ts` (8 bids through the
+  routers), `server/goldenBids.ts` (comparison, update-with-reason, hash
+  guard), `server/goldenBidsCompare.test.ts` (13, pure),
+  `server/fixtures/goldenBids.json`. Owner's calculator list:
+  `references/golden-bids-to-check.md` (two open questions in it: fitting
+  hours 0, strap/coupling counts on drops). Quoted lines not covered — not
+  built in the app.
+
+## (earlier) 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
+
+Landed on local-dev 2026-10-15 22:01 (session 46). Gate **38746107689 green** on `30e45889`.
 
 - **Q-DB1 FIXED** (`q-db1-plan.md`): a query or connection wait past 30 s
   destroys its connection (`server/dbDeadline.ts`, pool built in
