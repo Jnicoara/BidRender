@@ -214,3 +214,34 @@ drawing is short and a floating panel's live buttons sat on top of it.
   a short drawing, and the bottom-docked pill still covers its lower part;
   two fingers move the sheet out from under it. Shrinking that toolbar is
   its own change.
+
+**Update, third night:** the toolbar is two rows and the pill one at 375
+(`b7230030`); the drawing went 237 → 351 px tall.
+
+## Round 8 — zoom at 5,000 marks (2026-10-15, third night)
+
+Method: production build on 3002, laptop 1536, bid 1728469 (5,000 marks on
+one sheet). A throwaway playwright script: 16 single wheel steps 300 ms
+apart, each timed from the wheel event to two animation frames later (the
+frame the zoom is painted in), plus a burst of 8 steps 40 ms apart. Chrome
+trace and CPU profile for where the time goes. Scripts deleted after use.
+
+| Build                                   | Per step, median | Worst | Long tasks (16 steps) |
+| --------------------------------------- | ---------------- | ----- | --------------------- |
+| before (two runs)                       | 149 / 166 ms     | 244   | 17                    |
+| marks drawn once, scaled by a CSS var   | 116 ms           | 210   | 13                    |
+| + mark size settles 200 ms after a stop | **33 ms**        | 91    | 4                     |
+
+- **Cause:** a mark's size depends on the zoom, so every step re-rendered
+  all 5,000 (React), and then — once that was gone — restyled all of them
+  (trace: ~115 ms of style recalculation a step, forced inside the wheel
+  handler's `clientWidth` read).
+- **Fix (`TraceLayer.tsx`):** each mark is drawn once at a fixed unit size
+  and scaled by `--mark-s`; the size follows the zoom once it has been still
+  for 200 ms. During a wheel gesture the marks ride the drawing's zoom; when
+  it stops they settle to their clamped size in one restyle (~120 ms, once).
+  Crossing the zoom where letters appear re-renders the layer once (~95 ms).
+- **Checked:** drawn size = the clamp rule at 19%–386% (a hexagon is 0.866
+  of its diameter wide: 10 → 8.7, 23.2 → 20.2, 26 → 22.5 px); letters,
+  shapes and a selected mark (a fifth larger) by eye; `pnpm device:touch`
+  all five sizes 84 ok / 0 FAIL.

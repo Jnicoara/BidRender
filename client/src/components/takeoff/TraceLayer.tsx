@@ -43,7 +43,15 @@ import {
   runWidthInOverlay,
   type RunTypeColors,
 } from "@shared/takeoffMarks";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrosshairGuides, type CrosshairHandle } from "./CrosshairGuides";
@@ -97,6 +105,7 @@ import { JOINED_WITHIN_POINTS } from "@shared/quantityDrops";
 import { traceClickPoint } from "@/lib/traceClick";
 import { pastDragThreshold } from "@/lib/dragThreshold";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import { useDebounced } from "@/hooks/useDebounced";
 import {
   insertPoint,
   isPinned,
@@ -768,6 +777,8 @@ export function TraceLayer({
   // memoized MarkLayer is not re-rendered by a new arrow from the page.
   const stampClickRef = useRef(onStampClick);
   stampClickRef.current = onStampClick;
+  // The zoom the placed marks are sized for — see `markScaleStyle` below.
+  const markZoom = useDebounced(zoom, 200);
   const stableStampClick = useCallback(
     (id: number, additive: boolean) => stampClickRef.current(id, additive),
     []
@@ -1488,18 +1499,34 @@ export function TraceLayer({
           props below, so a pan, a crosshair move or a panel opening no longer
           touches them.
         */}
-        <MarkLayer
-          stamps={stamps}
-          renderScale={renderScale}
-          selectedStampIds={selectedStampIds}
-          pins={pins}
-          zoom={zoom}
-          statusFocus={statusFocus}
-          tracing={tracing}
-          boxing={boxing}
-          selectMode={selectMode}
-          onStampClick={stableStampClick}
-        />
+        {/*
+          ZOOM DOES NOT RE-RENDER THE MARKS (item 4, 2026-10-15 night). A
+          mark's size depends on the zoom, so every wheel step rebuilt all
+          5,000 of them: 149–166 ms a step in a production build. Each mark
+          is now drawn ONCE at MARK_UNIT and scaled by a CSS variable set
+          here, and React leaves the layer alone unless the letters appear
+          or disappear.
+
+          That alone got a step to ~116 ms: changing the variable makes the
+          browser restyle every mark (measured by trace). So the size follows
+          `markZoom`, the zoom once it has been still for 200 ms — during a
+          wheel gesture the marks ride the drawing's own zoom, and they snap
+          to their clamped size once, when it stops.
+        */}
+        <g style={markScaleStyle(markZoom)}>
+          <MarkLayer
+            stamps={stamps}
+            renderScale={renderScale}
+            selectedStampIds={selectedStampIds}
+            pins={pins}
+            showLetters={markScreenDiameter(markZoom) >= LETTER_MIN_PX}
+            statusFocus={statusFocus}
+            tracing={tracing}
+            boxing={boxing}
+            selectMode={selectMode}
+            onStampClick={stableStampClick}
+          />
+        </g>
 
         {/* The Shift-drag selection box, while it is being dragged. */}
         {box &&
@@ -2559,12 +2586,30 @@ export function TraceLayer({
  * a panel) never re-renders thousands of marks. `onStampClick` must be
  * STABLE for the memo to hold: TraceLayer passes `stableStampClick`.
  */
+/**
+ * Every mark is drawn at this radius and scaled to its real size by
+ * `--mark-s` (selected: `--mark-s-sel`). 16, not 1: a 1-unit letter blown up
+ * by CSS can be hinted badly, and a 16-unit one is ordinary text.
+ */
+const MARK_UNIT = 16;
+
+/** The two scales the marks read, for the zoom on screen. */
+function markScaleStyle(zoom: number): CSSProperties {
+  const r = markRadiusInOverlay(zoom);
+  return {
+    ["--mark-s" as string]: r / MARK_UNIT,
+    // Selection adds a fifth on top of whatever the clamp allowed, so it
+    // reads as "this one" at every zoom.
+    ["--mark-s-sel" as string]: (r * 1.2) / MARK_UNIT,
+  };
+}
+
 const MarkLayer = memo(function MarkLayer({
   stamps,
   renderScale,
   selectedStampIds,
   pins,
-  zoom,
+  showLetters,
   statusFocus,
   tracing,
   boxing,
@@ -2575,7 +2620,8 @@ const MarkLayer = memo(function MarkLayer({
   renderScale: number;
   selectedStampIds: ReadonlySet<number>;
   pins: ReadonlyMap<number, PinStyle> | undefined;
-  zoom: number;
+  /** The pin is big enough on screen to read a letter in (LETTER_MIN_PX). */
+  showLetters: boolean;
   statusFocus: MarkStatus | null;
   tracing: boolean;
   boxing: boolean;
@@ -2589,24 +2635,31 @@ const MarkLayer = memo(function MarkLayer({
   return (
     <>
       {stamps.map(placed => {
-        const at = toScreen({ x: placed.x, y: placed.y });
+        const pos = toScreen({ x: placed.x, y: placed.y });
+        // The shapes below are drawn about the mark's own origin; `pos`
+        // goes in the group's transform.
+        const at = { x: 0, y: 0 };
         const isSelected = !placed.pending && selectedStampIds.has(placed.id);
         const { shape, color, letter, status } = markAppearance(placed, pins);
         const paint = markPaint(status, color);
         // Below the size a letter can be read at, shape + colour remain.
-        const showLetter =
-          letter !== null && markScreenDiameter(zoom) >= LETTER_MIN_PX;
+        const showLetter = letter !== null && showLetters;
         /*
             Sized in screen pixels and expressed in overlay units, because this
-            overlay is inside the zoom transform. Selection adds a fifth on top
-            of whatever the clamp allowed, so it reads as "this one" at every
-            zoom rather than only where there is room for it.
+            overlay is inside the zoom transform — by the CSS scale on this
+            mark's group, from `markScaleStyle`. Everything below is in UNIT
+            space: radius MARK_UNIT, centred on 0,0. The outline is a quarter
+            of the UNSELECTED radius (markStrokeInOverlay), so a selected
+            mark, scaled a fifth larger, divides that back out.
           */
-        const r = markRadiusInOverlay(zoom) * (isSelected ? 1.2 : 1);
-        const stroke = markStrokeInOverlay(zoom);
+        const r = MARK_UNIT;
+        const stroke = (MARK_UNIT * 0.25) / (isSelected ? 1.2 : 1);
         return (
           <g
             key={`${placed.pending ? "pending" : "stamp"}-${placed.id}`}
+            style={{
+              transform: `translate(${pos.x}px, ${pos.y}px) scale(var(${isSelected ? "--mark-s-sel" : "--mark-s"}))`,
+            }}
             opacity={markFocusOpacity(status.status, statusFocus)}
             className={
               tracing || placed.pending

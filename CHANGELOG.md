@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Zooming a sheet with thousands of marks no longer stutters.** At 5,000
+  marks each wheel step took about 150 ms; it now takes about 33 ms. While
+  you zoom, the marks grow and shrink with the drawing, then settle to
+  their usual size a moment after you stop.
+
 - **Tracing on a small phone leaves the drawing half as tall again.** At
   375 px the trace toolbar took five rows (one of them a lone divider) and
   the tracing panel two; now the toolbar is two rows (mode, scale and Fit;
