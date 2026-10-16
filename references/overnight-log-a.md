@@ -424,3 +424,12 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   dashboard/archive show nothing of A's. Control test: the same reads as A
   DO show the marker, so the detector can fire. AI mocked (no spend).
   ~63 s locally (adds ~1–2 min to a full Gate).
+
+## Item 6 — failure drills — 00:30 → 00:27
+
+- `server/failureDrills.test.ts` 7/7: storage (fake S3 on/off via
+  R2_PLANS_ENDPOINT) — down throws (proxy 502), never "missing"; delete while
+  down = failed, left for the sweep; back = opens, no restart. AI — down
+  honest + nothing changed; back answers. Email — real door, fake key,
+  fetch replaced: no answer = notSent; 429 pauses with "later"; lifts next
+  day and sends. No real service touched. Removed one tautological assert.

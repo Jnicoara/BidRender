@@ -161,3 +161,15 @@ the local real-data copy, read only. Restored into
   `scripts/verifyBackup.mts`'s own example
   (`VERIFY_DATABASE_URL=…/mysql`) may hit the same thing on a locked-down
   login. That is noted here, not changed.
+
+## Failure drills — storage, AI, email — 2026-10-16
+
+`server/failureDrills.test.ts`, the same shape as Track C's database drill:
+down → honest, nothing lost → back → recovers with no restart. Nothing
+reached R2, the model, or the email provider.
+
+| Service                                                                    | Down                                                                                                                                                                                                 | Nothing lost                                                                                                                                                                     | Back                                                                       |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Plan storage** (a fake S3 server on this machine, switched off)          | Opening a plan **throws**, which the proxy answers as 502 "Storage backend error". It is never "that file does not exist", because the existence cache keeps only a real 404/403 (`r2ObjectExists`). | Deleting a file while down: rows go first, the file counts as `failed` and is left for the orphan sweep (`storedFiles.ts`).                                                      | The same plan opens again at once; nothing was remembered from the outage. |
+| **AI** (`invokeLLM` fails)                                                 | "The reader could not be reached. Nothing was changed — check these by eye."                                                                                                                         | Every answer is null; no mark or line moves (`countingAiFake.test.ts` counts them).                                                                                              | The next press answers normally.                                           |
+| **Email** (the real door, production settings, fake key, `fetch` replaced) | No answer → `notSent`, logged, never a crash. A quota refusal (429) **pauses** email: availability says "later", and a reset request answers "could not send" instead of pretending.                 | A reset token is stored before the send. The reset screen answers alike for every address (owner's no-enumeration rule), so a failed send for one account shows only in the log. | The pause lifts on its own (the next UTC day), and the next send goes.     |
