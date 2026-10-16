@@ -73,6 +73,12 @@ This is the human-readable companion to the git history — read this to see wha
   look-alike by itself. AI answers were tested with saved fake replies only,
   and no AI money was spent. An AI answer never confirms anything, and an
   AI that can't be reached changes nothing.
+- **The migration tool's record of the database is complete again.** Its
+  saved picture of the tables stopped at migration 0058, so asking it for
+  one new column wrote 339 statements that re-added what every database
+  already has. A picture as of 0163 is now saved, and the tool reports "no
+  schema changes". It's one metadata file: no SQL runs and no database
+  changes (owner, N2).
 
 ## [2026-10-15]
 
