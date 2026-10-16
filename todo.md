@@ -1312,6 +1312,16 @@ All additive and nullable. Specs are in the plans named.
       Other forms that save whole (bid settings, proposal text, clients) were
       not looked at — same check if one ever shows the symptom.
 
+### Library editors drop a half-made edit without asking (Track C, 2026-10-15 night) — suggestion, not built
+
+- [ ] **Back, or any nav link, from the assembly / kit / material editors
+      throws away what was typed, with no "Discard changes?".** The Plans
+      screen guards its unsaved trace (`beforeunload`, TakeoffPage), the
+      library editors do not — and their own Back button discards silently
+      too, so it reads as a choice rather than a slip. Worth deciding: a
+      shell-level `useUnsavedGuard(dirty)` that `navigate` (BidRenderShell)
+      consults would cover every editor at once.
+
 ### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed
 
 **Found** rehearsing the LT1/LT2 repair: adding a $0 fixture line to the
