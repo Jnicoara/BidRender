@@ -151,10 +151,15 @@ function KitBuilder({
   const [items, setItems] = useState<KitItem[] | null>(null);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // When the draft was taken from the saved kit, sent with Save so a save
+  // from a stale screen is refused rather than undoing someone else's
+  // (shared/staleEdit.ts).
+  const [openedAt, setOpenedAt] = useState<Date | null>(null);
 
   // Load the saved kit into the draft once, then leave the draft alone.
   const loaded = detailQuery.data;
   if (!isNew && loaded && items === null) {
+    setOpenedAt(loaded.updatedAt);
     setName(loaded.name);
     setDescription(loaded.description ?? "");
     setItems(
@@ -264,7 +269,11 @@ function KitBuilder({
       },
     };
     if (isNew) createKit.mutate(payload, done);
-    else updateKit.mutate({ id: kitId!, ...payload }, done);
+    else
+      updateKit.mutate(
+        { id: kitId!, ...(openedAt ? { openedAt } : {}), ...payload },
+        done
+      );
   };
   const busy = createKit.isPending || updateKit.isPending;
 

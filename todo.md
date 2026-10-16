@@ -1298,8 +1298,9 @@ All additive and nullable. Specs are in the plans named.
       changes nothing; `server/assemblyStaleEdit.test.ts`, red without the
       guard; shots `two-editors-{before,after}.png`). Whole seconds (the
       column's precision) — two saves inside one second slip through.
-      **Same shape, not yet guarded:** the kit editor (whole item list),
-      the Materials row editor, Labor rates and Modifiers (smaller forms,
+      **Kits guarded too** (same night; `server/staleEdit.test.ts`, red
+      without it; `two-kit-editors-after.png`). **Same shape, not yet
+      guarded:** the Materials row editor, Labor rates and Modifiers (smaller forms,
       fewer fields, same risk). Add `openedAt` to each update the same way.
 
 ### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed

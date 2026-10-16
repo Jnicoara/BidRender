@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { assemblies, materials, users } from "../drizzle/schema";
+import { assemblies, kits, materials, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { STALE_EDIT_MESSAGE, savedSinceOpened } from "../shared/staleEdit";
 
@@ -76,6 +76,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   if (!hasDb) return;
   const database = (await getDb())!;
+  await database.delete(kits).where(eq(kits.userId, USER));
   await database.delete(assemblies).where(eq(assemblies.userId, USER));
   await database.delete(materials).where(eq(materials.userId, USER));
 });
@@ -174,5 +175,43 @@ withDb("an assembly saved by two editors", () => {
         name: "Stale",
       })
     ).rejects.toThrow(STALE_EDIT_MESSAGE);
+  });
+});
+
+withDb("a kit saved by two editors", () => {
+  it("refuses the save from a screen opened before the other save", async () => {
+    const assembly = await newAssembly({
+      name: `Stale kit asm ${Date.now()}`,
+      category: "General",
+      baseLaborHours: 1,
+      materials: [],
+    });
+    const kit = (await caller().kits.create({
+      name: `Stale kit ${Date.now()}`,
+      items: [{ assemblyId: assembly.id, qty: 1 }],
+    }))!;
+    const opened = (await caller().kits.get({ id: kit.id }))!;
+    await nextSecond();
+    // A: 1 -> 4, saved.
+    await caller().kits.update({
+      id: kit.id,
+      openedAt: opened.updatedAt,
+      items: [{ assemblyId: assembly.id, qty: 4 }],
+    });
+    await nextSecond();
+    // B, from the screen opened before: renames, with the old quantity.
+    await expect(
+      caller().kits.update({
+        id: kit.id,
+        openedAt: opened.updatedAt,
+        name: "Renamed by B",
+        items: [{ assemblyId: assembly.id, qty: 1 }],
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+    const now = (await caller().kits.get({ id: kit.id }))!;
+    expect(
+      now.items.map(i => Number(i.qty)),
+      "A's quantity is kept"
+    ).toEqual([4]);
   });
 });
