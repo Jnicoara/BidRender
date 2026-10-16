@@ -21,7 +21,7 @@
  * is the same judgement `searchClients` documents: a contractor's customer list
  * is tens of rows. If that changes this needs a cursor query, not a `.slice()`.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
@@ -228,6 +228,14 @@ export default function ClientsPage() {
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
+  /**
+   * When the open editor's draft was taken from the saved client, sent with
+   * Save so a save from an older screen is refused (shared/staleEdit.ts).
+   * This person's own saves are remembered too: the list is paged, so a
+   * reopen before it refetches would otherwise carry the old timestamp.
+   */
+  const [editOpenedAt, setEditOpenedAt] = useState<Date | null>(null);
+  const ownSaves = useRef(new Map<number, Date>());
   const [pendingArchive, setPendingArchive] = useState<{
     id: number;
     name: string;
@@ -272,7 +280,8 @@ export default function ClientsPage() {
   });
 
   const updateClient = trpc.clients.update.useMutation({
-    onSuccess: () => {
+    onSuccess: saved => {
+      if (saved) ownSaves.current.set(saved.id, saved.updatedAt);
       setEditingId(null);
       invalidate();
     },
@@ -316,8 +325,15 @@ export default function ClientsPage() {
     phone: string | null;
     email: string | null;
     notes: string | null;
+    updatedAt?: Date;
   }) => {
     setEditingId(row.id);
+    const own = ownSaves.current.get(row.id);
+    setEditOpenedAt(
+      own && (!row.updatedAt || own > row.updatedAt)
+        ? own
+        : (row.updatedAt ?? null)
+    );
     setEditDraft({
       name: row.name,
       kind: row.kind,
@@ -333,6 +349,7 @@ export default function ClientsPage() {
     if (editingId == null) return;
     updateClient.mutate({
       id: editingId,
+      ...(editOpenedAt ? { openedAt: editOpenedAt } : {}),
       name: editDraft.name.trim(),
       kind: editDraft.kind,
       contactName: orNull(editDraft.contactName),

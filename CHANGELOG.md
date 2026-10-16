@@ -97,8 +97,9 @@ This is the human-readable companion to the git history — read this to see wha
   someone saved an assembly after you opened it, your Save used to put back
   everything they changed and still say "Assembly saved". Now it stops and
   says "Someone saved this after you opened it", changes nothing, and you
-  reopen it to see their change. Kits, materials, labor rates and
-  modifiers have the same protection.
+  reopen it to see their change. Kits, materials, labor rates,
+  modifiers and clients have the same protection — a client's address is
+  what a bid's tax is matched from.
 
 - **Fixed: a tax rate part left blank was saved as 0%.** Adding a tax area
   with a part named (say "State") but no rate typed saved it at 0% and the

@@ -17,6 +17,7 @@ import { appRouter } from "./routers";
 import { getDb } from "./db";
 import {
   assemblies,
+  clients,
   kits,
   laborRates,
   materials,
@@ -84,6 +85,7 @@ beforeEach(async () => {
   if (!hasDb) return;
   const database = (await getDb())!;
   await database.delete(kits).where(eq(kits.userId, USER));
+  await database.delete(clients).where(eq(clients.userId, USER));
   await database.delete(laborRates).where(eq(laborRates.userId, USER));
   await database.delete(modifiers).where(eq(modifiers.userId, USER));
   await database.delete(assemblies).where(eq(assemblies.userId, USER));
@@ -315,6 +317,37 @@ withDb("a labor rate and a modifier saved by two editors", () => {
     )!;
     expect(now.laborAdjustmentPctValue, "A's percent is kept").toBeCloseTo(
       0.25
+    );
+  });
+});
+
+withDb("a client saved by two editors", () => {
+  it("refuses the older screen's save, keeping the other's address", async () => {
+    const client = (await caller().clients.create({
+      name: `Stale client ${Date.now()}`,
+      address: "1 Old Rd, Springfield, IL",
+    }))!;
+    const opened = (await caller().clients.get({ id: client.id }))!;
+    await nextSecond();
+    // A corrects the job address (which tax is matched from).
+    await caller().clients.update({
+      id: client.id,
+      openedAt: opened.updatedAt,
+      address: "9 New Ave, Chicago, IL",
+    });
+    await nextSecond();
+    // B, from the screen opened before that, edits the phone — and would
+    // have sent the old address back.
+    await expect(
+      caller().clients.update({
+        id: client.id,
+        openedAt: opened.updatedAt,
+        phone: "555-0100",
+        address: "1 Old Rd, Springfield, IL",
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+    expect((await caller().clients.get({ id: client.id }))!.address).toBe(
+      "9 New Ave, Chicago, IL"
     );
   });
 });
