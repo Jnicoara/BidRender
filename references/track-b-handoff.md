@@ -38,7 +38,7 @@
   and `markReplay` remembers `bid:key` for a day — so the first mark after a
   reload, or in a second tab, would arrive as "-1" and be dropped as a
   replay: a mark that vanishes. The screen sends `markKey(MARK_SESSION,
-  m.key)` — a random id per page load plus the number
+m.key)` — a random id per page load plus the number
   (`client/src/lib/markKeys.ts`, test red on the bare line). Worth keeping in
   mind for the durable `clientKey` column: it needs the same uniqueness.
 
@@ -106,6 +106,7 @@
   the tag `exampleTagAfter` would write equals the seed's (§ 4 step 1).
 - **Step 0:** local-dev Gate for d0152f60 green after one re-run (image pull
   rate limit): smoke 96/2, staging `/api/version` d0152f60.
+
 ## FROM TRACK A, 2026-10-16 — a legend link does not reach the count already made (yours, not touched)
 
 Found by A's whole-job browser journey (`e2e/journey/journey.spec.ts`,
