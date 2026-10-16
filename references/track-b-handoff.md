@@ -5,7 +5,10 @@
 - **Done, pushed to track-b only:** unpriced starter prices read "not
   priced", never $0.00 (`893c4bcf`, Gate green); 375 px trace toolbar two
   rows, pill one row (`b7230030`, touch check 84/0); local-dev a4c97280
-  merged in (`04693306`). Running notes: `overnight-log-b.md` third night.
+  merged in (`04693306`, Gate 38855439414 green); zoom at 5,000 marks
+  149–166 → 33 ms a step (`0e554ad6`); first starter change at 2,006 shops
+  6.2 s → 0.46 s, assembly 18.8 → 1.3 s (`3f4402e6`, `forkForOwners`).
+  Running notes: `overnight-log-b.md` third night.
 
 ## WHERE B STANDS — 2026-10-15 (second morning), 375 px TOUCH FIXED
 

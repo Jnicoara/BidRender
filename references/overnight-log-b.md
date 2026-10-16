@@ -178,4 +178,19 @@ start.
 
 - local-dev a4c97280 (Q-DB1 database recovery, Lax cookie, S12) merged into
   track-b; CHANGELOG conflict only, both kept; no `drizzle/` change;
-  `pnpm check` clean.
+  `pnpm check` clean. Gate 38855439414 green (covers item 3 too).
+
+## Item 4 — zoom at 5,000 marks (22:23–22:40) · `0e554ad6`
+
+- Production build, bid 1728469. A wheel step: **149–166 ms → 33 ms**
+  median (worst 244 → 91). Marks drawn once and scaled by a CSS variable
+  that settles 200 ms after the zoom stops. stress-results-b.md round 8.
+- Drawn mark size = the clamp rule at 19–386%; touch check 84/0.
+
+## Item 5 — slow first admin edit (22:40–22:49) · `3f4402e6`
+
+- At 2,006 shops (test DB): material 6.2 s → 0.46 s, modifier 4.9 → 0.29,
+  run type 7.0 → 0.48, assembly 18.8 → 1.3 s. One fork code path for one
+  shop or many (`forkForOwners`). Copies counted correct; new statement-
+  count test red on one-at-a-time forks. 204 fork tests green. Morning Q2
+  closed. stress-results-b.md round 9.
