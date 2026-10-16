@@ -276,3 +276,29 @@ Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
   expected 200/403s, wiring order (B check at attach first, then A
   binding, `signUploadParts` gains `byteSize`, ticket cap per company),
   risks. `security-parked-a.md` row updated.
+
+## Gates — items 3+4 green, CI numbers — 22:39
+
+- Gate 38855631644 **green** on `0438079e` (items 3 + 4).
+- CI `[speed]`: screens Dashboard 39, Bid 87, **Plans 113**, Materials 16,
+  Assemblies 4, Materials list 33, Proposal 19 ms (limit 2000). Saves 2–14
+  ms except **"Price a material" 221 ms** (laptop: 6 ms) — under the 1000
+  limit, but 35× the laptop; worth a look (todo entry added).
+- CI `[burst]`: 6 sign-ins 722 ms, longest stall **15 ms** (limit 150).
+- Items 5 + 6 pushed (`f9e80c3b`).
+
+## Item 7 — safe todo items — 22:38 →
+
+Smallest risk first; everything here is a test fixture or a todo entry.
+
+- `server/backup.test.ts`: fixture bucket `bidrender-backups` →
+  `fixture-backup-bucket` (33/33). The old name is now nowhere in
+  `server/` or `scripts/`.
+- Closed as already done, each with the search that shows it: the
+  `deploying.md` "OAuth-only" sentence (gone); the dead Manus branch in
+  `storageProxy.ts` (no `"manus"` backend name); "typecheck the tests"
+  (`tsconfig.json` no longer excludes them); "make `bidrender_test` the
+  default" (the suite refuses any non-test DB).
+- New todo: the CI-only 221 ms material save (see Gates above).
+- Left alone: `takeoffGroups.rename` lock check (Track B's item); anything
+  touching live, migrations or money.

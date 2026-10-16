@@ -827,7 +827,9 @@ describe("credentials never leave the server", () => {
     R2_ACCOUNT_ID: "acct",
     R2_ACCESS_KEY_ID: "public-id",
     R2_SECRET_ACCESS_KEY: "SUPER-SECRET-VALUE",
-    R2_BUCKET: "bidrender-backups",
+    // An invented name on purpose: the real bucket is `bidsoftware`, and a
+    // plausible-looking fixture here read like the configured value.
+    R2_BUCKET: "fixture-backup-bucket",
   } as unknown as NodeJS.ProcessEnv;
 
   it("reads config from the environment, with a derived endpoint", () => {
@@ -859,7 +861,7 @@ describe("credentials never leave the server", () => {
     expect(serialised).not.toContain("SUPER-SECRET-VALUE");
     expect(serialised).not.toContain("public-id");
     expect(described.configured).toBe(true);
-    expect(described.bucket).toBe("bidrender-backups");
+    expect(described.bucket).toBe("fixture-backup-bucket");
   });
 
   it("uses no VITE_-prefixed variable, which would be bundled to the browser", () => {
