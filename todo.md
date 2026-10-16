@@ -1800,6 +1800,19 @@ Design: `references/homerun-footage-plan.md` § 4.
       § 3, guard 3). The tap-to-place path stays as it is.
       `references/device-audit.md` § "Left to do".
 
+### Starter offers: Drafts listed from runs on DELETED plan sets (for Track B, found by C 2026-10-16)
+
+- [ ] **`server/starterOffers.ts` `attachDrafts`** reads the Drafts' runs
+      with `inArray(takeoffRuns.bidId, draftIds)` and no live-sheet rule,
+      so a run left on a deleted plan set can list a Draft as "would
+      re-count" when nothing on it would move. Every quantity read filters
+      `onLivePlanSheet(…)`; the list form is
+      `onLivePlanSheet(takeoffRuns.sheetId, takeoffRuns.bidId)` (correlated,
+      added for the Dashboard's list reads). Found when
+      `quantitiesIgnoreDeletedPlans.test.ts` learned to see `inArray` reads;
+      it names this file as its one KNOWN gap and goes red when the gap is
+      fixed, so remove the entry in the same commit.
+
 ### Plans: a plan that cannot be opened leaves the counts panel saying "loading…" (Track B, 2026-10-16)
 
 - [ ] Only a damaged or password-protected set attached BEFORE 2026-10-16
@@ -1845,7 +1858,19 @@ Design: `references/homerun-footage-plan.md` § 4.
       row — then `drop` inserts with `INSERT … ON DUPLICATE KEY` semantics
       and reads the ids back. **Done when** `markReplay.test.ts` passes with
       the in-memory map cleared between the two sends.
-- [ ] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
+- [x] **DONE 2026-10-16 (Track C):** the lists (Dashboard, Find a bid,
+      archive) read every listed bid's lines, groups, mark counts and
+      charges in a few queries for the whole list
+      (`db.getRollupLinesForBids`; each single-bid read is now the list
+      read with one id, and the counts are laid on by the same
+      `applyPlanCounts`). An unlocked bid with traced-run lines still goes
+      the single-bid way (its footage is a dozen reads deep). Measured with
+      `speedBigData.test.ts` raised to **250 bids**, same laptop, same
+      fixture: Dashboard median **460 ms → 85 ms** (61 bids: 114 → 36 ms).
+      The test now holds the Dashboard to 1 s at 250 bids, and
+      `goldenBids.test.ts` holds the Dashboard card and Find a bid to the
+      bid screen's total due on all nine golden bids.
+- [x] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
       measured).** `server/speedBigData.test.ts` (`SPEED_BIG_DATA=1`): 61
       bids → `bids.dashboard` + `archived` median **493 ms**; 1 bid → 39 ms
       in the Gate. About 8 ms a bid, so ≈ 2 s near 250 bids for one company.

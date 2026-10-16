@@ -5687,6 +5687,28 @@ export async function getBidExpenseLines(
   }));
 }
 
+/** `getBidExpenseLines` for a list of bids, one query, the same order. */
+export async function getBidExpenseLinesForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, ExpenseLine[]>> {
+  const byBid = new Map<number, ExpenseLine[]>(bidIds.map(id => [id, []]));
+  const db = await getDb();
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
+    .select()
+    .from(bidExpenses)
+    .where(inArray(bidExpenses.bidId, [...bidIds]))
+    .orderBy(asc(bidExpenses.sortOrder), asc(bidExpenses.id));
+  for (const row of rows)
+    byBid.get(row.bidId)?.push({
+      name: row.name,
+      amount: Number(row.amount),
+      taxable: row.taxable,
+      markedUp: row.markedUp,
+    });
+  return byBid;
+}
+
 /**
  * Every LIVE bid's charges for one company, grouped by bid — in one query,
  * for the dashboard, which prices every card from sums and must not read
@@ -6855,27 +6877,45 @@ function markIsQuantity() {
 }
 
 async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
+  return (await stampCountsForBids([bidId])).get(bidId) ?? new Map();
+}
+
+/**
+ * `stampCountsForBid` for a LIST of bids in one query (the Dashboard and
+ * "Find a bid", 2026-10-16) — the single-bid read is this with one id, so the
+ * two cannot count a different set of marks. The live-sheet rule is the
+ * correlated form: each mark against its OWN bid's plan sets.
+ */
+async function stampCountsForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, Map<number, number>>> {
+  const byBid = new Map<number, Map<number, number>>();
   const db = await getDb();
-  if (!db) return new Map();
+  if (!db || bidIds.length === 0) return byBid;
   const rows = await db
-    .select({ groupId: takeoffStamps.groupId, total: sql<number>`count(*)` })
+    .select({
+      bidId: takeoffStamps.bidId,
+      groupId: takeoffStamps.groupId,
+      total: sql<number>`count(*)`,
+    })
     .from(takeoffStamps)
     .where(
       and(
-        eq(takeoffStamps.bidId, bidId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.bidId, [...bidIds]),
+        onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId),
         // Every bid line's live quantity comes from here: new marks only.
         markIsQuantity()
       )
     )
-    .groupBy(takeoffStamps.groupId);
+    .groupBy(takeoffStamps.bidId, takeoffStamps.groupId);
 
-  const counts = new Map<number, number>();
   for (const row of rows) {
     if (row.groupId === null) continue;
+    const counts = byBid.get(row.bidId) ?? new Map<number, number>();
     counts.set(row.groupId, Number(row.total));
+    byBid.set(row.bidId, counts);
   }
-  return counts;
+  return byBid;
 }
 
 /**
@@ -6887,10 +6927,19 @@ async function stampCountsForBid(bidId: number): Promise<Map<number, number>> {
 async function stampRoleCountsForBid(
   bidId: number
 ): Promise<Map<number, RoleCounts>> {
+  return (await stampRoleCountsForBids([bidId])).get(bidId) ?? new Map();
+}
+
+/** `stampRoleCountsForBid` for a list of bids, one query (see stampCountsForBids). */
+async function stampRoleCountsForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, Map<number, RoleCounts>>> {
+  const byBid = new Map<number, Map<number, RoleCounts>>();
   const db = await getDb();
-  if (!db) return new Map();
+  if (!db || bidIds.length === 0) return byBid;
   const rows = await db
     .select({
+      bidId: takeoffStamps.bidId,
       groupId: takeoffStamps.groupId,
       status: takeoffStamps.status,
       total: sql<number>`count(*)`,
@@ -6898,21 +6947,22 @@ async function stampRoleCountsForBid(
     .from(takeoffStamps)
     .where(
       and(
-        eq(takeoffStamps.bidId, bidId),
-        onLivePlanSheet(takeoffStamps.sheetId, bidId),
+        inArray(takeoffStamps.bidId, [...bidIds]),
+        onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId),
         inArray(takeoffStamps.status, [...LABOR_ROLES])
       )
     )
-    .groupBy(takeoffStamps.groupId, takeoffStamps.status);
-  const counts = new Map<number, RoleCounts>();
+    .groupBy(takeoffStamps.bidId, takeoffStamps.groupId, takeoffStamps.status);
   for (const row of rows) {
     if (row.groupId === null) continue;
+    const counts = byBid.get(row.bidId) ?? new Map<number, RoleCounts>();
     const entry = counts.get(row.groupId) ?? { remove: 0, relocate: 0 };
     if (row.status === "remove" || row.status === "relocate")
       entry[row.status] += Number(row.total);
     counts.set(row.groupId, entry);
+    byBid.set(row.bidId, counts);
   }
-  return counts;
+  return byBid;
 }
 
 /**
@@ -7226,26 +7276,36 @@ export async function resolveBidLinesFromPlans(
 }
 
 /** The three fields resolving a bid's lines needs, in one read. */
-async function getBidResolutionContext(bidId: number): Promise<
-  | {
-      userId: number;
-      distributionHeightInches: number | null;
-      quantitiesLockedAt: Date | null;
-    }
-  | undefined
-> {
+type BidResolutionContext = {
+  userId: number;
+  distributionHeightInches: number | null;
+  quantitiesLockedAt: Date | null;
+};
+
+async function getBidResolutionContext(
+  bidId: number
+): Promise<BidResolutionContext | undefined> {
+  return (await getBidResolutionContexts([bidId])).get(bidId);
+}
+
+/** `getBidResolutionContext` for a list of bids, one query. */
+async function getBidResolutionContexts(
+  bidIds: readonly number[]
+): Promise<Map<number, BidResolutionContext>> {
+  const byBid = new Map<number, BidResolutionContext>();
   const db = await getDb();
-  if (!db) return undefined;
-  const [bid] = await db
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
     .select({
+      id: bids.id,
       userId: bids.userId,
       distributionHeightInches: bids.distributionHeightInches,
       quantitiesLockedAt: bids.quantitiesLockedAt,
     })
     .from(bids)
-    .where(eq(bids.id, bidId))
-    .limit(1);
-  return bid;
+    .where(inArray(bids.id, [...bidIds]));
+  for (const { id, ...context } of rows) byBid.set(id, context);
+  return byBid;
 }
 
 async function resolveAgainstPlans(
@@ -7271,6 +7331,22 @@ async function resolveAgainstPlans(
       : new Map<number, RoleCounts>(),
     getGroupsForBidUnscoped(bidId),
   ]);
+  return applyPlanCounts(rows, counted, roleCounted, groups, options);
+}
+
+/**
+ * The second half of `resolveAgainstPlans`: the counts, read, laid onto the
+ * lines. Its own function so the LIST read (`getRollupLinesForBids`) lays
+ * them on with this same code rather than a copy of it.
+ */
+function applyPlanCounts(
+  rows: BidLineItem[],
+  counted: Map<number, number>,
+  roleCounted: Map<number, RoleCounts>,
+  groups: readonly TakeoffGroup[],
+  options: { quantities: boolean }
+): BidLineItem[] {
+  if (!rows.some(row => row.takeoffGroupId !== null)) return rows;
   const labels = new Map(groups.map(group => [group.id, group.label]));
 
   /*
@@ -7347,13 +7423,28 @@ export async function getBidLineItems(bidId: number): Promise<BidLineItem[]> {
  * stored quantity escaping to a screen is a bid disagreeing with its own plans.
  */
 async function storedBidLineItems(bidId: number): Promise<BidLineItem[]> {
+  return (await storedBidLineItemsForBids([bidId])).get(bidId) ?? [];
+}
+
+/** `storedBidLineItems` for a list of bids, one query, each bid's own order. */
+async function storedBidLineItemsForBids(
+  bidIds: readonly number[]
+): Promise<Map<number, BidLineItem[]>> {
+  const byBid = new Map<number, BidLineItem[]>(bidIds.map(id => [id, []]));
   const db = await getDb();
-  if (!db) return [];
-  return db
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
     .select()
     .from(bidLineItems)
-    .where(and(eq(bidLineItems.bidId, bidId), isNull(bidLineItems.archivedAt)))
+    .where(
+      and(
+        inArray(bidLineItems.bidId, [...bidIds]),
+        isNull(bidLineItems.archivedAt)
+      )
+    )
     .orderBy(asc(bidLineItems.sortOrder), asc(bidLineItems.id));
+  for (const row of rows) byBid.get(row.bidId)?.push(row);
+  return byBid;
 }
 
 /**
@@ -7601,9 +7692,22 @@ export async function markBidMathChangesSeen(
 
 /** Groups on a bid, without the user filter — see `stampCountsForBid`. */
 async function getGroupsForBidUnscoped(bidId: number): Promise<TakeoffGroup[]> {
+  return (await getGroupsForBidsUnscoped([bidId])).get(bidId) ?? [];
+}
+
+/** `getGroupsForBidUnscoped` for a list of bids, one query. */
+async function getGroupsForBidsUnscoped(
+  bidIds: readonly number[]
+): Promise<Map<number, TakeoffGroup[]>> {
+  const byBid = new Map<number, TakeoffGroup[]>(bidIds.map(id => [id, []]));
   const db = await getDb();
-  if (!db) return [];
-  return db.select().from(takeoffGroups).where(eq(takeoffGroups.bidId, bidId));
+  if (!db || bidIds.length === 0) return byBid;
+  const rows = await db
+    .select()
+    .from(takeoffGroups)
+    .where(inArray(takeoffGroups.bidId, [...bidIds]));
+  for (const row of rows) byBid.get(row.bidId)?.push(row);
+  return byBid;
 }
 
 /** Archived lines only — for showing what a bulk archive removed, and undoing it. */
@@ -7993,6 +8097,89 @@ async function liveUnpricedParts(
 /** A bid's lines, resolved for the rollup — what every pricing read loads. */
 export async function getRollupLines(bidId: number, userId: number) {
   return withUnpricedParts(await getBidLineItems(bidId), userId);
+}
+
+export type RollupLine = Awaited<ReturnType<typeof getRollupLines>>[number];
+
+/**
+ * `getRollupLines` for a LIST of bids — the Dashboard and "Find a bid" price
+ * every listed bid the bid screen's way, and did it with about six queries
+ * per bid (todo.md, "Dashboard time grows with the number of bids").
+ *
+ * The same steps as `getBidLineItems` → `withPlanCounts` →
+ * `resolveAgainstPlans` → `withUnpricedParts`, each read made once for the
+ * list by the `…ForBids` form the single-bid read itself calls, and the
+ * counts laid on by the same `applyPlanCounts`. One exception, on purpose:
+ * an UNLOCKED bid with traced-run lines measures its runs through
+ * `withTracedFootage`, a dozen reads deep, so it goes the single-bid way —
+ * the same function, not a copy. `server/goldenBids.test.ts` holds every
+ * listed card to its bid screen.
+ */
+export async function getRollupLinesForBids(
+  bidIds: readonly number[],
+  userId: number
+): Promise<Map<number, RollupLine[]>> {
+  const stored = await storedBidLineItemsForBids(bidIds);
+  const following = bidIds.filter(id => stored.get(id)!.some(followsDrawing));
+  const contexts = await getBidResolutionContexts(following);
+
+  const resolved = new Map<number, BidLineItem[]>(stored);
+  const oneByOne: number[] = [];
+  const together: number[] = [];
+  for (const id of following) {
+    const context = contexts.get(id);
+    if (!context) continue;
+    const measuresRuns =
+      context.quantitiesLockedAt === null &&
+      stored.get(id)!.some(row => row.takeoffRunTypeId !== null);
+    (measuresRuns ? oneByOne : together).push(id);
+  }
+
+  const live = together.filter(
+    id => contexts.get(id)!.quantitiesLockedAt === null
+  );
+  const [counted, roleCounted, groups] = await Promise.all([
+    stampCountsForBids(live),
+    stampRoleCountsForBids(
+      live.filter(id => stored.get(id)!.some(row => isLaborRoleLine(row)))
+    ),
+    getGroupsForBidsUnscoped(
+      together.filter(id =>
+        stored.get(id)!.some(row => row.takeoffGroupId !== null)
+      )
+    ),
+    Promise.all(
+      oneByOne.map(async id =>
+        resolved.set(
+          id,
+          await resolveAgainstPlans(id, contexts.get(id)!, stored.get(id)!, {
+            quantities: true,
+          })
+        )
+      )
+    ),
+  ]);
+  for (const id of together) {
+    resolved.set(
+      id,
+      applyPlanCounts(
+        stored.get(id)!,
+        counted.get(id) ?? new Map(),
+        roleCounted.get(id) ?? new Map(),
+        groups.get(id) ?? [],
+        { quantities: contexts.get(id)!.quantitiesLockedAt === null }
+      )
+    );
+  }
+
+  // One recipe read per distinct assembly across every listed bid.
+  const all = await withUnpricedParts(
+    bidIds.flatMap(id => resolved.get(id) ?? []),
+    userId
+  );
+  const byBid = new Map<number, RollupLine[]>(bidIds.map(id => [id, []]));
+  for (const line of all) byBid.get(line.bidId)?.push(line);
+  return byBid;
 }
 
 // ─── Material markup: the rules, and what a line freezes ─────────────────────
@@ -9767,7 +9954,12 @@ export async function getRunsForSheet(
  */
 function onLivePlanSheet(
   sheetId: typeof takeoffRuns.sheetId | typeof takeoffStamps.sheetId,
-  bidId: number
+  /**
+   * The bid, or — for a read across a LIST of bids — the row's own bid
+   * column, which makes the subquery correlated: each mark or run against
+   * its own bid's plan sets, exactly what the one-bid form asks.
+   */
+  bidId: number | typeof takeoffRuns.bidId | typeof takeoffStamps.bidId
 ) {
   return sql`${sheetId} IN (SELECT ${bidPdfSheets.id} FROM ${bidPdfSheets} INNER JOIN ${bidPdfs} ON ${bidPdfs.id} = ${bidPdfSheets.bidPdfId} WHERE ${bidPdfs.bidId} = ${bidId})`;
 }
@@ -16335,7 +16527,10 @@ export async function dropsNotPricedForBids(
       .where(
         and(
           eq(takeoffStamps.userId, userId),
-          inArray(takeoffStamps.bidId, Array.from(new Set(bidIds)))
+          inArray(takeoffStamps.bidId, Array.from(new Set(bidIds))),
+          // Only a pre-filter (the drops check below reads live sheets), but
+          // a mark on a deleted plan set should not even let a bid through.
+          onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId)
         )
       )
   )

@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **The Dashboard, the Bids list and the archive open about five times
+  faster for a company with many bids.** They priced every bid one at a
+  time; now they read all the listed bids together. Measured on 250 bids:
+  0.46 s → 0.09 s. The totals are the same ones the bid screen shows, and a
+  test now checks that for every kind of bid it covers.
 - **Fixed: adding a material with its labor hours typed as "$1.5" failed
   to save.** The form checked the hours one way and sent them another, so
   a value it had just accepted arrived as not-a-number. Both now read the
