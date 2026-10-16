@@ -397,3 +397,15 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   1,150 ft, boxes 40 — **proved** red with the dial ignored. Both restored,
   no diff. Map's "Gaps closed" updated; remaining bid-number gaps listed.
 - 00:09 item 2 stopped here to keep the queue moving.
+
+## Items 4 + 5 — fresh start, backup drill — 00:10 → 00:17
+
+- Fresh start: 164 migrations from zero (36 s), 87 tables / 205 FKs, seed
+  1,717 materials, golden bids exact, starter-protection tests pass;
+  `server/freshShop.test.ts` (new shop sees the whole starter, owns none).
+- Backup drill (`scripts/backupDrill.mts` + `bidTotalsDump.mts`): real
+  backup/verify with a local folder target. 87 tables / 38,851 rows
+  restored = manifest; 4,386 bids, **0 differ**, $1,748,599.67 both
+  sides. PARTIAL only for 13 test-fixture files never on this disk. Both
+  throwaway DBs dropped, scratch folder removed. Write-up in
+  `references/stress-results-a.md`.

@@ -111,3 +111,53 @@ status pricing (`server/markStatusPricing.test.ts`), undo/redo exact restore
 (`server/takeoffUndo.test.ts`), several counts in one batch
 (`client/src/lib/markBatches.test.ts`). **Mouse and finger:** the counting
 part of the browser journey (queue item 3) taps on laptop, iPad and phone.
+
+## Fresh start — 2026-10-16
+
+Empty local database (`bidrender_test_fresh_a`, utf8mb4_unicode_ci) →
+`scripts/migrate.mts` → `scripts/seedBaseline.mts` → tests → dropped.
+
+- **Migrations:** 164 applied from zero, `0000_flippant_hiroim` to
+  `0163_material_price_history`, in 36 s. Result: 87 tables, **205 foreign
+  keys** (the release plan's expected figure).
+- **Seed:** 1,717 shipped materials (= the seed files), 24 run types, 224
+  starter assemblies, 6 starter labor rates.
+- **Golden bids: all 9 exact** on the brand-new database. The start-leaves-
+  existing-shops-alone tests pass (bootLeavesStarterNumbers 17,
+  bootLeavesCompanyRows 2, seedPreservesUserPrices 4, starterAssembliesSeed
+  14).
+- **New shop gets the full starter:** `server/freshShop.test.ts`. Through the
+  screens' own reads, a company that never edited anything sees every active
+  shipped material, starter assembly, rate and run type, and owns none of
+  its own.
+- **The Gate does this on every full run** (an empty MySQL, every migration,
+  the seed, the whole suite), so it is not a one-off.
+
+## Backup + restore drill — 2026-10-16, local only
+
+`scripts/backupDrill.mts`: the **real** `runBackup` and `verifyBackup` (the
+nightly job's code), with the R2 bucket replaced by a local folder and the
+plans read from `.local-storage`. Then every bid is priced on both sides with
+the bid screen's own maths (`scripts/bidTotalsDump.mts`, read only). Source:
+the local real-data copy, read only. Restored into
+`bidrender_test_restore_drill`, then dropped. Nothing was sent to R2.
+
+|                              | Source        | Restored      |
+| ---------------------------- | ------------- | ------------- |
+| Tables                       | 87            | 87            |
+| Rows                         | 38,851        | 38,851        |
+| Bids priced                  | 4,386         | 4,386         |
+| Bids whose total differs     | —             | **0**         |
+| Sum of every bid's Total due | $1,748,599.67 | $1,748,599.67 |
+
+- **Backup:** 1.1 s for the database (1.5 MB gzipped), plus 131 of 144 plan
+  files (310 MB). The run says **PARTIAL**, honestly: 13 files are named in
+  the manifest as unreadable, all of them test or CI-smoke rows whose files
+  were never on this machine (`test/…/e1.pdf`, `bid-plans/…/ci-smoke-plan_…`).
+  So the drill exits 1, the strict answer `scripts/backup.mts` also gives.
+- **Restore:** 8.8 s, and it matches the manifest table for table.
+- **Found on the way:** aiming the restore at the `mysql` system database
+  fails locally (access denied); the drill aims at the server itself.
+  `scripts/verifyBackup.mts`'s own example
+  (`VERIFY_DATABASE_URL=…/mysql`) may hit the same thing on a locked-down
+  login. That is noted here, not changed.
