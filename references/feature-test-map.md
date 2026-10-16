@@ -745,10 +745,14 @@ Slice 4 searches that found nothing: "87.40", "flat + vertical";
 | Manual counting totals = hand math                  | server/countingManual.test.ts                                               | — (checks totals at every step)                                                                     |
 | AI never confirms, writes nothing (AI)              | server/countingAiFake.test.ts                                               | —                                                                                                   |
 
-**Still open from the bid-number rows** (next in line): edited shipped
-modifier stays applied (09-20), a priced starter reaching assemblies through
-the router (09-20), a dashboard card counting a priced line with no hours
-(09-25), "Price pending" actually blocking the print (09-29), the groundwork
-migrations 0157–0163 (queue item 4's fresh start runs them). The non-money
+| Edited shipped modifier stays applied (09-20, WEAK) | bidNumberGaps — 1 h × (1 + 15%) before and after the fork | lookup by stored id only: red (1 h, the original bug) |
+| Priced starter reaches assemblies (09-20, WEAK) | bidNumberGaps — 2 × $3.45 = $6.90, not $0 | not broken tonight |
+| Dashboard card counts a priced line with no hours (09-25, WEAK) | bidNumberGaps — $15.00 + "hours not set" 1, = bid screen | not broken tonight |
+| "Price pending" exactly when not priced (09-29, WEAK) | goldenBids — all 9 bids, proposal flag vs the bid screen | — |
+| Groundwork migrations 0157–0163 (10-14, NONE) | fresh start (stress-results-a.md): 164 migrations, golden bids exact | — |
+
+**Still open from the bid-number rows:** none of the money rows above. The
+non-money WEAK / NONE rows are layout and copy checks, listed per slice
+above. The non-money
 WEAK / NONE rows are layout and copy checks; they are listed per slice
 above.

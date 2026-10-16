@@ -159,4 +159,100 @@ describe.skipIf(!hasDb)("bid-number gaps", () => {
     expect(await qtyOf("Gaps 12-2 branch cable")).toBe(1150);
     expect(await qtyOf("Gaps whip box")).toBe(40);
   });
+  it("an edited SHIPPED modifier keeps applying to the assemblies that carry it", async () => {
+    const starterMod = (await c.modifiers.list({})).find(
+      m => m.userId === null && Number(m.laborAdjustmentPctValue) > 0
+    );
+    if (!starterMod) throw new Error("no shipped modifier");
+    const pct = Number(starterMod.laborAdjustmentPctValue);
+    const part = await own(c, "Gaps modifier part", 1);
+    const asm = (await c.assemblies.create({
+      name: "Gaps modified assembly",
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: 1,
+      laborRateId: journeyman,
+      materials: [{ materialId: part, qty: 1 }],
+      modifierIds: [starterMod.id],
+    }))!;
+    const bid = (await c.bids.create({
+      name: "Gaps modifier",
+      trades: ["electrical"],
+    }))!;
+    const hoursOf = async () => {
+      const { line } = await c.bids.addAssembly({
+        bidId: bid.id,
+        assemblyId: asm.id,
+        qty: 1,
+      });
+      const d = await c.bids.get({ id: bid.id });
+      return d.lines.find(l => l.id === line!.id)!.breakdown!.totalLaborHours;
+    };
+    // Hand math: 1 h × (1 + the modifier).
+    expect(await hoursOf()).toBeCloseTo(1 + pct, 6);
+    // Saving the shipped modifier at the SAME percentage forks it — the
+    // assembly still stores the shipped id. It must keep applying.
+    await c.modifiers.update({ id: starterMod.id, laborAdjustmentPct: pct });
+    expect(await hoursOf()).toBeCloseTo(1 + pct, 6);
+  });
+
+  it("pricing a SHIPPED material reaches an assembly built on it", async () => {
+    const shipped =
+      (await c.materials.list()).find(
+        m => m.userId === null && m.name === "Golden-free 1-gang box"
+      ) ??
+      (await c.materials.list()).find(
+        m => m.userId === null && m.unitOfSale === "each"
+      );
+    if (!shipped) throw new Error("no shipped material");
+    const asm = (await c.assemblies.create({
+      name: "Gaps starter-part assembly",
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: 0.1,
+      laborRateId: journeyman,
+      materials: [{ materialId: shipped.id, qty: 2 }],
+      modifierIds: [],
+    }))!;
+    // The assembly stores the SHIPPED id; pricing it forks a company copy.
+    await c.materials.update({ id: shipped.id, costPerUnit: 3.45 });
+    const bid = (await c.bids.create({
+      name: "Gaps starter part",
+      trades: ["electrical"],
+    }))!;
+    const { line } = await c.bids.addAssembly({
+      bidId: bid.id,
+      assemblyId: asm.id,
+      qty: 1,
+    });
+    // Hand math: 2 × $3.45 = $6.90 of material, not the shipped $0.
+    expect(Number(line!.snapshotMaterialCost)).toBeCloseTo(6.9, 4);
+  });
+
+  it("a dashboard card counts a priced line whose hours are not set, and says the hours are missing", async () => {
+    const part = await own(c, "Gaps no-hours part", 5);
+    const asm = (await c.assemblies.create({
+      name: "Gaps no-hours assembly",
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: null, // not set — never 0 h (D1)
+      laborRateId: journeyman,
+      materials: [{ materialId: part, qty: 1 }],
+      modifierIds: [],
+    }))!;
+    const bid = (await c.bids.create({
+      name: "Gaps no hours",
+      trades: ["electrical"],
+    }))!;
+    await c.bids.addAssembly({ bidId: bid.id, assemblyId: asm.id, qty: 3 });
+    const card = (await c.bids.dashboard()).find(b => b.id === bid.id)!;
+    // Hand math: 3 × $5.00 = $15.00 of material; the labor is not priced.
+    expect(card.directCost).toBe(15);
+    expect(card.notPriced.hours).toBe(1);
+    const screen = await c.bids.get({ id: bid.id });
+    expect(screen.totals.directCost).toBe(card.directCost);
+  });
 });

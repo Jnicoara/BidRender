@@ -512,3 +512,11 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   **0 problems** after folding one new row's pack into its add entry.
   Report `pricing/end-of-pricing-dry-run.md`. 16 OPEN + 27 CHECK →
   morning question N3. Nothing applied.
+
+## Item 14b — safe todo items: the last bid-number test gaps — 00:58 → 00:55
+
+- bidNumberGaps +3: edited shipped modifier keeps applying (**proved**:
+  stored-id lookup → red at 1 h vs 1.15 h, restored, no diff); priced
+  starter material reaches an assembly ($6.90 not $0); dashboard card
+  counts a priced no-hours line ($15, hours not set 1, = bid screen).
+  Map: every money row now has a test.
