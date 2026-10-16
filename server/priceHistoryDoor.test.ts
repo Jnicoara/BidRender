@@ -29,8 +29,11 @@ const ALLOWED: Record<string, Record<string, string>> = {
     setLifecycle: "archive / restore: status and archivedAt only",
     createMaterial: "THE DOOR: records a price above 0",
     updateMaterial: "THE DOOR: records a changed price",
-    forkMaterial:
-      "a copy of the shipped row — the company's price does not change (no row, § 2)",
+    // Was `forkMaterial` until Track B's 3f4402e6 (2026-10-15) moved every
+    // library fork into this one generic insert (`spec.table` — materials
+    // among them, via `forkMaterialFor`). The write moved, so the entry did.
+    forkForOwners:
+      "copies of the shipped row, one per company — the company's price does not change (no row, § 2)",
     revertMaterialToBaseline: "records the price going back, as the door does",
     seedBaselineMaterialsFrom: "inserts SHIPPED rows (userId NULL)",
     reactivateBaselineMaterials: "shared rows, isActive only",
@@ -63,6 +66,9 @@ const WRITE = new RegExp(
   [
     String.raw`\.update\(materials\)`,
     String.raw`\.insert\(materials\)`,
+    // The generic library fork writes whichever table it is handed, materials
+    // included (`forkForOwners`); without this the scan cannot see it at all.
+    String.raw`\.insert\(spec\.table\)`,
     String.raw`UPDATE\s+\x60?materials\x60?\s`,
     String.raw`INSERT\s+INTO\s+\x60?materials\x60?[\s(]`,
   ].join("|"),
