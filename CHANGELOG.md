@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A plan for stopping oversized plan uploads, with the checks written but
+  not switched on.** Today the size an upload declares is checked, but the
+  file actually sent is not, so a signed-in user could store far more than
+  they said. Two fixes are ready: tie the size into the upload link, and
+  check the real size before the plan is attached. They wait for a test on
+  the staging storage bucket first, because a wrong guess would break every
+  upload.
+
 - **The sign-in page is ready for invite-only sign-up (still switched off).**
   While the switch is off, nothing changes. When the owner turns it on, a
   stranger sees no "Create account" form, just a line pointing to the

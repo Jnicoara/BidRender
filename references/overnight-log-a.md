@@ -184,7 +184,11 @@ measurement, the cause (`bcryptjs` on the main thread), two fix options
 `--ff-only` went through: `d0152f60..a4c97280 local-dev -> local-dev`.
 No `drizzle/` change in the 17 commits. Gate 38853660685 on local-dev.
 
-## Item 2 — golden bids — 22:05 → 22:40
+## Item 2 — golden bids — 22:03 → 22:15
+
+(Times in this run's item headings are from the clock and the commit
+stamps. The first draft of items 2–5 carried guessed times that ran an hour
+ahead; corrected at 22:37.)
 
 - 8 fixture bids built through the routers (fixture users 9906, 9907):
   counts, homerun, drops, remove-relocate, scope-tags, labor-only,
@@ -202,7 +206,7 @@ No `drizzle/` change in the 17 commits. Gate 38853660685 on local-dev.
 - **Quoted lines not covered:** no router writes them and pricing ignores
   them. Listed in `golden-bids-to-check.md`.
 
-## Item 3 — speed limits — 22:45 →
+## Item 3 — speed limits — 22:15 → 22:22
 
 - `server/speedLimits.test.ts` (fixture user 9908): 1 sheet, 2 run types,
   20 runs with circuits, 6 counts × 25 marks, 24 lines. A screen = the
@@ -220,9 +224,9 @@ No `drizzle/` change in the 17 commits. Gate 38853660685 on local-dev.
 Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
 **96 passed / 2 skipped** (as expected). Staging `/api/version`:
 `commit a4c97280`, builtAt 05:11 UTC.
-- Item 3 committed `fe878143` (code); end 22:55.
+- Item 3 committed `fe878143` (code) at 22:22.
 
-## Item 4 — Q-AUTH1 sign-in burst — 22:55 → 23:15
+## Item 4 — Q-AUTH1 sign-in burst — 22:18 → 22:23 (worked beside item 3)
 
 - Option (b): `server/passwordHashing.ts`, `bcryptjs` in ≤4 worker threads
   started from source text (the server ships as one bundled file), loading
@@ -239,7 +243,7 @@ Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
   memory). Recommended on staging after merge.
 - Item 2 Gate 38854852318 **green** (d75970b1).
 
-## Item 5 — invite sign-up screens — 23:20 → 00:05
+## Item 5 — invite sign-up screens — 22:23 → 22:33
 
 - Free memory 3.8 GB before starting. ONE dev server (port 3017, test DB
   `bidrender_test_localdev`, `SIGNUP_INVITE_ONLY=on`), stopped after: its
@@ -258,3 +262,17 @@ Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
   new words, still exact. (The refusal itself came from my fixture: the
   invite was inserted past the seat check. The seat rule is right.)
 - Throwaway invites/users removed from the test DB afterwards.
+
+## Item 6 — A-S13 plan + fake-storage test — 22:33 → 22:38
+
+- **Measured offline** (fake credentials, no network, no bucket): today's
+  signed PUT has `X-Amz-SignedHeaders=host`; with `ContentLength` it is
+  `content-length;host`, for a PUT and for a piece.
+- `server/uploadSizeGuard.ts` (prepared, not wired): `boundPutInput`,
+  `boundPartInput` (exact piece lengths from `multipartPlan`),
+  `uploadSizeProblem`, `verifyUploadedSize` (HEAD at attach; refuses and
+  deletes a mismatch). `server/uploadSizeGuard.test.ts` 9/9 on a Map store.
+- Plan `references/a-s13-upload-size-plan.md`: staging proof steps with
+  expected 200/403s, wiring order (B check at attach first, then A
+  binding, `signUploadParts` gains `byteSize`, ticket cap per company),
+  risks. `security-parked-a.md` row updated.
