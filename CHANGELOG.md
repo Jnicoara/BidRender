@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Fixed: adding a material with its labor hours typed as "$1.5" failed
+  to save.** The form checked the hours one way and sent them another, so
+  a value it had just accepted arrived as not-a-number. Both now read the
+  box the same way.
 - **A price list that names one material at two different prices no longer
   picks one.** That material keeps the price it had and is listed as "not
   changed — fix the sheet", because either price would be a guess. Before,

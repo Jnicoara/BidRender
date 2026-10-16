@@ -1378,7 +1378,15 @@ All additive and nullable. Specs are in the plans named.
       the add form; leaving the screen asks, its Cancel does not — Cancel
       says discard). **Labor rates, Modifiers and Clients too** (same
       rule; each checked on screen untouched vs edited). Was:
-- [ ] **Back, or any nav link, from the assembly / kit / material editors
+- [x] **DONE 2026-10-16 (track-c, `0f92dbae`…`5ebb921f`):** a shell-level
+      guard (`lib/unsavedGuard.ts`, `hooks/useUnsavedGuard`, one dialog in
+      `BidRenderShell`) asks "Discard your changes?" on Back, a nav link,
+      browser Back or reload, on every library editor and Clients; Cancel
+      still cancels. Seen on screen. One rough edge, seen once on a cold dev
+      server: leaving within a second of Save, before the save's reply came
+      back, asked anyway (the editor still compared against the old copy) —
+      safe, but a needless question; not reproduced on four later runs.
+- [x] **Back, or any nav link, from the assembly / kit / material editors
       throws away what was typed, with no "Discard changes?".** The Plans
       screen guards its unsaved trace (`beforeunload`, TakeoffPage), the
       library editors do not — and their own Back button discards silently
@@ -1973,7 +1981,12 @@ Measurements: `references/code-first-ceiling.md` § d.
       hours; Count screen quantity (a kit added at 1 when the quantity could
       not be read — now refused); build-from-parts; first-run rate;
       material markup ("15%" accepted, `parseTypedPercent`); duplicate
-      units; SeatLimitsPanel. **Left — B's Plans-screen files, for Track B:** - **`takeoff/RunTypePicker.tsx` `ExtraDraftField` (line ~302) — SAME
+      units; SeatLimitsPanel. **2026-10-16: the `ExtraDraftField` fault below
+      was fixed by Track B (`88a35407`) with its own `DraftNumberInput`; the
+      merge into track-c kept ONE component (B's API, C's
+      `parseTypedNumber` reading and show-what-is-held on blur), so every
+      draft number box reads "1,500" / "$2.50" / "0x10" the same way.**
+      **Left — B's Plans-screen files, for Track B:** - **`takeoff/RunTypePicker.tsx` `ExtraDraftField` (line ~302) — SAME
       dropped-dot fault, a WRONG NUMBER:** `value={String(value)}` with
       `Number(raw)` on each key, so typing a 2.5 % extra or 1.5 in makeup
       saves 25 / 15. Fix like `DraftNumberInput` (it holds the text; this
@@ -2061,7 +2074,11 @@ Measurements: `references/code-first-ceiling.md` § d.
       holds are one-shot (1.5 s, 1.2 s), so they cannot starve a refresh,
       and both sit far under the new 20 s read deadline. Local: 4 of 4
       green with the changes above.
-- [ ] **`server/materialsList.test.ts` "does not contain the actual costs"
+- [x] **FIXED 2026-10-05 (`f8fdec3f`), this line left open until
+      2026-10-16:** the fixture cost 1.42 was inside the document's
+      `preparedOn` time ("05:54:01.424Z"); `asAFigure` now matches a cost
+      only as a standalone figure. Not seen red since.
+- [x] **`server/materialsList.test.ts` "does not contain the actual costs"
       failed once in CI** (run 37420713101, `6877993`): "expected
       '{"bidName":"Matlist bid 1791266041322…' not to contain '1.42'". Looks
       like a fixture price that can also appear inside a generated

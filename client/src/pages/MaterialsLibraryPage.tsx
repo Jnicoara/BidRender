@@ -1651,10 +1651,12 @@ export default function MaterialsLibraryPage() {
         // A new material starts with no labor unit unless one was typed —
         // NULL, never 0, so it joins the Needs hours worklist rather than
         // claiming to take no time.
+        // Read the way validateDraft read it: Number() here took "$1.5",
+        // which the check had passed as 1.5, as NaN (2026-10-16).
         laborHours:
           newDraft.laborHours.trim() === ""
             ? null
-            : Number(newDraft.laborHours),
+            : parseTypedNumber(newDraft.laborHours),
         category: newDraft.category,
         searchAliases: newDraft.searchAliases.trim() || null,
         brandNote: newDraft.brandNote.trim() || null,
