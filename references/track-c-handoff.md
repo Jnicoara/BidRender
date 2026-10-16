@@ -1,6 +1,17 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-15 → 16, night 3 — see `references/overnight-log.md` § night 3
+## (newest) 2026-10-16, day — waiting for B on local-dev
+
+- B's work (track-b) was NOT on local-dev at 09:50; watched every 15 min.
+  When it lands with smoke green: merge local-dev into track-c, fix
+  conflicts (likely `server/db.ts` near `bidDropsNotPriced`, CHANGELOG
+  `## [2026-10-16]`, todo), Gate green, give the owner the `!` push line.
+- Shipped on track-c meanwhile: "Discard your changes?" guard on every
+  library editor + Clients (`lib/unsavedGuard.ts`, `hooks/useUnsavedGuard`,
+  one dialog in the shell); dashboard drops check reads company heights
+  once per list (`companyHeights` in db.ts).
+
+## 2026-10-15 → 16, night 3 — see `references/overnight-log.md` § night 3
 
 - Merged local-dev (A's Gate fix) into track-c; signup keeps both the
   sign-up limits (C) and the invite gate (A).
