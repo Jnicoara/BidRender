@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Linking a legend symbol to an assembly now updates the count you already
+  made.** Linking from the Legend tab used to change only the symbol: the
+  count of it already on the bid stayed "by name" and unpriced until the
+  symbol was picked again. Now that count becomes the assembly's count at
+  once, under the same rules as "Link assembly" on the count's own card (a
+  locked bid, or a line already priced on the bid, is left alone).
+
 - **Checking a scale against a printed dimension now offers the fix.**
   Tap "Check it", tap the two ends of a dimension, type what it says: if
   the sheet's scale is off by more than 2%, the card says so and offers

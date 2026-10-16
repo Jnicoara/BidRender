@@ -6457,7 +6457,14 @@ export default function TakeoffPage({
     },
     onSuccess: r => {
       notUndoable("symbol");
-      toast.success(`Linked to ${r.assemblyName} — one click from now on.`);
+      toast.success(
+        r.adopted > 0
+          ? `Linked to ${r.assemblyName} — the count on this bid counts it now.`
+          : `Linked to ${r.assemblyName} — one click from now on.`
+      );
+      // The count already made became the assembly's (server/groupSource.ts):
+      // its card, its marks' names and the bid's lines all move.
+      if (r.adopted > 0) refreshFor("marksMoved");
     },
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
@@ -13210,7 +13217,7 @@ export default function TakeoffPage({
                       }}
                       onCancelLegend={() => setCapturingLegend(false)}
                       onLink={(symbolId, assemblyId) =>
-                        linkSymbol.mutate({ id: symbolId, assemblyId })
+                        linkSymbol.mutate({ id: symbolId, assemblyId, bidId })
                       }
                       onUnlink={id => unlinkSymbol.mutate({ id })}
                       renameRefusal={

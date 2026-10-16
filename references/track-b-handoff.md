@@ -1,5 +1,15 @@
 # Track B handoff — 2026-10-05
 
+## FOR TRACK A, 2026-10-16 03:50 — "a legend link does not reach the count already made": FIXED
+
+- `takeoffStamps.linkSymbol` takes the bid (`bidId`, sent by the Plans
+  screen) and adopts that bid's by-name counts of the symbol through the
+  SAME rules as the card's "Link assembly" — both now call
+  `server/groupSource.ts` `setGroupSourceChecked` (locked bid, a line already
+  priced, another count of that assembly: left as it was).
+  `server/legendLinkAdopts.test.ts`, red without it. Your journey can link the
+  switch from the legend again when this reaches local-dev.
+
 ## FOR TRACK A, 2026-10-16 00:25 — your "resent batch counted twice" line: DONE, one change
 
 - Taken onto track-b (`fcc3985b`): your server half from `291e719b`

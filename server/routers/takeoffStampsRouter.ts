@@ -36,6 +36,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { countDisplayName } from "../../shared/unassignedCount";
+import { setGroupSourceChecked } from "../groupSource";
 import {
   buildCountedItems,
   nameMatchesSymbol,
@@ -1505,6 +1506,13 @@ export const takeoffStampsRouter = router({
       z.object({
         id: z.number().int().positive(),
         assemblyId: z.number().int().positive(),
+        /**
+         * The bid the Legend tab is open on. Its counts of this symbol made
+         * BY NAME become this assembly's count now — the same as "Link
+         * assembly" on their card (server/groupSource.ts). Omitted, only the
+         * symbol changes, as before.
+         */
+        bidId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1528,10 +1536,39 @@ export const takeoffStampsRouter = router({
       await db.updateSymbolLink(input.id, ctx.scope.dataUserId, {
         assemblyId: input.assemblyId,
       });
+
+      /*
+        THE COUNT ALREADY MADE follows the link (Track A's whole-job journey,
+        2026-10-16): linking from the Legend left this bid's count of the
+        symbol "by name" and unpriced until the symbol was armed again.
+        Every check "Link assembly" makes still applies — a locked bid, a
+        line already priced, another count of that assembly — and a count
+        one of them stops is left as it was, never half-moved.
+      */
+      let adopted = 0;
+      if (input.bidId !== undefined) {
+        const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
+        if (bid) {
+          const byName = symbolCountsOn(
+            await db.getGroupsForBid(bid.id, ctx.scope.dataUserId),
+            { label: link.label, lookupKey: link.lookupKey, assemblyId: null }
+          ).filter(g => g.assemblyId === null);
+          for (const group of byName) {
+            const result = await setGroupSourceChecked(
+              group,
+              input.assemblyId,
+              ctx.scope.dataUserId
+            );
+            if (result.ok) adopted += 1;
+          }
+        }
+      }
       return {
         id: input.id,
         assemblyId: input.assemblyId,
         assemblyName: assembly.name,
+        /** This bid's counts of the symbol that now count the assembly. */
+        adopted,
       };
     }),
 

@@ -29,6 +29,7 @@ import { router, scoped } from "../_core/trpc";
 import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
 import { refuseUnknownKinds } from "../extrasInput";
+import { setGroupSourceChecked } from "../groupSource";
 import {
   UNASSIGNED_COUNT_LABEL,
   countDisplayName,
@@ -705,67 +706,18 @@ export const takeoffGroupsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const group = await requireGroup(input.id, userId);
-      /*
-        Never the Unassigned count itself: it would keep its reserved label,
-        stop being Unassigned, and could go to the bid as "__unassigned__".
-        Its marks MOVE into a count of their own (count-first-plan.md).
-      */
-      if (isUnassignedCount(group))
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "These marks are unassigned. Use “Pick what they are…” — it moves them into a count of their own.",
-        });
-      const bid = await requireBid(group.bidId, userId);
-      if (bid.quantitiesLockedAt !== null)
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: lockedEditRefusal("its counts cannot be changed"),
-        });
-      if (await db.getBidLineForGroup(group.id))
-        throw new TRPCError({
-          code: "CONFLICT",
-          message:
-            `"${group.label}" is already on the bid as a line, priced there. ` +
-            `Remove that line from the bid first, then link the count and send it again.`,
-        });
-
-      if (input.assemblyId === null) {
-        await db.setGroupSource(group.id, userId, null);
-        return { id: group.id, kind: "plain" as const, assemblyId: null };
-      }
-
-      const assembly = await db.getAssemblyById(input.assemblyId, userId);
-      if (!assembly)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Assembly not found.",
-        });
-      const others = (await db.getGroupsForBid(group.bidId, userId)).filter(
-        other => other.id !== group.id && other.assemblyId === assembly.id
-      );
-      const clash = mayShareAssembly(
+      // The rules live in server/groupSource.ts, shared with a legend link.
+      const result = await setGroupSourceChecked(
         group,
-        others,
-        await db.getSymbolLinks(userId)
-      )
-        ? undefined
-        : others[0];
-      if (clash)
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: `This bid already counts "${assembly.name}" as "${clash.label}". Mark these under that count instead, or link a different assembly.`,
-        });
-
-      await db.setGroupSource(group.id, userId, {
-        id: assembly.id,
-        name: assembly.name,
-        category: assembly.category ?? null,
-      });
+        input.assemblyId,
+        userId
+      );
+      if (!result.ok)
+        throw new TRPCError({ code: result.code, message: result.message });
       return {
-        id: group.id,
-        kind: "assembly" as const,
-        assemblyId: assembly.id,
+        id: result.id,
+        kind: result.kind,
+        assemblyId: result.assemblyId,
       };
     }),
 
