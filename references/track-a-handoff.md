@@ -17,7 +17,24 @@ Gate 38853660685. Queue (owner's order): 2 golden bids → 3 speed limits →
   `server/fixtures/goldenBids.json`. Owner's calculator list:
   `references/golden-bids-to-check.md` (two open questions in it: fitting
   hours 0, strap/coupling counts on drops). Quoted lines not covered — not
-  built in the app.
+  built in the app. **Bid 9** (`markup-extras`, user 9912) added later
+  through `GOLDEN_UPDATE_REASON`: extras, item markup, profit as margin.
+- **3 SPEED LIMITS — built.** `server/speedLimits.test.ts` (user 9908):
+  page-level reads per screen < 2 s, 7 saves < 1 s, median of 5, printed
+  `[speed]`. CI: screens ≤ 113 ms, saves ≤ 14 ms except **pricing a
+  material 221 ms** (laptop 6) — todo entry; `[speed-detail]` now splits it
+  for the next CI log. Builders shared: `server/bidBuilders.testHelper.ts`.
+- **4 Q-AUTH1 — FIXED.** `server/passwordHashing.ts` (bcryptjs in ≤4 worker
+  threads); `server/signInBurst.test.ts` stall 874 → 24 ms (CI 15 ms), red
+  before. Re-run C's burst script on staging after merge.
+- **5 INVITE SIGN-UP SCREENS — built, switch still OFF.** `signupLink.ts`,
+  `LoginPage`, `AuthGuard`; shots in `references/overnight-shots/a/`. The
+  invitee seat refusal now speaks to the invitee (`INVITEE_SEATS_FULL`).
+- **6 A-S13 — plan + prepared guard, NOT wired.**
+  `a-s13-upload-size-plan.md`, `server/uploadSizeGuard.ts` (+9 tests on an
+  offline signer / fake store). Next: the staging-bucket proof (§ 3).
+- **7 safe todo items:** backup fixture bucket renamed; four stale entries
+  closed with evidence.
 
 ## (earlier) 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
 
