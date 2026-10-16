@@ -302,3 +302,10 @@ Smallest risk first; everything here is a test fixture or a todo entry.
 - New todo: the CI-only 221 ms material save (see Gates above).
 - Left alone: `takeoffGroups.rename` lock check (Track B's item); anything
   touching live, migrations or money.
+- 22:42 Golden bid 9 `markup-extras` (user 9912): accepted extras
+  with the company's own numbers (5% conduit, 10% wire, 12"/36" makeup),
+  EMT item markup 40% over company 15%, profit 20% as margin. Compare first
+  failed naming ONLY the new bid (bids 1–8 matched); then written with
+  `GOLDEN_UPDATE_REASON`, history `changed: ["markup-extras"]`. Two owner
+  questions added to `golden-bids-to-check.md` § 9 (makeup 12" at each
+  end; extra on installed length, makeup after it).

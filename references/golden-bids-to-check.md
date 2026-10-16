@@ -148,6 +148,34 @@ Roll-up:
 - [ ] Check the bid really froze: overhead, profit and productivity all say
       "bid" as their source.
 
+## 9. `markup-extras` — extra, makeup, item markup, profit as margin
+
+Its own company. Journeyman $58. Prices as bid 2. Company material markup
+15%, **but the EMT carries its own 40%**. No overhead. Profit **20% as
+margin**. Extras accepted, with the company's own numbers: conduit +5%,
+wire +10%, makeup 12" at a device and 36" at a panel. The run is 100 ft,
+from the run height (10'-0") down to a receptacle at 1'-6", so the drop is
+8.5 ft.
+
+| Line                            | Bought qty                            | Installed (hours on) | Material           | Markup          | Hours               | Direct         |
+| ------------------------------- | ------------------------------------- | -------------------- | ------------------ | --------------- | ------------------- | -------------- |
+| EMT                             | 108.5 × 1.05 = **113.93 ft**          | 108.5                | 96.84              | **40%** = 38.74 | 108.5 × 0.04 = 4.34 | **348.56**     |
+| #12 conductors                  | 2 × (108.5 × 1.10 + 2) = **242.7 ft** | 221                  | 50.97              | 15% = 7.65      | 1.326               | **127.88**     |
+| #12 ground                      | 108.5 × 1.10 + 2 = **121.35 ft**      | 110.5                | 23.06              | 15% = 3.46      | 0.663               | **61.51**      |
+| Couplings / connectors / straps | 10 / 2 / 12                           | —                    | 4.20 / 0.74 / 1.32 | 15%             | 0                   | **6.26**       |
+| Field bend (the riser)          | 1                                     | —                    | 0                  | —               | 0                   | **not priced** |
+
+- [ ] Direct 544.21 + markup 50.79 = **595.00**; ÷ (1 − 0.20) = **743.75**
+      (profit 148.75). The bid says **1 line not priced**: the bend.
+- [ ] **Question to check:** wire makeup came out as **2 ft per conductor**
+      (12" at EACH end). The run starts at the run height, not at a panel,
+      so the 36" panel makeup did not apply. Is that right?
+- [ ] **Question to check:** the 10% extra is applied to the installed
+      length, and the makeup is added after it without its own 10%. Is that
+      how you would buy it?
+- [ ] The field bend is "not priced" because the EMT has no bend hours set
+      on this company. That is a real gap on the bid, shown, not a $0.
+
 ---
 
 ## Not covered yet — and why
@@ -157,5 +185,6 @@ Roll-up:
   pricing ignores them (`db.ts` loads `quotedLinePct: null`). A golden quoted
   line would pin a feature that is not built. Add one when it is. A
   supplier's price typed onto a line is bid 7.
-- **Wire extra and makeup** (`acceptExtraStarters`) and **material markup
-  bands**: not on any golden bid yet. Next to add.
+- **Material markup bands**: not loaded by pricing today (`db.ts` loads
+  `bands: []`), so not on a golden bid. Wire extra, makeup and item markup
+  are bid 9.

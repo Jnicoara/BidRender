@@ -1,5 +1,5 @@
 /**
- * GOLDEN BIDS — eight fixture bids, every line and total pinned
+ * GOLDEN BIDS — nine fixture bids, every line and total pinned
  * (server/goldenBids.ts says how it works and how to update on purpose).
  *
  * Each bid is built through the real routers, the way an estimator would:
@@ -14,8 +14,9 @@
  * number reaches these totals. Fittings are pointed at the test's own
  * materials for the same reason.
  *
- * Fixture users 9906 (no overhead, profit or tax) and 9907 (all of them),
- * unused elsewhere (checked 2026-10-15). Both are deleted when the file ends.
+ * Fixture users 9906 (no overhead, profit or tax), 9907 (all of them) and
+ * 9912 (extras, item markup, profit as margin), unused elsewhere (checked
+ * 2026-10-15). All three are deleted when the file ends.
  *
  * NOT COVERED, on purpose, until it exists: a QUOTED line. The columns are in
  * the schema (`isQuoteItem`, `quoteId`, `bidUnitCost`, `quotedMarkupPct`) but
@@ -56,7 +57,9 @@ import {
 
 const PLAIN = 9906;
 const PRICED = 9907;
-dropFixtureUsersAfterAll([PLAIN, PRICED]);
+/** Its own company, so its markup and extras cannot reach bids 1–8. */
+const MARKUP = 9912;
+dropFixtureUsersAfterAll([PLAIN, PRICED, MARKUP]);
 const hasDb = Boolean(process.env.DATABASE_URL);
 const GOLDEN_PATH = new URL("./fixtures/goldenBids.json", import.meta.url);
 
@@ -147,7 +150,7 @@ function snapshot(
   return { key, title, covers, checked: NOT_CHECKED, lines, totals };
 }
 
-// ─── The eight bids ───────────────────────────────────────────────────────────
+// ─── The bids ─────────────────────────────────────────────────────────────────
 
 type Built = { key: string; title: string; covers: string[]; detail: Detail };
 
@@ -468,6 +471,72 @@ async function buildPriced(): Promise<Built[]> {
   ];
 }
 
+/**
+ * 9 — wire extra and makeup accepted (the company's OWN numbers, not the
+ * shipped starters, so a starter change cannot move this bid), a per-item
+ * markup beating the company markup, and profit taken as MARGIN.
+ */
+async function buildMarkup(): Promise<Built[]> {
+  const c = as(MARKUP);
+  const journeyman = await rate(c, "Golden journeyman", 58);
+  await runLaborRate(c, MARKUP, journeyman);
+  await c.bids.setPricingDefaults({
+    overheadEnabled: false,
+    profitMethod: "margin",
+    profitValue: 0.2,
+    productivityPct: 0,
+    materialMarkupPct: 0.15,
+  });
+  await c.takeoffHeights.acceptExtraStarters({ accept: true });
+  await c.takeoffHeights.setExtras({
+    conduitExtraPct: 0.05,
+    wireExtraPct: 0.1,
+    makeupDeviceInches: 12,
+    makeupPanelInches: 36,
+  });
+  const type = await emtType(c, "Golden EMT markup");
+  const emt = (await c.materials.list()).find(
+    m => m.name === '1/2" EMT' && m.userId !== null
+  )!;
+  await c.bids.setItemMarkupOverride({ materialId: emt.id, markupPct: 0.4 });
+
+  const { bidId, sheetId } = await bidWithSheet(
+    c,
+    MARKUP,
+    "Golden 9 markup and extras"
+  );
+  const run = await straightRun(
+    c,
+    bidId,
+    sheetId,
+    type.id,
+    "Homerun to panel B",
+    100
+  );
+  await c.takeoffRuns.setEnds({
+    id: run.id,
+    startKind: "distribution",
+    endKind: "receptacle",
+    distributionHeightInches: 120,
+  });
+  await c.takeoffRuns.addCircuit({
+    runId: run.id,
+    name: "B-1",
+    conductorCount: 2,
+    groundCount: 1,
+  });
+  await c.takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+  return [
+    {
+      key: "markup-extras",
+      title:
+        '100 ft EMT homerun, panel to a receptacle; 5% conduit + 10% wire extra, 12"/36" makeup; EMT marked up 40% (item) over the company\'s 15%; 20% profit as margin',
+      covers: ["wire extra", "makeup", "item markup override", "profit margin"],
+      detail: await c.bids.get({ id: bidId }),
+    },
+  ];
+}
+
 // ─── The comparison ───────────────────────────────────────────────────────────
 
 describe.skipIf(!hasDb)("golden bids", () => {
@@ -476,7 +545,12 @@ describe.skipIf(!hasDb)("golden bids", () => {
   beforeAll(async () => {
     await freshUser(PLAIN);
     await freshUser(PRICED);
-    const built = [...(await buildPlain()), ...(await buildPriced())];
+    await freshUser(MARKUP);
+    const built = [
+      ...(await buildPlain()),
+      ...(await buildPriced()),
+      ...(await buildMarkup()),
+    ];
     actual = built.map(b => snapshot(b.key, b.title, b.covers, b.detail));
   }, 120_000);
 

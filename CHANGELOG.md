@@ -36,6 +36,9 @@ This is the human-readable companion to the git history — read this to see wha
   Today's numbers are far under both, about 0.2 s and 0.03 s at most on a
   laptop.
 
+- **A ninth golden bid covers wire extra and makeup, a per-item markup, and
+  profit taken as a margin.** It went in through the "update on purpose"
+  step, with its reason recorded, and the first eight bids did not move.
 - **Eight "golden" bids now guard every number the bid screen shows.** Each
   test run builds the same eight bids, covering counts, runs, drops, remove
   and relocate, scope tags, labor-only work, hand-typed prices, overhead,
