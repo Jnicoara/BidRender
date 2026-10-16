@@ -371,3 +371,46 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
   had failed on this test. "Gate green" in the fourth-night summary was
   wrong. From now on: code, wait for its Gate, then notes.
 - Full local smoke on the merged code: 222 passed / 6 skipped, 13.2 min.
+
+# 2026-10-16, afternoon (owner busy; queue: landed check, bid methods, break-it)
+
+## Item 1 — B landed (checked 13:58)
+
+- Gate 38961289110 on `230c18f5`: test, deploy-staging, smoke 223 passed
+  (14.3 min), all green; staging `/api/version` commit `230c18f5`. One line
+  in `track-b-handoff.md`.
+
+## Item 2 — bid methods + prevailing wage (13:15–13:55) · `35728e56`
+
+- Built with no column: one pricer per method behind `priceBid`, no stacking
+  by type; charge rate per line (`laborMarkup`, NULL = not priced, never
+  cost); A's marked-up charges at the company material %; effective margin
+  and the "how bid" line under Total due (laptop/iPad/phone shots
+  `bid-methods-1-how-bid-*`); prevailing-wage cost, apprentice rule,
+  re-check reminder; bracket overlap/gap check.
+- Owner's four-way test red when Cost + O&P kept a line's markup (the bid
+  total alone did NOT catch it — added the per-line check) and when A added
+  overhead. Golden bids unchanged; 100 pricing test files green; Gate
+  38964325613 478 files passed.
+- BM-M1..M10 applied to a throwaway DB (164 + 10, FKs 205 → 209, deletes
+  checked), dropped; drafts in `track-a-handoff.md`. Screens that need the
+  columns wait: `todo.md` § "Bid methods — wiring left".
+
+## Item 3 — Plans break-it + safe todo (14:00–14:25) · `4eff32e5`
+
+- **Found, fixed red-first:** `takeoffStamps.drop` and `takeoffRuns.save`
+  checked the sheet was the company's, not the bid's — a mark sent with bid
+  A's id landed on bid B's sheet past B's lock, counted on neither
+  (`server/sheetOnBid.test.ts`).
+- **Fixed red-first:** an unopenable plan left "This sheet: loading…" for
+  ever; now says the plan could not be opened (shots `plans-unopenable-*`).
+- Probed and found sound: moving marks across bids, re-saving a run on
+  another sheet, plan removal / scale on a locked bid, the crash-recovery
+  queue's bid/sheet pairing. Plans + PDFs smoke: 30 passed (desktop).
+- Logged, not fixed: a mouse in an ~820 px window leaves the drawing
+  ~80 px wide (layout decision).
+- Gate 38966480689 on `d78f28a8` (merge of local-dev `0628f8c9`, carries
+  `4eff32e5`): 480 test files passed. Dev server stopped 14:40; 3307 left running.
+- Safe todo: two flaky-test entries that were already fixed are ticked.
+  The dashboard batching is left for when a company nears 100 marked bids,
+  as its entry says.

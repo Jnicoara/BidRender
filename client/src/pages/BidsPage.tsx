@@ -172,6 +172,7 @@ import { errorText } from "@/lib/errorText";
 import { isReachFailure } from "@/lib/dataReach";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ArchivedBidNotice } from "@/components/bid/ArchivedBidNotice";
+import { effectiveMarginLine } from "@shared/bidMethods";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -816,7 +817,10 @@ export default function BidsPage({
     dropsNotPriced,
     unassignedMarks,
     warningsFrozenAt,
+    howBid,
+    effectiveMargin,
   } = detailQuery.data;
+  const marginLine = effectiveMarginLine(effectiveMargin, money);
   const lockedWarningsNote = frozenWarningsNote(warningsFrozenAt, {
     ...fromPlans,
     dropsNotPriced,
@@ -2878,6 +2882,29 @@ export default function BidsPage({
                   )}
                 </>
               )}
+
+              {/*
+                HOW THIS BID WAS PRICED, and what it earns — two lines under
+                the bottom line (references/bid-methods-plan.md § 4, § 7).
+                Every total traces to the settings behind it. Bid screen
+                only; the proposal never shows either.
+              */}
+              <div className="border-t border-border mt-2 pt-2 space-y-0.5">
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="how-bid"
+                >
+                  {howBid}
+                </p>
+                {marginLine && (
+                  <p
+                    className="text-xs text-muted-foreground"
+                    data-testid="effective-margin"
+                  >
+                    {marginLine}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -19,14 +19,11 @@
  */
 import type { Bid, BidLineItem, TaxJurisdictionRow } from "../drizzle/schema";
 import {
-  bottomOfBidRatio,
-  calculateBidPrice,
   calculateLineItem,
   resolveBidPricingSettings,
   type ResolvedPricingSettings,
   roundMoney,
   sumLineCosts,
-  type BidPriceBreakdown,
   type CompanyPricingDefaults,
   type LineItemBreakdown,
 } from "../shared/pricing";
@@ -36,6 +33,15 @@ import {
   type LineProblem,
 } from "../shared/linePricingProblems";
 import { storedMarkupPct } from "../shared/materialMarkup";
+import {
+  effectiveMargin,
+  howBidLine,
+  lineMethodTerms,
+  methodInputs,
+  priceBid,
+  type MethodPriceBreakdown,
+  type PricingMethod,
+} from "../shared/bidMethods";
 import { laborQtyOf } from "../shared/lineLaborQty";
 import { countNotPriced } from "../shared/lineNotPriced";
 import { scopePricesLabor, scopePricesMaterial } from "../shared/lineScope";
@@ -58,6 +64,7 @@ import {
 } from "../shared/salesTax";
 import {
   priceExpenses,
+  sumExpenses,
   sumMarkedUpExpenses,
   type ExpenseLine,
 } from "../shared/bidExtras";
@@ -78,7 +85,23 @@ export async function companyDefaultsFor(
     profitMethod: defaults?.profitMethod ?? "markup",
     profitValue: Number(defaults?.profitValue ?? 0),
     productivityPct: Number(defaults?.productivityPct ?? 0),
+    // Stored as a fraction (0.35 = 35%), as the markup rules read it.
+    materialMarkupPct: Number(defaults?.materialMarkupPct ?? 0),
   };
+}
+
+/**
+ * The method a bid is priced by (references/bid-methods-plan.md § 7).
+ *
+ * NULL — the old stacked math — for EVERY bid today, and that is a fact, not
+ * a shortcut: `bids.pricingMethod` (draft BM-M1) is not in the schema yet,
+ * because migrations are Track A's (track-a-handoff.md, "Bid methods"). When
+ * it lands this reads the column, `priceLine` reads `snapshotChargeRate`
+ * (BM-M5), and the SQL sums in `db.ts` (`costSums`) learn the method — the
+ * three places listed in todo.md under "Bid methods — wiring left".
+ */
+export function bidPricingMethod(_bid: Pick<Bid, "id">): PricingMethod | null {
+  return null;
 }
 
 /**
@@ -269,7 +292,12 @@ export function taxRulesForBid(
  * about the work it contains. A bid that should stop following gets its own
  * override, and then nothing at company level reaches it.
  */
-export function priceLine(line: BidLineItem, productivityPct: number) {
+export function priceLine(
+  line: BidLineItem,
+  productivityPct: number,
+  /** The bid's method, which decides what of the snapshot is read. */
+  method: PricingMethod | null
+) {
   /*
     WHO DOES THE WORK (0146, shared/lineScope.ts). Owner-furnished: the
     material is the owner's, so it leaves the money and its markup with it;
@@ -314,7 +342,15 @@ export function priceLine(line: BidLineItem, productivityPct: number) {
     productivityPct,
     // Frozen with the rest of the snapshot. NULL — a line from before markup
     // rules — reads as 0%, which is what keeps every such line where it was.
-    materialMarkupPct: storedMarkupPct(line.snapshotMarkupPct),
+    //
+    // Cost + O&P reads no markup at all; Markup + charge rate also bills
+    // labor at the frozen charge rate (shared/bidMethods.ts). `chargeRate`
+    // is null until BM-M5's `snapshotChargeRate` exists — see
+    // `bidPricingMethod`, which keeps every bid off that path until then.
+    ...lineMethodTerms(method, {
+      materialMarkupPct: storedMarkupPct(line.snapshotMarkupPct),
+      chargeRate: null,
+    }),
   });
 }
 
@@ -348,6 +384,7 @@ export function priceFromDirectCost(
    */
   bid: Pick<
     Bid,
+    | "id"
     | "overheadEnabled"
     | "overheadMode"
     | "overheadValue"
@@ -363,13 +400,15 @@ export function priceFromDirectCost(
    * the bid it opens.
    */
   materialMarkup: number,
-  company: CompanyPricingDefaults
+  company: CompanyPricingDefaults,
+  /** For a marked-up charge on Markup + charge rate; see `bidPriceOrFallback`. */
+  expenses: readonly ExpenseLine[]
 ): {
   price: number;
   priced: boolean;
   settings: ResolvedPricingSettings;
   /** The whole breakdown, for `billTheBid`. `finalPrice` is `price`. */
-  bidPrice: BidPriceBreakdown;
+  bidPrice: MethodPriceBreakdown;
 } {
   const settings = resolveBidPricingSettings(company, {
     overheadEnabled: bid.overheadEnabled,
@@ -381,10 +420,17 @@ export function priceFromDirectCost(
     productivityPct:
       bid.productivityPct === null ? null : Number(bid.productivityPct),
   });
+  /*
+    The SQL sums carry no labor markup: they have no charge rates. Every bid
+    is on the old math today (`bidPricingMethod`), where none applies; the
+    sums learn it with the column (todo.md, "Bid methods — wiring left").
+  */
   const { bidPrice, error } = bidPriceOrFallback(
     settings,
-    directCost,
-    materialMarkup
+    bidPricingMethod(bid),
+    { directCost, materialMarkup, laborMarkup: 0 },
+    company,
+    expenses
   );
   return {
     price: bidPrice.finalPrice,
@@ -403,25 +449,44 @@ export function priceFromDirectCost(
  */
 export function bidPriceOrFallback(
   settings: ResolvedPricingSettings,
-  directCost: number,
-  materialMarkup: number
-): { bidPrice: BidPriceBreakdown; error: unknown } {
+  /** The bid's method — `bidPricingMethod`. Decides which sums are read. */
+  method: PricingMethod | null,
+  sums: { directCost: number; materialMarkup: number; laborMarkup: number },
+  company: CompanyPricingDefaults,
+  /** The bid's charges; on Markup + charge rate the marked-up ones are marked up here. */
+  expenses: readonly ExpenseLine[]
+): { bidPrice: MethodPriceBreakdown; error: unknown } {
   try {
     return {
-      bidPrice: calculateBidPrice({
-        directCost,
-        materialMarkup,
-        overhead: settings.overhead,
-        profit: settings.profit,
-      }),
+      bidPrice: priceBid(
+        methodInputs(
+          method,
+          sums,
+          {
+            overhead: settings.overhead,
+            profit: settings.profit,
+            companyMaterialMarkupPct: company.materialMarkupPct ?? 0,
+          },
+          expenses
+        )
+      ),
       error: null,
     };
   } catch (error) {
-    const costWithMarkup = roundMoney(directCost + materialMarkup);
+    // Cost + O&P has no markup to fall back to; the other two keep theirs.
+    const markup =
+      method === "cost_op"
+        ? 0
+        : sums.materialMarkup + (method ? sums.laborMarkup : 0);
+    const costWithMarkup = roundMoney(sums.directCost + markup);
     return {
       bidPrice: {
-        directCost,
-        materialMarkup,
+        method,
+        directCost: sums.directCost,
+        materialMarkup: method === "cost_op" ? 0 : sums.materialMarkup,
+        laborMarkup: method === "markup_rate" ? sums.laborMarkup : 0,
+        expenseMarkup: 0,
+        expenseUplift: 1,
         costWithMarkup,
         overheadAmount: 0,
         costWithOverhead: costWithMarkup,
@@ -469,8 +534,9 @@ export function rollUpBid(
     line is `null` here and contributes nothing below; `problems` says which
     and why. See shared/linePricingProblems.ts.
   */
+  const method = bidPricingMethod(bid);
   const guarded = lines.map(line =>
-    priceLineGuarded(line, settings.productivityPct)
+    priceLineGuarded(line, settings.productivityPct, method)
   );
   const breakdowns = guarded.map(g => g.breakdown);
   const problems: PricingProblem[] = [];
@@ -501,8 +567,14 @@ export function rollUpBid(
   */
   const { bidPrice, error } = bidPriceOrFallback(
     settings,
-    directCost,
-    lineSums.materialMarkup
+    method,
+    {
+      directCost,
+      materialMarkup: lineSums.materialMarkup,
+      laborMarkup: lineSums.laborMarkup,
+    },
+    company,
+    expenses
   );
   if (error !== null) {
     /*
@@ -555,12 +627,16 @@ export type PricingProblem = LineProblem & { lineId: number | null };
  */
 export function priceLineGuarded(
   line: BidLineItem,
-  productivityPct: number
+  productivityPct: number,
+  method: PricingMethod | null
 ): { breakdown: LineItemBreakdown | null; problem: LineProblem | null } {
   const found = lineProblem(line);
   if (found) return { breakdown: null, problem: found };
   try {
-    return { breakdown: priceLine(line, productivityPct), problem: null };
+    return {
+      breakdown: priceLine(line, productivityPct, method),
+      problem: null,
+    };
   } catch (error) {
     return {
       breakdown: null,
@@ -677,6 +753,26 @@ export function bidRollup<L extends RollupLine>(
 
   return {
     settings,
+    /**
+     * One sentence saying what this bid was priced WITH — its method and the
+     * settings that method read (references/bid-methods-plan.md § 7). Shown
+     * under the total on the bid screen, never on the proposal.
+     */
+    howBid: howBidLine({
+      method: bidPrice.method,
+      overhead: settings.overhead,
+      profit: settings.profit,
+      materialMarkup: bidPrice.materialMarkup,
+    }),
+    /**
+     * Margin and markup of the whole bid before tax (plan § 4, owner Q10):
+     * cost is material + labor at loaded cost + every charge at cost, price
+     * is the subtotal. Display only — it reads the totals and moves nothing.
+     */
+    effectiveMargin: effectiveMargin({
+      cost: roundMoney(materialCost + laborCost + sumExpenses(expenses)),
+      price: subtotal,
+    }),
     priced,
     /** What could not be priced; see rollUpBid. Empty on a sound bid. */
     problems,
@@ -787,7 +883,7 @@ export function billTheBid({
   tax,
 }: {
   bid: Bid;
-  bidPrice: BidPriceBreakdown;
+  bidPrice: MethodPriceBreakdown;
   materialCost: number;
   laborCost: number;
   materialMarkup: number;
@@ -835,8 +931,9 @@ export function billTheBid({
     for exactly that reason (shared/pricing.ts). With no markup on the bid the
     two ratios are identical, which is why existing bids did not move.
   */
-  const uplift = bottomOfBidRatio(bidPrice);
-  const pricedExpenses = priceExpenses(expenses, uplift);
+  // The method's own factor (shared/bidMethods.ts): the bottom-of-bid ratio
+  // on the old math and Cost + O&P, the company markup on Markup + rate.
+  const pricedExpenses = priceExpenses(expenses, bidPrice.expenseUplift);
   const workPrice = roundMoney(
     bidPrice.finalPrice - pricedExpenses.markedUpCharged
   );

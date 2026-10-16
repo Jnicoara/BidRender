@@ -457,7 +457,8 @@ export const bidsRouter = router({
           bid,
           fullDirect,
           materialMarkup,
-          company
+          company,
+          chargesByBid.get(bid.id) ?? []
         );
         /*
         TOTAL DUE, which is what the card shows and says (owner, 2026-09-27):
@@ -962,6 +963,8 @@ export const bidsRouter = router({
 
       const {
         settings,
+        howBid,
+        effectiveMargin,
         priced,
         units,
         totals,
@@ -1120,6 +1123,10 @@ export const bidsRouter = router({
         units,
         totals,
         settings,
+        /** What the bid was priced with, one sentence (shared/bidMethods.ts). */
+        howBid,
+        /** Margin and markup before tax — display only. */
+        effectiveMargin,
         /**
          * "Profit / overhead not set" — the bid follows a company default
          * of 0 (shared/marginsNotSet.ts). A label; it moves no number.

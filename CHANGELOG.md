@@ -31,6 +31,24 @@ This is the human-readable companion to the git history — read this to see wha
 - **The Dashboard's "drops not priced" check is about a fifth faster** for
   a company with many bids, because it reads the company's height settings
   once instead of once per bid. The numbers it shows are unchanged.
+- **A mark or a traced run can only be saved on a sheet of its own bid.**
+  The server checked that a sheet belonged to the company, not to the bid
+  the mark was sent with. So a mark could be written onto another bid's
+  drawing, even one whose quantities were locked. It was counted on neither
+  bid but still drawn there. Both are refused now.
+- **A plan that can't be opened no longer leaves the panel saying
+  "loading…" for ever.** A damaged or password-protected set attached before
+  uploads started refusing them has no sheets, so its marks were never
+  coming. The panel now says "This sheet: the plan could not be opened".
+
+- **Every bid now says how it was priced and what it earns**, in two short
+  lines under Total due: "Priced the old way: material markup only" (or
+  which of markup, overhead and profit it used), and "Effective margin 11.3%
+  (markup 12.7%) · cost $401.40 → price $452.57". Both are on the bid screen
+  only, never the customer's quote, and change no number. Underneath, the
+  pricing engine can now price a bid one of two ways: Markup + charge rate,
+  or Cost + O&P. Neither can borrow the other's settings. No bid uses either
+  yet; they need database columns Track A applies first.
 - **The test gate can no longer show green over untested code.** A push
   that changed only notes used to run a short check that passed on its own.
   On a track branch, it also cancelled the full test run of the code just

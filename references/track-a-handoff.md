@@ -89,6 +89,107 @@ reads to everyone else as a fault in their code. Throwaway databases you
 create and drop yourself are exempt. (Prompted by A's own false alarm on
 2026-10-16 — nobody had replaced `bidrender_local`; see session 48.)
 
+## FROM B — 2026-10-16: Bid methods + prevailing wage, SQL drafts BM-M1..M10 for A
+
+**Owner: "BUILD BID METHODS + PREVAILING WAGE … put final SQL drafts
+(BM-M1..M9) in track-a-handoff.md for A."** The plan is
+`references/bid-methods-plan.md` (all 16 picks approved 2026-10-12); its
+§ 9 also has BM-M10 (owner Q15), so ten drafts. **B has written no file in
+`drizzle/`** (the Gate refuses that on a track branch). Number them, add the
+schema, apply them; B wires the code after local-dev is merged in
+(`todo.md` § "Bid methods — wiring left").
+
+**Tested by B, 2026-10-16, on a throwaway DB** (`bidrender_test_bm_throwaway`,
+created, migrated 0000–0163 from zero — 164 applied — then dropped):
+
+- All ten applied cleanly, in the order below, as written.
+- Every new column NULL, no default (except `sortOrder` 0, and the two
+  timestamps), so **all ten are ADDITIVE: step 1, migrate first. Step 3 is
+  empty.** No `UPDATE` anywhere; NULL is the old meaning everywhere (NULL
+  `pricingMethod` = the old stacked math, so no existing bid moves).
+- **Foreign keys 205 → 209** (+4: `wage_rate_sets_userId_fk`,
+  `wage_rate_set_rates_setId_fk`, `wage_rate_set_rates_laborRateId_fk`,
+  `bids_wageRateSetId_fk`). If your count before is not 205, stop and find
+  out why before going on.
+- Deletes checked on probe rows: deleting the role → its set row's
+  `laborRateId` NULL; deleting the set → the bid's `wageRateSetId` NULL and
+  the set's rows gone; deleting the user → its sets gone. (A set is archived,
+  never deleted, in the app; the FK is a backstop.)
+- BM-M10 needs BM-M6's table. Fold `fringePaidAsCash` into BM-M6's CREATE if
+  they ship together; B tested them apart.
+- Not tested: re-running a file (the journal prevents it; a plain `ADD`
+  dies on `Duplicate column` by design).
+
+```sql
+-- BM-M1  a bid's method; NULL = priced before methods existed (stacked)
+ALTER TABLE `bids` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;
+
+-- BM-M2  the company's method for NEW bids; NULL = cost_op
+ALTER TABLE `pricing_defaults` ADD `pricingMethod` enum('markup_rate','cost_op') NULL;
+
+-- BM-M3  flat % or brackets at the company level; NULL = flat
+ALTER TABLE `pricing_defaults` ADD `materialMarkupMode` enum('flat','brackets') NULL;
+
+-- BM-M4  the hourly charge rate per role (method A); NULL = not set
+ALTER TABLE `labor_rates` ADD `chargeRate` decimal(10,4) NULL;
+
+-- BM-M5  the charge rate frozen on the line; NULL = none (every line before)
+ALTER TABLE `bid_line_items` ADD `snapshotChargeRate` decimal(10,4) NULL;
+
+-- BM-M6  prevailing wage sets
+CREATE TABLE `wage_rate_sets` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `userId` int NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `wageDeterminationNumber` varchar(128) NULL,
+  `dateSet` date NOT NULL,
+  `archivedAt` timestamp NULL,
+  `createdAt` timestamp NOT NULL DEFAULT (now()),
+  `updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `wage_rate_sets_id` PRIMARY KEY(`id`),
+  CONSTRAINT `wage_rate_sets_userId_fk` FOREIGN KEY (`userId`)
+    REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+
+-- BM-M7  one row per classification in a set
+CREATE TABLE `wage_rate_set_rates` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `setId` int NOT NULL,
+  `classification` enum('journeyman','apprentice','trainee','other') NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `laborRateId` int NULL,
+  `baseWage` decimal(10,4) NOT NULL,
+  `fringe` decimal(10,4) NOT NULL,
+  `sortOrder` int NOT NULL DEFAULT 0,
+  CONSTRAINT `wage_rate_set_rates_id` PRIMARY KEY(`id`),
+  CONSTRAINT `wage_rate_set_rates_setId_fk` FOREIGN KEY (`setId`)
+    REFERENCES `wage_rate_sets`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `wage_rate_set_rates_laborRateId_fk` FOREIGN KEY (`laborRateId`)
+    REFERENCES `labor_rates`(`id`) ON DELETE SET NULL
+);
+
+-- BM-M8  the bid's wage set and the apprentice answer;
+--        NULL set = no prevailing wage; NULL answer = not asked = journeyman rate
+ALTER TABLE `bids` ADD `wageRateSetId` int NULL;
+ALTER TABLE `bids` ADD `registeredApprentices` boolean NULL;
+ALTER TABLE `bids` ADD CONSTRAINT `bids_wageRateSetId_fk`
+  FOREIGN KEY (`wageRateSetId`) REFERENCES `wage_rate_sets`(`id`) ON DELETE SET NULL;
+
+-- BM-M9  building area for the $/sq ft sanity line; NULL = not given
+ALTER TABLE `bids` ADD `buildingSqFt` decimal(12,2) NULL;
+
+-- BM-M10 (owner Q15) fringe paid as cash, so payroll tax applies to it too;
+--        NULL = not ticked = fringe is not taxed
+ALTER TABLE `wage_rate_sets` ADD `fringePaidAsCash` boolean NULL;
+```
+
+**What B built on track-b without them** (no number moves; golden bids
+unchanged): the engine with one pricer per method and no stacking by type
+(`shared/bidMethods.ts`), the charge rate per line, the prevailing-wage and
+bracket arithmetic, and two lines under Total due on every bid ("Priced the
+old way: …", "Effective margin …"). `bidPricingMethod()` in
+`server/bidPricing.ts` returns NULL for every bid until BM-M1 exists.
+
 ## NOW — 2026-10-16 day, session 48: owner's answers built (N4, N1, N2)
 
 - **N4:** math version 2 is BUTTON-ONLY (`buttonOnly`, `releaseTargetFor`):

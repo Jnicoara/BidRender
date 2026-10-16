@@ -384,7 +384,20 @@ export const takeoffStampsRouter = router({
           code: "BAD_REQUEST",
           message: lockedEditRefusal("new marks cannot be placed"),
         });
-      await requireSheet(input.sheetId, ctx.scope.dataUserId);
+      // On THIS bid, not merely the company's: a mark sent with this bid's id
+      // onto another bid's sheet would be counted on neither and drawn on the
+      // other, past this bid's lock check (server/sheetOnBid.test.ts).
+      if (
+        !(await db.getBidPdfSheetOnBid(
+          input.sheetId,
+          input.bidId,
+          ctx.scope.dataUserId
+        ))
+      )
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Sheet not found on this bid.",
+        });
 
       const group = await db.getGroupById(input.groupId, ctx.scope.dataUserId);
       if (!group || group.bidId !== input.bidId) {
