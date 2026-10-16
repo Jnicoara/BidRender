@@ -524,3 +524,4 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
 (Run 4 heading times corrected at 00:56 from the commit stamps: the first
 draft's hand-typed START times ran ahead of the clock. Ends were always
 `date`. Same slip as run 3; from here every time is read from the clock.)
+- 00:56 Gate 38868672873 **green** on 188758b6 (items 6, 8, 9, 10). Pushing items 11–14.
