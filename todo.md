@@ -1315,7 +1315,7 @@ All additive and nullable. Specs are in the plans named.
       Not guarded: proposal text and bid notes (text boxes that save on
       their own) — same check if one ever shows the symptom.
 
-### Library editors drop a half-made edit without asking (Track C, 2026-10-15 night) — DONE for assemblies and kits (2026-10-16)
+### Library editors drop a half-made edit without asking (Track C, 2026-10-15 night) — DONE for every library editor and Clients (2026-10-16)
 
 - [x] **BUILT 2026-10-16 (Track C):** `@/lib/unsavedGuard` (tested) +
       `useUnsavedGuard(dirty)` + one `UnsavedChangesDialog` in the shell.
@@ -1326,8 +1326,8 @@ All additive and nullable. Specs are in the plans named.
       leaves without asking. Checked on screen, laptop and phone
       (`overnight-shots/unsaved-*.png`). **Materials too** (row editor and
       the add form; leaving the screen asks, its Cancel does not — Cancel
-      says discard). **Not yet:** Labor rates, Modifiers and Clients (small
-      forms, same hook when wanted). Was:
+      says discard). **Labor rates, Modifiers and Clients too** (same
+      rule; each checked on screen untouched vs edited). Was:
 - [ ] **Back, or any nav link, from the assembly / kit / material editors
       throws away what was typed, with no "Discard changes?".** The Plans
       screen guards its unsaved trace (`beforeunload`, TakeoffPage), the

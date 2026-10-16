@@ -67,6 +67,8 @@ import {
 } from "@shared/loadedRate";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -486,9 +488,14 @@ function LaborRateRow({
   } | null>(null);
   /** The row as saved when the editor opened — sent with Save (staleEdit.ts). */
   const [openedAt, setOpenedAt] = useState<Date>(rate.updatedAt);
+  // Leaving the screen asks before an open edit is dropped
+  // (@/lib/unsavedGuard); Cancel does not — it says discard.
+  const [openedWith, setOpenedWith] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(editing && !sameToSave(draft, openedWith));
   const openEditor = (opened: { field: NeedsField; why: string } | null) => {
     setOpenedAt(rate.updatedAt);
     setDraft(draftFrom(rate));
+    setOpenedWith(draftFrom(rate));
     setOpenedFor(opened);
     setEditing(true);
   };
@@ -713,6 +720,7 @@ export default function LaborRatesPage() {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(adding && !sameToSave(newDraft, emptyDraft));
 
   const utils = trpc.useUtils();
   const {

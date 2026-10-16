@@ -11,8 +11,9 @@ This is the human-readable companion to the git history — read this to see wha
   used to throw a half-built recipe away without a word. Now it asks
   "Discard your changes?", and Keep editing leaves everything as typed.
   An untouched or just-saved editor still leaves straight away. The same
-  goes for an open edit or a half-typed new material on the Materials
-  screen (its Cancel button still just cancels).
+  goes for an open edit or a half-typed new entry on the Materials, Labor
+  rates, Job conditions and Clients screens (their Cancel buttons still
+  just cancel).
 
 ## [2026-10-15]
 

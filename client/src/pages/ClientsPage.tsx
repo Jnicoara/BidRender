@@ -65,6 +65,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { searchClients, isCreatableClient } from "@/lib/clientPicker";
 import { errorText } from "@/lib/errorText";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 type ClientKind = "company" | "individual";
 
@@ -228,6 +230,13 @@ export default function ClientsPage() {
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
+  // Leaving the screen asks before an open edit or a half-typed new client
+  // is dropped (@/lib/unsavedGuard); Cancel does not — it says discard.
+  const [openedWith, setOpenedWith] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(
+    (editingId !== null && !sameToSave(editDraft, openedWith)) ||
+      (adding && !sameToSave(newDraft, emptyDraft))
+  );
   /**
    * When the open editor's draft was taken from the saved client, sent with
    * Save so a save from an older screen is refused (shared/staleEdit.ts).
@@ -334,7 +343,7 @@ export default function ClientsPage() {
         ? own
         : (row.updatedAt ?? null)
     );
-    setEditDraft({
+    const opened: Draft = {
       name: row.name,
       kind: row.kind,
       contactName: row.contactName ?? "",
@@ -342,7 +351,9 @@ export default function ClientsPage() {
       phone: row.phone ?? "",
       email: row.email ?? "",
       notes: row.notes ?? "",
-    });
+    };
+    setEditDraft(opened);
+    setOpenedWith(opened);
   };
 
   const submitEdit = () => {

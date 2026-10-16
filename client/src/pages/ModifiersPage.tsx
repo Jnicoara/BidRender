@@ -62,6 +62,8 @@ import {
 import { applyModifiersToHours } from "@shared/pricing";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -171,6 +173,10 @@ function ModifierRow({
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   /** The row as saved when the editor opened — sent with Save. */
   const [openedAt, setOpenedAt] = useState<Date>(modifier.updatedAt);
+  // Leaving the screen asks before an open edit is dropped
+  // (@/lib/unsavedGuard); Cancel does not — it says discard.
+  const [openedWith, setOpenedWith] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(editing && !sameToSave(draft, openedWith));
 
   const save = () => {
     const problem = validateDraft(draft);
@@ -265,10 +271,12 @@ function ModifierRow({
           variant="ghost"
           className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
           onClick={() => {
-            setDraft({
+            const opened = {
               name: modifier.name,
               percent: String(toPercent(modifier.laborAdjustmentPctValue)),
-            });
+            };
+            setDraft(opened);
+            setOpenedWith(opened);
             setOpenedAt(modifier.updatedAt);
             setEditing(true);
           }}
@@ -367,6 +375,7 @@ export default function ModifiersPage() {
   const [view, setView] = useState<"active" | "archived">("active");
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(adding && !sameToSave(newDraft, emptyDraft));
   const [pendingDelete, setPendingDelete] = useState<Modifier | null>(null);
 
   const utils = trpc.useUtils();
