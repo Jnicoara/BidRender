@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Every bid now says how it was priced and what it earns**, in two short
+  lines under Total due: "Priced the old way: material markup only" (or
+  which of markup, overhead and profit it used), and "Effective margin 11.3%
+  (markup 12.7%) · cost $401.40 → price $452.57". Both are on the bid screen
+  only, never the customer's quote, and change no number. Underneath, the
+  pricing engine can now price a bid one of two ways: Markup + charge rate,
+  or Cost + O&P. Neither can borrow the other's settings. No bid uses either
+  yet; they need database columns Track A applies first.
+
 - **Typing a decimal into a quantity or percent box no longer multiplies it
   by ten.** In the run-type editor's extra and makeup boxes, an assembly's
   or kit's part quantities and an assembly step's count, the box redrew

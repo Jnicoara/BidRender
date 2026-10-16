@@ -3,6 +3,37 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Bid methods — wiring left (Track B, 2026-10-16, waits for A's BM-M1..M10)
+
+`references/bid-methods-plan.md`, all 16 picks approved. **Built on track-b
+2026-10-16, no column needed:** the engine (`shared/bidMethods.ts`: one
+pricer per method, the no-stacking type, `lineMethodTerms`, the A charge
+uplift), a per-line charge rate in `calculateLineItem` (`laborMarkup`,
+`laborNotPriced`), the "how bid" line and effective margin under Total due,
+the prevailing-wage and bracket arithmetic (`shared/prevailingWage.ts`,
+`shared/markupBrackets.ts`). Tests: `server/bidMethods.test.ts` and siblings.
+
+**Every bid prices by the old math until these land, and that is enforced in
+one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL. The
+SQL drafts are in `references/track-a-handoff.md` § "Bid methods". After A
+applies them and local-dev is merged into track-b:
+
+1. `bidPricingMethod(bid)` reads `bids.pricingMethod` (BM-M1).
+2. `priceLine` reads `snapshotChargeRate` (BM-M5) instead of `null`, and
+   adding a line freezes the role's `chargeRate` (BM-M4) into it.
+3. The SQL sums the Dashboard uses (`costSums` in `server/db.ts`) must learn
+   the method: zero material markup on Cost + O&P, add labor markup on A.
+   `server/bidPriceSurfaces.test.ts` gets an A bid and a B bid so a card and
+   its bid cannot disagree.
+4. `lineNotPriced` counts a NULL charge rate on an A line as labor not priced.
+5. Screens: the per-bid method toggle (old → new shown, Draft only), the
+   old-math offer on Drafts, greyed "Not used in …" settings, the company
+   method on `/settings/pricing` and the new-shop "How do you usually bid?"
+   step, charge rate per role on Labor Rates, wage sets in Labor, the
+   apprentice question, the re-check and below-PW warnings.
+6. Freeze `pricingMethod` with the rest when a bid leaves Draft
+   (`freezeBidSettings`).
+
 ## Smoke takes 13 min, was 6.3 — how to get it back near 6 without dropping a test (Track B, 2026-10-16, NOT done)
 
 **Measured 2026-10-16**, full local smoke on track-b after merging local-dev
