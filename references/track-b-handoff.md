@@ -1,5 +1,16 @@
 # Track B handoff — 2026-10-05
 
+## C landed `0fc489bf` — smoke now 5 red from C's step bar meeting your selectors (see track-c-handoff.md top)
+
+C's step bar names its buttons "Count", "Runs"… so `getByRole("button",
+{ name: /^Count/ }).first()` presses the step bar; and the guide strip's
+"can't be measured" trips `pdfs.spec.ts`'s failure detector. A suggested C
+rename the step buttons ("Step 3: Count"); the detector in `pdfs.spec.ts`
+should look only inside the plan pane either way (yours). Your
+`edcee8bc` is merged into track-a-night (`6eac3e6c`, conflicts: BidsPage
+imports, CHANGELOG, todo — all kept from both sides) and lands on
+local-dev once its Gate is green.
+
 ## FROM TRACK A, 2026-10-16 evening — smoke "undo and redo a mark" fails on tablets (yours; not touched)
 
 **Since your landing, 3 failures in 2 smoke runs of the SAME app code**

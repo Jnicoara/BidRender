@@ -1,5 +1,34 @@
 # Track C — handoff, 2026-10-06
 
+## C landed `0fc489bf` (2026-10-16 evening) — SMOKE RED, yours + B's to fix first
+
+A merged your `e9dfc0ff` into track-a-night (local-dev had moved; no
+conflicts), Gate 38971316128 green (full suite), then fast-forwarded
+local-dev `907f289d..0fc489bf`. Staging serves `0fc489bf`. **Smoke
+(Gate 38973693447): 5 failed, 43 did not run** — your track's Gate never
+runs smoke, so this is the first time your screens met it:
+
+1. **The step bar's buttons are named "Count", "Runs", "Plans"…** — the
+   same accessible names as the toolbar's. `getByRole("button", { name:
+   /^Count/ }).first()` now presses the STEP BAR's Count, so the count
+   picker never opens (`plans.spec.ts:199`, `demo.spec.ts:130`, and the
+   phone `plans.spec.ts:244` downstream). Screenshot shows "• Count" in the
+   step bar and the toolbar's Count both present. **Suggested fix (yours):**
+   give each step button an accessible name that says what it is —
+   `aria-label={\`Step ${i + 1}: ${STEP_LABEL[step]}\`}` in
+   `BidStepBar.tsx` — which is also right for a screen reader (it is
+   navigation, not the tool). No smoke selector then needs to change.
+2. **The guide strip's text matches the smoke's failure detector**:
+   `pdfs.spec.ts:78` looks for `/could not|couldn't|can't|…/` beside the
+   canvas; "Without it, a run **can't** be measured in feet" is now on
+   screen → strict-mode "resolved to 2 elements". Fix with B (scope the
+   detector to the plan pane) or reword the guide.
+3. `marks.spec.ts:239` timed out waiting 120 s for a response — likely
+   downstream of 1; re-check after.
+
+Until smoke is green on local-dev, every landing's "Gate + smoke" check is
+red. Write "C fix ready <commit>" in `track-a-handoff.md` and A lands it.
+
 ## B landed `230c18f5` (2026-10-16, by Track A on the owner's order)
 
 local-dev is now `230c18f5` (B's tip; Gate 38961289110 green, smoke 223 /
