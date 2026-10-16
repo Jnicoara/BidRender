@@ -271,3 +271,15 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
   `references/plans-test-map.md`. Full smoke 156 / 6 skipped, 8.3 min.
 - Found while writing it: the Count picker refuses a name already counted
   on the bid (by design; "Again" is the way back) — not a bug.
+
+## Item 3 — marks never move or vanish (00:55–01:10) · `9f13e976`, `739d9cca`
+
+- `e2e/smoke/marks.spec.ts`: zoom, turn, sheets, reload, offline, lost
+  answer, undo/redo, reload mid-send, second session — server exact and
+  every drawn mark on its point after each. 41 passed at four projects.
+- **Live fault found and fixed:** a mark placed just before a reload was
+  saved twice (crash-queue recovery resent it with no key). The queue now
+  stores each mark's send key; recovery sends it.
+- My sabotage runner restored files with `git checkout`, which would have
+  wiped uncommitted work in the same file — caught before it ran; it now
+  writes back the bytes it read.
