@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { parseTypedPercent } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { combinedRatePct } from "@shared/salesTax";
 import { errorText } from "@/lib/errorText";
@@ -82,9 +83,11 @@ function AreaForm({
   submitLabel: string;
 }) {
   const patch = (part: Partial<AreaDraft>) => setDraft({ ...draft, ...part });
+  // The app's percent reader: Number() made a BLANK part 0% (and saved it)
+  // and "0x10" 16%; blank is now not a rate, and "6.25%" is 6.25.
   const parsed = draft.components.map(c => ({
     label: c.label.trim(),
-    ratePct: Number(c.ratePct),
+    ratePct: parseTypedPercent(c.ratePct),
   }));
   const total = combinedRatePct(parsed.filter(c => Number.isFinite(c.ratePct)));
   const hasKey = Boolean(
@@ -205,9 +208,18 @@ function AreaForm({
           </Button>
           {/* Stacked rates are the norm, so the combined figure is shown as it
               is built — it is the number a contractor recognises. */}
-          <span className="ml-auto text-xs font-mono text-[#F5C518]">
-            {total.toFixed(4).replace(/\.?0+$/, "")}% combined
-          </span>
+          {/* Not a total while a part has no readable rate: "0% combined"
+              beside a blank box read as a rate, and that blank used to save
+              as 0 %. */}
+          {parsed.every(c => Number.isFinite(c.ratePct)) ? (
+            <span className="ml-auto text-xs font-mono text-[#F5C518]">
+              {total.toFixed(4).replace(/\.?0+$/, "")}% combined
+            </span>
+          ) : (
+            <span className="ml-auto text-xs text-amber-500">
+              Type a rate for every part
+            </span>
+          )}
         </div>
         {total > 25 && (
           <p className="text-xs text-destructive">
@@ -310,7 +322,7 @@ export function SalesTaxSection() {
     sourceNote: orNull(d.sourceNote),
     components: d.components.map(c => ({
       label: c.label.trim(),
-      ratePct: Number(c.ratePct),
+      ratePct: parseTypedPercent(c.ratePct),
     })),
   });
 

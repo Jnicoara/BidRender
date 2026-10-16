@@ -31,6 +31,12 @@ brand-variants pass by design and needs nothing from you now.
   type. → **B fixes it next (same pattern as `DraftNumberInput`), and the
   same read-only list as Q-QTY1 for run types with a whole-number extra of
   10 or more.** Not seen on screen by C (B's screen); found by reading.
+- **Q-TAX1 ⚠ CHANGES BID MONEY (already saved data)** — a tax area whose
+  rate part was left BLANK was saved at 0 % (seen on screen; fixed on
+  track-c, `tax-blank-rate-{before,after}.png`). → **A runs a read-only
+  list on live of tax-area parts at exactly 0 %, for you to check.** A 0
+  typed on purpose is fine; a blank that became 0 means bids in that area
+  are missing that tax.
 - **Q-QTY2** — same bug, assembly WORK STEPS "How many" box (×N): fixed by
   the same component; not shown on screen (needs a work step set up) —
   unit-tested only. → **Nothing to decide**; noted so you know it was

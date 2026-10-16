@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: a tax rate part left blank was saved as 0%.** Adding a tax area
+  with a part named (say "State") but no rate typed saved it at 0% and the
+  form said "0% combined", so bids in that area quietly charged no tax for
+  it. The form now asks for a rate for every part, and "6.25%" with the
+  percent sign is accepted.
+
 - **Golden measurements: every change is now checked against drawings with
   known true lengths.** Thirteen test drawings — 1/8", 3/16", 1/4",
   engineering and metric scales, rotated pages, a half-size print, a scan,
