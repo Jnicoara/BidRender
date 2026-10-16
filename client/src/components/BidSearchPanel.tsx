@@ -302,8 +302,10 @@ export function BidSearchPanel({
       {/* ── What is being shown, in words ── */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {/* No count over a list that failed to load: "0 bids" above
-            "Couldn't load your bids" contradicts it (drill, 2026-10-15). */}
-        {!(query.isError && rows.length === 0) && (
+            "Couldn't load your bids" contradicts it (drill, 2026-10-15).
+            Nor over one still LOADING: "0 bids" above the skeleton rows
+            stated a number nobody had counted yet (slow connection). */}
+        {!(query.isError && rows.length === 0) && !query.isPending && (
           <span>
             {rows.length}
             {query.hasNextPage ? "+" : ""} bid{rows.length === 1 ? "" : "s"}

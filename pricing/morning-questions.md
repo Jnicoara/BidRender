@@ -80,6 +80,15 @@ brand-variants pass by design and needs nothing from you now.
   unit-tested only. → **Nothing to decide**; noted so you know it was
   the same fault.
 
+- **Q-LEAK1 (security, fixed — tell A)** — on one browser tab, company A
+  signs out and company B signs in: B's Bids screen listed A's 25 bids,
+  names and totals, until B's own reads arrived (seen on screen, reads
+  slowed to 5 s; `account-switch-{before,after}.png`). Fixed on track-c:
+  any change of signed-in person drops every cached read
+  (`lib/accountCache.ts`, AuthGuard). → **Nothing to decide; A may want it
+  in `references/security-sweep.md`.** Nothing reached a server — it was
+  the browser's own memory — so no other company's data was ever served.
+
 ## ⚠ AT THE TOP — these change a starter or what a bid line counts
 
 0. ⚠ **CHANGES BID MONEY (a new feature, not built)** — "Copy this bid" (competitors all have it): when a bid is copied, should the copy be re-priced at **today's** library prices, or keep the **original's frozen** prices? → **Re-price at today's** — a copy is a new bid, and last year's numbers on it would be a quiet wrong price. Affects: what every copied bid totals. Sketch: `references/overnight-parked.md` P4.

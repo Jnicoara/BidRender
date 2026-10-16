@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: after signing out, the next company to sign in on the same
+  browser tab could see the last company's bids.** Signing out cleared only
+  who was signed in; everything else the app had loaded stayed, so a
+  different company signing in on a shared office computer saw the previous
+  company's bid list — names and totals — until its own arrived. Signing
+  out now clears all of it. The Bids list also no longer says "0 bids"
+  while it is still loading.
+
 - **Fixed: a quote prepared in the evening was dated tomorrow.** The date on
   the proposal and its "price good through" were worked out on the server,
   which runs on UTC — so after about 5 pm Pacific (8 pm Eastern) every

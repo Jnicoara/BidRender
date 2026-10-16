@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { isSignInQuery, shouldDropAccountCache } from "@/lib/accountCache";
 import LoginPage from "@/pages/LoginPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { isResetAddress } from "@/lib/resetLink";
@@ -44,6 +46,25 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     !!error &&
     (error as { data?: { code?: string } }).data?.code ===
       "SERVICE_UNAVAILABLE";
+
+  /*
+    The signed-in person changed (signed out, or someone else in): drop every
+    cached read but the sign-in check, so nothing read for one company is on
+    the next one's screen (@/lib/accountCache — company B saw company A's
+    bids after A signed out on the same tab). A database blip is not a
+    change of person, so it leaves the cache and the tracking alone.
+  */
+  const queryClient = useQueryClient();
+  const lastUserId = useRef<number | null>(null);
+  useEffect(() => {
+    if (unavailable || loading) return;
+    const next = user?.id ?? null;
+    if (shouldDropAccountCache(lastUserId.current, next))
+      queryClient.removeQueries({
+        predicate: query => !isSignInQuery(query.queryKey),
+      });
+    lastUserId.current = next;
+  }, [user?.id, unavailable, loading, queryClient]);
   useEffect(() => {
     if (!unavailable) return;
     const timer = window.setInterval(() => refresh(), 10_000);
