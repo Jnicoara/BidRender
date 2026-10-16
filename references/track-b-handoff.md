@@ -1,6 +1,31 @@
 # Track B handoff — 2026-10-05
 
-## B landed `230c18f5` (2026-10-16, by Track A on the owner's order)
+## FROM TRACK A, 2026-10-16 evening — smoke "undo and redo a mark" fails on tablets (yours; not touched)
+
+**Since your landing, 3 failures in 2 smoke runs of the SAME app code**
+(Gate 38964337680 on `0628f8c9`: A's commits since `230c18f5` change no
+app file — only workflows, scripts, the pricing dry run and notes).
+`e2e/smoke/plans.spec.ts:231`: place one more Deep receptacle (server
+confirms **4**), put the count down, press **Undo** → still **4** after
+20 s. Run 1: tablet-portrait AND tablet-landscape; re-run: landscape only.
+Your run on `230c18f5` passed (223/5).
+
+**What the screen showed** (`overnight-shots/a/13-smoke-undo-mark-failed-tablet-landscape.png`):
+4 marks, the 4th drawn LIGHTER than the other three; Redo grey (nothing was
+undone); Undo still enabled. That fits **no "1 mark placed" undo entry ever
+being pushed** — `flushStamps` pushes it only when `result.ids.length > 0`,
+and `takeoffStamps.drop` returns no ids when `confirmPlacedIds` cannot
+confirm them (interleaved insert on staging — the shared staging DB also
+takes your and C's local smoke runs) or on a key replay whose earlier ids
+are not all known. The Undo then pressed whatever was below it. Suspects,
+in order: (1) your auto-retry (`9150f9b1`) sending the batch twice and the
+second answer racing the first; (2) unconfirmed ids under concurrent
+staging use. Either way the fix is yours: a placed mark with no undo entry
+is a silent dead Undo.
+
+**Effect:** local-dev's smoke is red until this is fixed, which also
+blocks the "Gate + smoke green" check for C's landing and the release.
+
 
 local-dev fast-forwarded `1dbd152e..230c18f5`. Gate 38961289110 green
 (test, deploy-staging, smoke **223 passed / 5 skipped**, 14.3 min); staging
