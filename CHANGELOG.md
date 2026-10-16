@@ -6,6 +6,21 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **"Find all matching" is now tested on plan sheets whose true count is
+  known.** The test builds real PDFs holding receptacles, GFCIs, junction
+  boxes, smoke detectors, light fixtures and switches, plus look-alikes that
+  must not count. They are turned, crowded together, sit next to text and
+  wires, and spread over several sheets. On every symbol, "Confirm all"
+  takes exactly the true ones and none of the look-alikes. Any change that
+  moves these counts now fails the test run.
+- **Boxing one light fixture in a tightly packed ceiling grid gets an honest
+  message.** It used to say "Nothing is drawn inside that box", which was
+  false. It now explains that the fixtures touch, so one can't be told
+  apart, and says to box one that stands alone or tap them instead.
+- **A map of every feature and the test that proves it**
+  (`references/feature-test-map.md`). It lists about 600 features from the
+  whole changelog, with the gaps marked.
+
 - **A plan for stopping oversized plan uploads, with the checks written but
   not switched on.** Today the size an upload declares is checked, but the
   file actually sent is not, so a signed-in user could store far more than

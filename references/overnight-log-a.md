@@ -320,3 +320,39 @@ Nothing pushed except `track-a-night` after step 1's authorised local-dev
 fast-forward. No migrations, no DB rules, no live or staging database. One
 dev server (port 3017, test DB), stopped and verified gone. MySQL 3307 left
 running.
+
+# Run 4 — 2026-10-15 night (second queue)
+
+## Step 1 — land track-a-night on local-dev — 23:36
+
+Fast-forward `a4c97280..26670c62`, no `drizzle/` change. Gate on local-dev
+running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
+
+## Item 2 (part 1) — feature test map — 23:38 → 23:50
+
+- Four read-only search agents read CHANGELOG.md in four slices and looked
+  up each feature's test by name. ~600 rows in
+  `references/feature-test-map.md`, STRONG / WEAK / NONE / REMOVED, with
+  the search terms used for every NONE.
+- Bid-number WEAK rows picked out for tests next: kit after fork, whip dial,
+  edited shipped modifier, priced starter → assembly, locked extras, stale
+  labor rate, dashboard line with no hours, groundwork migrations.
+
+## Counting deep test (owner: most important) — 23:40 →
+
+- `client/src/lib/testPlanPdf.testHelper.ts` writes real PDFs (no
+  library); `client/src/lib/countingDeep.test.ts` reads them through the
+  screen's own pdf.js → vectorGeometry → findMatching path.
+- **Accuracy (before = after, no matcher change needed):** 8 symbol cases on
+  sheet 1 (duplex 10/10, GFCI 3/3, bare circle 3/3, J-box 4/4, smoke 4/4,
+  troffer 6/6, bare rectangle 3/3, switch 5/5); hard sheet duplex 9/11
+  (the two at 45° missed by design); sheet 2 via a sheet-1 template: all
+  found. **Confirm all wrong = 0 everywhere**; every look-alike offered is
+  flagged.
+- **Found:** a troffer in an edge-to-edge grid could not be boxed (every
+  edge and diagonal runs on into neighbours, so all is taken as "lines
+  through") and the screen said "Nothing is drawn inside that box" — false.
+  Now `TOUCHING_SYMBOLS_MESSAGE` says why and what to do. 100% not
+  possible from line work there; the person taps them.
+- **Proved it bites:** MIN_COVERAGE 0.8 → 0.5 made 5 of 13 cases red;
+  restored.
