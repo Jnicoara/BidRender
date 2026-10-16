@@ -28,6 +28,15 @@
   cross-check after all of it: 155 bids, 0 disagreements. **Gate:** first
   real CI run after the merge — 4 red, all tests that had never run in CI
   (A's new public routes; no file store in CI) — fixed; green since.
+- Later: a second local-dev merge (A's bcrypt worker pool, speed limits,
+  golden bids) — C's auth tests now mock `./passwordHashing`; a dead bid
+  link answers in 1 s, not 8 (`lib/queryRetry.ts`); hour suggestions no
+  longer learn from 0-hour close-out lines; the Clients editor has the
+  stale-save guard too; price-list import reports a material named at two
+  prices (Q-IMP1). Local smoke on the merged build: 140 passed.
+- **FOR TRACK B (all in `todo.md` under the `parseTypedNumber` item):**
+  RunTypePicker extra %/makeup (2.5 → 25, Q-QTY3); the Plans screen for a
+  missing bid says "could not load" instead of "could not be opened".
 
 ## 2026-10-15, day — answers, before/after screenshots, two todo items
 
