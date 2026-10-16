@@ -91,6 +91,12 @@ function toBridgeLine(line: {
 
 /** This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`. */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 /**
  * What a counted thing may be called.
@@ -192,7 +198,7 @@ export const takeoffGroupsRouter = router({
    * count following, the list and the drawing disagree with nothing on screen
    * to say which is right.
    */
-  list: procedure
+  list: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);

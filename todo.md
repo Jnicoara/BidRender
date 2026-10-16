@@ -3,6 +3,29 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Field and Co-owner — after FR-M1 (Track B, 2026-10-16, waits for A)
+
+`references/field-and-coowner-plan.md`. **Built on track-b with no column:**
+`plans.view` (Field's only capability; every role has it), the roles' rules
+(`PLANNED_ROLES`, `ROLE_RANK`, `mayGrant`), 17 Plans reads opened to it,
+`bids.fieldList` / `bids.basics`, the Jobs screen, Field's nav, the Plans
+screen view-only for anyone without `bids.edit`, and
+`server/fieldNoPrices.test.ts` (every route in the app, as a Field member).
+Looked at with a real `field` row on a throwaway DB
+(`references/overnight-shots/b/field-*.png`). After A applies FR-M1:
+
+1. Move `"coowner"` and `"field"` from `PLANNED_ROLES` into `COMPANY_ROLES`
+   (stored order: append, as the enum) so `INVITABLE_ROLES` includes Field.
+2. Crew page: offer Field in invites and role changes; offer Co-owner in
+   role changes only, and only to the owner or a co-owner (`mayGrant`).
+3. `companyRouter.setRole` / `setStatus`: the owner may act on a co-owner;
+   co-owners not on each other (already true by `outranks`). Add a test.
+4. `server/fieldNoPrices.test.ts`: store the member as `field` and drop the
+   `capabilitiesFor` mock.
+5. Polish seen 2026-10-16: on a view-only Plans screen each count row still
+   shows its undo and bin icons, greyed (as on a locked bid). Hide them for
+   `viewOnly`.
+
 ## Bid methods — wiring left (Track B, 2026-10-16, waits for A's BM-M1..M10)
 
 `references/bid-methods-plan.md`, all 16 picks approved. **Built on track-b

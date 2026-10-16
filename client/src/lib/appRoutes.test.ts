@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  fieldRoute,
   pathToRoute,
   retiredAddress,
   routeToPath,
@@ -382,5 +383,37 @@ describe("settings sections", () => {
       const path = routeToPath("settings", { view: section });
       expect(pathToRoute(path).view).toBe(section);
     }
+  });
+});
+
+describe("a Field member stays on what they may see", () => {
+  it("keeps the job list, a job's Plans and their account", () => {
+    expect(fieldRoute(pathToRoute("#/jobs"))).toEqual({ route: "jobs" });
+    expect(fieldRoute(pathToRoute("#/bids/12/plans"))).toEqual({
+      route: "takeoff",
+      projectId: 12,
+    });
+    expect(fieldRoute(pathToRoute("#/settings/account"))).toEqual({
+      route: "settings",
+      view: "account",
+    });
+    expect(routeToPath("jobs")).toBe("/jobs");
+  });
+
+  it("sends every money screen to the job list", () => {
+    for (const path of [
+      "#/",
+      "#/dashboard",
+      "#/bids/12",
+      "#/bids/12/proposal",
+      "#/bids/12/count",
+      "#/library/materials",
+      "#/settings/pricing",
+      "#/analytics",
+      "#/clients",
+      "#/team",
+      "#/archive",
+    ])
+      expect(fieldRoute(pathToRoute(path))).toEqual({ route: "jobs" });
   });
 });

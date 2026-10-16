@@ -43,6 +43,7 @@ import BidArchivePage from "@/pages/BidArchivePage";
 import KitsPage from "@/pages/KitsPage";
 import ClientsPage from "@/pages/ClientsPage";
 import TeamPage from "@/pages/TeamPage";
+import FieldJobsPage from "@/pages/FieldJobsPage";
 import AnalyticsPage from "@/pages/AnalyticsPage";
 import FirstRunPage from "@/pages/FirstRunPage";
 import { useCompany } from "@/hooks/useCompany";
@@ -64,6 +65,7 @@ import { APP_VERSION_LABEL } from "@shared/version";
 import { buildAgeLabel, buildStampLabel } from "@shared/buildStamp";
 import { BUILD_STAMP } from "@/lib/buildStamp";
 import {
+  fieldRoute,
   pathToRoute,
   retiredAddress,
   routeToPath,
@@ -98,7 +100,7 @@ export default function BidRenderShell() {
    * item and lands on "you cannot see this" has been shown a door that was
    * never theirs, and hiding it tells them what their account is.
    */
-  const { can } = useCompany();
+  const { can, loading: companyLoading } = useCompany();
   const canSeeAnalytics = can("analytics.view");
 
   // ── URL-based routing using hash ──────────────────────────────────────────
@@ -109,7 +111,26 @@ export default function BidRenderShell() {
   /** Whether the desktop nav is widened — see the aside for what opens it. */
   const [navOpen, setNavOpen] = useState(false);
 
-  const { route, projectId: activeProjectId, view: activeView } = routeState;
+  /*
+    A FIELD member (references/field-and-coowner-plan.md): plans and counts,
+    no money. They see Jobs, a job's Plans and their own account; any other
+    address shows the job list (`fieldRoute`) instead of a screen whose every
+    request the server refuses.
+  */
+  const fieldOnly = can("plans.view") && !can("bids.view");
+  const shownState = fieldOnly ? fieldRoute(routeState) : routeState;
+  useEffect(() => {
+    if (shownState === routeState) return;
+    window.history.replaceState(
+      null,
+      "",
+      `#${routeToPath(shownState.route, {
+        id: shownState.projectId,
+        view: shownState.view,
+      })}`
+    );
+  }, [shownState, routeState]);
+  const { route, projectId: activeProjectId, view: activeView } = shownState;
 
   const navigate = useCallback(
     (
@@ -248,6 +269,11 @@ export default function BidRenderShell() {
 
   // ── Content renderer ───────────────────────────────────────────────────────
   const renderContent = () => {
+    // Not before the role is known: a Field member would otherwise get the
+    // Dashboard for a moment, and its money requests refused.
+    if (companyLoading) return null;
+    if (route === "jobs")
+      return <FieldJobsPage onOpenPlans={id => navigate("takeoff", { id })} />;
     if (isOnDashboard) return dashboard;
     if (isInSettings)
       return (
@@ -290,7 +316,11 @@ export default function BidRenderShell() {
         <TakeoffPage
           key={`takeoff-${activeProjectId}`}
           bidId={activeProjectId}
-          onBack={() => navigate("bids", { id: activeProjectId })}
+          onBack={() =>
+            fieldOnly
+              ? navigate("jobs")
+              : navigate("bids", { id: activeProjectId })
+          }
         />
       );
     }
@@ -527,71 +557,87 @@ export default function BidRenderShell() {
           className="flex flex-col gap-1 p-2 flex-1 overflow-y-auto"
           aria-label="Main"
         >
-          <NavSection label="Work">
-            <NavBtn
-              onClick={() => navigate("dashboard")}
-              isActive={isOnDashboard || isInBids || isInTakeoff}
-              icon={LayoutDashboard}
-              label="Dashboard"
-              title="Dashboard — every bid by stage, and where a new one starts"
-            />
-            {/* Business data about people outside the company, not
+          {/* A Field member's whole nav: their jobs. Everything else in this
+              list is money or company setup (field-and-coowner-plan.md, F3). */}
+          {fieldOnly ? (
+            <NavSection label="Work">
+              <NavBtn
+                onClick={() => navigate("jobs")}
+                isActive={route === "jobs" || isInTakeoff}
+                icon={LayoutDashboard}
+                label="Jobs"
+                title="Jobs — the plans, what was counted, the materials to pull"
+              />
+            </NavSection>
+          ) : (
+            <>
+              <NavSection label="Work">
+                <NavBtn
+                  onClick={() => navigate("dashboard")}
+                  isActive={isOnDashboard || isInBids || isInTakeoff}
+                  icon={LayoutDashboard}
+                  label="Dashboard"
+                  title="Dashboard — every bid by stage, and where a new one starts"
+                />
+                {/* Business data about people outside the company, not
                 configuration — so it stays out here rather than going under
                 Company with the settings. It sits next to the Dashboard
                 because a bid is what it attaches to. */}
-            <NavBtn
-              onClick={() => navigate("clients")}
-              isActive={isInClients}
-              icon={Users}
-              label="Clients"
-              title="Clients — who the work is for"
-            />
-            {/* Last in Work, and only for those who hold the capability. The
+                <NavBtn
+                  onClick={() => navigate("clients")}
+                  isActive={isInClients}
+                  icon={Users}
+                  label="Clients"
+                  title="Clients — who the work is for"
+                />
+                {/* Last in Work, and only for those who hold the capability. The
                 one read-only screen in the app: reporting behind a
                 configuration menu is reporting nobody opens. */}
-            {canSeeAnalytics && (
-              <NavBtn
-                onClick={() => navigate("analytics")}
-                isActive={isInAnalytics}
-                icon={BarChart3}
-                label="Performance"
-                title="Performance — win rate and what the work earned"
-              />
-            )}
-          </NavSection>
+                {canSeeAnalytics && (
+                  <NavBtn
+                    onClick={() => navigate("analytics")}
+                    isActive={isInAnalytics}
+                    icon={BarChart3}
+                    label="Performance"
+                    title="Performance — win rate and what the work earned"
+                  />
+                )}
+              </NavSection>
 
-          <NavSection label="Library">
-            {/* Materials carries its own supply-house lens as a tab. Two nav
+              <NavSection label="Library">
+                {/* Materials carries its own supply-house lens as a tab. Two nav
                 entries for one table meant an estimator had to know which
                 address owned the field they wanted to edit. */}
-            <NavBtn
-              onClick={() => navigate("library-materials")}
-              isActive={isInLibraryMats}
-              icon={Boxes}
-              label="Materials"
-              title="Materials — the catalog, and your supplier's prices on it"
-            />
-            {/* Rare after setup, but it is the first onboarding step and the
+                <NavBtn
+                  onClick={() => navigate("library-materials")}
+                  isActive={isInLibraryMats}
+                  icon={Boxes}
+                  label="Materials"
+                  title="Materials — the catalog, and your supplier's prices on it"
+                />
+                {/* Rare after setup, but it is the first onboarding step and the
                 rate multiplies every line of every bid, so it stays findable
                 on its own rather than becoming a tab. */}
-            <NavBtn
-              onClick={() => navigate("library-labor-rates")}
-              isActive={isInLaborRates}
-              icon={HardHat}
-              label="Labor rates"
-              title="Labor rates — what an hour costs, by role"
-            />
-            {/* Kits and Modifiers are tabs in here: a kit contains assemblies
+                <NavBtn
+                  onClick={() => navigate("library-labor-rates")}
+                  isActive={isInLaborRates}
+                  icon={HardHat}
+                  label="Labor rates"
+                  title="Labor rates — what an hour costs, by role"
+                />
+                {/* Kits and Modifiers are tabs in here: a kit contains assemblies
                 and nothing else, and a modifier adjusts an assembly's labor,
                 so neither means anything without this screen. */}
-            <NavBtn
-              onClick={() => navigate("library-assemblies")}
-              isActive={isInLibraryAsms}
-              icon={Layers}
-              label="Assemblies"
-              title="Assemblies — recipes, kits and job-condition modifiers"
-            />
-          </NavSection>
+                <NavBtn
+                  onClick={() => navigate("library-assemblies")}
+                  isActive={isInLibraryAsms}
+                  icon={Layers}
+                  label="Assemblies"
+                  title="Assemblies — recipes, kits and job-condition modifiers"
+                />
+              </NavSection>
+            </>
+          )}
         </nav>
 
         {/* Company sits outside the scrolling nav so it stays reachable at the
@@ -599,33 +645,45 @@ export default function BidRenderShell() {
         <div className="flex flex-col gap-1 p-2 pt-0 shrink-0">
           <NavSection label="Company">
             <NavBtn
-              onClick={() => navigate("settings")}
+              onClick={() =>
+                fieldOnly
+                  ? navigate("settings", { view: "account" })
+                  : navigate("settings")
+              }
               isActive={isInSettings}
               icon={Settings}
-              label="Settings"
-              title="Settings — pricing defaults, branding, tax and display"
+              label={fieldOnly ? "Account" : "Settings"}
+              title={
+                fieldOnly
+                  ? "Account — your password and sign-out"
+                  : "Settings — pricing defaults, branding, tax and display"
+              }
             />
-            {/* Here rather than in Work: hiring is not a working rhythm, and
+            {!fieldOnly && (
+              <>
+                {/* Here rather than in Work: hiring is not a working rhythm, and
                 this screen is invite codes and role assignment. Shown to every
                 member whatever their role — a viewer needs to be able to find
                 out that they are a viewer. */}
-            <NavBtn
-              onClick={() => navigate("team")}
-              isActive={isInTeam}
-              icon={UsersRound}
-              label="Crew"
-              title="Crew — who can get into this company"
-            />
-            {/* Admin only, and last: nobody else has it, and those who do do
+                <NavBtn
+                  onClick={() => navigate("team")}
+                  isActive={isInTeam}
+                  icon={UsersRound}
+                  label="Crew"
+                  title="Crew — who can get into this company"
+                />
+                {/* Admin only, and last: nobody else has it, and those who do do
                 not need it above the things they use. */}
-            {isAdmin && (
-              <NavBtn
-                onClick={() => navigate("admin")}
-                isActive={isInAdmin}
-                icon={Shield}
-                label="Admin"
-                title="Admin settings"
-              />
+                {isAdmin && (
+                  <NavBtn
+                    onClick={() => navigate("admin")}
+                    isActive={isInAdmin}
+                    icon={Shield}
+                    label="Admin"
+                    title="Admin settings"
+                  />
+                )}
+              </>
             )}
           </NavSection>
         </div>
@@ -703,7 +761,9 @@ export default function BidRenderShell() {
                                 ? "Performance"
                                 : isInAdmin
                                   ? "Admin"
-                                  : "Bid"}
+                                  : route === "jobs"
+                                    ? "Jobs"
+                                    : "Bid"}
             </span>
           </div>
         </header>
@@ -749,39 +809,53 @@ export default function BidRenderShell() {
           )}
           aria-label="Main"
         >
-          {(
-            [
-              {
-                label: "Dashboard",
-                icon: LayoutDashboard,
-                active: isOnDashboard || isInBids || isInTakeoff,
-                go: () => navigate("dashboard"),
-              },
-              {
-                label: "Clients",
-                icon: Users,
-                active: isInClients,
-                go: () => navigate("clients"),
-              },
-              {
-                label: "Materials",
-                icon: Boxes,
-                active: isInLibraryMats,
-                go: () => navigate("library-materials"),
-              },
-              {
-                label: "Assemblies",
-                icon: Layers,
-                active: isInLibraryAsms,
-                go: () => navigate("library-assemblies"),
-              },
-              {
-                label: "Settings",
-                icon: Settings,
-                active: isInSettings,
-                go: () => navigate("settings"),
-              },
-            ] as const
+          {(fieldOnly
+            ? ([
+                {
+                  label: "Jobs",
+                  icon: LayoutDashboard,
+                  active: route === "jobs" || isInTakeoff,
+                  go: () => navigate("jobs"),
+                },
+                {
+                  label: "Account",
+                  icon: Settings,
+                  active: isInSettings,
+                  go: () => navigate("settings", { view: "account" }),
+                },
+              ] as const)
+            : ([
+                {
+                  label: "Dashboard",
+                  icon: LayoutDashboard,
+                  active: isOnDashboard || isInBids || isInTakeoff,
+                  go: () => navigate("dashboard"),
+                },
+                {
+                  label: "Clients",
+                  icon: Users,
+                  active: isInClients,
+                  go: () => navigate("clients"),
+                },
+                {
+                  label: "Materials",
+                  icon: Boxes,
+                  active: isInLibraryMats,
+                  go: () => navigate("library-materials"),
+                },
+                {
+                  label: "Assemblies",
+                  icon: Layers,
+                  active: isInLibraryAsms,
+                  go: () => navigate("library-assemblies"),
+                },
+                {
+                  label: "Settings",
+                  icon: Settings,
+                  active: isInSettings,
+                  go: () => navigate("settings"),
+                },
+              ] as const)
           ).map(item => (
             <button
               key={item.label}

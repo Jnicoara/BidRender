@@ -28,6 +28,7 @@ export type Route =
   | "bids"
   | "clients"
   | "team"
+  | "jobs"
   | "analytics"
   | "count"
   | "takeoff"
@@ -219,6 +220,8 @@ export function pathToRoute(path: string): RouteState {
   }
   if (p === "clients") return { route: "clients" };
   if (p === "team") return { route: "team" };
+  // A Field member's home: the jobs, no money (field-and-coowner-plan.md).
+  if (p === "jobs") return { route: "jobs" };
   if (p === "analytics") return { route: "analytics" };
   if (p === "welcome") return { route: "welcome" };
   // Library § …. Bare /library lands on Materials.
@@ -287,4 +290,19 @@ export function routeToPath(
     default:
       return `/${route}`;
   }
+}
+
+/**
+ * Where a FIELD member may be (references/field-and-coowner-plan.md, F3):
+ * the job list, a job's Plans, and their own account settings. Anything else
+ * — a bookmark, a link someone sent, the default landing — goes to the job
+ * list rather than to a screen whose every request would be refused. The
+ * server refuses those requests anyway (server/fieldNoPrices.test.ts); this
+ * is what keeps the screen from showing a wall of refusals.
+ */
+export function fieldRoute(state: RouteState): RouteState {
+  if (state.route === "jobs") return state;
+  if (state.route === "takeoff" && state.projectId) return state;
+  if (state.route === "settings" && state.view === "account") return state;
+  return { route: "jobs" };
 }

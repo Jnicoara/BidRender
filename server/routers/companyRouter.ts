@@ -39,6 +39,7 @@ import {
   inviteRejection,
   inviteStatus,
   inviteUsable,
+  mayGrant,
   outranks,
   type CompanyRole,
 } from "../../shared/permissions";
@@ -144,6 +145,11 @@ export const companyRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      if (!mayGrant(ctx.scope.role, input.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You cannot hand out a role above your own.",
+        });
       const code = generateInviteCode();
       // A pending invitation holds a seat (shared/seats.ts), so this is
       // refused when none is free — checked under the company row's lock.
@@ -317,6 +323,11 @@ export const companyRouter = router({
         });
       }
 
+      if (!mayGrant(ctx.scope.role, input.role))
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You cannot hand out a role above your own.",
+        });
       await db.setMemberRole(ctx.scope.companyId, input.userId, input.role);
       return { success: true };
     }),

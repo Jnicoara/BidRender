@@ -122,6 +122,12 @@ import {
  * without anyone remembering to tag it. See _core/trpc.ts.
  */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 const nameSchema = z.string().trim().min(1).max(255);
 
@@ -319,7 +325,7 @@ export const takeoffRunsRouter = router({
    * The UI asks before enabling the tool so it can show the actual reason and
    * the way out, rather than a disabled button with no explanation.
    */
-  measurability: procedure
+  measurability: plansRead
     .input(z.object({ sheetId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
@@ -327,7 +333,7 @@ export const takeoffRunsRouter = router({
     }),
 
   /** Every run on a sheet, with its measured quantities where possible. */
-  listForSheet: procedure
+  listForSheet: plansRead
     .input(z.object({ sheetId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const sheet = await requireSheet(input.sheetId, ctx.scope.dataUserId);
@@ -1786,7 +1792,7 @@ export const takeoffRunsRouter = router({
    * many runs have no type (with their feet, which is what somebody would go
    * hunting for), how many are branch wiring, and how many drafts are in.
    */
-  totals: procedure
+  totals: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
@@ -2245,7 +2251,7 @@ export const takeoffRunsRouter = router({
    * runs only; they moved together, which is the point of this sentence.) What
    * is left out is COUNTED and returned, never dropped in silence.
    */
-  drops: procedure
+  drops: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
@@ -2378,7 +2384,7 @@ export const takeoffRunsRouter = router({
    * with every other run query, so a new type's first run takes its slot as
    * soon as it is saved.
    */
-  typeColors: procedure
+  typeColors: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;

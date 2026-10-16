@@ -3245,7 +3245,21 @@ export default function TakeoffPage({
   onBack: () => void;
 }) {
   const utils = trpc.useUtils();
-  const { data: bid, error: bidError } = trpc.bids.get.useQuery(
+  /*
+    WHO IS LOOKING. A Field member holds `plans.view` only
+    (references/field-and-coowner-plan.md): every query below that carries a
+    price waits on `fullAccess`, so a Field session never sends one — the
+    server would refuse it anyway, and a refusal is not a thing to show a
+    crew member. Without `bids.edit` nothing on this screen can be changed.
+  */
+  const access = useCompany();
+  const fullAccess = access.can("bids.view");
+  const canEdit = access.can("bids.edit");
+  /*
+    The header needs the bid's NAME, and `bids.get` carries every price on
+    the bid; `bids.basics` carries no money, so every role reads this one.
+  */
+  const { data: bid, error: bidError } = trpc.bids.basics.useQuery(
     { id: bidId },
     { retry: retryUnlessMissing }
   );
@@ -5045,14 +5059,16 @@ export default function TakeoffPage({
       pageCount: number;
       outline: { pageNumber: number; title: string }[];
     }) => {
-      if (!doc) return;
+      // Writes sheet rows: only for someone who may change this bid. A
+      // viewer or Field member reads the rows the uploader's open made.
+      if (!doc || !canEdit) return;
       ensureSheets.mutate({
         bidPdfId: doc.id,
         pageCount: info.pageCount,
         outline: info.outline,
       });
     },
-    [doc?.id]
+    [doc?.id, canEdit]
   );
 
   // ── Tracing: queries, autosave, recovery ──────────────────────────────────
@@ -5526,8 +5542,14 @@ export default function TakeoffPage({
     // effect re-run per call would sync again on its own success.
   }, [circuitReport, activeSheet?.id, homerunData, bidId]);
 
-  const { data: symbols = [] } = trpc.takeoffStamps.symbols.useQuery();
-  const { data: allAssemblies = [] } = trpc.assemblies.list.useQuery();
+  const { data: symbols = [] } = trpc.takeoffStamps.symbols.useQuery(
+    undefined,
+    { enabled: fullAccess }
+  );
+  const { data: allAssemblies = [] } = trpc.assemblies.list.useQuery(
+    undefined,
+    { enabled: fullAccess }
+  );
 
   /**
    * The catalog, for the run-type pickers.
@@ -5536,7 +5558,9 @@ export default function TakeoffPage({
    * key and the Count picker's materials will want the same rows — one request
    * either way, and the page is where the other library lists already live.
    */
-  const { data: allMaterials = [] } = trpc.materials.list.useQuery();
+  const { data: allMaterials = [] } = trpc.materials.list.useQuery(undefined, {
+    enabled: fullAccess,
+  });
 
   /*
     Marks PLACED. The count list is bid-wide and refreshed on every batch,
@@ -5577,7 +5601,7 @@ export default function TakeoffPage({
   /** The palette: shipped types and this contractor's own, in one list. */
   const runTypes = trpc.takeoffRunTypes.list.useQuery(
     { includeArchived: false },
-    { staleTime: 60_000 }
+    { staleTime: 60_000, enabled: fullAccess }
   );
   const createRunType = trpc.takeoffRunTypes.create.useMutation({
     onError: e => toast.error(e.message),
@@ -5795,6 +5819,14 @@ export default function TakeoffPage({
    * `takeoffGroups.list` — the claim is a guard rather than a sentence.
    */
   const quantitiesLocked = bidCounts.data?.quantitiesLockedAt != null;
+  /**
+   * Nothing on this screen can change: the bid is locked, OR this person may
+   * not edit bids (a viewer, a Field member). Every tool, button and early
+   * return reads THIS; only the words that say "locked" read the lock
+   * itself, because "unlock the bid first" is false to someone who cannot
+   * edit at all.
+   */
+  const marksFrozen = quantitiesLocked || !canEdit;
 
   /*
     ── THE STATUS VIEW (status-and-scope-plan § 1a / 1b) ──────────────────
@@ -5817,7 +5849,7 @@ export default function TakeoffPage({
         focus: statusFocus,
         workTag: activeWorkTag,
         newMarksHere: newMarkIdsHere.length,
-        locked: quantitiesLocked,
+        locked: marksFrozen,
         twins: twinCountWarnings(bidCounts.data?.groups ?? []),
       }),
     [
@@ -5826,7 +5858,7 @@ export default function TakeoffPage({
       statusFocus,
       activeWorkTag,
       newMarkIdsHere.length,
-      quantitiesLocked,
+      marksFrozen,
     ]
   );
   /** A sheet named the way the sheet chip names it: its number, else title. */
@@ -5859,7 +5891,7 @@ export default function TakeoffPage({
   */
   const unconfirmedList = trpc.takeoffStamps.unconfirmedForBid.useQuery(
     { bidId },
-    { enabled: statusStrip.offerCheck !== null }
+    { enabled: fullAccess && statusStrip.offerCheck !== null }
   );
   const [checkingId, setCheckingId] = useState<number | null>(null);
   const [checkSkipped, setCheckSkipped] = useState<ReadonlySet<number>>(
@@ -6087,7 +6119,7 @@ export default function TakeoffPage({
   });
   const askDeleteCount = useCallback(
     (groupId: number) => {
-      if (quantitiesLocked) {
+      if (marksFrozen) {
         toast.error(lockedEditRefusal("its counts cannot be deleted"));
         return;
       }
@@ -6105,7 +6137,7 @@ export default function TakeoffPage({
         q: countDeleteQuestion({ label: row.label, marks: row.count }),
       });
     },
-    [quantitiesLocked, bidCounts.data, bridgeByGroup]
+    [marksFrozen, bidCounts.data, bridgeByGroup]
   );
 
   /*
@@ -6115,7 +6147,7 @@ export default function TakeoffPage({
   */
   const bidSummary = trpc.takeoffSummary.forBid.useQuery(
     { bidId },
-    { enabled: Number.isFinite(bidId) }
+    { enabled: fullAccess && Number.isFinite(bidId) }
   );
   const sendAll = trpc.takeoffSummary.sendAll.useMutation({
     onError: e => toast.error(e.message),
@@ -6149,7 +6181,7 @@ export default function TakeoffPage({
         is drawn at once and sent later, so a refusal arriving then would
         leave marks on the screen that were never counted.
       */
-      if (quantitiesLocked) {
+      if (marksFrozen) {
         toast.error(lockedEditRefusal("new marks cannot be placed"));
         return;
       }
@@ -6177,7 +6209,7 @@ export default function TakeoffPage({
       saveLastCount(bidId, last);
       toast.success(`Counting ${group.label} — click to place.`);
     },
-    [quantitiesLocked, bidId]
+    [marksFrozen, bidId]
   );
 
   /** A mark delete as an undo step: the packet puts them back, same ids. */
@@ -6861,7 +6893,7 @@ export default function TakeoffPage({
 
   const { data: copilot } = trpc.planCopilot.state.useQuery(
     { sheetId: activeSheet?.id ?? 0 },
-    { enabled: Boolean(activeSheet) && readerAvailable }
+    { enabled: fullAccess && Boolean(activeSheet) && readerAvailable }
   );
 
   const refreshCopilot = useCallback(() => {
@@ -7314,7 +7346,7 @@ export default function TakeoffPage({
       create: () => Promise<{ id: number; label: string }>,
       afterCreate?: () => void
     ) => {
-      if (quantitiesLocked) {
+      if (marksFrozen) {
         toast.error(lockedEditRefusal("new marks cannot be placed"));
         return;
       }
@@ -7369,7 +7401,7 @@ export default function TakeoffPage({
             );
         });
     },
-    [bidId, quantitiesLocked, armGroup, flushStamps, mirrorQueue, setPending]
+    [bidId, marksFrozen, armGroup, flushStamps, mirrorQueue, setPending]
   );
 
   /**
@@ -7380,7 +7412,7 @@ export default function TakeoffPage({
    */
   const countThese = useMemo(
     () =>
-      quantitiesLocked
+      marksFrozen
         ? undefined
         : (label: string) =>
             armWhileCreating(
@@ -7395,7 +7427,7 @@ export default function TakeoffPage({
                 }),
               () => void utils.takeoffGroups.list.invalidate({ bidId })
             ),
-    [quantitiesLocked, armWhileCreating, createGroup, bidId, utils]
+    [marksFrozen, armWhileCreating, createGroup, bidId, utils]
   );
 
   /**
@@ -7471,8 +7503,8 @@ export default function TakeoffPage({
     );
   }, [activeSheet?.id]);
   useEffect(() => {
-    if (quantitiesLocked) setFindSession(null);
-  }, [quantitiesLocked]);
+    if (marksFrozen) setFindSession(null);
+  }, [marksFrozen]);
 
   /** Queue marks under a count that need not be the armed one. */
   const queueMarksFor = useCallback(
@@ -7529,7 +7561,7 @@ export default function TakeoffPage({
     splitExistingToRemain(findSession.group.label).existing;
 
   const startFind = useCallback(() => {
-    if (!activeSheet || !armedGroup || quantitiesLocked) return;
+    if (!activeSheet || !armedGroup || marksFrozen) return;
     setSelectingText(false);
     const sheetId = activeSheet.id;
     setFindSession({
@@ -7563,7 +7595,7 @@ export default function TakeoffPage({
       .catch(() => {
         /* no looks: the box alone, which is what the panel then offers */
       });
-  }, [activeSheet?.id, armedGroup, quantitiesLocked, symbols, utils]);
+  }, [activeSheet?.id, armedGroup, marksFrozen, symbols, utils]);
 
   const runFind = useCallback(
     async (
@@ -8405,7 +8437,7 @@ export default function TakeoffPage({
         e.preventDefault();
         // Said here rather than left to the server's refusal: the key used
         // to send a request that could only come back refused (§ 1.2 a).
-        if (quantitiesLocked) {
+        if (marksFrozen) {
           toast.error(lockedEditRefusal("its marks cannot be deleted"));
           return;
         }
@@ -8423,7 +8455,7 @@ export default function TakeoffPage({
     armedGroup,
     deleteSelected,
     confirmingDelete,
-    quantitiesLocked,
+    marksFrozen,
   ]);
 
   /**
@@ -8864,7 +8896,7 @@ export default function TakeoffPage({
   const askRemoveRun = useCallback(
     (id: number) => {
       if (removeRun.isPending) return;
-      if (quantitiesLocked) {
+      if (marksFrozen) {
         toast.error(lockedEditRefusal("its runs cannot be deleted"));
         return;
       }
@@ -8877,7 +8909,7 @@ export default function TakeoffPage({
       const network = runs.filter(r => r.id === id || r.parentRunId === id);
       setRunDeleteAsk({ id, q: runDeleteQuestion(network) });
     },
-    [removeRun, quantitiesLocked, runs]
+    [removeRun, marksFrozen, runs]
   );
 
   const deleteSelection = useCallback(() => {
@@ -8900,7 +8932,7 @@ export default function TakeoffPage({
       selectedStampIds.size > 0 ||
       tracing ||
       armedGroup ||
-      quantitiesLocked
+      marksFrozen
     )
       return;
     const onKey = (e: KeyboardEvent) => {
@@ -8925,7 +8957,7 @@ export default function TakeoffPage({
     selectedStampIds,
     tracing,
     armedGroup,
-    quantitiesLocked,
+    marksFrozen,
     deleteSelection,
   ]);
 
@@ -9412,7 +9444,7 @@ export default function TakeoffPage({
    */
   const runTypeBridge = trpc.takeoffRunTypes.bridgeForBid.useQuery(
     { bidId },
-    { enabled: Number.isFinite(bidId) }
+    { enabled: fullAccess && Number.isFinite(bidId) }
   );
   const [sendingRunTypeId, setSendingRunTypeId] = useState<number | null>(null);
   const sendRunType = trpc.takeoffRunTypes.sendToBid.useMutation({
@@ -9571,7 +9603,7 @@ export default function TakeoffPage({
     (pathType: RunPathType) => {
       // Same reason as `armGroup`: a trace autosaves as it goes, and every
       // save of it would be refused on a locked bid.
-      if (quantitiesLocked) {
+      if (marksFrozen) {
         toast.error(lockedEditRefusal("new runs cannot be traced"));
         return;
       }
@@ -9584,7 +9616,7 @@ export default function TakeoffPage({
       setTracing(true);
       setSelectedRunId(null);
     },
-    [resetLegs, quantitiesLocked]
+    [resetLegs, marksFrozen]
   );
 
   /**
@@ -9791,7 +9823,7 @@ export default function TakeoffPage({
       pathType: RunPathType;
       traceMode: TraceMode;
     }) => {
-      if (quantitiesLocked) {
+      if (marksFrozen) {
         toast.error(lockedEditRefusal("legs cannot be added"));
         return;
       }
@@ -9807,7 +9839,7 @@ export default function TakeoffPage({
       setTracing(true);
       setSelectedRunId(null);
     },
-    [quantitiesLocked]
+    [marksFrozen]
   );
 
   const finishTrace = useCallback(async () => {
@@ -9905,10 +9937,10 @@ export default function TakeoffPage({
     moment the lock is known, whatever is in hand is put down.
   */
   useEffect(() => {
-    if (!quantitiesLocked) return;
+    if (!marksFrozen) return;
     setArmedGroup(null);
     if (tracing) cancelTrace();
-  }, [quantitiesLocked, tracing, cancelTrace]);
+  }, [marksFrozen, tracing, cancelTrace]);
 
   /*
     THE SHEET CHANGED: whatever was in hand is put down, and stays down.
@@ -9996,17 +10028,18 @@ export default function TakeoffPage({
           earlyPageText.current.set(earlyTextKey(doc.id, pageNumber), text);
         return;
       }
-      if (sheet.scaleSource !== "none") return;
+      // Detecting a scale WRITES it: only for someone who may change the bid.
+      if (sheet.scaleSource !== "none" || !canEdit) return;
       detectScale.mutate({ id: sheet.id, sheetText: text });
     },
-    [sheets, doc]
+    [sheets, doc, canEdit]
   );
 
   // Pages read before their sheet rows existed: detect them now (above).
   const earlyPageText = useRef<Map<string, string>>(new Map());
   const scaleCatchUpAsked = useRef<Set<number>>(new Set());
   useEffect(() => {
-    if (!doc) return;
+    if (!doc || !canEdit) return;
     for (const { sheetId, text } of sheetsToCatchUp(
       doc.id,
       sheets,
@@ -10508,7 +10541,8 @@ export default function TakeoffPage({
               className="h-8 gap-1.5 text-xs"
               onClick={onBack}
             >
-              <ArrowLeft className="w-3.5 h-3.5" /> Bid
+              <ArrowLeft className="w-3.5 h-3.5" />{" "}
+              {fullAccess ? "Bid" : "Jobs"}
             </Button>
             <div className={cn("flex-1 min-w-0", !phone && "basis-56")}>
               <h1
@@ -10517,7 +10551,7 @@ export default function TakeoffPage({
                   phone ? "text-base" : "text-lg"
                 )}
               >
-                Plans{bid?.bid?.name ? ` — ${bid.bid.name}` : ""}
+                Plans{bid?.name ? ` — ${bid.name}` : ""}
               </h1>
               {/*
                 Corrected 2026-09-21. This read "Counts feed the materials
@@ -10533,9 +10567,18 @@ export default function TakeoffPage({
                   the screen is for (device audit, 2026-10-01). */}
               {!compact && (
                 <p className="text-xs text-muted-foreground">
-                  Set each sheet&apos;s scale, then mark and trace what is on
-                  it. Counts you send to the bid change its price; the rest stay
-                  here until you do.
+                  {canEdit ? (
+                    <>
+                      Set each sheet&apos;s scale, then mark and trace what is
+                      on it. Counts you send to the bid change its price; the
+                      rest stay here until you do.
+                    </>
+                  ) : (
+                    <>
+                      Each sheet, what was counted and traced on it, and the
+                      materials list. View only.
+                    </>
+                  )}
                 </p>
               )}
             </div>
@@ -10561,10 +10604,16 @@ export default function TakeoffPage({
                   <DropdownMenuItem onSelect={() => setMaterialsListOpen(true)}>
                     <ClipboardList className="w-3.5 h-3.5" /> Materials list
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setTakeoffExportOpen(true)}>
-                    <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
-                  </DropdownMenuItem>
-                  {docs.length > 0 && (
+                  {/* The export can carry prices; Add PDF writes. Neither is a
+                      view-only member's (field-and-coowner-plan.md). */}
+                  {fullAccess && (
+                    <DropdownMenuItem
+                      onSelect={() => setTakeoffExportOpen(true)}
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
+                    </DropdownMenuItem>
+                  )}
+                  {canEdit && docs.length > 0 && (
                     <DropdownMenuItem
                       disabled={uploading}
                       onSelect={() => fileInput.current?.click()}
@@ -10595,16 +10644,18 @@ export default function TakeoffPage({
                 {/* The takeoff itself, by sheet and type — the door out to a
                 spreadsheet. Beside the materials list because both are files
                 that leave the app; outlined, like it. */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5 text-xs shrink-0"
-                  onClick={() => setTakeoffExportOpen(true)}
-                  title="Every count and run, by sheet and type — prices only if you ask"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
-                </Button>
-                {docs.length > 0 && (
+                {fullAccess && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-xs shrink-0"
+                    onClick={() => setTakeoffExportOpen(true)}
+                    title="Every count and run, by sheet and type — prices only if you ask"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Export takeoff
+                  </Button>
+                )}
+                {canEdit && docs.length > 0 && (
                   <Button
                     size="sm"
                     className="h-8 gap-1.5 text-xs shrink-0"
@@ -10671,7 +10722,7 @@ export default function TakeoffPage({
 
           {/* The sheet's own menu: where a destructive action lives, rather
               than as a button always on show (Clear this sheet, D6 override). */}
-          {activeSheet && (
+          {canEdit && activeSheet && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -10687,12 +10738,12 @@ export default function TakeoffPage({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 <DropdownMenuItem
-                  disabled={quantitiesLocked}
+                  disabled={marksFrozen}
                   onSelect={() => setConfirmClear(true)}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  {quantitiesLocked
+                  {marksFrozen
                     ? "Clear this sheet — unlock the bid first"
                     : "Clear all marks and runs on this sheet…"}
                 </DropdownMenuItem>
@@ -10776,9 +10827,14 @@ export default function TakeoffPage({
             />
           )}
 
-          <div className="w-px h-4 bg-border" />
+          {/* Every tool from here to the tools menu changes the plans: none
+              is shown to someone who cannot edit (a viewer, a Field member).
+              The sheet chip, zoom and focus stay. */}
+          {canEdit && (
+            <>
+              <div className="w-px h-4 bg-border" />
 
-          {/*
+              {/*
             ── COUNT ────────────────────────────────────────────────────────
 
             First, and alone in its group, because it is the tool that ALWAYS
@@ -10795,23 +10851,23 @@ export default function TakeoffPage({
             "these two are a kind, and they need something" without spending a
             pixel of width on saying so.
           */}
-          {armedGroup ? (
-            /*
+              {armedGroup ? (
+                /*
               Outside the measurability gate on purpose. The control that says
               what is being stamped — and the only way to stop — must not
               disappear on an unscaled sheet.
             */
-            <>
-              <Button
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => setArmedGroup(null)}
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                Counting {armedGroup.label}
-                <X className="w-3 h-3" />
-              </Button>
-              {/*
+                <>
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => setArmedGroup(null)}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    Counting {armedGroup.label}
+                    <X className="w-3 h-3" />
+                  </Button>
+                  {/*
                 PLACING AS — beside the count it qualifies, and only while one
                 is armed, which is the only time it does anything. Two
                 choices, not the four "Mark as…" offers: a run of existing
@@ -10819,208 +10875,217 @@ export default function TakeoffPage({
                 are set on a selection afterwards. Sticky (see
                 `placingStatus`). Not on a locked bid, which takes no marks.
               */}
-              {!quantitiesLocked && (
-                <div
-                  role="group"
-                  aria-label="Place marks as"
-                  className="inline-flex h-7 items-center rounded-md border border-border p-0.5 text-xs"
-                >
-                  {/* Remove joins New and Existing on a demo sheet only
+                  {!marksFrozen && (
+                    <div
+                      role="group"
+                      aria-label="Place marks as"
+                      className="inline-flex h-7 items-center rounded-md border border-border p-0.5 text-xs"
+                    >
+                      {/* Remove joins New and Existing on a demo sheet only
                       (@shared/sheetWorkTag `placingChoices`), so the basic
                       path keeps its two buttons. */}
-                  {placingChoices(activeWorkTag, placingStatus).map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-pressed={placingStatus === s}
-                      onClick={() => choosePlacing(s)}
-                      title={
-                        s === "new"
-                          ? "Place new devices — counted and priced on the bid"
-                          : s === "existing"
-                            ? "Place existing devices to remain — drawn hollow, not priced"
-                            : "Place devices to remove — drawn with an X, priced as remove labor"
-                      }
-                      className={`h-full rounded px-2 transition-colors ${
-                        placingStatus === s
-                          ? s === "new"
-                            ? "bg-primary text-primary-foreground"
+                      {placingChoices(activeWorkTag, placingStatus).map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={placingStatus === s}
+                          onClick={() => choosePlacing(s)}
+                          title={
+                            s === "new"
+                              ? "Place new devices — counted and priced on the bid"
+                              : s === "existing"
+                                ? "Place existing devices to remain — drawn hollow, not priced"
+                                : "Place devices to remove — drawn with an X, priced as remove labor"
+                          }
+                          className={`h-full rounded px-2 transition-colors ${
+                            placingStatus === s
+                              ? s === "new"
+                                ? "bg-primary text-primary-foreground"
+                                : s === "existing"
+                                  ? "bg-amber-500 text-black"
+                                  : "bg-red-600 text-white"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {s === "new"
+                            ? "New"
                             : s === "existing"
-                              ? "bg-amber-500 text-black"
-                              : "bg-red-600 text-white"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {s === "new"
-                        ? "New"
-                        : s === "existing"
-                          ? "Existing"
-                          : "Remove"}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            activeSheet &&
-            !tracing && (
-              <>
-                <StampPicker
-                  buildBidId={bidId}
-                  assemblies={allAssemblies.map(a => ({
-                    id: a.id,
-                    name: a.name,
-                    category: a.category ?? null,
-                  }))}
-                  disabled={allAssemblies.length === 0}
-                  onRefused={
-                    quantitiesLocked
-                      ? () =>
-                          toast.error(
-                            lockedEditRefusal("new marks cannot be placed")
-                          )
-                      : undefined
-                  }
-                  /*
+                              ? "Existing"
+                              : "Remove"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                activeSheet &&
+                !tracing && (
+                  <>
+                    <StampPicker
+                      buildBidId={bidId}
+                      assemblies={allAssemblies.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        category: a.category ?? null,
+                      }))}
+                      disabled={allAssemblies.length === 0}
+                      onRefused={
+                        marksFrozen
+                          ? () =>
+                              toast.error(
+                                lockedEditRefusal("new marks cannot be placed")
+                              )
+                          : undefined
+                      }
+                      /*
                   Several items sharing one assembly each have their own count
                   (shared/assemblyCounts.ts), and the picker has no symbol to
                   say which — so it asks, from the counts this bid already has.
                 */
-                  countsOf={assemblyId =>
-                    (bidCounts.data?.groups ?? []).filter(
-                      g => g.assemblyId === assemblyId
-                    )
-                  }
-                  onPickCount={(count, assemblyId) =>
-                    armGroup(count, assemblyId)
-                  }
-                  onPick={assembly => {
-                    // Armed at once; clicks before the count exists are kept
-                    // (armWhileCreating). The mutation's onError says why a
-                    // refusal happened, armWhileCreating what it cost.
-                    armWhileCreating(assembly.name, assembly.id, null, () =>
-                      groupForAssembly.mutateAsync({
-                        bidId,
-                        assemblyId: assembly.id,
-                      })
-                    );
-                  }}
-                  onCountPlain={label => {
-                    // A duplicate name is refused by name, and said so.
-                    armWhileCreating(label, null, null, () =>
-                      createGroup.mutateAsync({ bidId, label })
-                    );
-                  }}
-                  onJustCount={() =>
-                    armWhileCreating(UNASSIGNED_COUNT_NAME, null, null, () =>
-                      unassignedGroup.mutateAsync({ bidId })
-                    )
-                  }
-                />
-                {/*
+                      countsOf={assemblyId =>
+                        (bidCounts.data?.groups ?? []).filter(
+                          g => g.assemblyId === assemblyId
+                        )
+                      }
+                      onPickCount={(count, assemblyId) =>
+                        armGroup(count, assemblyId)
+                      }
+                      onPick={assembly => {
+                        // Armed at once; clicks before the count exists are kept
+                        // (armWhileCreating). The mutation's onError says why a
+                        // refusal happened, armWhileCreating what it cost.
+                        armWhileCreating(assembly.name, assembly.id, null, () =>
+                          groupForAssembly.mutateAsync({
+                            bidId,
+                            assemblyId: assembly.id,
+                          })
+                        );
+                      }}
+                      onCountPlain={label => {
+                        // A duplicate name is refused by name, and said so.
+                        armWhileCreating(label, null, null, () =>
+                          createGroup.mutateAsync({ bidId, label })
+                        );
+                      }}
+                      onJustCount={() =>
+                        armWhileCreating(
+                          UNASSIGNED_COUNT_NAME,
+                          null,
+                          null,
+                          () => unassignedGroup.mutateAsync({ bidId })
+                        )
+                      }
+                    />
+                    {/*
                 COUNT AGAIN (pin plan § 11.6). A sheet change puts the count
                 down; this puts the last one back in one click, on the sheet
                 the person now means. Never by itself.
               */}
-                {countAgain && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 gap-1.5 text-xs max-w-[12rem]"
-                    onClick={() => armGroup(countAgain, countAgain.assemblyId)}
-                    title={`Count ${countAgain.label} again (R)`}
-                    aria-label={`Count ${countAgain.label} again`}
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">Again: {countAgain.label}</span>
-                  </Button>
-                )}
-              </>
-            )
-          )}
+                    {countAgain && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1.5 text-xs max-w-[12rem]"
+                        onClick={() =>
+                          armGroup(countAgain, countAgain.assemblyId)
+                        }
+                        title={`Count ${countAgain.label} again (R)`}
+                        aria-label={`Count ${countAgain.label} again`}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">
+                          Again: {countAgain.label}
+                        </span>
+                      </Button>
+                    )}
+                  </>
+                )
+              )}
 
-          {/*
+              {/*
             CANCEL, ON SCREEN, for the box tools (device audit, touch #30).
             With a mouse these stop with Esc or the Legend panel's Cancel; on
             a tablet there is no Esc, and on a phone the panel has just put
             itself away so the box can be drawn. So the bar says what is armed
             and how to put it down, the same way "Counting X ✕" does.
           */}
-          {(coarse || phone) &&
-            (capturingSymbol || capturingLegend || findBoxing) && (
-              <Button
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={() => {
-                  setCapturingSymbol(false);
-                  setCapturingLegend(false);
-                  if (findBoxing) setFindSession(null);
-                }}
-              >
-                {capturingLegend
-                  ? "Boxing the legend"
-                  : findBoxing
-                    ? "Box one symbol to find"
-                    : "Box a symbol to capture"}
-                <X className="w-3 h-3" />
-                <span className="sr-only">Cancel</span>
-              </Button>
-            )}
+              {(coarse || phone) &&
+                (capturingSymbol || capturingLegend || findBoxing) && (
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => {
+                      setCapturingSymbol(false);
+                      setCapturingLegend(false);
+                      if (findBoxing) setFindSession(null);
+                    }}
+                  >
+                    {capturingLegend
+                      ? "Boxing the legend"
+                      : findBoxing
+                        ? "Box one symbol to find"
+                        : "Box a symbol to capture"}
+                    <X className="w-3 h-3" />
+                    <span className="sr-only">Cancel</span>
+                  </Button>
+                )}
 
-          {/*
+              {/*
             FIND ALL MATCHING sits beside the count it fills, and only there:
             what it finds is offered AS the armed count, so with nothing armed
             it would have nothing to offer them as. Not on a locked bid, which
             takes no new marks.
           */}
-          {!phone &&
-            armedGroup &&
-            activeSheet &&
-            !tracing &&
-            !quantitiesLocked && (
-              <Button
-                size="sm"
-                variant={findSession ? "secondary" : "outline"}
-                className="h-7 gap-1.5 text-xs"
-                onClick={() =>
-                  findSession ? setFindSession(null) : startFind()
-                }
-                title="Box one symbol and find every copy of it on this sheet. Nothing is counted until you confirm it."
-                aria-pressed={Boolean(findSession)}
-              >
-                <ScanSearch className="w-3.5 h-3.5" />
-                Find all matching
-              </Button>
-            )}
-          {/*
+              {!phone &&
+                armedGroup &&
+                activeSheet &&
+                !tracing &&
+                !marksFrozen && (
+                  <Button
+                    size="sm"
+                    variant={findSession ? "secondary" : "outline"}
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() =>
+                      findSession ? setFindSession(null) : startFind()
+                    }
+                    title="Box one symbol and find every copy of it on this sheet. Nothing is counted until you confirm it."
+                    aria-pressed={Boolean(findSession)}
+                  >
+                    <ScanSearch className="w-3.5 h-3.5" />
+                    Find all matching
+                  </Button>
+                )}
+              {/*
             CHECK SHEET needs no armed count: it reads every count on the
             sheet against the legend. Shown on a locked bid too — there it is
             a report with no buttons. Not on a phone, which reads rather than
             counts (Track B's device rule), like Find all matching beside it.
           */}
-          {!phone && activeSheet && !tracing && (
-            <Button
-              size="sm"
-              variant={checkSession ? "secondary" : "outline"}
-              className="h-7 gap-1.5 text-xs"
-              onClick={() =>
-                checkSession ? setCheckSession(null) : startCheck()
-              }
-              title={
-                sessionLegend
-                  ? `Compare every mark on this sheet with the legend on ${sessionLegend.sheetName}. Nothing changes until you press a button.`
-                  : "Compare every mark on this sheet with the legend. Read the legend first with Whole legend."
-              }
-              aria-pressed={Boolean(checkSession)}
-            >
-              <ListChecks className="w-3.5 h-3.5" />
-              Check sheet
-            </Button>
-          )}
+              {!phone && activeSheet && !tracing && (
+                <Button
+                  size="sm"
+                  variant={checkSession ? "secondary" : "outline"}
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() =>
+                    checkSession ? setCheckSession(null) : startCheck()
+                  }
+                  title={
+                    sessionLegend
+                      ? `Compare every mark on this sheet with the legend on ${sessionLegend.sheetName}. Nothing changes until you press a button.`
+                      : "Compare every mark on this sheet with the legend. Read the legend first with Whole legend."
+                  }
+                  aria-pressed={Boolean(checkSession)}
+                >
+                  <ListChecks className="w-3.5 h-3.5" />
+                  Check sheet
+                </Button>
+              )}
 
-          {activeSheet && !tracing && <div className="w-px h-4 bg-border" />}
+              {activeSheet && !tracing && (
+                <div className="w-px h-4 bg-border" />
+              )}
 
-          {/*
+              {/*
             ── MEASURE ──────────────────────────────────────────────────────
 
             Always rendered, disabled with a reason when the sheet cannot be
@@ -11028,9 +11093,9 @@ export default function TakeoffPage({
             sheet the screen offered NO tool at all, and a tool that is not on
             screen does not read as unavailable, it reads as non-existent.
           */}
-          {!phone && activeSheet && !tracing && (
-            <>
-              {/*
+              {!phone && activeSheet && !tracing && (
+                <>
+                  {/*
                 aria-disabled, not disabled. A truly disabled button gets
                 pointer-events: none from the button variants, which takes the
                 title tooltip with it — so the reason these were off was
@@ -11039,34 +11104,34 @@ export default function TakeoffPage({
                 reachable, so it has to actually be reachable: hovering or
                 focusing one raises the chip, and clicking says why in words.
               */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1.5 text-xs"
-                aria-disabled={!measurability}
-                onClick={() => {
-                  if (!measurability) return;
-                  // Not on a locked bid: `startTracing` refuses there, and a
-                  // "trace the path" hint beside that refusal contradicts it
-                  // (seen on screen, 2026-09-29).
-                  if (traceCondition && !quantitiesLocked)
-                    toast.info(traceCondition);
-                  startTracing("conduit");
-                }}
-                onMouseEnter={() => setReachingForMeasure(true)}
-                onMouseLeave={() => setReachingForMeasure(false)}
-                onFocus={() => setReachingForMeasure(true)}
-                onBlur={() => setReachingForMeasure(false)}
-                title={traceCondition ?? "Trace a conduit run"}
-                aria-label={`Trace conduit: ${armedRunType.conduit?.label ?? "Conduit"}`}
-              >
-                {/* Plain, deliberately — see runIcons. The shape says which
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    aria-disabled={!measurability}
+                    onClick={() => {
+                      if (!measurability) return;
+                      // Not on a locked bid: `startTracing` refuses there, and a
+                      // "trace the path" hint beside that refusal contradicts it
+                      // (seen on screen, 2026-09-29).
+                      if (traceCondition && !marksFrozen)
+                        toast.info(traceCondition);
+                      startTracing("conduit");
+                    }}
+                    onMouseEnter={() => setReachingForMeasure(true)}
+                    onMouseLeave={() => setReachingForMeasure(false)}
+                    onFocus={() => setReachingForMeasure(true)}
+                    onBlur={() => setReachingForMeasure(false)}
+                    title={traceCondition ?? "Trace a conduit run"}
+                    aria-label={`Trace conduit: ${armedRunType.conduit?.label ?? "Conduit"}`}
+                  >
+                    {/* Plain, deliberately — see runIcons. The shape says which
                     tool this is; colour on the drawing says which TYPE, and a
                     tinted toolbar would be teaching the older code. */}
-                <ConduitIcon className="w-3.5 h-3.5" />{" "}
-                {armedRunType.conduit?.label ?? "Conduit"}
-              </Button>
-              {/*
+                    <ConduitIcon className="w-3.5 h-3.5" />{" "}
+                    {armedRunType.conduit?.label ?? "Conduit"}
+                  </Button>
+                  {/*
                 Change what the tool is holding, without starting a trace.
 
                 Separate from the button because the button is the frequent
@@ -11075,90 +11140,90 @@ export default function TakeoffPage({
                 thing they do once. Same division as the mark tool: the armed
                 thing is shown, and changing it is one deliberate click.
               */}
-              <RunTypePicker
-                pathType="conduit"
-                runColors={runColors}
-                customHeightTypes={customHeightTypes}
-                types={runTypes.data ?? []}
-                armedId={armedRunType.conduit?.id ?? null}
-                onPick={type => armRunType("conduit", type, false)}
-                catalog={allMaterials}
-                onCreate={spec =>
-                  createRunType
-                    .mutateAsync({ ...spec, pathType: "conduit" })
-                    .then(type => armRunType("conduit", type, false))
-                    .catch(() => {
-                      /* the mutation's onError has already said so */
-                    })
-                }
-                onSave={saveRunType}
-              >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 w-6 px-0 text-xs"
-                  title="Change what kind of conduit run this traces"
-                  aria-label="Change conduit run type"
-                >
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </RunTypePicker>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 gap-1.5 text-xs"
-                aria-disabled={!measurability}
-                onClick={() => {
-                  if (!measurability) return;
-                  if (traceCondition && !quantitiesLocked)
-                    toast.info(traceCondition);
-                  startTracing("cable");
-                }}
-                onMouseEnter={() => setReachingForMeasure(true)}
-                onMouseLeave={() => setReachingForMeasure(false)}
-                onFocus={() => setReachingForMeasure(true)}
-                onBlur={() => setReachingForMeasure(false)}
-                title={
-                  traceCondition ??
-                  "Trace a run of self-contained cable — MC or Romex"
-                }
-                aria-label={`Trace cable: ${armedRunType.cable?.label ?? "Cable"}`}
-              >
-                <CableIcon className="w-3.5 h-3.5" />{" "}
-                {armedRunType.cable?.label ?? "Cable"}
-              </Button>
-              <RunTypePicker
-                pathType="cable"
-                runColors={runColors}
-                customHeightTypes={customHeightTypes}
-                types={runTypes.data ?? []}
-                armedId={armedRunType.cable?.id ?? null}
-                onPick={type => armRunType("cable", type, false)}
-                catalog={allMaterials}
-                onCreate={spec =>
-                  createRunType
-                    .mutateAsync({ ...spec, pathType: "cable" })
-                    .then(type => armRunType("cable", type, false))
-                    .catch(() => {
-                      /* the mutation's onError has already said so */
-                    })
-                }
-                onSave={saveRunType}
-              >
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 w-6 px-0 text-xs"
-                  title="Change what kind of cable run this traces"
-                  aria-label="Change cable run type"
-                >
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </RunTypePicker>
-            </>
-          )}
+                  <RunTypePicker
+                    pathType="conduit"
+                    runColors={runColors}
+                    customHeightTypes={customHeightTypes}
+                    types={runTypes.data ?? []}
+                    armedId={armedRunType.conduit?.id ?? null}
+                    onPick={type => armRunType("conduit", type, false)}
+                    catalog={allMaterials}
+                    onCreate={spec =>
+                      createRunType
+                        .mutateAsync({ ...spec, pathType: "conduit" })
+                        .then(type => armRunType("conduit", type, false))
+                        .catch(() => {
+                          /* the mutation's onError has already said so */
+                        })
+                    }
+                    onSave={saveRunType}
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-6 px-0 text-xs"
+                      title="Change what kind of conduit run this traces"
+                      aria-label="Change conduit run type"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </RunTypePicker>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    aria-disabled={!measurability}
+                    onClick={() => {
+                      if (!measurability) return;
+                      if (traceCondition && !marksFrozen)
+                        toast.info(traceCondition);
+                      startTracing("cable");
+                    }}
+                    onMouseEnter={() => setReachingForMeasure(true)}
+                    onMouseLeave={() => setReachingForMeasure(false)}
+                    onFocus={() => setReachingForMeasure(true)}
+                    onBlur={() => setReachingForMeasure(false)}
+                    title={
+                      traceCondition ??
+                      "Trace a run of self-contained cable — MC or Romex"
+                    }
+                    aria-label={`Trace cable: ${armedRunType.cable?.label ?? "Cable"}`}
+                  >
+                    <CableIcon className="w-3.5 h-3.5" />{" "}
+                    {armedRunType.cable?.label ?? "Cable"}
+                  </Button>
+                  <RunTypePicker
+                    pathType="cable"
+                    runColors={runColors}
+                    customHeightTypes={customHeightTypes}
+                    types={runTypes.data ?? []}
+                    armedId={armedRunType.cable?.id ?? null}
+                    onPick={type => armRunType("cable", type, false)}
+                    catalog={allMaterials}
+                    onCreate={spec =>
+                      createRunType
+                        .mutateAsync({ ...spec, pathType: "cable" })
+                        .then(type => armRunType("cable", type, false))
+                        .catch(() => {
+                          /* the mutation's onError has already said so */
+                        })
+                    }
+                    onSave={saveRunType}
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 w-6 px-0 text-xs"
+                      title="Change what kind of cable run this traces"
+                      aria-label="Change cable run type"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </Button>
+                  </RunTypePicker>
+                </>
+              )}
 
-          {/*
+              {/*
             ── COPY TEXT ────────────────────────────────────────────────────
             Its own group, after Measure: it reads the sheet rather than
             counting or measuring it, and it needs no scale, so it is never
@@ -11170,121 +11235,123 @@ export default function TakeoffPage({
             "select"s doing different things was the confusion. It saves
             nothing and puts nothing on the sheet; it reads words to copy.
           */}
-          {!phone && activeSheet && !tracing && (
-            <>
-              <div className="w-px h-4 bg-border" />
-              <Button
-                size="sm"
-                variant={selectingText ? "default" : "outline"}
-                className="h-7 gap-1.5 text-xs"
-                onClick={() =>
-                  selectingText ? setSelectingText(false) : startSelectingText()
-                }
-                aria-pressed={selectingText}
-                title="Drag a box to copy part numbers and notes (T)"
-              >
-                <TextSelect className="w-3.5 h-3.5" />
-                Copy text
-                {selectingText && <X className="w-3 h-3" />}
-              </Button>
-            </>
-          )}
+              {!phone && activeSheet && !tracing && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <Button
+                    size="sm"
+                    variant={selectingText ? "default" : "outline"}
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() =>
+                      selectingText
+                        ? setSelectingText(false)
+                        : startSelectingText()
+                    }
+                    aria-pressed={selectingText}
+                    title="Drag a box to copy part numbers and notes (T)"
+                  >
+                    <TextSelect className="w-3.5 h-3.5" />
+                    Copy text
+                    {selectingText && <X className="w-3 h-3" />}
+                  </Button>
+                </>
+              )}
 
-          {/*
+              {/*
             ── UNDO / REDO (D6) ─────────────────────────────────────────────
             Icons only, and the tooltip NAMES the step ("Undo: 3 marks
             placed"), so nobody undoes blind. Hidden while tracing: there,
             Ctrl+Z takes back the last point, and two arrows meaning two
             different things on one screen is the confusion to avoid.
           */}
-          {activeSheet && !tracing && (
-            <>
-              <div className="w-px h-4 bg-border" />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 px-0"
-                onClick={() => void stepBack("undo")}
-                // Live while the newest change is not covered, so the press
-                // can say so (Gap 4a) rather than sit greyed out.
-                disabled={
-                  undoBusy ||
-                  (nextUndo(undoState) === null &&
-                    undoState.notCovered === null)
-                }
-                title={undoTitle(undoState)}
-                aria-label={undoTitle(undoState)}
-              >
-                <Undo2 className="w-3.5 h-3.5" />
-              </Button>
-              {!phone && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 px-0"
-                  onClick={() => void stepBack("redo")}
-                  disabled={undoBusy || nextRedo(undoState) === null}
-                  title={redoTitle(undoState)}
-                  aria-label={redoTitle(undoState)}
-                >
-                  <Redo2 className="w-3.5 h-3.5" />
-                </Button>
-              )}
-              {/*
+              {activeSheet && !tracing && (
+                <>
+                  <div className="w-px h-4 bg-border" />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 px-0"
+                    onClick={() => void stepBack("undo")}
+                    // Live while the newest change is not covered, so the press
+                    // can say so (Gap 4a) rather than sit greyed out.
+                    disabled={
+                      undoBusy ||
+                      (nextUndo(undoState) === null &&
+                        undoState.notCovered === null)
+                    }
+                    title={undoTitle(undoState)}
+                    aria-label={undoTitle(undoState)}
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </Button>
+                  {!phone && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 px-0"
+                      onClick={() => void stepBack("redo")}
+                      disabled={undoBusy || nextRedo(undoState) === null}
+                      title={redoTitle(undoState)}
+                      aria-label={redoTitle(undoState)}
+                    >
+                      <Redo2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  {/*
                 DELETE, beside the arrows that take it back. It names what it
                 will delete ("Delete 3 marks") and is greyed out until
                 something is selected; marks of more than one count, or a
                 whole run, ask first (@/lib/stampSelection, toolbarDelete).
               */}
-              {(() => {
-                const run = runs.find(r => r.id === selectedRunId) ?? null;
-                const state = toolbarDelete(
-                  selectedStamps.length,
-                  run ? { isLeg: run.parentRunId != null } : null,
-                  new Set(selectedStamps.map(s => s.groupId)).size
-                );
-                const locked = quantitiesLocked && state.enabled;
-                return (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
-                    disabled={!state.enabled || locked}
-                    title={
-                      locked
-                        ? "This bid's quantities are locked — unlock them on the bid to delete."
-                        : state.title
-                    }
-                    onClick={deleteSelection}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    {state.label}
-                  </Button>
-                );
-              })()}
-              {/*
+                  {(() => {
+                    const run = runs.find(r => r.id === selectedRunId) ?? null;
+                    const state = toolbarDelete(
+                      selectedStamps.length,
+                      run ? { isLeg: run.parentRunId != null } : null,
+                      new Set(selectedStamps.map(s => s.groupId)).size
+                    );
+                    const locked = marksFrozen && state.enabled;
+                    return (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+                        disabled={!state.enabled || locked}
+                        title={
+                          locked
+                            ? "This bid's quantities are locked — unlock them on the bid to delete."
+                            : state.title
+                        }
+                        onClick={deleteSelection}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        {state.label}
+                      </Button>
+                    );
+                  })()}
+                  {/*
                 SELECT — the finger's Shift-click and Shift-drag (device audit,
                 touch #16/#17). Only on a coarse pointer: with a mouse the keys
                 already do it, and a switch nobody needs is a switch in the way.
               */}
-              {coarse && !armedGroup && (!phone || touchSelect) && (
-                <Button
-                  size="sm"
-                  variant={touchSelect ? "default" : "outline"}
-                  className="h-7 gap-1.5 px-2 text-xs"
-                  onClick={() => setTouchSelect(on => !on)}
-                  aria-pressed={touchSelect}
-                  title={
-                    touchSelect
-                      ? "Selecting — tap marks to add or remove, drag to box them. Tap to stop."
-                      : "Select several marks: tap them, or drag a box"
-                  }
-                >
-                  <SquareDashedMousePointer className="w-3.5 h-3.5" />
-                  Select
-                </Button>
-              )}
-              {/*
+                  {coarse && !armedGroup && (!phone || touchSelect) && (
+                    <Button
+                      size="sm"
+                      variant={touchSelect ? "default" : "outline"}
+                      className="h-7 gap-1.5 px-2 text-xs"
+                      onClick={() => setTouchSelect(on => !on)}
+                      aria-pressed={touchSelect}
+                      title={
+                        touchSelect
+                          ? "Selecting — tap marks to add or remove, drag to box them. Tap to stop."
+                          : "Select several marks: tap them, or drag a box"
+                      }
+                    >
+                      <SquareDashedMousePointer className="w-3.5 h-3.5" />
+                      Select
+                    </Button>
+                  )}
+                  {/*
                 THE PHONE'S TOOLS (device audit, 2026-10-01). A phone is for
                 checking a bid and quick counts, so the bar keeps Count, Undo
                 and Delete and everything else moves behind this one button —
@@ -11292,55 +11359,61 @@ export default function TakeoffPage({
                 § AI features), just not taking half the screen. Each item
                 calls exactly what its toolbar button calls.
               */}
-              {phone && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1.5 px-2 text-xs"
-                      aria-label="More tools"
-                    >
-                      <MoreHorizontal className="w-3.5 h-3.5" /> Tools
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      disabled={!measurability}
-                      onSelect={() => startTracing("conduit")}
-                    >
-                      <ConduitIcon className="w-3.5 h-3.5" /> Trace{" "}
-                      {armedRunType.conduit?.label ?? "conduit"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      disabled={!measurability}
-                      onSelect={() => startTracing("cable")}
-                    >
-                      <CableIcon className="w-3.5 h-3.5" /> Trace{" "}
-                      {armedRunType.cable?.label ?? "cable"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => startSelectingText()}>
-                      <TextSelect className="w-3.5 h-3.5" /> Copy text
-                    </DropdownMenuItem>
-                    {armedGroup && !quantitiesLocked && (
-                      <DropdownMenuItem onSelect={() => startFind()}>
-                        <ScanSearch className="w-3.5 h-3.5" /> Find all matching
-                      </DropdownMenuItem>
-                    )}
-                    {!armedGroup && (
-                      <DropdownMenuItem onSelect={() => setTouchSelect(true)}>
-                        <SquareDashedMousePointer className="w-3.5 h-3.5" />
-                        Select several marks
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem
-                      disabled={undoBusy || nextRedo(undoState) === null}
-                      onSelect={() => void stepBack("redo")}
-                    >
-                      <Redo2 className="w-3.5 h-3.5" /> {redoTitle(undoState)}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  {phone && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1.5 px-2 text-xs"
+                          aria-label="More tools"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" /> Tools
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          disabled={!measurability}
+                          onSelect={() => startTracing("conduit")}
+                        >
+                          <ConduitIcon className="w-3.5 h-3.5" /> Trace{" "}
+                          {armedRunType.conduit?.label ?? "conduit"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={!measurability}
+                          onSelect={() => startTracing("cable")}
+                        >
+                          <CableIcon className="w-3.5 h-3.5" /> Trace{" "}
+                          {armedRunType.cable?.label ?? "cable"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => startSelectingText()}>
+                          <TextSelect className="w-3.5 h-3.5" /> Copy text
+                        </DropdownMenuItem>
+                        {armedGroup && !marksFrozen && (
+                          <DropdownMenuItem onSelect={() => startFind()}>
+                            <ScanSearch className="w-3.5 h-3.5" /> Find all
+                            matching
+                          </DropdownMenuItem>
+                        )}
+                        {!armedGroup && (
+                          <DropdownMenuItem
+                            onSelect={() => setTouchSelect(true)}
+                          >
+                            <SquareDashedMousePointer className="w-3.5 h-3.5" />
+                            Select several marks
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          disabled={undoBusy || nextRedo(undoState) === null}
+                          onSelect={() => void stepBack("redo")}
+                        >
+                          <Redo2 className="w-3.5 h-3.5" />{" "}
+                          {redoTitle(undoState)}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </>
               )}
             </>
           )}
@@ -11448,7 +11521,7 @@ export default function TakeoffPage({
               nothing on it to measure at all.
             */}
             {/* On the phone only while tracing, where the length needs it. */}
-            {activeSheet && (!phone || tracing) && (
+            {canEdit && activeSheet && (!phone || tracing) && (
               <ScaleControl
                 sheet={activeSheet}
                 compact={phone}
@@ -11458,7 +11531,7 @@ export default function TakeoffPage({
                 notToScale={notToScaleBySheet[activeSheet.id] ?? false}
                 pageSize={activePageSize}
                 onRefused={
-                  quantitiesLocked
+                  marksFrozen
                     ? () =>
                         toast.error(
                           lockedEditRefusal("a sheet's scale cannot be changed")
@@ -11749,7 +11822,9 @@ export default function TakeoffPage({
 
       {/* What the marks ARE, and the sheet's demo / new tag. Shows nothing
           on a bid that never set a status, on a sheet nobody tagged. */}
-      {docs.length > 0 && activeSheet && (
+      {/* Fix-its for someone who can act on them; a view-only member gets
+          none (its "locked" wording would be false for them too). */}
+      {canEdit && docs.length > 0 && activeSheet && (
         <StatusStrip
           model={statusStrip}
           focus={statusFocus}
@@ -11763,7 +11838,7 @@ export default function TakeoffPage({
           }}
           placingStatus={placingStatus}
           onPlacing={choosePlacing}
-          canPlace={armedGroup !== null && !quantitiesLocked}
+          canPlace={armedGroup !== null && !marksFrozen}
           busy={setMarkStatus.isPending}
           onMakeRemove={() =>
             setMarkStatus.mutate({
@@ -12018,32 +12093,34 @@ export default function TakeoffPage({
                       margin keeps the row compact while the target stays full
                       size. Keys stop here so Enter opens the dialog instead of
                       selecting the row. */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-11 w-11 -my-2 -mr-2 p-0 shrink-0 self-center text-muted-foreground hover:text-destructive"
-                    onClick={e => {
-                      e.stopPropagation();
-                      // Refused before the dialog, not after it: a confirm
-                      // for something that will be refused is noise.
-                      if (quantitiesLocked) {
-                        toast.error(
-                          lockedEditRefusal("its plan sets cannot be removed")
-                        );
-                        return;
+                  {canEdit && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-11 w-11 -my-2 -mr-2 p-0 shrink-0 self-center text-muted-foreground hover:text-destructive"
+                      onClick={e => {
+                        e.stopPropagation();
+                        // Refused before the dialog, not after it: a confirm
+                        // for something that will be refused is noise.
+                        if (marksFrozen) {
+                          toast.error(
+                            lockedEditRefusal("its plan sets cannot be removed")
+                          );
+                          return;
+                        }
+                        setConfirmRemove(d);
+                      }}
+                      onKeyDown={e => e.stopPropagation()}
+                      aria-label={`Remove ${d.filename}`}
+                      title={
+                        marksFrozen
+                          ? "This bid's quantities are locked — unlock them on the bid to remove a plan set."
+                          : `Remove ${d.filename}`
                       }
-                      setConfirmRemove(d);
-                    }}
-                    onKeyDown={e => e.stopPropagation()}
-                    aria-label={`Remove ${d.filename}`}
-                    title={
-                      quantitiesLocked
-                        ? "This bid's quantities are locked — unlock them on the bid to remove a plan set."
-                        : `Remove ${d.filename}`
-                    }
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -12061,13 +12138,17 @@ export default function TakeoffPage({
                   pageCount: doc?.pageCount ?? sheets.length,
                   byteSize: doc?.byteSize ?? null,
                 }}
-                onReadNumbers={() => {
-                  if (!doc) return;
-                  beginSheetRead(doc.id, {
-                    url: doc.url,
-                    byteSize: doc.byteSize ?? null,
-                  });
-                }}
+                onReadNumbers={
+                  !canEdit
+                    ? null
+                    : () => {
+                        if (!doc) return;
+                        beginSheetRead(doc.id, {
+                          url: doc.url,
+                          byteSize: doc.byteSize ?? null,
+                        });
+                      }
+                }
                 onSetNumber={(pageNumber, sheetNumber) => {
                   if (!doc) return;
                   setSheetNumber.mutate({
@@ -12621,7 +12702,7 @@ export default function TakeoffPage({
                         too). A drag is the thing the lock exists to stop.
                       */
                       editableRunId={
-                        quantitiesLocked || selectingText ? null : selectedRunId
+                        marksFrozen || selectingText ? null : selectedRunId
                       }
                       onPickEnd={(runId, end) =>
                         setEndHighlight({ runId, end })
@@ -12660,7 +12741,7 @@ export default function TakeoffPage({
                         )
                       }
                       onDeleteSelected={() => deleteSelected(false)}
-                      moveTargets={quantitiesLocked ? [] : moveTargets}
+                      moveTargets={marksFrozen ? [] : moveTargets}
                       onMoveSelected={groupId =>
                         moveStamps.mutate({
                           // A mark still being sent has no id yet.
@@ -12671,7 +12752,7 @@ export default function TakeoffPage({
                         })
                       }
                       onSetStatusSelected={
-                        quantitiesLocked || !bidId
+                        marksFrozen || !bidId
                           ? undefined
                           : status =>
                               setMarkStatus.mutate({
@@ -12684,7 +12765,7 @@ export default function TakeoffPage({
                       }
                       selectedDrop={selectionDrops}
                       onSetHeightSelected={
-                        quantitiesLocked || !bidId
+                        marksFrozen || !bidId
                           ? undefined
                           : inches =>
                               setMarkHeight.mutate({
@@ -12697,7 +12778,7 @@ export default function TakeoffPage({
                               })
                       }
                       onSetDropExcludedSelected={
-                        quantitiesLocked || !bidId
+                        marksFrozen || !bidId
                           ? undefined
                           : excluded =>
                               setMarkDropExcluded.mutate({
@@ -12860,7 +12941,7 @@ export default function TakeoffPage({
                             legendName={sessionLegend?.sheetName ?? null}
                             legendRows={sessionLegend?.rows ?? []}
                             picks={sessionLegend?.picks ?? {}}
-                            locked={quantitiesLocked}
+                            locked={marksFrozen}
                             onUseHeight={(markId, inches) => {
                               if (!bidId) return;
                               setMarkHeight.mutate({
@@ -13052,7 +13133,8 @@ export default function TakeoffPage({
                 )}
                 dropRunTypes={runTypes.data ?? []}
                 bridge={bridgeByGroup}
-                quantitiesLocked={quantitiesLocked}
+                quantitiesLocked={marksFrozen}
+                viewOnly={!canEdit}
                 waitingToSend={bidCounts.data?.waitingToSend}
                 countedWithNoPrice={bidCounts.data?.countedWithNoPrice}
                 onSendToBid={id => sendToBid.mutate({ id })}
@@ -13143,14 +13225,14 @@ export default function TakeoffPage({
                               })
                           }
                           onSave={saveRunType}
-                          disabled={quantitiesLocked}
+                          disabled={marksFrozen}
                         >
                           <Button
                             size="sm"
                             variant="outline"
                             className="h-6 gap-1 px-2 text-[0.7rem] min-w-0"
                             aria-label={`Change what this run is`}
-                            disabled={quantitiesLocked}
+                            disabled={marksFrozen}
                           >
                             <span className="truncate">
                               {armed?.label ?? run.typeName ?? "Not said"}
@@ -13184,7 +13266,7 @@ export default function TakeoffPage({
                               : []
                             : run.circuits
                         }
-                        locked={quantitiesLocked}
+                        locked={marksFrozen}
                         onSave={patch =>
                           respecifyRun.mutateAsync({ id: run.id, ...patch })
                         }
@@ -13231,7 +13313,7 @@ export default function TakeoffPage({
                         onSave={onSetEnds}
                         onJumpTo={jumpTo}
                         highlight={endHighlight}
-                        locked={quantitiesLocked}
+                        locked={marksFrozen}
                       />
                       <RunEndsEditor
                         bidId={bidId}
@@ -13247,7 +13329,7 @@ export default function TakeoffPage({
                         onRunsAt={runsAt =>
                           setRunsAt.mutate({ runId: run.id, runsAt })
                         }
-                        locked={quantitiesLocked}
+                        locked={marksFrozen}
                         endsElsewhere
                       />
                     </>
@@ -13381,7 +13463,7 @@ export default function TakeoffPage({
                       }
                       onUnlink={id => unlinkSymbol.mutate({ id })}
                       renameRefusal={
-                        quantitiesLocked
+                        marksFrozen
                           ? lockedEditRefusal(
                               "its legend names cannot be changed"
                             )
