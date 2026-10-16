@@ -201,3 +201,39 @@ No `drizzle/` change in the 17 commits. Gate 38853660685 on local-dev.
   scratch; 2 further runs identical.
 - **Quoted lines not covered:** no router writes them and pricing ignores
   them. Listed in `golden-bids-to-check.md`.
+
+## Item 3 — speed limits — 22:45 →
+
+- `server/speedLimits.test.ts` (fixture user 9908): 1 sheet, 2 run types,
+  20 runs with circuits, 6 counts × 25 marks, 24 lines. A screen = the
+  page-level `useQuery` reads fired together; median of 5 after a warm-up.
+  Limits 2000 ms (screen), 1000 ms (save); `OVER_TODAY` names any raised
+  limit (empty).
+- Builders moved to `server/bidBuilders.testHelper.ts`, shared with the
+  golden bids (golden still matches after the move).
+- Measured locally (laptop, three tracks running): screens 8–167 ms
+  (Plans 167, Bid 141), saves 6–32 ms (scope tag 32). Nothing over → no
+  todo needed. CI numbers: in the Gate log, lines starting `[speed]`.
+
+## Step 1 result — 22:25
+
+Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
+**96 passed / 2 skipped** (as expected). Staging `/api/version`:
+`commit a4c97280`, builtAt 05:11 UTC.
+- Item 3 committed `fe878143` (code); end 22:55.
+
+## Item 4 — Q-AUTH1 sign-in burst — 22:55 → 23:15
+
+- Option (b): `server/passwordHashing.ts`, `bcryptjs` in ≤4 worker threads
+  started from source text (the server ships as one bundled file), loading
+  the `bcryptjs` path resolved by the main thread. No main-thread fallback.
+  `authRouter` (9 calls) and `starterEditor/store.ts` (4) switched.
+- `server/signInBurst.test.ts`: 6 real cost-12 sign-ins via `auth.login`
+  with a 10 ms ticker. **Red before: stall 874 ms** (burst 1,811 ms).
+  **Green after: 24 ms** (586 ms). Hash made by plain `bcryptjs` → old
+  passwords verify. Auth tests 58/58. From an esbuild bundle: hash, verify,
+  reject, and the process exits (idle workers unref'd).
+- `auth.email.test.ts` mocked `bcryptjs` by name; mock moved to
+  `./passwordHashing` with identical fakes — no assertion changed.
+- Not done: C's burst script against a production build (needs a server;
+  memory). Recommended on staging after merge.

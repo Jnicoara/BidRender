@@ -1641,7 +1641,19 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
-- [ ] **Stress test Q-AUTH1 (Track C's sign-in burst, 2026-10-15; Track A
+- [x] **DONE 2026-10-15 night (Track A, on `track-a-night`), option (b):**
+      `server/passwordHashing.ts` runs `bcryptjs` in up to 4 worker threads;
+      `authRouter` and the starter editor's store use it. Same hashes, no new
+      dependency. `server/signInBurst.test.ts` (6 real cost-12 sign-ins
+      through `auth.login`, event-loop ticker): longest stall **874 ms before,
+      24 ms after** (limit 150), burst 1,811 → 586 ms; the hash it signs in
+      with is made by plain `bcryptjs`, so old passwords still work. Proved
+      from an esbuild bundle too. NOT re-measured with C's script on the
+      production build (no dev/prod server run tonight, memory) — do that on
+      staging after merge. `auth.email.test.ts` mocked `bcryptjs` by name;
+      its mock moved to `./passwordHashing`, same fake hashes, no assertion
+      changed. Was:
+      **Stress test Q-AUTH1 (Track C's sign-in burst, 2026-10-15; Track A
       to fix): 11 sign-ins at once stall EVERY other request ~0.7 s.**
       Measured on the production build (`references/stress-results.md` "Sign-in
       burst", on `track-c`): 11/11 sign-ins ok at ~680 ms each; an ordinary bid

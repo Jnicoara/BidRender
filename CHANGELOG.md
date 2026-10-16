@@ -6,6 +6,20 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Many people signing in at once no longer freezes the app for everyone
+  else.** Checking a password is deliberately slow work. It used to run on
+  the same thread that answers every request, so a handful of sign-ins
+  together stalled all other screens for most of a second. It now runs on
+  separate threads: six sign-ins at once held the server for 24 milliseconds
+  instead of 874. Existing passwords work unchanged.
+
+- **The test run now fails if a main screen or a save gets slow.** On a
+  mid-sized bid it times what each screen asks the server for when it opens
+  (dashboard, bid, plans, materials, assemblies, materials list, proposal) and
+  seven everyday saves. Limits: 2 seconds for a screen, 1 second for a save.
+  Today's numbers are far under both, about 0.2 s and 0.03 s at most on a
+  laptop.
+
 - **Eight "golden" bids now guard every number the bid screen shows.** Each
   test run builds the same eight bids, covering counts, runs, drops, remove
   and relocate, scope tags, labor-only work, hand-typed prices, overhead,
