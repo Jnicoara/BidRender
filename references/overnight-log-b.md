@@ -283,3 +283,18 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
 - My sabotage runner restored files with `git checkout`, which would have
   wiped uncommitted work in the same file — caught before it ran; it now
   writes back the bytes it read.
+
+## Item 4 — hard PDFs (started 03:11, after the usage-limit pause 01:15–03:10)
+· `d0bf0094`
+
+- Measured first: the readable cases (1 page, turned, mixed sizes, scanned,
+  huge vector, 500 pages) all opened; a picture named .pdf was already
+  refused well. Faults: a password-protected or damaged file uploaded,
+  attached, and showed the engine's error with a useless Try again.
+- Fixed: the upload probes the file in the sheet-reader worker first (range
+  reads; fails open) and refuses a sure file problem with what to do;
+  `planFailureText` says the same for files attached before. A cut upload
+  finishes by itself (server fallback) or by Retry, attached once.
+- `e2e/smoke/pdfs.spec.ts`, 13 tests; probe and Retry each proved by
+  breaking. One existing unit test's expected wording updated on purpose
+  (the owner's item replaces "Invalid PDF structure." with words and a fix).
