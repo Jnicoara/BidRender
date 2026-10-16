@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **The test gate can no longer show green over untested code.** A push
+  that changed only notes used to run a short check that passed on its own.
+  On a track branch, it also cancelled the full test run of the code just
+  pushed. So a branch could look green while its code had never finished
+  testing. Track B found one test red for a day that way. Now a notes-only
+  push never touches the code run. Its own check is red unless the code
+  underneath really passed the full suite; cancelled, failed, or still
+  running all count as red.
+
 - **Typing a decimal into a quantity or percent box no longer multiplies it
   by ten.** In the run-type editor's extra and makeup boxes, an assembly's
   or kit's part quantities and an assembly step's count, the box redrew

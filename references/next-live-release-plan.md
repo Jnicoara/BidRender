@@ -95,7 +95,28 @@ FKs 205/205.** 0156 (`bids.lockedWarnings`) and 0157–0159 (`materials`
 pack columns — read on every materials read) and 0164 (read by the bid
 screen) MUST be on live before the push.
 
-### Owner decisions needed BEFORE the window
+### Owner decisions — ANSWERED 2026-10-16
+
+- **D1 = YES**: ship the boot change this release; **Q1 is waived**. Later
+  price changes reach live through the logged path (`starterDrift.mts
+  --apply` / `applyStarterChange`), never a re-stamp on boot.
+  (`boot-seed-plan.md` Q1 and `morning-questions-a.md` § 3 say so too.)
+- **D2 = YES**: remove live companies 5–8 (user 3036) **after the day's
+  verified backup** — step 8 below.
+- **D3 = YES**: a live account with no settings row (user 5) starts on
+  Journeyman's tagged example rate for traced runs.
+- **D4 = turn the invite gate ON at this release**: set
+  `SIGNUP_INVITE_ONLY=on` on the live app, **after first reading what is
+  set now** (DO → App → Settings → Environment variables; record it). An
+  env change redeploys the app, so it is its own step AFTER the code push
+  and its checks (step 9b). Note the earlier advice (`morning-questions-a.md`
+  § 5) was to wait until the sign-in page hides "Create account" — check
+  whether that screen work is in the candidate; if not, a stranger can fill
+  in the form and is refused only on submit (honest, not harmful).
+
+The wording below was the question as asked.
+
+### Owner decisions needed BEFORE the window (as asked)
 
 - **D1 — boot change vs Q1** (`morning-questions-a.md` § 3): Q1 says the
   boot change ships the release AFTER the end-of-pricing load; it is on
@@ -135,8 +156,9 @@ differ.
 | 5    | `git checkout main && git merge --ff-only <candidate> && git push origin main && git checkout local-dev`                    | **Approval C** — you say "push"; then `/api/version` commit = candidate, `builtAt` after the push          |
 | 6    | First boot: DO logs one `[seed] starter:` line (N/P/H/L as rehearsed); renamed 0, retired 0, deleted 0                      | matches the rehearsal                                                                                      |
 | 7    | `bidTotals --compare` vs step 3                                                                                             | "ok all N bid(s) unchanged"                                                                                |
-| 8    | Only if D2 = yes: save the 8 rows to JSON, dry run (kept 4, removable [5,6,7,8]), then `--apply --expect 5,6,7,8`           | your separate yes for D2                                                                                   |
+| 8    | D2 = yes: save the 8 rows to JSON, dry run (kept 4, removable [5,6,7,8]), then `--apply --expect 5,6,7,8`                  | dry run prints exactly kept 4 / removable [5,6,7,8]; after: kept 4, 0 others; totals unchanged             |
 | 9    | Point App Platform's health check at `/api/health` (Q-DB1)                                                                  | you click it in DO (owner's console)                                                                       |
+| 9b   | D4: read live's env vars (record), set `SIGNUP_INVITE_ONLY=on` (redeploys); then a sign-up with no invite is refused        | you set it in DO; `/api/version` same commit, new `builtAt`; refusal seen on bidridge.com                   |
 | 10   | Owner opens a bid and its plans; A records `deploying.md` § 11 "LIVE: `<candidate>`"                                        | **Approval D** — done                                                                                      |
 
 **Rollback:** DO → Activity → Rollback to `60479773` (safe: every migration
