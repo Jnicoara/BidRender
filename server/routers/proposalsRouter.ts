@@ -364,6 +364,7 @@ export const proposalsRouter = router({
         units,
         totals,
         salesTax,
+        taxRate,
         problems,
         notPriced: linesNotPriced,
       } = bidRollup(
@@ -473,7 +474,12 @@ export const proposalsRouter = router({
          * here, beside the preview, where it can still be fixed.
          */
         salesTax,
-        taxNote: explainTaxStatus(salesTax.status, bid.siteAddress),
+        taxNote: explainTaxStatus(
+          salesTax.status,
+          bid.siteAddress,
+          bid.taxJurisdictionId !== null &&
+            taxRate.source !== "bid-jurisdiction"
+        ),
         bid: {
           id: bid.id,
           name: bid.name,

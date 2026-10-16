@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A bid whose tax area was archived now says so.** It said "This bid has
+  no job address", which sent people to the address when what happened was
+  that the area picked for the bid had been archived. The note now names
+  that, and how to fix it.
+
 - **Fixed: an extra cost with no amount went on the bid at $0, and "$250"
   did nothing.** Additional expenses now ask for the amount and read "$250"
   and "1,250" as typed. Emptying the quote's "Price good for" no longer

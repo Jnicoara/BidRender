@@ -1085,7 +1085,12 @@ export const bidsRouter = router({
         salesTax,
         taxRate,
         /** Plain-language reason there is no tax, or null when there is. */
-        taxNote: explainTaxStatus(salesTax.status, bid.siteAddress),
+        taxNote: explainTaxStatus(
+          salesTax.status,
+          bid.siteAddress,
+          bid.taxJurisdictionId !== null &&
+            taxRate.source !== "bid-jurisdiction"
+        ),
         /**
          * Name and site address after the bid's own text and the linked record
          * have been reconciled — the same resolution the proposal prints, so
