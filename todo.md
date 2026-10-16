@@ -1654,6 +1654,13 @@ Design: `references/homerun-footage-plan.md` § 4.
       row — then `drop` inserts with `INSERT … ON DUPLICATE KEY` semantics
       and reads the ids back. **Done when** `markReplay.test.ts` passes with
       the in-memory map cleared between the two sends.
+- [ ] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
+      measured).** `server/speedBigData.test.ts` (`SPEED_BIG_DATA=1`): 61
+      bids → `bids.dashboard` + `archived` median **493 ms**; 1 bid → 39 ms
+      in the Gate. About 8 ms a bid, so ≈ 2 s near 250 bids for one company.
+      Fine today. **Done when** the dashboard pages or sums in SQL, and the
+      big-data run at 250 bids stays under 1 s (raise the fixture's bid
+      count in that test to prove it).
 - [ ] **Speed limit outlier (Track A, 2026-10-15 night): pricing a material
       takes 221 ms in CI against 6 ms on a laptop** — every other save is
       2–14 ms in CI (`server/speedLimits.test.ts`, Gate 38855631644, lines

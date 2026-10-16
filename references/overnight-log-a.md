@@ -433,3 +433,11 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   honest + nothing changed; back answers. Email — real door, fake key,
   fetch replaced: no answer = notSent; 429 pauses with "later"; lifts next
   day and sends. No real service touched. Removed one tautological assert.
+
+## Item 8 — speed on big data — 00:34 → 00:28
+
+- `server/speedBigData.test.ts` (on demand, SPEED_BIG_DATA=1, user 9922):
+  61 bids w/ marks, 500-sheet set, 5,000 marks on a sheet, full catalog.
+  All inside limits; slowest Dashboard 493 ms (grows ~8 ms/bid → todo).
+  Free memory read 1.94 GB at the start (journey agent's dev server up) —
+  a vitest run, no server/browser started by me; heavy work held.

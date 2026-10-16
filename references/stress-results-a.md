@@ -173,3 +173,29 @@ reached R2, the model, or the email provider.
 | **Plan storage** (a fake S3 server on this machine, switched off)          | Opening a plan **throws**, which the proxy answers as 502 "Storage backend error". It is never "that file does not exist", because the existence cache keeps only a real 404/403 (`r2ObjectExists`). | Deleting a file while down: rows go first, the file counts as `failed` and is left for the orphan sweep (`storedFiles.ts`).                                                      | The same plan opens again at once; nothing was remembered from the outage. |
 | **AI** (`invokeLLM` fails)                                                 | "The reader could not be reached. Nothing was changed — check these by eye."                                                                                                                         | Every answer is null; no mark or line moves (`countingAiFake.test.ts` counts them).                                                                                              | The next press answers normally.                                           |
 | **Email** (the real door, production settings, fake key, `fetch` replaced) | No answer → `notSent`, logged, never a crash. A quota refusal (429) **pauses** email: availability says "later", and a reset request answers "could not send" instead of pretending.                 | A reset token is stored before the send. The reset screen answers alike for every address (owner's no-enumeration rule), so a failed send for one account shows only in the log. | The pause lifts on its own (the next UTC day), and the next send goes.     |
+
+## Speed on big data — 2026-10-16
+
+`server/speedBigData.test.ts`, on demand (`SPEED_BIG_DATA=1`; built in 6 s on
+the laptop): one company with **61 bids** (60 with 50 counted marks each, sent
+to the bid), a **500-sheet** plan set, **5,000 marks on one sheet**, and the
+full shipped catalog (1,717 materials). Same limits as the Gate: screen < 2 s,
+save < 1 s; median of 3 after a warm-up.
+
+| Screen / save                        | Median     | Max    |
+| ------------------------------------ | ---------- | ------ |
+| Dashboard (61 bids)                  | **493 ms** | 559 ms |
+| Bid with 5,000 marks                 | 66 ms      | 68 ms  |
+| Plans — the 5,000-mark sheet         | 157 ms     | 166 ms |
+| Sheet list of 500                    | 8 ms       | 12 ms  |
+| Materials (full catalog)             | 38 ms      | 40 ms  |
+| Materials list (5,000 marks)         | 99 ms      | 105 ms |
+| Proposal                             | 28 ms      | 31 ms  |
+| Place a mark on the 5,000-mark sheet | 8 ms       | 10 ms  |
+| Rename the big bid                   | 7 ms       | 7 ms   |
+
+**Nothing over.** One trend to watch: the **dashboard grows with the number
+of bids**, about 8 ms a bid here (39 ms at 1 bid in the Gate, 493 ms at 61).
+At that rate it crosses 2 s near 250 bids for one company. That is not a
+problem today; the todo is to page it or sum it in SQL before any shop gets
+there. The everyday Gate fixture can't see this, because it has one bid.
