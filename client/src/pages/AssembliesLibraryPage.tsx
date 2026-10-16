@@ -617,6 +617,12 @@ function CostPreview({
           />
           <Row label="Bid price" value={money(bid.finalPrice)} strong />
         </div>
+      ) : profitMethod !== "none" && line ? (
+        // A method IS picked, so the missing price is the typed number.
+        <div className="text-xs text-[#F5C518] pt-1">
+          Type the overhead and profit as numbers — for example 15 — to see a
+          bid price.
+        </div>
       ) : (
         <div className="text-xs text-muted-foreground pt-1">
           Pick a profit method to see a bid price — markup and target margin
