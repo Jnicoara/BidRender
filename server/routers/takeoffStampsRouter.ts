@@ -35,6 +35,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
+import { countDisplayName } from "../../shared/unassignedCount";
+import { setGroupSourceChecked } from "../groupSource";
 import {
   buildCountedItems,
   nameMatchesSymbol,
@@ -550,20 +552,45 @@ export const takeoffStampsRouter = router({
    */
   moveToGroup: procedure
     .input(
-      z.object({
-        ids: z.array(z.number().int().positive()).min(1).max(2000),
-        groupId: z.number().int().positive(),
-      })
+      z
+        .object({
+          ids: z.array(z.number().int().positive()).max(2000).default([]),
+          /**
+           * Every mark in THIS count, on every sheet, instead of `ids` — how
+           * the Unassigned count is assigned in one go
+           * (references/count-first-plan.md). The screen only holds one
+           * sheet's marks, so it cannot list them itself.
+           */
+          fromGroupId: z.number().int().positive().optional(),
+          groupId: z.number().int().positive(),
+        })
+        .refine(v => v.ids.length > 0 || v.fromGroupId !== undefined, {
+          message: "Pick some marks to move.",
+        })
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
-      const ids = Array.from(new Set(input.ids));
       const group = await db.getGroupById(input.groupId, userId);
       if (!group)
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "That count was not found.",
         });
+      let ids = Array.from(new Set(input.ids));
+      if (input.fromGroupId !== undefined) {
+        const from = await db.getGroupById(input.fromGroupId, userId);
+        if (!from || from.bidId !== group.bidId)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "That count was not found.",
+          });
+        ids = await db.stampIdsInGroup(from.id, userId, from.bidId);
+        if (ids.length === 0)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "There are no marks in that count to move.",
+          });
+      }
       const bid = await requireBid(group.bidId, userId);
       if (bid.quantitiesLockedAt !== null)
         throw new TRPCError({
@@ -600,7 +627,8 @@ export const takeoffStampsRouter = router({
       }
       return {
         moved,
-        label: group.label,
+        // The toast's words: "Unassigned", never the reserved label.
+        label: countDisplayName(group.label),
         // A mark with no count (pre-phase-6, never backfilled) cannot be put
         // back under nothing by this procedure, so it is left out of undo.
         previous: Array.from(byGroup.entries())
@@ -1478,6 +1506,13 @@ export const takeoffStampsRouter = router({
       z.object({
         id: z.number().int().positive(),
         assemblyId: z.number().int().positive(),
+        /**
+         * The bid the Legend tab is open on. Its counts of this symbol made
+         * BY NAME become this assembly's count now — the same as "Link
+         * assembly" on their card (server/groupSource.ts). Omitted, only the
+         * symbol changes, as before.
+         */
+        bidId: z.number().int().positive().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -1501,10 +1536,39 @@ export const takeoffStampsRouter = router({
       await db.updateSymbolLink(input.id, ctx.scope.dataUserId, {
         assemblyId: input.assemblyId,
       });
+
+      /*
+        THE COUNT ALREADY MADE follows the link (Track A's whole-job journey,
+        2026-10-16): linking from the Legend left this bid's count of the
+        symbol "by name" and unpriced until the symbol was armed again.
+        Every check "Link assembly" makes still applies — a locked bid, a
+        line already priced, another count of that assembly — and a count
+        one of them stops is left as it was, never half-moved.
+      */
+      let adopted = 0;
+      if (input.bidId !== undefined) {
+        const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
+        if (bid) {
+          const byName = symbolCountsOn(
+            await db.getGroupsForBid(bid.id, ctx.scope.dataUserId),
+            { label: link.label, lookupKey: link.lookupKey, assemblyId: null }
+          ).filter(g => g.assemblyId === null);
+          for (const group of byName) {
+            const result = await setGroupSourceChecked(
+              group,
+              input.assemblyId,
+              ctx.scope.dataUserId
+            );
+            if (result.ok) adopted += 1;
+          }
+        }
+      }
       return {
         id: input.id,
         assemblyId: input.assemblyId,
         assemblyName: assembly.name,
+        /** This bid's counts of the symbol that now count the assembly. */
+        adopted,
       };
     }),
 

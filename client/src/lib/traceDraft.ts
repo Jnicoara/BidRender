@@ -199,6 +199,12 @@ export type QueuedStamp = {
    * every click was then. Read it through `queuedStampStatus`.
    */
   status?: UserMarkStatus;
+  /**
+   * The key this click was SENT with (@/lib/markKeys), so a recovery that
+   * resends it after a reload is recognised by the server and placed once.
+   * Absent on a queue written before 2026-10-16.
+   */
+  key?: string;
   x: number;
   y: number;
 };

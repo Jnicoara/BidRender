@@ -1,5 +1,112 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-16 (fourth night, done 04:08), track-b only
+
+- Q5 label built; A's two Plans faults fixed (resent marks, legend link);
+  Plans deep test (16 tools x 4 sizes), marks-never-vanish test (found and
+  fixed a reload double-save), hard PDFs (password/damaged refused before
+  upload), scale-check offer (+ two phone faults fixed), demo-tag offer.
+  Maps: `plans-test-map.md`. Logs: `overnight-log-b.md` fourth night.
+- Gate green through 303d86bf; local smoke 218/6 in 12.5 min (note for A
+  below). Not merged to local-dev.
+
+## FOR TRACK A, 2026-10-16 04:15 — the smoke run is longer now (Gate is yours)
+
+- Five new smoke specs from B tonight (`plans`, `marks`, `pdfs`, `demo`
+  specs; projects in `e2e/playwright.config.ts`). Locally the whole smoke
+  went **6.3 → 12.5 min** (218 passed, 6 skipped). Staging will be slower.
+  If that is too long for the Gate's smoke job, the place to trim is
+  `pdfs.spec.ts` (laptop only, 13 uploads) — say so and B will split it.
+
+## FOR TRACK A, 2026-10-16 03:50 — "a legend link does not reach the count already made": FIXED
+
+- `takeoffStamps.linkSymbol` takes the bid (`bidId`, sent by the Plans
+  screen) and adopts that bid's by-name counts of the symbol through the
+  SAME rules as the card's "Link assembly" — both now call
+  `server/groupSource.ts` `setGroupSourceChecked` (locked bid, a line already
+  priced, another count of that assembly: left as it was).
+  `server/legendLinkAdopts.test.ts`, red without it. Your journey can link the
+  switch from the legend again when this reaches local-dev.
+
+## FOR TRACK A, 2026-10-16 00:25 — your "resent batch counted twice" line: DONE, one change
+
+- Taken onto track-b (`fcc3985b`): your server half from `291e719b`
+  (`server/markReplay.ts`, its test, the `drop` `keys` input — same hunks,
+  so your merge sees identical lines) and the screen line in `flushStamps`.
+- **Changed: the key is not the bare queue number.** `m.key` is a NUMBER
+  counter (-1, -2, …) that restarts on every page load and in every tab,
+  and `markReplay` remembers `bid:key` for a day — so the first mark after a
+  reload, or in a second tab, would arrive as "-1" and be dropped as a
+  replay: a mark that vanishes. The screen sends `markKey(MARK_SESSION,
+m.key)` — a random id per page load plus the number
+  (`client/src/lib/markKeys.ts`, test red on the bare line). Worth keeping in
+  mind for the durable `clientKey` column: it needs the same uniqueness.
+
+## WHERE B STANDS — 2026-10-15 (third night, done 23:30)
+
+- All eight items worked, track-b only, local-dev not pushed. Plans only:
+  `user-levels-plan.md` (L1–L6, T1–T6). Break-it found four faults in the
+  new Unassigned count, all fixed with tests. Morning questions Q5, Q6 new;
+  Q2 closed. Servers stopped; MySQL 3307 running.
+
+- **Done, pushed to track-b only:** unpriced starter prices read "not
+  priced", never $0.00 (`893c4bcf`, Gate green); 375 px trace toolbar two
+  rows, pill one row (`b7230030`, touch check 84/0); local-dev a4c97280
+  merged in (`04693306`, Gate 38855439414 green); zoom at 5,000 marks
+  149–166 → 33 ms a step (`0e554ad6`); first starter change at 2,006 shops
+  6.2 s → 0.46 s, assembly 18.8 → 1.3 s (`3f4402e6`, `forkForOwners`).
+  "Just count, pick the item later" planned and built
+  (`count-first-plan.md`; `745da6da`, `b6b8ad2e`; morning Q5).
+  Running notes: `overnight-log-b.md` third night.
+
+## WHERE B STANDS — 2026-10-15 (second morning), 375 px TOUCH FIXED
+
+- **Pushed to track-b only:** screenshots (`overnight-shots/b/`), morning
+  Q4 (phone finger check), and the two 375 px touch fixes in
+  `TraceLayer.tsx` (selection extras behind "More" on touch; trace pill at
+  the bottom on touch). Touch check passes at all five touch sizes.
+- **Gate 38743997163 green on eb94729a** (test + drizzle-guard). Not merged
+  to local-dev. (Run 38740741446 on 92e29d04 was the MySQL image refusal, Q1.)
+- **Open:** at 375x667 the trace toolbar is three rows tall, so the drawing
+  is short; zoom at 5,000 marks; Q1, Q2, Q4.
+
+## WHERE B STANDS — 2026-10-15 (morning), GATE GREEN ON e8993da2
+
+- **Gate 38704354488 green on e8993da2** — covers starter offers, stress
+  rounds 1–6 and the touch follow-up. (Runs 38690818780 / 38691805415 were
+  the MySQL image refusal, no test ran — morning question Q1.)
+- **Not merged to local-dev.** Nothing pushed but track-b.
+- **Stress fixes** (stress-results-b.md): starter pinning no longer visits
+  every shop; preview counts instead of forking; marks in a memoized layer
+  (pan); a big set no longer downloads whole looking for panel schedules;
+  offline marks retry with a standing message; one failed sheet no longer
+  kills the plan; "Name this symbol" closes on a sheet change / Trace.
+- **Open:** two touch steps at 375 px (Q3); zoom at 5,000 marks (~130–260
+  ms a wheel step, fine at 1,000); first starter edit at thousands of shops
+  (Q2). Server stopped; MySQL 3307 left running.
+
+## WHERE B STANDS — 2026-10-15 (overnight), STARTER OFFERS BUILT ON track-b
+
+- **Built, steps 1–6 of `starter-offers-plan.md` § 4**, on track-b only
+  (local-dev untouched since d0152f60). The plan's header lists where the
+  build differs from its text. Running notes: `overnight-log-b.md`; owner
+  questions: `morning-questions-b.md`.
+- **Server:** `collapseOffer` (per field — the § 3a fix), Example tag in the
+  same change (`exampleTagAfter`), `server/starterOffers.ts` (read, Accept,
+  Accept all, Ignore, un-ignore, draft re-count), `starterOffersRouter`
+  (owner/admin answer), admin routes previewEdit / applyEdit / changeLog /
+  undoBatch. No migration.
+- **Screens:** Dashboard card, one Updates view on Materials / Assemblies /
+  Labor rates (`?view=updates`), the admin edit dialog and Change log on
+  `/starter`. Looked at laptop, iPad both ways, phone 375.
+- **Not built:**
+  a `starter_accepted` price-history row (no writer
+  exists), hide offers.
+- **For A:** `starterDrift --apply` may now stop holding tag splits where
+  the tag `exampleTagAfter` would write equals the seed's (§ 4 step 1).
+- **Step 0:** local-dev Gate for d0152f60 green after one re-run (image pull
+  rate limit): smoke 96/2, staging `/api/version` d0152f60.
+
 ## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
 
 **Never replace, restore, re-copy or drop a shared local database

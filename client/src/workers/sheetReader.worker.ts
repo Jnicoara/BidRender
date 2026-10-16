@@ -139,6 +139,27 @@ async function bookmarksOf(doc: pdfjs.PDFDocumentProxy) {
 
 self.onmessage = async (e: MessageEvent) => {
   const msg = e.data;
+  /*
+    PROBE (hard-PDF drill, 2026-10-16): open the file on this machine and
+    say whether pdf.js can, before an upload starts — a password-protected or
+    damaged set used to upload, attach, and only then fail to open. Reads
+    only the ranges pdf.js needs (FileRangeTransport), so a 2 GB set costs
+    a few chunks, not the file.
+  */
+  if (msg?.type === "probe") {
+    try {
+      const doc = await open(msg);
+      self.postMessage({ type: "probed", pageCount: doc.numPages });
+      void doc.destroy();
+    } catch (err) {
+      const e2 = err as { name?: string; message?: string };
+      self.postMessage({
+        type: "probeFailed",
+        message: `${e2.name ?? "Error"}: ${e2.message ?? String(err)}`,
+      });
+    }
+    return;
+  }
   if (!msg || msg.type !== "read") {
     self.postMessage({
       type: "error",

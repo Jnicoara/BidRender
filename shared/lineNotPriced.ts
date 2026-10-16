@@ -331,6 +331,14 @@ export type NotPricedTally = {
    * print are pinned by `server/dropsNotPriced.test.ts` instead.
    */
   drops?: number;
+  /**
+   * Marks in the bid's Unassigned count (references/count-first-plan.md).
+   * A LABEL on the whole-bid totals only — "+ 3 marks unassigned" (owner,
+   * Q5, 2026-10-15) — never money left out: `tallyLeavesOut` and
+   * `anyNotPriced` do not read it, and the Materials / Labor shares leave it
+   * behind. Optional, absent = 0. The print is blocked by its own check.
+   */
+  unassigned?: number;
 };
 
 export const NOTHING_NOT_PRICED: NotPricedTally = {

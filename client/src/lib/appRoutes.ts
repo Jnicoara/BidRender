@@ -50,11 +50,24 @@ export type Route =
  * addresses have somewhere real to land, and so browser Back still works when
  * moving between tabs inside one screen.
  */
-export const MATERIALS_VIEWS = ["catalog", "pricing"] as const;
+export const MATERIALS_VIEWS = ["catalog", "pricing", "updates"] as const;
 export type MaterialsView = (typeof MATERIALS_VIEWS)[number];
 
-export const ASSEMBLY_VIEWS = ["assemblies", "kits", "modifiers"] as const;
+export const ASSEMBLY_VIEWS = [
+  "assemblies",
+  "kits",
+  "modifiers",
+  "updates",
+] as const;
 export type AssemblyView = (typeof ASSEMBLY_VIEWS)[number];
+
+/**
+ * Labor rates had no tabs until BidRidge's starter updates (starter-offers-
+ * plan.md § 2.3, owner Q3): "updates" is the same view Materials and
+ * Assemblies carry, so a shop finds an update on whichever screen it is on.
+ */
+export const LABOR_RATE_VIEWS = ["rates", "updates"] as const;
+export type LaborRateView = (typeof LABOR_RATE_VIEWS)[number];
 
 /**
  * Settings, one panel at a time.
@@ -210,7 +223,11 @@ export function pathToRoute(path: string): RouteState {
   if (p === "welcome") return { route: "welcome" };
   // Library § …. Bare /library lands on Materials.
   if (p === "library") {
-    if (parts[1] === "labor-rates") return { route: "library-labor-rates" };
+    if (parts[1] === "labor-rates")
+      return {
+        route: "library-labor-rates",
+        view: pickView(query, LABOR_RATE_VIEWS, "rates"),
+      };
     if (parts[1] === "assemblies")
       return {
         route: "library-assemblies",
@@ -255,7 +272,9 @@ export function routeToPath(
         ? `/library/materials?view=${view}`
         : "/library/materials";
     case "library-labor-rates":
-      return "/library/labor-rates";
+      return view && view !== "rates"
+        ? `/library/labor-rates?view=${view}`
+        : "/library/labor-rates";
     case "library-assemblies":
       return view && view !== "assemblies"
         ? `/library/assemblies?view=${view}`

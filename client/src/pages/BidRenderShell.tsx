@@ -32,6 +32,7 @@ import { BackupHealthBanner } from "@/components/BackupHealthBanner";
 import AdminSettingsPage from "@/pages/AdminSettingsPage";
 import MaterialsLibraryPage from "@/pages/MaterialsLibraryPage";
 import LaborRatesPage from "@/pages/LaborRatesPage";
+import StarterUpdatesPage from "@/pages/StarterUpdatesPage";
 import ModifiersPage from "@/pages/ModifiersPage";
 import AssembliesLibraryPage from "@/pages/AssembliesLibraryPage";
 import BidsPage from "@/pages/BidsPage";
@@ -254,6 +255,12 @@ export default function BidRenderShell() {
       );
     // Materials and its supply-house lens are the same rows; the view only
     // decides which columns. See LibraryTabs.
+    // BidRidge starter updates: one view, on all three library screens.
+    if (activeView === "updates") {
+      if (isInLibraryMats) return <StarterUpdatesPage screen="materials" />;
+      if (isInLibraryAsms) return <StarterUpdatesPage screen="assemblies" />;
+      if (isInLaborRates) return <StarterUpdatesPage screen="laborRates" />;
+    }
     if (isInLibraryMats)
       return activeView === "pricing" ? (
         <MaterialDatabasePage />
@@ -308,6 +315,7 @@ export default function BidRenderShell() {
           onFixLine={lineId =>
             navigate("bids", { id: activeProjectId, fixLineId: lineId })
           }
+          onOpenPlans={() => navigate("takeoff", { id: activeProjectId })}
         />
       );
     }
@@ -672,27 +680,30 @@ export default function BidRenderShell() {
                 ? "Dashboard"
                 : isInSettings
                   ? "Settings"
-                  : isInLibraryMats
-                    ? activeView === "pricing"
-                      ? "Supplier pricing"
-                      : "Materials"
-                    : isInLibraryAsms
-                      ? activeView === "kits"
-                        ? "Kits"
-                        : activeView === "modifiers"
-                          ? "Modifiers"
-                          : "Assemblies"
-                      : isInLaborRates
-                        ? "Labor Rates"
-                        : isInClients
-                          ? "Clients"
-                          : isInTeam
-                            ? "Crew"
-                            : isInAnalytics
-                              ? "Performance"
-                              : isInAdmin
-                                ? "Admin"
-                                : "Bid"}
+                  : activeView === "updates" &&
+                      (isInLibraryMats || isInLibraryAsms || isInLaborRates)
+                    ? "Updates"
+                    : isInLibraryMats
+                      ? activeView === "pricing"
+                        ? "Supplier pricing"
+                        : "Materials"
+                      : isInLibraryAsms
+                        ? activeView === "kits"
+                          ? "Kits"
+                          : activeView === "modifiers"
+                            ? "Modifiers"
+                            : "Assemblies"
+                        : isInLaborRates
+                          ? "Labor Rates"
+                          : isInClients
+                            ? "Clients"
+                            : isInTeam
+                              ? "Crew"
+                              : isInAnalytics
+                                ? "Performance"
+                                : isInAdmin
+                                  ? "Admin"
+                                  : "Bid"}
             </span>
           </div>
         </header>

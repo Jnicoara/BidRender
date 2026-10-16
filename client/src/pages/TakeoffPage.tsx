@@ -111,6 +111,15 @@ import {
 import { StatusStrip } from "@/components/takeoff/StatusStrip";
 import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
+import { outlineNeeded } from "@/lib/planOutline";
+import { captureOutlived } from "@/lib/captureLifetime";
+import { planFailureText, planFileProblemText } from "@/lib/planFailure";
+import { probePlanFile } from "@/lib/probePlanFile";
+import {
+  isNetworkFailure,
+  markRetryDelay,
+  unsavedMarksMessage,
+} from "@/lib/markRetry";
 import { formatElevation } from "@shared/takeoffHeights";
 import {
   HeightAreasLayer,
@@ -387,7 +396,7 @@ import {
   type ProvisionalOutcome,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
-import { plansPane } from "@/lib/plansPane";
+import { isMissingBid, plansPane, retryUnlessMissing } from "@/lib/plansPane";
 import {
   UPLOAD_PREVIEW_NOTE,
   localPlanKey,
@@ -522,6 +531,9 @@ import {
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
+import { UNASSIGNED_COUNT_NAME } from "@shared/unassignedCount";
+import { MARK_SESSION, markKey, recoveredKeys } from "@/lib/markKeys";
+import { workTagOffer, workTagOfferText } from "@/lib/workTagOffer";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import {
@@ -917,12 +929,25 @@ function usePdfWorker() {
           pageNum,
           hash,
         }),
-      homeruns: (pageNum: number, hash: string) =>
-        ask<SheetHomeruns>({ type: "homeruns", pageNum, hash }),
+      homeruns: (
+        pageNum: number,
+        hash: string,
+        schedulePages: readonly number[] | null
+      ) =>
+        ask<SheetHomeruns>({ type: "homeruns", pageNum, hash, schedulePages }),
       keyedNotes: (pageNum: number, hash: string) =>
         ask<SheetNotesRead>({ type: "keyedNotes", pageNum, hash }),
-      circuits: (pageNum: number, hash: string) =>
-        ask<SheetCircuitText>({ type: "circuits", pageNum, hash }),
+      circuits: (
+        pageNum: number,
+        hash: string,
+        schedulePages: readonly number[] | null
+      ) =>
+        ask<SheetCircuitText>({
+          type: "circuits",
+          pageNum,
+          hash,
+          schedulePages,
+        }),
       connectPoints: (pageNum: number, hash: string, marks: ConnectMark[]) =>
         ask<[number, ConnectPoint][]>({
           type: "connectPoints",
@@ -1033,6 +1058,8 @@ class PlanUrlExpired extends Error {
 }
 
 function PlanPane({
+  sheetPages,
+  schedulePages,
   doc,
   localFile = null,
   sourceKey,
@@ -1059,6 +1086,16 @@ function PlanPane({
   viewRequest,
   drawingChrome,
 }: {
+  /**
+   * Pages that already have a sheet row; null while not known. The outline
+   * is read only for pages that do not (`outlineNeeded`).
+   */
+  sheetPages: readonly number[] | null;
+  /**
+   * Pages whose stored text could hold a panel schedule (null = read them
+   * all; undefined = not known yet, so the reads that need it wait).
+   */
+  schedulePages: readonly number[] | null | undefined;
   /**
    * Where this pane is looking RIGHT NOW (null = fitted), kept current on
    * every view change — what "Back" returns to after a detail jump (5d).
@@ -2063,6 +2100,20 @@ function PlanPane({
     page,
   });
   const [error, setError] = useState<string | null>(null);
+  /*
+    ONE sheet that could not be drawn — not the document. It used to set
+    `error`, which replaced the whole pane and stopped every later render
+    (each effect returns while `error` is set), so a sheet that failed while
+    the connection was down left the plan dead until a reload, even after the
+    connection came back (failure drill, 2026-10-15). Now it is this sheet's,
+    shown over the drawing with Try again; another sheet is unaffected.
+  */
+  const [sheetFailure, setSheetFailure] = useState<{
+    page: number;
+    message: string;
+  } | null>(null);
+  // Bumped by "Try again" on a document that could not be opened.
+  const [openNonce, setOpenNonce] = useState(0);
   /**
    * Pages whose text has been DELIVERED for scale detection, so it runs once
    * each — counted on delivery, not on asking (@/lib/pageTextRead).
@@ -2091,6 +2142,10 @@ function PlanPane({
   /** What the open document turned out to hold, for the re-announce. */
   const openedPages = useRef(0);
   const openedOutline = useRef<{ pageNumber: number; title: string }[]>([]);
+  // Read when the load finishes, not when it starts: the rows usually
+  // arrive while the document is still opening.
+  const sheetPagesRef = useRef(sheetPages);
+  sheetPagesRef.current = sheetPages;
 
   /*
     THE SAME FILE, A NEW ROW (Gap 6.1). An upload shown from this machine
@@ -2169,7 +2224,10 @@ function PlanPane({
           setPageCount(pages);
           setLoading(false);
           if (doc.pageCount !== pages) onPageCountRef.current(pages);
-          const entries = await outline(hash).catch(() => []);
+          // Only while a page still needs a sheet row (@/lib/planOutline).
+          const entries = outlineNeeded(pages, sheetPagesRef.current)
+            ? await outline(hash).catch(() => [])
+            : [];
           if (cancelled) return;
           openedOutline.current = entries;
           onDocumentReadyRef.current({ pageCount: pages, outline: entries });
@@ -2222,7 +2280,10 @@ function PlanPane({
         if (doc.pageCount !== pages) onPageCount(pages);
 
         // Best-effort: no outline is normal, and must not fail the open.
-        const entries = await outline(hash).catch(() => []);
+        // Only while a page still needs a sheet row (@/lib/planOutline).
+        const entries = outlineNeeded(pages, sheetPagesRef.current)
+          ? await outline(hash).catch(() => [])
+          : [];
         if (cancelled) return;
         openedOutline.current = entries;
         onDocumentReady({ pageCount: pages, outline: entries });
@@ -2261,7 +2322,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [source, hash, load, loadUrl, loadFile, outline]);
+  }, [source, hash, load, loadUrl, loadFile, outline, openNonce]);
 
   // Paint the backdrop: the whole sheet, once per page, at RENDER_SCALE.
   useEffect(() => {
@@ -2294,15 +2355,15 @@ function PlanPane({
         setDrawnScale(scale);
         bitmap.close();
         setRendering(false);
+        setSheetFailure(f => (f && f.page === page ? null : f));
         onPageRendered?.(page, canvas, scale);
       })
       .catch(err => {
         if (cancelled) return;
-        setError(
-          err instanceof Error
-            ? err.message
-            : "That page could not be drawn. Move to another sheet and back."
-        );
+        setSheetFailure({
+          page,
+          message: err instanceof Error ? err.message : String(err),
+        });
         setRendering(false);
       });
 
@@ -2615,8 +2676,11 @@ function PlanPane({
   onHomerunsRef.current = onHomeruns;
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
+    // Wait for the schedule pages: reading before they arrive reads every
+    // page of the set for schedules (`panelsInDoc`).
+    if (schedulePages === undefined) return;
     let cancelled = false;
-    homerunsOnPage(page, hash)
+    homerunsOnPage(page, hash, schedulePages)
       .then(read => {
         if (!cancelled) onHomerunsRef.current?.(page, read);
       })
@@ -2625,7 +2689,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [page, pageCount, loading, error, hash, homerunsOnPage]);
+  }, [page, pageCount, loading, error, hash, homerunsOnPage, schedulePages]);
 
   /*
     KEYED NOTES ON THIS SHEET, the same way: read once per page in the
@@ -2655,8 +2719,9 @@ function PlanPane({
   onCircuitTextRef.current = onCircuitText;
   useEffect(() => {
     if (loading || error || pageCount === 0) return;
+    if (schedulePages === undefined) return; // as for homeruns, above
     let cancelled = false;
-    circuitsOnPage(page, hash)
+    circuitsOnPage(page, hash, schedulePages)
       .then(read => {
         if (!cancelled) onCircuitTextRef.current?.(page, read);
       })
@@ -2665,7 +2730,7 @@ function PlanPane({
     return () => {
       cancelled = true;
     };
-  }, [page, pageCount, loading, error, hash, circuitsOnPage]);
+  }, [page, pageCount, loading, error, hash, circuitsOnPage, schedulePages]);
 
   const onScaleDoubtRef = useRef(onScaleDoubt);
   onScaleDoubtRef.current = onScaleDoubt;
@@ -2746,14 +2811,30 @@ function PlanPane({
   }, [go, page, pageCount]);
 
   if (error) {
+    const failure = planFailureText("open", doc.filename, error);
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center max-w-sm">
           <FileText className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-          <p className="text-sm font-medium">
-            {doc.filename} could not be opened
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{error}</p>
+          <p className="text-sm font-medium">{failure.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{failure.detail}</p>
+          {failure.canRetry ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={() => setOpenNonce(n => n + 1)}
+            >
+              Try again
+            </Button>
+          ) : (
+            // A file problem: trying again opens the same file. Say how to
+            // put it right instead (hard-PDF drill, 2026-10-16).
+            <p className="text-xs text-muted-foreground mt-3">
+              Remove it with the bin beside its name under Documents, then
+              upload the new copy.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -2815,8 +2896,11 @@ function PlanPane({
         onClick={fitToView}
         disabled={loading}
         title="Fit the whole sheet (0)"
+        aria-label="Fit"
       >
-        <Maximize2 className="w-3.5 h-3.5" /> Fit
+        <Maximize2 className="w-3.5 h-3.5" />
+        {/* The phone keeps the icon: its toolbar row has no room for words. */}
+        {!fitOnly && "Fit"}
       </Button>
     </div>
   );
@@ -2848,6 +2932,49 @@ function PlanPane({
         style={{ touchAction: "none" }}
         onPointerDown={beginPlainPan}
       >
+        {sheetFailure && sheetFailure.page === page && (
+          <div
+            // OPAQUE: under it is the previous sheet's picture, and a dimmed
+            // wrong sheet read as this one in the drill (2026-10-15).
+            className="absolute inset-0 z-30 flex items-center justify-center bg-background p-6"
+            // Its own: a press here is not the start of a pan.
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <div className="text-center max-w-sm" role="alert">
+              <FileText className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+              <p className="text-sm font-medium">
+                {
+                  planFailureText("sheet", doc.filename, sheetFailure.message)
+                    .title
+                }
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {
+                  planFailureText("sheet", doc.filename, sheetFailure.message)
+                    .detail
+                }
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3"
+                onClick={() => {
+                  setSheetFailure(null);
+                  /*
+                    REOPEN, not re-ask: pdf.js keeps a page's promise once
+                    asked, a rejected one included, so asking for the same
+                    sheet again failed again even after the connection came
+                    back (measured in the drill). Reopening the document is
+                    about a second on the 500-sheet set and starts clean.
+                  */
+                  setOpenNonce(n => n + 1);
+                }}
+              >
+                Try again
+              </Button>
+            </div>
+          </div>
+        )}
         {/*
           Opening, then drawing sheet N, then the sheet — one panel for both
           waits, so nothing shows until the sheet can be shown whole and fitted
@@ -3100,13 +3227,19 @@ export default function TakeoffPage({
   onBack: () => void;
 }) {
   const utils = trpc.useUtils();
-  const { data: bid } = trpc.bids.get.useQuery({ id: bidId });
+  const { data: bid, error: bidError } = trpc.bids.get.useQuery(
+    { id: bidId },
+    { retry: retryUnlessMissing }
+  );
   const {
     data: docs = [],
     isLoading,
     isError: docsFailed,
+    error: docsError,
     refetch: refetchDocs,
-  } = trpc.bidPdfs.list.useQuery({ bidId });
+  } = trpc.bidPdfs.list.useQuery({ bidId }, { retry: retryUnlessMissing });
+  /** The server said this bid is not there — deleted, or never was. */
+  const bidMissing = isMissingBid(bidError) || isMissingBid(docsError);
   /*
     The pane, and whether the list is KNOWN. A list that failed arrives as the
     default [], which is not "this bid has no plans": the pane must not offer
@@ -3129,6 +3262,7 @@ export default function TakeoffPage({
     isError: docsFailed,
     count: docs.length,
     previewing: uploadPreview !== null,
+    missing: bidMissing,
   });
   const docsKnown = pane === "plans" || pane === "empty";
 
@@ -3298,6 +3432,20 @@ export default function TakeoffPage({
    */
   const [calibrateSession, setCalibrateSession] = useState(0);
   const startCalibrating = (mode: "set" | "check") => {
+    /*
+      THE TRACE TOOL GOES DOWN FIRST. On a phone the scale chip shows only
+      while tracing, so "Check it" was always tapped with Trace armed — and
+      the taps meant for the two ends of a dimension drew a run instead
+      (found by e2e/smoke/plans.spec.ts, 2026-10-16). A run already in
+      progress is not thrown away for this: finish or discard it first.
+    */
+    if (tracing) {
+      if (tracePoints.length > 0) {
+        toast.info("Finish or discard this run first, then check the scale.");
+        return;
+      }
+      setTracing(false);
+    }
     setCalibratePoints([]);
     setCalibrateMode(mode);
     setCalibrateSession(n => n + 1);
@@ -3818,6 +3966,18 @@ export default function TakeoffPage({
       { bidPdfId: doc?.id ?? 0 },
       { enabled: Boolean(doc) }
     );
+  // For PlanPane: which pages could hold a panel schedule, from the text
+  // stored at upload (server: bidPdfs.schedulePages).
+  const { data: schedulePagesData } = trpc.bidPdfs.schedulePages.useQuery(
+    { bidPdfId: doc?.id ?? 0 },
+    { enabled: Boolean(doc), staleTime: Infinity }
+  );
+  // For PlanPane: pages with a row, so an open skips the outline read once
+  // every page has one (@/lib/planOutline). Null while loading.
+  const sheetPagesKnown = useMemo(
+    () => (sheetsLoading ? null : sheets.map(sh => sh.pageNumber)),
+    [sheets, sheetsLoading]
+  );
 
   /**
    * Sheet numbers and titles read at upload (viewer piece 2), per page. A
@@ -3842,6 +4002,51 @@ export default function TakeoffPage({
   const { data: jumpList = [] } = trpc.bidPdfs.sheetJumpList.useQuery({
     bidId,
   });
+
+  /*
+    THE SHEET-TAG OFFER after an upload (status plan § 2a; owner item 6,
+    2026-10-15): on a set uploaded in THIS tab, the sheets whose titles say
+    demolition, offered once — "Use these tags" or "Not now". Titles arrive
+    as the sheet reader reads them, so the offer appears when they do.
+    Nothing is tagged without the tap, and a tag moves no number.
+  */
+  const [freshSetId, setFreshSetId] = useState<number | null>(null);
+  const [tagOfferClosed, setTagOfferClosed] = useState(false);
+  const tagOffer = useMemo(
+    () =>
+      doc && doc.id === freshSetId && !tagOfferClosed
+        ? workTagOffer(sheets, id => {
+            const entry = jumpList.find(j => j.sheetId === id);
+            return entry
+              ? { title: entry.title, number: entry.number }
+              : { title: sheets.find(s => s.id === id)?.name ?? "" };
+          })
+        : [],
+    [doc, freshSetId, tagOfferClosed, sheets, jumpList]
+  );
+  const [taggingOffer, setTaggingOffer] = useState(false);
+  const takeTagOffer = async () => {
+    setTaggingOffer(true);
+    try {
+      for (const row of tagOffer)
+        await utils.client.bidPdfs.setSheetWorkTag.mutate({
+          id: row.sheetId,
+          workTag: row.tag,
+        });
+      notUndoable("sheetWorkTag");
+      toast.success(
+        tagOffer.length === 1
+          ? "Tagged — marks placed on that sheet start as Remove."
+          : `Tagged ${tagOffer.length} sheets — marks placed on them start as Remove.`
+      );
+      setTagOfferClosed(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not tag the sheets.");
+    } finally {
+      setTaggingOffer(false);
+      refreshFor("sheet");
+    }
+  };
 
   const thumbnailPageCount = doc?.pageCount ?? sheets.length;
   const wantedThumbnails = useMemo(
@@ -5317,7 +5522,11 @@ export default function TakeoffPage({
   );
 
   const dropStamps = trpc.takeoffStamps.drop.useMutation({
-    onError: e => toast.error(e.message),
+    // A dropped connection is said by the message that STAYS while marks
+    // wait (`unsavedMarksMessage`), not by a four-second "Failed to fetch".
+    onError: e => {
+      if (!isNetworkFailure(e)) toast.error(e.message);
+    },
     onSettled: refreshStamps,
   });
 
@@ -5500,6 +5709,10 @@ export default function TakeoffPage({
     onError: e => toast.error(e.message),
   });
   const createGroup = trpc.takeoffGroups.create.useMutation({
+    onError: e => toast.error(e.message),
+  });
+  /** The bid's one Unassigned count: "Just count" (count-first-plan.md). */
+  const unassignedGroup = trpc.takeoffGroups.unassigned.useMutation({
     onError: e => toast.error(e.message),
   });
 
@@ -5720,7 +5933,11 @@ export default function TakeoffPage({
           row.sendability.reason === "already-on-bid",
         sendable: row.sendability.sendable,
         // Made by name, with nothing from the library behind it (§ 8a).
-        byNameOnly: row.kind === "plain" || row.kind === "typed",
+        // Not the Unassigned count: it has no name to link an assembly to,
+        // and asks what its marks are instead.
+        byNameOnly:
+          !row.unassigned && (row.kind === "plain" || row.kind === "typed"),
+        unassigned: row.unassigned,
         // Remove / relocate labor lines (shared/roleLines.ts).
         laborRolesWaiting: row.laborRolesWaiting,
         laborRolesOnBid: row.laborRolesOnBid,
@@ -6029,6 +6246,31 @@ export default function TakeoffPage({
       refreshFor("marksMoved");
     },
   });
+  /**
+   * "Pick what they are" on the Unassigned count (count-first-plan.md): find
+   * or make the count the answer names — the way the Count picker does — and
+   * move EVERY unassigned mark, on every sheet, into it. Same move, undo and
+   * refresh as "Move to". A refusal was already said by the mutation.
+   */
+  const assignUnassigned = useCallback(
+    async (
+      fromGroupId: number,
+      to: { assembly: { id: number } } | { name: string }
+    ) => {
+      const target = await (
+        "assembly" in to
+          ? groupForAssembly.mutateAsync({ bidId, assemblyId: to.assembly.id })
+          : createGroup.mutateAsync({
+              bidId,
+              label: to.name,
+              reuseExisting: true,
+            })
+      ).catch(() => null);
+      if (!target) return;
+      moveStamps.mutate({ fromGroupId, groupId: target.id });
+    },
+    [bidId, groupForAssembly, createGroup, moveStamps]
+  );
   /*
     MARKING WHAT A MARK IS — new, existing to remain, remove, relocate (pin
     plan § 7). Only a new mark is priced (shared/markStatus.ts), so this moves
@@ -6270,7 +6512,14 @@ export default function TakeoffPage({
     },
     onSuccess: r => {
       notUndoable("symbol");
-      toast.success(`Linked to ${r.assemblyName} — one click from now on.`);
+      toast.success(
+        r.adopted > 0
+          ? `Linked to ${r.assemblyName} — the count on this bid counts it now.`
+          : `Linked to ${r.assemblyName} — one click from now on.`
+      );
+      // The count already made became the assembly's (server/groupSource.ts):
+      // its card, its marks' names and the bid's lines all move.
+      if (r.adopted > 0) refreshFor("marksMoved");
     },
     onSettled: () => void utils.takeoffStamps.symbols.invalidate(),
   });
@@ -6736,13 +6985,55 @@ export default function TakeoffPage({
           // A provisional count's id means nothing after a reload; its marks
           // are mirrored once the count exists (`armWhileCreating`).
           .filter(m => m.sheetId === sheetId && !isProvisionalGroup(m.groupId))
-          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y, status: m.status }))
+          .map(m => ({
+            groupId: m.groupId,
+            x: m.x,
+            y: m.y,
+            status: m.status,
+            // The key it is sent with, so a recovery resend counts once.
+            key: markKey(MARK_SESSION, m.key),
+          }))
       );
     },
     [bidId]
   );
 
   const flushTimer = useRef<number | null>(null);
+  /*
+    Marks a batch could not SEND are retried on their own (@/lib/markRetry):
+    they used to go out again only on the next click, so ten marks placed
+    while the connection was down stayed unsaved after it came back, with
+    nothing on screen to say so (failure drill, 2026-10-15).
+  */
+  const markRetry = useRef<{ attempt: number; timer: number | null }>({
+    attempt: 0,
+    timer: null,
+  });
+  const UNSAVED_TOAST = "marks-not-saved";
+  const scheduleMarkRetry = useCallback(() => {
+    const r = markRetry.current;
+    const unsent = pendingStamps.current.filter(m => !m.sent).length;
+    toast.warning(unsavedMarksMessage(Math.max(1, unsent)), {
+      id: UNSAVED_TOAST,
+      duration: Infinity,
+    });
+    if (r.timer !== null) return; // one retry waiting is enough
+    r.timer = window.setTimeout(() => {
+      r.timer = null;
+      flushStampsRef.current();
+    }, markRetryDelay(r.attempt));
+    r.attempt += 1;
+  }, []);
+  useEffect(() => {
+    // Back online: send now rather than at the next back-off step.
+    const onOnline = () => flushStampsRef.current();
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      const r = markRetry.current;
+      if (r.timer !== null) window.clearTimeout(r.timer);
+    };
+  }, []);
   /** What the server said about each provisional count (`armWhileCreating`). */
   const provisionalOutcomes = useRef(new Map<number, ProvisionalOutcome>());
 
@@ -6815,6 +7106,12 @@ export default function TakeoffPage({
           sheetId,
           groupId,
           at: batch.map(m => ({ x: m.x, y: m.y })),
+          // One per click: a batch resent after a LOST answer (the server
+          // wrote it, the reply never came) places each mark once, not
+          // twice (server/markReplay.ts; Track A's counting deep test).
+          // Never the bare queue number, which restarts every page load:
+          // see @/lib/markKeys.
+          keys: batch.map(m => markKey(MARK_SESSION, m.key)),
           status,
         })
         /*
@@ -6848,6 +7145,9 @@ export default function TakeoffPage({
           await utils.takeoffStamps.listForSheet.invalidate({ sheetId });
           setPending(pendingStamps.current.filter(m => !keys.has(m.key)));
           mirrorQueue(sheetId);
+          markRetry.current.attempt = 0;
+          if (pendingStamps.current.every(m => m.sent))
+            toast.dismiss(UNSAVED_TOAST);
         })
         /*
           Back in the queue, and still on the drawing. A failed request must
@@ -6855,15 +7155,26 @@ export default function TakeoffPage({
           OWN batch, whatever is queued behind it — and survives a reload in
           the mirror either way. The hook's onError has already said why.
         */
-        .catch(() => {
+        .catch(err => {
           setPending(
             pendingStamps.current.map(m =>
               keys.has(m.key) ? { ...m, sent: false } : m
             )
           );
+          // No answer at all: try again on its own (@/lib/markRetry). A
+          // refusal keeps its own message and waits for the person.
+          if (isNetworkFailure(err)) scheduleMarkRetry();
         });
     }
-  }, [bidId, dropStamps, mirrorQueue, setPending, utils, pushUndo]);
+  }, [
+    bidId,
+    dropStamps,
+    mirrorQueue,
+    setPending,
+    utils,
+    pushUndo,
+    scheduleMarkRetry,
+  ]);
   flushStampsRef.current = flushStamps;
   /**
    * Take a click: draw it now, send it shortly after.
@@ -7920,6 +8231,9 @@ export default function TakeoffPage({
             sheetId,
             groupId: group.id,
             at: part.map(st => ({ x: st.x, y: st.y })),
+            // The keys they were first sent with: a mark that DID land
+            // before the reload is not placed again (@/lib/markKeys).
+            keys: recoveredKeys(part),
             status: queuedStampStatus(part[0]),
           });
           recovered += part.length;
@@ -7960,6 +8274,20 @@ export default function TakeoffPage({
       ),
     [bidCounts.data?.groups, allAssemblies, symbols]
   );
+
+  // "Name this symbol" goes when the person picks up another tool or changes
+  // sheet (@/lib/captureLifetime): it outlived both and covered the trace
+  // bar's Finish on a tablet (touch check, 2026-10-15).
+  useEffect(() => {
+    if (
+      captureOutlived(pendingCapture, {
+        tracing,
+        countArmed: armedGroup !== null,
+        sheetId: activeSheet?.id,
+      })
+    )
+      setPendingCapture(null);
+  }, [pendingCapture, tracing, armedGroup, activeSheet?.id]);
 
   /**
    * R re-arms the last count ("Count again", @/lib/countAgain). Only while
@@ -8202,6 +8530,53 @@ export default function TakeoffPage({
     [layeredStamps, effectiveLayers]
   );
 
+  /*
+    The marks the drawing shows, as ONE array that only changes when the marks
+    do (Track B stress pass, 2026-10-15): it was built inline in the JSX, a
+    new array on every render, so the memoized MarkLayer re-rendered every
+    mark on every pan step — about 250 ms a step with 5,000 marks (dev).
+  */
+  const layerStamps = useMemo(
+    () => [
+      ...visibleStamps.map(st => ({
+        id: st.id,
+        name: st.name,
+        groupId: st.groupId,
+        assemblyId: st.assemblyId,
+        assemblyCategory: st.assemblyCategory ?? null,
+        x: st.x,
+        y: st.y,
+        status: st.status,
+      })),
+      /*
+                    Clicked and not yet saved, drawn the same way.
+
+                    Deliberately NOT put through the Layers filter above:
+                    these are the marks somebody is placing right now with
+                    that very count armed, and a mark that does not appear
+                    because a layer is hidden is indistinguishable from a
+                    click that missed.
+                  */
+      ...pendingMarks
+        // Held under a stand-in until the row arrives.
+        .filter(m => m.sheetId === drawnSheetId)
+        .map(m => ({
+          id: m.key,
+          name: m.name,
+          groupId: m.groupId,
+          assemblyId: m.assemblyId,
+          assemblyCategory: m.assemblyCategory,
+          x: m.x,
+          y: m.y,
+          // What "placing as" said when it was clicked, so
+          // an existing device is hollow before the reply.
+          status: m.status === "new" ? null : m.status,
+          pending: true,
+        })),
+    ],
+    [visibleStamps, pendingMarks, drawnSheetId]
+  );
+
   /** The selection's own height and left-off drops, for the pill. */
   const selectionDrops = useMemo(
     () => selectionDrop(stamps, selectedStampIds),
@@ -8276,23 +8651,25 @@ export default function TakeoffPage({
     return visibleRuns.filter(r => (r.parentRunId ?? r.id) === root);
   }, [hideOtherRuns, tracing, selectedRunId, visibleRuns]);
 
-  const stampGroups = useMemo(
-    () =>
-      groupStamps(
-        visibleStamps.map(st => ({
-          id: st.id,
-          sheetId: st.sheetId,
-          groupId: st.groupId,
-          name: st.name,
-          assemblyId: st.assemblyId,
-          assemblyCategory: st.assemblyCategory ?? null,
-          x: st.x,
-          y: st.y,
-          status: st.status,
-        }))
-      ),
-    [visibleStamps]
-  );
+  const stampGroups = useMemo(() => {
+    const groups = groupStamps(
+      visibleStamps.map(st => ({
+        id: st.id,
+        sheetId: st.sheetId,
+        groupId: st.groupId,
+        name: st.name,
+        assemblyId: st.assemblyId,
+        assemblyCategory: st.assemblyCategory ?? null,
+        x: st.x,
+        y: st.y,
+        status: st.status,
+      }))
+    );
+    // The Unassigned count first: it is the one asking a question.
+    const held = (g: (typeof groups)[number]) =>
+      g.groupId !== null && bridgeByGroup.get(g.groupId)?.unassigned === true;
+    return [...groups.filter(held), ...groups.filter(g => !held(g))];
+  }, [visibleStamps, bridgeByGroup]);
 
   /**
    * A stamp sitting on a run's end that nothing has claimed yet.
@@ -9778,6 +10155,16 @@ export default function TakeoffPage({
         return;
       }
 
+      // Can it be OPENED? A password or a damaged file used to upload,
+      // attach, and only then fail on the drawing (hard-PDF drill,
+      // 2026-10-16). Fails open: only a sure file problem stops it.
+      const probe = await probePlanFile(file);
+      if (!probe.ok) {
+        const words = planFileProblemText(probe.problem, file.name);
+        fail(words.title, { detail: words.detail, retryable: false });
+        return;
+      }
+
       // A genuinely huge set opens fine but takes a visible moment the first
       // time. This used to warn from 150MB that it "may not render on a
       // low-memory device", which was true when the viewer read the whole
@@ -9848,6 +10235,8 @@ export default function TakeoffPage({
             keepLocal(attached.id);
             setState({ state: "done" });
             setSelectedDocId(attached.id);
+            setFreshSetId(attached.id);
+            setTagOfferClosed(false);
             if (!previewed) setPage(1);
             void utils.bidPdfs.list.invalidate({ bidId });
             toast.success(`${attached.filename} attached.`);
@@ -9902,6 +10291,8 @@ export default function TakeoffPage({
 
         setState({ state: "done" });
         setSelectedDocId(attached.id);
+        setFreshSetId(attached.id);
+        setTagOfferClosed(false);
         if (!previewed) setPage(1);
         void utils.bidPdfs.list.invalidate({ bidId });
         toast.success(`${attached.filename} attached.`);
@@ -10117,7 +10508,7 @@ export default function TakeoffPage({
               header is one line and the drawing gets the rest. Same three
               actions, same handlers — no phone-only copy of what they do.
             */}
-            {phone && (
+            {phone && !bidMissing && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -10154,7 +10545,7 @@ export default function TakeoffPage({
               cost, so it must not sit behind a finished, priced bid. It stays
               outlined rather than filled because adding a plan is still the
               louder action on this screen. */}
-            {!phone && (
+            {!phone && !bidMissing && (
               <>
                 <Button
                   size="sm"
@@ -10484,6 +10875,11 @@ export default function TakeoffPage({
                       createGroup.mutateAsync({ bidId, label })
                     );
                   }}
+                  onJustCount={() =>
+                    armWhileCreating(UNASSIGNED_COUNT_NAME, null, null, () =>
+                      unassignedGroup.mutateAsync({ bidId })
+                    )
+                  }
                 />
                 {/*
                 COUNT AGAIN (pin plan § 11.6). A sheet change puts the count
@@ -10971,13 +11367,21 @@ export default function TakeoffPage({
                     locked={tracePoints.length > 0}
                   />
                 )}
-                <TraceEndsPickers
-                  bidId={bidId}
-                  value={traceEnds}
-                  onChange={updateTraceEnds}
-                  quantity={activeTraceMode === "quantity"}
-                />
-                <div className="w-px h-4 bg-border" />
+                {/*
+                  On the phone the pickers take the second row to themselves
+                  (order-last, full width) and the mode, scale and Fit share the
+                  first: two rows, not five, so the drawing keeps its height.
+                  The divider alone took a row of its own there.
+                */}
+                <div className={cn(phone && "order-last basis-full")}>
+                  <TraceEndsPickers
+                    bidId={bidId}
+                    value={traceEnds}
+                    onChange={updateTraceEnds}
+                    quantity={activeTraceMode === "quantity"}
+                  />
+                </div>
+                {!phone && <div className="w-px h-4 bg-border" />}
               </>
             )}
 
@@ -11011,6 +11415,7 @@ export default function TakeoffPage({
             {activeSheet && (!phone || tracing) && (
               <ScaleControl
                 sheet={activeSheet}
+                compact={phone}
                 wanted={
                   !measurability?.ok && (reachingForMeasure || calibrating)
                 }
@@ -11370,6 +11775,35 @@ export default function TakeoffPage({
         />
       )}
 
+      {/* The sheet-tag offer after an upload (see `tagOffer`). One line,
+          shrink-0, so it never pushes the drawing's controls away. */}
+      {tagOffer.length > 0 && (
+        <div
+          role="status"
+          className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs"
+        >
+          <span className="min-w-0 flex-1 basis-64">
+            {workTagOfferText(tagOffer)}
+          </span>
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            disabled={taggingOffer}
+            onClick={() => void takeTagOffer()}
+          >
+            Use these tags
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            onClick={() => setTagOfferClosed(true)}
+          >
+            Not now
+          </Button>
+        </div>
+      )}
+
       {/* Above the workspace rather than inside the empty state, so it is in
           the same place whether this is the first plan or the tenth. */}
       <UploadProgress
@@ -11388,6 +11822,30 @@ export default function TakeoffPage({
       {pane === "loading" ? (
         <div className="flex-1 p-6">
           <div className="h-full rounded-xl border border-border bg-card animate-pulse" />
+        </div>
+      ) : pane === "missing" ? (
+        // The server's answer, not a lost one: no "try again", which could
+        // never help, and no hint that the connection is at fault.
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div
+            role="alert"
+            className="w-full max-w-lg rounded-2xl border border-border bg-card p-10 text-center"
+          >
+            <p className="text-base font-medium">This bid doesn&apos;t exist</p>
+            <p className="text-sm text-muted-foreground mt-1.5">
+              It was deleted, or this link points at a bid that was never in
+              your company. Your connection is fine.
+            </p>
+            <Button
+              size="sm"
+              className="mt-4"
+              onClick={() => {
+                window.location.hash = "#/dashboard";
+              }}
+            >
+              Go to your bids
+            </Button>
+          </div>
         </div>
       ) : pane === "failed" ? (
         // Never the upload box: that would say this bid has no plans.
@@ -11635,6 +12093,8 @@ export default function TakeoffPage({
                 if (doc) setPageCount.mutate({ id: doc.id, pageCount });
               }}
               onDocumentReady={handleDocumentReady}
+              sheetPages={sheetPagesKnown}
+              schedulePages={schedulePagesData?.pages}
               onSheetVisible={handleSheetVisible}
               scaleSet={
                 activeSheet?.scaleRatio != null && activeSheet.scaleText
@@ -12148,43 +12608,7 @@ export default function TakeoffPage({
                       armedGroupName={armedGroup?.label ?? null}
                       zoom={size.zoom}
                       statusFocus={statusFocus}
-                      stamps={[
-                        ...visibleStamps.map(st => ({
-                          id: st.id,
-                          name: st.name,
-                          groupId: st.groupId,
-                          assemblyId: st.assemblyId,
-                          assemblyCategory: st.assemblyCategory ?? null,
-                          x: st.x,
-                          y: st.y,
-                          status: st.status,
-                        })),
-                        /*
-                          Clicked and not yet saved, drawn the same way.
-
-                          Deliberately NOT put through the Layers filter above:
-                          these are the marks somebody is placing right now with
-                          that very count armed, and a mark that does not appear
-                          because a layer is hidden is indistinguishable from a
-                          click that missed.
-                        */
-                        ...pendingMarks
-                          // Held under a stand-in until the row arrives.
-                          .filter(m => m.sheetId === drawnSheetId)
-                          .map(m => ({
-                            id: m.key,
-                            name: m.name,
-                            groupId: m.groupId,
-                            assemblyId: m.assemblyId,
-                            assemblyCategory: m.assemblyCategory,
-                            x: m.x,
-                            y: m.y,
-                            // What "placing as" said when it was clicked, so
-                            // an existing device is hollow before the reply.
-                            status: m.status === "new" ? null : m.status,
-                            pending: true,
-                          })),
-                      ]}
+                      stamps={layerStamps}
                       proposals={proposals}
                       onDropStamp={queueStamp}
                       selectedStampIds={selectedStampIds}
@@ -12603,6 +13027,7 @@ export default function TakeoffPage({
                 onLinkAssembly={(id, assemblyId) =>
                   setGroupSource.mutate({ id, assemblyId })
                 }
+                onAssignUnassigned={(id, to) => void assignUnassigned(id, to)}
                 sendingGroupId={
                   sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
                 }
@@ -12914,7 +13339,7 @@ export default function TakeoffPage({
                       }}
                       onCancelLegend={() => setCapturingLegend(false)}
                       onLink={(symbolId, assemblyId) =>
-                        linkSymbol.mutate({ id: symbolId, assemblyId })
+                        linkSymbol.mutate({ id: symbolId, assemblyId, bidId })
                       }
                       onUnlink={id => unlinkSymbol.mutate({ id })}
                       renameRefusal={

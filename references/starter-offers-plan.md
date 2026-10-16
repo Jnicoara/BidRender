@@ -31,6 +31,43 @@ to be fixed before it's built (§ 3a).
 >   (`baseline-screen-plan.md` § 10a). A still owns release order and
 >   `starterDrift --apply` (§ 5). Recorded in both track handoffs.
 
+> **BUILT 2026-10-14/15 (Track B, overnight; track-b, not merged).** Steps
+> 1–6 of § 4. Where the build differs from the text below, it says so here:
+>
+> - **§ 3a's fix as built** (`collapseOffer`, shared/starterChange.ts): one
+>   offer per (row, field) / (assembly, part); the offer is about the NEWEST
+>   change and is gone once that is answered; the shop's value counts as
+>   "BidRidge's" when it equals ANY value the starter held since the copy
+>   (first change's old value, or an earlier change's new one), so neither
+>   an earlier Ignore nor an earlier Accept makes it read own-value.
+>   `baselineVersion` only marks where the copy started; Accept never moves
+>   it.
+> - **§ 2.6 as suggested:** the tag rides in the change's value,
+>   `{"v": …, "example": …}`; price tagged only above $0, hours while any
+>   is set, rates always (`exampleTagAfter`). `seedProposal` now reports a
+>   person's change "live ahead" before its tag-split hold; LIFTING that hold
+>   for `starterDrift --apply` stays A's.
+> - **Updates is ONE view on Materials, Assemblies and Labor rates**
+>   (`?view=updates`), showing every kind with the screen's own first: run
+>   types and modifiers have no library screen, so a per-screen filter would
+>   have hidden them. The tab shows only while there are updates. The
+>   Dashboard card links to Materials → Updates.
+> - **Labor rates edit as a PAIR**: a rate is base wage × (1 + burden),
+>   stored as both, so the admin edits the wage or a burden part and the
+>   `rateEdit` route writes it AND the rate `loadedRate` makes, in one batch
+>   (`rateEditFields`, shared/loadedRate.ts). Typing the rate itself is
+>   refused on a broken-down rate.
+> - **Undo restores a $0 price** (found by eye): the above-zero rule is for
+>   new values; an undo puts back what the row held.
+> - **No `starter_accepted` price-history row**: nothing writes
+>   `material_price_history` yet.
+> - Files: `server/starterOffers.ts`, `server/routers/starterOffersRouter.ts`,
+>   `starterLibraryRouter` (previewEdit / applyEdit / changeLog / undoBatch),
+>   `client/src/components/library/StarterUpdates*.tsx`,
+>   `client/src/pages/starter/StarterEditing.tsx`,
+>   `client/src/lib/starterUpdates.ts`, `starterEdit.ts`,
+>   `hooks/useRefreshStarterOffers.ts`.
+
 ---
 
 ## 0. Decisions this builds on (searched before writing; none re-opened)

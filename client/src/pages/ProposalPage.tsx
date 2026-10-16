@@ -51,6 +51,7 @@ import {
 } from "@/lib/notPricedTotal";
 import { NOTHING_NOT_PRICED } from "@shared/lineNotPriced";
 import { exampleWarning } from "@shared/exampleTags";
+import { unassignedSentence } from "@shared/unassignedCount";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -146,11 +147,14 @@ export default function ProposalPage({
   bidId,
   onBack,
   onFixLine,
+  onOpenPlans,
 }: {
   bidId: number;
   onBack: () => void;
   /** Open the bid on this line with its "Fix this line" panel (gap 10). */
   onFixLine: (lineId: number) => void;
+  /** Open the bid's Plans screen — where unassigned marks are picked. */
+  onOpenPlans?: () => void;
 }) {
   const utils = trpc.useUtils();
   /**
@@ -237,8 +241,15 @@ export default function ProposalPage({
   */
   const examples = mode === "full" && data ? data.examples : null;
   const [confirmExamples, setConfirmExamples] = useState(false);
+  /*
+    Marks nobody has said what they are (references/count-first-plan.md)
+    block a priced print like a line not priced: they are work the total
+    cannot include. Scope-only is never blocked.
+  */
+  const unassigned = mode === "full" && data ? data.unassignedMarks : 0;
   const requestPrint = () => {
-    if (noWork || anyNotPriced(notPriced)) setConfirmPrint(true);
+    if (noWork || anyNotPriced(notPriced) || unassigned > 0)
+      setConfirmPrint(true);
     else if (examples && examples.lines > 0) setConfirmExamples(true);
     else print();
   };
@@ -674,7 +685,9 @@ export default function ProposalPage({
             <AlertDialogTitle>
               {noWork
                 ? "Add work before sending"
-                : `Price ${headline.one ? "this" : "these"} before sending`}
+                : anyNotPriced(notPriced)
+                  ? `Price ${headline.one ? "this" : "these"} before sending`
+                  : "Say what these marks are before sending"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {noWork ? (
@@ -682,6 +695,11 @@ export default function ProposalPage({
                   This bid has no lines yet, so the total would be $0.00. The
                   proposal can't be printed or saved until work is added to the
                   bid.
+                </>
+              ) : !anyNotPriced(notPriced) ? (
+                <>
+                  {unassignedSentence(unassigned)} The proposal can't be printed
+                  or saved until they are picked on the Plans screen.
                 </>
               ) : (
                 <>
@@ -700,6 +718,9 @@ export default function ProposalPage({
                     : " on the bid."}
                   {unpricedList.length > 0
                     ? " Pick a line to go straight to its fix."
+                    : null}
+                  {unassigned > 0
+                    ? ` ${unassignedSentence(unassigned)} Pick them on the Plans screen too.`
                     : null}
                 </>
               )}
@@ -749,6 +770,11 @@ export default function ProposalPage({
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>Close</AlertDialogCancel>
+            {!noWork && unassigned > 0 && onOpenPlans && (
+              <AlertDialogAction onClick={onOpenPlans}>
+                Open the Plans screen
+              </AlertDialogAction>
+            )}
             <AlertDialogAction onClick={onBack}>
               Back to the bid
             </AlertDialogAction>

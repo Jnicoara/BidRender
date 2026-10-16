@@ -21,15 +21,18 @@
  *   4. Anything else PINS first: every company with no copy of the row gets
  *      one, forked AS IT IS NOW and marked `isPinnedCopy = TRUE`, so the
  *      change cannot reach it. A part change pins the ASSEMBLY.
- *   5. CHANGE the shared row (or its part) and bump its version by 1.
+ *   5. CHANGE the shared row (or its part) and bump its version by 1. A
+ *      number that carries an Example tag writes the tag in the SAME change
+ *      (`exampleTagAfter`; starter-offers-plan.md § 2.6, Track B 2026-10-14):
+ *      a price above 0 is an example, a blank or $0 is not.
  *   6. LOG it: append-only, values wrapped `{"v": …}` so a column that WAS
  *      NULL is not mistaken for "not applicable" (SQL NULL).
  *
  * ── Not in this file yet ────────────────────────────────────────────────────
- * Offers, Accept and Ignore (§ 10a.3 "Offers"), hide / unhide / item_add
- * (`hideStarterItem`), and run-type EXTRAS, kits and labor steps (§ 10a.1
- * #1). Nothing calls this from a screen yet: the screen is Track B's and the
- * starter editor's login Track A's.
+ * Hide / unhide / item_add (`hideStarterItem`), and run-type EXTRAS, kits
+ * and labor steps (§ 10a.1 #1). Offers, Accept and Ignore are
+ * `server/starterOffers.ts` (Track B, 2026-10-14), read per FIELD
+ * (starter-offers-plan.md § 3a), not by `baselineVersion`.
  *
  * ── The boot no longer undoes a change here (Track A, 2026-10-13) ───────────
  * Until then `seedBaselineMaterials` re-stamped shared rows from the seed files
@@ -66,10 +69,12 @@ import {
   starterChangePins,
   starterChanges,
   takeoffRunTypes,
+  users,
 } from "../drizzle/schema";
 import * as db from "./db";
 import {
   STARTER_REFERENCES,
+  exampleTagAfter,
   sameStarterValue,
   starterChangeRefusal,
   starterFieldKind,
@@ -81,23 +86,63 @@ import { ABOVE_ZERO_FIELDS } from "../shared/starterSheetChecks";
 
 type Registry = {
   table: MySqlTable;
-  fork: (rowId: number, ownerUserId: number) => Promise<number>;
+  /**
+   * Fork the shared row for every owner listed, in one pass: owner → the
+   * copy's id, and whether this call made it (db.ts `forkForOwners`).
+   */
+  forkFor: (
+    rowId: number,
+    owners: readonly number[]
+  ) => Promise<Map<number, { id: number; made: boolean }>>;
 };
 
+/*
+  Each fork is looked up when CALLED, not when this module loads: the routers
+  import this file now, and a test that mocks ./db without the fork functions
+  (server/auth.email.test.ts) failed to load the whole router tree on
+  `db.forkMaterial` (Gate 38686356758, 2026-10-15).
+*/
 const TABLES: Record<StarterTable, Registry> = {
-  materials: { table: materials, fork: db.forkMaterial },
-  assemblies: { table: assemblies, fork: db.forkAssembly },
-  laborRates: { table: laborRates, fork: db.forkLaborRate },
-  modifiers: { table: modifiers, fork: db.forkModifier },
-  runTypes: { table: takeoffRunTypes, fork: db.forkRunType },
+  materials: {
+    table: materials,
+    forkFor: (id, owners) => db.forkMaterialFor(id, owners),
+  },
+  assemblies: {
+    table: assemblies,
+    forkFor: (id, owners) => db.forkAssemblyFor(id, owners),
+  },
+  laborRates: {
+    table: laborRates,
+    forkFor: (id, owners) => db.forkLaborRateFor(id, owners),
+  },
+  modifiers: {
+    table: modifiers,
+    forkFor: (id, owners) => db.forkModifierFor(id, owners),
+  },
+  runTypes: {
+    table: takeoffRunTypes,
+    forkFor: (id, owners) => db.forkRunTypeFor(id, owners),
+  },
 };
+
+/** The drizzle table behind a starter table name: ONE registry for both files. */
+export function starterTableOf(table: StarterTable): MySqlTable {
+  return TABLES[table].table;
+}
+
+/** Its columns by name (the offer read reads fields by name). */
+export function starterColumnsOf(
+  table: StarterTable
+): Record<string, MySqlColumn> {
+  return columnsOf(table);
+}
 
 /** What `targetTable` stores: the SQL name, as `childTable` does. */
 export function starterTableName(table: StarterTable): string {
   return getTableName(TABLES[table].table);
 }
 
-function tableFromName(name: string): StarterTable | null {
+export function tableFromName(name: string): StarterTable | null {
   for (const key of Object.keys(TABLES) as StarterTable[])
     if (starterTableName(key) === name) return key;
   return null;
@@ -108,7 +153,11 @@ function columnsOf(table: StarterTable): Record<string, MySqlColumn> {
 }
 
 /** A recipe line's fields a part change may set (`assemblyMaterialLine`'s). */
-const PART_LINE_FIELDS = ["qty", "overrideLaborHours", "isBranchWhip"] as const;
+export const PART_LINE_FIELDS = [
+  "qty",
+  "overrideLaborHours",
+  "isBranchWhip",
+] as const;
 type PartLineField = (typeof PART_LINE_FIELDS)[number];
 export type PartLine = {
   qty: string | number;
@@ -250,8 +299,14 @@ function storedValue(
   }
 }
 
-/** The log's wrapper: `{"v": null}` is "was NULL"; SQL NULL is "n/a". */
-const wrap = (v: unknown) => ({ v: v ?? null });
+/**
+ * The log's wrapper: `{"v": null}` is "was NULL"; SQL NULL is "n/a". A number
+ * that carries an Example tag logs it beside the value, `{"v": "0.5500",
+ * "example": true}`, so the tag is part of the same change and an Accept
+ * writes both (§ 2.6). `sameStarterValue` compares `v` only.
+ */
+const wrap = (v: unknown, example?: boolean) =>
+  example === undefined ? { v: v ?? null } : { v: v ?? null, example };
 
 // ─── Reading rows inside the transaction ─────────────────────────────────────
 
@@ -334,12 +389,21 @@ type Planned = {
   /** SQL NULL in the log: a part added has no old value, a removed none new. */
   oldApplies: boolean;
   newApplies: boolean;
+  /** The Example tag before and after, for a number that carries one. */
+  example?: { old: boolean; new: boolean } | null;
   write: () => Promise<void>;
 };
 
 async function plan(
   input: StarterChangeInput,
-  at: string
+  at: string,
+  /**
+   * An undo putting back a value the row HELD. The above-zero rule is for new
+   * numbers (the sheet refuses a $0 price); an undo restores an old one
+   * exactly, and a $0 "not priced" price was a real old value. Without this,
+   * pricing an unpriced item could never be undone (found 2026-10-14).
+   */
+  restoring = false
 ): Promise<{ planned?: Planned; skip?: true; problems: string[] }> {
   const problems: string[] = [];
   const refuse = (why: string) => {
@@ -360,9 +424,9 @@ async function plan(
     const why = starterChangeRefusal(input.table, input.field);
     if (why) return refuse(why);
     const column = columnsOf(input.table)[input.field];
-    const aboveZero = (ABOVE_ZERO_FIELDS[input.table] ?? []).includes(
-      input.field
-    );
+    const aboveZero =
+      !restoring &&
+      (ABOVE_ZERO_FIELDS[input.table] ?? []).includes(input.field);
     const stored = storedValue(column, input.newValue, aboveZero);
     if ("refused" in stored) return refuse(`${input.field} ${stored.refused}`);
     const refTable = STARTER_REFERENCES[input.table]?.[input.field];
@@ -378,6 +442,14 @@ async function plan(
       return { skip: true, problems };
     const { table } = TABLES[input.table];
     const cols = columnsOf(input.table);
+    // The Example tag goes WITH its number, in this same change (§ 2.6 of
+    // references/starter-offers-plan.md): never a change of its own.
+    const companion = exampleTagAfter(
+      input.table,
+      input.field,
+      stored.value,
+      row
+    );
     return {
       problems,
       planned: {
@@ -388,11 +460,15 @@ async function plan(
         newValue: stored.value,
         oldApplies: true,
         newApplies: true,
+        example: companion
+          ? { old: row[companion.tag] === true, new: companion.value }
+          : null,
         write: async () => {
           await handle
             .update(table)
             .set({
               [input.field]: stored.value,
+              ...(companion ? { [companion.tag]: companion.value } : {}),
               version: sql`${cols.version} + 1`,
             })
             .where(eq(cols.id, input.rowId));
@@ -603,39 +679,101 @@ async function plan(
  * step 4). Returns the pins made: { owner, forkId }.
  *
  * "Has a copy" is whatever the table's own fork function says it is: the
- * fork returns an existing copy rather than make a second, so a returned id
- * that was already one of the company's copies is no pin. That keeps the
- * rule in ONE place per table (run types reuse only an ACTIVE fork, the
- * others any), instead of restating it here.
+ * fork returns an existing copy rather than make a second, and says so
+ * (`made: false`), so a reused copy is no pin. That keeps the rule in ONE
+ * place per table (run types reuse only an ACTIVE fork, the others any),
+ * instead of restating it here.
+ *
+ * All the shops at once (`forkFor`, db.ts `forkForOwners`), and one UPDATE
+ * for the pin flag: one shop at a time was five round trips a shop, 6.2 s
+ * for a material and 18.8 s for an assembly at 2,006 shops (2026-10-15,
+ * stress-results-b.md round 9).
  */
 async function pinCompanies(
   table: StarterTable,
   rowId: number
 ): Promise<Array<{ owner: number; forkId: number }>> {
   const handle = await database();
-  const { table: t, fork } = TABLES[table];
+  const { table: t, forkFor } = TABLES[table];
   const cols = columnsOf(table);
-  const owners = await handle
-    .select({ owner: companies.ownerUserId })
-    .from(companies)
-    .orderBy(asc(companies.ownerUserId));
+  const owners = await unpinnedOwners(table, rowId);
+  if (owners.length === 0) return [];
+  const forks = await forkFor(rowId, owners);
   const pins: Array<{ owner: number; forkId: number }> = [];
-  for (const { owner } of owners) {
-    const before = (
-      await handle
-        .select({ id: cols.id })
-        .from(t)
-        .where(and(eq(cols.userId, owner), eq(cols.baselineId, rowId)))
-    ).map(r => r.id as number);
-    const forkId = await fork(rowId, owner);
-    if (before.includes(forkId)) continue;
+  for (const owner of owners) {
+    const fork = forks.get(owner);
+    if (fork?.made) pins.push({ owner, forkId: fork.id });
+  }
+  for (let i = 0; i < pins.length; i += 500)
     await handle
       .update(t)
       .set({ isPinnedCopy: true })
-      .where(eq(cols.id, forkId));
-    pins.push({ owner, forkId });
-  }
+      .where(
+        inArray(
+          cols.id,
+          pins.slice(i, i + 500).map(p => p.forkId)
+        )
+      );
   return pins;
+}
+
+/**
+ * Every shop with no copy the fork would REUSE — the shops a pin reaches.
+ * One query instead of two per shop: measured 2026-10-15 (Track B stress
+ * pass), a change to a row every shop already held took 414 ms at 306 shops
+ * (~4 s at 3,000; an hour for a 1,000-row sheet), and 10 ms after. The fork
+ * stays the authority for every shop listed here (`pinCompanies` still asks
+ * it): this only leaves out copies the fork reuses — any copy, and for run
+ * types an ACTIVE one (`forkRunType`) — so a shop is never wrongly skipped.
+ * The preview counts the same list (`countPins`), so its number is this one.
+ */
+async function unpinnedOwners(
+  table: StarterTable,
+  rowId: number
+): Promise<number[]> {
+  const handle = await database();
+  const cols = columnsOf(table);
+  const reuses =
+    table === "runTypes"
+      ? and(eq(cols.baselineId, rowId), eq(takeoffRunTypes.status, "active"))
+      : eq(cols.baselineId, rowId);
+  const covered = new Set(
+    (
+      await handle
+        .select({ owner: cols.userId })
+        .from(TABLES[table].table)
+        .where(reuses)
+    ).map(r => r.owner as number)
+  );
+  return (
+    await handle
+      .select({ owner: companies.ownerUserId })
+      .from(companies)
+      .orderBy(asc(companies.ownerUserId))
+  )
+    .map(r => r.owner)
+    .filter(o => !covered.has(o));
+}
+
+/**
+ * The preview's pins: the shops `pinCompanies` would fork, named by the SAME
+ * filter (`unpinnedOwners`) and not forked. A batch that changes one row
+ * twice (a rate's wage and rate) pins once, as the real call does: the first
+ * change's pins are remembered in `counted`.
+ */
+async function countPins(
+  table: StarterTable,
+  rowId: number,
+  counted: Map<string, Set<number>>
+): Promise<Array<{ owner: number; forkId: number }>> {
+  const key = `${table}:${rowId}`;
+  const already = counted.get(key) ?? new Set<number>();
+  const owners = (await unpinnedOwners(table, rowId)).filter(
+    o => !already.has(o)
+  );
+  for (const o of owners) already.add(o);
+  counted.set(key, already);
+  return owners.map(owner => ({ owner, forkId: 0 }));
 }
 
 // ─── The function ────────────────────────────────────────────────────────────
@@ -648,8 +786,16 @@ async function applyPlanned(
     fileSha256?: string;
     note?: string;
   },
-  plans: Array<{ input: StarterChangeInput; undoesChangeId: number | null }>
+  plans: Array<{ input: StarterChangeInput; undoesChangeId: number | null }>,
+  /**
+   * "count" is the PREVIEW: it counts the shops a pin would reach, with the
+   * same filter, and forks nobody (2,006 forks made a preview take 7.3 s,
+   * measured 2026-10-15). Only `previewStarterChanges` passes it, inside a
+   * transaction it rolls back.
+   */
+  pinMode: "pin" | "count" = "pin"
 ): Promise<ApplyStarterResult> {
+  const counted = new Map<string, Set<number>>();
   return db.inOneTransaction(async () => {
     const handle = await database();
     const problems: string[] = [];
@@ -675,7 +821,11 @@ async function applyPlanned(
         continue;
       }
       seen.add(key);
-      const result = await plan(c, `change ${i + 1}`);
+      const result = await plan(
+        c,
+        `change ${i + 1}`,
+        p.undoesChangeId !== null
+      );
       problems.push(...result.problems);
       if (result.skip) skipped += 1;
       if (result.planned)
@@ -696,9 +846,11 @@ async function applyPlanned(
     const applied: ApplyStarterResult["applied"] = [];
     for (const change of planned) {
       const { input } = change;
-      const pins = change.pins
-        ? await pinCompanies(input.table, input.rowId)
-        : [];
+      const pins = !change.pins
+        ? []
+        : pinMode === "pin"
+          ? await pinCompanies(input.table, input.rowId)
+          : await countPins(input.table, input.rowId, counted);
       await change.write();
       const after = await lockedRow(input.table, input.rowId);
       const [logged] = await handle.insert(starterChanges).values({
@@ -709,12 +861,16 @@ async function applyPlanned(
         field: "field" in input ? input.field : null,
         childTable: "childTable" in input ? input.childTable : null,
         childRefId: "childRefId" in input ? input.childRefId : null,
-        oldValue: change.oldApplies ? wrap(change.oldValue) : null,
-        newValue: change.newApplies ? wrap(change.newValue) : null,
+        oldValue: change.oldApplies
+          ? wrap(change.oldValue, change.example?.old)
+          : null,
+        newValue: change.newApplies
+          ? wrap(change.newValue, change.example?.new)
+          : null,
         version: after!.version as number,
         undoesChangeId: change.undoesChangeId,
       });
-      if (pins.length > 0)
+      if (pins.length > 0 && pinMode === "pin")
         await handle.insert(starterChangePins).values(
           pins.map(pin => ({
             changeId: logged.insertId,
@@ -854,7 +1010,7 @@ async function reverseOf(
   };
 }
 
-function sameLine(a: unknown, b: unknown): boolean {
+export function sameLine(a: unknown, b: unknown): boolean {
   const x = a as Record<string, unknown> | null;
   const y = b as Record<string, unknown> | null;
   if (!x || !y) return x === y;
@@ -956,4 +1112,299 @@ export async function changesFor(table: StarterTable, rowId: number) {
       )
     )
     .orderBy(asc(starterChanges.id));
+}
+
+// ─── The admin screen's preview and change log (Track B, 2026-10-14) ─────────
+
+/** Thrown inside the preview's transaction so nothing it wrote is kept. */
+class PreviewRollback extends Error {
+  constructor(readonly outcome: StarterPreview) {
+    super("preview: rolled back");
+  }
+}
+
+export type StarterPreview = {
+  /** "offer" pins and offers; "everyone" reaches every shop now. */
+  reach: "offer" | "everyone" | "unchanged";
+  /** Shops that get a pinned copy holding today's value. */
+  pins: number;
+  /** Shops whose copy will NOT already hold the new value: they get an offer. */
+  offered: number;
+  /** The value as it would be stored, for the "Old → New" line. */
+  oldValue: unknown;
+  newValue: unknown;
+  /** Every field the Confirm writes, old → new (a rate: wage and rate). */
+  lines: Array<{ field: string | null; oldValue: unknown; newValue: unknown }>;
+};
+
+/**
+ * What `applyStarterChange` WOULD do with ONE change, measured by doing it in
+ * a transaction and rolling it back — so the preview's numbers are the
+ * function's own, and cannot drift from what Confirm then does
+ * (starter-offers-plan.md § 6 test 14). Refusals throw `StarterChangeRefused`
+ * exactly as the real call would.
+ */
+export async function previewStarterChange(
+  change: StarterChangeInput
+): Promise<StarterPreview> {
+  return previewStarterChanges([change]);
+}
+
+/**
+ * The same for one Confirm that writes several fields of ONE row together —
+ * a labor rate's wage and the rate it makes (owner Q5: one Confirm, one
+ * batch). Pins are the batch's (only the first change can pin: after it every
+ * shop has a copy). A shop is "offered" when its copy differs from ANY of the
+ * new values. `lines` lists each field, old → new.
+ */
+export async function previewStarterChanges(
+  changes: StarterChangeInput[]
+): Promise<StarterPreview> {
+  try {
+    await db.inOneTransaction(async () => {
+      // The shops a pin would reach, read BEFORE the change (count mode forks
+      // nobody, so they still have no copy afterwards either).
+      const willPin = new Set(
+        await unpinnedOwners(changes[0].table, changes[0].rowId)
+      );
+      const result = await applyPlanned(
+        { editorUserId: null, source: "screen", note: "preview" },
+        changes.map(input => ({ input, undoesChangeId: null })),
+        "count"
+      );
+      const handle = await database();
+      if (result.applied.length === 0)
+        throw new PreviewRollback({
+          reach: "unchanged",
+          pins: 0,
+          offered: 0,
+          oldValue: null,
+          newValue: null,
+          lines: [],
+        });
+      const logged = await handle
+        .select()
+        .from(starterChanges)
+        .where(
+          inArray(
+            starterChanges.id,
+            result.applied.map(a => a.changeId)
+          )
+        )
+        .orderBy(asc(starterChanges.id));
+      const first = changes[0];
+      const everyone = changes.every(
+        c =>
+          c.kind === "field" &&
+          starterFieldKind(c.table, c.field) === "everyone"
+      );
+      // A pinned shop holds today's value, which the change differs from.
+      let offered = 0;
+      if (!everyone) {
+        offered = result.applied.some(a => a.pins > 0) ? willPin.size : 0;
+        const cols = columnsOf(first.table);
+        const copies = (await handle
+          .select()
+          .from(TABLES[first.table].table)
+          .where(eq(cols.baselineId, first.rowId))) as Array<
+          Record<string, unknown>
+        >;
+        const owners = new Map<number, Record<string, unknown>[]>();
+        for (const c of copies) {
+          if (c.userId === null) continue;
+          const o = c.userId as number;
+          if (!owners.has(o)) owners.set(o, []);
+          owners.get(o)!.push(c);
+        }
+        for (const [owner, list] of Array.from(owners)) {
+          if (willPin.has(owner) && offered > 0) continue;
+          const live =
+            list.find(
+              c =>
+                c.isActive !== false &&
+                (c.status == null || c.status === "active")
+            ) ?? list[0];
+          const differs = logged.some(l =>
+            l.kind !== "field"
+              ? true
+              : !sameStarterValue(live[l.field!], unwrap(l.newValue))
+          );
+          if (differs) offered += 1;
+        }
+      }
+      throw new PreviewRollback({
+        reach: everyone ? "everyone" : "offer",
+        pins: result.applied.reduce((n, a) => n + a.pins, 0),
+        offered,
+        oldValue: unwrap(logged[0].oldValue),
+        newValue: unwrap(logged[0].newValue),
+        lines: logged.map(l => ({
+          field: l.field,
+          oldValue: unwrap(l.oldValue),
+          newValue: unwrap(l.newValue),
+        })),
+      });
+    });
+  } catch (err) {
+    if (err instanceof PreviewRollback) return err.outcome;
+    throw err;
+  }
+  throw new Error("preview: the transaction did not roll back");
+}
+
+export type StarterLogEntry = {
+  batchId: number;
+  source: string;
+  note: string | null;
+  editorName: string | null;
+  at: Date;
+  changes: Array<{
+    changeId: number;
+    table: StarterTable | null;
+    rowId: number;
+    itemName: string;
+    kind: string;
+    field: string | null;
+    childRefId: number | null;
+    childName: string | null;
+    oldValue: unknown;
+    newValue: unknown;
+    pins: number;
+    undoesChangeId: number | null;
+    /** The undo that put this one back, if any. */
+    undoneByChangeId: number | null;
+  }>;
+};
+
+/**
+ * The change log, newest batch first (the admin screen's Change log tab).
+ * The SEED's finding-field batches are left out unless asked for: a start
+ * writes one whenever search words differ, and they would bury the edits a
+ * person made.
+ */
+export async function starterChangeLog(input: {
+  limit: number;
+  includeSeed: boolean;
+}): Promise<StarterLogEntry[]> {
+  const handle = await database();
+  const batchRows = await handle
+    .select()
+    .from(starterChangeBatches)
+    .where(
+      input.includeSeed
+        ? sql`1 = 1`
+        : sql`${starterChangeBatches.source} <> 'seed'`
+    )
+    .orderBy(desc(starterChangeBatches.id))
+    .limit(input.limit);
+  if (batchRows.length === 0) return [];
+  const changes = await handle
+    .select()
+    .from(starterChanges)
+    .where(
+      inArray(
+        starterChanges.batchId,
+        batchRows.map(b => b.id)
+      )
+    )
+    .orderBy(asc(starterChanges.id));
+  const ids = changes.map(c => c.id);
+  const pinRows = ids.length
+    ? await handle
+        .select({
+          changeId: starterChangePins.changeId,
+          n: sql<number>`count(*)`,
+        })
+        .from(starterChangePins)
+        .where(inArray(starterChangePins.changeId, ids))
+        .groupBy(starterChangePins.changeId)
+    : [];
+  const undoRows = ids.length
+    ? await handle
+        .select({
+          id: starterChanges.id,
+          undoes: starterChanges.undoesChangeId,
+        })
+        .from(starterChanges)
+        .where(inArray(starterChanges.undoesChangeId, ids))
+    : [];
+  const editorIds = batchRows
+    .map(b => b.editorUserId)
+    .filter((id): id is number => id !== null);
+  const editors = editorIds.length
+    ? await handle
+        .select({ id: users.id, name: users.name, email: users.email })
+        .from(users)
+        .where(inArray(users.id, editorIds))
+    : [];
+  const pins = new Map(pinRows.map(p => [p.changeId, Number(p.n)]));
+  const undoneBy = new Map(
+    undoRows.map(u => [u.undoes as number, u.id] as const)
+  );
+  const editorName = new Map(editors.map(e => [e.id, e.name || e.email]));
+
+  // Names: the target rows, and the parts a recipe change names.
+  const names = new Map<string, string>();
+  const byTable = new Map<StarterTable, Set<number>>();
+  const want = (t: StarterTable, id: number) => {
+    if (!byTable.has(t)) byTable.set(t, new Set());
+    byTable.get(t)!.add(id);
+  };
+  for (const c of changes) {
+    const t = tableFromName(c.targetTable);
+    if (!t) continue;
+    want(t, c.targetRowId);
+    if (c.childRefId !== null)
+      want(
+        c.childTable === "assembly_modifiers" ? "modifiers" : "materials",
+        c.childRefId
+      );
+  }
+  for (const [t, set] of Array.from(byTable)) {
+    const cols = columnsOf(t);
+    const nameCol = t === "runTypes" ? cols.label : cols.name;
+    const rows = (await handle
+      .select({ id: cols.id, name: nameCol })
+      .from(TABLES[t].table)
+      .where(inArray(cols.id, Array.from(set)))) as Array<{
+      id: number;
+      name: string;
+    }>;
+    for (const r of rows) names.set(`${t}:${r.id}`, r.name);
+  }
+
+  return batchRows.map(b => ({
+    batchId: b.id,
+    source: b.source,
+    note: b.note,
+    editorName:
+      b.editorUserId === null ? null : (editorName.get(b.editorUserId) ?? null),
+    at: b.createdAt,
+    changes: changes
+      .filter(c => c.batchId === b.id)
+      .map(c => {
+        const table = tableFromName(c.targetTable);
+        const childTable =
+          c.childTable === "assembly_modifiers" ? "modifiers" : "materials";
+        return {
+          changeId: c.id,
+          table,
+          rowId: c.targetRowId,
+          itemName:
+            names.get(`${table}:${c.targetRowId}`) ?? `#${c.targetRowId}`,
+          kind: c.kind,
+          field: c.field,
+          childRefId: c.childRefId,
+          childName:
+            c.childRefId === null
+              ? null
+              : (names.get(`${childTable}:${c.childRefId}`) ?? null),
+          oldValue: c.oldValue === null ? null : unwrap(c.oldValue),
+          newValue: c.newValue === null ? null : unwrap(c.newValue),
+          pins: pins.get(c.id) ?? 0,
+          undoesChangeId: c.undoesChangeId,
+          undoneByChangeId: undoneBy.get(c.id) ?? null,
+        };
+      }),
+  }));
 }

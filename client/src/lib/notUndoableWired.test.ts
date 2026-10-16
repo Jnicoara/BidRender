@@ -74,6 +74,8 @@ const NEITHER: Record<string, string> = {
     "confirms a reading; setSheetScale is the change",
   "takeoffGroups.forAssembly": "finds or makes the count a tool arms",
   "takeoffGroups.create": "an empty count; its marks are the step",
+  "takeoffGroups.unassigned":
+    "finds or makes the bid's empty Unassigned count; its marks are the step",
   "takeoffStamps.checkLookAlikes": "a question, writes nothing",
 };
 

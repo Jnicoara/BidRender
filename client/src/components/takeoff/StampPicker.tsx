@@ -33,7 +33,7 @@
  * the same query finds the same assembly wherever it is typed.
  */
 import { useMemo, useState } from "react";
-import { Hash, MapPin, Plus, Search } from "lucide-react";
+import { CircleHelp, Hash, MapPin, Plus, Search } from "lucide-react";
 import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -64,10 +64,17 @@ export function StampPicker({
   countsOf,
   onPickCount,
   onCountPlain,
+  onJustCount,
   disabled,
   onRefused,
   buildBidId,
 }: {
+  /**
+   * Count now, say what it is later (references/count-first-plan.md): the
+   * marks go into the bid's Unassigned count. Offered while nothing is
+   * typed, first, and Enter on an empty box picks it.
+   */
+  onJustCount?: () => void;
   assemblies: PickableAssembly[];
   onPick: (assembly: PickableAssembly) => void;
   /**
@@ -266,7 +273,12 @@ export function StampPicker({
                 being counted.
               */
                   if (e.key === "Enter") {
-                    if (results[0]) {
+                    // Nothing typed: "Just count", not whichever assembly
+                    // happens to be listed first on an empty search.
+                    if (!query.trim() && onJustCount) {
+                      onJustCount();
+                      setOpen(false);
+                    } else if (results[0]) {
                       pick(results[0]);
                     } else if (query.trim()) {
                       recordMiss();
@@ -281,6 +293,26 @@ export function StampPicker({
               />
             </div>
             <div className="max-h-56 overflow-y-auto">
+              {!query.trim() && onJustCount && (
+                <>
+                  <button
+                    className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted"
+                    onClick={() => {
+                      onJustCount();
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <CircleHelp className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="font-medium">Just count</span>
+                    </span>
+                    <span className="block text-[0.7rem] text-muted-foreground mt-0.5 pl-[1.125rem]">
+                      Pick what it is later — marks go in Unassigned
+                    </span>
+                  </button>
+                  <div className="h-px bg-border my-1" />
+                </>
+              )}
               {results.map(assembly => (
                 <button
                   key={assembly.id}

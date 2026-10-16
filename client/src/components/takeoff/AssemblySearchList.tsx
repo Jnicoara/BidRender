@@ -17,7 +17,7 @@
  * so linking it is the same path as linking any other.
  */
 import { useMemo, useState } from "react";
-import { Check, Plus, Search } from "lucide-react";
+import { Check, Hash, Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
@@ -37,9 +37,16 @@ export function AssemblySearchList({
   onPick,
   onCancel,
   buildBidId,
+  onPickName,
 }: {
   assemblies: SearchableAssembly[];
   onPick: (assembly: SearchableAssembly) => void;
+  /**
+   * Also offer the typed words as a NAME — a free count, no library item
+   * (level 1). Where an answer can be "just call it this": assigning the
+   * Unassigned count's marks (references/count-first-plan.md).
+   */
+  onPickName?: (name: string) => void;
   /** Escape in the box. */
   onCancel: () => void;
   /** The bid, to offer "Build it from parts here" on a miss. */
@@ -138,6 +145,21 @@ export function AssemblySearchList({
               ? "Your library has no assemblies yet."
               : `Nothing matches “${query.trim()}”.`}
           </p>
+        )}
+        {onPickName && query.trim() && (
+          <button
+            type="button"
+            className="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-muted flex items-center gap-2"
+            onClick={() => onPickName(query.trim())}
+          >
+            <Hash className="w-3 h-3 text-muted-foreground shrink-0" />
+            <span className="flex-1 min-w-0 truncate">
+              Call them “<span className="font-medium">{query.trim()}</span>”
+            </span>
+            <span className="text-xs text-muted-foreground">
+              price it on the bid
+            </span>
+          </button>
         )}
         {results.length === 0 && query.trim() && buildBidId !== undefined ? (
           <Button

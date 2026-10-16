@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Typing a decimal into a quantity or percent box no longer multiplies it
+  by ten.** In the run-type editor's extra and makeup boxes, an assembly's
+  or kit's part quantities and an assembly step's count, the box redrew
+  itself after each key, so the point in "2." vanished and "2.5" saved as 25. The box now keeps what was typed.
+- **The Plans screen for a bid that no longer exists says so.** It used to
+  wait through three retries and then say the plans "could not load — try
+  again", which read as a connection problem. It now says the bid doesn't
+  exist (deleted, or a wrong link) and offers the way back to your bids.
 - **A bid now says when profit or overhead was never set.** A company that
   has never set its profit or overhead has them at 0, so every bid
   following those defaults adds nothing for either while looking complete.
@@ -47,43 +55,59 @@ This is the human-readable companion to the git history — read this to see wha
   print the proposal and download the spreadsheet. It checks every printed
   number against hand math, on a laptop, an iPad and a phone.
 
-- **Tested: one company can never see or change another company's work.**
-  A test acts as a second company and calls every one of the app's 388
-  server actions with the first company's ids. Nothing leaked and nothing
-  changed. It runs on every check.
-- **Tested: file storage, AI and email can each go down and come back.**
-  While down, the app says so plainly and loses nothing. When the service
-  returns, the app picks up again by itself, with no restart.
-- **A brand-new database builds from scratch and prices every test bid to
-  the cent.** A backup restored on this machine came back with every one of
-  4,386 bids at the same total. This used the real backup code, and nothing
-  was sent to the cloud.
-- **Speed checked on a big company** (61 bids, a 500-sheet plan set, 5,000
-  marks on one sheet). Every screen opened well under 2 seconds. The
-  dashboard slows as bids pile up, so that is on the list to fix before it
-  matters.
-- **The proposal, the quote-app panel and the spreadsheet export now match
-  the bid screen to the cent** on every test bid. "Price pending" shows
-  exactly when something isn't priced.
-- **The pricing sheet loader keeps a pack you type** on the rows marked
-  "pack not checked", so the row stops being flagged and shops get the
-  right pack size.
-- **The end-of-pricing name changes are ready as one checked list** (560
-  changes, from every recorded name-review answer). Nothing is applied yet;
-  16 answers need the owner's word first.
-- **The helper tools are type-checked too**, which found three real mistakes
-  in older tools, now fixed.
+- **After uploading plans, demolition sheets are offered their tag.** When a
+  sheet's title says DEMOLITION, a bar above the drawing names it and offers
+  "Use these tags" (or "Not now"). A tagged sheet shows its amber "DEMO
+  SHEET" banner and marks placed there start as Remove. Nothing is tagged
+  until you tap, and a tag never changes a count or a price.
 
-- **A dropped connection can no longer make the Plans screen count marks
-  twice.** If taps reached the server but the answer was lost, the screen
-  resent them and each one was counted again (3 receptacles became 6). The
-  server now places each tap once. This takes effect when the Plans screen
-  sends a small key with each tap, which is a one-line change handed to Track B.
-- **Counting on scanned plans is tested too.** On a scan, every match is
-  found and every one waits for a person, so "Confirm all" can never count a
-  look-alike by itself. AI answers were tested with saved fake replies only,
-  and no AI money was spent. An AI answer never confirms anything, and an
-  AI that can't be reached changes nothing.
+- **Linking a legend symbol to an assembly now updates the count you already
+  made.** Linking from the Legend tab used to change only the symbol: the
+  count of it already on the bid stayed "by name" and unpriced until the
+  symbol was picked again. Now that count becomes the assembly's count at
+  once, under the same rules as "Link assembly" on the count's own card (a
+  locked bid, or a line already priced on the bid, is left alone).
+
+- **Checking a scale against a printed dimension now offers the fix.**
+  Tap "Check it", tap the two ends of a dimension, type what it says: if
+  the sheet's scale is off by more than 2%, the card says so and offers
+  "Use 1/4" = 1'-0" — what this dimension says". One tap sets it (and can be
+  undone); the scale never changes by itself. On a phone, "Check it" used
+  to leave the trace tool armed, so the two taps drew a run instead of
+  measuring — fixed, and the check's bar no longer runs its buttons
+  together on a narrow screen.
+
+- **A password-protected or damaged plan file is refused before it
+  uploads, with what to do about it.** It used to upload, attach to the bid,
+  and then show "PasswordException: No password given" or "Invalid PDF
+  structure" with a Try again button that could never work. Now it says the
+  file is password-protected (save a copy without the password) or damaged
+  or incomplete (print it to a new PDF, or ask for the file again), and
+  nothing is attached. Scanned plans, turned pages, mixed sheet sizes, a
+  huge vector sheet and a 500-sheet set were all checked and open as they
+  should.
+
+- **Fixed: a mark placed just before reloading the page could be saved
+  twice.** The page keeps unsent marks safe across a crash and sends them
+  again after a reload; if the first send had in fact arrived, the mark was
+  counted twice. Each mark now keeps its own key through the reload, so the
+  server counts it once. Found by a new test that places marks and runs and
+  then zooms, turns the device, switches sheets, reloads, goes offline,
+  loses a reply, undoes and redoes, and has a second person editing — and
+  checks every mark is still exactly where it was put, once.
+
+- **Every Plans-screen tool now has a browser test that would catch it
+  breaking**, on a laptop with a mouse and on an upright iPad, a sideways
+  iPad and a phone with a finger: switching sheets, the scale offer, counting,
+  Just count, undo/redo, selecting and deleting, drops, tracing, layers,
+  detail links and Back, note tags, Look up, homeruns, heights, "scale may be
+  wrong" and the sheet cards. Each was proved by breaking the app on purpose
+  and watching its test fail. They run with every staging deploy.
+  `references/plans-test-map.md` lists them.
+- **Fixed a way marks could be counted twice.** If the connection dropped
+  after the server saved a batch of marks but before the reply arrived, the
+  screen sent them again and they were saved twice (3 receptacles became 6).
+  Each mark now carries a key the server recognises, so a resend counts once.
 - **The migration tool's record of the database is complete again.** Its
   saved picture of the tables stopped at migration 0058, so asking it for
   one new column wrote 339 statements that re-added what every database
@@ -92,6 +116,59 @@ This is the human-readable companion to the git history — read this to see wha
   changes (owner, N2).
 
 ## [2026-10-15]
+
+- **The bid total now says "+ N marks unassigned"** beside "+ N lines not
+  priced" on Direct cost, Bid price and Total due (and the proposal page's
+  "Your figures"), so marks nobody has named yet are never out of sight.
+  It is a label only: no amount changes, and the Materials and Labor rows
+  don't carry it.
+
+- **Just count now, pick what it is later.** In the Plans screen's Count
+  picker, "Just count" (or Enter with nothing typed) lets you tap marks
+  without naming anything. They show as "?" pins under an amber
+  "Unassigned" count; "Pick what they are…" turns every one of them, on
+  every sheet, into an assembly or a named count in one step (with Undo).
+  Until then the bid warns under its total and a priced proposal can't be
+  printed. Nothing about the bid's money changes.
+- **Groundwork for "just count, pick the item later" (server side).** A bid
+  can now hold one "Unassigned" count for marks nobody has named yet. It
+  never goes onto the bid, its marks will block printing a priced proposal
+  until they are assigned, and all of them can be moved into a real count
+  in one step. Nobody can name a count of their own "Unassigned". The
+  screens come next.
+
+- **The first BidRidge starter change no longer takes seconds per thousand
+  shops.** Protecting every existing shop from a starter change means giving
+  each its own copy first; that was done one shop at a time (6 s for a
+  material, 19 s for an assembly at 2,000 shops). It is now done for all of
+  them at once: half a second for a material, about a second for an
+  assembly. What each shop's copy holds is unchanged.
+
+- **Zooming a sheet with thousands of marks no longer stutters.** At 5,000
+  marks each wheel step took about 150 ms; it now takes about 33 ms. While
+  you zoom, the marks grow and shrink with the drawing, then settle to
+  their usual size a moment after you stop.
+
+- **Tracing on a small phone leaves the drawing half as tall again.** At
+  375 px the trace toolbar took five rows (one of them a lone divider) and
+  the tracing panel two; now the toolbar is two rows (mode, scale and Fit;
+  then From/to) and the panel one row. The drawing went from 237 to 351 px
+  tall. Laptop is unchanged.
+
+- **An unpriced starter item no longer shows "$0.00".** The starter editor,
+  its change log and a shop's starter Updates now say "not priced" (and
+  "rate not set" for a labor rate) instead of a dollar amount that reads as
+  free. The stored value was always the "not priced" zero; only the wording
+  was wrong.
+- **On a small phone you can now select several marks by finger.** The
+  "marks selected" panel used to fill the top half of the drawing with its
+  extra controls, so a second mark under it could not be tapped. With a
+  finger those extras now sit behind a "More" button.
+- **On a small phone a traced run no longer ends a point early.** The
+  tracing panel (with Finish) covered most of a short phone's drawing, so a
+  tap meant for the drawing could land on Finish. With a finger the panel
+  now sits at the bottom of the drawing and shows only the total and its
+  buttons.
 
 - **"Find all matching" is now tested on plan sheets whose true count is
   known.** The test builds real PDFs holding receptacles, GFCIs, junction
@@ -164,6 +241,74 @@ This is the human-readable companion to the git history — read this to see wha
   whether the server can reach its database.
 
 ## [2026-10-14]
+
+- **BidRidge can now change its starter catalog without changing anyone's
+  numbers behind their back.** On the BidRidge starter screen a price,
+  hours, name, raceway fact or run-type waste can be changed one at a time:
+  it first says how many shops it reaches, then every shop already using the
+  item keeps its current value and sees "N starter updates available" on its
+  Dashboard, with an Updates tab on Materials, Assemblies and Labor rates.
+  Each update shows yours → BidRidge's new value; Accept, Accept all and
+  Ignore are for the owner and admins. Bids already priced never change,
+  sent and locked bids never move, and an update that would re-count draft
+  bids says how many before you accept. New shops simply start with the new
+  value. Every change is listed in a change log with Undo.
+
+- **Groundwork for BidRidge starter updates (nothing visible yet).** When
+  BidRidge changes a shipped price, hours or rate, the "Example" tag now
+  changes with it in the same step, so a number and its tag can never part.
+  The rules that will decide what a shop is offered now work per field, so
+  accepting one update can never hide another, and a field BidRidge changed
+  twice shows as one update rather than looking like the shop's own number.
+- **The labor on traced conduit and wire can now be priced.** The hours on
+  runs traced on the plans were priced at $0 an hour, because nothing in
+  the app could choose their labor rate. The bid warned about it, but the
+  total came up short. Settings › Pricing now has "Labor rate for traced
+  runs", which says plainly when it is not set. Runs sent after it is set
+  are priced at that rate. Runs already on a bid keep what they were sent
+  with, pending the owner's decision.
+- **A browser test now does a whole job as a brand-new customer would**: sign
+  up, upload a plan, count, trace, add drops and a homerun, tag a line,
+  print the proposal and download the spreadsheet. It checks every printed
+  number against hand math, on a laptop, an iPad and a phone.
+
+- **Tested: one company can never see or change another company's work.**
+  A test acts as a second company and calls every one of the app's 388
+  server actions with the first company's ids. Nothing leaked and nothing
+  changed. It runs on every check.
+- **Tested: file storage, AI and email can each go down and come back.**
+  While down, the app says so plainly and loses nothing. When the service
+  returns, the app picks up again by itself, with no restart.
+- **A brand-new database builds from scratch and prices every test bid to
+  the cent.** A backup restored on this machine came back with every one of
+  4,386 bids at the same total. This used the real backup code, and nothing
+  was sent to the cloud.
+- **Speed checked on a big company** (61 bids, a 500-sheet plan set, 5,000
+  marks on one sheet). Every screen opened well under 2 seconds. The
+  dashboard slows as bids pile up, so that is on the list to fix before it
+  matters.
+- **The proposal, the quote-app panel and the spreadsheet export now match
+  the bid screen to the cent** on every test bid. "Price pending" shows
+  exactly when something isn't priced.
+- **The pricing sheet loader keeps a pack you type** on the rows marked
+  "pack not checked", so the row stops being flagged and shops get the
+  right pack size.
+- **The end-of-pricing name changes are ready as one checked list** (560
+  changes, from every recorded name-review answer). Nothing is applied yet;
+  16 answers need the owner's word first.
+- **The helper tools are type-checked too**, which found three real mistakes
+  in older tools, now fixed.
+
+- **A dropped connection can no longer make the Plans screen count marks
+  twice.** If taps reached the server but the answer was lost, the screen
+  resent them and each one was counted again (3 receptacles became 6). The
+  server now places each tap once. This takes effect when the Plans screen
+  sends a small key with each tap, which is a one-line change handed to Track B.
+- **Counting on scanned plans is tested too.** On a scan, every match is
+  found and every one waits for a person, so "Confirm all" can never count a
+  look-alike by itself. AI answers were tested with saved fake replies only,
+  and no AI money was spent. An AI answer never confirms anything, and an
+  AI that can't be reached changes nothing.
 
 - **Invitation-only sign-up is ready behind a switch, and the switch is
   off.** When the owner turns it on, a new account needs an invitation: one
@@ -366,8 +511,6 @@ This is the human-readable companion to the git history — read this to see wha
   Quick bid, and the database groundwork for the starter editor's own login
   (not switched on). Both live bids were checked before and after: no total
   moved.
-
-## [2026-10-12]
 
 - **Opening a plan sheet no longer places panels from their labels.** When
   a sheet names a panel ("PANEL 2B") that has no spot on the bid yet, an
@@ -702,8 +845,6 @@ This is the human-readable companion to the git history — read this to see wha
   sheets.** Yesterday's fix caught one way it happened; a second way, about
   one upload in six on staging, left the sheet list empty until a reload.
   The list is now always read again after the sheets are saved.
-
-## [2026-10-09]
 
 - **A dead AI key now says so.** If the server has no Anthropic key, or the
   key has expired or been disabled, the help assistant and the plan reader

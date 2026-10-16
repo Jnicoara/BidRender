@@ -5680,6 +5680,11 @@ rather than by a measurement, and the measurement costs an afternoon.
 
 ## 16. Mark first, name it after
 
+> **Picked up 2026-10-15 (owner: "just count, pick the item later"):
+> `references/count-first-plan.md`** builds steps 3–5 and answers § 16.5 —
+> ONE Unassigned count per bid, and a reserved label nobody can type rather
+> than a new column. Steps 1–2 and selecting marks had shipped since.
+
 **Planned 2026-09-21, not built.** Requested after bid 23: a way to just drop
 marks, which land unassigned and flagged, then select them and assign them to a
 MATERIAL, an ASSEMBLY, or a plain name.

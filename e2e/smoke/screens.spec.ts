@@ -150,6 +150,29 @@ for (const [label, suffix] of [
   });
 }
 
+/*
+  A bid that is not there (deleted, or a link to one that never was). Until
+  2026-10-16 Plans retried, then said "Could not load this bid's plans … try
+  again in a moment", which reads as a connection problem and offered a
+  Try again that could never work (owner, 2026-10-16; @/lib/plansPane).
+*/
+test("Plans for a bid that does not exist says so, not a connection fault", async ({
+  page,
+}) => {
+  await page.goto("/#/bids/2147483000/plans");
+  await expect(page.getByText("This bid doesn't exist")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText(/Could not load/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
+  // Nothing offered that would act on a bid that is not there.
+  for (const name of ["Export takeoff", "More for this bid's plans"])
+    await expect(page.getByRole("button", { name })).toHaveCount(0);
+  await expectNothingLost(page, "Plans, missing bid");
+  await page.getByRole("button", { name: "Go to your bids" }).click();
+  await expect(page).toHaveURL(/#\/dashboard/);
+});
+
 test("Plans on a phone or upright tablet opens the panel full-screen with a Sheets tab", async ({
   page,
   viewport,

@@ -880,6 +880,25 @@ export const bidPdfsRouter = router({
     }),
 
   /**
+   * The pages that could hold a panel schedule, from the text stored at
+   * upload — so the viewer reads those pages for schedules instead of every
+   * page of the set (`db.schedulePagesOf`). Null when the stored text does
+   * not cover every page: the viewer then reads them all, as before.
+   */
+  schedulePages: procedure
+    .input(z.object({ bidPdfId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const pdf = await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
+      return {
+        pages: await db.schedulePagesOf(
+          input.bidPdfId,
+          ctx.scope.dataUserId,
+          pdf.pageCount ?? Number.MAX_SAFE_INTEGER
+        ),
+      };
+    }),
+
+  /**
    * Create the sheet rows for a document, once, from what the viewer parsed.
    *
    * The client supplies these because reading a PDF's outline needs a PDF

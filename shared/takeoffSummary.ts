@@ -18,6 +18,7 @@
  *
  * Pure: no database, so the sorting rule has tests that read like it.
  */
+import { countDisplayName } from "./unassignedCount";
 
 /** Why an item is not on the bid. Each has a sentence (`reasonText`). */
 export type NotOnBidReason =
@@ -29,6 +30,8 @@ export type NotOnBidReason =
   | "assemblyGone"
   /** A count kind that cannot be priced from yet (levels 2 and 3). */
   | "unsupported"
+  /** Marks with nothing named yet (references/count-first-plan.md). */
+  | "unassigned"
   /** A run-type row that cannot go: no material named, a fitting unknown. */
   | "cannotSend"
   /** Runs on a sheet with no scale, so they have no length. */
@@ -119,6 +122,7 @@ export type SummaryCount = {
           | "already-on-bid"
           | "nothing-counted"
           | "no-price"
+          | "unassigned"
           | "unsupported-level";
       };
 };
@@ -174,6 +178,8 @@ export const REASON_TEXT: Record<NotOnBidReason, string> = {
   locked: "The bid is locked. Unlock it to add this.",
   assemblyGone: "Counted against an assembly no longer in your library.",
   unsupported: "This kind of count cannot be priced on the bid yet.",
+  unassigned:
+    "Nothing says what these marks are yet. Pick what they are, and they go over as that.",
   cannotSend: "Cannot go on the bid as it stands.",
   noScale: "On a sheet with no scale, so it has no length.",
   noType: "Traced with no run type, so nothing says what it is.",
@@ -234,7 +240,7 @@ export function takeoffSummary(input: {
       key: `count:${c.id}`,
       kind: "count" as const,
       group: null,
-      name: c.label,
+      name: countDisplayName(c.label),
       qty: c.count,
       unit: "each" as const,
       notPriced: c.kind === "plain",
@@ -249,6 +255,13 @@ export function takeoffSummary(input: {
         ...base,
         reason: "assemblyGone",
         why: REASON_TEXT.assemblyGone,
+        send: null,
+      });
+    } else if (s.reason === "unassigned") {
+      notOnBid.push({
+        ...base,
+        reason: "unassigned",
+        why: REASON_TEXT.unassigned,
         send: null,
       });
     } else if (s.reason === "unsupported-level") {
