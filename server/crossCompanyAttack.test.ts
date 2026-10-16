@@ -90,6 +90,10 @@ const PUBLIC: Record<string, string> = {
   "auth.signup":
     "Creating an account cannot need one. Rate limited (authRouter).",
   "auth.login": "Signing in cannot need a session. Wrong attempts limited.",
+  "auth.signupMode":
+    "Whether sign-up is invite-only, for the sign-in page; says nothing else (Track A, 2026-10-14).",
+  "auth.inviteInfo":
+    "What an invite code is, for the page its link opens; whoever holds the code already holds the way in. Limited per sender (Track A).",
   "auth.requestPasswordReset":
     "A person who forgot a password has no session. Limited per sender and per address.",
   "auth.checkResetToken":

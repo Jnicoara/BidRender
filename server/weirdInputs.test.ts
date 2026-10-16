@@ -18,7 +18,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { appRouter } from "./routers";
 import { getDb, getBidLineItem as db_getLine } from "./db";
 import { resolveScope } from "./_core/companyScope";
@@ -123,8 +125,21 @@ let owner: User;
 let pool: Pool;
 const report: Record<string, unknown> = {};
 
+/*
+  A deployed server always has a file store, and this suite only ever passed
+  where one was configured — the local .env. CI has none, so every upload
+  route answered "No file storage is configured" (an INTERNAL error, which
+  is what this suite counts as a crash). It names its own: a disk store in a
+  fresh temp folder, the same way pdfUpload.test.ts does, put back after.
+*/
+const savedStorage: Record<string, string | undefined> = {};
+
 describeDb("weird input everywhere", () => {
   beforeAll(async () => {
+    for (const name of ["PLAN_STORAGE", "LOCAL_STORAGE_DIR"])
+      savedStorage[name] = process.env[name];
+    process.env.PLAN_STORAGE = "disk";
+    process.env.LOCAL_STORAGE_DIR = mkdtempSync(join(tmpdir(), "weird-"));
     await clean();
     const database = (await getDb())!;
     await database.insert(users).values({
@@ -163,6 +178,11 @@ describeDb("weird input everywhere", () => {
     if (process.env.WEIRD_REPORT)
       writeFileSync(process.env.WEIRD_REPORT, JSON.stringify(report, null, 2));
     await clean();
+    rmSync(process.env.LOCAL_STORAGE_DIR!, { recursive: true, force: true });
+    for (const [name, value] of Object.entries(savedStorage)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   }, 120_000);
 
   it("adding to a full line is refused in words, and the line keeps its quantity", async () => {
