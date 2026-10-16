@@ -1485,6 +1485,16 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       every route that writes under a bid, the plan-screen routes (Track B)
       included — or an owner decision that editing in the trash is fine.
 
+### Price-list import: one material at two prices is REFUSED (owner, 2026-10-16, Q-IMP1)
+
+- [ ] **Build:** a sheet naming one material twice at different prices
+      changes nothing for that material and lists it as refused ("named at
+      $3 and $4 — not changed, fix the sheet"). Today the last row wins and
+      the import reports it. Change the "last price stands" case in
+      `server/supplierPricing.test.ts` to the new rule in the same commit
+      (owner decision, `pricing/morning-questions.md` Q-IMP1). Import
+      screen is hidden (`PRICE_LIST_IMPORT_SHOWN = false`), so no urgency.
+
 ### Before beta: wrong numbers on bids — prices typed or imported in the wrong unit (owner, 2026-10-12)
 
 A pack or bulk price stored as a per-unit price does not look broken. It

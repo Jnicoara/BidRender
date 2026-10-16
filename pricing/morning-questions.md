@@ -67,6 +67,9 @@ brand-variants pass by design and needs nothing from you now.
   `archived-modifier-assembly-editor-{before,after}.png`). → **Keep it
   (archive = retired, stop using it)** — but you may prefer "keep applying
   until taken off the recipe". Affects: labor hours on new lines only.
+  **ANSWERED 2026-10-16 (owner): YES, keep it** — archived = retired, not
+  applied to new bid lines. Nothing to build; the app already does this and
+  the editor says so.
 - **Q-IMP1 (money, low urgency — the import is hidden)** — a price list that
   names one material twice at DIFFERENT prices: the last row wins (pinned
   by `supplierPricing.test.ts`, "the last price stands"). It used to win
@@ -75,6 +78,11 @@ brand-variants pass by design and needs nothing from you now.
   material instead (change nothing, list it)** — a guessed price is the
   thing this app avoids. Affects: which supplier price is stored when a
   sheet contradicts itself.
+  **ANSWERED 2026-10-16 (owner): YES, refuse** — a material named at two
+  different prices in one sheet keeps its stored price and is listed as
+  refused. NOT BUILT YET: needs the import changed and the "last price
+  stands" case in `supplierPricing.test.ts` changed to the new rule (an
+  owner decision, not a loosened test). Listed in `todo.md`.
 - **Q-QTY2** — same bug, assembly WORK STEPS "How many" box (×N): fixed by
   the same component; not shown on screen (needs a work step set up) —
   unit-tested only. → **Nothing to decide**; noted so you know it was
