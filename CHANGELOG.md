@@ -10,7 +10,9 @@ This is the human-readable companion to the git history — read this to see wha
   first.** Back, a menu link, the browser's Back button or closing the tab
   used to throw a half-built recipe away without a word. Now it asks
   "Discard your changes?", and Keep editing leaves everything as typed.
-  An untouched or just-saved editor still leaves straight away.
+  An untouched or just-saved editor still leaves straight away. The same
+  goes for an open edit or a half-typed new material on the Materials
+  screen (its Cancel button still just cancels).
 
 ## [2026-10-15]
 

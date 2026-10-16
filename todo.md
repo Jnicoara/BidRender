@@ -1324,9 +1324,10 @@ All additive and nullable. Specs are in the plans named.
       browser's Back and a reload/close all ask "Discard your changes?"
       (Keep editing / Discard changes). An untouched or just-saved editor
       leaves without asking. Checked on screen, laptop and phone
-      (`overnight-shots/unsaved-*.png`). **Not yet:** the Materials,
-      Labor rates, Modifiers and Clients row editors (small forms, same
-      hook when wanted). Was:
+      (`overnight-shots/unsaved-*.png`). **Materials too** (row editor and
+      the add form; leaving the screen asks, its Cancel does not — Cancel
+      says discard). **Not yet:** Labor rates, Modifiers and Clients (small
+      forms, same hook when wanted). Was:
 - [ ] **Back, or any nav link, from the assembly / kit / material editors
       throws away what was typed, with no "Discard changes?".** The Plans
       screen guards its unsaved trace (`beforeunload`, TakeoffPage), the

@@ -98,6 +98,8 @@ import {
   type StickJoint,
 } from "@shared/runFittings";
 import { errorText } from "@/lib/errorText";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -425,6 +427,15 @@ function MaterialRow({
   */
   const [markupDraft, setMarkupDraft] = useState("");
   const [openedWith, setOpenedWith] = useState<Draft | null>(null);
+  const [openedMarkup, setOpenedMarkup] = useState("");
+  /*
+    A nav link, browser Back or a reload asks before throwing an open edit
+    away (@/lib/unsavedGuard). Cancel does not ask: it says discard.
+  */
+  useUnsavedGuard(
+    editing &&
+      (!sameToSave(draft, openedWith) || markupDraft.trim() !== openedMarkup)
+  );
   /** The row as saved when the editor opened — sent with Save. */
   const [openedAt, setOpenedAt] = useState<Date>(material.updatedAt);
   /**
@@ -446,11 +457,12 @@ function MaterialRow({
 
   const startEditing = (focus: NeedsField | null = null) => {
     setOpenedFor(focus);
-    setMarkupDraft(
+    const markupText =
       markupOverride === undefined
         ? ""
-        : String(Math.round(markupOverride * 10000) / 100)
-    );
+        : String(Math.round(markupOverride * 10000) / 100);
+    setMarkupDraft(markupText);
+    setOpenedMarkup(markupText);
     const qty = material.packQty === null ? 0 : Number(material.packQty);
     const opened: Draft = {
       name: material.name,
@@ -1189,6 +1201,8 @@ export default function MaterialsLibraryPage() {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  // A half-typed new material asks before a nav link or reload drops it.
+  useUnsavedGuard(adding && !sameToSave(newDraft, emptyDraft));
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [view, setView] = useState<LibraryView>("active");
