@@ -34,9 +34,16 @@
   longer learn from 0-hour close-out lines; the Clients editor has the
   stale-save guard too; price-list import reports a material named at two
   prices (Q-IMP1). Local smoke on the merged build: 140 passed.
+- After 03:00: **company B saw company A's bid list** after A signed out
+  on the same tab (cache kept across sign-out) — fixed, `lib/accountCache.ts`
+  (Q-LEAK1 for A's security list); the quote was dated in UTC (tomorrow
+  every American evening) — fixed; the QuickBooks file name likewise;
+  self-saving percent boxes take "7%".
 - **FOR TRACK B (all in `todo.md` under the `parseTypedNumber` item):**
   RunTypePicker extra %/makeup (2.5 → 25, Q-QTY3); the Plans screen for a
-  missing bid says "could not load" instead of "could not be opened".
+  missing bid says "could not load" instead of "could not be opened";
+  smoke flow 3 is intermittent locally (capture warning "also matches CI
+  DUPLEX"), shown not caused by C's change.
 
 ## 2026-10-15, day — answers, before/after screenshots, two todo items
 
