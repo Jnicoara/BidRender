@@ -27,6 +27,17 @@ on:
     # changes get the same gate before they reach local-dev. c-* added
     # 2026-10-08: c-sch80-500 was pushed and nothing ran.
     branches: [local-dev, "track-*", "a-*", "c-*"]
+    # A push that changes ONLY notes does not start this workflow at all
+    # (owner, 2026-10-16). Before, it ran a "DOCS" mode here that went green
+    # on its own — over a code run it had just CANCELLED (cancel-in-progress
+    # below), so a branch could show green over code no full run had ever
+    # finished (Track B found `quantitiesIgnoreDeletedPlans` red for a day
+    # that way). Notes pushes now run .github/workflows/docs-gate.yml, which
+    # is red unless the code commit under them passed THIS workflow's suite,
+    # and which cannot cancel a run here: a different workflow, a different
+    # concurrency group. Keep these two patterns equal to docs-gate.yml's
+    # `paths` (scripts/ciCodeCommitPassed.test.ts checks).
+    paths-ignore: ["**.md", "references/**"]
   pull_request:
 
 # One run per branch at a time; a newer push cancels the older run —
@@ -61,20 +72,18 @@ jobs:
     # the job failed before a single test ran. The preinstalled server cannot
     # be rate-limited and needs no secret.
     #
-    # ── What this job runs: FULL, DOCS or SEEN (references/private-repo-plan.md)
-    # Since the repo went private every job-minute is billed, rounded UP per
+    # ── What this job runs: FULL or SEEN (references/private-repo-plan.md)
+    # Every job-minute is billed once the repo is private, rounded UP per
     # job. So the job first decides how much testing this push needs, and
     # nothing that can change a result is ever tested less:
     #
     #   FULL  — the default: typecheck, migrate, seed, the whole suite.
-    #   DOCS  — every file this push changed is documentation (`*.md`, or
-    #           anything under references/). Runs only the tests that READ
-    #           documentation, listed in .github/docs-only-tests.txt, which
-    #           server/docsOnlyGate.test.ts keeps complete. No deploy follows:
-    #           staging gets the commit with the next code push.
     #   SEEN  — this exact commit already passed the FULL suite in another
     #           Gate run (a track tip fast-forwarded onto local-dev). Same
     #           commit, same files, same result; the deploy and smoke still run.
+    #
+    # There was a DOCS mode until 2026-10-16; notes-only pushes now run
+    # docs-gate.yml instead (see `paths-ignore` above for why).
     #
     # Anything it cannot classify — a pull request, a new branch, a force
     # push whose `before` is gone, a failed API call — is FULL.
@@ -98,16 +107,8 @@ jobs:
         id: mode
         env:
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
         run: |
           mode=full
-          if [ "${{ github.event_name }}" = "push" ] && [ -n "$BEFORE" ] &&
-             [ "$BEFORE" != "0000000000000000000000000000000000000000" ] &&
-             git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
-            code=$(printf '%s\n' "$changed" | grep -vE '(\.md$|^references/)' | grep -v '^$' || true)
-            if [ -n "$changed" ] && [ -z "$code" ]; then mode=docs; fi
-          fi
           if [ "$mode" = full ]; then
             # A run of this workflow on this commit whose "Test suite" step
             # passed. Only that step counts: a DOCS or SEEN run is a success
@@ -158,11 +159,6 @@ jobs:
         if: steps.mode.outputs.mode != 'seen'
         run: pnpm install --frozen-lockfile
 
-      # No database: none of these needs one (server/docsOnlyGate.test.ts).
-      - name: Documentation tests (DOCS only)
-        if: steps.mode.outputs.mode == 'docs'
-        run: DATABASE_URL= npx vitest run $(grep -v '^#' .github/docs-only-tests.txt)
-
       # Cheapest check first, so a type error fails in a minute.
       - name: Typecheck (app and tests)
         if: steps.mode.outputs.mode == 'full'
@@ -205,9 +201,10 @@ jobs:
   # ── Piece 2: code-only auto-deploy to staging ────────────────────────────
   deploy-staging:
     needs: test
-    # Not after a DOCS run: nothing a person can see changed, and a staging
-    # rebuild plus a smoke is about ten billed minutes for it.
-    if: github.event_name == 'push' && github.ref_name == 'local-dev' && needs.test.outputs.mode != 'docs'
+    # Notes-only pushes never reach this workflow (`paths-ignore`), so no
+    # staging rebuild is spent on them; staging takes the commit with the
+    # next code push.
+    if: github.event_name == 'push' && github.ref_name == 'local-dev'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

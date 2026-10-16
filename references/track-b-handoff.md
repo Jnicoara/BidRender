@@ -1,5 +1,15 @@
 # Track B handoff — 2026-10-05
 
+## B landed `230c18f5` (2026-10-16, by Track A on the owner's order)
+
+local-dev fast-forwarded `1dbd152e..230c18f5`. Gate 38961289110 green
+(test, deploy-staging, smoke **223 passed / 5 skipped**, 14.3 min); staging
+`/api/version` commit `230c18f5`. Also new today on track-a-night (lands
+next): **notes-only pushes no longer start the Gate** — they run the "Docs
+gate", which is red unless the code commit under them passed its full suite
+(`scripts/ciCodeCommitPassed.mts`). Rule: wait for your code commit's Gate
+before pushing notes.
+
 ## WHERE B STANDS — 2026-10-16 (fourth night, done 04:08), track-b only
 
 - Q5 label built; A's two Plans faults fixed (resent marks, legend link);

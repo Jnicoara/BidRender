@@ -1,0 +1,89 @@
+# THE DOCS GATE — what a notes-only push runs (owner, 2026-10-16).
+#
+# A push that changes only notes (`*.md`, anything under references/) does
+# NOT start the Gate (gate.yml `paths-ignore`). It runs this instead, which:
+#
+#   1. runs the tests that READ documentation (.github/docs-only-tests.txt,
+#      kept complete by server/docsOnlyGate.test.ts), and
+#   2. goes RED unless the CODE commit under this push passed the Gate's full
+#      "Test suite" step (scripts/ciCodeCommitPassed.mts). Cancelled, failed,
+#      still running or never run: red, saying which.
+#
+# Why: the Gate's old DOCS mode went green on its own, and on a track branch
+# the notes push that started it CANCELLED the code run still going — a
+# branch showed green over code no full run had finished (Track B,
+# 2026-10-16). This workflow cannot cancel a Gate run: its own concurrency
+# group below. RULE for every push: wait for the code commit's Gate before
+# pushing notes; a notes run that went red because the code run was still
+# going turns green by re-running this job afterwards.
+#
+# A push that ALSO changes code starts the Gate too; then this workflow says
+# so and stops (the Gate covers it). Nothing here deploys or reaches live.
+name: Docs gate
+
+on:
+  push:
+    branches: [local-dev, "track-*", "a-*", "c-*"]
+    # Keep equal to gate.yml's `paths-ignore`
+    # (scripts/ciCodeCommitPassed.test.ts checks).
+    paths: ["**.md", "references/**"]
+
+concurrency:
+  group: docs-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Notes only, or code too?
+        id: kind
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          kind=notes
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] &&
+             git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            code=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -vE '(\.md$|^references/)' | grep -v '^$' || true)
+            if [ -n "$code" ]; then kind=code; fi
+          fi
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          if [ "$kind" = code ]; then echo "::notice::This push changes code too; the Gate tests it. Nothing to do here."; fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.kind.outputs.kind == 'notes'
+
+      - uses: actions/setup-node@v4
+        if: steps.kind.outputs.kind == 'notes'
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        if: steps.kind.outputs.kind == 'notes'
+        run: pnpm install --frozen-lockfile
+
+      # No database: none of these needs one (server/docsOnlyGate.test.ts).
+      - name: Documentation tests
+        if: steps.kind.outputs.kind == 'notes'
+        run: DATABASE_URL= npx vitest run $(grep -v '^#' .github/docs-only-tests.txt)
+
+      # The newest commit on this branch's first-parent line that changed
+      # anything but notes — a merge that brought code counts as itself.
+      - name: The code commit underneath passed its full Gate run
+        if: steps.kind.outputs.kind == 'notes'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          code_sha=$(git log -1 --first-parent --format=%H HEAD -- . ':!*.md' ':!references/')
+          echo "Code commit under this push: $code_sha"
+          node scripts/ciCodeCommitPassed.mts "$code_sha"

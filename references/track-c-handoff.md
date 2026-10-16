@@ -1,5 +1,16 @@
 # Track C — handoff, 2026-10-06
 
+## B landed `230c18f5` (2026-10-16, by Track A on the owner's order)
+
+local-dev is now `230c18f5` (B's tip; Gate 38961289110 green, smoke 223 /
+5 skipped, staging serves it). **Your turn:** merge local-dev in, keep ONE
+`DraftNumberInput` (B's and yours collide — both tests must pass on it),
+get the Gate green incl. smoke, then write **"C ready `<commit>`"** at the
+top of `references/track-a-handoff.md`; A lands it with
+`git push origin <commit>:local-dev`. New on local-dev soon (A's Gate fix):
+notes-only pushes run the "Docs gate", red unless the code under them
+passed its full suite — wait for your code Gate before pushing notes.
+
 ## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
 
 **Never replace, restore, re-copy or drop a shared local database

@@ -26,6 +26,15 @@ This is the human-readable companion to the git history — read this to see wha
 - **The Dashboard's "drops not priced" check is about a fifth faster** for
   a company with many bids, because it reads the company's height settings
   once instead of once per bid. The numbers it shows are unchanged.
+- **The test gate can no longer show green over untested code.** A push
+  that changed only notes used to run a short check that passed on its own.
+  On a track branch, it also cancelled the full test run of the code just
+  pushed. So a branch could look green while its code had never finished
+  testing. Track B found one test red for a day that way. Now a notes-only
+  push never touches the code run. Its own check is red unless the code
+  underneath really passed the full suite; cancelled, failed, or still
+  running all count as red.
+
 - **Typing a decimal into a quantity or percent box no longer multiplies it
   by ten.** In the run-type editor's extra and makeup boxes, an assembly's
   or kit's part quantities and an assembly step's count, the box redrew
@@ -41,9 +50,9 @@ This is the human-readable companion to the git history — read this to see wha
   with a button to Settings › Pricing. It changes no number. A value
   typed on the bid itself, 0 included, counts as a decision and is never
   flagged.
-- **The 16 open pricing-name answers are recorded, and the 30 mud ring names
-  wait for approval.** The end-of-pricing dry run now holds every decision:
-  626 changes, 0 problems. It is still a dry run only.
+- **The 16 open pricing-name answers are recorded, and the owner approved
+  all 30 mud ring names.** The end-of-pricing dry run now holds every
+  decision: 656 changes, 0 problems. It is still a dry run only.
 
 - **Fixing a Draft whose traced runs were priced at $0 an hour is now one
   button, and a new company's runs start priced.** The owner chose no

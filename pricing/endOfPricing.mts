@@ -27,7 +27,9 @@
  * it. Item 9, the 30 mud rings, is written with `pendingApproval: true`:
  * checked against the catalog like everything else, listed in its own
  * section for the owner to approve, and left out of the change list until
- * that flag comes off.
+ * that flag comes off. Owner, later 2026-10-16: "mud rings = YES, all 30 as
+ * listed" — the flag is off and each carries `approved`; they are in the
+ * change list and listed in their own APPROVED section.
  *
  * ── Why --apply refuses ─────────────────────────────────────────────────────
  * Applying is the end-of-pricing LOAD: renames through
@@ -53,7 +55,7 @@ const { BASELINE_MATERIALS, RENAMED_BASELINE_MATERIALS } = await import(
 
 if (process.argv.includes("--apply")) {
   console.error(
-    "--apply is not built: the apply IS the end-of-pricing load, and it waits for the owner's go, the mud rings' approval and the CHECK items in pricing/end-of-pricing-dry-run.md."
+    "--apply is not built: the apply IS the end-of-pricing load, and it waits for the owner's go and the CHECK items in pricing/end-of-pricing-dry-run.md."
   );
   process.exit(2);
 }
@@ -196,6 +198,11 @@ await conn.end();
 // the owner's approval (`pendingApproval`: the 30 mud rings). Both are still
 // checked against the catalog above, so a bad name shows up before approval.
 const pending = changes.filter(c => c.pendingApproval === true);
+// Approved by the owner after being listed (the mud rings, 2026-10-16): in
+// the change list like any other entry, and still listed on their own.
+const approvedRings = changes.filter(
+  c => typeof c.approved === "string" && c.q === "Mud rings"
+);
 const decidedList = changes.filter(c => c.kind === "decided");
 const applied = changes.filter(
   c => c.pendingApproval !== true && c.kind !== "decided"
@@ -265,12 +272,26 @@ const out: string[] = [
     ? open.map(c => `- **${where(c)}:** ${esc(c.what)}`)
     : ["None. All 16 were answered by the owner on 2026-10-16 (below)."]),
   "",
-  `## WAITING FOR YOUR APPROVAL — the ${pending.length} mud rings (item 9)`,
-  "",
-  `${pending.filter(c => c.kind === "rename").length} are renames of the rows that exist today, so those rows keep their ids and every starter that uses them; ${pending.filter(c => c.kind === "addRow").length} are new. **A's proposal, for you to confirm: today's rows become the 1/2" raise** (5/8" is the other common choice; say if you want that instead). Not in the change list until you approve.`,
-  "",
-  ...pending.map(pendingLine),
-  "",
+  ...(pending.length > 0
+    ? [
+        `## WAITING FOR YOUR APPROVAL — the ${pending.length} mud rings (item 9)`,
+        "",
+        `${pending.filter(c => c.kind === "rename").length} are renames of the rows that exist today, so those rows keep their ids and every starter that uses them; ${pending.filter(c => c.kind === "addRow").length} are new. **A's proposal, for you to confirm: today's rows become the 1/2" raise** (5/8" is the other common choice; say if you want that instead). Not in the change list until you approve.`,
+        "",
+        ...pending.map(pendingLine),
+        "",
+      ]
+    : []),
+  ...(approvedRings.length > 0
+    ? [
+        `## APPROVED 2026-10-16 — the ${approvedRings.length} mud rings (item 9)`,
+        "",
+        `Owner: "mud rings = YES, all 30 as listed." ${approvedRings.filter(c => c.kind === "rename").length} renames (today's rows become the 1/2" raise and keep their ids and starters) and ${approvedRings.filter(c => c.kind === "addRow").length} new rows, now in the change list below.`,
+        "",
+        ...approvedRings.map(pendingLine),
+        "",
+      ]
+    : []),
   "## DECIDED 2026-10-16 — the 16 answers that were OPEN",
   "",
   'Owner: "N3 = YES to all 16 of your picks." Each pick\'s changes are in the review tables below, quoting it.',
