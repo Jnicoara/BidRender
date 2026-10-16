@@ -607,3 +607,9 @@ draft's hand-typed START times ran ahead of the clock. Ends were always
 - **Who replaced `bidrender_local`?** Nobody — see the correction above.
   Rule written in all three handoffs: never replace or restore a shared
   local DB without saying so in the handoff first.
+- Owner: mud rings YES (all 30) → approved in the dry run, 656 changes,
+  0 problems, still dry run. N5 YES, waits for B and C to land on
+  local-dev (watched every 15 min). Release plan for SOON written
+  (`next-live-release-plan.md` top section): landing order, 26
+  wrong-number fixes with commits, migrations 0152–0164 (13 additive,
+  expect 165 / 205 FKs), decisions D1–D4, approval steps A–D.

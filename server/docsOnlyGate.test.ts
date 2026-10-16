@@ -2,9 +2,10 @@
  * A push that changes only documentation still runs every test that READS
  * documentation.
  *
- * The Gate (.github/workflows/gate.yml, "DOCS") skips the full suite when a
- * push changes nothing but `*.md` files and references/, and runs only the
- * test files listed in .github/docs-only-tests.txt. That list is a fact about
+ * A push that changes nothing but `*.md` files and references/ does not start
+ * the Gate; the Docs gate (.github/workflows/docs-gate.yml, since 2026-10-16;
+ * it was the Gate's "DOCS" mode before) runs only the test files listed in
+ * .github/docs-only-tests.txt — and is red unless the code under it passed. That list is a fact about
  * the code the day it was written, so this test re-derives it: any test file
  * that reads files AND names a `.md` path in a string on a code line must be
  * listed. Without it, a new test that checks a doc would pass on the day it

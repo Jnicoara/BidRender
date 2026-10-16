@@ -13,6 +13,158 @@
 > matched § 5g. The rest of this file is the record of that release; the
 > section below is the start of the NEXT one.
 
+## RELEASE SOON — written 2026-10-16 (Track A, PAPER ONLY; supersedes the two sections below for this release)
+
+Live is **`60479773` / 152 migrations / 183 FKs**. This release carries
+**everything on local-dev now (`1dbd152e`) + Track B (`230c18f5`) + Track
+C (`0333bf0e`)** once both have landed on local-dev, then **N5** (one
+additive migration, owner's yes 2026-10-16). Nothing below has been run
+against live. Every count is as of 2026-10-16 — **if what a command prints
+does not match, stop and find out why before going on**: either this line
+is stale or the system is not in the state you think it is.
+
+### Order of landing (before the candidate exists)
+
+1. **B** fast-forwards local-dev (`230c18f5` already contains `1dbd152e`;
+   its Gate 38944686077 green, local smoke 222/6). Owner runs B's push line.
+2. **C** merges local-dev in — **conflict known**: B and C each wrote
+   `client/src/components/DraftNumberInput.tsx` (different APIs) for the
+   same 10×-quantity bug, both edit `AssembliesLibraryPage.tsx`,
+   `KitsPage.tsx`, `AssemblyStepsSection.tsx`, and `server/db.ts` near
+   `bidDropsNotPriced`. **One component must survive**, and the tests of
+   BOTH (B1 and C2 below) must pass on it. C's Gate green incl. smoke, then
+   the owner fast-forwards local-dev.
+3. **A: N5** on local-dev — migration **0164** (additive: nullable
+   `pricing_defaults.profitSetAt`, `overheadSetAt`, no default; no FK),
+   applied to the **staging DB after a staging backup**, code reads it
+   (NULL = never set → the amber "not set" label; a Settings save stamps
+   it). B and C merge local-dev afterwards.
+4. **Candidate** = the commit staging serves after step 3. Neither B nor C
+   touches `drizzle/` (checked 2026-10-16).
+
+### Every wrong-number fix that reaches live
+
+"Saved data" = does anything already stored, or any existing bid's total,
+change when the code ships. **Live today** (read-only check, 2026-10-16):
+0 traced-run lines, 0 close-outs, 0 tax areas, 0 assembly/kit quantities ≥
+10 whole, 0 run-type extras ≥ 10%; 3 companies (1, 1421, 3036) at 0/0
+profit/overhead, never set, followed by 2 empty Drafts (bids 23, 25). So
+**no live data is known to be saved wrong** by any fault below.
+
+| #   | Wrong → right                                                                                                                                       | From | Commit(s)                                                                                                                | Saved data / existing totals at ship                                         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| W1  | Traced-run labor priced at **$0/h** (no way to set the run rate) → Settings › Pricing "Labor rate for traced runs"                                  | A    | `e34c4be2`                                                                                                               | none (lines keep their frozen rate; live has 0 run lines)                    |
+| W2  | A Draft's $0 run lines → "Update to the current math" (math v2, **button only**) prices them at the run rate, old → new shown                       | A    | `daa3f49d`                                                                                                               | only a Draft whose user presses it; release step moves nothing past v1       |
+| W3  | New company's run rate unset → shipped **Journeyman $59.22 "Example rate"**                                                                         | A    | `daa3f49d`                                                                                                               | only a company's FIRST settings row — **live user 5 has none** (decision D3) |
+| W4  | Scan "Confirm all" could count an AI-"same" look-alike → review grid first; set-aside finds no longer lost                                          | A    | `daa3f49d`                                                                                                               | future counts only                                                           |
+| W5  | A resent batch of marks counted **twice** (3 → 6) → one key per mark (server + screen; also the reload-crash and offline paths)                     | A+B  | `291e719b` `fcc3985b` `9f13e976` `9150f9b1`                                                                              | none; marks already doubled stay                                             |
+| W6  | Viewing a sheet added homerun circuits / placed panels by itself (moved homerun feet) → buttons                                                     | C    | `9291c708` `540ac344`                                                                                                    | none (C: 4,237/4,237 unchanged)                                              |
+| W7  | A run line whose part changed silently priced the old part → "Part changed — Send again"                                                            | C    | `9291c708`                                                                                                               | none                                                                         |
+| W8  | A **locked** bid's warning counts moved with the library → frozen at lock (`bids.lockedWarnings`, 0156)                                             | C    | `734c8258`                                                                                                               | none; bids locked before keep live counts (live: 0 non-Draft)                |
+| W9  | A server start re-stamped shared starter numbers each deploy → start inserts only; differences become proposals                                     | A    | `d38f5930`                                                                                                               | totals none (4,386/4,386); **owner Q1 conflict, decision D1**                |
+| W10 | Pricing sheet guessed pack sizes from words; a $0 could become a $0 "Example price" → fixed in the loader                                           | A    | `9a497c95` `188758b6`                                                                                                    | none until the end-of-pricing load                                           |
+| W11 | Signup race gave one user 5 companies → exactly one                                                                                                 | A    | `c0f67720`                                                                                                               | stops new ones; live companies 5–8 need the script (decision D2)             |
+| W12 | "Profit / overhead not set" was silent → amber label (N5 makes a typed 0 stop showing it)                                                           | A    | `1dbd152e` + 0164                                                                                                        | label only                                                                   |
+| W13 | **Typed "2.5" saved 25** (run-type extra %, makeup inches, assembly/kit quantities, step counts; "1.5" → 15, "2.25" → 225)                          | B+C  | `88a35407` `1fff2082`                                                                                                    | none; old 10× values stay (live: none found)                                 |
+| W14 | Settings › Pricing saved **"15%" / "1,5" / blank as 0%** company profit, overhead, productivity → read as typed or refused                          | C    | `c1d7811b` `b08c950b`                                                                                                    | none; old zeros stay (live: 3 never-set zeros)                               |
+| W15 | A blank tax-rate part saved **0%** → refused                                                                                                        | C    | `baa720c9`                                                                                                               | none (live: 0 tax areas)                                                     |
+| W16 | Close-out blank total / blank lines recorded **0 h** (Performance too good) → refused; hour suggestions no longer learn from 0                      | C    | `b8000a24` `fdd953ed`                                                                                                    | none (live: 0 close-outs)                                                    |
+| W17 | Number parsing: "0x10" → 16, "1,5" → 15, "$1.5"/"15%"/"65,000" refused; blank extra cost $0; blank "Price good for" 0 days; "6.25%" bid tax refused | C    | `e5e95d16` `58d18781` `7c9ecc5c` `165948ee` `271fa375` `c802969b` `b4fde025` `6dc1d4d2` `ce23fb35` `efa7f7ca` `3dcc818d` | none                                                                         |
+| W18 | Two counts of one assembly at once lost one (1+2 → 2); double close-out save left two sets of lines                                                 | C    | `e01ccc49` `790d3665`                                                                                                    | none                                                                         |
+| W19 | Two people saving one assembly/kit/material/rate/modifier/client silently undid each other → stale save refused                                     | C    | `92995a5a` `35dcbaa1` `384bd483` `372c45a3` `24df03f5`                                                                   | none                                                                         |
+| W20 | Quote dated in UTC (tomorrow after ~5 pm Pacific; good-through a day late) → local date                                                             | C    | `ecf09dc6` `16eb9c0c`                                                                                                    | new quotes only                                                              |
+| W21 | Price import counted a twice-named material twice; last price won silently → counted once, warned                                                   | C    | `e5f63b9f`                                                                                                               | none (owner's "refuse" answer, Q-IMP1, is NOT built — rides a later release) |
+| W22 | Screens stated **false zeros** when the database was unreachable or loading ("0 lines", sales tax "off", $0 total due); failed save flashed green   | C    | `f69af364` `08c852ab` `7af3dc17`                                                                                         | none                                                                         |
+| W23 | Removed labor role showed blank role / $0.00 labor preview → "Removed role"; archived condition shown on recipes                                    | C    | `38568a68` `53c2ee66`                                                                                                    | none                                                                         |
+| W24 | Legend link left the existing by-name count unpriced → the count adopts the assembly                                                                | B    | `3f613a30`                                                                                                               | only when someone links (a Draft line becomes priced)                        |
+| W25 | Bid total silent about unassigned marks → "+ N marks unassigned"; starter editor "$0.00" → "not priced"                                             | B    | `4ea3c557` `893c4bcf`                                                                                                    | labels only                                                                  |
+| W26 | Pack price typed → unit price rounded **up** at 4 dp; price history on every write (new)                                                            | C    | `4ba0cda0` `18cda2bc` `b3676bb3`                                                                                         | new writes only (uses 0157–0163)                                             |
+
+Not wrong-number fixes, also riding: B's starter offers (nothing moves until
+an admin clicks Accept), plan-reading help, phone bar, invite screens
+(switch OFF), Q-DB1, SameSite=Lax, `CLIENT_IP_FROM` (unset), bcrypt workers,
+the drizzle snapshot, and tests. **Not riding:** the end-of-pricing load
+(dry run, 656 changes approved — its own release), Q-IMP1 refuse,
+the durable mark key column, the users.email UNIQUE.
+
+### Migrations: 0152–0164, all ADDITIVE (step 1 = before the push; step 3 empty)
+
+12 files 0152–0163 (no `UPDATE` in any; 22 new FKs) + 0164 (N5, two
+nullable columns, 0 FKs). **Expect "Applied 13 migrations … all 165",
+FKs 205/205.** 0156 (`bids.lockedWarnings`) and 0157–0159 (`materials`
+pack columns — read on every materials read) and 0164 (read by the bid
+screen) MUST be on live before the push.
+
+### Owner decisions — ANSWERED 2026-10-16
+
+- **D1 = YES**: ship the boot change this release; **Q1 is waived**. Later
+  price changes reach live through the logged path (`starterDrift.mts
+  --apply` / `applyStarterChange`), never a re-stamp on boot.
+  (`boot-seed-plan.md` Q1 and `morning-questions-a.md` § 3 say so too.)
+- **D2 = YES**: remove live companies 5–8 (user 3036) **after the day's
+  verified backup** — step 8 below.
+- **D3 = YES**: a live account with no settings row (user 5) starts on
+  Journeyman's tagged example rate for traced runs.
+- **D4 = turn the invite gate ON at this release**: set
+  `SIGNUP_INVITE_ONLY=on` on the live app, **after first reading what is
+  set now** (DO → App → Settings → Environment variables; record it). An
+  env change redeploys the app, so it is its own step AFTER the code push
+  and its checks (step 9b). Note the earlier advice (`morning-questions-a.md`
+  § 5) was to wait until the sign-in page hides "Create account" — check
+  whether that screen work is in the candidate; if not, a stranger can fill
+  in the form and is refused only on submit (honest, not harmful).
+
+The wording below was the question as asked.
+
+### Owner decisions needed BEFORE the window (as asked)
+
+- **D1 — boot change vs Q1** (`morning-questions-a.md` § 3): Q1 says the
+  boot change ships the release AFTER the end-of-pricing load; it is on
+  local-dev, so this release carries it. **Waive Q1 for this release**
+  (recommended: the pricing load then goes out through `starterDrift.mts
+--apply` later), or hold the release.
+- **D2 — remove live companies 5–8** (user 3036): yes / no
+  (`removeRaceCompanies.mts`, step 10).
+- **D3 — live user 5 has no pricing-settings row**, so on first open after
+  the push their traced runs start on Journeyman's example rate (tagged).
+  No saved line changes. OK, or leave existing accounts unset?
+- **D4 — `SIGNUP_INVITE_ONLY`**: confirm the live app has no such variable
+  (the gate ships OFF).
+
+### Before the window (no live writes)
+
+P1. Candidate's Gate green **including smoke** (B's smoke now ~13 min).
+P2. `git diff 60479773 <candidate> --stat -- drizzle` shows **exactly**
+0152–0164 `.sql`, `meta/_journal.json`, `meta/0163_snapshot.json` (and
+`meta/0164_snapshot.json` if N5's file was generated), `schema.ts`.
+Anything else: stop.
+P3. Rehearse on a FRESH restored copy of live with the candidate (as § Night
+prep P4), plus: `applyMathVersion.mts` dry run → **"0 Draft(s) to move …
+2 wait for the button"** (bids 23, 25 at v1); `freezeSentBids.mts` dry run
+→ 0; `repairStarterCovers.mts` **not needed** (swap list unchanged since
+`60479773`, checked 2026-10-16); `bidTotalsDump.mts` before/after → 0
+differ.
+
+### The day — your approval steps, in order
+
+| Step | What A does                                                                                                                 | **You approve when you see**                                                                               |
+| ---- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1    | Freeze merges (tell B, C). Pre-flight: live `/api/version` = `60479773`; candidate = staging's commit; Gate+smoke green; P2 | **Approval A** — "pre-flight clean, candidate `<sha>`"                                                     |
+| 2    | `backup.mts` + `verifyBackup.mts KEEP_SCRATCH=1`; P3 rehearsal on THAT copy                                                 | **Approval B** — counts = manifest; 13 applied → 165, FKs 205; totals 0 differ; math "0 to move"           |
+| 3    | Read-only on live: `schemaDrift` (152/183), `bidTotals` from a `60479773` worktree, `starterDrift` (read, kept)             | (no approval — recorded)                                                                                   |
+| 4    | `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts`                           | prints "Applied 13 … all 165"; second run nothing; drift "matches", 205/205; site still serving `60479773` |
+| 5    | `git checkout main && git merge --ff-only <candidate> && git push origin main && git checkout local-dev`                    | **Approval C** — you say "push"; then `/api/version` commit = candidate, `builtAt` after the push          |
+| 6    | First boot: DO logs one `[seed] starter:` line (N/P/H/L as rehearsed); renamed 0, retired 0, deleted 0                      | matches the rehearsal                                                                                      |
+| 7    | `bidTotals --compare` vs step 3                                                                                             | "ok all N bid(s) unchanged"                                                                                |
+| 8    | D2 = yes: save the 8 rows to JSON, dry run (kept 4, removable [5,6,7,8]), then `--apply --expect 5,6,7,8`                  | dry run prints exactly kept 4 / removable [5,6,7,8]; after: kept 4, 0 others; totals unchanged             |
+| 9    | Point App Platform's health check at `/api/health` (Q-DB1)                                                                  | you click it in DO (owner's console)                                                                       |
+| 9b   | D4: read live's env vars (record), set `SIGNUP_INVITE_ONLY=on` (redeploys); then a sign-up with no invite is refused        | you set it in DO; `/api/version` same commit, new `builtAt`; refusal seen on bidridge.com                   |
+| 10   | Owner opens a bid and its plans; A records `deploying.md` § 11 "LIVE: `<candidate>`"                                        | **Approval D** — done                                                                                      |
+
+**Rollback:** DO → Activity → Rollback to `60479773` (safe: every migration
+additive; `60479773` measured on the migrated copy in P3). Migrations stay.
+Item 8: re-insert the saved rows from the JSON.
+
 ## Night prep 2026-10-14 — the release AFTER `60479773` (PAPER ONLY)
 
 Track A, overnight run on `track-a-night`. **Nothing here was run against
