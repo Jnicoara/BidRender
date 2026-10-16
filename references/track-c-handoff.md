@@ -23,13 +23,25 @@ create and drop yourself are exempt. (Prompted by a false alarm: on
 it was a release step never run there. The rule stands anyway: the cost of
 saying it is one line.)
 
-## (newest) 2026-10-16, day — waiting for B on local-dev
+## (newest) 2026-10-16, afternoon — C ready e9dfc0ff; 6b waits for S2
 
-- B's work (track-b) was NOT on local-dev at 09:50; watched every 15 min.
-  When it lands with smoke green: merge local-dev into track-c, fix
-  conflicts (likely `server/db.ts` near `bidDropsNotPriced`, CHANGELOG
-  `## [2026-10-16]`, todo), Gate green, give the owner the `!` push line.
-- Shipped on track-c meanwhile: "Discard your changes?" guard on every
+- **B landed and is merged.** "C ready e9dfc0ff" is at the top of
+  `track-a-handoff.md` (Gate 38968275571 green); A lands it. One
+  `DraftNumberInput` (B's API + C's parsing/blur). The first merge Gate was
+  red: C's `priceHistoryDoor.test.ts` could not see B's generic
+  `forkForOwners` — the scan now can.
+- **Scope tags 6b is BUILT on local branch `c-scope-prompts`** (not pushed:
+  C pushes track-c only; it holds a `drizzle/schema.ts` commit, a0180e50,
+  that is A's to land). Final S2 SQL + the schema.ts text are in
+  `track-a-handoff.md`. **When S2 is on local-dev:** merge local-dev into
+  track-c, then merge `c-scope-prompts` taking A's schema.ts, migrate
+  `bidrender_test_c`, run `server/scopePromptsLibrary.test.ts`, push.
+- Q-IMP1 built; lists (Dashboard / Find a bid / archive) priced together
+  (250 bids 460 → 85 ms); guide mode was already finished.
+- **For B:** `starterOffers.ts` reads Drafts' runs without the live-sheet
+  rule — todo.md, and `quantitiesIgnoreDeletedPlans.test.ts` names it as
+  its one known gap.
+- Earlier today: "Discard your changes?" guard on every
   library editor + Clients (`lib/unsavedGuard.ts`, `hooks/useUnsavedGuard`,
   one dialog in the shell); dashboard drops check reads company heights
   once per list (`companyHeights` in db.ts).
