@@ -80,9 +80,9 @@ brand-variants pass by design and needs nothing from you now.
   sheet contradicts itself.
   **ANSWERED 2026-10-16 (owner): YES, refuse** — a material named at two
   different prices in one sheet keeps its stored price and is listed as
-  refused. NOT BUILT YET: needs the import changed and the "last price
-  stands" case in `supplierPricing.test.ts` changed to the new rule (an
-  owner decision, not a loosened test). Listed in `todo.md`.
+  refused. **BUILT 2026-10-16 (track-c)**: the import refuses it, and the
+  "last price stands" case in `supplierPricing.test.ts` now pins the
+  refusal (an owner decision, not a loosened test).
 - **Q-QTY2** — same bug, assembly WORK STEPS "How many" box (×N): fixed by
   the same component; not shown on screen (needs a work step set up) —
   unit-tested only. → **Nothing to decide**; noted so you know it was

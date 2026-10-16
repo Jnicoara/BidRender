@@ -511,7 +511,7 @@ function ImportPriceListDialog({
     priced: string[];
     unmatched: string[];
     renamed: Array<{ from: string; to: string }>;
-    conflicts: Array<{ name: string; prices: number[]; used: number }>;
+    refused: Array<{ name: string; prices: number[] }>;
   } | null>(null);
 
   const importPrices = trpc.materials.importPrices.useMutation({
@@ -523,8 +523,8 @@ function ImportPriceListDialog({
           (data.unmatched.length
             ? `, ${data.unmatched.length} name${data.unmatched.length === 1 ? "" : "s"} matched nothing`
             : "") +
-          (data.conflicts.length
-            ? `, ${data.conflicts.length} named at two prices (the last was used)`
+          (data.refused.length
+            ? `, ${data.refused.length} not changed (named at two prices)`
             : "")
       );
       onDone();
@@ -584,19 +584,18 @@ function ImportPriceListDialog({
                   `and ${result.renamed.length - 20} more under their new names`}
               </div>
             )}
-            {result.conflicts.length > 0 && (
+            {result.refused.length > 0 && (
               <div className="text-amber-400">
-                Named at more than one price — the last one on the sheet was
-                used; check it:{" "}
-                {result.conflicts
+                Not changed — the sheet names these at more than one price; fix
+                the sheet and import again:{" "}
+                {result.refused
                   .slice(0, 20)
                   .map(
-                    c =>
-                      `${c.name} (${c.prices.map(p => money(p)).join(" / ")} → ${money(c.used)})`
+                    c => `${c.name} (${c.prices.map(p => money(p)).join(" / ")})`
                   )
                   .join(", ")}
-                {result.conflicts.length > 20
-                  ? ` and ${result.conflicts.length - 20} more`
+                {result.refused.length > 20
+                  ? ` and ${result.refused.length - 20} more`
                   : ""}
               </div>
             )}

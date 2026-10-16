@@ -1487,7 +1487,12 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
 
 ### Price-list import: one material at two prices is REFUSED (owner, 2026-10-16, Q-IMP1)
 
-- [ ] **Build:** a sheet naming one material twice at different prices
+- [x] **DONE 2026-10-16 (track-c):** `importPrices` returns `refused`
+      (name + both prices) in place of `conflicts`, writes nothing for that
+      material, and the import result says "Not changed — fix the sheet".
+      The "last price stands" case became "two prices are refused, not the
+      last price" plus a one-price case that still forks once.
+- [x] **Build:** a sheet naming one material twice at different prices
       changes nothing for that material and lists it as refused ("named at
       $3 and $4 — not changed, fix the sheet"). Today the last row wins and
       the import reports it. Change the "last price stands" case in

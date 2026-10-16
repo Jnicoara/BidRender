@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A price list that names one material at two different prices no longer
+  picks one.** That material keeps the price it had and is listed as "not
+  changed — fix the sheet", because either price would be a guess. Before,
+  the last row on the sheet won. (Owner decision; the import screen is not
+  shown to users yet.)
 - **Leaving the assembly or kit editor with unsaved changes now asks
   first.** Back, a menu link, the browser's Back button or closing the tab
   used to throw a half-built recipe away without a word. Now it asks

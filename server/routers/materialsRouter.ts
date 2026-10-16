@@ -763,21 +763,22 @@ export const materialsRouter = router({
         byTarget.set(target.id, entry);
       }
 
-      // Pass 2 — one write per material, at the LAST price the sheet gives
-      // it (the rule `supplierPricing.test.ts` pins: "the last price stands").
-      // What changed on 2026-10-15 is only what is SAID: a material the sheet
-      // names at two different prices is reported with both and the one used,
-      // where it was silent and counted as priced twice. Whether it should be
-      // refused instead is Q-IMP1 in pricing/morning-questions.md.
-      const conflicts: Array<{ name: string; prices: number[]; used: number }> =
-        [];
+      // Pass 2 — one write per material. A material the sheet names at two
+      // DIFFERENT prices is REFUSED: its stored price is left exactly as it
+      // was and it is listed with both prices, because picking one would be a
+      // guessed price (owner, 2026-10-16, Q-IMP1 in
+      // pricing/morning-questions.md). Until then the last row won and was
+      // reported; before 2026-10-15 it won silently. The same price twice is
+      // just that price.
+      const refused: Array<{ name: string; prices: number[] }> = [];
       for (const { target, prices, last } of Array.from(byTarget.values())) {
-        if (prices.size > 1)
-          conflicts.push({
+        if (prices.size > 1) {
+          refused.push({
             name: target.name,
             prices: Array.from(prices).sort((a, b) => a - b),
-            used: last,
           });
+          continue;
+        }
         const costPerUnit = last;
         const editableId =
           target.userId === null
@@ -799,7 +800,7 @@ export const materialsRouter = router({
         priced.push(target.name);
       }
 
-      return { priced, unmatched, renamed, conflicts };
+      return { priced, unmatched, renamed, refused };
     }),
 
   /**

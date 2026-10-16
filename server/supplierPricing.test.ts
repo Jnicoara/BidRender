@@ -206,13 +206,15 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
     expect((await caller().materials.list()).length).toBe(before);
   });
 
-  it("says when a material is named at two different prices, and counts it once", async () => {
-    // One item in two sections of a supplier sheet. The last row wins (the
-    // test below pins that); it used to win SILENTLY, with the material
-    // counted as priced twice (2026-10-15). Q-IMP1 asks whether to refuse.
+  it("refuses a material named at two different prices: nothing changes, and it is listed", async () => {
+    // One item in two sections of a supplier sheet. Owner, 2026-10-16
+    // (Q-IMP1): picking either price is a guess, so the material keeps the
+    // price it had and is listed with both. Until then the last row won
+    // (2026-10-15), and before that it won silently and counted twice.
     const [a, b] = (await caller().materials.list())
       .filter(m => m.userId === null)
       .slice(0, 2);
+    const aBefore = Number(a.costPerUnit);
     const result = await caller().materials.importPrices({
       supplierName: "Rexel",
       rows: [
@@ -222,13 +224,15 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
         { name: b.name.toUpperCase(), costPerUnit: 7 },
       ],
     });
-    expect(result.conflicts).toEqual([
-      { name: a.name, prices: [3, 4], used: 4 },
-    ]);
-    // Each material once; the same price twice is just that price.
-    expect(result.priced).toEqual([a.name, b.name]);
+    expect(result.refused).toEqual([{ name: a.name, prices: [3, 4] }]);
+    // The same price twice is just that price, priced once.
+    expect(result.priced).toEqual([b.name]);
     const after = await caller().materials.list();
-    expect(Number(after.find(m => m.name === a.name)!.costPerUnit)).toBe(4);
+    const aAfter = after.filter(m => m.name === a.name);
+    // Not forked, not repriced: the shipped row is the only one, unchanged.
+    expect(aAfter).toHaveLength(1);
+    expect(aAfter[0].userId).toBeNull();
+    expect(Number(aAfter[0].costPerUnit)).toBe(aBefore);
     expect(Number(after.find(m => m.name === b.name)!.costPerUnit)).toBe(7);
   });
 
@@ -269,12 +273,12 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
     expect(Number(row.costPerUnit)).toBeCloseTo(6.4, 4);
   });
 
-  it("two old spellings of one row fork it once, and the last price stands", async () => {
+  it("two old spellings of one row at one price fork it once", async () => {
     // Both older SER spellings point at the same final name.
     const result = await caller().materials.importPrices({
       supplierName: "Platt",
       rows: [
-        { name: "1/0-3 SER aluminum", costPerUnit: 2 },
+        { name: "1/0-3 SER aluminum", costPerUnit: 3 },
         { name: "1/0-3 SER AL", costPerUnit: 3 },
       ],
     });
@@ -283,12 +287,40 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
       "1/0-1/0-1/0-2 SER Aluminum",
       "1/0-1/0-1/0-2 SER Aluminum",
     ]);
+    expect(result.refused).toEqual([]);
     const rows = (await caller().materials.list()).filter(
       m => m.name === "1/0-1/0-1/0-2 SER Aluminum"
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].userId).toBe(USER);
     expect(Number(rows[0].costPerUnit)).toBeCloseTo(3, 4);
+  });
+
+  it("two old spellings of one row at two prices are refused, not the last price", async () => {
+    // Replaces "the last price stands" — owner, 2026-10-16 (Q-IMP1): the
+    // sheet contradicts itself, so the row is neither forked nor repriced.
+    const before = (await caller().materials.list()).filter(
+      m => m.name === "1/0-1/0-1/0-2 SER Aluminum"
+    );
+    const result = await caller().materials.importPrices({
+      supplierName: "Platt",
+      rows: [
+        { name: "1/0-3 SER aluminum", costPerUnit: 2 },
+        { name: "1/0-3 SER AL", costPerUnit: 3 },
+      ],
+    });
+
+    expect(result.priced).toEqual([]);
+    expect(result.refused).toEqual([
+      { name: "1/0-1/0-1/0-2 SER Aluminum", prices: [2, 3] },
+    ]);
+    const rows = (await caller().materials.list()).filter(
+      m => m.name === "1/0-1/0-1/0-2 SER Aluminum"
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].userId).toBe(before[0].userId);
+    expect(rows[0].userId).toBeNull();
+    expect(Number(rows[0].costPerUnit)).toBe(Number(before[0].costPerUnit));
   });
 
   it("a company's own row still carrying the old name wins over the rename", async () => {
