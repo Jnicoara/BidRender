@@ -382,7 +382,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   the browser journey (item 3).
 - Gate 38863505561 **green** on 24ca6a72 (counting part 1). Pushed 291e719b + 887fe193.
 
-## Item 2 (part 2) — bid-number gap tests — 00:08 →
+## Item 2 (part 2) — bid-number gap tests — 00:03 → 00:09
 
 - `server/bidNumberGaps.test.ts` (user 9917): (1) a kit prices the
   company's COPY of an edited starter assembly — 2 × 3 h = 6 h, $360.
@@ -398,7 +398,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   no diff. Map's "Gaps closed" updated; remaining bid-number gaps listed.
 - 00:09 item 2 stopped here to keep the queue moving.
 
-## Items 4 + 5 — fresh start, backup drill — 00:10 → 00:17
+## Items 4 + 5 — fresh start, backup drill — 00:09 → 00:17
 
 - Fresh start: 164 migrations from zero (36 s), 87 tables / 205 FKs, seed
   1,717 materials, golden bids exact, starter-protection tests pass;
@@ -414,7 +414,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   predicted. Found/missed/Confirm all still exact there. Fixed: exact on
   the safety numbers, look-alikes held to the circle family.
 
-## Item 7 — company separation — 00:22 → 00:23
+## Item 7 — company separation — 00:17 → 00:23
 
 - `server/companySeparation.test.ts` (users 9919/9920): a probe over
   appRouter itself — every procedure (388, skipping auth/starter realms),
@@ -425,7 +425,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   DO show the marker, so the detector can fire. AI mocked (no spend).
   ~63 s locally (adds ~1–2 min to a full Gate).
 
-## Item 6 — failure drills — 00:30 → 00:27
+## Item 6 — failure drills — 00:23 → 00:27
 
 - `server/failureDrills.test.ts` 7/7: storage (fake S3 on/off via
   R2_PLANS_ENDPOINT) — down throws (proxy 502), never "missing"; delete while
@@ -434,7 +434,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   fetch replaced: no answer = notSent; 429 pauses with "later"; lifts next
   day and sends. No real service touched. Removed one tautological assert.
 
-## Item 8 — speed on big data — 00:34 → 00:28
+## Item 8 — speed on big data — 00:27 → 00:29
 
 - `server/speedBigData.test.ts` (on demand, SPEED_BIG_DATA=1, user 9922):
   61 bids w/ marks, 500-sheet set, 5,000 marks on a sheet, full catalog.
@@ -442,7 +442,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   Free memory read 1.94 GB at the start (journey agent's dev server up) —
   a vitest run, no server/browser started by me; heavy work held.
 
-## Item 9 — golden bids on printed/exported output — 00:38 → 00:34
+## Item 9 — golden bids on printed/exported output — 00:29 → 00:34
 
 - Added to `server/goldenBids.test.ts`: for all 9 golden bids, the
   proposal prints "Price pending" EXACTLY when the bid screen says something
@@ -457,7 +457,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
 - Gate 38866950752 **green** on 35807ccc (item 7; CI separation 388 procs,
   782 answered, 0 leaks).
 
-## Item 10 — typed PACK QTY on PACK NOT CHECKED rows — 00:42 → 00:40
+## Item 10 — typed PACK QTY on PACK NOT CHECKED rows — 00:34 → 00:40
 
 - Found the real gap: the loader already priced price ÷ any pack qty, but
   never KEPT the pack — the row stayed NOT CHECKED and the pack offered to
@@ -471,7 +471,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
 - Dry run on the real sheet: no refusals, "packs typed …: 0 set". Nothing
   loaded, no sheet rebuild.
 
-## Item 13 — migration snapshot hole — 00:47 → 00:43
+## Item 13 — migration snapshot hole — 00:40 → 00:43
 
 - Throwaway worktree (node_modules junction, removed link-first; worktree
   removed, real node_modules intact): draft 0163_snapshot.json in
@@ -490,7 +490,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   each with where it is, what the day needs, and whether it moves a total;
   the backup drill and bidTotalsDump as day checks. Doc only.
 
-## Item 14a — type-check: tests already covered; scripts/ and pricing/ now too — 00:52 → 00:49
+## Item 14a — type-check: tests already covered; scripts/ and pricing/ now too — 00:44 → 00:49
 
 - Tests: already in `pnpm check` (tsconfig includes them; closed earlier).
 - `tsconfig.scripts.json` (target ES2022, scripts/ + pricing/ .mts/.ts):
@@ -500,7 +500,7 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   no Type. `pnpm check` = both configs (72 s locally). CLAUDE.md paragraph
   updated (it said these were not covered).
 
-## Item 11 — end-of-pricing job prep — 00:53 → 00:51
+## Item 11 — end-of-pricing job prep — 00:44 → 00:51 (agents ran from 00:44)
 
 - Two agents turned every recorded owner answer (6 shelf reviews + pack
   scan) into `pricing/end-of-pricing-answers.json` — 560 changes, each with
@@ -513,10 +513,14 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   Report `pricing/end-of-pricing-dry-run.md`. 16 OPEN + 27 CHECK →
   morning question N3. Nothing applied.
 
-## Item 14b — safe todo items: the last bid-number test gaps — 00:58 → 00:55
+## Item 14b — safe todo items: the last bid-number test gaps — 00:51 → 00:55
 
 - bidNumberGaps +3: edited shipped modifier keeps applying (**proved**:
   stored-id lookup → red at 1 h vs 1.15 h, restored, no diff); priced
   starter material reaches an assembly ($6.90 not $0); dashboard card
   counts a priced no-hours line ($15, hours not set 1, = bid screen).
   Map: every money row now has a test.
+
+(Run 4 heading times corrected at 00:56 from the commit stamps: the first
+draft's hand-typed START times ran ahead of the clock. Ends were always
+`date`. Same slip as run 3; from here every time is read from the clock.)
