@@ -544,3 +544,4 @@ draft's hand-typed START times ran ahead of the clock. Ends were always
 - Journey: 3/3 pass (laptop 38 s, iPad 34 s, phone 59 s) with the run rate
   picked in Settings and every printed number = hand math. Fault 2 (legend
   link) → `track-b-handoff.md`.
+- 03:42 Gate 38887304438 **green** on e34c4be2 (run-rate fix + journey). Queue complete; run 4 end.
