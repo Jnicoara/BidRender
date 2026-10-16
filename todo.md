@@ -1311,8 +1311,9 @@ All additive and nullable. Specs are in the plans named.
       save (the list still held the old timestamp); every editor now writes
       the saved row into its cache on success — checked on screen with every
       refetch held 4 s, all five editors, two saves each, none refused.
-      Other forms that save whole (bid settings, proposal text, clients) were
-      not looked at — same check if one ever shows the symptom.
+      **Clients too** (00:37; the address is what tax is matched from).
+      Not guarded: proposal text and bid notes (text boxes that save on
+      their own) — same check if one ever shows the symptom.
 
 ### Library editors drop a half-made edit without asking (Track C, 2026-10-15 night) — suggestion, not built
 
