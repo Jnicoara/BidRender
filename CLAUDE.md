@@ -362,11 +362,16 @@ compiling, the change broke a fixture's contract with the code, which is
 exactly what the gate is for. Fix the fixture honestly — CLAUDE.md's rules
 against weakening an assertion apply to types too.
 
-**What is still NOT covered: the rest of `scripts/`.** Its tests are in; its
-16 `.mts` tools (`migrate.mts`, `schemaDrift.mts` among them) are not.
-Measured 2026-09-26, including them would report 43 errors in 11 files — and
-42 of those are the missing `target` in `tsconfig.json` (top-level `await`,
-iteration), not type faults. The `target` decision comes first; see `todo.md`.
+**`scripts/` and `pricing/` tools are covered too, since 2026-10-16**, by a
+second config (`tsconfig.scripts.json`, target ES2022 for top-level `await`)
+that `pnpm check` runs after the main one. Turning it on found three real
+faults, all fixed: `rehearseBackfill.mts` read three totals fields renamed
+on 2026-09-29, `groundShareImpact.mts` hand-built a run without its typed
+length, and the pricing-sheet builder left brand rows' Type column
+undefined. The main `tsconfig.json` target is still its own decision
+(`todo.md`); the second file exists so that decision does not block this.
+Until 2026-10-16 this paragraph said these tools were NOT covered (43 errors
+measured 2026-09-26, mostly the missing target).
 
 **Measuring the wrong thing looks exactly like measuring.** The first attempt to
 check the re-run behaviour ran the file once against a database that had two

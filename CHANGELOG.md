@@ -144,6 +144,72 @@ This is the human-readable companion to the git history — read this to see wha
   The rules that will decide what a shop is offered now work per field, so
   accepting one update can never hide another, and a field BidRidge changed
   twice shows as one update rather than looking like the shop's own number.
+- **The labor on traced conduit and wire can now be priced.** The hours on
+  runs traced on the plans were priced at $0 an hour, because nothing in
+  the app could choose their labor rate. The bid warned about it, but the
+  total came up short. Settings › Pricing now has "Labor rate for traced
+  runs", which says plainly when it is not set. Runs sent after it is set
+  are priced at that rate. Runs already on a bid keep what they were sent
+  with, pending the owner's decision.
+- **A browser test now does a whole job as a brand-new customer would**: sign
+  up, upload a plan, count, trace, add drops and a homerun, tag a line,
+  print the proposal and download the spreadsheet. It checks every printed
+  number against hand math, on a laptop, an iPad and a phone.
+
+- **Tested: one company can never see or change another company's work.**
+  A test acts as a second company and calls every one of the app's 388
+  server actions with the first company's ids. Nothing leaked and nothing
+  changed. It runs on every check.
+- **Tested: file storage, AI and email can each go down and come back.**
+  While down, the app says so plainly and loses nothing. When the service
+  returns, the app picks up again by itself, with no restart.
+- **A brand-new database builds from scratch and prices every test bid to
+  the cent.** A backup restored on this machine came back with every one of
+  4,386 bids at the same total. This used the real backup code, and nothing
+  was sent to the cloud.
+- **Speed checked on a big company** (61 bids, a 500-sheet plan set, 5,000
+  marks on one sheet). Every screen opened well under 2 seconds. The
+  dashboard slows as bids pile up, so that is on the list to fix before it
+  matters.
+- **The proposal, the quote-app panel and the spreadsheet export now match
+  the bid screen to the cent** on every test bid. "Price pending" shows
+  exactly when something isn't priced.
+- **The pricing sheet loader keeps a pack you type** on the rows marked
+  "pack not checked", so the row stops being flagged and shops get the
+  right pack size.
+- **The end-of-pricing name changes are ready as one checked list** (560
+  changes, from every recorded name-review answer). Nothing is applied yet;
+  16 answers need the owner's word first.
+- **The helper tools are type-checked too**, which found three real mistakes
+  in older tools, now fixed.
+
+- **A dropped connection can no longer make the Plans screen count marks
+  twice.** If taps reached the server but the answer was lost, the screen
+  resent them and each one was counted again (3 receptacles became 6). The
+  server now places each tap once. This takes effect when the Plans screen
+  sends a small key with each tap, which is a one-line change handed to Track B.
+- **Counting on scanned plans is tested too.** On a scan, every match is
+  found and every one waits for a person, so "Confirm all" can never count a
+  look-alike by itself. AI answers were tested with saved fake replies only,
+  and no AI money was spent. An AI answer never confirms anything, and an
+  AI that can't be reached changes nothing.
+
+## [2026-10-15]
+
+- **"Find all matching" is now tested on plan sheets whose true count is
+  known.** The test builds real PDFs holding receptacles, GFCIs, junction
+  boxes, smoke detectors, light fixtures and switches, plus look-alikes that
+  must not count. They are turned, crowded together, sit next to text and
+  wires, and spread over several sheets. On every symbol, "Confirm all"
+  takes exactly the true ones and none of the look-alikes. Any change that
+  moves these counts now fails the test run.
+- **Boxing one light fixture in a tightly packed ceiling grid gets an honest
+  message.** It used to say "Nothing is drawn inside that box", which was
+  false. It now explains that the fixtures touch, so one can't be told
+  apart, and says to box one that stands alone or tap them instead.
+- **A map of every feature and the test that proves it**
+  (`references/feature-test-map.md`). It lists about 600 features from the
+  whole changelog, with the gaps marked.
 
 - **A plan for stopping oversized plan uploads, with the checks written but
   not switched on.** Today the size an upload declares is checked, but the

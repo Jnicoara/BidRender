@@ -1,0 +1,11 @@
+{
+  "//": "The tools in scripts/ and pricing/ (.mts, top-level await), typechecked by `pnpm check` since 2026-10-16. Its own file because they need target ES2022; the main tsconfig's target is a separate decision (CLAUDE.md § pnpm check, todo.md). Their imports from server/ and shared/ are followed automatically.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "target": "ES2022", "noEmit": true },
+  "include": [
+    "scripts/**/*.mts",
+    "scripts/**/*.ts",
+    "pricing/**/*.mts",
+    "pricing/**/*.ts"
+  ]
+}

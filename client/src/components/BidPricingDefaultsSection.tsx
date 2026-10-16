@@ -357,6 +357,65 @@ export function BidPricingDefaultsSection() {
           and every existing bid still set to follow it.
         </CompanyDefaultNotice>
       </div>
+
+      {/* ── Labor rate for traced runs ───────────────────────────────────── */}
+      <RunLaborRate
+        value={defaults.defaultLaborRateId ?? null}
+        onPick={id => save.mutate({ defaultLaborRateId: id })}
+      />
     </section>
+  );
+}
+
+/**
+ * Which labor role prices the hours on TRACED RUNS — the conduit, wire and
+ * fittings sent from the Plans screen (`pricing_defaults.defaultLaborRateId`).
+ * Nothing could set it before 2026-10-16, so every run line froze at $0 an
+ * hour. Unset is said in amber, with what it costs, never shown as a blank.
+ * A line freezes its rate when it is sent: picking here moves runs sent from
+ * now on, not ones already on a bid.
+ */
+function RunLaborRate({
+  value,
+  onPick,
+}: {
+  value: number | null;
+  onPick: (id: number | null) => void;
+}) {
+  const { data: rates } = trpc.laborRates.list.useQuery();
+  const picked = rates?.find(r => r.id === value) ?? null;
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div>
+        <Label htmlFor="run-labor-rate" className="text-sm">
+          Labor rate for traced runs
+        </Label>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          The role whose hourly rate prices the hours on conduit, wire and
+          fittings you trace on the plans. It applies to runs sent from now on;
+          runs already on a bid keep the rate they were sent with.
+        </p>
+      </div>
+      <select
+        id="run-labor-rate"
+        value={value ?? ""}
+        onChange={e =>
+          onPick(e.target.value === "" ? null : Number(e.target.value))
+        }
+        className="h-8 w-full max-w-xs rounded-md border border-input bg-background px-2 text-sm"
+      >
+        <option value="">Not set</option>
+        {(rates ?? []).map(r => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+      </select>
+      {picked ? null : (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Not set — the hours on traced runs are priced at $0 an hour.
+        </p>
+      )}
+    </div>
   );
 }

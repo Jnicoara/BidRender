@@ -602,6 +602,13 @@ function qualifiers(words: readonly WordBox[]) {
  * (its shade, its device words, how much line work is joined onto it). Built
  * on the sheet it was boxed on — a legend sheet, or the plan itself.
  */
+/**
+ * Every line in the box carries on outside it, so no one symbol can be told
+ * apart: what a box round one fixture in an edge-to-edge grid gets.
+ */
+export const TOUCHING_SYMBOLS_MESSAGE =
+  "Every line in that box carries on outside it, so one symbol can't be told apart — these are drawn touching each other. Box one that stands on its own, or count these by tapping.";
+
 export type SymbolTemplate = {
   rel: RelSeg[];
   relWords: RelWord[];
@@ -1055,6 +1062,16 @@ export function symbolFromBox(
 
   if (symbolSegs.length === 0 && symbolWords.length === 0) {
     if (geo.imageCoverage > 0.4) return { kind: "scan", message: SCAN_MESSAGE };
+    /*
+      Something IS drawn there, but every line of it carries on past the box
+      — fixtures laid edge to edge in a ceiling grid, where each edge (and
+      even each diagonal) continues straight into the next fixture. Those are
+      dropped as lines running through, which is right for a wire through a
+      receptacle and leaves nothing here. Saying "nothing is drawn" was false
+      (found 2026-10-15, counting deep test, a 4 x 3 troffer grid).
+    */
+    if (wholly.length > 0)
+      return { kind: "empty", message: TOUCHING_SYMBOLS_MESSAGE };
     return {
       kind: "empty",
       message:

@@ -1316,6 +1316,8 @@ const addBrand = (
     category,
     name,
     size: "",
+    // As every other row starts (add() above); the column was undefined here.
+    type: "",
     unit: E,
     isNew: true,
     brand,

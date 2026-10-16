@@ -106,6 +106,39 @@
   the tag `exampleTagAfter` would write equals the seed's (§ 4 step 1).
 - **Step 0:** local-dev Gate for d0152f60 green after one re-run (image pull
   rate limit): smoke 96/2, staging `/api/version` d0152f60.
+## FROM TRACK A, 2026-10-16 — a legend link does not reach the count already made (yours, not touched)
+
+Found by A's whole-job browser journey (`e2e/journey/journey.spec.ts`,
+fault 2 in its header). **Steps:** capture a legend symbol, count a few of
+it on this bid (a count "by name", no assembly), then link the symbol to an
+assembly FROM THE LEGEND. **Expected:** the count already on this bid
+becomes that assembly's count, and its bid line is priced. **Got:** the
+count stays "by name" (no assembly, "Not priced" on the bid) until the
+symbol happens to be armed again. Linking from the COUNT CARD works. The
+journey links the switch from its card to stay green; when this is fixed,
+it can link from the legend (the sheet-2 duplex count already adopts the
+link, asserted there).
+
+## FROM TRACK A, 2026-10-16 — one line in `TakeoffPage.tsx` (yours, so not touched)
+
+**A resent batch of marks counted twice.** When `flushStamps`' send fails,
+the marks go back to unsent and ride the next flush. If the failure was a
+LOST ANSWER (the connection dropped after the server wrote them), every mark
+in that batch was written again: 3 receptacles became 6. Found by A's
+counting deep test, "offline then back online".
+
+**Server half is done on `track-a-night`:** `takeoffStamps.drop` takes an
+optional `keys` (one per `at` entry) and places each key once per bid,
+returning the earlier ids for a resent key (`server/markReplay.ts`,
+`server/markReplay.test.ts`, red before). Remembered in memory for a day; it
+does nothing until the screen sends keys.
+
+**Yours, one line:** in `flushStamps` (TakeoffPage.tsx ~6811), add
+`keys: batch.map(m => m.key),` beside `at:`. The queued marks already carry
+`key`. The crash-recovery path (~7909) sends stamps without keys; leave it
+(its queue is rewritten after each part, so it does not resend).
+A durable version (a `clientKey` column and a unique index, a migration) is
+in `todo.md` for whoever plans the next release.
 
 ## WHERE B STANDS — 2026-10-14 (merge), LOCAL-DEV MERGED; B OWNS ALL OF STARTER OFFERS
 

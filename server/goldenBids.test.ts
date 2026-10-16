@@ -27,6 +27,8 @@
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { describe, expect, it, beforeAll } from "vitest";
+import { appRouter } from "./routers";
+import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import {
   as,
@@ -541,6 +543,7 @@ async function buildMarkup(): Promise<Built[]> {
 
 describe.skipIf(!hasDb)("golden bids", () => {
   let actual: GoldenBid[] = [];
+  let details: Built[] = [];
 
   beforeAll(async () => {
     await freshUser(PLAIN);
@@ -551,6 +554,7 @@ describe.skipIf(!hasDb)("golden bids", () => {
       ...(await buildPriced()),
       ...(await buildMarkup()),
     ];
+    details = built;
     actual = built.map(b => snapshot(b.key, b.title, b.covers, b.detail));
   }, 120_000);
 
@@ -598,4 +602,81 @@ describe.skipIf(!hasDb)("golden bids", () => {
         0
       );
   });
+
+  /*
+    THE PRINTED AND EXPORTED NUMBERS MATCH THE BID SCREEN, TO THE CENT (owner's
+    queue item 9, 2026-10-16). For every golden bid: the proposal the customer
+    gets, the quote-app panel, and the takeoff spreadsheet with prices. A bid
+    that leaves something unpriced must PRINT "Price pending" — no figure —
+    rather than a short one.
+  */
+  it("the proposal, the quote-app panel and the spreadsheet agree with the bid screen", async () => {
+    const cents = (n: number) => Math.round(n * 100);
+    // The quote-app panel is an internal-tier feature (shared/permissions.ts
+    // FEATURES), read off the session's user. A tier changes what is SHOWN,
+    // never a price, so these reads are made as an internal-tier session.
+    const internal = (id: number) =>
+      appRouter.createCaller({
+        user: {
+          id,
+          openId: `test-fixture-${id}`,
+          role: "user",
+          accessTier: "internal",
+        },
+      } as unknown as TrpcContext);
+    for (const b of details) {
+      const c = internal(b.detail.bid.userId);
+      const bidId = b.detail.bid.id;
+      const screen = b.detail.totals;
+      const leavesOut = b.detail.lines.some(
+        l => l.breakdown === null || l.problem !== null
+      );
+
+      const proposal = await c.proposals.document({ bidId });
+      const investment = proposal.document.investment;
+      const notPriced = actual.find(a => a.key === b.key)!.totals;
+      const anyNotPriced =
+        leavesOut ||
+        Number(notPriced["notPriced.lines"]) > 0 ||
+        Number(notPriced["notPriced.parts"]) > 0 ||
+        Number(notPriced["notPriced.hours"]) > 0;
+      // The printed figure is "Price pending" exactly when the bid screen
+      // says something is not priced (shared/proposal.ts `pricePending`).
+      expect(investment.pricePending, `${b.key}: Price pending`).toBe(
+        anyNotPriced
+      );
+      if (!anyNotPriced)
+        expect(cents(investment.total), `${b.key} proposal total`).toBe(
+          cents(screen.totalDue)
+        );
+
+      const quote = await c.quoteApp.get({ bidId });
+      if (quote.state === "ready") {
+        expect(quote.totalDueCents, `${b.key} quote total due`).toBe(
+          cents(screen.totalDue)
+        );
+        expect(quote.preTaxCents, `${b.key} quote pre-tax`).toBe(
+          cents(screen.totalDue) - cents(screen.salesTaxAmount)
+        );
+      } else {
+        expect(
+          anyNotPriced,
+          `${b.key}: the quote panel blocks only an unfinished bid`
+        ).toBe(true);
+      }
+
+      const sheet = await c.takeoffExport.get({ bidId, includePrices: true });
+      const f = sheet.prices!;
+      expect(cents(f.directCost), `${b.key} spreadsheet direct cost`).toBe(
+        cents(screen.directCost)
+      );
+      expect(
+        cents(f.pricedRows) +
+          cents(f.notPricedCost) +
+          cents(f.otherCost) +
+          cents(f.markedUpCharges),
+        `${b.key} spreadsheet rows add up`
+      ).toBe(cents(f.directCost));
+    }
+  }, 120_000);
 });

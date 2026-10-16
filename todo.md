@@ -1661,6 +1661,24 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
+- [ ] **Durable "a mark is placed once per key" (Track A, 2026-10-16) —
+      WRONG-NUMBER RISK, partly closed.** A batch of marks resent after a lost
+      answer counted twice. Closed in memory on `track-a-night`
+      (`server/markReplay.ts`: `takeoffStamps.drop` `keys`, a day, one
+      server) — once Track B's one line sends the keys
+      (`track-b-handoff.md`). Still open across a restart or a second
+      instance. **Durable fix:** `takeoff_stamps.clientKey VARCHAR(64) NULL`
+      + UNIQUE (`bidId`, `clientKey`) — ADDITIVE, NULL for every existing
+      row — then `drop` inserts with `INSERT … ON DUPLICATE KEY` semantics
+      and reads the ids back. **Done when** `markReplay.test.ts` passes with
+      the in-memory map cleared between the two sends.
+- [ ] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
+      measured).** `server/speedBigData.test.ts` (`SPEED_BIG_DATA=1`): 61
+      bids → `bids.dashboard` + `archived` median **493 ms**; 1 bid → 39 ms
+      in the Gate. About 8 ms a bid, so ≈ 2 s near 250 bids for one company.
+      Fine today. **Done when** the dashboard pages or sums in SQL, and the
+      big-data run at 250 bids stays under 1 s (raise the fixture's bid
+      count in that test to prove it).
 - [ ] **Speed limit outlier (Track A, 2026-10-15 night): pricing a material
       takes 221 ms in CI against 6 ms on a laptop** — every other save is
       2–14 ms in CI (`server/speedLimits.test.ts`, Gate 38855631644, lines

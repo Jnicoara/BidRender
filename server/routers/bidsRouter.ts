@@ -2142,10 +2142,32 @@ export const bidsRouter = router({
          * pricing_defaults.materialMarkupPct. Always a markup, never a margin.
          */
         materialMarkupPct: markupPctSchema.nullable().optional(),
+        /**
+         * The labor role a TRACED RUN's hours are priced at (the run lines
+         * sent from the Plans screen). Until 2026-10-16 nothing could set
+         * this, so every run line froze at $0/h (found by the whole-job
+         * journey test; morning question N4). NULL clears it. Setting it
+         * moves no existing line — each line froze its rate when sent — only
+         * runs sent afterwards (Send again does not refresh a rate — shared/resendLine.ts refills only price and hours).
+         */
+        defaultLaborRateId: z.number().int().positive().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const patch: Record<string, unknown> = {};
+      if (input.defaultLaborRateId !== undefined) {
+        if (input.defaultLaborRateId !== null) {
+          // One of THIS company's roles (or a shipped one it can see) —
+          // never another company's id.
+          const rates = await db.getLibraryLaborRates(ctx.scope.dataUserId);
+          if (!rates.some(r => r.id === input.defaultLaborRateId))
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "That labor role is not in your library.",
+            });
+        }
+        patch.defaultLaborRateId = input.defaultLaborRateId;
+      }
       if (input.materialMarkupPct !== undefined) {
         patch.materialMarkupPct =
           input.materialMarkupPct === null

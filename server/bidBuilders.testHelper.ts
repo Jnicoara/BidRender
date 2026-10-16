@@ -13,7 +13,7 @@
 import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { bidPdfs, pricingDefaults, users } from "../drizzle/schema";
+import { bidPdfs, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 export const as = (user: number) =>
@@ -106,14 +106,13 @@ export async function rate(c: Caller, name: string, hourlyCost: number) {
   );
 }
 
-/** Point the company's run-line labor at `rateId` (no router sets it). */
-export async function runLaborRate(c: Caller, user: number, rateId: number) {
-  await c.bids.setPricingDefaults({ productivityPct: 0 });
-  const database = (await getDb())!;
-  await database
-    .update(pricingDefaults)
-    .set({ defaultLaborRateId: rateId })
-    .where(eq(pricingDefaults.userId, user));
+/**
+ * Point the company's run-line labor at `rateId`, through the app since
+ * 2026-10-16 (`bids.setPricingDefaults` `defaultLaborRateId`). Until then
+ * nothing could set it and this wrote the column directly.
+ */
+export async function runLaborRate(c: Caller, _user: number, rateId: number) {
+  await c.bids.setPricingDefaults({ defaultLaborRateId: rateId });
 }
 
 /** 1/2" EMT with 2 #12 + ground, fittings on the test's own materials. */
