@@ -154,11 +154,12 @@ async function holdsExactly(step: string) {
       })
       .toEqual(sorted(expected.marks[n].map(stored)));
   }
-  const runs = await serverRuns();
-  expect(runs.length, `${step}: one run`).toBe(1);
-  expect(sorted(runs[0].points), `${step}: the run's points`).toEqual(
-    sorted(expected.run.map(stored))
-  );
+  // Polled like the marks: a run is saved a moment after Finish.
+  await expect
+    .poll(async () => (await serverRuns()).map(r => sorted(r.points)), {
+      message: `${step}: exactly one run, at its points`,
+    })
+    .toEqual([sorted(expected.run.map(stored))]);
 
   // On screen: each drawn mark's centre, read back as a drawing point.
   const open = await onPage();

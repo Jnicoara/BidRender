@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Fixed: a mark placed just before reloading the page could be saved
+  twice.** The page keeps unsent marks safe across a crash and sends them
+  again after a reload; if the first send had in fact arrived, the mark was
+  counted twice. Each mark now keeps its own key through the reload, so the
+  server counts it once. Found by a new test that places marks and runs and
+  then zooms, turns the device, switches sheets, reloads, goes offline,
+  loses a reply, undoes and redoes, and has a second person editing — and
+  checks every mark is still exactly where it was put, once.
+
 - **Every Plans-screen tool now has a browser test that would catch it
   breaking**, on a laptop with a mouse and on an upright iPad, a sideways
   iPad and a phone with a finger: switching sheets, the scale offer, counting,

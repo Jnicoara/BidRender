@@ -68,3 +68,26 @@ move or vanish" (item 3, next).
 - ~144 `client/src/lib` unit files cover the logic underneath (view maths,
   gestures, undo stack, scale check, detail refs, keyed notes, homerun
   text…), but none of them can see a screen.
+
+## Marks never move or vanish — `e2e/smoke/marks.spec.ts` (item 3, 2026-10-16)
+
+Marks on two sheets and a three-point run, then each step below. After
+EVERY step the check is the same (`holdsExactly`): the server's marks on
+both sheets and the run's points equal what was placed — not one more, not
+one fewer — and every mark drawn on the open sheet sits on its saved point
+(its centre read back through the drawing's own position on screen, within
+1 pt plus half a pixel). Laptop (mouse), iPad both ways and phone (finger):
+41 passed, 3.4 min locally.
+
+| Step | Broken by (red) |
+| --- | --- |
+| placed (mouse clicks / finger taps) | marks drawn 40 px right of their point (`TraceLayer.tsx` transform) — red at the first check |
+| zoom in and out (wheel / two-finger spread) | the same break; zoom also asserts the drawing grew |
+| turn the device (portrait ⇄ landscape) | — (same check) |
+| switch sheets and back | — |
+| reload | — |
+| offline, then online: placed offline, saved once | — |
+| a LOST ANSWER (saved, reply never came) | the send without keys — red here |
+| undo and redo | — |
+| RELOAD while a batch is in flight | recovery without keys — red here. **This was a live fault**, found by the next row on its first run: the mark was on the bid twice. Fixed in `9f13e976` (`markKeys.recoveredKeys`). |
+| a second session edits the same sheet at the same time | — (adds one, deletes one of ours, we add one; all three right after a reload) |
