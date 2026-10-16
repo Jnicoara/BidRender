@@ -4,6 +4,21 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-16]
+
+- **Every Plans-screen tool now has a browser test that would catch it
+  breaking**, on a laptop with a mouse and on an upright iPad, a sideways
+  iPad and a phone with a finger: switching sheets, the scale offer, counting,
+  Just count, undo/redo, selecting and deleting, drops, tracing, layers,
+  detail links and Back, note tags, Look up, homeruns, heights, "scale may be
+  wrong" and the sheet cards. Each was proved by breaking the app on purpose
+  and watching its test fail. They run with every staging deploy.
+  `references/plans-test-map.md` lists them.
+- **Fixed a way marks could be counted twice.** If the connection dropped
+  after the server saved a batch of marks but before the reply arrived, the
+  screen sent them again and they were saved twice (3 receptacles became 6).
+  Each mark now carries a key the server recognises, so a resend counts once.
+
 ## [2026-10-15]
 
 - **The bid total now says "+ N marks unassigned"** beside "+ N lines not
