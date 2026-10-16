@@ -664,7 +664,8 @@ function AssemblyBuilder({
   /** Tracks whether the user has typed in the hours box themselves. */
   const [hoursTouched, setHoursTouched] = useState(false);
 
-  const { data: laborRates = [] } = trpc.laborRates.list.useQuery();
+  const { data: laborRates = [], isSuccess: ratesLoaded } =
+    trpc.laborRates.list.useQuery();
   const { data: modifiers = [] } = trpc.modifiers.list.useQuery({
     status: "active",
   });
@@ -739,6 +740,11 @@ function AssemblyBuilder({
   // resolveLaborRate, not a bare find: an assembly that referenced a starter
   // role keeps that id after the role is forked, and the fork is what it means.
   const selectedRate = resolveLaborRate(laborRates, draft.laborRateId);
+  // The recipe still names a role that has since been REMOVED from Labor
+  // rates: the box went blank, the preview said "$0.00" and nothing said
+  // why (break-it, 2026-10-15) — new bid lines price that labor at $0.
+  const roleRemoved =
+    ratesLoaded && draft.laborRateId !== null && !selectedRate;
   const laborRate = selectedRate?.effectiveHourlyRate ?? 0;
 
   // Re-point the draft at the fork once one exists. Without this the role
@@ -1139,7 +1145,14 @@ function AssemblyBuilder({
                     className="h-8 w-56 text-sm"
                     aria-label="Labor role"
                   >
-                    <SelectValue />
+                    {/* Children, not a placeholder: Radix shows a placeholder
+                        only with NO value, and this value is the removed
+                        role's id, which matches no item. */}
+                    <SelectValue>
+                      {roleRemoved ? (
+                        <span className="text-destructive">Removed role</span>
+                      ) : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_ROLE}>
@@ -1304,6 +1317,12 @@ function AssemblyBuilder({
               {draft.laborRateId === null && (
                 <p className="text-xs text-destructive">
                   No role picked — labor prices at $0 until you choose one.
+                </p>
+              )}
+              {roleRemoved && (
+                <p className="text-xs text-destructive">
+                  The role this used was removed from Labor rates — new bid
+                  lines price this labor at $0 until you pick another.
                 </p>
               )}
 

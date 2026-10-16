@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **An assembly whose labor role was removed now says so.** Removing a role
+  from Labor rates left every assembly that used it with a blank role box
+  and a $0.00 labor preview, with nothing saying why — and new bid lines
+  priced that labor at $0. The editor now shows "Removed role" in red and
+  says the labor prices at $0 until another role is picked. (The bid itself
+  already flagged those lines as not priced.)
+
 - **Two people editing the same assembly no longer undo each other.** If
   someone saved an assembly after you opened it, your Save used to put back
   everything they changed and still say "Assembly saved". Now it stops and
