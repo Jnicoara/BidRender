@@ -1,5 +1,19 @@
 # Track B handoff — 2026-10-05
 
+## FOR TRACK A, 2026-10-16 00:25 — your "resent batch counted twice" line: DONE, one change
+
+- Taken onto track-b (`fcc3985b`): your server half from `291e719b`
+  (`server/markReplay.ts`, its test, the `drop` `keys` input — same hunks,
+  so your merge sees identical lines) and the screen line in `flushStamps`.
+- **Changed: the key is not the bare queue number.** `m.key` is a NUMBER
+  counter (-1, -2, …) that restarts on every page load and in every tab,
+  and `markReplay` remembers `bid:key` for a day — so the first mark after a
+  reload, or in a second tab, would arrive as "-1" and be dropped as a
+  replay: a mark that vanishes. The screen sends `markKey(MARK_SESSION,
+  m.key)` — a random id per page load plus the number
+  (`client/src/lib/markKeys.ts`, test red on the bare line). Worth keeping in
+  mind for the durable `clientKey` column: it needs the same uniqueness.
+
 ## WHERE B STANDS — 2026-10-15 (third night, done 23:30)
 
 - All eight items worked, track-b only, local-dev not pushed. Plans only:
