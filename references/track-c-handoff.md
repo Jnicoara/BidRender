@@ -19,11 +19,15 @@
   emptied box as a 0% COMPANY profit/overhead/productivity (fixed; Q-DEF1
   asks for a read-only live check).
 - Break-it: a blank tax-rate part saved as 0 % (fixed, Q-TAX1); two
-  people saving one assembly silently undid each other (fixed for
-  assemblies with `shared/staleEdit.ts`; kits/materials/labor/modifiers in
-  `todo.md`). **Gate:** first real CI run after the merge — 4 red, all
-  tests that had never run in CI (A's new public routes; no file store in
-  CI) — fixed.
+  people saving one library item silently undid each other — now refused
+  in words in all five editors (`shared/staleEdit.ts`, `openedAt` on each
+  update; a slow-connection self-refusal I introduced was measured and
+  fixed). Job close-out recorded blanks as 0 h (Q-CLOSE1); a blank expense
+  amount added $0; an emptied "Price good for" saved 0 days; an archived
+  condition / removed role sat on assemblies unseen (Q-MOD1). Money
+  cross-check after all of it: 155 bids, 0 disagreements. **Gate:** first
+  real CI run after the merge — 4 red, all tests that had never run in CI
+  (A's new public routes; no file store in CI) — fixed; green since.
 
 ## 2026-10-15, day — answers, before/after screenshots, two todo items
 
