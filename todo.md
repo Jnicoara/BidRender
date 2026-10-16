@@ -1633,7 +1633,14 @@ Design: `references/homerun-footage-plan.md` § 4.
       a scratch bid with 7 items. Time it (server ms and the panel's first
       paint) on a real 500-sheet set with marks and runs spread across it, and
       write the numbers next to the code. No number is claimed here yet.
-- [ ] **Stress test (B, 2026-10-10): time the DASHBOARD for a company with
+- [ ] **MEASURED 2026-10-15 (Track B), not fixed:** `bids.dashboard`
+      ~240 / ~440 / ~840 ms at 50 / 100 / 200 marked bids (test DB, server
+      ms, one count of 3 marks per bid) — ~4.2 ms per marked bid, linear,
+      in `db.dropsNotPricedForBids` (numbers next to it). Fix when a real
+      company nears 100 marked live bids: load heights, runs and scales for
+      all bids in one pass. Not a `dropKind` pre-filter — a count's drop
+      type can come from its assembly. Card first paint not measured.
+      Was: **Stress test (B, 2026-10-10): time the DASHBOARD for a company with
       50+ bids that have marks.** Since "N drops not priced" reached the
       lists (`db.dropsNotPricedForBids`), every bid card with a mark loads
       that bid's takeoff on each read (4 bids at a time). Only looked at on a

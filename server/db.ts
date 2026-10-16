@@ -15740,6 +15740,14 @@ export async function bidUnassignedMarks(
  * A LOCKED bid with frozen counts (F13) answers from them, as its bid page
  * does (server/bidWarnings.ts), and is not recounted: a library edit since
  * the lock must not move its card.
+ *
+ * MEASURED (Track B, 2026-10-15, test DB, one count of 3 marks per bid):
+ * `bids.dashboard` takes ~240 ms at 50 marked bids, ~440 at 100, ~840 at
+ * 200 — about 4.2 ms per marked bid, in a straight line, almost all of it
+ * here. The paged `bids.search` is bounded by its page. A pre-filter on
+ * `takeoff_groups.dropKind` would be WRONG: a count's drop type can come
+ * from its assembly (`loadGroupDrops`'s `kindOf`). The fix, when it is
+ * needed, is loading heights, runs and scales for all the bids at once.
  */
 export async function dropsNotPricedForBids(
   bidIds: readonly number[],
