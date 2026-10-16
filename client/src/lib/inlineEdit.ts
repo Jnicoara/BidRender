@@ -130,6 +130,32 @@ export function commitNumericEdit(
 }
 
 /**
+ * `commitNumericEdit` for a box that shows a PERCENT of a stored FRACTION
+ * ("15" on screen, 0.15 stored). A trailing "%" is read as meant, and the
+ * outcome's value is the fraction to store.
+ *
+ * Settings › Pricing used `(Number(text) || 0) / 100` until 2026-10-15, so
+ * "15%", "1,5" and an emptied box all saved the COMPANY profit / overhead /
+ * productivity as 0% — with "Company default saved" — re-pricing every Draft
+ * bid that follows it. Blank and unreadable now revert, and nothing moves.
+ */
+export function commitPercentEdit(
+  draft: string,
+  savedFraction: number,
+  rules: NumericFieldRules = {}
+): CommitOutcome {
+  const savedPct = Math.round(savedFraction * 1e6) / 1e4;
+  const outcome = commitNumericEdit(
+    draft.trim().replace(/%$/, ""),
+    savedPct,
+    rules
+  );
+  return outcome.action === "save"
+    ? { action: "save", value: outcome.value / 100 }
+    : outcome;
+}
+
+/**
  * What an unset value looks like. The call site names the convention.
  *
  * Two of them, and both are deliberate:

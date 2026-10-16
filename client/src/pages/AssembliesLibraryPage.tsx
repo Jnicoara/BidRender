@@ -29,7 +29,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { parseTypedNumber } from "@/lib/inlineEdit";
+import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
 import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
@@ -412,23 +412,25 @@ function CostPreview({
 
   const bid = useMemo(() => {
     if (!line || profitMethod === "none") return null;
+    // Read like every other percent box ("15%" is 15). An unreadable box
+    // shows no price rather than one priced at 0 (it used `|| 0`).
+    const overheadRead =
+      overheadMode === "percentage"
+        ? parseTypedPercent(overheadValue) / 100
+        : parseTypedNumber(overheadValue);
+    const profitRead = parseTypedPercent(profitValue) / 100;
+    if (
+      (overheadOn && !Number.isFinite(overheadRead)) ||
+      !Number.isFinite(profitRead)
+    )
+      return null;
     try {
       return calculateBidPrice({
         directCost: line.directCost,
         overhead: overheadOn
-          ? {
-              enabled: true,
-              mode: overheadMode,
-              value:
-                overheadMode === "percentage"
-                  ? (Number(overheadValue) || 0) / 100
-                  : Number(overheadValue) || 0,
-            }
+          ? { enabled: true, mode: overheadMode, value: overheadRead }
           : { enabled: false },
-        profit: {
-          method: profitMethod,
-          value: (Number(profitValue) || 0) / 100,
-        },
+        profit: { method: profitMethod, value: profitRead },
       });
     } catch {
       return null;

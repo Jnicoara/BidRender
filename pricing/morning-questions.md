@@ -11,6 +11,16 @@ brand-variants pass by design and needs nothing from you now.
 
 ## ⚠⚠ NIGHT 3 (2026-10-15 → 16) — WRONG NUMBERS FOUND, fixed on track-c, need your call on what is already saved
 
+- **Q-DEF1 ⚠⚠ CHANGES BID MONEY (already saved data), the widest one** —
+  Settings › Pricing read its boxes with `(Number(text) || 0) / 100`, so
+  typing "15%" (or "1,5", or emptying the box) and leaving it saved the
+  COMPANY profit / overhead / productivity as **0%**, said "Company
+  default saved", and re-priced every Draft bid following it. Seen on
+  screen (profit 15% → 0% from typing "15%"); fixed on track-c
+  (`commitPercentEdit`: "15%" is 15, blank or a typo is refused and
+  nothing moves). → **A runs a read-only list on live of companies whose
+  default profit or overhead is exactly 0, for you to ask them about.**
+  A 0 can be deliberate; nothing is changed automatically.
 - **Q-QTY1 ⚠ CHANGES BID MONEY (already saved data)** — Typing a decimal
   quantity KEY BY KEY into an assembly's material box, or a kit's assembly
   box, stored it 10× or 100× too big: "1.5" saved as **15**, "2.25" as

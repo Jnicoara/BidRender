@@ -15,6 +15,9 @@
   `references/golden-measurements.md`): 13 drawings, 0.01 in tolerance,
   proven red with a 0.5 % scale error; the app measures right everywhere,
   on screen too (mouse/touch, 0/90/270°, fit/zoomed).
+- **Break-it, widest wrong number:** Settings › Pricing saved "15%" or an
+  emptied box as a 0% COMPANY profit/overhead/productivity (fixed; Q-DEF1
+  asks for a read-only live check).
 - Break-it: a blank tax-rate part saved as 0 % (fixed, Q-TAX1); two
   people saving one assembly silently undid each other (fixed for
   assemblies with `shared/staleEdit.ts`; kits/materials/labor/modifiers in

@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: typing "15%" as your company profit saved 0%.** On Settings ›
+  Pricing, a percent sign, a comma decimal or an emptied box in profit,
+  overhead or productivity was saved as 0% — with "Company default saved"
+  — and every Draft bid following the default re-priced at it. "15%" now
+  means 15, and anything the box cannot read is refused with nothing
+  changed. The assembly editor's price preview reads the same way.
+
 - **An archived job condition on an assembly is now shown.** Archiving a
   condition (like "Working at height") stops it applying to new bid lines,
   but the assembly editor only listed active conditions, so it sat on the
