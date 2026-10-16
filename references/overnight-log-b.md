@@ -244,3 +244,30 @@ Owner's list: 1 Q5 label (YES) · 2 Plans deep test + test map · 3 marks
 never move or vanish · 4 hard PDFs · 5 scale check (plan, build) · 6 demo
 vs new clarity (view only) · 7 break-it + safe todo. A's Plans fixes in
 track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
+
+## Item 1 — Q5 label (23:37–23:45) · `4ea3c557`
+
+- "+ N marks unassigned" on Direct cost, Bid price, Total due and the
+  proposal's Your figures; not Materials/Labor; `anyNotPriced` and
+  `tallyLeavesOut` ignore it (label only). Tests red without it; looked at
+  laptop + phone.
+
+## A's handoff — marks counted twice after a lost answer (00:19–00:25) · `fcc3985b`, merge `a8984970`
+
+- A's server half taken (same hunks); screen sends a key per mark — NOT the
+  bare queue number A suggested (it restarts per page load/tab; the server
+  remembers keys per bid for a day, so a reload's first mark would vanish).
+  `client/src/lib/markKeys.ts`. Note left for A in the handoff.
+- Merged local-dev 26670c62 (no `drizzle/`); CHANGELOG conflict only.
+- A background sabotage run was killed by the machine at 1.5 GB free (other
+  tracks' tsc / vitest); its one broken file was restored from git at once;
+  waited for memory, re-ran in small foreground batches.
+
+## Item 2 — Plans deep test (23:47–00:52) · `998d2224`
+
+- `e2e/smoke/plans.spec.ts` + own fixture `deepPlan.ts`: 16 tools at laptop
+  (mouse), iPad both ways and phone (finger), each proved by breaking it once
+  (laptop for all 16; phone and upright iPad for the finger paths).
+  `references/plans-test-map.md`. Full smoke 156 / 6 skipped, 8.3 min.
+- Found while writing it: the Count picker refuses a name already counted
+  on the bid (by design; "Again" is the way back) — not a bug.
