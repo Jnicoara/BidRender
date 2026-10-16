@@ -65,13 +65,13 @@ export default defineConfig({
     {
       name: "desktop",
       dependencies: ["setup"],
-      testMatch: /(flow|screens|version|plans|marks|pdfs)\.spec\.ts/,
+      testMatch: /(flow|screens|version|plans|marks|pdfs|demo)\.spec\.ts/,
       use: { viewport: { width: 1440, height: 900 } },
     },
     {
       name: "phone",
       dependencies: ["setup"],
-      testMatch: /(screens|plans|marks)\.spec\.ts/,
+      testMatch: /(screens|plans|marks|demo)\.spec\.ts/,
       use: { viewport: { width: 390, height: 844 }, ...touch },
     },
     {

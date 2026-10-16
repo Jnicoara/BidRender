@@ -532,6 +532,7 @@ import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
 import { UNASSIGNED_COUNT_NAME } from "@shared/unassignedCount";
 import { MARK_SESSION, markKey, recoveredKeys } from "@/lib/markKeys";
+import { workTagOffer, workTagOfferText } from "@/lib/workTagOffer";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import {
@@ -3993,6 +3994,54 @@ export default function TakeoffPage({
   const { data: jumpList = [] } = trpc.bidPdfs.sheetJumpList.useQuery({
     bidId,
   });
+
+  /*
+    THE SHEET-TAG OFFER after an upload (status plan § 2a; owner item 6,
+    2026-10-15): on a set uploaded in THIS tab, the sheets whose titles say
+    demolition, offered once — "Use these tags" or "Not now". Titles arrive
+    as the sheet reader reads them, so the offer appears when they do.
+    Nothing is tagged without the tap, and a tag moves no number.
+  */
+  const [freshSetId, setFreshSetId] = useState<number | null>(null);
+  const [tagOfferClosed, setTagOfferClosed] = useState(false);
+  const tagOffer = useMemo(
+    () =>
+      doc && doc.id === freshSetId && !tagOfferClosed
+        ? workTagOffer(
+            sheets,
+            id => {
+              const entry = jumpList.find(j => j.sheetId === id);
+              return entry
+                ? { title: entry.title, number: entry.number }
+                : { title: sheets.find(s => s.id === id)?.name ?? "" };
+            }
+          )
+        : [],
+    [doc, freshSetId, tagOfferClosed, sheets, jumpList]
+  );
+  const [taggingOffer, setTaggingOffer] = useState(false);
+  const takeTagOffer = async () => {
+    setTaggingOffer(true);
+    try {
+      for (const row of tagOffer)
+        await utils.client.bidPdfs.setSheetWorkTag.mutate({
+          id: row.sheetId,
+          workTag: row.tag,
+        });
+      notUndoable("sheetWorkTag");
+      toast.success(
+        tagOffer.length === 1
+          ? "Tagged — marks placed on that sheet start as Remove."
+          : `Tagged ${tagOffer.length} sheets — marks placed on them start as Remove.`
+      );
+      setTagOfferClosed(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not tag the sheets.");
+    } finally {
+      setTaggingOffer(false);
+      refreshFor("sheet");
+    }
+  };
 
   const thumbnailPageCount = doc?.pageCount ?? sheets.length;
   const wantedThumbnails = useMemo(
@@ -10172,6 +10221,8 @@ export default function TakeoffPage({
             keepLocal(attached.id);
             setState({ state: "done" });
             setSelectedDocId(attached.id);
+            setFreshSetId(attached.id);
+            setTagOfferClosed(false);
             if (!previewed) setPage(1);
             void utils.bidPdfs.list.invalidate({ bidId });
             toast.success(`${attached.filename} attached.`);
@@ -10226,6 +10277,8 @@ export default function TakeoffPage({
 
         setState({ state: "done" });
         setSelectedDocId(attached.id);
+        setFreshSetId(attached.id);
+        setTagOfferClosed(false);
         if (!previewed) setPage(1);
         void utils.bidPdfs.list.invalidate({ bidId });
         toast.success(`${attached.filename} attached.`);
@@ -11706,6 +11759,35 @@ export default function TakeoffPage({
           }}
           onStopCheck={() => setCheckingId(null)}
         />
+      )}
+
+      {/* The sheet-tag offer after an upload (see `tagOffer`). One line,
+          shrink-0, so it never pushes the drawing's controls away. */}
+      {tagOffer.length > 0 && (
+        <div
+          role="status"
+          className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs"
+        >
+          <span className="min-w-0 flex-1 basis-64">
+            {workTagOfferText(tagOffer)}
+          </span>
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            disabled={taggingOffer}
+            onClick={() => void takeTagOffer()}
+          >
+            Use these tags
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            onClick={() => setTagOfferClosed(true)}
+          >
+            Not now
+          </Button>
+        </div>
       )}
 
       {/* Above the workspace rather than inside the empty state, so it is in

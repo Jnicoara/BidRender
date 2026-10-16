@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **After uploading plans, demolition sheets are offered their tag.** When a
+  sheet's title says DEMOLITION, a bar above the drawing names it and offers
+  "Use these tags" (or "Not now"). A tagged sheet shows its amber "DEMO
+  SHEET" banner and marks placed there start as Remove. Nothing is tagged
+  until you tap, and a tag never changes a count or a price.
+
 - **Linking a legend symbol to an assembly now updates the count you already
   made.** Linking from the Legend tab used to change only the symbol: the
   count of it already on the bid stayed "by name" and unpriced until the

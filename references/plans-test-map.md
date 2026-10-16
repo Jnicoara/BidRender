@@ -113,3 +113,14 @@ before the fix now gets the same plain words and no Try again
 (`planFailureText`, `canRetry`). Left: the counts panel on such a file
 still says "loading…" (the file can no longer be attached, so only old
 ones show it).
+
+## Demo vs new — `e2e/smoke/demo.spec.ts` (item 6, 2026-10-16)
+
+A two-sheet set ("E-101 DEMOLITION PLAN", "E-201 POWER PLAN" in their title
+blocks). Laptop (mouse) and phone (finger), 7 tests.
+
+| Step | Broken by (red) |
+| --- | --- |
+| the offer names E-101 only; nothing tagged until "Use these tags"; then the server holds demo on E-101 only, the banner shows, and the bid's lines did not move | "Use these tags" does nothing |
+| marks on the demo sheet start as Remove; on new work, as new (server statuses) | — |
+| the strip says "3 new · 2 removed"; tapping "removed" dims the new marks | the strip's tap does nothing |
