@@ -1,0 +1,113 @@
+# Stress results — Track A
+
+Track A's drills and measurements. **`references/stress-results.md` belongs to
+Track C** (on `track-c`); this file is kept apart so the two never collide in
+a merge. Fold them together whenever both are on local-dev.
+
+## Counting deep test — 2026-10-15 night
+
+**Fixture:** plan PDFs written byte by byte with a known answer
+(`client/src/lib/testPlanPdf.testHelper.ts`, sheets in
+`client/src/lib/countingFixtures.testHelper.ts`). Sheet 1 (17 × 11):
+receptacles in four turns, crowded 16 pt apart, beside a room name, with a
+wire through, by a wall; GFCI look-alikes (same shape + "GF"); bare circles;
+1.5× receptacles; grey "existing" receptacles; junction boxes vs smoke
+detectors (same circle, J vs SD); troffers in two turns vs bare rectangles;
+switches. Sheet 2: other places, other counts. Sheet 3 (hard): a wire ending
+on the circle, circuit numbers beside, gray hatching through, 45° turns, a
+4 × 3 edge-to-edge troffer grid. Plus sheet 1 as a 150 dpi noisy scan.
+
+Read through the plans screen's own path (pdf.js → `vectorGeometry` →
+`findMatching` / `findOnScan`); scored per symbol. **Accuracy is the same
+before and after tonight: no matcher change was needed** (one message was
+corrected, below).
+
+### Line-work sheets (`countingDeep.test.ts`, golden counts in the Gate)
+
+| Symbol boxed              | True                  | Found | Missed | Look-alikes offered (all flagged) | In Confirm all        |
+| ------------------------- | --------------------- | ----- | ------ | --------------------------------- | --------------------- |
+| Duplex                    | 10                    | 10    | 0      | 3 GFCI, 2 grey                    | **10 right, 0 wrong** |
+| GFCI                      | 3                     | 3     | 0      | none                              | 3 / 0                 |
+| Bare circle               | 3                     | 3     | 0      | 15 (every duplex holds a circle)  | 3 / 0                 |
+| Junction box              | 4                     | 4     | 0      | none (SD circles not offered)     | 4 / 0                 |
+| Smoke detector            | 4                     | 4     | 0      | none                              | 4 / 0                 |
+| Troffer                   | 6                     | 6     | 0      | none                              | 6 / 0                 |
+| Bare rectangle            | 3                     | 3     | 0      | 6 troffers                        | 3 / 0                 |
+| Switch                    | 5                     | 5     | 0      | none                              | 5 / 0                 |
+| Hard-sheet duplex         | 11                    | 9     | **2**  | none                              | 9 / 0                 |
+| Sheet 2, boxed on sheet 1 | 3 dup / 2 trof / 1 GF | all   | 0      | 1 GFCI (flagged)                  | exact / 0             |
+
+**Not 100%, and why:**
+
+- **45° devices: missed on purpose.** Plans draw devices square, and every
+  extra angle tried is a chance to match a non-device. The person sees 9
+  offered and taps the 2.
+- **1.5× copies: not offered.** A different size is treated as a different
+  symbol. Box one of the big ones, or tap them.
+- **Edge-to-edge grid: cannot be boxed.** Every edge and diagonal runs on
+  into the neighbours, so all of it is a line running through, the same rule
+  that lets a wire pass through a receptacle. **Found tonight:** the screen
+  said "Nothing is drawn inside that box", which was false. It now says the
+  fixtures touch, and to box one that stands alone or tap them
+  (`TOUCHING_SYMBOLS_MESSAGE`).
+
+**The test bites:** with `MIN_COVERAGE` 0.8 → 0.5, 5 of 13 cases go red.
+
+### Scanned copy (`countingScan.test.ts`, opencv.js, no AI)
+
+| Symbol         | True | Found | Missed | Look-alikes offered    | In Confirm all                  |
+| -------------- | ---- | ----- | ------ | ---------------------- | ------------------------------- |
+| Duplex         | 10   | 10    | 0      | 3 circles, 3 GFCI      | **0** (every find needs a look) |
+| GFCI           | 3    | 3     | 0      | 3 circles, 9 duplexes  | 0                               |
+| Junction box   | 4    | 4     | 0      | 3 circles, 4 smoke     | 0                               |
+| Smoke detector | 4    | 4     | 0      | 3 circles, 1 GFCI, 4 J | 0                               |
+| Troffer        | 6    | 6     | 0      | none                   | 0                               |
+| Switch         | 5    | 5     | 0      | none                   | 0                               |
+
+On a scan the words beside a symbol (GF, SD, J) are pixels, not read, so
+**every** find carries "check it by eye" and Confirm all takes none. A
+scan can never count a look-alike by itself; the person confirms each find.
+100% hands-off is not possible on a scan without reading those words, which
+is the AI button's job.
+
+### AI reading — saved fake answers only, no money spent
+
+`server/countingAiFake.test.ts` (router, `invokeLLM` mocked) and
+`countingScan.test.ts` (client rules):
+
+- The reply parser takes only the four closed answers; anything else becomes
+  "no answer", never a guess.
+- One press = one call. **Nothing on the bid moves** (marks and lines counted
+  before and after). An unreachable AI changes nothing and says so. With AI
+  switched off it refuses before any call.
+- **An AI answer never confirms a find.** With right answers, Confirm all
+  takes 9 of the 10 duplexes. The tenth, with a wire through it, keeps its
+  "weaker likeness (0.81)" flag. No look-alike gets in.
+- **A wrong "same" from the AI lets that look-alike into Confirm all**
+  (still only on the person's press). Morning question N1.
+
+### Manual counting (`server/countingManual.test.ts`) — totals = hand math
+
+One receptacle = $3.00 parts + 0.15 h × $62 = $12.30.
+
+| Step                                                            | Marks | Line qty | Direct (hand) | Direct (app) |
+| --------------------------------------------------------------- | ----- | -------- | ------------- | ------------ |
+| Owner 5 on sheet 1 + estimator 4 on sheet 2, at the same moment | 9     | 9        | 110.70        | 110.70       |
+| Estimator's batch undone                                        | 5     | 5        | 61.50         | 61.50        |
+| Redone                                                          | 9     | 9        | 110.70        | 110.70       |
+| 2 marked existing, 1 remove                                     | 9     | 6        | 73.80         | 73.80        |
+| 3 tagged "Wall" (location)                                      | 9     | 6        | 73.80         | 73.80        |
+| Line owner-furnished (labor only)                               | 9     | 6        | 55.80         | 55.80        |
+
+**Offline, then back online — a real bug, fixed on the server:** a batch
+resent after a lost answer wrote every mark twice (3 → 6). Now each tap is
+placed once per key (`server/markReplay.ts`, `markReplay.test.ts`, red
+before). It takes effect with one line on the Plans screen (Track B's file,
+`track-b-handoff.md`). It is held in memory, so a durable column is in
+`todo.md`.
+
+Covered elsewhere, not repeated: twin fold (`server/twinFold.test.ts`),
+status pricing (`server/markStatusPricing.test.ts`), undo/redo exact restore
+(`server/takeoffUndo.test.ts`), several counts in one batch
+(`client/src/lib/markBatches.test.ts`). **Mouse and finger:** the counting
+part of the browser journey (queue item 3) taps on laptop, iPad and phone.

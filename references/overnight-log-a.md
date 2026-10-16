@@ -373,3 +373,10 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   in memory, red before, `markReplay.test.ts` 5/5; stamp neighbours 84/84).
   Screen half is ONE line in TakeoffPage (B's file) → `track-b-handoff.md`.
   Durable column → todo. Noted at the TOP of morning questions (N0).
+- Manual counting (`server/countingManual.test.ts`, users 9915/9916): two
+  people tapping at once on two sheets, undo/redo, status, location tag,
+  owner-furnished — every step's total = hand math (table in
+  `references/stress-results-a.md`, Track A's own file: `stress-results.md`
+  is Track C's on `track-c`, kept apart to avoid a merge clash).
+- 00:03 counting deep test done except mouse-vs-finger, which rides
+  the browser journey (item 3).
