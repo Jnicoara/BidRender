@@ -525,6 +525,9 @@ export const DOES_NOT_RECOUNT: Record<StarterTable, readonly string[]> = {
     "workersCompPct",
     "insurancePct",
     "benefitsPct",
+    // 0165: frozen on each line as `snapshotChargeRate`, like hourlyCost's
+    // `snapshotLaborRate` — a new charge rate reaches new lines only.
+    "chargeRate",
   ],
   modifiers: ["name", "laborAdjustmentPct", "scope"],
   runTypes: ["label"],
