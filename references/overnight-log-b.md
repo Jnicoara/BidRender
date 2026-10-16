@@ -222,3 +222,18 @@ start.
 - Also tonight (item 8 / todo): moveToGroup toast fix `04bb1d2e`;
   bids.dashboard measured 240/440/840 ms at 50/100/200 marked bids
   (`90fcb4fc`, no code change).
+
+## Item 8 — break-it pass on starter offers + Plans (23:25–23:45)
+
+- Starter offers' Accept path read through: stale picks refused, one
+  transaction, answers upserted; nothing found.
+- The new Unassigned count, attacked from every route that takes a count id
+  — four faults, each fixed with a test red without it:
+  `04bb1d2e` "Move to" Unassigned toasted `__unassigned__`;
+  `a2544d45` an undo blocked by a newer Unassigned count named it so;
+  `6b27d143` the Unassigned count itself could be linked to an assembly
+  (kept its reserved label, became sendable — could reach the bid);
+  `75d8e319` setDrop on it was allowed (drops can add footage).
+- Safe todo: dashboard timing measured (`90fcb4fc`, numbers only). The
+  starter rename path is not safe unattended (A's seed area) — left.
+- Dev and production servers stopped; MySQL 3307 left running.
