@@ -1860,7 +1860,7 @@ Measurements: `references/code-first-ceiling.md` § d.
 
 ### Flaky tests — fix in a batch before beta
 
-- [ ] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
+- [x] **MUST INVESTIGATE RIGHT AFTER THE 24105ad LIVE RELEASE (owner,
       2026-10-06) — treat as a possible REAL bug, not a test flake: a
       person who reloads the Plans screen and sees nothing for a minute
       would believe their plans were gone.** Smoke flow 9, "a refresh keeps
@@ -1936,12 +1936,14 @@ Measurements: `references/code-first-ceiling.md` § d.
       holds are one-shot (1.5 s, 1.2 s), so they cannot starve a refresh,
       and both sit far under the new 20 s read deadline. Local: 4 of 4
       green with the changes above.
-- [ ] **`server/materialsList.test.ts` "does not contain the actual costs"
+- [x] **`server/materialsList.test.ts` "does not contain the actual costs"
       failed once in CI** (run 37420713101, `6877993`): "expected
       '{"bidName":"Matlist bid 1791266041322…' not to contain '1.42'". Looks
       like a fixture price that can also appear inside a generated
       timestamp-or-id string. Not investigated; noted so the next red run is
-      recognised.
+      recognised. **FIXED (f8fdec3f):** the cost is matched as a standalone
+      figure; the failure was `preparedOn` "05:54:01.424Z" containing "1.42".
+      Ticked 2026-10-16 (B).
 
 Both are timing, not wrong answers, and both touch the shared test database.
 Fix them together: a green run that sometimes lies about being red trains
