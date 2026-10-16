@@ -91,6 +91,7 @@ import { SampleBidNotice } from "@/components/SampleBidNotice";
 import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { MathChangeStrip } from "@/components/MathChangeStrip";
+import { MarginsNotSetStrip } from "@/components/MarginsNotSetStrip";
 import {
   countUnpricedLaborLines,
   groupStaleRates,
@@ -1188,6 +1189,8 @@ export default function BidsPage({
         {/* "Total changed because…" and "Update to the current math" (owner
             Q14, Q22). Here and on Quick bid; never on the proposal. */}
         <MathChangeStrip bidId={bidId} />
+        {/* A company default of 0 nobody chose — label only (owner, 2026-10-16). */}
+        <MarginsNotSetStrip marginsNotSet={detailQuery.data?.marginsNotSet} />
         {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
             track is as wide as its widest child's longest unbreakable line,
             which made the whole bid 445 px wide on a 390 px phone. */}

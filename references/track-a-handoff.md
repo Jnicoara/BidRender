@@ -4,6 +4,16 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
+
+**Never replace, restore, re-copy or drop a shared local database
+(`bidrender_local`, `bidrender_test_localdev`) without first writing it in
+your handoff:** which database, from what, when, and why. All three tracks
+and the owner work against the same MySQL on 3307, so an unannounced swap
+reads to everyone else as a fault in their code. Throwaway databases you
+create and drop yourself are exempt. (Prompted by A's own false alarm on
+2026-10-16 — nobody had replaced `bidrender_local`; see session 48.)
+
 ## NOW — 2026-10-16 day, session 48: owner's answers built (N4, N1, N2)
 
 - **N4:** math version 2 is BUTTON-ONLY (`buttonOnly`, `releaseTargetFor`):
@@ -18,9 +28,12 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
   (`08b067ce`, pushed to staging by hand). The next live release carries
   it; `next-live-release-plan.md`'s "rides the next release" step is now
   simply true.
-- **Local copy note:** `bidrender_local` was replaced with an older copy
-  today (its duplex starter holds "Wall plate"). Run the journey on a fresh
-  throwaway DB (`migrate.mts` + `seedBaseline.mts`), as the log says.
+- **Local copy note:** `bidrender_local`'s duplex starter still holds
+  "Wall plate" because `scripts/repairStarterCovers.mts` (a by-hand release
+  step) has never run there — NOT because anyone replaced it; I said that
+  first and it was wrong (tables dated 09-15..10-14). The journey needs the
+  seeded recipes: run it on a fresh throwaway DB (`migrate.mts` +
+  `seedBaseline.mts`) or the test DB, as the log says.
 
 ## (earlier) 2026-10-16 night, session 47: second overnight queue on `track-a-night`
 

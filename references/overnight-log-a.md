@@ -575,8 +575,14 @@ draft's hand-typed START times ran ahead of the clock. Ends were always
 - Journey 3/3 on a throwaway fresh DB (`bidrender_test_journey_a`, dropped):
   laptop 38 s, iPad 29 s, phone 57 s. On `bidrender_local` it failed BEFORE
   anything changed today: that copy's duplex starter holds "Wall plate",
-  the seed says the nylon duplex plate — the local copy was replaced with
-  an older one since yesterday's green run.
+  the seed says the nylon duplex plate. **Corrected later the same day:**
+  I first wrote that the local copy had been replaced with an older one.
+  It was not — its tables date 2026-09-15 to 10-14, nothing was created
+  today, and no track's handoff or log mentions a restore. Yesterday's
+  green journey ran on the TEST database (this log, "3018, test DB"). The
+  real cause: the starter cover swap reaches an EXISTING database only
+  through `scripts/repairStarterCovers.mts`, run by hand at a release, and
+  it has never been run on `bidrender_local`.
 - Full suite before the golden update: 457 files passed, 1 failed (golden
   `mathVersion` only), 1 skipped.
 - **Live DB, read-only** (READ ONLY session + transaction, rolled back):
@@ -586,3 +592,18 @@ draft's hand-typed START times ran ahead of the clock. Ends were always
   (10 kit items in all); Q-TAX1 0 tax areas on live; Q-CLOSE1 0 close-outs
   on live; run-type extras ≥ 10% none (no company run types, runs or extra
   defaults with one).
+- **N3 recorded** (owner: yes to all 16 picks; mud rings for approval): 16
+  OPEN → 0, each a `decided` entry plus its changes (+61 renames, +7 rows,
+  +11 search-word removals, +3 additions, descriptions ±2). The 30 mud
+  rings are `pendingApproval` and listed in the dry run (5 renames of
+  today's rows to the 1/2" raise, 25 new). Dry run: 626 changes + 30
+  waiting, 0 problems; `--apply` still refuses.
+- **"Profit / overhead not set"** (owner): amber strip on the bid with a
+  Settings › Pricing button, label only (`shared/marginsNotSet.ts`, flag
+  on `bids.get`). Test `server/marginsNotSet.test.ts` 4 (red with the
+  field forced off: 2 fail). On screen (fresh local account): both → set
+  profit 15% in Settings → back, the strip moved to "Overhead not set" with
+  no reload; phone no sideways scroll. Shots `12-*`. Limit parked as N5.
+- **Who replaced `bidrender_local`?** Nobody — see the correction above.
+  Rule written in all three handoffs: never replace or restore a shared
+  local DB without saying so in the handoff first.

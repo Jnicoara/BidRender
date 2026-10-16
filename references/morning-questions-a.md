@@ -51,6 +51,17 @@ A live check before deciding: how many live run lines have a $0 rate and
 hours > 0. That is a read-only count; I didn't run it, since tonight's rules
 keep me off live.
 
+### N5. "Profit / overhead not set" can't tell a typed 0 from "never set"
+
+Built 2026-10-16 as you asked (label only, `shared/marginsNotSet.ts`).
+`pricing_defaults` keeps no record of whether a company's 0 was typed or
+never set, so a shop that deliberately runs 0% profit sees the amber line
+on every bid that follows the default. A value typed on the bid stops it
+for that bid. **To tell the two apart** needs one nullable column (e.g.
+`profitSetAt` / `overheadSetAt`, written by Settings), additive, in the
+next migration batch. Want it? Live today: 3 companies at 0/0, all never
+set (live check, 2026-10-16).
+
 ### N0. FIXED, changes a total in one case: a resent batch of marks counted twice
 
 On the Plans screen, if a batch of taps reached the server but the answer was

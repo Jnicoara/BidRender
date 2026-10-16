@@ -70,6 +70,7 @@ import {
 } from "../../shared/handPricedLines";
 import { isLaborRoleLine } from "../../shared/roleLines";
 import { canUpdateMath, reasonsBetween } from "../../shared/mathVersion";
+import { marginsNotSet } from "../../shared/marginsNotSet";
 import {
   leaveDraft,
   mathUpdateWorthOffering,
@@ -1076,6 +1077,11 @@ export const bidsRouter = router({
         units,
         totals,
         settings,
+        /**
+         * "Profit / overhead not set" — the bid follows a company default
+         * of 0 (shared/marginsNotSet.ts). A label; it moves no number.
+         */
+        marginsNotSet: marginsNotSet(settings),
         company,
         /** The linked client record, or null. */
         client: client ?? null,

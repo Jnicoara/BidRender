@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A bid now says when profit or overhead was never set.** A company that
+  has never set its profit or overhead has them at 0, so every bid
+  following those defaults adds nothing for either while looking complete.
+  The bid now shows an amber "Profit not set" or "Overhead not set" line,
+  with a button to Settings › Pricing. It changes no number. A value
+  typed on the bid itself, 0 included, counts as a decision and is never
+  flagged.
+- **The 16 open pricing-name answers are recorded, and the 30 mud ring names
+  wait for approval.** The end-of-pricing dry run now holds every decision:
+  626 changes, 0 problems. It is still a dry run only.
+
 - **Fixing a Draft whose traced runs were priced at $0 an hour is now one
   button, and a new company's runs start priced.** The owner chose no
   automatic re-pricing. A Draft still holding such runs offers "Update to
