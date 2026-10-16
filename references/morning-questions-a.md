@@ -3,6 +3,39 @@
 Only things for live, money, or that cannot be undone. Everything reversible
 was decided and is in `overnight-log-a.md`.
 
+## 2026-10-15 night (second queue) — counting and totals
+
+### N0. FIXED, changes a total in one case: a resent batch of marks counted twice
+
+On the Plans screen, if a batch of taps reached the server but the answer was
+lost (Wi-Fi drop, tablet asleep), the screen sent the batch again and every
+mark counted twice: 3 receptacles became 6. **Server fix on `track-a-night`**
+(`server/markReplay.ts`, test red before): a mark is placed once per key. It
+takes effect when Track B adds one line to the screen (`track-b-handoff.md`).
+**What moves:** only a count that would have been doubled. No existing bid
+changes; marks already doubled on a bid stay as they are. Nothing to decide
+unless you want B to hold the line.
+
+### N1. On a SCAN, should an "AI says same" find be allowed into Confirm all? (affects counts)
+
+Found by the counting deep test (`client/src/lib/countingScan.test.ts`),
+with saved fake AI answers and no money spent. On a scanned sheet every find
+starts flagged ("the tag beside it is not read"), so **Confirm all takes
+nothing** until a person looks. That part is safe. Pressing **Ask AI** and
+getting "same" clears that flag, and the find becomes "clear", so the next
+Confirm all takes it. So if the AI wrongly answers "same" on a GFCI, Confirm
+all counts that GFCI as a duplex. Nothing is counted without a person
+pressing Confirm all, but that one press now trusts the AI.
+
+- **A (today):** keep as is. The AI is a helper, and Confirm all is the
+  person's decision.
+- **B (recommended):** an AI-cleared scan find stays out of Confirm all and
+  is confirmed one at a time, with the AI's answer shown. Safer, and costs
+  one tap per find on scans.
+- **C:** B, but only for finds the AI moved from flagged to clear.
+
+Nothing changed tonight. It's a count decision, so it's yours.
+
 ## 1. GitHub minutes once the repo is private — needs a money decision BEFORE switching
 
 Measured: the Gate used **≈ 17,400 billed minutes / month**; tonight's change

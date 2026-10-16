@@ -356,3 +356,20 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   possible from line work there; the person taps them.
 - **Proved it bites:** MIN_COVERAGE 0.8 → 0.5 made 5 of 13 cases red;
   restored.
+- Step 1 result: local-dev Gate 38862215110 **green** — smoke 96 passed / 2 skipped; staging /api/version commit 26670c62.
+- Scan copy (`countingScan.test.ts`, opencv.js, 150 dpi + noise): every
+  true copy found on all 6 symbols; EVERY find needs a look (words not read
+  on a scan), so Confirm all takes none. Golden counts frozen (exact
+  look-alike lists — may differ on Linux font rendering; watch the Gate).
+- AI reading with saved FAKE answers (`server/countingAiFake.test.ts`,
+  `invokeLLM` mocked): parser takes only the 4 closed answers; one press =
+  one call; nothing on the bid moves; unreachable AI changes nothing; AI off
+  refuses before any call. Client: answers never confirm; right answers →
+  Confirm all takes 9 of 10 duplexes (the wire-through one keeps a
+  weaker-likeness flag), no look-alike. A WRONG "same" lets that copy into
+  Confirm all → **morning question N1**.
+- **Real bug — offline then back online:** a batch resent after a lost
+  answer wrote every mark twice. Server fix `server/markReplay.ts` (keys,
+  in memory, red before, `markReplay.test.ts` 5/5; stamp neighbours 84/84).
+  Screen half is ONE line in TakeoffPage (B's file) → `track-b-handoff.md`.
+  Durable column → todo. Noted at the TOP of morning questions (N0).

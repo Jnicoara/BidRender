@@ -4,6 +4,19 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-16]
+
+- **A dropped connection can no longer make the Plans screen count marks
+  twice.** If taps reached the server but the answer was lost, the screen
+  resent them and each one was counted again (3 receptacles became 6). The
+  server now places each tap once. This takes effect when the Plans screen
+  sends a small key with each tap, which is a one-line change handed to Track B.
+- **Counting on scanned plans is tested too.** On a scan, every match is
+  found and every one waits for a person, so "Confirm all" can never count a
+  look-alike by itself. AI answers were tested with saved fake replies only,
+  and no AI money was spent. An AI answer never confirms anything, and an
+  AI that can't be reached changes nothing.
+
 ## [2026-10-15]
 
 - **"Find all matching" is now tested on plan sheets whose true count is

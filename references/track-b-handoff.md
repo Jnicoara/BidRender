@@ -1,5 +1,26 @@
 # Track B handoff — 2026-10-05
 
+## FROM TRACK A, 2026-10-16 — one line in `TakeoffPage.tsx` (yours, so not touched)
+
+**A resent batch of marks counted twice.** When `flushStamps`' send fails,
+the marks go back to unsent and ride the next flush. If the failure was a
+LOST ANSWER (the connection dropped after the server wrote them), every mark
+in that batch was written again: 3 receptacles became 6. Found by A's
+counting deep test, "offline then back online".
+
+**Server half is done on `track-a-night`:** `takeoffStamps.drop` takes an
+optional `keys` (one per `at` entry) and places each key once per bid,
+returning the earlier ids for a resent key (`server/markReplay.ts`,
+`server/markReplay.test.ts`, red before). Remembered in memory for a day; it
+does nothing until the screen sends keys.
+
+**Yours, one line:** in `flushStamps` (TakeoffPage.tsx ~6811), add
+`keys: batch.map(m => m.key),` beside `at:`. The queued marks already carry
+`key`. The crash-recovery path (~7909) sends stamps without keys; leave it
+(its queue is rewritten after each part, so it does not resend).
+A durable version (a `clientKey` column and a unique index, a migration) is
+in `todo.md` for whoever plans the next release.
+
 ## WHERE B STANDS — 2026-10-14 (merge), LOCAL-DEV MERGED; B OWNS ALL OF STARTER OFFERS
 
 - **Owner answered `starter-offers-plan.md` Q1–Q7: all YES, as
