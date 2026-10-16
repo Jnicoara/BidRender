@@ -4,7 +4,32 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-15 night, session 46: overnight queue on `track-a-night`
+## NOW — 2026-10-16 night, session 47: second overnight queue on `track-a-night`
+
+Step 1: `track-a-night` landed on local-dev at `26670c62` (Gate + smoke
+96/2 green, staging serves it). Then, on `track-a-night` only:
+- **2 feature test map** `references/feature-test-map.md` (~600 features,
+  STRONG/WEAK/NONE); every money row now has a test (`server/bidNumberGaps.test.ts`,
+  several proved by breaking).
+- **Counting deep test** (owner's top item): `client/src/lib/countingDeep.test.ts`
+  + `countingScan.test.ts` (golden counts; Confirm all never takes a
+  look-alike), `server/countingManual.test.ts` (hand math each step),
+  `server/countingAiFake.test.ts` (fake AI only). **Bug fixed:** a resent
+  batch of marks counted twice → `server/markReplay.ts` (B's one screen line
+  in `track-b-handoff.md`). Results `references/stress-results-a.md`.
+- **4–9:** fresh start, backup drill (`scripts/backupDrill.mts`,
+  `bidTotalsDump.mts`), failure drills, company-separation probe over every
+  procedure, big-data speed (on demand), golden bids on proposal / quote
+  panel / CSV.
+- **10** typed packs kept (`starterPacksTyped.ts`); **11** end-of-pricing dry
+  run (`pricing/endOfPricing.mts`, 560 changes, 0 problems, 16 OPEN);
+  **12** release plan § "Since 2026-10-15"; **13** snapshot proved, PARKED
+  (N2); **14** `pnpm check` covers scripts/ and pricing/.
+- **3 browser journey:** an agent wrote `e2e/journey/` (see the log for its
+  result).
+- Morning questions N0–N3 at the top of `morning-questions-a.md`.
+
+## (earlier) 2026-10-15 night, session 46: overnight queue on `track-a-night`
 
 Step 1 done: `track-a-night` landed on local-dev at `a4c97280` (ff, 22:01),
 Gate 38853660685. Queue (owner's order): 2 golden bids → 3 speed limits →
