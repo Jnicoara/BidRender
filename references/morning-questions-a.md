@@ -36,6 +36,36 @@ pressing Confirm all, but that one press now trusts the AI.
 
 Nothing changed tonight. It's a count decision, so it's yours.
 
+### N2. The migration snapshot gap 0059–0163: the condition is met, but where should the commit go?
+
+You said: apply the draft on the branch only if `drizzle-kit generate` then
+says "no changes". **Measured tonight, in a throwaway worktree:** with
+`references/drafts/drizzle-snapshot/0163_snapshot.json` copied to
+`drizzle/meta/`, generate printed **"No schema changes, nothing to
+migrate"**. Without it, generate wrote a new migration of **339
+statements**: the gap, which re-adds what production already has. So the
+draft closes the gap exactly.
+
+**Not committed, because both places it could go have a side effect:**
+
+- **On `track-a-night`:** the Gate's "Refuse migrations written on a track
+  branch" step turns red on ANY commit touching `drizzle/`, a snapshot
+  included.
+- **On local-dev:** staging auto-deploy is refused while `drizzle/` differs
+  from what staging runs, so B's and C's staging deploys would stop until
+  staging takes it too.
+
+**Pick one:**
+
+- **A:** A commits it on local-dev in a quiet window, then deploys staging by
+  hand once (one file, no SQL).
+- **B (recommended):** it rides the next live release with that release's
+  `drizzle/` changes, as one step in `next-live-release-plan.md`. It is added
+  there tonight.
+- **C:** an `a-*` branch (no track refusal) for the Gate, then landed as in A.
+
+It is a metadata file only: no SQL runs, and no database changes.
+
 ## 1. GitHub minutes once the repo is private — needs a money decision BEFORE switching
 
 Measured: the Gate used **≈ 17,400 billed minutes / month**; tonight's change

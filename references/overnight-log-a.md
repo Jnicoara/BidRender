@@ -470,3 +470,14 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   keeps them. `server/typedPacks.test.ts` 10; pack/sheet neighbours 55/55.
 - Dry run on the real sheet: no refusals, "packs typed …: 0 set". Nothing
   loaded, no sheet rebuild.
+
+## Item 13 — migration snapshot hole — 00:47 → 00:43
+
+- Throwaway worktree (node_modules junction, removed link-first; worktree
+  removed, real node_modules intact): draft 0163_snapshot.json in
+  drizzle/meta → `drizzle-kit generate`: **"No schema changes, nothing to
+  migrate"**. Without it: a 0164 migration of **339 statements**.
+- **PARKED (morning question N2), not committed:** any drizzle/ commit
+  turns the track-branch Gate red by design, and on local-dev it stops the
+  staging auto-deploy until staging matches. Recommended: ride the next
+  live release.
