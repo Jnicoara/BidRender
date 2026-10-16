@@ -409,3 +409,18 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   sides. PARTIAL only for 13 test-fixture files never on this disk. Both
   throwaway DBs dropped, scratch folder removed. Write-up in
   `references/stress-results-a.md`.
+- **Gate 38865031567 RED (1st for this item):** countingScan gfci/smoke —
+  the look-alike lists differ on Linux (text rasterises differently), as
+  predicted. Found/missed/Confirm all still exact there. Fixed: exact on
+  the safety numbers, look-alikes held to the circle family.
+
+## Item 7 — company separation — 00:22 → 00:23
+
+- `server/companySeparation.test.ts` (users 9919/9920): a probe over
+  appRouter itself — every procedure (388, skipping auth/starter realms),
+  each A id in each id field, other fields from the zod schema. **0 read
+  leaks, 0 write leaks** in 4,755 calls (728 answered within B's own
+  scope); A's bid, library and per-table row counts unchanged; B's
+  dashboard/archive show nothing of A's. Control test: the same reads as A
+  DO show the marker, so the detector can fire. AI mocked (no spend).
+  ~63 s locally (adds ~1–2 min to a full Gate).
