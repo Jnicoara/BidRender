@@ -35,6 +35,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
+import { countDisplayName } from "../../shared/unassignedCount";
 import {
   buildCountedItems,
   nameMatchesSymbol,
@@ -573,7 +574,8 @@ export const takeoffStampsRouter = router({
       }
       return {
         moved,
-        label: group.label,
+        // The toast's words: "Unassigned", never the reserved label.
+        label: countDisplayName(group.label),
         // A mark with no count (pre-phase-6, never backfilled) cannot be put
         // back under nothing by this procedure, so it is left out of undo.
         previous: Array.from(byGroup.entries())

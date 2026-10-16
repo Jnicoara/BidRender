@@ -118,6 +118,24 @@ describeDb("a bid with marks nobody has named yet", () => {
     expect(groups.find(r => r.id === exits.id)?.count).toBe(3);
   });
 
+  it("moving marks INTO it says 'Unassigned', never the stored label", async () => {
+    const { bidId, heldId } = await aBidWithThreeUnassigned();
+    const exits = await caller().takeoffGroups.create({
+      bidId,
+      label: "Exit signs",
+    });
+    await caller().takeoffStamps.moveToGroup({
+      fromGroupId: heldId,
+      groupId: exits.id,
+    });
+    const back = await caller().takeoffStamps.moveToGroup({
+      fromGroupId: exits.id,
+      groupId: heldId,
+    });
+    // The screen's toast reads "Moved 3 marks to <label>".
+    expect(back.label).toBe("Unassigned");
+  });
+
   it("nobody can make a count of their own that looks like it", async () => {
     const { bidId } = await aBidWithThreeUnassigned();
     await expect(
