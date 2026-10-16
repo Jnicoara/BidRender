@@ -441,3 +441,16 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   All inside limits; slowest Dashboard 493 ms (grows ~8 ms/bid → todo).
   Free memory read 1.94 GB at the start (journey agent's dev server up) —
   a vitest run, no server/browser started by me; heavy work held.
+
+## Item 9 — golden bids on printed/exported output — 00:38 → 00:34
+
+- Added to `server/goldenBids.test.ts`: for all 9 golden bids, the
+  proposal prints "Price pending" EXACTLY when the bid screen says something
+  is not priced, and otherwise its total = Total due to the cent; the
+  quote-app panel's totalDueCents and preTaxCents match; the takeoff
+  spreadsheet's Direct cost matches and its rows add up. All green.
+- False alarm on the way, recorded: the labor-only bid's document carries
+  $1,200 with `pricePending: true` (printed as "Price pending") — the
+  first check read the figure, not the flag. The quote-app panel is an
+  internal-tier feature read off the session, so those reads use an
+  internal-tier caller (a tier never changes a price).
