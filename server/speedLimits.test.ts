@@ -24,6 +24,7 @@
  */
 import { describe, expect, it, beforeAll } from "vitest";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import * as db from "./db";
 import {
   as,
   bidWithSheet,
@@ -279,4 +280,28 @@ describe.skipIf(!hasDb)("speed limits", () => {
     }
     expect(over, "saves over their limit").toEqual([]);
   }, 180_000);
+
+  /*
+    Diagnostic, not a limit: "Price a material" measured 221 ms in CI against
+    6 ms on a laptop (Gate 38855631644; todo.md, "Speed limit outlier"). It
+    is three calls, so each is timed on its own here and printed as
+    `[speed-detail]` — the next CI log says which one it is.
+  */
+  it("prints where the material save spends its time", async () => {
+    const parts: Record<string, (i: number) => Promise<unknown>> = {
+      getMaterialById: () => db.getMaterialById(f.materialId, USER),
+      updateMaterial: i =>
+        db.updateMaterial(f.materialId, USER, {
+          costPerUnit: (3 + i / 100).toFixed(4),
+        }),
+      "materials.update (whole)": i =>
+        f.c.materials.update({ id: f.materialId, costPerUnit: 3.5 + i / 100 }),
+    };
+    for (const [name, fn] of Object.entries(parts)) {
+      const t = await timeIt(fn);
+      console.log(
+        `[speed-detail] ${name}: median ${t.median.toFixed(0)} ms, all ${t.all.map(n => n.toFixed(0)).join("/")}`
+      );
+    }
+  }, 60_000);
 });
