@@ -29,6 +29,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -38,6 +41,8 @@ import { componentLaborUnit, laborForAssembly } from "@shared/materialLabor";
 import { unpricedPartsIn } from "@shared/lineNotPriced";
 import { LaborRateQuickEdit } from "@/components/LaborRateQuickEdit";
 import { resolveLaborRate } from "@shared/laborRateLookup";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,7 +85,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -111,6 +115,7 @@ import {
   MaterialPicker,
   type PickableMaterial,
 } from "@/components/MaterialPicker";
+import { errorText } from "@/lib/errorText";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,6 +338,39 @@ function OriginBadge({ assembly }: { assembly: Assembly }) {
 
 type ProfitMethod = "markup" | "margin" | "none";
 
+/** One line of the cost preview. Module level so a re-render updates it rather than rebuilding it (see BidRenderShell's NavBtn note, 2026-10-14). */
+const Row = ({
+  label,
+  value,
+  strong,
+  warn,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  /** Amber: this figure leaves something out. */
+  warn?: boolean;
+}) => (
+  <div className="flex items-baseline justify-between gap-3 py-1">
+    <span
+      className={cn(
+        "text-xs",
+        strong ? "text-foreground font-medium" : "text-muted-foreground"
+      )}
+    >
+      {label}
+    </span>
+    <span
+      className={cn(
+        "font-mono text-sm",
+        warn ? "text-[#F5C518]" : strong ? "text-[#F5C518]" : "text-foreground"
+      )}
+    >
+      {value}
+    </span>
+  </div>
+);
+
 function CostPreview({
   draft,
   laborRate,
@@ -358,8 +396,8 @@ function CostPreview({
           costPerUnit: m.costPerUnit,
           qty: m.qty,
         })),
-        baseLaborHours: draft.baseLaborHours,
-        overheadLaborHours: Number(draft.overheadLaborHours) || 0,
+        baseLaborHours: hoursToSave(draft.baseLaborHours),
+        overheadLaborHours: parseTypedNumber(draft.overheadLaborHours) || 0,
         modifiers: modifierPcts,
         laborRate,
       });
@@ -376,23 +414,25 @@ function CostPreview({
 
   const bid = useMemo(() => {
     if (!line || profitMethod === "none") return null;
+    // Read like every other percent box ("15%" is 15). An unreadable box
+    // shows no price rather than one priced at 0 (it used `|| 0`).
+    const overheadRead =
+      overheadMode === "percentage"
+        ? parseTypedPercent(overheadValue) / 100
+        : parseTypedNumber(overheadValue);
+    const profitRead = parseTypedPercent(profitValue) / 100;
+    if (
+      (overheadOn && !Number.isFinite(overheadRead)) ||
+      !Number.isFinite(profitRead)
+    )
+      return null;
     try {
       return calculateBidPrice({
         directCost: line.directCost,
         overhead: overheadOn
-          ? {
-              enabled: true,
-              mode: overheadMode,
-              value:
-                overheadMode === "percentage"
-                  ? (Number(overheadValue) || 0) / 100
-                  : Number(overheadValue) || 0,
-            }
+          ? { enabled: true, mode: overheadMode, value: overheadRead }
           : { enabled: false },
-        profit: {
-          method: profitMethod,
-          value: (Number(profitValue) || 0) / 100,
-        },
+        profit: { method: profitMethod, value: profitRead },
       });
     } catch {
       return null;
@@ -420,42 +460,6 @@ function CostPreview({
   // same rule a bid line follows (`lineMaterialNotPriced`).
   const materialMissing =
     !draft.laborOnly && line.materialCost === 0 && line.laborCost > 0;
-
-  const Row = ({
-    label,
-    value,
-    strong,
-    warn,
-  }: {
-    label: string;
-    value: string;
-    strong?: boolean;
-    /** Amber: this figure leaves something out. */
-    warn?: boolean;
-  }) => (
-    <div className="flex items-baseline justify-between gap-3 py-1">
-      <span
-        className={cn(
-          "text-xs",
-          strong ? "text-foreground font-medium" : "text-muted-foreground"
-        )}
-      >
-        {label}
-      </span>
-      <span
-        className={cn(
-          "font-mono text-sm",
-          warn
-            ? "text-[#F5C518]"
-            : strong
-              ? "text-[#F5C518]"
-              : "text-foreground"
-        )}
-      >
-        {value}
-      </span>
-    </div>
-  );
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-1">
@@ -615,6 +619,12 @@ function CostPreview({
           />
           <Row label="Bid price" value={money(bid.finalPrice)} strong />
         </div>
+      ) : profitMethod !== "none" && line ? (
+        // A method IS picked, so the missing price is the typed number.
+        <div className="text-xs text-[#F5C518] pt-1">
+          Type the overhead and profit as numbers — for example 15 — to see a
+          bid price.
+        </div>
       ) : (
         <div className="text-xs text-muted-foreground pt-1">
           Pick a profit method to see a bid price — markup and target margin
@@ -664,10 +674,21 @@ function AssemblyBuilder({
   /** Tracks whether the user has typed in the hours box themselves. */
   const [hoursTouched, setHoursTouched] = useState(false);
 
-  const { data: laborRates = [] } = trpc.laborRates.list.useQuery();
+  const { data: laborRates = [], isSuccess: ratesLoaded } =
+    trpc.laborRates.list.useQuery();
   const { data: modifiers = [] } = trpc.modifiers.list.useQuery({
     status: "active",
   });
+  const { data: archivedModifiers = [] } = trpc.modifiers.list.useQuery({
+    status: "archived",
+  });
+  // Conditions still on the recipe that have since been archived. They are
+  // not applied to new bid lines, and the chips below list only active ones,
+  // so they were on the recipe with nothing on screen saying so (break-it,
+  // 2026-10-15).
+  const archivedOnRecipe = archivedModifiers.filter(m =>
+    draft.modifierIds.includes(m.id)
+  );
 
   /**
    * The picker's own search box, so focus can be handed back to it.
@@ -699,7 +720,7 @@ function AssemblyBuilder({
   const showsPlaceholderHours =
     !hoursTouched &&
     assemblyHours(draft.baseLaborHours) !== null &&
-    isPlaceholderHours(draft.name, Number(draft.baseLaborHours));
+    isPlaceholderHours(draft.name, parseTypedNumber(draft.baseLaborHours));
 
   /**
    * What the parts come to, against what was typed.
@@ -739,7 +760,37 @@ function AssemblyBuilder({
   // resolveLaborRate, not a bare find: an assembly that referenced a starter
   // role keeps that id after the role is forked, and the fork is what it means.
   const selectedRate = resolveLaborRate(laborRates, draft.laborRateId);
+  // The recipe still names a role that has since been REMOVED from Labor
+  // rates: the box went blank, the preview said "$0.00" and nothing said
+  // why (break-it, 2026-10-15) — new bid lines price that labor at $0.
+  const roleRemoved =
+    ratesLoaded && draft.laborRateId !== null && !selectedRate;
   const laborRate = selectedRate?.effectiveHourlyRate ?? 0;
+
+  /*
+    Unsaved work asks before Back or a nav link throws it away
+    (@/lib/unsavedGuard). Compared as what Save would send, with the role
+    resolved the way the effect below re-points it, so opening a recipe whose
+    role was forked is not "a change". `initial` follows the server, so a
+    saved form is clean again once the save comes back.
+  */
+  const toSave = (d: Draft) => ({
+    name: d.name.trim(),
+    category: d.category,
+    trade: d.trade,
+    projectType: d.projectType,
+    base: hoursToSave(d.baseLaborHours),
+    overhead: parseTypedNumber(d.overheadLaborHours),
+    role: resolveLaborRate(laborRates, d.laborRateId)?.id ?? d.laborRateId,
+    materials: d.materials.map(m => [m.materialId, m.qty, m.isBranchWhip]),
+    modifierIds: d.modifierIds,
+    laborOnly: d.laborOnly,
+    mountHeightTypeKey: d.mountHeightTypeKey,
+    remove: hoursToSave(d.removeLaborHours),
+    relocate: hoursToSave(d.relocateLaborHours),
+    steps: d.steps,
+  });
+  const leave = useUnsavedGuard(!sameToSave(toSave(draft), toSave(initial)));
 
   // Re-point the draft at the fork once one exists. Without this the role
   // dropdown blanks out after a quick edit — its value is an id the list no
@@ -817,7 +868,9 @@ function AssemblyBuilder({
     }
     // Blank is NOT SET (D1) and saves as such; anything else must be a
     // number of 0 or more. A blank never becomes 0.
-    const hours = Number(draft.baseLaborHours);
+    // The same reader the save uses (hoursToSave), so what passes here is
+    // what is stored: "$2" is 2, "0x10" is refused rather than saved as 16.
+    const hours = parseTypedNumber(draft.baseLaborHours);
     if (
       draft.baseLaborHours.trim() !== "" &&
       (Number.isNaN(hours) || hours < 0)
@@ -825,7 +878,7 @@ function AssemblyBuilder({
       toast.error("Labor hours must be 0 or more, or left blank for not set.");
       return;
     }
-    const overhead = Number(draft.overheadLaborHours);
+    const overhead = parseTypedNumber(draft.overheadLaborHours);
     if (
       draft.overheadLaborHours.trim() === "" ||
       Number.isNaN(overhead) ||
@@ -844,7 +897,9 @@ function AssemblyBuilder({
       ["Remove", draft.removeLaborHours],
       ["Relocate", draft.relocateLaborHours],
     ] as const) {
-      const n = Number(value);
+      // The same reading hoursToSave uses: with Number() here, "0x10" passed
+      // this check and then saved as NOT SET (2026-10-15).
+      const n = parseTypedNumber(value);
       if (value.trim() !== "" && (Number.isNaN(n) || n < 0)) {
         toast.error(
           `${word} hours must be 0 or more, or left blank for not set.`
@@ -863,7 +918,7 @@ function AssemblyBuilder({
             size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs"
-            onClick={onCancel}
+            onClick={() => leave(onCancel)}
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back
           </Button>
@@ -1137,7 +1192,14 @@ function AssemblyBuilder({
                     className="h-8 w-56 text-sm"
                     aria-label="Labor role"
                   >
-                    <SelectValue />
+                    {/* Children, not a placeholder: Radix shows a placeholder
+                        only with NO value, and this value is the removed
+                        role's id, which matches no item. */}
+                    <SelectValue>
+                      {roleRemoved ? (
+                        <span className="text-destructive">Removed role</span>
+                      ) : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_ROLE}>
@@ -1304,6 +1366,12 @@ function AssemblyBuilder({
                   No role picked — labor prices at $0 until you choose one.
                 </p>
               )}
+              {roleRemoved && (
+                <p className="text-xs text-destructive">
+                  The role this used was removed from Labor rates — new bid
+                  lines price this labor at $0 until you pick another.
+                </p>
+              )}
 
               {showsPlaceholderHours && (
                 <p className="text-xs text-[#F5C518]">
@@ -1354,21 +1422,26 @@ function AssemblyBuilder({
                   this one assembly — not a percentage, and nothing to do with
                   the company-wide productivity factor in Settings.
                 </p>
-                {Number(draft.overheadLaborHours) > 0 &&
+                {parseTypedNumber(draft.overheadLaborHours) > 0 &&
                 assemblyHours(draft.baseLaborHours) === null ? (
                   <p className="text-xs text-[#F5C518]">
                     Hours not set — the overhead hours are not priced on their
                     own until the work hours are.
                   </p>
                 ) : (
-                  Number(draft.overheadLaborHours) > 0 && (
+                  parseTypedNumber(draft.overheadLaborHours) > 0 && (
                     <p className="text-xs text-muted-foreground">
-                      {round(Number(draft.baseLaborHours) || 0, 3)} h +{" "}
-                      {round(Number(draft.overheadLaborHours) || 0, 3)} h ={" "}
+                      {round(parseTypedNumber(draft.baseLaborHours) || 0, 3)} h
+                      +{" "}
+                      {round(
+                        parseTypedNumber(draft.overheadLaborHours) || 0,
+                        3
+                      )}{" "}
+                      h ={" "}
                       <span className="text-foreground font-medium">
                         {round(
-                          (Number(draft.baseLaborHours) || 0) +
-                            (Number(draft.overheadLaborHours) || 0),
+                          (parseTypedNumber(draft.baseLaborHours) || 0) +
+                            (parseTypedNumber(draft.overheadLaborHours) || 0),
                           3
                         )}{" "}
                         h
@@ -1412,7 +1485,8 @@ function AssemblyBuilder({
               </div>
               {modifiers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No active modifiers. Add some on the Modifiers screen first.
+                  No active modifiers. Add some on the Modifiers tab of
+                  Assemblies first.
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
@@ -1444,6 +1518,29 @@ function AssemblyBuilder({
                       </button>
                     );
                   })}
+                </div>
+              )}
+              {archivedOnRecipe.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-[#F5C518]">
+                  <span>
+                    Archived, so not applied to new bid lines:{" "}
+                    {archivedOnRecipe.map(m => m.name).join(", ")}.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 text-xs"
+                    onClick={() =>
+                      setDraft(d => ({
+                        ...d,
+                        modifierIds: d.modifierIds.filter(
+                          id => !archivedOnRecipe.some(m => m.id === id)
+                        ),
+                      }))
+                    }
+                  >
+                    Take off this recipe
+                  </Button>
                 </div>
               )}
             </div>
@@ -1483,7 +1580,12 @@ export default function AssembliesLibraryPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingItem | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: assemblies = [], isLoading } = trpc.assemblies.list.useQuery({
+  const {
+    data: assemblies = [],
+    isLoading,
+    isLoadingError: assembliesFailed,
+    refetch: refetchAssemblies,
+  } = trpc.assemblies.list.useQuery({
     status: view,
   });
   const { data: archivedRows = [] } = trpc.assemblies.list.useQuery({
@@ -1498,17 +1600,46 @@ export default function AssembliesLibraryPage() {
     void utils.assemblies.list.invalidate();
   }, [utils]);
 
+  // When the open editor's form was taken from the saved row: the editor
+  // builds its form ONCE, on opening, so this is set then — and moved on by
+  // its own saves — never by a later refetch, which would let a save put
+  // back someone else's change (shared/staleEdit.ts).
+  const [openedAt, setOpenedAt] = useState<{ id: number; at: Date } | null>(
+    null
+  );
+  const openedDetail = editingId !== null ? detailQuery.data : undefined;
+  useEffect(() => {
+    if (editingId === null) setOpenedAt(null);
+    else if (openedDetail)
+      setOpenedAt(current =>
+        current?.id === openedDetail.id
+          ? current
+          : { id: openedDetail.id, at: openedDetail.updatedAt }
+      );
+  }, [editingId, openedDetail]);
+
   const createAssembly = trpc.assemblies.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
   const updateAssembly = trpc.assemblies.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
+      // The form now holds what was just saved, so it is "opened" as of it —
+      // and the cached detail becomes the saved row, so closing and
+      // reopening before the refetch lands does not reopen the OLD row,
+      // whose `updatedAt` the guard would refuse (slow connection, 2026-10-15).
+      if (result?.assembly) {
+        setOpenedAt({ id: result.assembly.id, at: result.assembly.updatedAt });
+        const saved = result.assembly;
+        utils.assemblies.get.setData({ id: saved.id }, old =>
+          old ? { ...old, ...saved } : old
+        );
+      }
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
-      else toast.success("Assembly saved");
+      else toast.success("Assembly saved.");
     },
     onSettled: () => {
       refresh();
@@ -1518,7 +1649,7 @@ export default function AssembliesLibraryPage() {
   });
 
   const revertAssembly = trpc.assemblies.revert.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Restored the starter recipe"),
     onSettled: () => {
       refresh();
@@ -1528,7 +1659,7 @@ export default function AssembliesLibraryPage() {
   });
 
   const duplicateAssembly = trpc.assemblies.duplicate.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: copy => {
       if (!copy) return;
       toast.success(`Created "${copy.name}" — an independent copy.`);
@@ -1538,20 +1669,20 @@ export default function AssembliesLibraryPage() {
   });
 
   const archiveAssembly = trpc.assemblies.archive.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () =>
-      toast.success("Archived — restore it any time from the Archived tab"),
+      toast.success("Archived — restore it any time from Recently deleted."),
     onSettled: refresh,
   });
 
   const restoreAssembly = trpc.assemblies.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Back in the working list."),
     onSettled: refresh,
   });
 
   const deleteAssemblyForever = trpc.assemblies.deleteForever.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Deleted permanently."),
     onSettled: refresh,
   });
@@ -1594,7 +1725,7 @@ export default function AssembliesLibraryPage() {
               trade: draft.trade,
               projectType: draft.projectType,
               baseLaborHours: hoursToSave(draft.baseLaborHours),
-              overheadLaborHours: Number(draft.overheadLaborHours),
+              overheadLaborHours: parseTypedNumber(draft.overheadLaborHours),
               laborRateId: draft.laborRateId,
               materials: draft.materials.map(m => ({
                 materialId: m.materialId,
@@ -1687,12 +1818,13 @@ export default function AssembliesLibraryPage() {
           updateAssembly.mutate(
             {
               id: detail.id,
+              ...(openedAt?.id === detail.id ? { openedAt: openedAt.at } : {}),
               name: draft.name,
               category: draft.category,
               trade: draft.trade,
               projectType: draft.projectType,
               baseLaborHours: hoursToSave(draft.baseLaborHours),
-              overheadLaborHours: Number(draft.overheadLaborHours),
+              overheadLaborHours: parseTypedNumber(draft.overheadLaborHours),
               laborRateId: draft.laborRateId,
               materials: draft.materials.map(m => ({
                 materialId: m.materialId,
@@ -1805,6 +1937,15 @@ export default function AssembliesLibraryPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading assemblies…
+            </div>
+          ) : assembliesFailed ? (
+            // Not "No assemblies yet" — a list that failed to load is not
+            // an empty one (drill, 2026-10-15; LoadFailed.tsx).
+            <div className="p-4">
+              <LoadFailed
+                what="your assemblies"
+                onRetry={() => void refetchAssemblies()}
+              />
             </div>
           ) : visible.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
@@ -1930,7 +2071,7 @@ export default function AssembliesLibraryPage() {
                                 name: assembly.name,
                               })
                             }
-                            title="Delete permanently — cannot be undone"
+                            title="Delete forever — cannot be undone"
                             aria-label={`Delete ${assembly.name} forever`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />

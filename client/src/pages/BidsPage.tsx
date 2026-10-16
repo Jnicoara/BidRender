@@ -72,7 +72,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { InlineNumberField } from "@/components/InlineNumberField";
-import { asPercent, fromPercent } from "@/lib/inlineEdit";
+import { asPercent, fromPercent, parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { DuplicateUnitPanel } from "@/components/DuplicateUnitPanel";
 import { UnitLinkBadge } from "@/components/UnitLinkBadge";
@@ -88,6 +88,7 @@ import { BidExtrasPanel } from "@/components/BidExtrasPanel";
 import { CloseoutPanel } from "@/components/CloseoutPanel";
 import { CollapsiblePanel } from "@/components/CollapsiblePanel";
 import { SampleBidNotice } from "@/components/SampleBidNotice";
+import { BidStepBar } from "@/components/BidStepBar";
 import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { MathChangeStrip } from "@/components/MathChangeStrip";
@@ -167,6 +168,10 @@ import {
 } from "@shared/homerunFootage";
 import { homerunSummaryLine } from "@/lib/homerunText";
 import { frozenWarningsNote } from "@/lib/frozenWarnings";
+import { errorText } from "@/lib/errorText";
+import { isReachFailure } from "@/lib/dataReach";
+import { LoadFailed } from "@/components/LoadFailed";
+import { ArchivedBidNotice } from "@/components/bid/ArchivedBidNotice";
 
 /**
  * "the Plans screen", as a link to it. The bid's warnings send people there
@@ -357,22 +362,22 @@ function FixTheseButton({
 }
 
 /**
- * One bid. This file used to export a list-or-detail switch; the list is gone.
- *
- * It was a header, a New bid button, an archive entry and `BidSearchPanel` —
- * and the Dashboard rendered all four already, so /bids was a second door into
- * a room you were standing in. /bids now redirects there (see RETIRED_PATHS in
- * @/lib/appRoutes) and this screen always has a bid.
+ * One bid. This file used to export a list-or-detail switch; the list moved
+ * out. Since 2026-10-14 the Bids list is its own screen (BidListPage, /bids),
+ * and this screen always has a bid.
  */
 export default function BidsPage({
   bidId,
   fixLineId,
   onBack,
+  backLabel = "Dashboard",
 }: {
   bidId: number;
   /** `/bids/:id?fix=<lineId>` — open on that line's fix (gap 10). */
   fixLineId?: number;
   onBack: () => void;
+  /** The screen Back returns to — where this bid was opened from. */
+  backLabel?: string;
 }) {
   const [assemblyQuery, setAssemblyQuery] = useState("");
   const [addQty, setAddQty] = useState("1");
@@ -552,12 +557,12 @@ export default function BidsPage({
       toast.success(
         `Markup rules re-applied — ${changed} line${changed === 1 ? "" : "s"} updated.`
       ),
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
   const addAssembly = trpc.bids.addAssembly.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
@@ -583,7 +588,7 @@ export default function BidsPage({
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: refresh,
   });
@@ -601,7 +606,7 @@ export default function BidsPage({
   const foldTwin = useFoldTwin(bidId, refresh);
 
   const updateBid = trpc.bids.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: refresh,
   });
 
@@ -681,7 +686,7 @@ export default function BidsPage({
    */
   const addHighlighted = useCallback(
     (assemblyId: number) => {
-      const qty = Number(addQty);
+      const qty = parseTypedNumber(addQty);
       if (!(qty > 0)) {
         toast.error("Enter a quantity greater than zero.");
         return;
@@ -745,7 +750,30 @@ export default function BidsPage({
    * into a bid since the list was folded into the Dashboard, so there is no
    * surrounding screen left to notice you are stuck on.
    */
-  if (detailQuery.isError) {
+  // Out of reach is not gone. With the bid already on screen, a failed
+  // REFRESH keeps the page (the app-wide bar says why); before 2026-10-15 a
+  // save that failed in an outage refetched, failed, and swapped the whole
+  // bid for an error. Only a bid that never loaded gets this screen.
+  const outOfReach = detailQuery.isError && isReachFailure(detailQuery.error);
+  if (outOfReach && !detailQuery.data) {
+    // Not "may have been deleted": the bid is fine and the DATA was out of
+    // reach. Said otherwise, a contractor with the database blipping was
+    // told their bid might be gone (drill, 2026-10-15; @/lib/dataReach).
+    return (
+      <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6">
+        <div className="w-full max-w-md">
+          <LoadFailed
+            what="this bid"
+            onRetry={() => void detailQuery.refetch()}
+          />
+        </div>
+        <Button size="sm" variant="ghost" className="gap-1.5" onClick={onBack}>
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to {backLabel}
+        </Button>
+      </div>
+    );
+  }
+  if (detailQuery.isError && !outOfReach) {
     return (
       <div className="flex flex-col h-full bg-background items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm text-muted-foreground">
@@ -757,7 +785,7 @@ export default function BidsPage({
           className="gap-1.5"
           onClick={onBack}
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to the dashboard
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to {backLabel}
         </Button>
       </div>
     );
@@ -984,7 +1012,7 @@ export default function BidsPage({
             className="h-8 gap-1.5 text-xs"
             onClick={onBack}
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" /> {backLabel}
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold truncate flex items-center gap-2">
@@ -1180,9 +1208,24 @@ export default function BidsPage({
             </SelectContent>
           </Select>
         </div>
+        {/* Where this bid is, and the one next step (shared/bidSteps.ts). */}
+        <BidStepBar
+          bidId={bid.id}
+          here="bid"
+          className="mt-3"
+          onGo={place => {
+            window.location.hash =
+              place === "plans"
+                ? `/bids/${bid.id}/plans`
+                : place === "proposal"
+                  ? `/bids/${bid.id}/proposal`
+                  : `/bids/${bid.id}`;
+          }}
+        />
       </div>
 
       <div className="shrink-0 md:shrink md:flex-1 md:overflow-y-auto px-4 md:px-6 py-5">
+        <ArchivedBidNotice bidId={bid.id} archivedAt={bid.archivedAt} />
         {bid.isSample && <SampleBidNotice bidId={bid.id} />}
         <ExampleRatesBanner className="mb-4" />
         {/* Above everything, full width: it changes what every quantity below
@@ -1200,8 +1243,19 @@ export default function BidsPage({
         {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
             track is as wide as its widest child's longest unbreakable line,
             which made the whole bid 445 px wide on a 390 px phone. */}
-        <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[1fr_22rem]">
-          <div className="space-y-4 min-w-0">
+        {/*
+          THREE BLOCKS, TWO COLUMNS (owner, 2026-10-14: "you scroll down and
+          it's mostly empty with a little text off to the right"). The rail
+          used to hold close-out, extras, tax and pricing settings under the
+          total, so once the line list ended the left half was empty for a
+          screen or more. Now on a laptop the rail is only the client and the
+          total — sticky, beside the lines — and the four panels sit under the
+          lines in the main column (row 2). On a phone the grid is one column
+          and the blocks keep their old order: lines, then client and total,
+          then the panels.
+        */}
+        <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[1fr_22rem] lg:grid-rows-[auto_1fr]">
+          <div className="space-y-4 min-w-0 lg:col-start-1 lg:row-start-1">
             {/* Add an assembly — deliberately minimal */}
             <div className="rounded-xl border border-border bg-card p-4 space-y-2">
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -1682,7 +1736,11 @@ export default function BidsPage({
                               <InlineNumberField
                                 value={Number(line.qty)}
                                 onSave={qty =>
-                                  updateLine.mutate({ bidId, id: line.id, qty })
+                                  updateLine.mutateAsync({
+                                    bidId,
+                                    id: line.id,
+                                    qty,
+                                  })
                                 }
                                 rules={{ min: 0, max: 999999 }}
                                 className="h-7 w-16 text-sm"
@@ -1879,7 +1937,7 @@ export default function BidsPage({
           </div>
 
           {/* Rollup */}
-          <div className="lg:sticky lg:top-0 h-fit space-y-4 min-w-0">
+          <div className="lg:sticky lg:top-0 h-fit lg:self-start space-y-4 min-w-0 lg:col-start-2 lg:row-start-1 lg:row-span-2">
             {/* Who the work is for. Above the total because it is part of what
                 the bid IS rather than part of what it costs, and because the
                 proposal reads it. Entirely optional — see ClientLinkField. */}
@@ -2398,7 +2456,7 @@ export default function BidsPage({
                     priced at $0. On a line priced by hand, pick who does the
                     hours beside them. On an assembly line, press &ldquo;Fix
                     this line&rdquo; and pick who does them. A role with no rate
-                    yet gets one in Labor Rates.{" "}
+                    yet gets one on the Labor rates screen.{" "}
                     <FixTheseButton
                       count={fixCount("rate")}
                       onClick={() => startFixWalk("rate")}
@@ -2821,7 +2879,10 @@ export default function BidsPage({
                 </>
               )}
             </div>
+          </div>
 
+          {/* Under the lines on a laptop, after the total on a phone. */}
+          <div className="space-y-4 min-w-0 lg:col-start-1 lg:row-start-2">
             {/* After the bid is built, not before: closing out is something
                 that happens when the job is finished, and it sits shut until
                 somebody opens it. */}
@@ -2953,7 +3014,7 @@ export default function BidsPage({
                       }
                       whenUnset={{ placeholder: "company default" }}
                       onSave={raw =>
-                        updateBid.mutate({
+                        updateBid.mutateAsync({
                           id: bid.id,
                           overheadValue:
                             bid.overheadMode === "flat"
@@ -3031,7 +3092,7 @@ export default function BidsPage({
                     }
                     whenUnset={{ placeholder: "company default" }}
                     onSave={raw =>
-                      updateBid.mutate({
+                      updateBid.mutateAsync({
                         id: bid.id,
                         profitValue: fromPercent(raw),
                       })
@@ -3099,7 +3160,7 @@ export default function BidsPage({
                     }
                     whenUnset={{ placeholder: "company default" }}
                     onSave={raw =>
-                      updateBid.mutate({
+                      updateBid.mutateAsync({
                         id: bid.id,
                         productivityPct: fromPercent(raw),
                       })
@@ -3147,7 +3208,7 @@ export default function BidsPage({
                   value={asPercent(Number(bid.whipAdjustPct))}
                   whenUnset="zero"
                   onSave={raw =>
-                    updateBid.mutate({
+                    updateBid.mutateAsync({
                       id: bid.id,
                       whipAdjustPct: fromPercent(raw),
                     })

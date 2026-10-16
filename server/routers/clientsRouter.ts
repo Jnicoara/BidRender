@@ -18,6 +18,7 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { CLIENT_KINDS } from "../../drizzle/schema";
 import * as db from "../db";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 import {
   PAGE_SIZE_MAX,
   clampPageSize,
@@ -157,6 +158,8 @@ export const clientsRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
+        /** When the editor took its draft (shared/staleEdit.ts). */
+        openedAt: z.date().optional(),
         name: nameSchema.optional(),
         kind: z.enum(CLIENT_KINDS).optional(),
         contactName: optionalText(255),
@@ -167,8 +170,13 @@ export const clientsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, ...rest } = input;
-      await requireClient(id, ctx.scope.dataUserId);
+      const { id, openedAt, ...rest } = input;
+      const current = await requireClient(id, ctx.scope.dataUserId);
+      // The editor saves every field, and a client's address is the job
+      // address tax is matched from — a save from an older screen would put
+      // the old one back (shared/staleEdit.ts).
+      if (savedSinceOpened(current.updatedAt, openedAt))
+        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
 
       const patch: Record<string, unknown> = {};
       if (rest.name !== undefined) patch.name = rest.name;

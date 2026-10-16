@@ -19,7 +19,9 @@ import { previewAssembly } from "../../shared/assemblyHours";
 import { hourlyCostFor } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import { DEFAULT_TRADE } from "../../shared/trades";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 import * as db from "../db";
+import { requireLibraryRefs } from "../libraryRefs";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -198,6 +200,11 @@ export const kitsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // A kit item must name this company's assembly or a shared one
+      // (server/libraryRefs.ts).
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        assemblies: input.items.map(i => i.assemblyId),
+      });
       const existing = await db.getLibraryKits(ctx.scope.dataUserId);
       const clash = existing.find(
         k => k.name.toLowerCase() === input.name.toLowerCase()
@@ -230,6 +237,8 @@ export const kitsRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
+        /** When the editor took its draft; a stale save is refused (shared/staleEdit.ts). */
+        openedAt: z.date().optional(),
         name: nameSchema.optional(),
         description: descriptionSchema.optional(),
         trade: tradeSchema.optional(),
@@ -240,6 +249,14 @@ export const kitsRouter = router({
       const target = await db.getKitById(input.id, ctx.scope.dataUserId);
       if (!target)
         throw new TRPCError({ code: "NOT_FOUND", message: "Kit not found." });
+      // The editor saves its whole item list, so a save from a screen opened
+      // before somebody else's would put their change back.
+      if (savedSinceOpened(target.updatedAt, input.openedAt))
+        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
+      // Before the fork, so a refusal leaves no fork behind.
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        assemblies: input.items?.map(i => i.assemblyId),
+      });
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline
@@ -251,8 +268,9 @@ export const kitsRouter = router({
       if (input.description !== undefined)
         patch.description = input.description;
       if (input.trade !== undefined) patch.trade = input.trade;
-      if (Object.keys(patch).length > 0)
-        await db.updateKit(editableId, ctx.scope.dataUserId, patch);
+      // Even when only the items changed: updateKit stamps `updatedAt`, which
+      // the next editor's guard reads.
+      await db.updateKit(editableId, ctx.scope.dataUserId, patch);
 
       // Omitting `items` leaves the contents alone; sending [] empties the kit.
       if (input.items !== undefined) {

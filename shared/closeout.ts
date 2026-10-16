@@ -225,12 +225,17 @@ export function suggestHours(
   currentHours: number,
   samples: readonly AssemblySample[]
 ): HourSuggestion | null {
+  // An actual of 0 is not a sample. Until 2026-10-15 the close-out form
+  // recorded every line LEFT BLANK as 0 hours, so those zeros are in saved
+  // data — and three of them suggested setting the assembly to 0 h, which
+  // "apply" would have written. Real work estimated above 0 that took no
+  // time at all is not something to learn from.
   const usable = samples.filter(
     s =>
       Number.isFinite(s.estimatedHours) &&
       s.estimatedHours > 0 &&
       Number.isFinite(s.actualHours) &&
-      s.actualHours >= 0
+      s.actualHours > 0
   );
   if (usable.length < MIN_SAMPLES_FOR_SUGGESTION) return null;
   if (!(currentHours > 0)) return null;

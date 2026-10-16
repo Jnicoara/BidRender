@@ -35,6 +35,7 @@ import {
 } from "@shared/accountingExport";
 import { money } from "@/lib/money";
 import { ClientLinkField } from "@/components/ClientLinkField";
+import { errorText } from "@/lib/errorText";
 
 export function AccountingExportDialog({
   bidId,
@@ -61,7 +62,7 @@ export function AccountingExportDialog({
   const utils = trpc.useUtils();
   const bidQuery = trpc.bids.get.useQuery({ id: bidId }, { enabled: open });
   const linkClient = trpc.bids.update.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.bids.get.invalidate({ id: bidId });
       void utils.accounting.quickbooks.invalidate({ bidId });

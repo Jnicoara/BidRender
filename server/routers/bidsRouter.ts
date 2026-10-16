@@ -145,6 +145,23 @@ const hoursPerUnitSchema = z.number().min(0).max(99999);
 const labelSchema = z.string().trim().min(1).max(128);
 
 const overheadModeSchema = z.enum(["percentage", "flat"]);
+/**
+ * Overhead, either way it is entered. Capped at what its column holds
+ * (decimal(12,4) on bids and pricing_defaults): uncapped, a 1e15 got through
+ * validation and crashed the save (weird-input sweep, 2026-10-14).
+ */
+const overheadValueSchema = z.number().min(0).max(99_999_999);
+
+/** Turn "the line would overflow" into the sentence it carries. */
+async function refuseOverfullLine<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof db.LineQuantityTooLarge)
+      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    throw error;
+  }
+}
 const profitMethodSchema = z.enum(["markup", "margin"]);
 
 /**
@@ -193,8 +210,14 @@ async function listPricingContext(userId: number) {
 }
 
 /**
- * One bid priced for "Find a bid" and the archive — through `bidRollup`, the
- * bid screen's own function, with the same charges and the same tax.
+ * Every bid of a list priced for "Find a bid", the archive and the Dashboard's
+ * drawing-following cards — through `bidRollup`, the bid screen's own
+ * function, with the same charges and the same tax.
+ *
+ * Their lines and charges are read in a few queries for the WHOLE list
+ * (`db.getRollupLinesForBids`), not a few per bid: priced one bid at a time
+ * the Dashboard grew about 8 ms a bid (todo.md, measured by
+ * `server/speedBigData.test.ts`).
  *
  * ── Which number, and why it is named ────────────────────────────────────────
  * `totalDue` is what those lists show, labelled "Total due", matching the bid
@@ -204,15 +227,35 @@ async function listPricingContext(userId: number) {
  * reads like both. `finalPrice` is still returned for callers that want the
  * price before plain charges and tax. server/bidPriceSurfaces.test.ts.
  */
-async function priceForList(
-  bid: Bid,
+async function priceListBids<B extends Bid>(
+  bids: readonly B[],
   userId: number,
   context: Awaited<ReturnType<typeof listPricingContext>>
-) {
-  const [lines, expenses] = await Promise.all([
-    db.getRollupLines(bid.id, userId),
-    db.getBidExpenseLines(bid.id),
+): Promise<Map<number, ReturnType<typeof pricedFromLines>>> {
+  const ids = bids.map(bid => bid.id);
+  const [linesByBid, expensesByBid] = await Promise.all([
+    db.getRollupLinesForBids(ids, userId),
+    db.getBidExpenseLinesForBids(ids),
   ]);
+  return new Map(
+    bids.map(bid => [
+      bid.id,
+      pricedFromLines(
+        bid,
+        linesByBid.get(bid.id) ?? [],
+        expensesByBid.get(bid.id) ?? [],
+        context
+      ),
+    ])
+  );
+}
+
+function pricedFromLines(
+  bid: Bid,
+  lines: db.RollupLine[],
+  expenses: Awaited<ReturnType<typeof db.getBidExpenseLines>>,
+  context: Awaited<ReturnType<typeof listPricingContext>>
+) {
   const { totals, incomplete, notPriced } = bidRollup(
     bid,
     lines,
@@ -310,13 +353,9 @@ export const bidsRouter = router({
 
       // Only the page's rows are priced — this is why the page is bounded.
       const context = await listPricingContext(ctx.scope.dataUserId);
+      const prices = await priceListBids(rows, ctx.scope.dataUserId, context);
       const priced = withListDrops(
-        await Promise.all(
-          rows.map(async bid => ({
-            ...bid,
-            ...(await priceForList(bid, ctx.scope.dataUserId, context)),
-          }))
-        ),
+        rows.map(bid => ({ ...bid, ...prices.get(bid.id)! })),
         await db.dropsNotPricedForBids(
           rows.map(r => r.id),
           ctx.scope.dataUserId
@@ -365,10 +404,18 @@ export const bidsRouter = router({
       db.getDashboardBids(ctx.scope.dataUserId, company.productivityPct),
       db.getLiveBidExpenseLines(ctx.scope.dataUserId),
     ]);
-    const drops = await db.dropsNotPricedForBids(
-      rows.map(r => r.id),
-      ctx.scope.dataUserId
-    );
+    // The bids priced the bid screen's way (below), all in one go.
+    const [drops, followPrices] = await Promise.all([
+      db.dropsNotPricedForBids(
+        rows.map(r => r.id),
+        ctx.scope.dataUserId
+      ),
+      priceListBids(
+        rows.filter(r => r.planLines > 0 && r.quantitiesLockedAt === null),
+        ctx.scope.dataUserId,
+        { company, tax }
+      ),
+    ]);
 
     const cards = await Promise.all(
       rows.map(async row => {
@@ -390,22 +437,17 @@ export const bidsRouter = router({
         way (owner, 2026-09-27, todo.md option 2). Its plan lines store the
         quantity from when they were SENT; the bid screen re-derives it from
         the marks and runs on every read, so the SQL sums below would be
-        yesterday's number in today's voice. `priceForList` resolves the lines
-        through `getRollupLines` and prices them with `bidRollup` — the same
-        call "Find a bid" makes — so the card cannot disagree with the bid.
+        yesterday's number in today's voice. `priceListBids` resolves the lines
+        the way `getRollupLines` does (for the whole list at once) and prices
+        them with `bidRollup` — the same call "Find a bid" makes — so the card
+        cannot disagree with the bid (server/goldenBids.test.ts holds it to).
 
         Every other bid (no plan lines, or LOCKED, where the stored qty IS the
         number) keeps the one-query SQL path, which is what keeps a 3,000-bid
         dashboard fast. server/dashboardFollowsDrawing.test.ts.
       */
         if (planLines > 0 && bid.quantitiesLockedAt === null) {
-          return {
-            ...bid,
-            ...(await priceForList(bid, ctx.scope.dataUserId, {
-              company,
-              tax,
-            })),
-          };
+          return { ...bid, ...followPrices.get(bid.id)! };
         }
         // The card's direct cost is the bid screen's: lines plus marked-up
         // charges (rollUpBid). Leaving the charges out read a bid carrying a
@@ -436,7 +478,7 @@ export const bidsRouter = router({
           lineCount,
           directCost: fullDirect,
           finalPrice: price,
-          /** What the card shows, as "Total due". See `priceForList`. */
+          /** What the card shows, as "Total due". See `priceListBids`. */
           totalDue,
           /**
            * The card's price leaves something out: a line the SQL skipped as
@@ -506,7 +548,7 @@ export const bidsRouter = router({
         // default; omitting the key leaves it as it is.
         overheadEnabled: z.boolean().nullable().optional(),
         overheadMode: overheadModeSchema.nullable().optional(),
-        overheadValue: z.number().min(0).nullable().optional(),
+        overheadValue: overheadValueSchema.nullable().optional(),
         profitMethod: profitMethodSchema.nullable().optional(),
         profitValue: z.number().min(0).max(0.99).nullable().optional(),
         productivityPct: productivitySchema.nullable().optional(),
@@ -808,12 +850,13 @@ export const bidsRouter = router({
       listPricingContext(ctx.scope.dataUserId),
     ]);
 
+    const prices = await priceListBids(rows, ctx.scope.dataUserId, context);
     return Promise.all(
       rows.map(async bid => {
         // Priced exactly as "Find a bid" prices it, so a bid's total due reads
         // the same whether it is archived or not — someone deciding what to
         // rescue is looking at the number they saw before archiving it.
-        const priced = await priceForList(bid, ctx.scope.dataUserId, context);
+        const priced = prices.get(bid.id)!;
         // Non-null by construction: getArchivedBids filters on archivedAt.
         const archivedAt = bid.archivedAt as Date;
         return {
@@ -1096,7 +1139,12 @@ export const bidsRouter = router({
         salesTax,
         taxRate,
         /** Plain-language reason there is no tax, or null when there is. */
-        taxNote: explainTaxStatus(salesTax.status, bid.siteAddress),
+        taxNote: explainTaxStatus(
+          salesTax.status,
+          bid.siteAddress,
+          bid.taxJurisdictionId !== null &&
+            taxRate.source !== "bid-jurisdiction"
+        ),
         /**
          * Name and site address after the bid's own text and the linked record
          * have been reconciled — the same resolution the proposal prints, so
@@ -1169,6 +1217,18 @@ export const bidsRouter = router({
    * every line sent before the last mark as a "change", which is a warning about
    * nothing on a screen that is already correct.
    */
+  /**
+   * The step bar's counts (shared/bidSteps.ts): plan pages, scaled pages,
+   * marks, runs, lines and status. Read-only; moves no number.
+   */
+  progress: procedure
+    .input(z.object({ bidId: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
+      const counts = await db.getBidProgressCounts(input.bidId);
+      return { ...counts, status: bid.status };
+    }),
+
   quantityLock: procedure
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
@@ -1392,13 +1452,15 @@ export const bidsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
-      const { id, merged } = await db.addAssemblyToBid(
-        input.bidId,
-        ctx.scope.dataUserId,
-        input.assemblyId,
-        input.qty,
-        input.unitLabel,
-        { merge: input.merge }
+      const { id, merged } = await refuseOverfullLine(() =>
+        db.addAssemblyToBid(
+          input.bidId,
+          ctx.scope.dataUserId,
+          input.assemblyId,
+          input.qty,
+          input.unitLabel,
+          { merge: input.merge }
+        )
       );
       const line = await db.getBidLineItem(id, input.bidId);
       return { line, merged };
@@ -1868,6 +1930,7 @@ export const bidsRouter = router({
         laborRateId: input.laborRateId,
         laborRate,
         laborRateWasExample,
+        actorUserId: ctx.scope.actorUserId,
       });
     }),
 
@@ -2160,7 +2223,7 @@ export const bidsRouter = router({
       z.object({
         overheadEnabled: z.boolean().optional(),
         overheadMode: overheadModeSchema.optional(),
-        overheadValue: z.number().min(0).optional(),
+        overheadValue: overheadValueSchema.optional(),
         profitMethod: profitMethodSchema.optional(),
         profitValue: z.number().min(0).max(0.99).optional(),
         productivityPct: productivitySchema.optional(),

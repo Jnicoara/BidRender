@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { partitionScopeNotes } from "@shared/bidExtras";
+import { errorText } from "@/lib/errorText";
 
 type ScopeKind = "include" | "exclude";
 
@@ -61,7 +62,7 @@ export function ScopeNotesPanel({ bidId }: { bidId: number }) {
     void utils.proposals.document.invalidate({ bidId });
   };
 
-  const onError = (e: { message: string }) => toast.error(e.message);
+  const onError = (e: { message: string }) => toast.error(errorText(e));
 
   const addNote = trpc.bidExtras.scope.addToBid.useMutation({
     onError,

@@ -41,8 +41,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { parseTypedPercent } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { combinedRatePct } from "@shared/salesTax";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 type ComponentDraft = { label: string; ratePct: string };
 
@@ -80,9 +83,11 @@ function AreaForm({
   submitLabel: string;
 }) {
   const patch = (part: Partial<AreaDraft>) => setDraft({ ...draft, ...part });
+  // The app's percent reader: Number() made a BLANK part 0% (and saved it)
+  // and "0x10" 16%; blank is now not a rate, and "6.25%" is 6.25.
   const parsed = draft.components.map(c => ({
     label: c.label.trim(),
-    ratePct: Number(c.ratePct),
+    ratePct: parseTypedPercent(c.ratePct),
   }));
   const total = combinedRatePct(parsed.filter(c => Number.isFinite(c.ratePct)));
   const hasKey = Boolean(
@@ -203,9 +208,18 @@ function AreaForm({
           </Button>
           {/* Stacked rates are the norm, so the combined figure is shown as it
               is built — it is the number a contractor recognises. */}
-          <span className="ml-auto text-xs font-mono text-[#F5C518]">
-            {total.toFixed(4).replace(/\.?0+$/, "")}% combined
-          </span>
+          {/* Not a total while a part has no readable rate: "0% combined"
+              beside a blank box read as a rate, and that blank used to save
+              as 0 %. */}
+          {parsed.every(c => Number.isFinite(c.ratePct)) ? (
+            <span className="ml-auto text-xs font-mono text-[#F5C518]">
+              {total.toFixed(4).replace(/\.?0+$/, "")}% combined
+            </span>
+          ) : (
+            <span className="ml-auto text-xs text-amber-500">
+              Type a rate for every part
+            </span>
+          )}
         </div>
         {total > 25 && (
           <p className="text-xs text-destructive">
@@ -269,7 +283,7 @@ export function SalesTaxSection() {
   };
 
   const setRules = trpc.salesTax.setRules.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const createArea = trpc.salesTax.create.useMutation({
@@ -278,25 +292,25 @@ export function SalesTaxSection() {
       setAdding(false);
       setDraft(emptyArea);
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const updateArea = trpc.salesTax.update.useMutation({
     onSuccess: () => setEditingId(null),
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const markVerified = trpc.salesTax.markVerified.useMutation({
     onSuccess: () => toast.success("Marked as checked today."),
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const archiveArea = trpc.salesTax.archive.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
   const restoreArea = trpc.salesTax.restore.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: invalidate,
   });
 
@@ -308,13 +322,29 @@ export function SalesTaxSection() {
     sourceNote: orNull(d.sourceNote),
     components: d.components.map(c => ({
       label: c.label.trim(),
-      ratePct: Number(c.ratePct),
+      ratePct: parseTypedPercent(c.ratePct),
     })),
   });
 
   const current = rules.data;
   const rows = areas.data ?? [];
   const archivedRows = archived.data ?? [];
+
+  // Not drawn from defaults: a failed load showed "Charge sales tax" OFF and
+  // "No tax areas yet" to a company that charges tax (drill, 2026-10-15).
+  if ((rules.isError && !current) || (areas.isError && !areas.data))
+    return (
+      <section className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">Sales tax</h3>
+        <LoadFailed
+          what="your sales tax settings"
+          onRetry={() => {
+            void rules.refetch();
+            void areas.refetch();
+          }}
+        />
+      </section>
+    );
 
   return (
     <section className="space-y-4">
@@ -362,6 +392,8 @@ export function SalesTaxSection() {
           </div>
           <Switch
             checked={current?.enabled ?? false}
+            // Until the setting is known, "off" would be a guess.
+            disabled={!current}
             onCheckedChange={enabled => setRules.mutate({ enabled })}
             aria-label="Charge sales tax on bids"
           />
@@ -590,7 +622,7 @@ export function SalesTaxSection() {
                         className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => archiveArea.mutate({ id: row.id })}
                         aria-label={`Archive ${row.name}`}
-                        title="Archive — bids pinned to it keep working"
+                        title="Archive — bids already using it keep their rate"
                       >
                         <Archive className="w-3.5 h-3.5" />
                       </Button>

@@ -26,12 +26,14 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useCompany } from "@/hooks/useCompany";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Check, Lock } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import {
   DEFAULT_ACCENT,
@@ -44,6 +46,8 @@ import {
   type ProposalLayout,
   type ProposalSectionId,
 } from "@shared/proposal";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 /**
  * A handful of accents that look right in print.
@@ -137,10 +141,14 @@ export function ProposalDesignControls({
   compact?: boolean;
 }) {
   const utils = trpc.useUtils();
-  const { data: settings } = trpc.proposals.settings.useQuery();
+  const settingsQuery = trpc.proposals.settings.useQuery();
+  const settings = settingsQuery.data;
+  // Company-wide, so settings.edit (owner, admin) — the server refuses
+  // anyone else (proposalsRouter, security sweep 2026-10-14).
+  const canEdit = useCompany().can("settings.edit");
 
   const save = trpc.proposals.setSettings.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.proposals.settings.invalidate();
       // The document is built server-side, so a layout change is a refetch.
@@ -160,7 +168,14 @@ export function ProposalDesignControls({
     if (!editingTerms.current) setTermsDraft(settings.termsText);
   }, [settings]);
 
-  if (!settings) return null;
+  // Not blank: a section that failed to load says so (drill, 2026-10-15).
+  if (!settings)
+    return settingsQuery.isError ? (
+      <LoadFailed
+        what="your proposal settings"
+        onRetry={() => void settingsQuery.refetch()}
+      />
+    ) : null;
 
   const hidden = settings.hiddenSections;
 
@@ -191,206 +206,220 @@ export function ProposalDesignControls({
         )}
       </div>
 
-      {/* ── Layout ─────────────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <Label className="text-sm">Layout</Label>
-        <div className="grid grid-cols-3 gap-3">
-          {PROPOSAL_LAYOUTS.map(layout => {
-            const active = settings.layout === layout;
-            return (
-              <button
-                key={layout}
-                onClick={() => save.mutate({ layout })}
-                aria-pressed={active}
-                className={cn(
-                  "relative rounded-lg border-2 p-2 text-left transition-all duration-150",
-                  active
-                    ? "border-[#F5C518] bg-[var(--bp-yellow-dim)]"
-                    : "border-border hover:border-foreground/30"
-                )}
-              >
-                <LayoutThumb layout={layout} accent={settings.accentColor} />
-                <div className="mt-2 flex items-center gap-1">
-                  <span className="text-xs font-semibold">
-                    {PROPOSAL_LAYOUT_INFO[layout].label}
-                  </span>
-                  {active && <Check className="w-3 h-3 text-[#F5C518]" />}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          {PROPOSAL_LAYOUT_INFO[settings.layout].description}
+      {!canEdit && (
+        <p className="text-xs text-muted-foreground">
+          Only the company owner or an admin can change how proposals look.
         </p>
-      </div>
+      )}
 
-      {/* ── Accent colour ──────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div>
-          <Label className="text-sm">Accent color</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Rules, headings and the total panel. Everything else stays black on
-            white so it photocopies and faxes cleanly.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {ACCENT_PRESETS.map(preset => (
-            <button
-              key={preset.value}
-              title={preset.label}
-              aria-label={preset.label}
-              aria-pressed={settings.accentColor === preset.value}
-              onClick={() => save.mutate({ accentColor: preset.value })}
-              className={cn(
-                "w-7 h-7 rounded-full border-2 transition-transform hover:scale-105",
-                settings.accentColor === preset.value
-                  ? "border-foreground"
-                  : "border-transparent"
-              )}
-              style={{ background: preset.value }}
-            />
-          ))}
-          <Input
-            value={accentDraft}
-            onChange={e => setAccentDraft(e.target.value)}
-            onFocus={selectOnFocus}
-            onBlur={() => commitAccent(accentDraft)}
-            onKeyDown={e => {
-              if (e.key === "Enter") e.currentTarget.blur();
-              if (e.key === "Escape") {
-                setAccentDraft(settings.accentColor);
-                e.currentTarget.blur();
-              }
-            }}
-            aria-label="Accent color hex value"
-            className="h-8 w-28 text-sm font-mono"
-          />
-        </div>
-      </div>
-
-      {/* ── Sections ───────────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div>
-          <Label className="text-sm">Sections</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            What appears on the document. A section with nothing to show is left
-            out on its own — no empty headings.
-          </p>
-        </div>
-
-        <div className="space-y-2.5">
-          {PROPOSAL_SECTIONS.map(section => {
-            const on = isSectionVisible(hidden, section.id);
-            return (
-              <div
-                key={section.id}
-                className="flex items-start justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm">{section.label}</span>
-                    {section.required && (
-                      <span
-                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"
-                        title="Always on — a proposal with no sender or no price is not a proposal."
-                      >
-                        <Lock className="w-3 h-3" aria-hidden />
-                        Always on
-                      </span>
-                    )}
+      {/* fieldset: one switch for every control below. */}
+      <fieldset
+        disabled={!canEdit}
+        className="space-y-4 min-w-0 disabled:opacity-60"
+      >
+        {/* ── Layout ─────────────────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <Label className="text-sm">Layout</Label>
+          <div className="grid grid-cols-3 gap-3">
+            {PROPOSAL_LAYOUTS.map(layout => {
+              const active = settings.layout === layout;
+              return (
+                <button
+                  key={layout}
+                  onClick={() => save.mutate({ layout })}
+                  aria-pressed={active}
+                  className={cn(
+                    "relative rounded-lg border-2 p-2 text-left transition-all duration-150",
+                    active
+                      ? "border-[#F5C518] bg-[var(--bp-yellow-dim)]"
+                      : "border-border hover:border-foreground/30"
+                  )}
+                >
+                  <LayoutThumb layout={layout} accent={settings.accentColor} />
+                  <div className="mt-2 flex items-center gap-1">
+                    <span className="text-xs font-semibold">
+                      {PROPOSAL_LAYOUT_INFO[layout].label}
+                    </span>
+                    {active && <Check className="w-3 h-3 text-[#F5C518]" />}
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {section.description}
-                  </p>
-                </div>
-                <Switch
-                  checked={on}
-                  disabled={!!section.required}
-                  onCheckedChange={next =>
-                    save.mutate({
-                      hiddenSections: setSectionVisible(
-                        hidden,
-                        section.id as ProposalSectionId,
-                        next
-                      ) as ProposalSectionId[],
-                    })
-                  }
-                  aria-label={`Show ${section.label}`}
-                  className="shrink-0 mt-0.5"
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Terms & validity ───────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-        <div>
-          <Label className="text-sm">Standard terms</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Your payment terms and exclusions, reused on every proposal. Leave
-            it empty and the Terms section is left off.
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {PROPOSAL_LAYOUT_INFO[settings.layout].description}
           </p>
         </div>
-        <textarea
-          value={termsDraft}
-          rows={4}
-          onChange={e => setTermsDraft(e.target.value)}
-          onFocus={() => {
-            editingTerms.current = true;
-          }}
-          onBlur={() => {
-            editingTerms.current = false;
-            if (termsDraft !== settings.termsText)
-              save.mutate({ termsText: termsDraft });
-          }}
-          onKeyDown={e => {
-            if (e.key === "Escape") {
-              setTermsDraft(settings.termsText);
-              editingTerms.current = false;
-              e.currentTarget.blur();
-            }
-          }}
-          placeholder={
-            "50% deposit on acceptance, balance on completion.\nPrice excludes permits, patching and painting."
-          }
-          aria-label="Standard terms"
-          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-none"
-        />
 
-        <div className="flex items-center gap-2">
-          <Label className="text-sm shrink-0">Price good for</Label>
-          <Input
-            value={validDraft}
-            onChange={e => setValidDraft(e.target.value)}
-            onFocus={selectOnFocus}
+        {/* ── Accent colour ──────────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div>
+            <Label className="text-sm">Accent color</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Rules, headings and the total panel. Everything else stays black
+              on white so it photocopies and faxes cleanly.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {ACCENT_PRESETS.map(preset => (
+              <button
+                key={preset.value}
+                title={preset.label}
+                aria-label={preset.label}
+                aria-pressed={settings.accentColor === preset.value}
+                onClick={() => save.mutate({ accentColor: preset.value })}
+                className={cn(
+                  "w-7 h-7 rounded-full border-2 transition-transform hover:scale-105",
+                  settings.accentColor === preset.value
+                    ? "border-foreground"
+                    : "border-transparent"
+                )}
+                style={{ background: preset.value }}
+              />
+            ))}
+            <Input
+              value={accentDraft}
+              onChange={e => setAccentDraft(e.target.value)}
+              onFocus={selectOnFocus}
+              onBlur={() => commitAccent(accentDraft)}
+              onKeyDown={e => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setAccentDraft(settings.accentColor);
+                  e.currentTarget.blur();
+                }
+              }}
+              aria-label="Accent color hex value"
+              className="h-8 w-28 text-sm font-mono"
+            />
+          </div>
+        </div>
+
+        {/* ── Sections ───────────────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div>
+            <Label className="text-sm">Sections</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              What appears on the document. A section with nothing to show is
+              left out on its own — no empty headings.
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            {PROPOSAL_SECTIONS.map(section => {
+              const on = isSectionVisible(hidden, section.id);
+              return (
+                <div
+                  key={section.id}
+                  className="flex items-start justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">{section.label}</span>
+                      {section.required && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] text-muted-foreground"
+                          title="Always on — a proposal with no sender or no price is not a proposal."
+                        >
+                          <Lock className="w-3 h-3" aria-hidden />
+                          Always on
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {section.description}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={on}
+                    disabled={!!section.required}
+                    onCheckedChange={next =>
+                      save.mutate({
+                        hiddenSections: setSectionVisible(
+                          hidden,
+                          section.id as ProposalSectionId,
+                          next
+                        ) as ProposalSectionId[],
+                      })
+                    }
+                    aria-label={`Show ${section.label}`}
+                    className="shrink-0 mt-0.5"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Terms & validity ───────────────────────────────────────────────── */}
+        <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div>
+            <Label className="text-sm">Standard terms</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Your payment terms and exclusions, reused on every proposal. Leave
+              it empty and the Terms section is left off.
+            </p>
+          </div>
+          <textarea
+            value={termsDraft}
+            rows={4}
+            onChange={e => setTermsDraft(e.target.value)}
+            onFocus={() => {
+              editingTerms.current = true;
+            }}
             onBlur={() => {
-              const days = Number(validDraft);
-              if (!Number.isFinite(days) || days < 0 || days > 365) {
-                setValidDraft(String(settings.validDays));
-                return;
-              }
-              if (Math.trunc(days) !== settings.validDays)
-                save.mutate({ validDays: Math.trunc(days) });
+              editingTerms.current = false;
+              if (termsDraft !== settings.termsText)
+                save.mutate({ termsText: termsDraft });
             }}
             onKeyDown={e => {
-              if (e.key === "Enter") e.currentTarget.blur();
               if (e.key === "Escape") {
-                setValidDraft(String(settings.validDays));
+                setTermsDraft(settings.termsText);
+                editingTerms.current = false;
                 e.currentTarget.blur();
               }
             }}
-            inputMode="numeric"
-            aria-label="Days the price stands"
-            className="h-8 w-20 text-sm text-right"
+            placeholder={
+              "50% deposit on acceptance, balance on completion.\nPrice excludes permits, patching and painting."
+            }
+            aria-label="Standard terms"
+            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-none"
           />
-          <span className="text-xs text-muted-foreground">
-            days {settings.validDays === 0 && "— not stated on the document"}
-          </span>
+
+          <div className="flex items-center gap-2">
+            <Label className="text-sm shrink-0">Price good for</Label>
+            <Input
+              value={validDraft}
+              onChange={e => setValidDraft(e.target.value)}
+              onFocus={selectOnFocus}
+              onBlur={() => {
+                // A blank box was 0 days ("valid for 0 days" on the quote).
+                const days =
+                  validDraft.trim() === "" ? NaN : parseTypedNumber(validDraft);
+                if (!Number.isFinite(days) || days < 0 || days > 365) {
+                  setValidDraft(String(settings.validDays));
+                  return;
+                }
+                if (Math.trunc(days) !== settings.validDays)
+                  save.mutate({ validDays: Math.trunc(days) });
+              }}
+              onKeyDown={e => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setValidDraft(String(settings.validDays));
+                  e.currentTarget.blur();
+                }
+              }}
+              inputMode="numeric"
+              aria-label="Days the price stands"
+              className="h-8 w-20 text-sm text-right"
+            />
+            <span className="text-xs text-muted-foreground">
+              days {settings.validDays === 0 && "— not stated on the document"}
+            </span>
+          </div>
         </div>
-      </div>
+      </fieldset>
     </section>
   );
 }

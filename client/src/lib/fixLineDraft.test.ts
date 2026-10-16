@@ -47,6 +47,18 @@ describe("what the fix panel sends", () => {
     expect(r.ok && r.request.hours).toBe(0);
   });
 
+  it("reads a typed number as the person meant it — never a different one", () => {
+    const hours = (text: string) => {
+      const r = fixLineRequest(draft({ hours: text }), at({ hours: true }));
+      return r.ok ? r.request.hours : "refused";
+    };
+    expect(hours("$1.25")).toBe(1.25);
+    expect(hours("1,500")).toBe(1500); // grouped thousands
+    // "1,5" used to become 15 (every comma stripped) and "0x10" 16.
+    expect(hours("1,5")).toBe("refused");
+    expect(hours("0x10")).toBe("refused");
+  });
+
   it("refuses a $0 price rather than sending an unpriced number", () => {
     expect(
       fixLineRequest(draft({ partPrices: { 5: "0" } }), at({ parts: true })).ok

@@ -325,3 +325,29 @@ export function inviteRejection(
     return "That invitation has already been used.";
   return "That invitation is no longer valid. Ask for a new one.";
 }
+
+/**
+ * What each capability means, in the words the Crew screen shows ("What
+ * your role covers"). A Record over every capability, so a new one does not
+ * compile until somebody has said what it means in plain English — the
+ * screen showed the raw codes ("bids.view") until 2026-10-14.
+ */
+export const CAPABILITY_LABEL: Record<Capability, string> = {
+  "bids.view": "See bids and proposals",
+  "bids.edit": "Build, price and send bids",
+  "bids.delete": "Delete archived bids forever",
+  "library.view": "See the library",
+  "library.edit": "Change the library",
+  "pricing.view": "See costs and prices",
+  "pricing.edit": "Change company pricing",
+  "analytics.view": "See company performance",
+  "clients.view": "See clients",
+  "clients.edit": "Change clients",
+  "settings.edit": "Change branding and proposal settings",
+  "members.manage": "Invite and manage the crew",
+};
+
+/** A role as the screen says it: "Estimator", never "estimator". */
+export function roleLabel(role: string): string {
+  return role ? role[0].toUpperCase() + role.slice(1) : role;
+}

@@ -18,12 +18,13 @@
  * is bounded at a couple of dozen by the nature of an org chart, so windowing
  * would add machinery with nothing to window.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { cn } from "@/lib/utils";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
 import { ScopeFilter } from "@/components/library/LibraryControls";
 import {
   filterByScope,
@@ -65,6 +66,10 @@ import {
   readParts,
   type LoadedParts,
 } from "@shared/loadedRate";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -89,6 +94,8 @@ type LaborRate = {
   workersCompPct?: string | null;
   insurancePct?: string | null;
   benefitsPct?: string | null;
+  /** When the row was last saved; the editor sends it back (staleEdit.ts). */
+  updatedAt: Date;
 };
 
 /** Mirrors the bounds the router enforces. */
@@ -160,9 +167,11 @@ const breakdownDraftFrom = (rate: LaborRate): BreakdownDraft | null => {
 
 /** The typed parts as numbers (burdens as fractions), or null if any is bad. */
 function breakdownParts(b: BreakdownDraft): LoadedParts | null {
-  const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
-  const wage = num(b.baseWage);
-  const pcts = BURDEN_FIELDS.map(([key]) => num(b[key]) / 100);
+  // The app's readers: "$32.50" and "7.65%" as meant, "0x10" not as 16.
+  const wage = b.baseWage.trim() === "" ? NaN : parseTypedNumber(b.baseWage);
+  const pcts = BURDEN_FIELDS.map(([key]) =>
+    b[key].trim() === "" ? NaN : parseTypedPercent(b[key]) / 100
+  );
   if (!Number.isFinite(wage) || wage < 0 || wage > MAX_HOURLY) return null;
   if (pcts.some(p => !Number.isFinite(p) || p < 0 || p > 2)) return null;
   return {
@@ -197,7 +206,7 @@ function validateDraft(draft: Draft): string | null {
       : "Enter a wage, and each percentage from 0 to 200.";
   }
   if (draft.rateType === "hourly") {
-    const rate = Number(draft.hourlyCost);
+    const rate = parseTypedNumber(draft.hourlyCost);
     if (draft.hourlyCost.trim() === "" || Number.isNaN(rate))
       return "Enter an hourly rate.";
     if (rate < 0) return "An hourly rate cannot be negative.";
@@ -205,13 +214,13 @@ function validateDraft(draft: Draft): string | null {
     return null;
   }
 
-  const salary = Number(draft.annualSalary);
+  const salary = parseTypedNumber(draft.annualSalary);
   if (draft.annualSalary.trim() === "" || Number.isNaN(salary))
     return "Enter an annual salary.";
   if (salary < 0) return "A salary cannot be negative.";
   if (salary > MAX_SALARY) return "That salary is too large.";
 
-  const working = Number(draft.annualHours);
+  const working = parseTypedNumber(draft.annualHours);
   if (draft.annualHours.trim() === "" || Number.isNaN(working))
     return "Enter the working hours per year.";
   // Zero hours is a division by zero, not a free employee.
@@ -229,12 +238,12 @@ function draftHourlyRate(draft: Draft): number | null {
       return parts ? loadedRate(parts) : null;
     }
     if (draft.rateType === "hourly") {
-      const rate = Number(draft.hourlyCost);
+      const rate = parseTypedNumber(draft.hourlyCost);
       return Number.isFinite(rate) ? rate : null;
     }
     return effectiveHourlyRate(
-      Number(draft.annualSalary),
-      Number(draft.annualHours)
+      parseTypedNumber(draft.annualSalary),
+      parseTypedNumber(draft.annualHours)
     );
   } catch {
     return null;
@@ -461,7 +470,8 @@ function LaborRateRow({
   onRemove,
 }: {
   rate: LaborRate;
-  onSave: (id: number, draft: Draft) => void;
+  /** Resolves false when the save was refused (its toast says why). */
+  onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onRevert: (rate: LaborRate) => void;
   onRemove: (rate: LaborRate) => void;
 }) {
@@ -477,8 +487,16 @@ function LaborRateRow({
     field: NeedsField;
     why: string;
   } | null>(null);
+  /** The row as saved when the editor opened — sent with Save (staleEdit.ts). */
+  const [openedAt, setOpenedAt] = useState<Date>(rate.updatedAt);
+  // Leaving the screen asks before an open edit is dropped
+  // (@/lib/unsavedGuard); Cancel does not — it says discard.
+  const [openedWith, setOpenedWith] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(editing && !sameToSave(draft, openedWith));
   const openEditor = (opened: { field: NeedsField; why: string } | null) => {
+    setOpenedAt(rate.updatedAt);
     setDraft(draftFrom(rate));
+    setOpenedWith(draftFrom(rate));
     setOpenedFor(opened);
     setEditing(true);
   };
@@ -499,9 +517,16 @@ function LaborRateRow({
       toast.error(problem);
       return;
     }
-    // Fire and forget — the row updates from cache immediately.
-    onSave(rate.id, draft);
+    // The row updates from cache immediately — and the editor reopens
+    // holding what was typed if the save is refused, instead of the edit
+    // being lost (todo.md, 2026-10-15).
+    const typed = draft;
     setEditing(false);
+    void onSave(rate.id, typed, openedAt).then(saved => {
+      if (saved) return;
+      setDraft(typed);
+      setEditing(true);
+    });
   };
 
   if (editing) {
@@ -696,9 +721,15 @@ export default function LaborRatesPage() {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(adding && !sameToSave(newDraft, emptyDraft));
 
   const utils = trpc.useUtils();
-  const { data: rates = [], isLoading } = trpc.laborRates.list.useQuery();
+  const {
+    data: rates = [],
+    isLoading,
+    isLoadingError: ratesFailed,
+    refetch: refetchRates,
+  } = trpc.laborRates.list.useQuery();
   const [scope, setScope] = useState<LibraryScope>("all");
   /** Scope is a view filter only — labor rates have no archive of their own. */
   // (scope is applied in `visible` below, alongside the search filter)
@@ -729,7 +760,7 @@ export default function LaborRatesPage() {
       if (context?.previous !== undefined) {
         utils.laborRates.list.setData(undefined, context.previous as never);
       }
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     [utils]
   );
@@ -796,6 +827,15 @@ export default function LaborRatesPage() {
       ),
     onError: (error, _vars, context) => rollback(context, error),
     onSuccess: result => {
+      // The saved row, new `updatedAt` and all, straight into the list: a
+      // reopen before the refetch lands would otherwise carry the old one,
+      // and the stale-save guard would refuse this person's own next save
+      // (seen with a slow connection, 2026-10-15; shared/staleEdit.ts).
+      const saved = result?.laborRate;
+      if (saved)
+        utils.laborRates.list.setData(undefined, old =>
+          old?.map(row => (row.id === saved.id ? saved : row))
+        );
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
     },
@@ -829,51 +869,78 @@ export default function LaborRatesPage() {
   }, [rates, query, scope]);
 
   const handleSave = useCallback(
-    (id: number, draft: Draft) => {
+    (id: number, draft: Draft, openedAt: Date) => {
       const parts =
         draft.rateType === "hourly" && draft.breakdown
           ? breakdownParts(draft.breakdown)
           : null;
-      updateRate.mutate({
-        id,
-        name: draft.name.trim(),
-        rateType: draft.rateType,
-        // Parts when built from a wage; otherwise null, so parts that no
-        // longer explain the number are not left beside it (the router
-        // compares, so an untouched example stays an example).
-        ...(parts
-          ? { breakdown: parts }
-          : draft.rateType === "hourly"
-            ? { hourlyCost: Number(draft.hourlyCost), breakdown: null }
-            : {
-                annualSalary: Number(draft.annualSalary),
-                annualHours: Number(draft.annualHours),
-                breakdown: null,
-              }),
-      });
+      return updateRate
+        .mutateAsync({
+          id,
+          openedAt,
+          name: draft.name.trim(),
+          rateType: draft.rateType,
+          // Parts when built from a wage; otherwise null, so parts that no
+          // longer explain the number are not left beside it (the router
+          // compares, so an untouched example stays an example).
+          ...(parts
+            ? { breakdown: parts }
+            : draft.rateType === "hourly"
+              ? {
+                  hourlyCost: parseTypedNumber(draft.hourlyCost),
+                  breakdown: null,
+                }
+              : {
+                  annualSalary: parseTypedNumber(draft.annualSalary),
+                  annualHours: parseTypedNumber(draft.annualHours),
+                  breakdown: null,
+                }),
+        })
+        .then(
+          () => true,
+          () => false
+        );
     },
     [updateRate]
   );
 
+  const creating = useRef(false);
   const handleCreate = useCallback(() => {
+    // One add at a time — the form stays until the server answers.
+    if (creating.current) return;
     const problem = validateDraft(newDraft);
     if (problem) {
       toast.error(problem);
       return;
     }
-    createRate.mutate({
-      name: newDraft.name.trim(),
-      rateType: newDraft.rateType,
-      ...(newDraft.rateType === "hourly"
-        ? { hourlyCost: Number(newDraft.hourlyCost) }
-        : {
-            annualSalary: Number(newDraft.annualSalary),
-            annualHours: Number(newDraft.annualHours),
-          }),
-    });
-    toast.success(`Added "${newDraft.name.trim()}"`);
-    setNewDraft(emptyDraft);
-    setAdding(false);
+    creating.current = true;
+    const name = newDraft.name.trim();
+    createRate.mutate(
+      {
+        name,
+        rateType: newDraft.rateType,
+        // The same reader validateDraft used: Number() here sent "$45",
+        // which the check had accepted, to the server as NaN (2026-10-15).
+        ...(newDraft.rateType === "hourly"
+          ? { hourlyCost: parseTypedNumber(newDraft.hourlyCost) }
+          : {
+              annualSalary: parseTypedNumber(newDraft.annualSalary),
+              annualHours: parseTypedNumber(newDraft.annualHours),
+            }),
+      },
+      {
+        // "Added" and the cleared form only once it IS added; a refused add
+        // keeps what was typed beside the message saying why.
+        onSuccess: () => {
+          toast.success(`Added "${name}"`);
+          setNewDraft(emptyDraft);
+          setAdding(false);
+        },
+        onSettled: () => {
+          creating.current = false;
+        },
+      }
+    );
   }, [createRate, newDraft]);
 
   return (
@@ -966,6 +1033,14 @@ export default function LaborRatesPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading roles…
+            </div>
+          ) : ratesFailed ? (
+            // A list that failed to load is not an empty one (drill, 2026-10-15).
+            <div className="p-4">
+              <LoadFailed
+                what="your labor rates"
+                onRetry={() => void refetchRates()}
+              />
             </div>
           ) : visible.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">

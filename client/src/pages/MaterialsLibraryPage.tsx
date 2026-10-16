@@ -18,14 +18,18 @@ import {
   useState,
 } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
 import {
   Archive as ArchiveIcon,
   Boxes,
   Check,
+  ChevronRight,
+  History,
   CircleDollarSign,
   Clock,
   Loader2,
@@ -83,6 +87,8 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIsMobile } from "@/hooks/useMobile";
 import { unitCost } from "@/lib/money";
+import { packPhrase, priceWrite } from "@shared/packPricing";
+import { PriceHistoryPanel } from "@/components/PriceHistoryPanel";
 import { materialItemKey } from "@shared/materialMarkup";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { focusOnOpen, NEEDS_WHY, type NeedsField } from "@/lib/needsFix";
@@ -91,6 +97,9 @@ import {
   STICK_JOINTS,
   type StickJoint,
 } from "@shared/runFittings";
+import { errorText } from "@/lib/errorText";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -131,6 +140,12 @@ type Material = {
   strapFromBoxFeet: string | null;
   /** Raceway only — labor hours for one field bend (0084). NULL is not set. */
   fieldBendLaborHours: string | null;
+  /** The pack it is bought in (0157–0159). NULL = sold singly / typed per unit. */
+  packQty: string | null;
+  packLabel: string | null;
+  packPrice: string | null;
+  /** When the row was last saved; the editor sends it back (staleEdit.ts). */
+  updatedAt: Date;
 };
 
 /**
@@ -155,7 +170,9 @@ const STICK_JOINT_LABELS: Record<StickJoint, string> = {
 
 const feetText = (value: string | null) =>
   value === null ? "" : String(Number(value));
-const feetValue = (text: string) => (text.trim() === "" ? null : Number(text));
+// Read as a person types it (parseTypedNumber): "0x10" is not 16 ft here.
+const feetValue = (text: string) =>
+  text.trim() === "" ? null : parseTypedNumber(text);
 
 /**
  * Ask for alias suggestions for a draft. Shared by the add form and the inline
@@ -229,6 +246,16 @@ type Draft = {
   brandNote: string;
   /** Only when editing a raceway; the add form never carries it. */
   raceway?: RacewayDraft;
+  /**
+   * PRICE BY THE PACK (pricing-safety-plan § 2, owner Q1). The pack size
+   * lives under the editor's More options; "" = sold singly, and the price
+   * row is the one box it always was. With a pack, the row shows both boxes
+   * and whichever was typed last is the one saved. Edit form only.
+   */
+  packQty?: string;
+  packLabel?: string;
+  packPrice?: string;
+  priceTyped?: "unit" | "pack";
 };
 
 const emptyDraft: Draft = {
@@ -244,11 +271,18 @@ const emptyDraft: Draft = {
 /** Shared validation for both the add form and inline edits. */
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return "Give the material a name.";
-  const cost = Number(draft.costPerUnit);
+  const cost = parseTypedNumber(draft.costPerUnit);
   if (draft.costPerUnit.trim() === "" || Number.isNaN(cost))
     return "Enter a cost.";
   if (cost < 0) return "Cost cannot be negative.";
   if (cost > MAX_COST) return "That cost is too large.";
+  // Labor hours: blank is NOT SET; anything typed must read as hours. Until
+  // 2026-10-15 nothing checked this box — "0x10" saved as 16 hours.
+  if (draft.laborHours.trim() !== "") {
+    const hours = parseTypedNumber(draft.laborHours);
+    if (!(hours >= 0 && hours <= MAX_LABOR_UNIT_HOURS))
+      return `Labor hours must be between 0 and ${MAX_LABOR_UNIT_HOURS}, or blank.`;
+  }
   if (draft.raceway) {
     const { stickLengthFeet, strapSpacingFeet, strapFromBoxFeet } =
       draft.raceway;
@@ -363,7 +397,9 @@ function MaterialRow({
   showCategory: boolean;
   /** Rendering the Archived view — different actions, no inline editing. */
   isArchived?: boolean;
-  onSave: (id: number, draft: Draft) => Promise<void>;
+  /** Resolves true once saved; false if refused (the toast says why). */
+  /** `openedAt`: the row's updatedAt when the editor opened (shared/staleEdit.ts). */
+  onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onSuggestAliases: SuggestAliases;
   onRevert: (material: Material) => void;
   onRemove: (material: Material) => void;
@@ -377,6 +413,10 @@ function MaterialRow({
   markupOverride?: number;
 }) {
   const [editing, setEditing] = useState(false);
+  /** The editor's one "More options" fold (pack size). Shut each time it opens. */
+  const [moreOpen, setMoreOpen] = useState(false);
+  /** The price-history side panel, opened from More options. */
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   /*
     The markup is NOT part of the material draft, on purpose. Saving the draft
@@ -387,6 +427,17 @@ function MaterialRow({
   */
   const [markupDraft, setMarkupDraft] = useState("");
   const [openedWith, setOpenedWith] = useState<Draft | null>(null);
+  const [openedMarkup, setOpenedMarkup] = useState("");
+  /*
+    A nav link, browser Back or a reload asks before throwing an open edit
+    away (@/lib/unsavedGuard). Cancel does not ask: it says discard.
+  */
+  useUnsavedGuard(
+    editing &&
+      (!sameToSave(draft, openedWith) || markupDraft.trim() !== openedMarkup)
+  );
+  /** The row as saved when the editor opened — sent with Save. */
+  const [openedAt, setOpenedAt] = useState<Date>(material.updatedAt);
   /**
    * Which warning opened the editor, if one did — "Needs price" lands the
    * cursor in the price box and says why, instead of the person having to
@@ -401,20 +452,32 @@ function MaterialRow({
       // A Draft bid's "Re-apply markup rules" offer counts on this.
       void utils.bids.markupReapplyPreview.invalidate();
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   const startEditing = (focus: NeedsField | null = null) => {
     setOpenedFor(focus);
-    setMarkupDraft(
+    const markupText =
       markupOverride === undefined
         ? ""
-        : String(Math.round(markupOverride * 10000) / 100)
-    );
+        : String(Math.round(markupOverride * 10000) / 100);
+    setMarkupDraft(markupText);
+    setOpenedMarkup(markupText);
+    const qty = material.packQty === null ? 0 : Number(material.packQty);
     const opened: Draft = {
       name: material.name,
       unitOfSale: material.unitOfSale,
       costPerUnit: String(Number(material.costPerUnit)),
+      packQty: qty > 0 ? String(qty) : "",
+      packLabel: material.packLabel ?? "",
+      // The pack price as typed when there is one; else worked out to show.
+      packPrice:
+        material.packPrice !== null
+          ? String(Number(material.packPrice))
+          : qty > 0
+            ? (Number(material.costPerUnit) * qty).toFixed(2)
+            : "",
+      priceTyped: material.packPrice !== null ? "pack" : "unit",
       // Empty string for unset, so an untouched material opens with a blank
       // box rather than a 0 nobody typed. See the Draft field's own note.
       laborHours:
@@ -444,6 +507,8 @@ function MaterialRow({
     };
     setDraft(opened);
     setOpenedWith(opened);
+    setOpenedAt(material.updatedAt);
+    setMoreOpen(false);
     setEditing(true);
   };
 
@@ -454,20 +519,28 @@ function MaterialRow({
       return;
     }
     const typedMarkup = markupDraft.trim();
-    const nextMarkup = typedMarkup === "" ? null : Number(typedMarkup) / 100;
+    const nextMarkup =
+      typedMarkup === "" ? null : parseTypedPercent(typedMarkup) / 100;
     if (nextMarkup !== null && !(nextMarkup >= 0 && nextMarkup <= 10)) {
       toast.error("Markup must be between 0% and 1000%.");
       return;
     }
+    // A refused save keeps the editor OPEN with everything typed in it.
+    // Until 2026-10-15 it closed anyway — the toast said "couldn't save"
+    // and the whole edit was gone (database-down drill).
     if (nextMarkup !== (markupOverride ?? null)) {
-      await setOverride.mutateAsync({
-        materialId: material.id,
-        markupPct: nextMarkup,
-      });
+      try {
+        await setOverride.mutateAsync({
+          materialId: material.id,
+          markupPct: nextMarkup,
+        });
+      } catch {
+        return; // its onError has said why
+      }
     }
     // Only when something ABOUT THE MATERIAL changed — see markupDraft above.
     if (JSON.stringify(draft) !== JSON.stringify(openedWith)) {
-      await onSave(material.id, draft);
+      if (!(await onSave(material.id, draft, openedAt))) return;
     }
     setEditing(false);
   };
@@ -512,7 +585,19 @@ function MaterialRow({
           </Select>
           <Input
             value={draft.costPerUnit}
-            onChange={e => setDraft({ ...draft, costPerUnit: e.target.value })}
+            onChange={e => {
+              const v = e.target.value;
+              const qty = parseTypedNumber(draft.packQty ?? "");
+              setDraft({
+                ...draft,
+                costPerUnit: v,
+                priceTyped: "unit",
+                // The other box follows, so the two never disagree on screen.
+                ...(qty > 0 && v.trim() !== "" && !Number.isNaN(Number(v))
+                  ? { packPrice: (Number(v) * qty).toFixed(2) }
+                  : {}),
+              });
+            }}
             className="h-8 w-28 text-sm text-right"
             inputMode="decimal"
             onFocus={selectOnFocus}
@@ -520,6 +605,51 @@ function MaterialRow({
             aria-label="Price per unit"
             autoFocus={focusOnOpen(openedFor, "price")}
           />
+          {/* The pack box — only once a pack size is set under More options. */}
+          {parseTypedNumber(draft.packQty ?? "") > 0 && (
+            <>
+              <span className="text-xs text-muted-foreground">or</span>
+              <Input
+                value={draft.packPrice ?? ""}
+                onChange={e => {
+                  const v = e.target.value;
+                  const qty = parseTypedNumber(draft.packQty ?? "");
+                  setDraft({
+                    ...draft,
+                    packPrice: v,
+                    priceTyped: "pack",
+                    // Shown with the same round-up the server stores.
+                    ...(v.trim() !== "" && !Number.isNaN(Number(v))
+                      ? {
+                          costPerUnit: String(
+                            Number(
+                              priceWrite({
+                                typed: "pack",
+                                amount: Number(v),
+                                packQty: qty,
+                              }).costPerUnit
+                            )
+                          ),
+                        }
+                      : {}),
+                  });
+                }}
+                className="h-8 w-28 text-sm text-right"
+                inputMode="decimal"
+                onFocus={selectOnFocus}
+                placeholder="pack price"
+                aria-label="Price per pack"
+              />
+              <span className="text-xs text-muted-foreground">
+                per{" "}
+                {packPhrase(
+                  parseTypedNumber(draft.packQty ?? ""),
+                  draft.unitOfSale,
+                  draft.packLabel || null
+                )}
+              </span>
+            </>
+          )}
           {/*
             Hours per unit of sale, and the PLACEHOLDER is doing real work:
             "hours" rather than "0.00", because an empty box here means unset
@@ -598,6 +728,102 @@ function MaterialRow({
             placeholder="Brand or part number you buy (optional)"
             aria-label="Brand or part number"
             disabled={isBusy}
+          />
+        </div>
+
+        {/*
+          MORE OPTIONS — one control, shut by default (CLAUDE.md §
+          "Customization available, but never in the way"). It holds the pack
+          size today; anything else per-material and rarely touched goes here
+          too, rather than growing a second disclosure.
+        */}
+        <div className="mt-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen(o => !o)}
+          >
+            <ChevronRight
+              className={cn(
+                "w-3 h-3 transition-transform",
+                moreOpen && "rotate-90"
+              )}
+            />
+            More options
+            {parseTypedNumber(draft.packQty ?? "") > 0 && (
+              <span className="text-muted-foreground/80">
+                {" "}
+                · sold by the{" "}
+                {packPhrase(
+                  parseTypedNumber(draft.packQty ?? ""),
+                  draft.unitOfSale,
+                  draft.packLabel || null
+                )}
+              </span>
+            )}
+          </button>
+          {moreOpen && (
+            <div className="mt-1.5 rounded-md border border-border p-2.5 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span>Bought by the pack:</span>
+                <Input
+                  value={draft.packQty ?? ""}
+                  onChange={e =>
+                    setDraft({ ...draft, packQty: e.target.value })
+                  }
+                  className="h-7 w-20 text-xs text-right"
+                  inputMode="decimal"
+                  onFocus={selectOnFocus}
+                  placeholder="how many"
+                  aria-label="How many in a pack"
+                  disabled={isBusy}
+                />
+                <span className="text-muted-foreground">
+                  {draft.unitOfSale === "foot"
+                    ? "ft in a"
+                    : draft.unitOfSale === "box"
+                      ? "boxes in a"
+                      : "in a"}
+                </span>
+                <Input
+                  value={draft.packLabel ?? ""}
+                  onChange={e =>
+                    setDraft({ ...draft, packLabel: e.target.value })
+                  }
+                  className="h-7 w-24 text-xs"
+                  placeholder="roll, box…"
+                  aria-label="What the pack is called"
+                  maxLength={32}
+                  disabled={isBusy}
+                />
+              </div>
+              <p className="text-[0.7rem] text-muted-foreground">
+                Then you can type the price of the whole{" "}
+                {draft.packLabel?.trim() || "pack"} and the price per{" "}
+                {draft.unitOfSale === "each" ? "one" : draft.unitOfSale} is
+                worked out for you, rounded up. Leave it blank if you buy them
+                one at a time.
+              </p>
+              <div className="pt-1 border-t border-border">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1.5 text-xs px-2"
+                  onClick={() => setHistoryOpen(true)}
+                >
+                  <History className="w-3.5 h-3.5" /> Price history
+                </Button>
+              </div>
+            </div>
+          )}
+          <PriceHistoryPanel
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            materialId={material.id}
+            name={material.name}
+            unitOfSale={material.unitOfSale}
           />
         </div>
 
@@ -942,7 +1168,7 @@ function MaterialRow({
               variant="ghost"
               className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
               onClick={() => onDeleteForever?.(material)}
-              title="Delete permanently — cannot be undone"
+              title="Delete forever — cannot be undone"
               aria-label={`Delete ${material.name} forever`}
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -975,6 +1201,8 @@ export default function MaterialsLibraryPage() {
   const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
+  // A half-typed new material asks before a nav link or reload drops it.
+  useUnsavedGuard(adding && !sameToSave(newDraft, emptyDraft));
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [view, setView] = useState<LibraryView>("active");
@@ -1021,13 +1249,14 @@ export default function MaterialsLibraryPage() {
   const {
     data: materials = [],
     isLoading,
+    isLoadingError: materialsFailed,
     refetch,
   } = trpc.materials.list.useQuery({ status: view });
   const { data: archivedRows = [] } = trpc.materials.list.useQuery({
     status: "archived",
   });
 
-  const onError = (e: { message: string }) => toast.error(e.message);
+  const onError = (e: { message: string }) => toast.error(errorText(e));
   const utils = trpc.useUtils();
   const refreshAll = () => {
     void utils.materials.list.invalidate();
@@ -1042,7 +1271,7 @@ export default function MaterialsLibraryPage() {
   const archiveMaterial = trpc.materials.archive.useMutation({
     onError,
     onSuccess: () => {
-      toast.success("Archived — restore it any time from the Archived tab");
+      toast.success("Archived — restore it any time from Recently deleted.");
       refreshAll();
     },
   });
@@ -1249,14 +1478,32 @@ export default function MaterialsLibraryPage() {
   });
 
   const handleSave = useCallback(
-    async (id: number, draft: Draft) => {
+    async (id: number, draft: Draft, openedAt: Date) => {
       setBusyId(id);
       try {
         const result = await updateMaterial.mutateAsync({
           id,
+          openedAt,
           name: draft.name.trim(),
           unitOfSale: draft.unitOfSale,
-          costPerUnit: Number(draft.costPerUnit),
+          // The box typed last is the one sent: a pack price is divided on
+          // the server (shared/packPricing.ts), never here, so the stored
+          // number has one source.
+          ...(draft.priceTyped === "pack" &&
+          parseTypedNumber(draft.packQty ?? "") > 0 &&
+          (draft.packPrice ?? "").trim() !== ""
+            ? { packPrice: parseTypedNumber(draft.packPrice ?? "") }
+            : { costPerUnit: parseTypedNumber(draft.costPerUnit) }),
+          ...(draft.packQty !== undefined
+            ? {
+                packQty:
+                  draft.packQty.trim() === "" ||
+                  !(parseTypedNumber(draft.packQty ?? "") > 0)
+                    ? null
+                    : parseTypedNumber(draft.packQty ?? ""),
+                packLabel: draft.packLabel?.trim() || null,
+              }
+            : {}),
           /*
             A BLANK BOX CLEARS IT BACK TO UNSET, and that is the point of the
             nullable column rather than an oversight to tidy into a zero.
@@ -1272,7 +1519,9 @@ export default function MaterialsLibraryPage() {
             like it silently failed.
           */
           laborHours:
-            draft.laborHours.trim() === "" ? null : Number(draft.laborHours),
+            draft.laborHours.trim() === ""
+              ? null
+              : parseTypedNumber(draft.laborHours),
           category: draft.category,
           // Sent unconditionally now the editor shows it: blank means the user
           // cleared the field, which is a real edit, where omitting the key
@@ -1302,21 +1551,31 @@ export default function MaterialsLibraryPage() {
               }
             : {}),
         });
+        // The saved row, new `updatedAt` and all, straight into the list, so
+        // reopening the editor before the refetch lands does not carry the
+        // old one into the stale-save guard (shared/staleEdit.ts).
+        const saved = result.material;
+        if (saved && !result.forked)
+          utils.materials.list.setData({ status: view }, old =>
+            old?.map(row => (row.id === saved.id ? { ...row, ...saved } : row))
+          );
         if (result.forked) {
           toast.success(
             `Saved as your own copy — the starter "${result.material?.name}" is unchanged.`
           );
         } else {
-          toast.success("Material updated");
+          toast.success("Material updated.");
         }
         await refetch();
+        return true;
       } catch {
-        // onError already surfaced it
+        // onError already surfaced it; the editor stays open with the edit.
+        return false;
       } finally {
         setBusyId(null);
       }
     },
-    [updateMaterial, refetch]
+    [updateMaterial, refetch, utils, view]
   );
 
   /**
@@ -1362,7 +1621,7 @@ export default function MaterialsLibraryPage() {
       setBusyId(material.id);
       try {
         await revertMaterial.mutateAsync({ id: material.id });
-        toast.success("Restored the starter version");
+        toast.success("Restored the starter version.");
         await refetch();
       } catch {
         /* handled by onError */
@@ -1388,14 +1647,16 @@ export default function MaterialsLibraryPage() {
       await createMaterial.mutateAsync({
         name: newDraft.name.trim(),
         unitOfSale: newDraft.unitOfSale,
-        costPerUnit: Number(newDraft.costPerUnit),
+        costPerUnit: parseTypedNumber(newDraft.costPerUnit),
         // A new material starts with no labor unit unless one was typed —
         // NULL, never 0, so it joins the Needs hours worklist rather than
         // claiming to take no time.
+        // Read the way validateDraft read it: Number() here took "$1.5",
+        // which the check had passed as 1.5, as NaN (2026-10-16).
         laborHours:
           newDraft.laborHours.trim() === ""
             ? null
-            : Number(newDraft.laborHours),
+            : parseTypedNumber(newDraft.laborHours),
         category: newDraft.category,
         searchAliases: newDraft.searchAliases.trim() || null,
         brandNote: newDraft.brandNote.trim() || null,
@@ -1486,7 +1747,8 @@ export default function MaterialsLibraryPage() {
                 onlyUnpriced ? "opacity-80" : "text-muted-foreground"
               )}
             >
-              {unpricedCount}
+              {/* A count of a list that did not load is not zero. */}
+              {materialsFailed ? "—" : unpricedCount}
             </span>
           </Button>
           <Button
@@ -1505,19 +1767,19 @@ export default function MaterialsLibraryPage() {
                 onlyUnhoured ? "opacity-80" : "text-muted-foreground"
               )}
             >
-              {unhouredCount}
+              {materialsFailed ? "—" : unhouredCount}
             </span>
           </Button>
         </div>
 
-        {onlyUnpriced && unpricedCount === 0 && (
+        {onlyUnpriced && unpricedCount === 0 && !materialsFailed && (
           <p className="text-xs text-muted-foreground mb-3">
             Every material in your library has a price. Switch the filter off to
             see them all.
           </p>
         )}
 
-        {onlyUnhoured && unhouredCount === 0 && (
+        {onlyUnhoured && unhouredCount === 0 && !materialsFailed && (
           <p className="text-xs text-muted-foreground mb-3">
             Every material in your library has a labor unit. Switch the filter
             off to see them all.
@@ -1654,6 +1916,15 @@ export default function MaterialsLibraryPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading materials…
+            </div>
+          ) : materialsFailed ? (
+            // Not "No materials yet" — a catalog that failed to load is not
+            // an empty one (drill, 2026-10-15; LoadFailed.tsx).
+            <div className="p-4">
+              <LoadFailed
+                what="your materials"
+                onRetry={() => void refetch()}
+              />
             </div>
           ) : visible.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">

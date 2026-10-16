@@ -94,7 +94,7 @@ export function ScopeFilter({
           title={
             value === "all"
               ? "Everything — the starter library and your own"
-              : "Only what you have created or customised"
+              : "Only what you have created or customized"
           }
           className={cn(
             "px-2.5 py-1 rounded-md text-xs transition-colors flex items-center gap-1.5",

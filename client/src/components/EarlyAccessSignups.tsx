@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { Check, Download, Mail, RefreshCw, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { errorText } from "@/lib/errorText";
 
 function formatWhen(value: Date): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -59,7 +60,7 @@ export function EarlyAccessSignups() {
     onError: (error, _vars, context) => {
       if (context?.snapshot)
         utils.earlyAccess.list.setData({ limit: 500 }, context.snapshot);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: () => void utils.earlyAccess.list.invalidate(),
   });

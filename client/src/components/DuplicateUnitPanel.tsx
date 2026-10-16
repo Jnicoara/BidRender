@@ -31,7 +31,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { errorText } from "@/lib/errorText";
 
 type Group = { source: string; count: string };
 
@@ -53,7 +55,7 @@ export function DuplicateUnitPanel({
   const sourceAt = (index: number) => groups[index].source || units[0] || "";
 
   const generate = trpc.bids.generateUnits.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       const made = result.created.length;
       toast.success(
@@ -78,15 +80,15 @@ export function DuplicateUnitPanel({
   }
 
   const totalCopies = groups.reduce((sum, g) => {
-    const n = Number(g.count);
+    const n = parseTypedNumber(g.count);
     return sum + (Number.isInteger(n) && n > 0 ? n : 0);
   }, 0);
-  const start = Number(startNumber);
+  const start = parseTypedNumber(startNumber);
   const lastNumber =
     Number.isInteger(start) && totalCopies > 0 ? start + totalCopies - 1 : null;
 
   const submit = () => {
-    const start = Number(startNumber);
+    const start = parseTypedNumber(startNumber);
     if (!baseName.trim()) {
       toast.error("Give the copies a name.");
       return;
@@ -99,7 +101,7 @@ export function DuplicateUnitPanel({
     const specs = [];
     for (let index = 0; index < groups.length; index++) {
       const source = sourceAt(index);
-      const n = Number(groups[index].count);
+      const n = parseTypedNumber(groups[index].count);
       if (!source) {
         toast.error("Pick a unit to copy.");
         return;

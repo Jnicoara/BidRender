@@ -7,6 +7,12 @@
  * became a view of Materials, and the Bids LIST became the Dashboard, which
  * already carried its search, its New bid and its archive entry.
  *
+ * ── Changed 2026-10-14 (owner) ───────────────────────────────────────────────
+ * The nav's Work group is now the daily work: Dashboard, Bids (/bids, every
+ * bid as a searchable list) and Plans (/plans, every bid with drawings). Both
+ * are screens with content of their own, which is what kept them out before —
+ * a top-level entry that only asks "which one?" is still the thing to avoid.
+ *
  * Folding a screen retires its address, and a retired address is the part of a
  * restructure that breaks quietly. A bookmark, a link in an email, an
  * onboarding href and every `path` in `shared/navigationTargets.ts` all point
@@ -26,6 +32,9 @@ export type Route =
   | "library-labor-rates"
   | "library-assemblies"
   | "bids"
+  | "bid-list"
+  | "plans-index"
+  | "trash"
   | "clients"
   | "team"
   | "analytics"
@@ -124,9 +133,8 @@ export const RETIRED_PATHS: Record<string, string> = {
   matdb: "/library/materials?view=pricing",
   "library/kits": "/library/assemblies?view=kits",
   "library/modifiers": "/library/assemblies?view=modifiers",
-  // The bids LIST, not a bid. Everything it held — the search, New bid, the way
-  // into the archive — is on the Dashboard already. /bids/:id is untouched.
-  bids: "/dashboard",
+  // The old projects list. (/bids was here too until 2026-10-14, when the
+  // owner put a Bids list back in the nav — it is a live screen again.)
   projects: "/dashboard",
   home: "/dashboard",
   // Quick bid's CHOOSER. Counting itself moved to /bids/:id/count, where it has
@@ -160,9 +168,9 @@ function pickView<T extends string>(
 /**
  * The canonical address for a retired path, or null if the path is current.
  *
- * Matched against the WHOLE path, not its first segment: `/bids` is retired but
- * `/bids/12` is a live bid, and treating them the same would make every bid
- * unreachable.
+ * Matched against the WHOLE path, not its first segment, so a retired path
+ * never swallows a live address that starts the same way — `/library/kits`
+ * is retired, `/library/materials` is not.
  */
 export function retiredAddress(path: string): string | null {
   const { full } = splitPath(path);
@@ -196,9 +204,17 @@ export function pathToRoute(path: string): RouteState {
   // "trash" for soft-deleted projects; that screen and its route are gone, and
   // this is the only archive left.
   if (p === "archive") return { route: "bid-archive" };
+  // Recently deleted: every archived thing in one place, with Restore
+  // (owner, 2026-10-14). The bid archive above stays as the bids' own page.
+  if (p === "trash") return { route: "trash" };
+  // The two daily lists the owner asked to have in the nav (2026-10-14):
+  // every bid, and every bid with plans. Each is a real screen with its own
+  // content, not a "which one?" chooser — see bidListPages in the shell.
+  if (p === "plans" && !parts[1]) return { route: "plans-index" };
+  if (p === "bids" && !parts[1]) return { route: "bid-list" };
   if (p === "bids") {
     // /bids/:id opens straight into one bid, which is what the Dashboard links
-    // to. The bare "/bids" case is handled by RETIRED_PATHS above; an id that
+    // to. The bare "/bids" is the Bids list, handled just above; an id that
     // is not a number is an address that never existed.
     const id = parts[1] ? parseInt(parts[1], 10) : NaN;
     if (isNaN(id)) return { route: "dashboard" };
@@ -254,8 +270,12 @@ export function routeToPath(
   switch (route) {
     case "dashboard":
       return "/dashboard";
+    case "bid-list":
+      return "/bids";
+    case "plans-index":
+      return "/plans";
     case "bids":
-      if (!id) return "/dashboard";
+      if (!id) return "/bids";
       return fixLineId ? `/bids/${id}?fix=${fixLineId}` : `/bids/${id}`;
     case "takeoff":
       return id ? `/bids/${id}/plans` : "/dashboard";

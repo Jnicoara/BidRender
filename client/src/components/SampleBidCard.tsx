@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { FlaskConical, Trash2 } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
 import { SAMPLE_NOTICE } from "@shared/sampleProject";
+import { errorText } from "@/lib/errorText";
 
 export function SampleBidCard({
   onOpenBid,
@@ -44,7 +45,7 @@ export function SampleBidCard({
   };
 
   const create = trpc.sample.create.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSuccess: result => {
       refresh();
       onOpenBid(result.bidId);
@@ -53,7 +54,7 @@ export function SampleBidCard({
   });
 
   const remove = trpc.sample.remove.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSuccess: () => {
       refresh();
       toast.success("Sample removed. Nothing of yours was touched.");

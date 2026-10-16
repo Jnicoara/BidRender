@@ -40,6 +40,7 @@ import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TotalDueCaption } from "@/components/TotalDueCaption";
 import { useCompany } from "@/hooks/useCompany";
+import { errorText } from "@/lib/errorText";
 
 /** Only a deadline worth acting on gets colour. The rest stays quiet. */
 const URGENCY_STYLE: Record<RetentionUrgency, string> = {
@@ -94,7 +95,7 @@ export default function BidArchivePage({
       toast.success(`${bid?.name ?? "Bid"} is back on your dashboard.`);
       invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
   });
 
   const deleteForever = trpc.bids.deleteForever.useMutation({
@@ -102,7 +103,7 @@ export default function BidArchivePage({
       toast.success("Bid deleted permanently.");
       invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
   });
 
   const deleteAll = trpc.bids.deleteAllArchived.useMutation({
@@ -113,7 +114,7 @@ export default function BidArchivePage({
       invalidate();
     },
     onError: error => {
-      toast.error(error.message);
+      toast.error(errorText(error));
       // The archive changed under the dialog — show what is there now.
       invalidate();
     },
@@ -129,11 +130,11 @@ export default function BidArchivePage({
             className="h-8 gap-1.5 text-xs"
             onClick={onBack}
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            <ArrowLeft className="w-3.5 h-3.5" /> Recently deleted
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold flex items-center gap-2">
-              <Archive className="w-4 h-4 text-muted-foreground" /> Archive
+              <Archive className="w-4 h-4 text-muted-foreground" /> Deleted bids
             </h1>
             <p className="text-xs text-muted-foreground">
               Archived bids stay here for {RETENTION_DAYS} days, then they are
@@ -273,7 +274,7 @@ export default function BidArchivePage({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete “{confirmDelete?.name}” for good?
+              Delete “{confirmDelete?.name}” forever?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This removes the bid, every line on it and any plans attached to
@@ -295,7 +296,7 @@ export default function BidArchivePage({
                 setConfirmDelete(null);
               }}
             >
-              Delete permanently
+              Delete forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

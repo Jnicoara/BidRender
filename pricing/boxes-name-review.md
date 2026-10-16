@@ -359,3 +359,12 @@ the box, so it is one part, and the supply house sells it as one SKU (Raco
 would price a part nobody buys. The one separate stud support in the catalog,
 row 672 ("Box support bracket", stud-to-stud), is the right answer only
 where a box sits BETWEEN studs, which none of these starters says.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

@@ -45,6 +45,7 @@ import {
   saveAsAssemblyRefusal,
 } from "@shared/handPricedLines";
 import { ASSEMBLY_CATEGORY_ORDER } from "@shared/assemblyCategories";
+import { errorText } from "@/lib/errorText";
 
 /**
  * The assembly shelves, as the Library screen lists them — the ONE shared
@@ -163,7 +164,7 @@ export function HandPricedLineFields({
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSettled: onChanged,
   });
@@ -204,10 +205,10 @@ export function HandPricedLineFields({
               value={hours}
               whenUnset={{ placeholder: "not set" }}
               onSave={next =>
-                update.mutate({ bidId, id: line.id, laborHours: next })
+                update.mutateAsync({ bidId, id: line.id, laborHours: next })
               }
               onClear={() =>
-                update.mutate({ bidId, id: line.id, laborHours: null })
+                update.mutateAsync({ bidId, id: line.id, laborHours: null })
               }
               rules={{ min: 0, max: 99999 }}
               suffix="h"
@@ -258,10 +259,10 @@ export function HandPricedLineFields({
           value={price}
           whenUnset={{ placeholder: "no price" }}
           onSave={next =>
-            update.mutate({ bidId, id: line.id, materialCost: next })
+            update.mutateAsync({ bidId, id: line.id, materialCost: next })
           }
           onClear={() =>
-            update.mutate({ bidId, id: line.id, materialCost: null })
+            update.mutateAsync({ bidId, id: line.id, materialCost: null })
           }
           rules={{ min: 0, max: 99999999 }}
           className="h-7 w-24 text-sm"
@@ -274,10 +275,10 @@ export function HandPricedLineFields({
           value={hours}
           whenUnset={{ placeholder: "no hours" }}
           onSave={next =>
-            update.mutate({ bidId, id: line.id, laborHours: next })
+            update.mutateAsync({ bidId, id: line.id, laborHours: next })
           }
           onClear={() =>
-            update.mutate({ bidId, id: line.id, laborHours: null })
+            update.mutateAsync({ bidId, id: line.id, laborHours: null })
           }
           rules={{ min: 0, max: 99999 }}
           suffix="h"
@@ -360,7 +361,7 @@ function LinkToLibrary({
       toast.success(`Priced from ${from}.`);
       setOpen(false);
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: onChanged,
   });
 
@@ -512,7 +513,7 @@ function SaveAsAssembly({
       void utils.assemblies.list.invalidate();
       void utils.materials.list.invalidate();
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: onChanged,
   });
 

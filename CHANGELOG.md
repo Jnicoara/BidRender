@@ -6,6 +6,31 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **The Dashboard, the Bids list and the archive open about five times
+  faster for a company with many bids.** They priced every bid one at a
+  time; now they read all the listed bids together. Measured on 250 bids:
+  0.46 s → 0.09 s. The totals are the same ones the bid screen shows, and a
+  test now checks that for every kind of bid it covers.
+- **Fixed: adding a material with its labor hours typed as "$1.5" failed
+  to save.** The form checked the hours one way and sent them another, so
+  a value it had just accepted arrived as not-a-number. Both now read the
+  box the same way.
+- **A price list that names one material at two different prices no longer
+  picks one.** That material keeps the price it had and is listed as "not
+  changed — fix the sheet", because either price would be a guess. Before,
+  the last row on the sheet won. (Owner decision; the import screen is not
+  shown to users yet.)
+- **Leaving the assembly or kit editor with unsaved changes now asks
+  first.** Back, a menu link, the browser's Back button or closing the tab
+  used to throw a half-built recipe away without a word. Now it asks
+  "Discard your changes?", and Keep editing leaves everything as typed.
+  An untouched or just-saved editor still leaves straight away. The same
+  goes for an open edit or a half-typed new entry on the Materials, Labor
+  rates, Job conditions and Clients screens (their Cancel buttons still
+  just cancel).
+- **The Dashboard's "drops not priced" check is about a fifth faster** for
+  a company with many bids, because it reads the company's height settings
+  once instead of once per bid. The numbers it shows are unchanged.
 - **The test gate can no longer show green over untested code.** A push
   that changed only notes used to run a short check that passed on its own.
   On a track branch, it also cancelled the full test run of the code just
@@ -194,6 +219,20 @@ This is the human-readable companion to the git history — read this to see wha
   (`references/feature-test-map.md`). It lists about 600 features from the
   whole changelog, with the gaps marked.
 
+- **Fixed: after signing out, the next company to sign in on the same
+  browser tab could see the last company's bids.** Signing out cleared only
+  who was signed in; everything else the app had loaded stayed, so a
+  different company signing in on a shared office computer saw the previous
+  company's bid list — names and totals — until its own arrived. Signing
+  out now clears all of it. The Bids list also no longer says "0 bids"
+  while it is still loading.
+
+- **Fixed: a quote prepared in the evening was dated tomorrow.** The date on
+  the proposal and its "price good through" were worked out on the server,
+  which runs on UTC — so after about 5 pm Pacific (8 pm Eastern) every
+  quote carried the next day's date and a validity date a day late. The
+  quote now uses the date where you are.
+
 - **A plan for stopping oversized plan uploads, with the checks written but
   not switched on.** Today the size an upload declares is checked, but the
   file actually sent is not, so a signed-in user could store far more than
@@ -236,6 +275,89 @@ This is the human-readable companion to the git history — read this to see wha
   not been checked by hand yet: `references/golden-bids-to-check.md` is the
   calculator list for that.
 
+- **A bid link that leads nowhere now says so in a second, not eight.** A
+  deleted bid, or a link to another company's, sat on "Loading bid…" while
+  the app asked three more times for an answer that could not change. Only
+  connection and server hiccups are retried now.
+
+- **A bid whose tax area was archived now says so.** It said "This bid has
+  no job address", which sent people to the address when what happened was
+  that the area picked for the bid had been archived. The note now names
+  that, and how to fix it.
+
+- **Fixed: an extra cost with no amount went on the bid at $0, and "$250"
+  did nothing.** Additional expenses now ask for the amount and read "$250"
+  and "1,250" as typed. Emptying the quote's "Price good for" no longer
+  saves 0 days, a bid's own tax rate takes "6.25%", and the bid's add
+  box no longer reads "0x10" as 16.
+
+- **Fixed: Job close-out recorded empty boxes as 0 hours.** Leaving the
+  total blank recorded "the job took 0 hours", and in By assembly every
+  line left blank was recorded as taking no time, which made Performance
+  look better than the job was and could suggest cutting an assembly's
+  hours. A blank total is now refused, and By assembly asks for every line
+  by name (or use One total for a rough figure). Hour suggestions no
+  longer learn from a 0-hour line, so old blanks can no longer suggest
+  setting an assembly to 0 hours.
+
+- **Fixed: typing "15%" as your company profit saved 0%.** On Settings ›
+  Pricing, a percent sign, a comma decimal or an emptied box in profit,
+  overhead or productivity was saved as 0% — with "Company default saved"
+  — and every Draft bid following the default re-priced at it. "15%" now
+  means 15, and anything the box cannot read is refused with nothing
+  changed. The assembly editor's price preview reads the same way.
+
+- **An archived job condition on an assembly is now shown.** Archiving a
+  condition (like "Working at height") stops it applying to new bid lines,
+  but the assembly editor only listed active conditions, so it sat on the
+  recipe unseen. The editor now names it, says it no longer applies, and
+  offers to take it off.
+
+- **An assembly whose labor role was removed now says so.** Removing a role
+  from Labor rates left every assembly that used it with a blank role box
+  and a $0.00 labor preview, with nothing saying why — and new bid lines
+  priced that labor at $0. The editor now shows "Removed role" in red and
+  says the labor prices at $0 until another role is picked. (The bid itself
+  already flagged those lines as not priced.)
+
+- **Two people editing the same assembly no longer undo each other.** If
+  someone saved an assembly after you opened it, your Save used to put back
+  everything they changed and still say "Assembly saved". Now it stops and
+  says "Someone saved this after you opened it", changes nothing, and you
+  reopen it to see their change. Kits, materials, labor rates,
+  modifiers and clients have the same protection — a client's address is
+  what a bid's tax is matched from.
+
+- **Fixed: a tax rate part left blank was saved as 0%.** Adding a tax area
+  with a part named (say "State") but no rate typed saved it at 0% and the
+  form said "0% combined", so bids in that area quietly charged no tax for
+  it. The form now asks for a rate for every part, and "6.25%" with the
+  percent sign is accepted.
+
+- **Golden measurements: every change is now checked against drawings with
+  known true lengths.** Thirteen test drawings — 1/8", 3/16", 1/4",
+  engineering and metric scales, rotated pages, a half-size print, a scan,
+  short, long and many-cornered runs, clicked at five zoom levels by mouse
+  and by touch — must come out within a hundredth of an inch, or the
+  automatic test run fails. Today they all do, and a traced 40 ft run
+  measured exactly 40 ft on screen by mouse and finger, upright and turned.
+
+- **Every remaining number box now reads what you typed the same way.** On
+  the Count screen, a kit button pressed with a quantity the app could not
+  read used to add the kit once anyway; it now says "Enter a quantity
+  greater than zero". A material's own markup accepts "15%", and the
+  first-run labor rate, build-from-parts, duplicate units and the admin
+  seat limits no longer read "0x10" as 16 or a blank as 0.
+
+- **Fixed: typing a decimal quantity in an assembly or kit saved it 10× or
+  100× too big.** Typing 1.5 into a material's quantity on an assembly (or
+  an assembly's quantity in a kit) lost the decimal point as it was typed
+  and saved 15; 2.25 saved 225. The box now keeps exactly what you type,
+  and a typo snaps back to the last real number when you leave the box.
+  The same fix covers the "how many" box on an assembly's work steps.
+  Assemblies saved before this are unchanged — check any with a suspicious
+  whole-number quantity.
+
 - **The sign-in cookie can no longer be used by another website.** It was
   set so that pages on other sites could send requests carrying a signed-in
   person’s session; now only BidRidge’s own pages, and links into it, carry
@@ -248,6 +370,104 @@ This is the human-readable companion to the git history — read this to see wha
   still reporting itself as running. Now a stuck connection is thrown away
   after 30 seconds and replaced, and a new health address says honestly
   whether the server can reach its database.
+
+- **Labor rates keep your typing when a save fails,** the same as modifiers:
+  a refused edit reopens with what you typed, and adding a role only says
+  "Added" once it really is. A rate typed with a dollar sign ("$45") is now
+  saved as 45.
+
+- **Modifiers keep your typing when a save fails.** Editing a job condition
+  and losing the connection used to throw the change away; now the editor
+  opens again with what you typed. Adding one no longer says "Added" before
+  it actually is, and keeps the form filled in if it fails.
+
+- **"Fix this line" no longer turns "1,5" into 15.** Typing hours or a price
+  with a comma as the decimal point used to be read as fifteen on the bid;
+  now it's refused with "must be a number" so the line never takes a number
+  you didn't mean. "$12.50" and "1,500" still read as written.
+
+- **A material's labor hours are now checked before they're saved.** A
+  mistyped entry used to be saved as some other number without a word; now
+  it's refused with a message ("between 0 and 12, or blank") and the editor
+  stays open. Pack quantities and conduit lengths read typed numbers the
+  same careful way.
+
+- **Modifier percentages accept "15%".** Typing the percent sign in a job
+  condition's labor adjustment used to be refused; now "15%" saves as 15%,
+  and a mistyped entry is refused instead of turning into a different number.
+
+- **Assembly hours read the way you type them.** "$1.5" in an assembly's
+  labor hours now saves 1.5 hours, and a mistyped entry like "0x10" is
+  refused with a message instead of being saved as 16 hours.
+
+- **Fixed counts being lost when two arrive at once.** On the Count screen,
+  counting the same item twice in quick succession — a double tap, two
+  people on one bid, or counts sent together when the signal came back —
+  could add only one of them to the line, so the bid showed fewer than
+  were counted. Every count now lands.
+
+- **Losing signal no longer loses your work.** When the connection drops,
+  BidRidge now says "You're offline" and holds what you change, sending it
+  when the signal is back. Before, opening a screen with no signal could
+  reload the page into the browser's "no internet" screen, throwing away
+  the app and anything waiting to be saved — and it could wrongly claim a
+  new version was available.
+
+- **The app no longer piles up memory when you go back and forth to the
+  plans.** Each visit to a busy drawing used to stay in memory for five
+  minutes after you left — fifteen trips left the page using almost four
+  times the memory, enough to slow a phone down. It is now let go as soon
+  as you leave.
+
+- **Clearer messages when something you typed is refused.** Instead of
+  "Something in that wasn't valid", the app now says which box and what
+  the limit is — "The name is too long — 255 characters at most". And
+  starting a new bid keeps the name you typed if the create fails, so you
+  don't have to type it again.
+
+- **A deleted bid says so.** Open a bid that was moved to Recently deleted
+  (in another tab, or from an old link) and it now says so at the top,
+  with the date it will be deleted for good and a Restore button. Before,
+  it looked like a normal bid, and work done on it would have been
+  deleted with it.
+
+- **Editing a material no longer loses your changes if the save fails.**
+  The editor used to close even when the save was refused, throwing away
+  everything you had typed; now it stays open so you can try again.
+
+- **A number that didn't save no longer looks saved.** If a quantity,
+  rate or price can't be saved — the connection drops, say — the box no
+  longer flashes green. It turns red and keeps what you typed, so nothing
+  is lost and nothing pretends: press Enter to try again once you're back
+  online, or Esc to put back the saved value. Screens also stay put when
+  a background refresh fails, instead of swapping your bid for an error.
+
+- **A stalled connection is reported in 20 seconds, not 80.** When the
+  database stops answering without failing, screens used to sit on
+  "Loading…" for over a minute with no explanation. Now the "can't reach
+  your data" bar appears after 20 seconds and clears itself when the
+  connection returns.
+
+- **When BidRidge can't reach its data, screens now say so instead of
+  saying something false.** With the database briefly unreachable, a bid
+  you opened claimed it "may have been archived or deleted", and other
+  screens said "No clients yet", "No roles yet", "0 lines", "Needs
+  pricing 0", sales tax "off", or went blank. Each now says it couldn't load, with a Try
+  again button, and a bar at the top says what's on screen may be
+  incomplete. The bar clears by itself when the connection comes back.
+
+- **"Where do I…?" forgives a typo.** Typing "pasword" or "custmers" now
+  finds the right help topic instead of saying nothing matches — one slip
+  of the thumb on a phone no longer sends you hunting through menus.
+
+- **The app opens about half a second sooner.** Every open used to sit
+  idle for about 300 ms before asking for the Dashboard's data, waiting on
+  a built-in pause in the screen library. The app's code now starts
+  arriving at once for anyone who has signed in before, and screens no
+  longer wait on that pause even on the first sign-in on a new device —
+  Dashboard from about 890 ms to about 400 ms on a test account with 151
+  bids, laptop and phone alike. Every main screen now shows in under a
+  second. The signed-out landing page is unchanged.
 
 ## [2026-10-14]
 
@@ -346,6 +566,162 @@ This is the human-readable companion to the git history — read this to see wha
   again before creating anything. (Code only; not live yet. The database
   rule that makes this impossible at the source is drafted for later.)
 
+- **BidRidge opens much faster on a phone.** The first screen used to
+  download the code for every screen in the app — about 834 KB, roughly 4
+  seconds on a weak signal before anything showed. Each screen's code now
+  arrives when you open it (and in the background once you're in), so the
+  Dashboard needs 217 KB, about 1 second. If BidRidge was updated while a
+  tab was open, the tab refreshes itself once instead of breaking.
+
+- **Signed out in the middle of work, you're told so and taken back.** If
+  your session ended while you worked (it expired, or you changed your
+  password on another device), BidRidge used to drop you on the public
+  home page without a word, and lose the bid you were on. Now the sign-in
+  form opens, says you were signed out (and that your last change wasn't
+  saved, when that's the case), and signing in takes you back to the same
+  screen.
+
+- **Number boxes understand "1,500" and "$12.50"** — now on the Materials and Labor rates editors too (a salary of "65,000" was refused). Typing a price with a
+  dollar sign or a thousands comma used to make the box snap back and lose
+  what you typed. It now saves what you meant. Things that aren't plain
+  numbers ("0x10", "1,5") are refused instead of turning into a different
+  number.
+
+- **Exports can't carry spreadsheet tricks.** A name typed as a formula (for
+  example one starting with "=") could run as a formula when an export was
+  opened in Excel. Exported text that looks like a formula is now kept as
+  plain text. Real negative amounts stay numbers.
+
+- **Double-clicks no longer show false errors.** Sending a count to the bid,
+  setting a material's own markup, or saving a job close-out twice in a row
+  quickly could show an error even though it had worked. The count was
+  never doubled, but the second close-out save could have left two sets of
+  hours behind. Now the second click quietly agrees with the first, and a
+  close-out always keeps exactly one set of lines.
+
+- **The menu is back on a phone turned sideways.** With the phone on its
+  side, the main menu (Dashboard, Bids, Plans and the rest) shrank to
+  nothing and only the bottom group showed. The whole menu now scrolls
+  together. The guide's tip also shrinks to one line on a short screen, so
+  the drawing keeps its room.
+
+- **Extreme numbers no longer crash a save.** A test now throws the biggest,
+  most negative and longest values each screen allows at every save in the
+  app. Five crashed instead of saying no, and now each gets a plain answer:
+  - Adding an assembly again when the line was already huge. It now says
+    "more than a line can hold — add it as a separate line" and keeps the
+    line as it was.
+  - An overhead amount over 99,999,999.
+  - A close-out on a bid with an absurd estimate.
+  - An empty edit to a run type's extra.
+  - Setting a starter labor rate that doesn't exist.
+
+- **The "Find it" helper gives up after 15 seconds and says why.** When the AI
+  service was down or stuck, it could take six minutes and then claim it
+  didn't understand the question. Now it says the helper didn't answer and
+  points to the sidebar and "Where do I…?", which work without it.
+
+- **A database hiccup no longer looks like being signed out or losing
+  everything.** If the server briefly can't reach its data, BidRidge now
+  says "Can't reach BidRidge right now — you're still signed in and nothing
+  is lost" and tries again by itself. Before, it showed the public sign-up
+  page, or bounced you to sign in. Lists that fail to load now say so with
+  a Try again button instead of "No bids yet" or "Nothing here". The
+  Dashboard's "total due" no longer shows $0 while it is still loading.
+
+- **The Dashboard stays fast for a busy company.** With 150 bids and ten other
+  companies working at the same time, the Dashboard took 2.4 seconds to
+  load. It now takes 0.4. It had been doing the slow "drops not priced"
+  check on bids that cannot have any drops.
+
+- **Passwords that have leaked in a data breach are refused** at sign-up,
+  password change and reset, with the reason. Only the first five letters
+  of a scrambled form of the password leave BidRidge to check it. If the
+  breach list can't be reached, sign-up still works.
+
+- **Guide mode for new users.** A slim strip along the bottom of the screen
+  says the one next step for the bid you're on, in plain words: get the
+  drawings in, set the scale, count the devices, trace runs if the job needs
+  them, check the bid, print it. It follows what you've actually done, so it
+  moves on by itself, and it never sits over the drawing or a button. Close
+  a tip with ×, or turn the guide off from the strip or in Settings ›
+  Display (it stays on until you do). **"Where do I…?"** (strip, sidebar,
+  phone More menu) finds any screen from plain words like "labor rate",
+  "logo" or "undo delete". It works with no internet, and no AI is used.
+
+- **The first tap on the menu works now.** The side menu (and the phone's
+  bottom bar) was rebuilt from scratch whenever the app redrew, which
+  happens several times as a screen loads, so a tap in the first moments
+  after opening the app, or during a refresh, could do nothing. On a slow
+  connection on a job site that could be several seconds of dead taps.
+- **Recently deleted shows the newest first**, so the bid you just deleted
+  is at the top instead of below the fold.
+- **The bid step bar ignores deleted drawings.** Marks and runs on a plan
+  set you had deleted still ticked "Count" and "Runs". They no longer do.
+
+- **Another website can no longer act as you.** While you were signed in, a
+  page on any other site could quietly send BidRidge a request that cleared
+  your logo, removed the sample bid or accepted every labor-step
+  suggestion. The server now only takes changes from BidRidge's own screens.
+- **Only the owner or an admin changes the letterhead and proposal look.**
+  Estimators could change the company's branding and every proposal's
+  defaults, which their role was never meant to allow. They now see those
+  settings read-only, with a line saying who can change them.
+
+- **Closed security gaps found by an automated "attacker" test.** A new test
+  signs in as a stranger from another company and calls every one of the
+  server's 403 routes with the first company's ids. It found that saving an
+  assembly, kit or run type with another company's material or assembly id
+  was accepted, and the reply showed that material's name and price. Any
+  logged-in user could read a competitor's prices one id at a time. Old
+  hidden assembly routes also let anyone change another company's items.
+  All refused now. Sign-up is now limited (10 an hour per sender, 100 an
+  hour overall), and so are wrong current passwords on "Change password".
+
+- **See a material's price history.** In a material's editor, More options › Price history lists every recorded price change, newest first: the price, the change in %, who changed it and how (typed, imported), the supplier, and the pack it was priced from. View only — bids keep the prices they were built with.
+
+- **Type a price by the roll or box.** In a material's editor, "More
+  options" now holds the pack it's bought in ("10 in a bundle", "250 ft
+  roll"). Once set, you can type the price of the whole pack and the app
+  works out the per-foot or per-each price, rounded up. Supplier pricing
+  shows the pack price beside the unit price too.
+
+- **Every price change on a material is now remembered.** Typing a price,
+  importing one, saving a bid line to the library, or going back to
+  BidRidge's price each writes one line of price history (old price, new
+  price, who, how, supplier and pack). There is no screen for it yet; the
+  point of starting now is that history cannot be filled in afterwards.
+  Bids are untouched — they keep the prices they were built with.
+- **Pack prices round up, never down.** When a pack price is divided into a
+  per-foot or per-each price, the result rounds up at the fourth decimal, so
+  a converted price can never come out a hair low.
+- **A step bar on every bid.** Plans › Scale › Count › Runs › Review › Print,
+  with a tick on what's done and one yellow "Next" button for what to do
+  next. It's a guide, not a gate — any step can be done in any order, runs
+  are optional, and a bid counted by hand without plans skips straight past
+  Plans and Scale.
+- **New homerun icon**: an arrow with wire ticks, like a homerun on a
+  drawing, instead of a plug on each end.
+
+- **Back goes back to where you were.** Open a bid from the Bids list or the
+  Plans list and its Back button now says "Bids" or "Plans" and takes you
+  there, instead of always going to the Dashboard.
+
+- **One "Recently deleted" page.** Everything you archive — bids, materials,
+  assemblies, kits, modifiers and clients — is now listed in one place in the
+  left menu, each with a Restore button. Before, each kind had its own
+  Archived tab and you had to know where to look.
+
+- **The left menu is now daily work on top, setup at the bottom.** Bids and
+  Plans have their own entries again: Bids is every bid in one searchable
+  list, and Plans is every job with drawings plus an "Upload a plan" button.
+  Settings sits at the bottom with Crew, Labor rates, Performance and (for
+  staff) Admin. On a phone the bottom bar shows its words and has a "More"
+  button for everything else. Old links still open the right screen.
+- **Less empty screen.** On a bid, close-out, extra costs, tax and pricing
+  settings now sit under the line items instead of in a long column on the
+  right, so the bid total stays beside the lines while you scroll. Settings'
+  four pricing cards sit two by two on a wide screen.
 - **Tap a detail reference on a plan to go to that detail, and Back to
   return.** When a sheet says "SEE DETAIL 2/E004", tapping that reference
   now offers "Go to detail 2". Go opens sheet E004 zoomed to detail 2's own

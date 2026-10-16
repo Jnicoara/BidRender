@@ -1,0 +1,25 @@
+# Before / after — every layout change from both overnight runs
+
+**Before** = `29f58481`, track-c just before night 1's first layout change
+(2026-10-14 20:04). **After** = today's build (`817e6bea` code). Both were
+production builds against the same local database and the stress account
+(Stress Co, 155 bids), the same screens at the same sizes — laptop
+1440×900 and phone 375×812 — taken one after the other on 2026-10-15.
+
+| Change                          | Files (`-laptop` / `-phone`, `-before` / `-after`)        | What to look at                                                                                                                                                                                                                                                                                                |
+| ------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation (sidebar, phone bar) | `nav-*`, `nav-more-phone-after`                           | Daily work on top, setup at the bottom; phone: Dashboard, Bids, Plans, Materials, More (no More menu before)                                                                                                                                                                                                   |
+| Bids list                       | `bids-list-*`                                             | Before: `/bids` did not exist and landed on the Dashboard. After: every bid, searchable                                                                                                                                                                                                                        |
+| Plans list                      | `plans-list-*`                                            | Every bid with drawings, plus Upload a plan                                                                                                                                                                                                                                                                    |
+| Recently deleted                | `recently-deleted-*`, `recently-deleted-*-before-archive` | Before: `/trash` did not exist (Dashboard); deleted bids lived in the Archive screen. After: one place, with days left and Restore                                                                                                                                                                             |
+| Bid page + step bar             | `bid-page-*`                                              | The step bar (Plans › Scale › Count › Runs › Review › Print) and "Next:" button; the guide strip at the bottom                                                                                                                                                                                                 |
+| Plans screen header             | `plans-screen-step-bar-*`                                 | The same step bar on the Plans screen                                                                                                                                                                                                                                                                          |
+| Homerun icon                    | `homerun-icon-before`, `homerun-icon-after`               | ICON ONLY, drawn from each version's exact SVG at the 14 px it is used at and at 72 px: a patch lead before, a run with conductor ticks after. The live toggle appears only on a sheet with detected homeruns, and the fixture "Bar layout check" (5 sheets) has none, so the toolbar itself could not be shot |
+| "Couldn't load"                 | `couldnt-load-clients-*`                                  | Clients with its read cut off: "No clients yet · Working list 0" before; "Couldn't load your clients" + the top bar after                                                                                                                                                                                      |
+| Refused save (red box)          | `refused-save-*`                                          | A quantity changed 4 → 6 whose save never answers, 350 ms after Enter: green "saved" tick (fading) + "Failed to fetch" before; red box, value kept, "Couldn't reach BidRidge…" after                                                                                                                           |
+
+The failures in the last two rows were made by blocking those requests in
+the browser (identical for both builds), not by breaking the database.
+Earlier, unpaired drill shots — the database down, offline, memory — are
+one folder up (`drill-*`, `offline-*`), with their numbers in
+`references/stress-results.md`.

@@ -623,6 +623,23 @@ async function main() {
   try {
     for (const size of sizes) {
       const page = await openAt(browser, size, openId);
+      // SIGNED IN, OR NOTHING. On 2026-10-14 the server ran with a different
+      // JWT_SECRET from .env's, every minted session was refused, and the
+      // audit measured the public landing page at every "screen" — and
+      // printed "0 hard fault(s)". A check that cannot see the app must not
+      // report on it: the app's own nav is the proof of a session.
+      await gotoRoute(page, "/dashboard");
+      const signedIn = await page
+        .locator('nav[aria-label="Main"]')
+        .first()
+        .waitFor({ state: "attached", timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!signedIn)
+        throw new Error(
+          `Not signed in at ${size.name}: the app's nav never appeared, so every screen would be the landing page. ` +
+            `Is the server's JWT_SECRET the one in .env (a JWT_SECRET set in the shell wins over .env), and is OPEN_ID (${openId}) a user in this database?`
+        );
       // Login screen first, on a context with no session.
       if (!only || only.includes("login")) {
         const anon = await deviceContext(browser, size);

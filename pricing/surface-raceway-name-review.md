@@ -243,3 +243,12 @@ row in one place so A can relabel them in one pass.
 connector", "extension adapter", "shallow", "700" and "wiremold". Each must
 surface its own row first. If the recount finds a starter or run type using
 638, 639, 645 or the 500 entrance end, stop and find out why first.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

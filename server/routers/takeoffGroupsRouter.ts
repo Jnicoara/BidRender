@@ -897,12 +897,21 @@ export const takeoffGroupsRouter = router({
         );
         warning = sendWarning(row, bridgeLines, families);
         lineId = (
-          await db.addCountToBid(
-            group.bidId,
-            ctx.scope.dataUserId,
-            group,
-            count
-          )
+          await db
+            .addCountToBid(group.bidId, ctx.scope.dataUserId, group, count)
+            .catch(error => {
+              // Two sends of one count at once (a double-click): the unique
+              // key lets one line in and refuses the other. That second send
+              // is the same case as a send AFTER the first — "already on the
+              // bid" — not a server error (race drill, 2026-10-14: the loser
+              // answered with the raw failed INSERT).
+              if (db.isDuplicateKey(error))
+                throw new TRPCError({
+                  code: "CONFLICT",
+                  message: refusalMessage("already-on-bid", group.label),
+                });
+              throw error;
+            })
         ).id;
       }
       const roleLineIds = await db.addLaborRoleLinesToBid(

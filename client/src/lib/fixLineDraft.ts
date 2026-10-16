@@ -18,6 +18,7 @@
  *     taps it, which writes it INTO the box. Nothing is read from the hint.
  */
 import type { LineFixGaps } from "@shared/lineFix";
+import { parseTypedNumber } from "./inlineEdit";
 
 export type FixDraft = {
   /** Typed text per part, keyed by the recipe's material id. */
@@ -58,10 +59,15 @@ export type FixLineRequest = {
 };
 
 /** A typed number, or null for a blank box, or NaN for something unreadable. */
+/**
+ * Blank is null; anything else is read the way every number box reads
+ * (parseTypedNumber). This stripped EVERY comma and then used Number(), so
+ * "1,5" — a European 1.5 — became 15 hours or $15 on a bid line, and "0x10"
+ * became 16 (2026-10-15). Junk is NaN, which the request refuses in words.
+ */
 function typed(text: string): number | null {
-  const t = text.trim().replace(/^\$/, "").replace(/,/g, "");
-  if (t === "") return null;
-  const n = Number(t);
+  if (text.trim() === "") return null;
+  const n = parseTypedNumber(text);
   return Number.isFinite(n) ? n : Number.NaN;
 }
 

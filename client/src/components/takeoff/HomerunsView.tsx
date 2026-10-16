@@ -12,7 +12,7 @@
  * (CLAUDE.md § Customization). Off until asked: the labels sit on the
  * drawing, and a drawing is read first.
  */
-import { Cable } from "lucide-react";
+import { HomerunIcon } from "./runIcons";
 import { Button } from "@/components/ui/button";
 import {
   homerunLabel,
@@ -48,7 +48,7 @@ export function HomerunsToggle({
       title="Homerun arrows and their circuit tags, read from this sheet — read-only"
       onClick={() => onChange(!on)}
     >
-      <Cable className="w-3.5 h-3.5" />
+      <HomerunIcon className="w-3.5 h-3.5" />
       Homeruns
       <span className="text-muted-foreground">{count}</span>
     </Button>

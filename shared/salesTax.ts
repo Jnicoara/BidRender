@@ -419,8 +419,16 @@ export function matchJurisdiction(
  */
 export function explainTaxStatus(
   status: SalesTaxStatus,
-  jobAddress?: string | null
+  jobAddress?: string | null,
+  /**
+   * The bid was set to a tax area that has since been archived. Without this
+   * the note blamed the job address — true, and beside the point: the person
+   * had picked an area, and it went (break-it, 2026-10-15).
+   */
+  chosenAreaArchived = false
 ): string | null {
+  if (status === "no-rate" && chosenAreaArchived)
+    return "The tax area chosen for this bid has been archived. Pick another under Tax on this bid, add the job address so one can be matched, or set a rate on this bid.";
   switch (status) {
     case "ok":
       return null;

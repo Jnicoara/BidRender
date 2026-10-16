@@ -65,7 +65,8 @@ export default defineConfig({
     {
       name: "desktop",
       dependencies: ["setup"],
-      testMatch: /(flow|screens|version|plans|marks|pdfs|demo)\.spec\.ts/,
+      testMatch:
+        /(flow|screens|version|plans|marks|pdfs|demo|newScreens|guide)\.spec\.ts/,
       use: { viewport: { width: 1440, height: 900 } },
     },
     {
@@ -75,15 +76,26 @@ export default defineConfig({
       use: { viewport: { width: 390, height: 844 }, ...touch },
     },
     {
+      // The owner's phone size for the overnight review (2026-10-14): the
+      // narrowest common iPhone. Only the new-screens spec, so the rest of
+      // the smoke keeps its one phone run. Laptop and both iPads name
+      // newScreens in their own testMatch (case-sensitive: `screens` does
+      // NOT match it).
+      name: "phone-375",
+      dependencies: ["setup"],
+      testMatch: /(newScreens|guide)\.spec\.ts$/,
+      use: { viewport: { width: 375, height: 812 }, ...touch },
+    },
+    {
       name: "tablet-portrait",
       dependencies: ["setup"],
-      testMatch: /(screens|touch|plans|marks)\.spec\.ts/,
+      testMatch: /(screens|touch|plans|marks|newScreens|guide)\.spec\.ts/,
       use: { viewport: { width: 820, height: 1180 }, ...touch },
     },
     {
       name: "tablet-landscape",
       dependencies: ["setup"],
-      testMatch: /(screens|touch|plans|marks)\.spec\.ts/,
+      testMatch: /(screens|touch|plans|marks|newScreens|guide)\.spec\.ts/,
       use: { viewport: { width: 1180, height: 820 }, ...touch },
     },
   ],

@@ -39,6 +39,7 @@ import {
   type FixLineRequest,
 } from "@/lib/fixLineDraft";
 import { LIBRARY_NOTE, otherLinesOffer } from "@shared/lineFix";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 
 const UNIT_WORD: Record<string, string> = {
   each: "each",
@@ -293,7 +294,7 @@ export function FixLinePanel({
   const showRate =
     gaps.rate || (gaps.hours && !(Number(line.snapshotLaborRate ?? 0) > 0));
   const overhead = data.assembly?.overheadHours ?? 0;
-  const typedHours = Number(draft.hours);
+  const typedHours = parseTypedNumber(draft.hours);
   let focusGiven = false;
   const focusFirst = () => {
     if (focusGiven) return false;

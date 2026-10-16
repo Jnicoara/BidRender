@@ -4,6 +4,81 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## FOR A — S2 `scope_prompts` (scope-tags step 6b), FINAL 2026-10-16 (Track C)
+
+Replaces the 2026-10-12 S2 draft in `track-b-handoff.md`. Additive, step 1
+(a new table; nothing existing is read differently), step 3 empty.
+Rehearsed on a throwaway DB (`bidrender_test_c_s2`: migrated 0000–0163,
+seeded, this applied, then dropped): applies clean, FK and both unique
+keys present; with it, `goldenBids` + `goldenBidsCompare` pass unchanged
+and C's 10 new tests pass. The 6b code (`c-scope-prompts`, local to C, not
+pushed — C pushes track-c only) also RUNS WITHOUT the table: bids ask the
+shipped list, the editor says changes arrive with the next DB update. So
+the table can go to staging/live before or after the code. Changes from
+the 10-12 draft: `notWords` (6a's prompts have them), `shippedKey` (seed
+matches by key), `sortOrder`, two unique keys, no `version` /
+`baselineVersion`.
+
+```sql
+CREATE TABLE `scope_prompts` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int,
+	`baselineId` int,
+	`shippedKey` varchar(64),
+	`name` varchar(255) NOT NULL,
+	`matchWords` varchar(2048) NOT NULL,
+	`notWords` varchar(1024) NOT NULL DEFAULT '',
+	`matchCategories` varchar(1024) NOT NULL DEFAULT '',
+	`isActive` boolean NOT NULL DEFAULT true,
+	`sortOrder` int NOT NULL DEFAULT 0,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `scope_prompts_id` PRIMARY KEY(`id`),
+	CONSTRAINT `scope_prompts_shippedKey_unique` UNIQUE(`shippedKey`),
+	CONSTRAINT `scope_prompts_user_baseline_unique` UNIQUE(`userId`,`baselineId`)
+);
+--> statement-breakpoint
+ALTER TABLE `scope_prompts` ADD CONSTRAINT `scope_prompts_userId_users_id_fk` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+CREATE INDEX `scope_prompts_baselineId_idx` ON `scope_prompts` (`baselineId`);
+```
+
+`drizzle/schema.ts` declaration (append; C's code imports `scopePrompts`
+and `ScopePromptRow` by these names):
+
+```ts
+export const scopePrompts = mysqlTable(
+  "scope_prompts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").references(() => users.id, { onDelete: "cascade" }),
+    baselineId: int("baselineId"),
+    /** The shipped prompt's stable key; NULL on every company row. */
+    shippedKey: varchar("shippedKey", { length: 64 }),
+    name: varchar("name", { length: 255 }).notNull(),
+    matchWords: varchar("matchWords", { length: 2048 }).notNull(),
+    notWords: varchar("notWords", { length: 1024 }).default("").notNull(),
+    matchCategories: varchar("matchCategories", { length: 1024 })
+      .default("")
+      .notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    sortOrder: int("sortOrder").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    unique("scope_prompts_shippedKey_unique").on(t.shippedKey),
+    unique("scope_prompts_user_baseline_unique").on(t.userId, t.baselineId),
+    index("scope_prompts_baselineId_idx").on(t.baselineId),
+  ]
+);
+
+export type ScopePromptRow = typeof scopePrompts.$inferSelect;
+export type InsertScopePromptRow = typeof scopePrompts.$inferInsert;
+```
+
+When S2 is on local-dev, C merges it and lands 6b on track-c.
+
 ## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
 
 **Never replace, restore, re-copy or drop a shared local database

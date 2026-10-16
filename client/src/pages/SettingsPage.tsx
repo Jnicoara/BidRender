@@ -45,6 +45,8 @@ import {
   useCrosshairColor,
   useCrosshairSize,
   useShowNextSegment,
+  useShowStepBar,
+  useGuideState,
 } from "@/hooks/useCrosshairColor";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -101,7 +103,7 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
     display: {
       label: "Display",
       blurb:
-        "Theme, text size and the plan crosshair. Saved on this device, and affects nothing else.",
+        "Theme, text size, the plan crosshair and the bid step bar. Saved on this device, and affects nothing else.",
     },
     account: {
       label: "Account",
@@ -132,7 +134,7 @@ function AccountSection() {
           className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/40 text-sm text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors"
         >
           <LogOut size={14} />
-          Sign Out
+          Sign out
         </button>
       </div>
     </section>
@@ -445,6 +447,8 @@ function DisplaySection() {
 
       <CrosshairColorSetting />
       <ShowNextSegmentSetting />
+      <ShowStepBarSetting />
+      <GuideSetting />
     </div>
   );
 }
@@ -468,6 +472,67 @@ function ShowNextSegmentSetting() {
         </p>
       </div>
       <Switch id="show-next-segment" checked={show} onCheckedChange={setShow} />
+    </section>
+  );
+}
+
+/**
+ * The bid step bar (Plans › … › Print). On by default; off hides it on the
+ * bid and Plans screens for this person on this browser. Nothing else moves.
+ */
+function ShowStepBarSetting() {
+  const [show, setShow] = useShowStepBar();
+  return (
+    <section className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          <label htmlFor="show-step-bar">Show the bid step bar</label>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          The line under a bid's name — Plans, Scale, Count, Runs, Review, Print
+          — with one Next button. Turn it off if you know your own way through a
+          bid.
+        </p>
+      </div>
+      <Switch id="show-step-bar" checked={show} onCheckedChange={setShow} />
+    </section>
+  );
+}
+
+/**
+ * Guide mode (client/src/lib/guide.ts): one tip at a time along the bottom,
+ * walking a bid from plans to print. On until turned off, here or from the
+ * strip; "show closed tips again" brings back every tip closed with ×.
+ */
+function GuideSetting() {
+  const [state, setState] = useGuideState();
+  return (
+    <section className="flex items-start justify-between gap-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-0.5">
+          <label htmlFor="guide-mode">Guide mode</label>
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          One tip at a time along the bottom of the screen — upload, scale,
+          count, runs, review, print — and "Where do I…?" to find anything. Turn
+          it off once you know your way around.
+        </p>
+        {!state.off && state.hidden.length > 0 && (
+          <button
+            type="button"
+            className="mt-1.5 text-xs text-[#F5C518] hover:underline"
+            onClick={() => setState({ ...state, hidden: [] })}
+          >
+            Show the {state.hidden.length} closed tip
+            {state.hidden.length === 1 ? "" : "s"} again
+          </button>
+        )}
+      </div>
+      <Switch
+        id="guide-mode"
+        checked={!state.off}
+        onCheckedChange={on => setState({ ...state, off: !on })}
+      />
     </section>
   );
 }
@@ -525,7 +590,13 @@ export default function SettingsPage({
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6">
-        <div className="max-w-2xl">
+        {/* A readable form column, except Pricing on a wide screen: its four
+            cards sit two by two there, so a laptop does not show one narrow
+            column of cards with the right half of the window empty (owner,
+            2026-10-14, "dead space"). */}
+        <div
+          className={cn("max-w-2xl", section === "pricing" && "xl:max-w-6xl")}
+        >
           {section === "pricing" && <BidPricingDefaultsSection />}
           {section === "heights" && <HeightsSection />}
           {section === "branding" && <BrandingSection />}

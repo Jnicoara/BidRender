@@ -13,9 +13,43 @@ import {
   commitNumericEdit,
   formatForEdit,
   fromPercent,
+  parseTypedNumber,
   planFieldKey,
   revertToSaved,
 } from "./inlineEdit";
+
+describe("a number as a person types it (break-it drill, 2026-10-15)", () => {
+  it("reads a dollar sign and thousands commas as meant", () => {
+    expect(parseTypedNumber("1,500")).toBe(1500);
+    expect(parseTypedNumber("$12.50")).toBe(12.5);
+    expect(parseTypedNumber("$1,250.75")).toBe(1250.75);
+    expect(parseTypedNumber(" 7 ")).toBe(7);
+    expect(parseTypedNumber(".5")).toBe(0.5);
+    expect(parseTypedNumber("-3")).toBe(-3);
+    expect(parseTypedNumber("12,345,678")).toBe(12345678);
+    // These used to snap back, losing the typed price.
+    expect(commitNumericEdit("1,500", 0)).toEqual({
+      action: "save",
+      value: 1500,
+    });
+    expect(commitNumericEdit("$12.50", 0)).toEqual({
+      action: "save",
+      value: 12.5,
+    });
+  });
+
+  it("refuses anything that would become a DIFFERENT number", () => {
+    // Number() read these as 16, 3 and 7.
+    for (const text of ["0x10", "0b11", "0o7"])
+      expect(parseTypedNumber(text)).toBeNaN();
+    // A European decimal must not become fifteen.
+    expect(parseTypedNumber("1,5")).toBeNaN();
+    expect(parseTypedNumber("1,50")).toBeNaN();
+    for (const text of ["12.5.3", "Infinity", "five", "1 000", "$", "-", "--3"])
+      expect(parseTypedNumber(text)).toBeNaN();
+    expect(commitNumericEdit("0x10", 0)).toMatchObject({ action: "revert" });
+  });
+});
 
 describe("Escape reverts the edit", () => {
   it("returns the last saved value, discarding whatever was typed", () => {

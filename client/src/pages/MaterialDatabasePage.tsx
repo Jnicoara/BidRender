@@ -28,6 +28,8 @@ import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { money } from "@/lib/money";
+import { packPhrase } from "@shared/packPricing";
 import { PRICE_LIST_IMPORT_SHOWN } from "@/lib/priceListImport";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -47,6 +49,7 @@ import {
   summarisePriceAges,
   type PriceAge,
 } from "@shared/priceStaleness";
+import { errorText } from "@/lib/errorText";
 
 type Material = {
   id: number;
@@ -58,6 +61,10 @@ type Material = {
   supplierName: string | null;
   priceUpdatedAt: Date | string | null;
   searchAliases: string | null;
+  /** The pack it is bought in (0157–0159). NULL = sold singly / typed per unit. */
+  packQty: string | null;
+  packLabel: string | null;
+  packPrice: string | null;
 };
 
 const AGE_FILTERS: Array<{ key: PriceAge | "all"; label: string }> = [
@@ -96,8 +103,21 @@ export default function MaterialDatabasePage() {
   };
 
   const updateMaterial = trpc.materials.update.useMutation({
-    onError: error => toast.error(error.message),
-    onSuccess: () => refresh(),
+    onError: error => toast.error(errorText(error)),
+    onSuccess: result => {
+      // The saved row (new `updatedAt` included) into every cached copy of
+      // the list at once, so the Catalog editor opened straight after this
+      // does not carry an old timestamp into the stale-save guard
+      // (shared/staleEdit.ts) and refuse this person's own next save.
+      const saved = result?.material;
+      if (saved && !result.forked)
+        utils.materials.list.setQueriesData(undefined, {}, old =>
+          Array.isArray(old)
+            ? old.map(row => (row.id === saved.id ? { ...row, ...saved } : row))
+            : old
+        );
+      refresh();
+    },
   });
 
   // Run once per query; `rows` filters it, the correction note reads it.
@@ -368,19 +388,57 @@ export default function MaterialDatabasePage() {
                           />
                         </div>
 
-                        <div className="md:w-28 shrink-0 flex justify-end">
+                        <div className="md:w-28 shrink-0 flex flex-col items-end gap-1">
                           <InlineNumberField
                             value={Number(material.costPerUnit)}
                             ariaLabel={`Price for ${material.name}`}
                             className="h-7 w-24 text-xs text-right"
                             rules={{ min: 0, allowEmpty: false }}
                             onSave={next =>
-                              updateMaterial.mutate({
+                              updateMaterial.mutateAsync({
                                 id: material.id,
                                 costPerUnit: next,
                               })
                             }
                           />
+                          {/*
+                            By the pack, once a pack size is set (Materials ›
+                            edit › More options): type the roll or box price
+                            and the per-unit price above is worked out on the
+                            server, rounded up (pricing-safety-plan § 2).
+                          */}
+                          {material.packQty !== null &&
+                            Number(material.packQty) > 0 && (
+                              <div className="flex items-center gap-1">
+                                <InlineNumberField
+                                  value={
+                                    material.packPrice !== null
+                                      ? Number(material.packPrice)
+                                      : Number(
+                                          (
+                                            Number(material.costPerUnit) *
+                                            Number(material.packQty)
+                                          ).toFixed(2)
+                                        )
+                                  }
+                                  ariaLabel={`Price per ${packPhrase(Number(material.packQty), material.unitOfSale, material.packLabel)} for ${material.name}`}
+                                  className="h-6 w-20 text-[11px] text-right"
+                                  rules={{ min: 0, allowEmpty: false }}
+                                  onSave={next =>
+                                    updateMaterial.mutateAsync({
+                                      id: material.id,
+                                      packPrice: next,
+                                    })
+                                  }
+                                />
+                                <span
+                                  className="text-[10px] text-muted-foreground whitespace-nowrap"
+                                  title={`Price for the whole ${packPhrase(Number(material.packQty), material.unitOfSale, material.packLabel)}`}
+                                >
+                                  /{material.packLabel?.trim() || "pack"}
+                                </span>
+                              </div>
+                            )}
                         </div>
 
                         <div
@@ -453,16 +511,20 @@ function ImportPriceListDialog({
     priced: string[];
     unmatched: string[];
     renamed: Array<{ from: string; to: string }>;
+    refused: Array<{ name: string; prices: number[] }>;
   } | null>(null);
 
   const importPrices = trpc.materials.importPrices.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: data => {
       setResult(data);
       toast.success(
         `Priced ${data.priced.length} material${data.priced.length === 1 ? "" : "s"}` +
           (data.unmatched.length
             ? `, ${data.unmatched.length} name${data.unmatched.length === 1 ? "" : "s"} matched nothing`
+            : "") +
+          (data.refused.length
+            ? `, ${data.refused.length} not changed (named at two prices)`
             : "")
       );
       onDone();
@@ -520,6 +582,22 @@ function ImportPriceListDialog({
                 ))}
                 {result.renamed.length > 20 &&
                   `and ${result.renamed.length - 20} more under their new names`}
+              </div>
+            )}
+            {result.refused.length > 0 && (
+              <div className="text-amber-400">
+                Not changed — the sheet names these at more than one price; fix
+                the sheet and import again:{" "}
+                {result.refused
+                  .slice(0, 20)
+                  .map(
+                    c =>
+                      `${c.name} (${c.prices.map(p => money(p)).join(" / ")})`
+                  )
+                  .join(", ")}
+                {result.refused.length > 20
+                  ? ` and ${result.refused.length - 20} more`
+                  : ""}
               </div>
             )}
             {result.unmatched.length > 0 && (

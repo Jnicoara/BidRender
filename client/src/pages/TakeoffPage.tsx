@@ -40,6 +40,7 @@
  * scale still opens, still lists every sheet, and still measures once the user
  * sets a scale by hand.
  */
+import { BidStepBar } from "@/components/BidStepBar";
 import {
   useCallback,
   useEffect,
@@ -10495,12 +10496,22 @@ export default function TakeoffPage({
               {/* Laptop only: on a tablet or phone it was two or three lines
                   of height taken from the drawing on every visit, to say what
                   the screen is for (device audit, 2026-10-01). */}
+              {/* The bid's steps and the one next step, in the line the
+                  blurb used ("Set each sheet's scale, then mark and trace…"),
+                  which the bar now says step by step (owner, 2026-10-14).
+                  Laptop only, for the reason above. */}
               {!compact && (
-                <p className="text-xs text-muted-foreground">
-                  Set each sheet&apos;s scale, then mark and trace what is on
-                  it. Counts you send to the bid change its price; the rest stay
-                  here until you do.
-                </p>
+                <BidStepBar
+                  bidId={bidId}
+                  here="plans"
+                  className="mt-0.5"
+                  onGo={place => {
+                    window.location.hash =
+                      place === "proposal"
+                        ? `/bids/${bidId}/proposal`
+                        : `/bids/${bidId}`;
+                  }}
+                />
               )}
             </div>
             {/*

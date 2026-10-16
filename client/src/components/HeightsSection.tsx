@@ -43,6 +43,8 @@ import { ExtrasSection } from "@/components/ExtrasSection";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { formatElevation } from "@shared/takeoffHeights";
 import type { HeightRow } from "@shared/takeoffHeights";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
 
 /**
  * What to call the level a number came from, in the estimator's words.
@@ -185,7 +187,7 @@ export function HeightsSection() {
   const [newLabel, setNewLabel] = useState("");
 
   const refresh = () => utils.takeoffHeights.company.invalidate();
-  const onError = (error: { message: string }) => toast.error(error.message);
+  const onError = (error: { message: string }) => toast.error(errorText(error));
 
   const setDistribution =
     trpc.takeoffHeights.setCompanyDistribution.useMutation({
@@ -222,7 +224,11 @@ export function HeightsSection() {
     onError,
   });
 
-  if (!query.data) return null;
+  // Not blank: a section that failed to load says so (drill, 2026-10-15).
+  if (!query.data)
+    return query.isError ? (
+      <LoadFailed what="your heights" onRetry={() => void query.refetch()} />
+    ) : null;
   const { distributionHeight, types, bidsInheriting } = query.data;
 
   const visible = types.filter(row => row.common && row.isActive);

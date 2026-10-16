@@ -56,6 +56,7 @@ import { MARK_STATUSES, USER_MARK_STATUSES } from "../../shared/markStatus";
 import { TAKEOFF_LOCATIONS } from "../../drizzle/schema";
 import { SYMBOL_THUMBNAIL_MAX_CHARS } from "../../shared/symbolCapture";
 import * as db from "../db";
+import { requireLibraryRefs } from "../libraryRefs";
 import { planViewerUrl } from "../storage";
 import {
   isSameLook,
@@ -1044,6 +1045,11 @@ export const takeoffStampsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
+      // The assembly it links to must be this company's or shared
+      // (server/libraryRefs.ts).
+      await requireLibraryRefs(ctx.scope.dataUserId, {
+        assemblies: [input.assemblyId],
+      });
       const lookupKey = symbolLookupKey(input.label);
       // A renamed symbol answers to its new name AND its captured one, so
       // boxing it again under either finds the same row (no second "Linear").
@@ -1166,7 +1172,9 @@ export const takeoffStampsRouter = router({
         lookupKey,
         assemblyId,
         thumbnail: input.thumbnail,
-        capturedFromSheetId: input.capturedFromSheetId ?? null,
+        // The sheet as READ above, owned by this company — never the id as
+        // sent, which stored another company's sheet id until 2026-10-14.
+        capturedFromSheetId: sheet?.id ?? null,
       });
       // Its first look, with the box, so Find all matching can search it
       // later from any sheet. Without a box the old picture stands for it.

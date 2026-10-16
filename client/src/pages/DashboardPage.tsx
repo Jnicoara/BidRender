@@ -18,7 +18,7 @@
  * Card values come from bids.dashboard, which rolls each bid up through the
  * same code path the detail view uses. This screen formats; it never computes.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -66,6 +66,7 @@ import { IncompletePriceTag } from "@/components/IncompletePriceTag";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { TotalDueCaption } from "@/components/TotalDueCaption";
 import { planCountLabel, recentPlanBids } from "@shared/planCounts";
+import { errorText } from "@/lib/errorText";
 
 /** Deadlines read as a weekday and date — "Fri 14 Aug" scans faster than a slashed number. */
 const formatDue = (value: string | Date | null) => {
@@ -131,18 +132,34 @@ export default function DashboardPage({
   onCount: (id: number) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  /** Set the instant a create is sent; see `start`. */
+  const creating = useRef(false);
   const [name, setName] = useState("");
   const [confirmArchive, setConfirmArchive] = useState<PendingArchive | null>(
     null
   );
 
   const utils = trpc.useUtils();
-  const { data: bids = [], isLoading } = trpc.bids.dashboard.useQuery();
+  const {
+    data: bids = [],
+    isLoading,
+    // Failed with nothing to show; a failed REFRESH keeps the list (the
+    // app-wide bar speaks for it — @/lib/dataReach).
+    isLoadingError: isError,
+    refetch: refetchBids,
+  } = trpc.bids.dashboard.useQuery();
+  /*
+    The headline is a NUMBER, so it waits for real data. Until 2026-10-14 it
+    read the empty list a loading or failed query defaults to, and said "Out
+    for bid (0) · total due $0" above "Loading bids…" — for seconds on a
+    slow connection (failure drill, references/stress-results.md).
+  */
+  const headlineKnown = !isLoading && !isError;
   const recentPlans = useMemo(() => recentPlanBids(bids), [bids]);
   const { data: archived = [] } = trpc.bids.archived.useQuery();
 
   const createBid = trpc.bids.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: bid => {
       if (bid) onOpenBid(bid.id);
     },
@@ -164,7 +181,7 @@ export default function DashboardPage({
   const startFromPlan = trpc.bids.create.useMutation({
     onError: error => {
       clearPendingPlan();
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSuccess: bid => {
       if (!bid) {
@@ -197,7 +214,7 @@ export default function DashboardPage({
    * is editable the moment the screen opens.
    */
   const startCounting = trpc.bids.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: bid => {
       if (bid) onCount(bid.id);
     },
@@ -251,7 +268,7 @@ export default function DashboardPage({
     onError: (error, _vars, context) => {
       if (context?.snapshot)
         utils.bids.dashboard.setData(undefined, context.snapshot);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSuccess: (_result, { id }, context) => {
       toast.success(
@@ -267,7 +284,7 @@ export default function DashboardPage({
   });
 
   const restoreBid = trpc.bids.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Back on your dashboard."),
     onSettled: () => {
       void utils.bids.dashboard.invalidate();
@@ -324,13 +341,32 @@ export default function DashboardPage({
   }, [groups]);
 
   const start = () => {
+    // The form now stays open until the bid exists, so a second Enter or a
+    // double click must not send a second create. A REF, set in this call:
+    // both clicks of a double click run this same function from one render,
+    // so `createBid.isPending` is still false for the second (drilled: two
+    // bids). The button's `disabled` covers the slower cases.
+    if (creating.current) return;
     if (!name.trim()) {
       toast.error("Give the bid a name.");
       return;
     }
-    createBid.mutate({ name: name.trim() });
-    setName("");
-    setAdding(false);
+    creating.current = true;
+    // The form clears only once the bid exists: a refused create (no
+    // connection, a name over the limit) keeps what was typed beside the
+    // message saying why. It cleared at once until 2026-10-15.
+    createBid.mutate(
+      { name: name.trim() },
+      {
+        onSuccess: () => {
+          setName("");
+          setAdding(false);
+        },
+        onSettled: () => {
+          creating.current = false;
+        },
+      }
+    );
   };
 
   return (
@@ -347,16 +383,28 @@ export default function DashboardPage({
           </div>
           <div className="text-right shrink-0 mr-2">
             <div className="text-xs text-muted-foreground">
-              Out for bid ({summary.open.count}) · total due{" "}
-              <IncompletePriceTag show={summary.open.incomplete} />
+              Out for bid{headlineKnown && ` (${summary.open.count})`} · total
+              due{" "}
+              {headlineKnown && (
+                <IncompletePriceTag show={summary.open.incomplete} />
+              )}
             </div>
             {/* The same "+ 4 lines not priced" the cards carry, summed — a
                 headline quietly short by four parts reads as a whole one. */}
-            <NotPricedTotal
-              amount={moneyWhole(summary.open.total)}
-              notPriced={summary.open.notPriced}
-              className="font-mono text-base text-[#F5C518]"
-            />
+            {headlineKnown ? (
+              <NotPricedTotal
+                amount={moneyWhole(summary.open.total)}
+                notPriced={summary.open.notPriced}
+                className="font-mono text-base text-[#F5C518]"
+              />
+            ) : (
+              <div
+                className="font-mono text-base text-muted-foreground"
+                aria-label={isError ? "Total not available" : "Loading total"}
+              >
+                {isError ? "—" : "…"}
+              </div>
+            )}
           </div>
           {/* Only offered once there is something in it — an always-visible
               empty Archive is a door to a blank room. */}
@@ -367,7 +415,7 @@ export default function DashboardPage({
               className="h-8 gap-1.5 text-xs shrink-0"
               onClick={onOpenArchive}
             >
-              <Archive className="w-3.5 h-3.5" /> Archive
+              <Archive className="w-3.5 h-3.5" /> Recently deleted
               <span className="text-muted-foreground">{archived.length}</span>
             </Button>
           )}
@@ -416,7 +464,12 @@ export default function DashboardPage({
               className="h-8 flex-1 min-w-[14rem] text-sm"
               autoFocus
             />
-            <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={start}>
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={start}
+              disabled={createBid.isPending}
+            >
               <Check className="w-3 h-3" /> Create
             </Button>
             <Button
@@ -545,6 +598,22 @@ export default function DashboardPage({
           <div className="py-16 text-center text-sm text-muted-foreground">
             Loading bids…
           </div>
+        ) : isError ? (
+          /* A failed load is not an empty company: it said "No bids yet"
+             to a company with 150 of them until 2026-10-14. */
+          <div className="py-16 text-center text-sm text-muted-foreground space-y-2">
+            <p>
+              Couldn't load your bids. They're safe — this is a connection
+              problem.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void refetchBids()}
+            >
+              Try again
+            </Button>
+          </div>
         ) : bids.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
             No bids yet. Create one to start pricing a job.
@@ -572,7 +641,7 @@ export default function DashboardPage({
                     </span>
                     <span
                       className="ml-auto font-mono text-xs text-muted-foreground"
-                      title={`Total due of the ${group.status} bids`}
+                      title={`Total due on ${group.status} bids`}
                     >
                       {/* A column summing a short bid is short too, and says
                           which way: can't be priced, or not priced yet. */}
@@ -656,7 +725,7 @@ export default function DashboardPage({
                                 }}
                                 className="shrink-0 -mr-1 -mt-0.5 p-1 rounded text-muted-foreground/60 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground hover:bg-muted transition-all"
                                 aria-label={`Archive ${bid.name}`}
-                                title="Archive — hides it here, recoverable for 30 days"
+                                title={`Archive — moves it to Recently deleted, recoverable for ${RETENTION_DAYS} days`}
                               >
                                 <Archive className="w-3.5 h-3.5" />
                               </button>
