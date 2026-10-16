@@ -16,7 +16,8 @@ import {
   sql,
   getTableColumns,
 } from "drizzle-orm";
-import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
+import type { SQL } from "drizzle-orm";
+import type { AnyMySqlColumn, MySqlTable } from "drizzle-orm/mysql-core";
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createAppPool } from "./appPool";
@@ -1752,6 +1753,127 @@ const materialContentFields = (row: Material): Partial<InsertMaterial> => {
   return copy;
 };
 
+/** A shared (app-owned, NULL `userId`) row by id, for `forkForOwners`. */
+async function sharedRow<TRow>(
+  table: MySqlTable,
+  idCol: AnyMySqlColumn,
+  userIdCol: AnyMySqlColumn,
+  rowId: number
+): Promise<TRow | undefined> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select()
+    .from(table)
+    .where(and(eq(idCol, rowId), isNull(userIdCol)))
+    .limit(1);
+  return row as TRow | undefined;
+}
+
+/** Rows per multi-row INSERT / per `IN (…)` list in `forkForOwners`. */
+const FORK_CHUNK = 500;
+
+/**
+ * Fork ONE shared row for MANY companies, and say which copies are new.
+ *
+ * ── Why the one-company forks call this too ─────────────────────────────────
+ * A starter change pins every shop without a copy (server/starterChanges.ts
+ * `pinCompanies`). Forking them one at a time was five round trips a shop:
+ * 6.2 s for a material and 18.8 s for an assembly at 2,006 shops, measured
+ * 2026-10-15 (stress-results-b.md round 9). Here it is a fixed handful of
+ * statements whatever the number of shops.
+ *
+ * A second, faster copy of each fork would be two answers to "what does a
+ * copy carry", which is the money bug `shared/forkedRows.ts` was written
+ * about. So there is no second copy: `forkMaterial` and the others are this
+ * function with one owner, and each table's copy is built by ONE `values`
+ * function, used for one company and for two thousand alike.
+ *
+ * Returns owner → { id, made }: `made` is false when the owner already had a
+ * copy the fork reuses (`reuse` narrows which copies count — run types reuse
+ * only an ACTIVE one), which is the existing idempotence of every fork.
+ */
+async function forkForOwners<TRow extends { id: number; version: number }>(
+  spec: {
+    table: MySqlTable;
+    id: AnyMySqlColumn;
+    userId: AnyMySqlColumn;
+    baselineId: AnyMySqlColumn;
+    /** Extra condition a copy must meet to be reused (run types: active). */
+    reuse?: SQL;
+    label: string;
+    /** The shared row, or undefined when there is none. */
+    readBaseline: () => Promise<TRow | undefined>;
+    /** The copy's content, built once per call from the shared row. */
+    values: (baseline: TRow) => Record<string, unknown>;
+    /** Children for copies just made (an assembly's recipe, a type's extras). */
+    afterInsert?: (
+      baseline: TRow,
+      made: ReadonlyArray<{ owner: number; id: number }>
+    ) => Promise<void>;
+  },
+  baselineId: number,
+  owners: readonly number[]
+): Promise<Map<number, { id: number; made: boolean }>> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = new Map<number, { id: number; made: boolean }>();
+  const unique = Array.from(new Set(owners));
+  const copiesOf = async (who: readonly number[]) => {
+    const found = new Map<number, number>();
+    for (let i = 0; i < who.length; i += FORK_CHUNK) {
+      const rows = await db
+        .select({ id: spec.id, owner: spec.userId })
+        .from(spec.table)
+        .where(
+          and(
+            eq(spec.baselineId, baselineId),
+            inArray(spec.userId, who.slice(i, i + FORK_CHUNK)),
+            spec.reuse
+          )
+        )
+        .orderBy(asc(spec.id));
+      for (const r of rows) {
+        const owner = r.owner as number;
+        if (!found.has(owner)) found.set(owner, r.id as number);
+      }
+    }
+    return found;
+  };
+
+  const existing = await copiesOf(unique);
+  for (const [owner, id] of Array.from(existing))
+    result.set(owner, { id, made: false });
+  const missing = unique.filter(o => !existing.has(o));
+  if (missing.length === 0) return result;
+
+  const baseline = await spec.readBaseline();
+  if (!baseline) throw new Error(`Baseline ${spec.label} not found`);
+  const content = spec.values(baseline);
+  for (let i = 0; i < missing.length; i += FORK_CHUNK)
+    await db.insert(spec.table).values(
+      missing.slice(i, i + FORK_CHUNK).map(owner => ({
+        ...content,
+        userId: owner,
+        baselineId: baseline.id,
+        baselineVersion: baseline.version,
+      }))
+    );
+
+  // Read back by owner rather than trusting consecutive insert ids, which
+  // MySQL does not promise under its default auto-increment lock mode.
+  const made = await copiesOf(missing);
+  const madeList = missing.map(owner => {
+    const id = made.get(owner);
+    if (id === undefined)
+      throw new Error(`Fork of ${spec.label} ${baselineId} was not written`);
+    result.set(owner, { id, made: true });
+    return { owner, id };
+  });
+  if (spec.afterInsert) await spec.afterInsert(baseline, madeList);
+  return result;
+}
+
 /**
  * Collapse baseline + user rows into the one list a user should see.
  *
@@ -2127,34 +2249,28 @@ export async function forkMaterial(
   baselineId: number,
   userId: number
 ): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
+  return (await forkMaterialFor(baselineId, [userId])).get(userId)!.id;
+}
 
-  const [existing] = await db
-    .select()
-    .from(materials)
-    .where(
-      and(eq(materials.userId, userId), eq(materials.baselineId, baselineId))
-    )
-    .limit(1);
-  if (existing) return existing.id;
-
-  const [baseline] = await db
-    .select()
-    .from(materials)
-    .where(and(eq(materials.id, baselineId), isNull(materials.userId)))
-    .limit(1);
-  if (!baseline) throw new Error("Baseline material not found");
-
-  // Cast: materialContentFields returns Partial, but `name` is always present
-  // on a real row, so the result satisfies InsertMaterial.
-  const [result] = await db.insert(materials).values({
-    ...materialContentFields(baseline),
-    userId,
-    baselineId: baseline.id,
-    baselineVersion: baseline.version,
-  } as InsertMaterial);
-  return result.insertId;
+/** `forkMaterial` for many companies at once — see `forkForOwners`. */
+export async function forkMaterialFor(
+  baselineId: number,
+  owners: readonly number[]
+) {
+  return forkForOwners<Material>(
+    {
+      table: materials,
+      id: materials.id,
+      userId: materials.userId,
+      baselineId: materials.baselineId,
+      label: "material",
+      readBaseline: () =>
+        sharedRow(materials, materials.id, materials.userId, baselineId),
+      values: baseline => materialContentFields(baseline),
+    },
+    baselineId,
+    owners
+  );
 }
 
 /**
@@ -2670,32 +2786,28 @@ export async function forkLaborRate(
   baselineId: number,
   userId: number
 ): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
+  return (await forkLaborRateFor(baselineId, [userId])).get(userId)!.id;
+}
 
-  const [existing] = await db
-    .select()
-    .from(laborRates)
-    .where(
-      and(eq(laborRates.userId, userId), eq(laborRates.baselineId, baselineId))
-    )
-    .limit(1);
-  if (existing) return existing.id;
-
-  const [baseline] = await db
-    .select()
-    .from(laborRates)
-    .where(and(eq(laborRates.id, baselineId), isNull(laborRates.userId)))
-    .limit(1);
-  if (!baseline) throw new Error("Baseline labor rate not found");
-
-  const [result] = await db.insert(laborRates).values({
-    ...contentFields<LaborRate, InsertLaborRate>(baseline),
-    userId,
-    baselineId: baseline.id,
-    baselineVersion: baseline.version,
-  } as InsertLaborRate);
-  return result.insertId;
+/** `forkLaborRate` for many companies at once — see `forkForOwners`. */
+export async function forkLaborRateFor(
+  baselineId: number,
+  owners: readonly number[]
+) {
+  return forkForOwners<LaborRate>(
+    {
+      table: laborRates,
+      id: laborRates.id,
+      userId: laborRates.userId,
+      baselineId: laborRates.baselineId,
+      label: "labor rate",
+      readBaseline: () =>
+        sharedRow(laborRates, laborRates.id, laborRates.userId, baselineId),
+      values: baseline => contentFields<LaborRate, InsertLaborRate>(baseline),
+    },
+    baselineId,
+    owners
+  );
 }
 
 /** Discard the user's edits, restoring the starter content. Keeps the row id. */
@@ -3041,32 +3153,28 @@ export async function forkModifier(
   baselineId: number,
   userId: number
 ): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
+  return (await forkModifierFor(baselineId, [userId])).get(userId)!.id;
+}
 
-  const [existing] = await db
-    .select()
-    .from(modifiers)
-    .where(
-      and(eq(modifiers.userId, userId), eq(modifiers.baselineId, baselineId))
-    )
-    .limit(1);
-  if (existing) return existing.id;
-
-  const [baseline] = await db
-    .select()
-    .from(modifiers)
-    .where(and(eq(modifiers.id, baselineId), isNull(modifiers.userId)))
-    .limit(1);
-  if (!baseline) throw new Error("Baseline modifier not found");
-
-  const [result] = await db.insert(modifiers).values({
-    ...contentFields<Modifier, InsertModifier>(baseline),
-    userId,
-    baselineId: baseline.id,
-    baselineVersion: baseline.version,
-  } as InsertModifier);
-  return result.insertId;
+/** `forkModifier` for many companies at once — see `forkForOwners`. */
+export async function forkModifierFor(
+  baselineId: number,
+  owners: readonly number[]
+) {
+  return forkForOwners<Modifier>(
+    {
+      table: modifiers,
+      id: modifiers.id,
+      userId: modifiers.userId,
+      baselineId: modifiers.baselineId,
+      label: "modifier",
+      readBaseline: () =>
+        sharedRow(modifiers, modifiers.id, modifiers.userId, baselineId),
+      values: baseline => contentFields<Modifier, InsertModifier>(baseline),
+    },
+    baselineId,
+    owners
+  );
 }
 
 export async function revertModifierToBaseline(id: number, userId: number) {
@@ -3888,18 +3996,29 @@ async function copyAssemblySteps(fromAssemblyId: number, toAssemblyId: number) {
       .where(eq(assemblyLaborSteps.assemblyId, fromAssemblyId))
       .orderBy(asc(assemblyLaborSteps.sortOrder), asc(assemblyLaborSteps.id));
     if (lines.length === 0) return;
-    // The STORED step ids travel, as material ids do on a fork — a fork must
-    // copy what the line points at, not what it currently resolves to.
-    await db.insert(assemblyLaborSteps).values(
-      lines.map(line => ({
-        assemblyId: toAssemblyId,
-        kind: line.kind,
-        laborStepId: line.laborStepId,
-        count: line.count,
-        sortOrder: line.sortOrder,
-      }))
-    );
+    await db
+      .insert(assemblyLaborSteps)
+      .values(assemblyStepCopyRows(toAssemblyId, lines));
   }, undefined);
+}
+
+/**
+ * An assembly's step lines copied onto another: ONE builder for a single
+ * fork and a bulk one. The STORED step ids travel, as material ids do on a
+ * fork — a fork must copy what the line points at, not what it currently
+ * resolves to.
+ */
+function assemblyStepCopyRows(
+  toAssemblyId: number,
+  lines: ReadonlyArray<typeof assemblyLaborSteps.$inferSelect>
+) {
+  return lines.map(line => ({
+    assemblyId: toAssemblyId,
+    kind: line.kind,
+    laborStepId: line.laborStepId,
+    count: line.count,
+    sortOrder: line.sortOrder,
+  }));
 }
 
 /** The step library a company sees, with how many of its assemblies use each. */
@@ -4227,16 +4346,33 @@ export async function setAssemblyMaterials(
     .delete(assemblyMaterials)
     .where(eq(assemblyMaterials.assemblyId, assemblyId));
   if (lines.length === 0) return;
-  await db.insert(assemblyMaterials).values(
-    lines.map((line, index) => ({
-      assemblyId,
-      materialId: line.materialId,
-      qty: line.qty,
-      overrideLaborHours: line.overrideLaborHours ?? null,
-      isBranchWhip: line.isBranchWhip ?? false,
-      sortOrder: index,
-    }))
-  );
+  await db
+    .insert(assemblyMaterials)
+    .values(assemblyMaterialRows(assemblyId, lines));
+}
+
+/** The rows a recipe is stored as: ONE builder for a save and a bulk fork. */
+function assemblyMaterialRows(
+  assemblyId: number,
+  lines: Parameters<typeof setAssemblyMaterials>[1]
+) {
+  return lines.map((line, index) => ({
+    assemblyId,
+    materialId: line.materialId,
+    qty: line.qty,
+    overrideLaborHours: line.overrideLaborHours ?? null,
+    isBranchWhip: line.isBranchWhip ?? false,
+    sortOrder: index,
+  }));
+}
+
+/** The modifier links an assembly is stored as — same reason as above. */
+function assemblyModifierRows(assemblyId: number, modifierIds: number[]) {
+  return modifierIds.map((modifierId, index) => ({
+    assemblyId,
+    modifierId,
+    sortOrder: index,
+  }));
 }
 
 /** Replace which modifiers apply to an assembly. */
@@ -4251,13 +4387,9 @@ export async function setAssemblyModifiers(
     .delete(assemblyModifiers)
     .where(eq(assemblyModifiers.assemblyId, assemblyId));
   if (modifierIds.length === 0) return;
-  await db.insert(assemblyModifiers).values(
-    modifierIds.map((modifierId, index) => ({
-      assemblyId,
-      modifierId,
-      sortOrder: index,
-    }))
-  );
+  await db
+    .insert(assemblyModifiers)
+    .values(assemblyModifierRows(assemblyId, modifierIds));
 }
 
 /**
@@ -4268,36 +4400,104 @@ export async function forkAssembly(
   baselineId: number,
   userId: number
 ): Promise<number> {
+  return (await forkAssemblyFor(baselineId, [userId])).get(userId)!.id;
+}
+
+/** `forkAssembly` for many companies at once — see `forkForOwners`. */
+export async function forkAssemblyFor(
+  baselineId: number,
+  owners: readonly number[]
+) {
+  return forkForOwners<Assembly>(
+    {
+      table: assemblies,
+      id: assemblies.id,
+      userId: assemblies.userId,
+      baselineId: assemblies.baselineId,
+      label: "assembly",
+      readBaseline: () =>
+        sharedRow(assemblies, assemblies.id, assemblies.userId, baselineId),
+      values: baseline => contentFields<Assembly, InsertAssembly>(baseline),
+      // The recipe is the assembly — a fork without its lines is an empty shell.
+      afterInsert: (baseline, made) =>
+        copyAssemblyChildrenToForks(baseline.id, made),
+    },
+    baselineId,
+    owners
+  );
+}
+
+/**
+ * `copyAssemblyChildren` onto freshly made forks, in bulk.
+ *
+ * The recipe read (`getAssemblyMaterialLines`) is per company: it drops a
+ * line whose material resolves to nothing for THAT company. When every line
+ * points at a shared material that exists, no company drops any, so one read
+ * serves all of them. Otherwise — a line pointing at a company's own row or
+ * at a row deleted outright — each fork is copied the one-at-a-time way, so
+ * the answer is exactly what it always was.
+ */
+async function copyAssemblyChildrenToForks(
+  fromAssemblyId: number,
+  forks: ReadonlyArray<{ owner: number; id: number }>
+) {
+  if (forks.length === 0) return;
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-
-  const [existing] = await db
-    .select()
-    .from(assemblies)
-    .where(
-      and(eq(assemblies.userId, userId), eq(assemblies.baselineId, baselineId))
+  const stored = Array.from(
+    new Set(
+      (
+        await db
+          .select({ materialId: assemblyMaterials.materialId })
+          .from(assemblyMaterials)
+          .where(eq(assemblyMaterials.assemblyId, fromAssemblyId))
+      ).map(r => r.materialId)
     )
-    .limit(1);
-  if (existing) return existing.id;
+  );
+  const shared =
+    stored.length === 0
+      ? []
+      : await db
+          .select({ id: materials.id })
+          .from(materials)
+          .where(and(inArray(materials.id, stored), isNull(materials.userId)));
+  if (forks.length === 1 || shared.length !== stored.length) {
+    for (const fork of forks)
+      await copyAssemblyChildren(fromAssemblyId, fork.id, fork.owner);
+    return;
+  }
 
-  const [baseline] = await db
-    .select()
-    .from(assemblies)
-    .where(and(eq(assemblies.id, baselineId), isNull(assemblies.userId)))
-    .limit(1);
-  if (!baseline) throw new Error("Baseline assembly not found");
-
-  const [result] = await db.insert(assemblies).values({
-    ...contentFields<Assembly, InsertAssembly>(baseline),
-    userId,
-    baselineId: baseline.id,
-    baselineVersion: baseline.version,
-  } as InsertAssembly);
-  const forkId = result.insertId;
-
-  // The recipe is the assembly — a fork without its lines is an empty shell.
-  await copyAssemblyChildren(baseline.id, forkId, userId);
-  return forkId;
+  const [lines, modifierIds] = await Promise.all([
+    getAssemblyMaterialLines(fromAssemblyId, forks[0].owner),
+    getAssemblyModifierIds(fromAssemblyId),
+  ]);
+  const recipe = lines.map(assemblyMaterialLine);
+  const insertChunked = async <R>(
+    rows: R[],
+    write: (chunk: R[]) => Promise<unknown>
+  ) => {
+    for (let i = 0; i < rows.length; i += FORK_CHUNK)
+      await write(rows.slice(i, i + FORK_CHUNK));
+  };
+  await insertChunked(
+    forks.flatMap(f => assemblyMaterialRows(f.id, recipe)),
+    chunk => db.insert(assemblyMaterials).values(chunk)
+  );
+  await insertChunked(
+    forks.flatMap(f => assemblyModifierRows(f.id, modifierIds)),
+    chunk => db.insert(assemblyModifiers).values(chunk)
+  );
+  await stepsTablesMissing(async () => {
+    const steps = await db
+      .select()
+      .from(assemblyLaborSteps)
+      .where(eq(assemblyLaborSteps.assemblyId, fromAssemblyId))
+      .orderBy(asc(assemblyLaborSteps.sortOrder), asc(assemblyLaborSteps.id));
+    await insertChunked(
+      forks.flatMap(f => assemblyStepCopyRows(f.id, steps)),
+      chunk => db.insert(assemblyLaborSteps).values(chunk)
+    );
+  }, undefined);
 }
 
 /** Copy material lines and modifier links from one assembly onto another. */
@@ -10125,22 +10325,34 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
     company means by it". An ARCHIVED fork is not reused: archiving it was
     somebody's decision, and a new edit starts a fresh copy.
   */
+  return (await forkRunTypeFor(source.id, [userId])).get(userId)!.id;
+}
+
+/** `forkRunType` of a SHARED type for many companies — see `forkForOwners`. */
+export async function forkRunTypeFor(
+  baselineId: number,
+  owners: readonly number[]
+) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [existing] = await db
-    .select({ id: takeoffRunTypes.id })
-    .from(takeoffRunTypes)
-    .where(
-      and(
-        eq(takeoffRunTypes.userId, userId),
-        eq(takeoffRunTypes.baselineId, source.id),
-        eq(takeoffRunTypes.status, "active")
-      )
-    )
-    .limit(1);
-  if (existing) return existing.id;
-
-  /*
+  return forkForOwners<TakeoffRunType>(
+    {
+      table: takeoffRunTypes,
+      id: takeoffRunTypes.id,
+      userId: takeoffRunTypes.userId,
+      baselineId: takeoffRunTypes.baselineId,
+      // Only an ACTIVE fork is reused — see the note in `forkRunType`.
+      reuse: eq(takeoffRunTypes.status, "active"),
+      label: "run type",
+      readBaseline: () =>
+        sharedRow(
+          takeoffRunTypes,
+          takeoffRunTypes.id,
+          takeoffRunTypes.userId,
+          baselineId
+        ),
+      values: source => {
+        /*
     Everything EXCEPT identity and lifecycle, rather than a list of the
     specification columns.
 
@@ -10156,64 +10368,66 @@ export async function forkRunType(id: number, userId: number): Promise<number> {
     be copied is every specification column, which changes whenever the feature
     grows. Naming the short list means a new column is forked by default.
   */
-  const {
-    id: _id,
-    userId: _userId,
-    baselineId: _baselineId,
-    baselineVersion: _baselineVersion,
-    version: _version,
-    status: _status,
-    archivedAt: _archivedAt,
-    createdAt: _createdAt,
-    updatedAt: _updatedAt,
-    // Starter machinery (0154), as LIBRARY_OWNERSHIP_FIELDS says for the
-    // other four tables: legal on a shared row only, never copied.
-    isPinnedCopy: _isPinnedCopy,
-    hiddenAt: _hiddenAt,
-    replacedById: _replacedById,
-    ...specification
-  } = source;
-
-  const forkId = await createRunType({
-    ...specification,
-    userId,
-    baselineId: source.id,
-    baselineVersion: source.version,
-  });
-
-  /*
+        const {
+          id: _id,
+          userId: _userId,
+          baselineId: _baselineId,
+          baselineVersion: _baselineVersion,
+          version: _version,
+          status: _status,
+          archivedAt: _archivedAt,
+          createdAt: _createdAt,
+          updatedAt: _updatedAt,
+          // Starter machinery (0154), as LIBRARY_OWNERSHIP_FIELDS says for the
+          // other four tables: legal on a shared row only, never copied.
+          isPinnedCopy: _isPinnedCopy,
+          hiddenAt: _hiddenAt,
+          replacedById: _replacedById,
+          ...specification
+        } = source;
+        return specification;
+      },
+      afterInsert: async (source, made) => {
+        /*
     The type's EXTRAS go with it (0135, per-foot-items-plan.md § 3a): a fork
     of an underground type that lost its tape would quietly stop buying it.
     Copied by the same exclusion as the type above, so a column added to the
     extras later is copied by default. `baselineExtraId` points back, so the
     fork's bid line keeps its `runExtraKey`.
   */
-  const extras = await db
-    .select()
-    .from(takeoffRunTypeExtras)
-    .where(eq(takeoffRunTypeExtras.runTypeId, source.id));
-  if (extras.length > 0) {
-    await db.insert(takeoffRunTypeExtras).values(
-      extras.map(extra => {
-        const {
-          id: _id,
-          userId: _extraUserId,
-          runTypeId: _runTypeId,
-          baselineExtraId: _baselineExtraId,
-          createdAt: _created,
-          updatedAt: _updated,
-          ...copied
-        } = extra;
-        return {
-          ...copied,
-          userId,
-          runTypeId: forkId,
-          baselineExtraId: extra.baselineExtraId ?? extra.id,
-        };
-      })
-    );
-  }
-  return forkId;
+        const extras = await db
+          .select()
+          .from(takeoffRunTypeExtras)
+          .where(eq(takeoffRunTypeExtras.runTypeId, source.id));
+        if (extras.length === 0) return;
+        const rows = made.flatMap(({ owner, id: forkId }) =>
+          extras.map(extra => {
+            const {
+              id: _id,
+              userId: _extraUserId,
+              runTypeId: _runTypeId,
+              baselineExtraId: _baselineExtraId,
+              createdAt: _created,
+              updatedAt: _updated,
+              ...copied
+            } = extra;
+            return {
+              ...copied,
+              userId: owner,
+              runTypeId: forkId,
+              baselineExtraId: extra.baselineExtraId ?? extra.id,
+            };
+          })
+        );
+        for (let i = 0; i < rows.length; i += FORK_CHUNK)
+          await db
+            .insert(takeoffRunTypeExtras)
+            .values(rows.slice(i, i + FORK_CHUNK));
+      },
+    },
+    baselineId,
+    owners
+  );
 }
 
 /**

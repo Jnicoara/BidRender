@@ -86,7 +86,14 @@ import { ABOVE_ZERO_FIELDS } from "../shared/starterSheetChecks";
 
 type Registry = {
   table: MySqlTable;
-  fork: (rowId: number, ownerUserId: number) => Promise<number>;
+  /**
+   * Fork the shared row for every owner listed, in one pass: owner → the
+   * copy's id, and whether this call made it (db.ts `forkForOwners`).
+   */
+  forkFor: (
+    rowId: number,
+    owners: readonly number[]
+  ) => Promise<Map<number, { id: number; made: boolean }>>;
 };
 
 /*
@@ -98,23 +105,23 @@ type Registry = {
 const TABLES: Record<StarterTable, Registry> = {
   materials: {
     table: materials,
-    fork: (id, owner) => db.forkMaterial(id, owner),
+    forkFor: (id, owners) => db.forkMaterialFor(id, owners),
   },
   assemblies: {
     table: assemblies,
-    fork: (id, owner) => db.forkAssembly(id, owner),
+    forkFor: (id, owners) => db.forkAssemblyFor(id, owners),
   },
   laborRates: {
     table: laborRates,
-    fork: (id, owner) => db.forkLaborRate(id, owner),
+    forkFor: (id, owners) => db.forkLaborRateFor(id, owners),
   },
   modifiers: {
     table: modifiers,
-    fork: (id, owner) => db.forkModifier(id, owner),
+    forkFor: (id, owners) => db.forkModifierFor(id, owners),
   },
   runTypes: {
     table: takeoffRunTypes,
-    fork: (id, owner) => db.forkRunType(id, owner),
+    forkFor: (id, owners) => db.forkRunTypeFor(id, owners),
   },
 };
 
@@ -672,34 +679,41 @@ async function plan(
  * step 4). Returns the pins made: { owner, forkId }.
  *
  * "Has a copy" is whatever the table's own fork function says it is: the
- * fork returns an existing copy rather than make a second, so a returned id
- * that was already one of the company's copies is no pin. That keeps the
- * rule in ONE place per table (run types reuse only an ACTIVE fork, the
- * others any), instead of restating it here.
+ * fork returns an existing copy rather than make a second, and says so
+ * (`made: false`), so a reused copy is no pin. That keeps the rule in ONE
+ * place per table (run types reuse only an ACTIVE fork, the others any),
+ * instead of restating it here.
+ *
+ * All the shops at once (`forkFor`, db.ts `forkForOwners`), and one UPDATE
+ * for the pin flag: one shop at a time was five round trips a shop, 6.2 s
+ * for a material and 18.8 s for an assembly at 2,006 shops (2026-10-15,
+ * stress-results-b.md round 9).
  */
 async function pinCompanies(
   table: StarterTable,
   rowId: number
 ): Promise<Array<{ owner: number; forkId: number }>> {
   const handle = await database();
-  const { table: t, fork } = TABLES[table];
+  const { table: t, forkFor } = TABLES[table];
   const cols = columnsOf(table);
+  const owners = await unpinnedOwners(table, rowId);
+  if (owners.length === 0) return [];
+  const forks = await forkFor(rowId, owners);
   const pins: Array<{ owner: number; forkId: number }> = [];
-  for (const owner of await unpinnedOwners(table, rowId)) {
-    const before = (
-      await handle
-        .select({ id: cols.id })
-        .from(t)
-        .where(and(eq(cols.userId, owner), eq(cols.baselineId, rowId)))
-    ).map(r => r.id as number);
-    const forkId = await fork(rowId, owner);
-    if (before.includes(forkId)) continue;
+  for (const owner of owners) {
+    const fork = forks.get(owner);
+    if (fork?.made) pins.push({ owner, forkId: fork.id });
+  }
+  for (let i = 0; i < pins.length; i += 500)
     await handle
       .update(t)
       .set({ isPinnedCopy: true })
-      .where(eq(cols.id, forkId));
-    pins.push({ owner, forkId });
-  }
+      .where(
+        inArray(
+          cols.id,
+          pins.slice(i, i + 500).map(p => p.forkId)
+        )
+      );
   return pins;
 }
 

@@ -36,6 +36,11 @@ pin means writing each table's copy rules a second time in SQL, and two
 copies of those rules disagreeing is the money bug `shared/forkedRows.ts`
 was written about. Not a number on anyone's bid either way.
 
+**Update, third night: fixed, without a second copy of the rules** (you
+asked). Every fork now copies for many shops at once, and the one-shop fork
+is the same code with one shop. At 2,006 shops: material 6.2 s → 0.46 s,
+assembly 18.8 s → 1.3 s (stress-results-b.md round 9). No decision needed.
+
 ## Q3. Touch checks — mostly settled; two steps open at 375 px (no decision needed)
 
 Followed up 2026-10-15 morning (stress-results-b.md round 6). The overnight

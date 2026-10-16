@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **The first BidRidge starter change no longer takes seconds per thousand
+  shops.** Protecting every existing shop from a starter change means giving
+  each its own copy first; that was done one shop at a time (6 s for a
+  material, 19 s for an assembly at 2,000 shops). It is now done for all of
+  them at once: half a second for a material, about a second for an
+  assembly. What each shop's copy holds is unchanged.
+
 - **Zooming a sheet with thousands of marks no longer stutters.** At 5,000
   marks each wheel step took about 150 ms; it now takes about 33 ms. While
   you zoom, the marks grow and shrink with the drawing, then settle to

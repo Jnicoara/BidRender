@@ -245,3 +245,37 @@ trace and CPU profile for where the time goes. Scripts deleted after use.
   of its diameter wide: 10 → 8.7, 23.2 → 20.2, 26 → 22.5 px); letters,
   shapes and a selected mark (a fifth larger) by eye; `pnpm device:touch`
   all five sizes 84 ok / 0 FAIL.
+
+## Round 9 — the first starter change at 2,006 shops (2026-10-15, third night)
+
+Method: `scripts/_stressPin.mts` (throwaway, deleted) against
+`bidrender_test_b`: 2,000 throwaway shops (users 7,000,000+, removed after),
+then the FIRST change to one shared row per table through
+`applyStarterChange`, timed with `Date.now()`, then undone. After the fix it
+also counted, per change: copies, pinned copies, distinct owners, pins
+logged, and an assembly's recipe lines / a run type's extras on the copies.
+
+| First change to a shared… | Before    | After      |
+| ------------------------- | --------- | ---------- |
+| material                  | 6,239 ms  | **460 ms** |
+| modifier                  | 4,942 ms  | **286 ms** |
+| run type                  | 7,032 ms  | **484 ms** |
+| assembly                  | 18,845 ms | **1,263 ms** |
+
+- **Cause:** `pinCompanies` forked one shop at a time — five round trips a
+  shop (its own check, the fork's check, the shared row, the insert, the
+  pin flag), plus an assembly's recipe copied line set by line set.
+- **Fix:** `forkForOwners` (server/db.ts): the copies that already exist,
+  the shared row once, one multi-row insert per 500 shops, the new ids read
+  back by owner (not trusted to be consecutive), children in bulk; one
+  UPDATE for the pin flag. **`forkMaterial` and the other four ARE this
+  function with one owner**, and the recipe/modifier/step rows come from
+  the same builders a save uses — no second copy of any copy rule
+  (`shared/forkedRows.ts`'s worry). An assembly whose recipe points at a
+  company's own or a deleted material still copies one shop at a time,
+  because that read differs per shop.
+- **Checked:** 2,000 copies, 2,000 pinned, 2,000 owners, 2,000 pins logged
+  per change; 10,000 recipe lines = 5 × 2,000. `server/forkForOwners.test.ts`
+  counts MySQL's `Questions` for a 40-shop fork: under 12 (material) and 25
+  (assembly); 161 and 641 with one-at-a-time forks (seen red). 16 fork
+  suites, 204 tests, green.
