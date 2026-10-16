@@ -6,6 +6,18 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **The labor on traced conduit and wire can now be priced.** The hours on
+  runs traced on the plans were priced at $0 an hour, because nothing in
+  the app could choose their labor rate. The bid warned about it, but the
+  total came up short. Settings › Pricing now has "Labor rate for traced
+  runs", which says plainly when it is not set. Runs sent after it is set
+  are priced at that rate. Runs already on a bid keep what they were sent
+  with, pending the owner's decision.
+- **A browser test now does a whole job as a brand-new customer would**: sign
+  up, upload a plan, count, trace, add drops and a homerun, tag a line,
+  print the proposal and download the spreadsheet. It checks every printed
+  number against hand math, on a laptop, an iPad and a phone.
+
 - **Tested: one company can never see or change another company's work.**
   A test acts as a second company and calls every one of the app's 388
   server actions with the first company's ids. Nothing leaked and nothing

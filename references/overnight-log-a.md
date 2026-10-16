@@ -525,3 +525,22 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
 draft's hand-typed START times ran ahead of the clock. Ends were always
 `date`. Same slip as run 3; from here every time is read from the clock.)
 - 00:56 Gate 38868672873 **green** on 188758b6 (items 6, 8, 9, 10). Pushing items 11–14.
+
+## Item 3 — whole-job browser journey — resumed 03:26
+
+- The journey agent was stopped at the usage limit after laptop and iPad
+  passed; its dev server was killed then. Resumed: memory 5.6 GB, ONE dev
+  server (3018, test DB), stopped after (tree killed, port free).
+- **Real fault (N4, top of morning questions): traced runs' labor was $0/h
+  everywhere** — `defaultLaborRateId` had no way in. Fixed going
+  forward: `bids.setPricingDefaults` field (refuses another company's
+  role) + Settings › Pricing "Labor rate for traced runs" (amber when
+  unset; screenshots 7-/8- laptop+phone, saved, kept after reload, no
+  sideways scroll). Test `bidNumberGaps` ($0 → 4 h × $60 = $240);
+  fixture helper now uses the router (golden bids unchanged).
+- Caught a false sentence before it shipped: the help text said "use Send
+  again to update them" — resendLine refills price and hours, never the
+  rate. Text now says only what is true.
+- Journey: 3/3 pass (laptop 38 s, iPad 34 s, phone 59 s) with the run rate
+  picked in Settings and every printed number = hand math. Fault 2 (legend
+  link) → `track-b-handoff.md`.

@@ -5,6 +5,43 @@ was decided and is in `overnight-log-a.md`.
 
 ## 2026-10-15 night (second queue) — counting and totals
 
+### N4 (TOP). Traced runs' labor was priced at $0/h on every bid — FIXED going forward; existing lines are your call
+
+Found by the whole-job browser journey. A traced run's lines (conduit, wire,
+fittings sent from the Plans screen) price their hours at the company's
+`pricing_defaults.defaultLaborRateId`, and **nothing in the app could set
+it**: not Settings, not the first-run screen, not any procedure. So run
+hours froze at $0 an hour. The bid did warn ("N lines have hours but no
+labor rate"), but the total was short by every run's labor.
+
+**Fixed on `track-a-night`:** Settings › Pricing has a new "Labor rate for
+traced runs" picker. While nothing is picked it says, in amber, that run
+hours are priced at $0. `bids.setPricingDefaults` takes it, and refuses
+another company's role. Tests:
+
+- `server/bidNumberGaps.test.ts`: $0 before a rate is set, then 4 h × $60 =
+  $240 on a run sent afterwards.
+- The journey: a new account picks Journeyman, and every printed number
+  matches hand math at laptop, iPad and phone.
+
+Screens are in `references/overnight-shots/a/7-…` and `8-…`.
+
+**What does NOT move, and needs your decision:**
+
+1. **Run lines already on bids keep $0/h.** Each line froze its rate when
+   sent. Send again refreshes a missing price and missing hours, never the
+   rate. Options: **A** leave them (an estimator re-sends after picking a
+   rate); **B** let Send again also refresh a $0 rate on a Draft bid
+   (changes Draft totals, math-version rule); **C** a one-off repair for
+   Drafts.
+2. **A new company still starts with no run rate.** Options: **A** keep
+   unset plus the amber line (today's fix); **B** default it to the role the
+   first-run screen asks for (moves new bids' totals, never old ones).
+
+A live check before deciding: how many live run lines have a $0 rate and
+hours > 0. That is a read-only count; I didn't run it, since tonight's rules
+keep me off live.
+
 ### N0. FIXED, changes a total in one case: a resent batch of marks counted twice
 
 On the Plans screen, if a batch of taps reached the server but the answer was

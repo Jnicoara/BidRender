@@ -199,3 +199,33 @@ of bids**, about 8 ms a bid here (39 ms at 1 bid in the Gate, 493 ms at 61).
 At that rate it crosses 2 s near 250 bids for one company. That is not a
 problem today; the todo is to page it or sum it in SQL before any shop gets
 there. The everyday Gate fixture can't see this, because it has one bid.
+
+## Whole-job journey in a browser — 2026-10-16
+
+`e2e/journey/` (local only; refuses any non-local server):
+`SMOKE_BASE_URL=http://127.0.0.1:3018 npx playwright test -c e2e/journey/playwright.config.ts`.
+A brand-new account signs up through the screen, sets an hourly rate, a
+profit and (since tonight) the traced-run labor rate, then makes a bid,
+uploads the fixture plan, takes the printed scale, captures two legend
+symbols, and counts them (mouse on laptop, finger on iPad and phone). It
+links and sends the counts, traces a run with wire and ends, sets the run
+height, adds drops and a homerun, tags a line owner-furnished, reads the
+bid totals, prints the proposal, and downloads the takeoff CSV. **Every
+printed number is checked against hand math in the test**, read from the
+screen text and the downloaded file.
+
+| Size                  | Result | Time |
+| --------------------- | ------ | ---- |
+| Laptop 1366×768       | pass   | 38 s |
+| iPad 820×1180 (touch) | pass   | 34 s |
+| Phone 390×844 (touch) | pass   | 59 s |
+
+Set through the API, and why (said in the test): material prices (14 rows,
+the Materials screen's own test), and the homerun's panel and circuit (the
+shared fixture plan prints no circuit tags to read).
+
+**Found: traced runs' labor priced at $0/h on every bid**, because nothing
+could set the rate. Fixed going forward (Settings › Pricing); morning
+question N4. **Found: a legend link does not reach a count already made**,
+handed to Track B. Mouse and finger give the same counts (the same
+assertions pass on all three projects).

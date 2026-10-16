@@ -7,6 +7,9 @@
  * Every price is the test's own. Fixture user 9917.
  */
 import { beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { getDb } from "./db";
+import { users } from "../drizzle/schema";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import {
   as,
@@ -254,5 +257,41 @@ describe.skipIf(!hasDb)("bid-number gaps", () => {
     expect(card.notPriced.hours).toBe(1);
     const screen = await c.bids.get({ id: bid.id });
     expect(screen.totals.directCost).toBe(card.directCost);
+  });
+  it("a traced run's labor is priced at the rate the company sets — $0/h until one is set (N4)", async () => {
+    // A company of its own, so the run rate starts unset as on a real account.
+    const OWN = 9923;
+    await freshUser(OWN);
+    const o = as(OWN);
+    const role = await rate(o, "Gaps run role", 60);
+    const type = await emtType(o, "Gaps EMT rate");
+    const { bidId, sheetId } = await bidWithSheet(o, OWN, "Gaps run rate");
+    await straightRun(o, bidId, sheetId, type.id, "Run", 100);
+    await o.takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
+    const raceway = async () =>
+      (await o.bids.get({ id: bidId })).lines.find(
+        l => l.runMaterialRole === "raceway"
+      )!;
+    // The fault: nothing set → 100 ft × 0.04 h = 4 h priced at $0.
+    expect(Number((await raceway()).snapshotLaborRate)).toBe(0);
+    // Set through the app; the frozen line stays as sent…
+    await o.bids.setPricingDefaults({ defaultLaborRateId: role });
+    expect(Number((await raceway()).snapshotLaborRate)).toBe(0);
+    // …and a run type sent afterwards prices its hours at $60:
+    // 4 h × $60 = $240 of labor on 100 ft.
+    const type2 = await emtType(o, "Gaps EMT rate 2");
+    await straightRun(o, bidId, sheetId, type2.id, "Run 2", 100, 40);
+    await o.takeoffRunTypes.sendToBid({ bidId, runTypeId: type2.id });
+    const line2 = (await o.bids.get({ id: bidId })).lines.find(
+      l => l.runMaterialRole === "raceway" && l.takeoffRunTypeId === type2.id
+    )!;
+    expect(Number(line2.snapshotLaborRate)).toBe(60);
+    expect(line2.breakdown!.laborCost).toBe(240);
+    // Another company's role is refused.
+    await expect(
+      c.bids.setPricingDefaults({ defaultLaborRateId: role })
+    ).rejects.toThrow(/not in your library/);
+    const database = (await getDb())!;
+    await database.delete(users).where(eq(users.id, OWN));
   });
 });

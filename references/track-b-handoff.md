@@ -1,5 +1,18 @@
 # Track B handoff — 2026-10-05
 
+## FROM TRACK A, 2026-10-16 — a legend link does not reach the count already made (yours, not touched)
+
+Found by A's whole-job browser journey (`e2e/journey/journey.spec.ts`,
+fault 2 in its header). **Steps:** capture a legend symbol, count a few of
+it on this bid (a count "by name", no assembly), then link the symbol to an
+assembly FROM THE LEGEND. **Expected:** the count already on this bid
+becomes that assembly's count, and its bid line is priced. **Got:** the
+count stays "by name" (no assembly, "Not priced" on the bid) until the
+symbol happens to be armed again. Linking from the COUNT CARD works. The
+journey links the switch from its card to stay green; when this is fixed,
+it can link from the legend (the sheet-2 duplex count already adopts the
+link, asserted there).
+
 ## FROM TRACK A, 2026-10-16 — one line in `TakeoffPage.tsx` (yours, so not touched)
 
 **A resent batch of marks counted twice.** When `flushStamps`' send fails,
