@@ -76,9 +76,12 @@ export function notPricedSuffix(notPriced: NotPricedTally): string {
     parts > 0 ? plural(parts, "part") : "",
     drops > 0 ? plural(drops, "drop") : "",
   ].filter(Boolean);
+  // Unassigned marks (owner Q5): said, never counted as money left out.
+  const unassigned = whole(notPriced.unassigned ?? 0);
   const pieces = [
     priced.length > 0 ? `${priced.join(", ")} not priced` : "",
     hours > 0 ? `${plural(hours, "line")} hours not set` : "",
+    unassigned > 0 ? `${plural(unassigned, "mark")} unassigned` : "",
   ].filter(Boolean);
   return pieces.length === 0 ? "" : `+ ${pieces.join(", ")}`;
 }
@@ -186,7 +189,8 @@ export function laborShare(notPriced: NotPricedTally): NotPricedTally {
 
 /** Whether a total leaves anything out at all. */
 export function anyNotPriced(notPriced: NotPricedTally): boolean {
-  return notPricedSuffix(notPriced) !== "";
+  // Unassigned marks are a label, not money left out (owner Q5).
+  return notPricedSuffix({ ...notPriced, unassigned: 0 }) !== "";
 }
 
 /** The whole total as one string: "$4,210.00 + 4 lines not priced". */
@@ -231,9 +235,11 @@ export function bidNotPricedCount(
    * REQUIRED, so no bid screen can build its tally and forget them (owner,
    * 2026-10-07): they are not lines, so the lines alone cannot see them.
    */
-  dropsNotPriced: number
+  dropsNotPriced: number,
+  /** Marks in the Unassigned count (`bids.get` → `unassignedMarks`): label only. */
+  unassignedMarks = 0
 ): NotPricedTally {
-  return withDropsNotPriced(
+  const tally = withDropsNotPriced(
     countNotPriced(
       lines.map(line => ({
         line,
@@ -242,4 +248,7 @@ export function bidNotPricedCount(
     ),
     dropsNotPriced
   );
+  return unassignedMarks > 0
+    ? { ...tally, unassigned: unassignedMarks }
+    : tally;
 }

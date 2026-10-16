@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **The bid total now says "+ N marks unassigned"** beside "+ N lines not
+  priced" on Direct cost, Bid price and Total due (and the proposal page's
+  "Your figures"), so marks nobody has named yet are never out of sight.
+  It is a label only: no amount changes, and the Materials and Labor rows
+  don't carry it.
+
 - **Just count now, pick what it is later.** In the Plans screen's Count
   picker, "Just count" (or Enter with nothing typed) lets you tap marks
   without naming anything. They show as "?" pins under an amber

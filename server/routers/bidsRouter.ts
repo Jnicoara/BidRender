@@ -1104,7 +1104,7 @@ export const bidsRouter = router({
         /**
          * Marks in the bid's Unassigned count (references/count-first-plan.md):
          * said under the totals and a priced print blocked until they are
-         * picked. Not in the not-priced tally — the total reads as it did.
+         * picked. The total also says "+ N marks unassigned" (owner Q5, a label only).
          */
         unassignedMarks: await db.bidUnassignedMarks(
           bid.id,

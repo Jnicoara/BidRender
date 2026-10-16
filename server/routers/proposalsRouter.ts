@@ -439,6 +439,10 @@ export const proposalsRouter = router({
         notPriced,
       });
 
+      const unassignedMarks = await db.bidUnassignedMarks(
+        bid.id,
+        ctx.scope.dataUserId
+      );
       return {
         document,
         /**
@@ -505,8 +509,14 @@ export const proposalsRouter = router({
          * every figure (`clientFigure`), and Print is blocked with this list
          * until the lines are priced. The document itself still builds, so
          * the estimator can see what they are fixing.
+         *
+         * Plus unassigned marks as a LABEL on "Your figures" (owner Q5) —
+         * after the document was built from the tally without them.
          */
-        notPriced,
+        notPriced:
+          unassignedMarks > 0
+            ? { ...notPriced, unassigned: unassignedMarks }
+            : notPriced,
         notPricedLines: notPricedLines(
           priced.map(({ line, breakdown }) => ({
             line,
@@ -525,13 +535,10 @@ export const proposalsRouter = router({
         /**
          * Marks in the bid's Unassigned count (references/count-first-plan.md):
          * they block a priced print, like a line not priced, until somebody
-         * says what they are. Not in the not-priced TALLY, so the bid's total
-         * reads as it did (count-first-plan.md Q2).
+         * says what they are. In the tally above as a LABEL only (owner Q5);
+         * no figure and no "Price pending" reads it.
          */
-        unassignedMarks: await db.bidUnassignedMarks(
-          bid.id,
-          ctx.scope.dataUserId
-        ),
+        unassignedMarks,
       };
     }),
 });

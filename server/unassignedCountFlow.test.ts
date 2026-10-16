@@ -95,6 +95,29 @@ describeDb("a bid with marks nobody has named yet", () => {
     expect(waitingToSend).toBe(0);
   });
 
+  it("the total SAYS them (owner Q5) and nothing else moves", async () => {
+    const { bidId, heldId } = await aBidWithThreeUnassigned();
+    const full = await caller().proposals.document({ bidId });
+    expect(full.notPriced.unassigned).toBe(3);
+    // A label: once the marks are assigned (to a count not on the bid), the
+    // document is exactly what it was — no figure was ever moved by them.
+    const named = await caller().takeoffGroups.create({
+      bidId,
+      label: "Exit signs",
+    });
+    await caller().takeoffStamps.moveToGroup({
+      fromGroupId: heldId,
+      groupId: named.id,
+    });
+    const after = await caller().proposals.document({ bidId });
+    expect(after.notPriced.unassigned).toBeUndefined();
+    expect(after.document).toEqual(full.document);
+    expect({ ...full.notPriced, unassigned: undefined }).toEqual({
+      ...after.notPriced,
+      unassigned: undefined,
+    });
+  });
+
   it("blocks a priced print until the marks are assigned", async () => {
     const { bidId, heldId } = await aBidWithThreeUnassigned();
     expect((await caller().proposals.document({ bidId })).unassignedMarks).toBe(

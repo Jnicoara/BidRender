@@ -237,3 +237,10 @@ start.
 - Safe todo: dashboard timing measured (`90fcb4fc`, numbers only). The
   starter rename path is not safe unattended (A's seed area) — left.
 - Dev and production servers stopped; MySQL 3307 left running.
+
+# Fourth night, 2026-10-15 → 16 (started 23:37)
+
+Owner's list: 1 Q5 label (YES) · 2 Plans deep test + test map · 3 marks
+never move or vanish · 4 hard PDFs · 5 scale check (plan, build) · 6 demo
+vs new clarity (view only) · 7 break-it + safe todo. A's Plans fixes in
+track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.

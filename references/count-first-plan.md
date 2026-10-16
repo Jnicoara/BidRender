@@ -85,7 +85,7 @@ priced"). Plan first, then build. Park anything that changes a total._
   hand on the bid today (§ 5f.4) and its unpriced line already blocks the
   print as "not priced". Making it Unassigned would block a hand-priced
   line that is complete.
-- **Q2.** Should the bid TOTAL also say "+ N marks unassigned", like
+- **Q2. ANSWERED YES (owner, 2026-10-15) — built: the whole-bid totals say it, a label only.** Should the bid TOTAL also say "+ N marks unassigned", like
   "+ 2 drops not priced"? — Parked (changes what a total says). Built
   without it: the print block and a warning strip line.
 - **Q3.** Should the Unassigned count ever reach the bid as an unpriced

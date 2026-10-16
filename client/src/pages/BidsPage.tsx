@@ -851,7 +851,11 @@ export default function BidsPage({
    * lines that are otherwise priced (0087). Through the same rule the server's
    * cards use, so this screen and the search result for it cannot disagree.
    */
-  const notPricedTally = bidNotPricedCount(lines, dropsNotPriced);
+  const notPricedTally = bidNotPricedCount(
+    lines,
+    dropsNotPriced,
+    unassignedMarks
+  );
   /** "Homeruns: Measured, +15% routing · 12 homeruns", when there are any. */
   const homerunLine = homeruns?.rows.length
     ? {
@@ -2024,8 +2028,8 @@ export default function BidsPage({
               {/*
                 UNASSIGNED MARKS (references/count-first-plan.md): counted with
                 nothing named, so no line holds them. Said here, under the
-                totals that cannot include them; the total's own wording is
-                left alone (Q2). A priced print is blocked until they are
+                totals that cannot include them; the total also says
+                "+ N marks unassigned" (owner Q5, label only). A priced print waits until they are
                 picked.
               */}
               {unassignedMarks > 0 && (

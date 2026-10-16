@@ -73,7 +73,7 @@ Suggested answers are what was built.
 1. A count you NAMED but linked to nothing still goes to the bid and is
    priced there (level 1, your 2026-09-25 decision) — it is not
    "Unassigned". — **Keep it so.**
-2. The bid total does NOT say "+ N marks unassigned"; the warning sits
+2. **Answered YES, built (fourth night):** the total now says it. Was: the bid total does NOT say "+ N marks unassigned"; the warning sits
    under it and the print is blocked. — **Your call** (it changes what a
    total says, so parked).
 3. The Unassigned count never becomes a bid line. — **Keep it so.**
