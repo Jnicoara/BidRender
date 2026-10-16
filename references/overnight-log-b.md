@@ -143,3 +143,39 @@ beyond the plan, money, or anything irreversible go to
   clean. Leftover touch-check counts removed; server stopped; MySQL 3307
   left running.
 - Gate 38743997163 green on eb94729a.
+
+# Third night, 2026-10-15 → 16 (started 22:01)
+
+Owner's list: 1 merge A's fix · 2 "$0.00" after Undo · 3 375 px trace
+toolbar · 4 zoom at 5,000 marks · 5 slow first admin edit · 6 count now,
+item later · 7 user-levels plan · 8 break-it loop. Free memory 2.9 GB at
+start.
+
+## Item 2 — "$0.00" after the screenshot Undo (22:01–22:12) · `893c4bcf`
+
+- **The item really was the stored 0**, which is how `costPerUnit` (NOT NULL
+  DEFAULT 0) says "not priced". The screens were wrong: the starter editor's
+  list, its change log ("$1.23 → $0.00") and a shop's Updates printed it as
+  a dollar amount. Now "not priced"; labor rows "rate not set" with no
+  "$0.00 / h". `starterPriceText` in `client/src/lib/starterUpdates.ts`;
+  test red without it. Looked at laptop and phone 390.
+- The shop's own Materials screen still shows `$0` + its filter, per
+  CLAUDE.md § 6 (MONEY) — not changed.
+- Gate 38853954418 green.
+
+## Item 3 — 375 px trace toolbar (22:12–22:20) · `b7230030`
+
+- Measured first: in Trace at 375x667 the toolbar was FIVE rows (mode;
+  From/to; a lone divider; the scale with two notes running off the edge;
+  Fit) and the drawing 237 px tall, with a two-row pill over it.
+- Now two rows (mode + compact scale + icon Fit; From/to) and a one-row
+  pill (number, New leg icon, Undo, Finish, X; Snap only while a leg start
+  is picked). Drawing **351 px** tall. iPad portrait looked at: toolbar
+  unchanged, pill one row.
+- `pnpm device:touch` all five sizes: **84 ok, 0 FAIL**, exit 0.
+
+## Item 1 — A's fix reached local-dev (22:21) · `04693306`
+
+- local-dev a4c97280 (Q-DB1 database recovery, Lax cookie, S12) merged into
+  track-b; CHANGELOG conflict only, both kept; no `drizzle/` change;
+  `pnpm check` clean.

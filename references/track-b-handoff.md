@@ -1,5 +1,12 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-15 (third night, running)
+
+- **Done, pushed to track-b only:** unpriced starter prices read "not
+  priced", never $0.00 (`893c4bcf`, Gate green); 375 px trace toolbar two
+  rows, pill one row (`b7230030`, touch check 84/0); local-dev a4c97280
+  merged in (`04693306`). Running notes: `overnight-log-b.md` third night.
+
 ## WHERE B STANDS — 2026-10-15 (second morning), 375 px TOUCH FIXED
 
 - **Pushed to track-b only:** screenshots (`overnight-shots/b/`), morning
