@@ -206,6 +206,32 @@ describe.skipIf(!hasDb)("importing a supplier price list", () => {
     expect((await caller().materials.list()).length).toBe(before);
   });
 
+  it("says when a material is named at two different prices, and counts it once", async () => {
+    // One item in two sections of a supplier sheet. The last row wins (the
+    // test below pins that); it used to win SILENTLY, with the material
+    // counted as priced twice (2026-10-15). Q-IMP1 asks whether to refuse.
+    const [a, b] = (await caller().materials.list())
+      .filter(m => m.userId === null)
+      .slice(0, 2);
+    const result = await caller().materials.importPrices({
+      supplierName: "Rexel",
+      rows: [
+        { name: a.name, costPerUnit: 3 },
+        { name: a.name, costPerUnit: 4 },
+        { name: b.name, costPerUnit: 7 },
+        { name: b.name.toUpperCase(), costPerUnit: 7 },
+      ],
+    });
+    expect(result.conflicts).toEqual([
+      { name: a.name, prices: [3, 4], used: 4 },
+    ]);
+    // Each material once; the same price twice is just that price.
+    expect(result.priced).toEqual([a.name, b.name]);
+    const after = await caller().materials.list();
+    expect(Number(after.find(m => m.name === a.name)!.costPerUnit)).toBe(4);
+    expect(Number(after.find(m => m.name === b.name)!.costPerUnit)).toBe(7);
+  });
+
   it("matches case- and whitespace-insensitively", async () => {
     // A supply house writes "12-2 NM-B " where the catalog says "12-2 NM-B".
     // Exact matching would report half a real price list as unmatched.

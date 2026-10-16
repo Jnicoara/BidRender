@@ -728,6 +728,15 @@ export const materialsRouter = router({
       const renamed: Array<{ from: string; to: string }> = [];
       const stamped = new Date();
 
+      // Pass 1 — which material each row names. No writes yet.
+      const byTarget = new Map<
+        number,
+        {
+          target: (typeof existing)[number];
+          prices: Set<number>;
+          last: number;
+        }
+      >();
       for (const row of input.rows) {
         // A name the company actually has wins outright — including an OLD
         // name on a copy they forked before the rename, which is theirs and
@@ -744,21 +753,40 @@ export const materialsRouter = router({
           unmatched.push(row.name);
           continue;
         }
+        const entry = byTarget.get(target.id) ?? {
+          target,
+          prices: new Set<number>(),
+          last: row.costPerUnit,
+        };
+        entry.prices.add(row.costPerUnit);
+        entry.last = row.costPerUnit;
+        byTarget.set(target.id, entry);
+      }
+
+      // Pass 2 — one write per material, at the LAST price the sheet gives
+      // it (the rule `supplierPricing.test.ts` pins: "the last price stands").
+      // What changed on 2026-10-15 is only what is SAID: a material the sheet
+      // names at two different prices is reported with both and the one used,
+      // where it was silent and counted as priced twice. Whether it should be
+      // refused instead is Q-IMP1 in pricing/morning-questions.md.
+      const conflicts: Array<{ name: string; prices: number[]; used: number }> =
+        [];
+      for (const { target, prices, last } of Array.from(byTarget.values())) {
+        if (prices.size > 1)
+          conflicts.push({
+            name: target.name,
+            prices: Array.from(prices).sort((a, b) => a - b),
+            used: last,
+          });
+        const costPerUnit = last;
         const editableId =
           target.userId === null
             ? await db.forkMaterial(target.id, ctx.scope.dataUserId)
             : target.id;
-        // The next row naming the same material — two old spellings of one
-        // row, say — must write the fork, not fork the shipped row again.
-        byName.set(key(target.name), {
-          ...target,
-          id: editableId,
-          userId: ctx.scope.dataUserId,
-        });
 
         await db.updateMaterial(editableId, ctx.scope.dataUserId, {
           price: {
-            write: priceWrite({ typed: "unit", amount: row.costPerUnit }),
+            write: priceWrite({ typed: "unit", amount: costPerUnit }),
             // No import log row yet (PS-M5's preview/undo is step 4), so
             // importId stays NULL; the history still says "imported".
             why: { source: "imported", actorUserId: ctx.scope.actorUserId },
@@ -771,7 +799,7 @@ export const materialsRouter = router({
         priced.push(target.name);
       }
 
-      return { priced, unmatched, renamed };
+      return { priced, unmatched, renamed, conflicts };
     }),
 
   /**

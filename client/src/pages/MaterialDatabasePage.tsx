@@ -28,6 +28,7 @@ import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { money } from "@/lib/money";
 import { packPhrase } from "@shared/packPricing";
 import { PRICE_LIST_IMPORT_SHOWN } from "@/lib/priceListImport";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -497,6 +498,7 @@ function ImportPriceListDialog({
     priced: string[];
     unmatched: string[];
     renamed: Array<{ from: string; to: string }>;
+    conflicts: Array<{ name: string; prices: number[]; used: number }>;
   } | null>(null);
 
   const importPrices = trpc.materials.importPrices.useMutation({
@@ -507,6 +509,9 @@ function ImportPriceListDialog({
         `Priced ${data.priced.length} material${data.priced.length === 1 ? "" : "s"}` +
           (data.unmatched.length
             ? `, ${data.unmatched.length} name${data.unmatched.length === 1 ? "" : "s"} matched nothing`
+            : "") +
+          (data.conflicts.length
+            ? `, ${data.conflicts.length} named at two prices (the last was used)`
             : "")
       );
       onDone();
@@ -564,6 +569,22 @@ function ImportPriceListDialog({
                 ))}
                 {result.renamed.length > 20 &&
                   `and ${result.renamed.length - 20} more under their new names`}
+              </div>
+            )}
+            {result.conflicts.length > 0 && (
+              <div className="text-amber-400">
+                Named at more than one price — the last one on the sheet was
+                used; check it:{" "}
+                {result.conflicts
+                  .slice(0, 20)
+                  .map(
+                    c =>
+                      `${c.name} (${c.prices.map(p => money(p)).join(" / ")} → ${money(c.used)})`
+                  )
+                  .join(", ")}
+                {result.conflicts.length > 20
+                  ? ` and ${result.conflicts.length - 20} more`
+                  : ""}
               </div>
             )}
             {result.unmatched.length > 0 && (
