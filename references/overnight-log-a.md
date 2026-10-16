@@ -454,3 +454,19 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   first check read the figure, not the flag. The quote-app panel is an
   internal-tier feature read off the session, so those reads use an
   internal-tier caller (a tier never changes a price).
+- Gate 38866950752 **green** on 35807ccc (item 7; CI separation 388 procs,
+  782 answered, 0 leaks).
+
+## Item 10 — typed PACK QTY on PACK NOT CHECKED rows — 00:42 → 00:40
+
+- Found the real gap: the loader already priced price ÷ any pack qty, but
+  never KEPT the pack — the row stayed NOT CHECKED and the pack offered to
+  shops stayed each / 1. Now: `typedPackFor` (shared/starterSheetChecks.ts)
+  takes Pack size + qty on a NOT CHECKED row; refuses a different qty on a
+  DECIDED row (names starterPacks.ts); records nothing on ordinary rows
+  (unchanged). Loader writes `server/seed/materials/starterPacksTyped.ts`
+  (empty today); `mergeTypedPacks` folds it in and takes those names off
+  PACK_NOT_CHECKED; loader judges against the AS-DECIDED lists so a rerun
+  keeps them. `server/typedPacks.test.ts` 10; pack/sheet neighbours 55/55.
+- Dry run on the real sheet: no refusals, "packs typed …: 0 set". Nothing
+  loaded, no sheet rebuild.

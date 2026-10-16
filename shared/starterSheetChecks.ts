@@ -96,6 +96,57 @@ export function checkPriceRow(input: {
   return { problems, value };
 }
 
+/**
+ * A pack TYPED on a pricing-sheet row — accepted only on a "PACK NOT CHECKED"
+ * row (pricing/pack-pass-2026-10-14.md), where the sheet asks the owner to
+ * "set the pack you buy". The sheet ships those rows as `each` / 1, so that
+ * is "not answered yet" and records nothing; anything else is the answer.
+ *
+ * On a row whose pack is already WRITTEN (STARTER_PACKS) the sheet does not
+ * move it: a different qty there is refused, naming the file to change.
+ * Every other row (nothing written, not flagged) keeps today's rule — the
+ * qty divides the price and is not recorded.
+ */
+export function typedPackFor(input: {
+  at: string;
+  label: string;
+  qty: number | null;
+  /** The row is on PACK_NOT_CHECKED. */
+  notChecked: boolean;
+  /** The row's written pack, if STARTER_PACKS has one. */
+  written: { label: string; qty: number } | undefined;
+}): RowCheck<{ label: string; qty: number }> {
+  const { at, label, qty, notChecked, written } = input;
+  if (qty === null) return { problems: [], value: null };
+  if (Number.isNaN(qty) || qty <= 0)
+    return {
+      problems: [`${at}: pack qty is not a number above 0`],
+      value: null,
+    };
+  if (written) {
+    if (qty !== written.qty)
+      return {
+        problems: [
+          `${at}: pack qty ${qty}, but this row's pack is decided as "${written.label}" (${written.qty}) in server/seed/materials/starterPacks.ts — change it there`,
+        ],
+        value: null,
+      };
+    return { problems: [], value: null };
+  }
+  if (!notChecked) return { problems: [], value: null };
+  const words = label.trim();
+  if (qty === 1 && (words === "" || words.toLowerCase() === "each"))
+    return { problems: [], value: null }; // as shipped: not answered yet
+  if (!words)
+    return {
+      problems: [
+        `${at}: pack qty ${qty} needs its Pack size words ("box of ${qty}")`,
+      ],
+      value: null,
+    };
+  return { problems: [], value: { label: words, qty } };
+}
+
 export type HoursEntry = { laborHours?: string; fieldBendLaborHours?: string };
 
 /**
