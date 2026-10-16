@@ -14,25 +14,40 @@
  * `overheadSource` "company"). A value typed on the bid itself, 0 included,
  * is somebody's decision and is never flagged.
  *
- * ── What this cannot tell apart ─────────────────────────────────────────────
- * `pricing_defaults` keeps no record of whether a 0 was typed or never set,
- * so a company that deliberately runs 0% sees the label too. Telling the two
- * apart needs a column (Track A's migration), parked for the owner.
+ * ── A typed 0 is a decision (N5, 0164, owner 2026-10-16) ─────────────────────
+ * Until 0164 `pricing_defaults` kept no record of whether a 0 was typed or
+ * never set, so a shop that deliberately runs 0% saw the label too. Now a
+ * Settings save stamps `profitSetAt` / `overheadSetAt`, and a group the
+ * company has SET is never flagged, whatever its value. The stamps are a
+ * REQUIRED argument, so no caller can forget them and fall back to "every
+ * 0 is unset". A company that typed 0 before 0164 has no stamp and sees the
+ * label until it saves that group once.
  */
 import type { ResolvedPricingSettings } from "./pricing";
 
 export type MarginsNotSet = { profit: boolean; overhead: boolean };
 
+/** When the company last saved each group in Settings; null = never. */
+export type CompanyMarginsSetAt = {
+  profitSetAt: Date | string | null;
+  overheadSetAt: Date | string | null;
+};
+
 export function marginsNotSet(
   settings: Pick<
     ResolvedPricingSettings,
     "profit" | "overhead" | "profitSource" | "overheadSource"
-  >
+  >,
+  company: CompanyMarginsSetAt
 ): MarginsNotSet {
   return {
-    profit: settings.profitSource === "company" && settings.profit.value === 0,
+    profit:
+      settings.profitSource === "company" &&
+      company.profitSetAt === null &&
+      settings.profit.value === 0,
     overhead:
       settings.overheadSource === "company" &&
+      company.overheadSetAt === null &&
       (!settings.overhead.enabled || settings.overhead.value === 0),
   };
 }

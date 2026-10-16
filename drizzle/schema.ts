@@ -1797,6 +1797,17 @@ export const pricingDefaults = mysqlTable(
       .notNull(),
 
     /**
+     * When somebody last SAVED the profit / the overhead through Settings
+     * (0164, owner N5 2026-10-16). NULL = never set: the stored 0 is the
+     * shipped fallback, not a choice, and the bid says "not set"
+     * (shared/marginsNotSet.ts). Stamped by `bids.setPricingDefaults` on any
+     * write to that group, 0 included — a typed 0% is a decision. Nullable,
+     * no default, so "not yet set" is a value nothing else can produce.
+     */
+    profitSetAt: timestamp("profitSetAt"),
+    overheadSetAt: timestamp("overheadSetAt"),
+
+    /**
      * Company-wide productivity adjustment, as a fraction (0.10 = +10% hours).
      *
      * Applied at calculation time as a final multiplier AFTER job-condition
