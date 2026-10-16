@@ -1709,13 +1709,29 @@ Design: `references/homerun-footage-plan.md` § 4.
 
 ### Plans: a plan that cannot be opened leaves the counts panel saying "loading…" (Track B, 2026-10-16)
 
-- [ ] Only a damaged or password-protected set attached BEFORE 2026-10-16
+- [x] **DONE 2026-10-16 (B):** PlanPane reports `onOpenFailed`; the line
+      says "This sheet: the plan could not be opened" and the Counts / Runs
+      empty states say why (`sheetLine`'s `planUnopened`,
+      `client/src/lib/panelTabs.test.ts`, red without it). Looked at on a
+      throwaway bid at laptop, iPad and phone
+      (`references/overnight-shots/b/plans-unopenable-*.png`). Was:
+      Only a damaged or password-protected set attached BEFORE 2026-10-16
       can show it (the upload now refuses those — `probePlanFile`). The
       drawing says what is wrong, but no sheet rows exist, so the sheet's
       mark list never loads and the line reads "This sheet: loading…" for
       ever. Fix: route PlanPane's open error up and let the panel say "This
       plan could not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts`
       work.
+
+### Plans: a mouse in an ~820 px window leaves the drawing ~80 px wide (Track B, 2026-10-16, NOT fixed — layout policy)
+
+- [ ] `plansLayout` gives a mouse at 768 px or wider the laptop layout, with
+      the sheet list AND the panel open beside the drawing. At 820 x 1180
+      the drawing gets about 80 px, and a damaged plan's message wraps one
+      word per line (`references/overnight-shots/b/plans-unopenable-ipad.png`).
+      A real iPad has a finger and gets the phone layout, so this is a
+      narrow laptop window (split screen). Not fixed: whether to start a
+      panel folded below some width is a layout decision, not a fault fix.
 
 ### Before beta: speed of the summary, and two missing Undos
 

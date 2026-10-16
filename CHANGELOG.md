@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A mark or a traced run can only be saved on a sheet of its own bid.**
+  The server checked that a sheet belonged to the company, not to the bid
+  the mark was sent with. So a mark could be written onto another bid's
+  drawing, even one whose quantities were locked. It was counted on neither
+  bid but still drawn there. Both are refused now.
+- **A plan that can't be opened no longer leaves the panel saying
+  "loading…" for ever.** A damaged or password-protected set attached before
+  uploads started refusing them has no sheets, so its marks were never
+  coming. The panel now says "This sheet: the plan could not be opened".
+
 - **Every bid now says how it was priced and what it earns**, in two short
   lines under Total due: "Priced the old way: material markup only" (or
   which of markup, overhead and profit it used), and "Effective margin 11.3%

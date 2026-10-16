@@ -1201,8 +1201,11 @@ export type RunTypeBridgeEntry = {
 export function ThisSheetLine({
   stampGroups,
   runs,
+  planUnopened,
   className,
 }: {
+  /** The plan could not be opened, so null lists are never arriving. */
+  planUnopened: boolean;
   stampGroups: readonly { placed: number }[] | null;
   runs:
     | readonly {
@@ -1213,10 +1216,11 @@ export function ThisSheetLine({
     | null;
   className?: string;
 }) {
-  const loading = stampGroups === null || runs === null;
+  const loading = (stampGroups === null || runs === null) && !planUnopened;
   return (
     <p className={className} aria-busy={loading || undefined}>
       {sheetLine({
+        planUnopened,
         counts: stampGroups,
         runs:
           runs?.map(r => ({
@@ -1230,7 +1234,21 @@ export function ThisSheetLine({
 }
 
 /** Where an empty state would go, while the sheet's lists are on their way. */
-function SheetListLoading({ what }: { what: "marks" | "runs" }) {
+function SheetListLoading({
+  what,
+  planUnopened,
+}: {
+  what: "marks" | "runs";
+  /** Never coming: say why, rather than a "Loading…" nothing will end. */
+  planUnopened: boolean;
+}) {
+  if (planUnopened)
+    return (
+      <p className="p-6 text-center text-sm text-muted-foreground">
+        This plan could not be opened, so it has no {what} to list. The drawing
+        says what is wrong with the file.
+      </p>
+    );
   return (
     <p
       className="p-6 text-center text-sm text-muted-foreground"
@@ -1264,6 +1282,7 @@ export function RunsPanel({
   onRemoveCircuit,
   stampGroups,
   sheetLoaded,
+  planUnopened,
   bridge,
   waitingToSend,
   countedWithNoPrice,
@@ -1391,6 +1410,12 @@ export function RunsPanel({
    * and a line built from them would state "0 marks" nobody counted.
    */
   sheetLoaded: boolean;
+  /**
+   * The plan could not be opened (damaged, or a password): with no sheet
+   * rows, the lists above never arrive, and the panel says so instead of
+   * "loading…" for ever.
+   */
+  planUnopened: boolean;
   /** Each count's relationship to the bid, by group id. */
   bridge?: ReadonlyMap<number, GroupBridgeState>;
   /**
@@ -1697,6 +1722,7 @@ export function RunsPanel({
         <ThisSheetLine
           stampGroups={sheetLoaded ? stampGroups : null}
           runs={sheetLoaded ? runs : null}
+          planUnopened={planUnopened}
           className="text-foreground"
         />
         {quantitiesLocked && (
@@ -1745,7 +1771,9 @@ export function RunsPanel({
             stays where they can watch it climb. */}
         {/* Not loaded is not empty: "Nothing counted" while the marks are
             still on their way reads exactly like marks that were lost. */}
-        {tab === "counts" && !sheetLoaded && <SheetListLoading what="marks" />}
+        {tab === "counts" && !sheetLoaded && (
+          <SheetListLoading what="marks" planUnopened={planUnopened} />
+        )}
         {tab === "counts" &&
           sheetLoaded &&
           stampGroups.length === 0 &&
@@ -2443,7 +2471,7 @@ export function RunsPanel({
         {tab === "totals" && dropsReadout}
 
         {tab !== "runs" ? null : !sheetLoaded ? (
-          <SheetListLoading what="runs" />
+          <SheetListLoading what="runs" planUnopened={planUnopened} />
         ) : runs.length === 0 ? (
           <div className="p-6 text-center">
             <Zap className="w-7 h-7 mx-auto mb-3 text-muted-foreground/50" />
