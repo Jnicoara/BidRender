@@ -298,3 +298,14 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
 - `e2e/smoke/pdfs.spec.ts`, 13 tests; probe and Retry each proved by
   breaking. One existing unit test's expected wording updated on purpose
   (the owner's item replaces "Invalid PDF structure." with words and a fix).
+
+## Item 5 — scale check against a printed dimension (03:23–03:37) · `632a6b37`
+
+- Plan: `references/scale-check-plan.md`. The check already existed (2%
+  tolerance, misread factors); the gap was the fix. Built
+  `scaleFromCheck` + the one-tap "Use <scale> — what this dimension says"
+  (exact ratio saved, shown by name; never applied by itself).
+- Found on the phone: "Check it" left Trace armed — the two taps drew a run.
+  Fixed (Trace goes down first; a run in progress asks to be finished).
+  The check bar overlapped its buttons at 390 px — fixed. Looked at laptop
+  and phone. Proved both by breaking.
