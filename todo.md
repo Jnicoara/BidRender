@@ -22,9 +22,9 @@ Looked at with a real `field` row on a throwaway DB
    co-owners not on each other (already true by `outranks`). Add a test.
 4. `server/fieldNoPrices.test.ts`: store the member as `field` and drop the
    `capabilitiesFor` mock.
-5. Polish seen 2026-10-16: on a view-only Plans screen each count row still
-   shows its undo and bin icons, greyed (as on a locked bid). Hide them for
-   `viewOnly`.
+5. **Built 2026-10-16, NOT looked at yet:** a view-only Plans screen no longer
+   shows each count row's undo and bin icons (they were greyed, as on a
+   locked bid). Look at it with the first real Field login.
 
 ## Bid methods — wiring left (Track B, 2026-10-16, waits for A's BM-M1..M10)
 

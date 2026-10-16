@@ -1866,15 +1866,16 @@ export function RunsPanel({
                   <span className="font-mono text-sm tabular-nums">
                     {group.count}
                   </span>
-                  {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
-                  {group.groupId !== null && (
+                  {/* Undo and trash, as on a run card (owner, 2026-09-29).
+                      Not view-only: nothing here may change for them. */}
+                  {!viewOnly && group.groupId !== null && (
                     <CardUndo
                       subject={{ kind: "count", id: group.groupId }}
                       cardUndo={cardUndo}
                       onCardUndo={onCardUndo}
                     />
                   )}
-                  {onDeleteCountMarks && (
+                  {!viewOnly && onDeleteCountMarks && (
                     <Button
                       size="sm"
                       variant="ghost"
