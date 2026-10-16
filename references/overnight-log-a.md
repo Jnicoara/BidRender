@@ -380,3 +380,15 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   is Track C's on `track-c`, kept apart to avoid a merge clash).
 - 00:03 counting deep test done except mouse-vs-finger, which rides
   the browser journey (item 3).
+- Gate 38863505561 **green** on 24ca6a72 (counting part 1). Pushed 291e719b + 887fe193.
+
+## Item 2 (part 2) — bid-number gap tests — 00:08 →
+
+- `server/bidNumberGaps.test.ts` (user 9917): (1) a kit prices the
+  company's COPY of an edited starter assembly — 2 × 3 h = 6 h, $360.
+  **Proved:** kit lookup switched to the stored id → red (0 h), restored.
+  (2) a LOCKED bid keeps run lines when company extras change: 110 ft /
+  $93.50 locked, 125 ft / $106.25 after unlock (the unlock half is the
+  built-in contrast). **Breaking the lock itself to watch it go red was
+  REFUSED by the auto-mode safety check** ("security test removal"); not
+  worked around, file restored at once.
