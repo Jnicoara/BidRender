@@ -211,10 +211,16 @@ export function InlineNumberField({
       emptied box in placeholder mode never becomes a zero — the trapdoor this
       change exists to close, and the one that has now shipped twice.
     */
+    // A percent box takes a trailing "%" as meant, like every other percent
+    // box since 2026-10-15 (Settings, markup, tax) — it used to refuse "15%".
+    const typed =
+      percentKind || suffix?.includes("%")
+        ? draft.trim().replace(/%$/, "")
+        : draft;
     const outcome =
       whenUnset === undefined
-        ? commitNumericEdit(draft, shown, rules)
-        : commitNullableEdit(draft, value, whenUnset, rules);
+        ? commitNumericEdit(typed, shown, rules)
+        : commitNullableEdit(typed, value, whenUnset, rules);
 
     if (outcome.action === "save") {
       confirmWhenWritten(onSave(outcome.value));
@@ -247,6 +253,8 @@ export function InlineNumberField({
     rules,
     onSave,
     confirmWhenWritten,
+    percentKind,
+    suffix,
   ]);
 
   const caption = percentKind ? otherPercentCaption(percentKind, draft) : null;
