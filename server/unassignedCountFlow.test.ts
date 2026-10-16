@@ -7,10 +7,10 @@
  * Fixture user 9790 is this file's own.
  */
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { bidPdfs, bids, users } from "../drizzle/schema";
+import { assemblies, bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 
@@ -144,6 +144,22 @@ describeDb("a bid with marks nobody has named yet", () => {
     await expect(
       caller().takeoffGroups.restore({ undo: removed.undo! })
     ).rejects.toThrow(/^(?!.*__unassigned__).*Unassigned/);
+  });
+
+  it("cannot itself be linked to an assembly — its marks move instead", async () => {
+    const { heldId } = await aBidWithThreeUnassigned();
+    const database = (await getDb())!;
+    const [anyAssembly] = await database
+      .select({ id: assemblies.id })
+      .from(assemblies)
+      .where(isNull(assemblies.userId))
+      .limit(1);
+    await expect(
+      caller().takeoffGroups.setSource({
+        id: heldId,
+        assemblyId: anyAssembly.id,
+      })
+    ).rejects.toThrow(/Pick what they are/);
   });
 
   it("nobody can make a count of their own that looks like it", async () => {

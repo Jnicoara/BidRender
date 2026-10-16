@@ -705,6 +705,17 @@ export const takeoffGroupsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const group = await requireGroup(input.id, userId);
+      /*
+        Never the Unassigned count itself: it would keep its reserved label,
+        stop being Unassigned, and could go to the bid as "__unassigned__".
+        Its marks MOVE into a count of their own (count-first-plan.md).
+      */
+      if (isUnassignedCount(group))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "These marks are unassigned. Use “Pick what they are…” — it moves them into a count of their own.",
+        });
       const bid = await requireBid(group.bidId, userId);
       if (bid.quantitiesLockedAt !== null)
         throw new TRPCError({
