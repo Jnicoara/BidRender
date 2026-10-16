@@ -14,7 +14,21 @@ before pushing notes.
 (test, deploy-staging, smoke 223 passed, 14.3 min); staging `/api/version`
 commit `230c18f5`, built 20:19 UTC. Landed.
 
-## WHERE B STANDS — 2026-10-16 day session, track-b
+## WHERE B STANDS — 2026-10-16 late afternoon, track-b (tip `d261554f`)
+
+- **Narrow laptop window:** the sheet list opens folded when both panels
+  would leave the drawing under 400 px (`9d0890ae`; 820 px: 80 → 310 px).
+- **Bid methods wiring: WAITING** for A's "BM migrations applied" here.
+  The six steps are in `todo.md` § "Bid methods — wiring left".
+- **Field and Co-owner** (`82100644`, plan `field-and-coowner-plan.md`):
+  built with no column; FR-M1 drafted, tested on a throwaway DB, in
+  `track-a-handoff.md` § "FROM B — 2026-10-16 evening". Field can reach no
+  price through any route (`server/fieldNoPrices.test.ts`). After FR-M1:
+  `todo.md` § "Field and Co-owner — after FR-M1". Owner questions Q7.
+- **Plans break-it:** count rename refused on the Unassigned count and on a
+  locked bid (`9f48431d`).
+
+## WHERE B STOOD — 2026-10-16 day session, track-b
 
 - **Correction:** the fourth night's "Gate green through 303d86bf" below was
   wrong. Each code commit's Gate was cancelled by the notes push after it;
