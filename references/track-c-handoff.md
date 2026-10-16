@@ -7,6 +7,10 @@
 - **Wrong number fixed:** assembly / kit quantity boxes stored 2.25 as 225
   when typed. Q-QTY1 at the top of `pricing/morning-questions.md` asks
   for a read-only live list of suspicious saved quantities.
+- Number-box sweep finished outside B's files. **FOR TRACK B:** the run-type
+  editor's extra % / makeup boxes (`RunTypePicker.tsx` `ExtraDraftField`)
+  have the same dropped-dot fault (2.5 → 25) — Q-QTY3; list in `todo.md`
+  under the `parseTypedNumber` item.
 
 ## 2026-10-15, day — answers, before/after screenshots, two todo items
 

@@ -20,7 +20,7 @@
  */
 import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { parseTypedNumber } from "@/lib/inlineEdit";
+import { parseTypedPercent } from "@/lib/inlineEdit";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
@@ -108,12 +108,10 @@ type Draft = { name: string; percent: string };
 const emptyDraft: Draft = { name: "", percent: "" };
 
 /**
- * The box as a person types it: "15", "15%", "+15" all mean 15. Read with
- * the app's one number reader (parseTypedNumber) — Number() took "0x10" as
- * 16 — plus a trailing "%", which in a percent box says what it means.
+ * The box as a person types it: "15", "15%", "+15" all mean 15 — the app's
+ * one percent reader (Number() took "0x10" as 16).
  */
-const typedPercent = (text: string) =>
-  parseTypedNumber(text.trim().replace(/%$/, ""));
+const typedPercent = parseTypedPercent;
 
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return "Give the modifier a name.";

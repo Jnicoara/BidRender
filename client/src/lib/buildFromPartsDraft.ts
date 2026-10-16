@@ -7,6 +7,7 @@
  * (CLAUDE.md § Editing fields 6), and a part chosen twice adds to the first.
  */
 import type { AssemblyCategoryName } from "@shared/assemblyCategories";
+import { parseTypedNumber } from "./inlineEdit";
 import { money } from "./money";
 
 export interface DraftPart {
@@ -56,7 +57,7 @@ export function addDraftPart(
 ): BuildDraft {
   const existing = draft.parts.find(part => part.materialId === material.id);
   if (existing) {
-    const now = Number(existing.qty);
+    const now = parseTypedNumber(existing.qty);
     return {
       ...draft,
       parts: draft.parts.map(part =>
@@ -100,7 +101,7 @@ export function buildRequest(
     return { ok: false, problem: "Add at least one part." };
   const parts: { materialId: number; qty: number }[] = [];
   for (const part of draft.parts) {
-    const qty = Number(part.qty.trim());
+    const qty = parseTypedNumber(part.qty);
     if (part.qty.trim() === "" || !Number.isFinite(qty) || qty <= 0)
       return {
         ok: false,
@@ -110,7 +111,7 @@ export function buildRequest(
   }
   let baseLaborHours: number | null = null;
   if (draft.hours.trim() !== "") {
-    const hours = Number(draft.hours.trim());
+    const hours = parseTypedNumber(draft.hours);
     if (!Number.isFinite(hours) || hours < 0)
       return { ok: false, problem: "Hours must be a number, 0 or more." };
     baseLaborHours = hours;
@@ -140,7 +141,7 @@ export function draftPartsCost(draft: BuildDraft): {
   let cost = 0;
   let notPriced = 0;
   for (const part of draft.parts) {
-    const qty = Number(part.qty);
+    const qty = parseTypedNumber(part.qty);
     if (!(part.costPerUnit > 0)) {
       notPriced += 1;
       continue;

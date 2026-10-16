@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Every remaining number box now reads what you typed the same way.** On
+  the Count screen, a kit button pressed with a quantity the app could not
+  read used to add the kit once anyway; it now says "Enter a quantity
+  greater than zero". A material's own markup accepts "15%", and the
+  first-run labor rate, build-from-parts, duplicate units and the admin
+  seat limits no longer read "0x10" as 16 or a blank as 0.
+
 - **Fixed: typing a decimal quantity in an assembly or kit saved it 10× or
   100× too big.** Typing 1.5 into a material's quantity on an assembly (or
   an assembly's quantity in a kit) lost the decimal point as it was typed

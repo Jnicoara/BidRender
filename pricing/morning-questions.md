@@ -24,6 +24,13 @@ brand-variants pass by design and needs nothing from you now.
   A shop's own fix is editing the assembly; bids already priced from a
   wrong one keep their frozen line until re-added. Shipped starters are
   not affected (they come from the seed files, not typing).
+- **Q-QTY3 ⚠ WRONG NUMBER IN B'S FILE (not touched, listed for B)** — the
+  run-type editor's extra % and makeup inches (`takeoff/RunTypePicker.tsx`
+  `ExtraDraftField`) have the SAME dropped-dot fault: a typed 2.5 % extra
+  saves as 25 %, which moves wire/conduit footage on every bid using that
+  type. → **B fixes it next (same pattern as `DraftNumberInput`), and the
+  same read-only list as Q-QTY1 for run types with a whole-number extra of
+  10 or more.** Not seen on screen by C (B's screen); found by reading.
 - **Q-QTY2** — same bug, assembly WORK STEPS "How many" box (×N): fixed by
   the same component; not shown on screen (needs a work step set up) —
   unit-tested only. → **Nothing to decide**; noted so you know it was

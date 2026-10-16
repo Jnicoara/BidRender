@@ -1784,8 +1784,22 @@ Measurements: `references/code-first-ceiling.md` § d.
       (check, save and add; also accepts a trailing "%": "15%" saves 15%). Materials' labor
       hours (now checked: 0–12 or blank), pack quantity and raceway lengths. Fix
       this line (hours and prices): it stripped EVERY comma, so "1,5" became
-      15 on a bid line — now refused in words. Left: SeatLimitsPanel (admin)
-      and B's plan-screen components.
+      15 on a bid line — now refused in words. **Night 3 (2026-10-15 → 16,
+      Track C):** assembly material qty and kit item qty stored 2.25 as 225
+      when typed key by key (`String(qty)` re-rendered "2." as "2") — now
+      `DraftNumberInput`; also assembly steps' "How many"; Remove/Relocate
+      hours; Count screen quantity (a kit added at 1 when the quantity could
+      not be read — now refused); build-from-parts; first-run rate;
+      material markup ("15%" accepted, `parseTypedPercent`); duplicate
+      units; SeatLimitsPanel. **Left — B's Plans-screen files, for Track B:** - **`takeoff/RunTypePicker.tsx` `ExtraDraftField` (line ~302) — SAME
+      dropped-dot fault, a WRONG NUMBER:** `value={String(value)}` with
+      `Number(raw)` on each key, so typing a 2.5 % extra or 1.5 in makeup
+      saves 25 / 15. Fix like `DraftNumberInput` (it holds the text; this
+      one is nullable, so keep its blank = "company"). `CountField` (~367)
+      floors, so a dot is dropped harmlessly, but "0x10" reads as 16. - `takeoff/GroupDrop.tsx` ~164, `takeoff/HomerunControls.tsx` ~274:
+      `<select>`s of ids (checked) — fine. - `takeoff/SheetIndex.tsx` ~266 typed sheet number — text, probably
+      fine; `SheetCheck.tsx` ~503 and `TraceLayer.tsx` ~2210 are id
+      `<select>`s (fine).
 
 ### Flaky tests — fix in a batch before beta
 

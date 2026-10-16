@@ -48,6 +48,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { InlineNumberField } from "@/components/InlineNumberField";
 import { DuplicateUnitPanel } from "@/components/DuplicateUnitPanel";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { snapshotHoursFor } from "@shared/assemblyHours";
@@ -247,7 +248,7 @@ export default function QuickBidPage({
 
   const add = useCallback(
     (assemblyId: number) => {
-      const amount = Number(qty);
+      const amount = parseTypedNumber(qty);
       if (!Number.isFinite(amount) || amount <= 0) {
         toast.error("Enter a quantity greater than zero.");
         return;
@@ -448,7 +449,7 @@ export default function QuickBidPage({
                 query={buildingFrom}
                 target={{
                   kind: "line",
-                  qty: Number(qty),
+                  qty: parseTypedNumber(qty),
                   unitLabel: unitLabel.trim() || null,
                   merge: true,
                 }}
@@ -663,11 +664,18 @@ export default function QuickBidPage({
                   <button
                     key={kit.id}
                     onClick={() => {
-                      const amount = Number(qty);
+                      // Refused like an assembly add. It used to put the
+                      // kit on at 1 when the quantity could not be read —
+                      // a different number from the one on screen.
+                      const amount = parseTypedNumber(qty);
+                      if (!Number.isFinite(amount) || amount <= 0) {
+                        toast.error("Enter a quantity greater than zero.");
+                        return;
+                      }
                       addKit.mutate({
                         bidId,
                         kitId: kit.id,
-                        qty: Number.isFinite(amount) && amount > 0 ? amount : 1,
+                        qty: amount,
                         unitLabel: unitLabel.trim() || null,
                       });
                       focusSearch();

@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, Check, HardHat, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { needsRate } from "@shared/laborRatePricing";
 import { NavigationHelper } from "@/components/NavigationHelper";
@@ -53,7 +54,7 @@ export default function FirstRunPage() {
 
   const save = async (id: number) => {
     const raw = drafts[id];
-    const value = Number(raw);
+    const value = parseTypedNumber(raw ?? "");
     if (
       raw === undefined ||
       raw.trim() === "" ||

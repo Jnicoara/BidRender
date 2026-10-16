@@ -64,6 +64,16 @@ export function parseTypedNumber(text: string): number {
 }
 
 /**
+ * A percent box as a person types it: "15", "15%", "+15" all mean 15.
+ * parseTypedNumber plus a trailing "%", which in a percent box says what it
+ * means (Modifiers, and a material's markup — where "15%" was refused with
+ * "must be between 0% and 1000%" until 2026-10-15).
+ */
+export function parseTypedPercent(text: string): number {
+  return parseTypedNumber(text.trim().replace(/%$/, ""));
+}
+
+/**
  * What a half-typed number in a form box means right now (2026-10-15).
  *
  * The component quantity boxes rendered `String(qty)` straight from the

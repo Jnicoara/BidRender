@@ -4,7 +4,7 @@
  * String(qty), so "2." snapped to "2" and typing 2.25 stored 225.
  */
 import { describe, expect, it } from "vitest";
-import { draftNumber } from "./inlineEdit";
+import { draftNumber, parseTypedPercent } from "./inlineEdit";
 
 /** Every prefix a person passes through while typing `text`, key by key. */
 const keyByKey = (text: string) =>
@@ -40,5 +40,14 @@ describe("draftNumber — what a half-typed box means", () => {
     const positive = (n: number) => n > 0;
     expect(draftNumber("0", positive)).toBe(null);
     expect(draftNumber("3", positive)).toBe(3);
+  });
+});
+
+describe("parseTypedPercent — a percent box", () => {
+  it("takes a trailing % and nothing else extra", () => {
+    expect(parseTypedPercent("15%")).toBe(15);
+    expect(parseTypedPercent(" 12.5% ")).toBe(12.5);
+    expect(parseTypedPercent("0x10")).toBeNaN();
+    expect(parseTypedPercent("15%%")).toBeNaN();
   });
 });

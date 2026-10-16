@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { selectOnFocus } from "@/lib/selectOnFocus";
-import { parseTypedNumber } from "@/lib/inlineEdit";
+import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
 import {
   Archive as ArchiveIcon,
   Boxes,
@@ -501,7 +501,8 @@ function MaterialRow({
       return;
     }
     const typedMarkup = markupDraft.trim();
-    const nextMarkup = typedMarkup === "" ? null : Number(typedMarkup) / 100;
+    const nextMarkup =
+      typedMarkup === "" ? null : parseTypedPercent(typedMarkup) / 100;
     if (nextMarkup !== null && !(nextMarkup >= 0 && nextMarkup <= 10)) {
       toast.error("Markup must be between 0% and 1000%.");
       return;
