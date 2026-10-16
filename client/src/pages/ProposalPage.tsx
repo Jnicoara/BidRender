@@ -143,6 +143,15 @@ function BidField({
   );
 }
 
+/** This browser's IANA zone, or undefined where Intl cannot say. */
+const BROWSER_TIME_ZONE: string | undefined = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+})();
+
 export default function ProposalPage({
   bidId,
   onBack,
@@ -163,7 +172,10 @@ export default function ProposalPage({
    */
   const [mode, setMode] = useState<"full" | "scope-only">("full");
   const { data, isLoading, error } = trpc.proposals.document.useQuery(
-    { bidId, mode },
+    // The browser's time zone, so the quote is dated by the reader's
+    // calendar, not the server's (UTC on live — dated tomorrow every
+    // American evening, 2026-10-15).
+    { bidId, mode, timeZone: BROWSER_TIME_ZONE },
     // A refusal (an incomplete bid) will refuse again; retrying only delays
     // the sentence that says why.
     { retry: false }

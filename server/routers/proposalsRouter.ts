@@ -116,6 +116,17 @@ async function requireBid(id: number, userId: number) {
  */
 const companySettings = requireCapability("settings.edit");
 
+/** The zone name if this runtime knows it, else undefined (the server's). */
+function knownTimeZone(name: string | undefined): string | undefined {
+  if (!name) return undefined;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: name });
+    return name;
+  } catch {
+    return undefined;
+  }
+}
+
 export const proposalsRouter = router({
   // ── Branding ───────────────────────────────────────────────────────────────
 
@@ -321,6 +332,12 @@ export const proposalsRouter = router({
          * the priced proposal. Every visit starts from the real document.
          */
         mode: z.enum(PROPOSAL_MODES).default("full"),
+        /**
+         * The reader's time zone, for the date on the quote (shared/proposal.ts
+         * `timeZone`). A name this server does not know is ignored, never an
+         * error: the quote still builds, in the server's zone.
+         */
+        timeZone: z.string().max(64).optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -447,6 +464,7 @@ export const proposalsRouter = router({
         // The clock is the server's, so two people looking at the same proposal
         // on either side of midnight see the same date on it.
         now: new Date(),
+        timeZone: knownTimeZone(input.timeZone),
         notPriced,
       });
 

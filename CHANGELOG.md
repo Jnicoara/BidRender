@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: a quote prepared in the evening was dated tomorrow.** The date on
+  the proposal and its "price good through" were worked out on the server,
+  which runs on UTC — so after about 5 pm Pacific (8 pm Eastern) every
+  quote carried the next day's date and a validity date a day late. The
+  quote now uses the date where you are.
+
 - **A plan for stopping oversized plan uploads, with the checks written but
   not switched on.** Today the size an upload declares is checked, but the
   file actually sent is not, so a signed-in user could store far more than
