@@ -136,6 +136,16 @@ describeDb("a bid with marks nobody has named yet", () => {
     expect(back.label).toBe("Unassigned");
   });
 
+  it("an undo that cannot put it back says 'Unassigned', never the stored label", async () => {
+    const { bidId, heldId } = await aBidWithThreeUnassigned();
+    const removed = await caller().takeoffGroups.remove({ id: heldId });
+    // "Just count" again starts a new Unassigned count.
+    await caller().takeoffGroups.unassigned({ bidId });
+    await expect(
+      caller().takeoffGroups.restore({ undo: removed.undo! })
+    ).rejects.toThrow(/^(?!.*__unassigned__).*Unassigned/);
+  });
+
   it("nobody can make a count of their own that looks like it", async () => {
     const { bidId } = await aBidWithThreeUnassigned();
     await expect(
