@@ -4,9 +4,41 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
+## NOW — 2026-10-15 night, session 46: overnight queue on `track-a-night`
 
-Same branch, still not on local-dev. Gate **38746107689 green** on `30e45889`.
+Step 1 done: `track-a-night` landed on local-dev at `a4c97280` (ff, 22:01),
+Gate 38853660685. Queue (owner's order): 2 golden bids → 3 speed limits →
+4 Q-AUTH1 fix → 5 invite sign-up screens → 6 A-S13 plan + fake-storage test →
+7 safe todo items. Progress per item in `overnight-log-a.md`.
+
+- **2 GOLDEN BIDS — built.** `server/goldenBids.test.ts` (8 bids through the
+  routers), `server/goldenBids.ts` (comparison, update-with-reason, hash
+  guard), `server/goldenBidsCompare.test.ts` (13, pure),
+  `server/fixtures/goldenBids.json`. Owner's calculator list:
+  `references/golden-bids-to-check.md` (two open questions in it: fitting
+  hours 0, strap/coupling counts on drops). Quoted lines not covered — not
+  built in the app. **Bid 9** (`markup-extras`, user 9912) added later
+  through `GOLDEN_UPDATE_REASON`: extras, item markup, profit as margin.
+- **3 SPEED LIMITS — built.** `server/speedLimits.test.ts` (user 9908):
+  page-level reads per screen < 2 s, 7 saves < 1 s, median of 5, printed
+  `[speed]`. CI: screens ≤ 113 ms, saves ≤ 14 ms except **pricing a
+  material 221 ms** (laptop 6) — todo entry; `[speed-detail]` now splits it
+  for the next CI log. Builders shared: `server/bidBuilders.testHelper.ts`.
+- **4 Q-AUTH1 — FIXED.** `server/passwordHashing.ts` (bcryptjs in ≤4 worker
+  threads); `server/signInBurst.test.ts` stall 874 → 24 ms (CI 15 ms), red
+  before. Re-run C's burst script on staging after merge.
+- **5 INVITE SIGN-UP SCREENS — built, switch still OFF.** `signupLink.ts`,
+  `LoginPage`, `AuthGuard`; shots in `references/overnight-shots/a/`. The
+  invitee seat refusal now speaks to the invitee (`INVITEE_SEATS_FULL`).
+- **6 A-S13 — plan + prepared guard, NOT wired.**
+  `a-s13-upload-size-plan.md`, `server/uploadSizeGuard.ts` (+9 tests on an
+  offline signer / fake store). Next: the staging-bucket proof (§ 3).
+- **7 safe todo items:** backup fixture bucket renamed; four stale entries
+  closed with evidence.
+
+## (earlier) 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
+
+Landed on local-dev 2026-10-15 22:01 (session 46). Gate **38746107689 green** on `30e45889`.
 
 - **Q-DB1 FIXED** (`q-db1-plan.md`): a query or connection wait past 30 s
   destroys its connection (`server/dbDeadline.ts`, pool built in

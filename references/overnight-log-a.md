@@ -175,3 +175,148 @@ measurement, the cause (`bcryptjs` on the main thread), two fix options
 - **Gate 38746107689 GREEN** on `30e45889` (full suite, Q-DB1 + A-S9b +
   A-S12 + Q-AUTH1 note). Run 2 end **07:02**. No dev server started; MySQL
   3307 left running (shared). Nothing pushed except `track-a-night`.
+
+# Run 3 — 2026-10-15 night
+
+## Step 1 — land track-a-night on local-dev — 22:01
+
+`origin/local-dev` (d0152f60) was an ancestor of `track-a-night`, so
+`--ff-only` went through: `d0152f60..a4c97280 local-dev -> local-dev`.
+No `drizzle/` change in the 17 commits. Gate 38853660685 on local-dev.
+
+## Item 2 — golden bids — 22:03 → 22:15
+
+(Times in this run's item headings are from the clock and the commit
+stamps. The first draft of items 2–5 carried guessed times that ran an hour
+ahead; corrected at 22:37.)
+
+- 8 fixture bids built through the routers (fixture users 9906, 9907):
+  counts, homerun, drops, remove-relocate, scope-tags, labor-only,
+  free-count (a typed price stands in for a quote item), op-and-tax
+  (overhead, profit, productivity, markup, 8% tax, two expenses, Active).
+- Every line field and total from `bids.get` plus the screen's not-priced
+  tally pinned in `server/fixtures/goldenBids.json`. A moved number fails,
+  naming bid · line · field: old → new. On-purpose updates need
+  `GOLDEN_UPDATE_REASON`, are refused under CI, and are hash-checked, so a
+  hand edit fails too.
+- **Proof it bites:** the first draft cleared the run height before reading
+  the drops bid, which pinned 60 ft. Fixing the fixture made the compare fail
+  with 20 named diffs (60 → 94 ft, $252.61 → $365.83). Then regenerated from
+  scratch; 2 further runs identical.
+- **Quoted lines not covered:** no router writes them and pricing ignores
+  them. Listed in `golden-bids-to-check.md`.
+
+## Item 3 — speed limits — 22:15 → 22:22
+
+- `server/speedLimits.test.ts` (fixture user 9908): 1 sheet, 2 run types,
+  20 runs with circuits, 6 counts × 25 marks, 24 lines. A screen = the
+  page-level `useQuery` reads fired together; median of 5 after a warm-up.
+  Limits 2000 ms (screen), 1000 ms (save); `OVER_TODAY` names any raised
+  limit (empty).
+- Builders moved to `server/bidBuilders.testHelper.ts`, shared with the
+  golden bids (golden still matches after the move).
+- Measured locally (laptop, three tracks running): screens 8–167 ms
+  (Plans 167, Bid 141), saves 6–32 ms (scope tag 32). Nothing over → no
+  todo needed. CI numbers: in the Gate log, lines starting `[speed]`.
+
+## Step 1 result — 22:25
+
+Local-dev Gate 38853660685 **green**: test, deploy-staging, smoke
+**96 passed / 2 skipped** (as expected). Staging `/api/version`:
+`commit a4c97280`, builtAt 05:11 UTC.
+- Item 3 committed `fe878143` (code) at 22:22.
+
+## Item 4 — Q-AUTH1 sign-in burst — 22:18 → 22:23 (worked beside item 3)
+
+- Option (b): `server/passwordHashing.ts`, `bcryptjs` in ≤4 worker threads
+  started from source text (the server ships as one bundled file), loading
+  the `bcryptjs` path resolved by the main thread. No main-thread fallback.
+  `authRouter` (9 calls) and `starterEditor/store.ts` (4) switched.
+- `server/signInBurst.test.ts`: 6 real cost-12 sign-ins via `auth.login`
+  with a 10 ms ticker. **Red before: stall 874 ms** (burst 1,811 ms).
+  **Green after: 24 ms** (586 ms). Hash made by plain `bcryptjs` → old
+  passwords verify. Auth tests 58/58. From an esbuild bundle: hash, verify,
+  reject, and the process exits (idle workers unref'd).
+- `auth.email.test.ts` mocked `bcryptjs` by name; mock moved to
+  `./passwordHashing` with identical fakes — no assertion changed.
+- Not done: C's burst script against a production build (needs a server;
+  memory). Recommended on staging after merge.
+- Item 2 Gate 38854852318 **green** (d75970b1).
+
+## Item 5 — invite sign-up screens — 22:23 → 22:33
+
+- Free memory 3.8 GB before starting. ONE dev server (port 3017, test DB
+  `bidrender_test_localdev`, `SIGNUP_INVITE_ONLY=on`), stopped after: its
+  whole cmd/cross-env/tsx tree killed, port 3017 free, verified.
+- Built: `client/src/lib/signupLink.ts` + test (9), `LoginPage`, `AuthGuard`
+  (`#/signup?invite=`). Switch OFF = page unchanged.
+- Screenshots `references/overnight-shots/a/` 1–5 × laptop 1366×768 /
+  iPad 820×1180 / phone 390×844 (+ 6, dashboard after an invite sign-up).
+  None scrolls sideways. Looked at: 1 laptop, 2 phone, 3 phone, 5 iPad.
+- Driven in the browser: the new-company link signed up and landed on the
+  dashboard, code gone from the address; the waitlist link went to the
+  landing form (`#early-access`, field visible).
+- **Found by using it:** a company-code sign-up refused for seats told the
+  INVITEE "Remove someone or add a seat." Now `INVITEE_SEATS_FULL` (both
+  accept paths are the invitee's); `seats.test.ts` assertion moved to the
+  new words, still exact. (The refusal itself came from my fixture: the
+  invite was inserted past the seat check. The seat rule is right.)
+- Throwaway invites/users removed from the test DB afterwards.
+
+## Item 6 — A-S13 plan + fake-storage test — 22:33 → 22:38
+
+- **Measured offline** (fake credentials, no network, no bucket): today's
+  signed PUT has `X-Amz-SignedHeaders=host`; with `ContentLength` it is
+  `content-length;host`, for a PUT and for a piece.
+- `server/uploadSizeGuard.ts` (prepared, not wired): `boundPutInput`,
+  `boundPartInput` (exact piece lengths from `multipartPlan`),
+  `uploadSizeProblem`, `verifyUploadedSize` (HEAD at attach; refuses and
+  deletes a mismatch). `server/uploadSizeGuard.test.ts` 9/9 on a Map store.
+- Plan `references/a-s13-upload-size-plan.md`: staging proof steps with
+  expected 200/403s, wiring order (B check at attach first, then A
+  binding, `signUploadParts` gains `byteSize`, ticket cap per company),
+  risks. `security-parked-a.md` row updated.
+
+## Gates — items 3+4 green, CI numbers — 22:39
+
+- Gate 38855631644 **green** on `0438079e` (items 3 + 4).
+- CI `[speed]`: screens Dashboard 39, Bid 87, **Plans 113**, Materials 16,
+  Assemblies 4, Materials list 33, Proposal 19 ms (limit 2000). Saves 2–14
+  ms except **"Price a material" 221 ms** (laptop: 6 ms) — under the 1000
+  limit, but 35× the laptop; worth a look (todo entry added).
+- CI `[burst]`: 6 sign-ins 722 ms, longest stall **15 ms** (limit 150).
+- Items 5 + 6 pushed (`f9e80c3b`).
+
+## Item 7 — safe todo items — 22:38 →
+
+Smallest risk first; everything here is a test fixture or a todo entry.
+
+- `server/backup.test.ts`: fixture bucket `bidrender-backups` →
+  `fixture-backup-bucket` (33/33). The old name is now nowhere in
+  `server/` or `scripts/`.
+- Closed as already done, each with the search that shows it: the
+  `deploying.md` "OAuth-only" sentence (gone); the dead Manus branch in
+  `storageProxy.ts` (no `"manus"` backend name); "typecheck the tests"
+  (`tsconfig.json` no longer excludes them); "make `bidrender_test` the
+  default" (the suite refuses any non-test DB).
+- New todo: the CI-only 221 ms material save (see Gates above).
+- Left alone: `takeoffGroups.rename` lock check (Track B's item); anything
+  touching live, migrations or money.
+- 22:42 Golden bid 9 `markup-extras` (user 9912): accepted extras
+  with the company's own numbers (5% conduit, 10% wire, 12"/36" makeup),
+  EMT item markup 40% over company 15%, profit 20% as margin. Compare first
+  failed naming ONLY the new bid (bids 1–8 matched); then written with
+  `GOLDEN_UPDATE_REASON`, history `changed: ["markup-extras"]`. Two owner
+  questions added to `golden-bids-to-check.md` § 9 (makeup 12" at each
+  end; extra on installed length, makeup after it).
+- 22:48 Gate 38856736105 **green** on `f9e80c3b` (items 5 + 6). Pushed through `dabfc76e` (bid 9, speed detail, handoff, todo); its Gate running.
+- 23:01 Final Gate 38857671207 **green** on `dabfc76e`. The
+  material save is 3 ms in CI this time (`[speed-detail]` 1 ms read /
+  1 ms write): the 221 ms did not reproduce. Burst stall 13 ms.
+
+## Run 3 end — 23:01
+
+Nothing pushed except `track-a-night` after step 1's authorised local-dev
+fast-forward. No migrations, no DB rules, no live or staging database. One
+dev server (port 3017, test DB), stopped and verified gone. MySQL 3307 left
+running.

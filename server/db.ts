@@ -268,6 +268,7 @@ import { TRADE_ALL, normalizeTradeId, resolveForTrade } from "../shared/trades";
 import {
   lowerLimitRefusal,
   seatRefusal,
+  INVITEE_SEATS_FULL,
   type SeatUsage,
 } from "../shared/seats";
 import {
@@ -12405,8 +12406,9 @@ export async function acceptInviteWithinSeats(
       .for("update");
     if (!invite) return { ok: false, message: "That invitation is not valid." };
 
-    const refusal = seatRefusal(usage, 0);
-    if (refusal) return { ok: false, message: refusal };
+    // Said to the person accepting, who cannot free a seat themselves.
+    if (seatRefusal(usage, 0))
+      return { ok: false, message: INVITEE_SEATS_FULL };
 
     // Same order as before this was a transaction, and for the same reason:
     // consume the code first. Inside one transaction the order no longer

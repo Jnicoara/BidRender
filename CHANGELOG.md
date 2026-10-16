@@ -80,6 +80,48 @@ This is the human-readable companion to the git history — read this to see wha
   accepting one update can never hide another, and a field BidRidge changed
   twice shows as one update rather than looking like the shop's own number.
 
+- **A plan for stopping oversized plan uploads, with the checks written but
+  not switched on.** Today the size an upload declares is checked, but the
+  file actually sent is not, so a signed-in user could store far more than
+  they said. Two fixes are ready: tie the size into the upload link, and
+  check the real size before the plan is attached. They wait for a test on
+  the staging storage bucket first, because a wrong guess would break every
+  upload.
+
+- **The sign-in page is ready for invite-only sign-up (still switched off).**
+  While the switch is off, nothing changes. When the owner turns it on, a
+  stranger sees no "Create account" form, just a line pointing to the
+  early-access list. Someone with an invite link sees who invited them, and
+  their address is filled in. A bad or used link says why. Someone accepting
+  an invite to a company that has no free seat is now told to ask whoever
+  invited them, instead of being told to remove someone.
+
+- **Many people signing in at once no longer freezes the app for everyone
+  else.** Checking a password is deliberately slow work. It used to run on
+  the same thread that answers every request, so a handful of sign-ins
+  together stalled all other screens for most of a second. It now runs on
+  separate threads: six sign-ins at once held the server for 24 milliseconds
+  instead of 874. Existing passwords work unchanged.
+
+- **The test run now fails if a main screen or a save gets slow.** On a
+  mid-sized bid it times what each screen asks the server for when it opens
+  (dashboard, bid, plans, materials, assemblies, materials list, proposal) and
+  seven everyday saves. Limits: 2 seconds for a screen, 1 second for a save.
+  Today's numbers are far under both, about 0.2 s and 0.03 s at most on a
+  laptop.
+
+- **A ninth golden bid covers wire extra and makeup, a per-item markup, and
+  profit taken as a margin.** It went in through the "update on purpose"
+  step, with its reason recorded, and the first eight bids did not move.
+- **Eight "golden" bids now guard every number the bid screen shows.** Each
+  test run builds the same eight bids, covering counts, runs, drops, remove
+  and relocate, scope tags, labor-only work, hand-typed prices, overhead,
+  profit, tax and expenses. Every line and total is compared with a saved
+  copy. If any number moves, the check fails and names the line. A change
+  on purpose has to be saved with a written reason. The saved numbers have
+  not been checked by hand yet: `references/golden-bids-to-check.md` is the
+  calculator list for that.
+
 - **The sign-in cookie can no longer be used by another website.** It was
   set so that pages on other sites could send requests carrying a signed-in
   person’s session; now only BidRidge’s own pages, and links into it, carry
