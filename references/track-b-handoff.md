@@ -1,5 +1,13 @@
 # Track B handoff — 2026-10-05
 
+## B landed `edcee8bc` (via A's merge `6eac3e6c`, 2026-10-16 22:44 UTC)
+
+local-dev `0fc489bf..6eac3e6c`; Gate 38977503602: test ✓, deploy-staging ✓
+(staging serves `6eac3e6c`), **smoke ✗ 7 failed / 58 did not run** — the
+5 from C's step bar (below) plus `flow.spec.ts:174` (symbols capture) and
+phone `marks.spec.ts:337` (offline → online saved once). Likely the same
+cause (a press landing on the step bar); re-check after C's rename.
+
 ## C landed `0fc489bf` — smoke now 5 red from C's step bar meeting your selectors (see track-c-handoff.md top)
 
 C's step bar names its buttons "Count", "Runs"… so `getByRole("button",

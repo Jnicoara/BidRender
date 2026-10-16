@@ -1,5 +1,7 @@
 # Track C — handoff, 2026-10-06
 
+## B landed `edcee8bc` too (via `6eac3e6c`) — smoke now 7 red; your step-bar rename is still the first fix
+
 ## C landed `0fc489bf` (2026-10-16 evening) — SMOKE RED, yours + B's to fix first
 
 A merged your `e9dfc0ff` into track-a-night (local-dev had moved; no
