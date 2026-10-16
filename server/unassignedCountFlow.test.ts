@@ -162,6 +162,13 @@ describeDb("a bid with marks nobody has named yet", () => {
     ).rejects.toThrow(/Pick what they are/);
   });
 
+  it("takes no drop — a drop says what a device is", async () => {
+    const { heldId } = await aBidWithThreeUnassigned();
+    await expect(
+      caller().takeoffGroups.setDrop({ id: heldId, dropKind: "receptacle" })
+    ).rejects.toThrow(/Pick what they are first/);
+  });
+
   it("nobody can make a count of their own that looks like it", async () => {
     const { bidId } = await aBidWithThreeUnassigned();
     await expect(

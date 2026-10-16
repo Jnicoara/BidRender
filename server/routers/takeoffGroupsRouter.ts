@@ -801,6 +801,14 @@ export const takeoffGroupsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;
       const group = await requireGroup(input.id, userId);
+      // A drop says what a device IS; unassigned marks are not anything yet,
+      // and their drops would add footage nothing else on the bid explains.
+      if (isUnassignedCount(group))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "These marks are unassigned. Pick what they are first, then set their drop.",
+        });
       const bid = await requireBid(group.bidId, userId);
       if (bid.quantitiesLockedAt !== null)
         throw new TRPCError({
