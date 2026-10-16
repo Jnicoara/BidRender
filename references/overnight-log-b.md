@@ -336,3 +336,38 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
 - Left in todo: a plan that cannot be opened (attached before tonight's
   probe) leaves the counts panel on "loading…".
 - Ended 04:08. Dev server stopped; MySQL 3307 left running.
+
+# 2026-10-16, day session (owner present)
+
+## Item 1 — decimals, missing bid, flow 3 (09:55–10:35) · `88a35407`
+
+- **"2.5" saved as 25.** Every draft number box rebuilt its text from the
+  number, so "2." showed as "2" and the next "5" made 25. Same fault in the
+  run-type extra/makeup boxes, assembly and kit part quantities, and the
+  assembly step count. One `DraftNumberInput` keeps the typed text
+  (`lib/draftNumberText.ts`, red before: 2 of 6 failed). Looked at: saved
+  2.5, reopened 2.5; assembly box "clear, type 2.5" reads 2.5 (was "02.5"
+  on a first try, fixed).
+- **Missing bid on Plans.** Was: three retries, then "Could not load …
+  try again". Now: "This bid doesn't exist", no retry, no Try again, no
+  header actions, "Go to your bids" (`plansPane` "missing", red before).
+  `screens.spec` test, red with the fix removed, green on laptop and phone.
+- **Flow 3.** The only recorded failure (10-14) was the tip fixed by A.
+  9 local runs passed, 3 of them with the CPU slowed 6x (save 3.5–4.3 s,
+  0.35–0.53 s normally). No app fault found. The test now waits for the
+  naming card to close before looking for the row; it goes red if a save
+  never closes (proved by breaking the save once).
+
+## Item 2 — merge local-dev cff5a50b (10:35–) · `10196c4b`, `f1e779e9`, `8ebf6c2e`
+
+- Conflicts: CHANGELOG and this track's handoff, both sides kept.
+  CHANGELOG's same-date sections folded (916 entries before and after).
+- **The merge's Gate went red on B's own code**, not A's:
+  `quantitiesIgnoreDeletedPlans` — `stampIdsInGroup` (10-15, `745da6da`)
+  read marks by bid without `onLivePlanSheet`. Fixed in `8ebf6c2e`.
+- **Why nobody saw it for a day:** every B code commit since 10-15 had its
+  Gate cancelled by the notes commit pushed right after, and a notes-only
+  run skips the tests and reports success. The last real run, `4ea3c557`,
+  had failed on this test. "Gate green" in the fourth-night summary was
+  wrong. From now on: code, wait for its Gate, then notes.
+- Full local smoke on the merged code: 222 passed / 6 skipped, 13.2 min.
