@@ -13,6 +13,7 @@ import {
   bidWithSheet,
   emtType,
   freshUser,
+  own,
   rate,
   runLaborRate,
   straightRun,
@@ -88,5 +89,74 @@ describe.skipIf(!hasDb)("bid-number gaps", () => {
     await c.bids.unlockQuantities({ bidId });
     // Unlocked: follows the drawing and today's extra — 125 ft, $106.25.
     expect(await raceway()).toEqual({ qty: 125, material: 106.25 });
+  });
+  it("a line at an older labor rate is flagged on a Draft, price untouched; not on a Won bid", async () => {
+    const role = await rate(c, "Gaps rate role", 50);
+    const box = await own(c, "Gaps box", 1.5);
+    const asm = (await c.assemblies.create({
+      name: "Gaps rated assembly",
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: 0.5,
+      laborRateId: role,
+      materials: [{ materialId: box, qty: 1 }],
+      modifierIds: [],
+    }))!;
+    const bid = (await c.bids.create({
+      name: "Gaps stale rate",
+      trades: ["electrical"],
+    }))!;
+    const { line } = await c.bids.addAssembly({
+      bidId: bid.id,
+      assemblyId: asm.id,
+      qty: 10,
+    });
+    // Hand math: 10 × ($1.50 + 0.5 h × $50) = $265.00.
+    const before = await c.bids.get({ id: bid.id });
+    expect(before.totals.directCost).toBe(265);
+    expect(before.staleRates).toEqual([]);
+    await c.laborRates.update({ id: role, hourlyCost: 72 });
+    const after = await c.bids.get({ id: bid.id });
+    expect(after.totals.directCost).toBe(265); // frozen at add (R4)
+    expect(after.staleRates).toEqual([
+      { lineId: line!.id, name: line!.name, frozenRate: 50, currentRate: 72 },
+    ]);
+    await c.bids.update({ id: bid.id, status: "Won" });
+    expect((await c.bids.get({ id: bid.id })).staleRates).toEqual([]);
+  });
+
+  it("the per-bid whip dial scales branch wire on the supplier list, and only that", async () => {
+    const wire = await own(c, "Gaps 12-2 branch cable", 0.4, 0.01, "foot");
+    const box = await own(c, "Gaps whip box", 1.1);
+    const asm = (await c.assemblies.create({
+      name: "Gaps whip receptacle",
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: 0.2,
+      laborRateId: journeyman,
+      materials: [
+        { materialId: box, qty: 1 },
+        { materialId: wire, qty: 25, isBranchWhip: true },
+      ],
+      modifierIds: [],
+    }))!;
+    const bid = (await c.bids.create({
+      name: "Gaps whip",
+      trades: ["electrical"],
+    }))!;
+    await c.bids.addAssembly({ bidId: bid.id, assemblyId: asm.id, qty: 40 });
+    const qtyOf = async (name: string) =>
+      (await c.materialsList.get({ bidId: bid.id })).entries.find(
+        e => e.name === name
+      )?.qty;
+    // Hand math: 40 × 25 ft = 1,000 ft of cable, 40 boxes.
+    expect(await qtyOf("Gaps 12-2 branch cable")).toBe(1000);
+    expect(await qtyOf("Gaps whip box")).toBe(40);
+    await c.bids.update({ id: bid.id, whipAdjustPct: 0.15 });
+    // +15%: 1,150 ft of cable, still 40 boxes.
+    expect(await qtyOf("Gaps 12-2 branch cable")).toBe(1150);
+    expect(await qtyOf("Gaps whip box")).toBe(40);
   });
 });

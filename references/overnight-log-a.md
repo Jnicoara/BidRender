@@ -392,3 +392,8 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   built-in contrast). **Breaking the lock itself to watch it go red was
   REFUSED by the auto-mode safety check** ("security test removal"); not
   worked around, file restored at once.
+- (3) stale labor rate flagged through the router (50 → 72, price frozen,
+  none on Won) — **proved** red with the flag emptied; (4) whip dial 1,000 →
+  1,150 ft, boxes 40 — **proved** red with the dial ignored. Both restored,
+  no diff. Map's "Gaps closed" updated; remaining bid-number gaps listed.
+- 00:09 item 2 stopped here to keep the queue moving.

@@ -734,4 +734,21 @@ Slice 4 searches that found nothing: "87.40", "flat + vertical";
 
 ## Gaps closed tonight
 
-_(filled in as each test lands)_
+| Gap (row above)                                     | Test                                                                        | Proved by breaking                                                                                  |
+| --------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Kit of a forked assembly priced right (09-21, WEAK) | server/bidNumberGaps.test.ts — 2 × 3 h = 6 h, $360                          | kit lookup → stored id: red (0 h)                                                                   |
+| Locked bid freezes extras figures (09-29, WEAK)     | bidNumberGaps — 110 ft / $93.50 locked, 125 ft / $106.25 unlocked           | built-in contrast (unlock half); breaking the lock itself was refused by the auto-mode safety check |
+| Older labor rate flagged (09-28, WEAK)              | bidNumberGaps — flagged 50 → 72 on Draft, price frozen at $265, none on Won | flag list emptied: red                                                                              |
+| Per-bid whip dial (09-20, WEAK)                     | bidNumberGaps — 1,000 → 1,150 ft, boxes stay 40                             | dial ignored: red                                                                                   |
+| Find all matching on known answers (counts)         | client/src/lib/countingDeep.test.ts, countingScan.test.ts                   | MIN_COVERAGE 0.8 → 0.5: 5 red                                                                       |
+| A resent batch counted twice (counts, NEW bug)      | server/markReplay.test.ts                                                   | red before the fix                                                                                  |
+| Manual counting totals = hand math                  | server/countingManual.test.ts                                               | — (checks totals at every step)                                                                     |
+| AI never confirms, writes nothing (AI)              | server/countingAiFake.test.ts                                               | —                                                                                                   |
+
+**Still open from the bid-number rows** (next in line): edited shipped
+modifier stays applied (09-20), a priced starter reaching assemblies through
+the router (09-20), a dashboard card counting a priced line with no hours
+(09-25), "Price pending" actually blocking the print (09-29), the groundwork
+migrations 0157–0163 (queue item 4's fresh start runs them). The non-money
+WEAK / NONE rows are layout and copy checks; they are listed per slice
+above.
