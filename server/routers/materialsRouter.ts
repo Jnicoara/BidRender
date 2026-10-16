@@ -45,6 +45,7 @@ import { STICK_JOINTS } from "../../shared/runFittings";
 import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
 import { RENAMED_BASELINE_MATERIALS } from "../../shared/renamedMaterials";
 import { materialFlagsClearedBy } from "../../shared/exampleTags";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 import {
   parseLaborSheet,
   planAssemblyHoursImport,
@@ -317,6 +318,8 @@ export const materialsRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
+        /** When the editor took its draft; a stale save is refused (shared/staleEdit.ts). */
+        openedAt: z.date().optional(),
         name: nameSchema.optional(),
         unitOfSale: z.enum(MATERIAL_UNITS_OF_SALE).optional(),
         costPerUnit: costSchema.optional(),
@@ -357,6 +360,7 @@ export const materialsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const {
         id,
+        openedAt,
         costPerUnit,
         packPrice,
         packQty,
@@ -381,6 +385,10 @@ export const materialsRouter = router({
           code: "NOT_FOUND",
           message: "Material not found.",
         });
+      // The row editor saves its whole form, so a save from a screen opened
+      // before somebody else's would put their change back — a price, too.
+      if (savedSinceOpened(target.updatedAt, openedAt))
+        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
 
       if (packPrice !== undefined && costPerUnit !== undefined)
         throw new TRPCError({

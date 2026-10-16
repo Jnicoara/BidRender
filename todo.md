@@ -1299,8 +1299,10 @@ All additive and nullable. Specs are in the plans named.
       guard; shots `two-editors-{before,after}.png`). Whole seconds (the
       column's precision) — two saves inside one second slip through.
       **Kits guarded too** (same night; `server/staleEdit.test.ts`, red
-      without it; `two-kit-editors-after.png`). **Same shape, not yet
-      guarded:** the Materials row editor, Labor rates and Modifiers (smaller forms,
+      without it; `two-kit-editors-after.png`) **and Materials** (the row
+      editor; a price kept, `two-material-editors-after.png` — rows have no
+      self-saving price box, so a person's own row edit cannot trip it).
+      **Same shape, not yet guarded:**, Labor rates and Modifiers (smaller forms,
       fewer fields, same risk). Add `openedAt` to each update the same way.
 
 ### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed

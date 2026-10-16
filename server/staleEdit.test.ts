@@ -215,3 +215,36 @@ withDb("a kit saved by two editors", () => {
     ).toEqual([4]);
   });
 });
+
+withDb("a material saved by two editors", () => {
+  it("refuses the save from a screen opened before the other save, and keeps the other's price", async () => {
+    const part = await newPart({
+      name: `Stale material ${Date.now()}`,
+      costPerUnit: 2,
+    });
+    const [opened] = (await caller().materials.list()).filter(
+      m => m.id === part.id
+    );
+    await nextSecond();
+    // A: price 2 -> 5, saved.
+    await caller().materials.update({
+      id: part.id,
+      openedAt: opened.updatedAt,
+      costPerUnit: 5,
+    });
+    await nextSecond();
+    // B, from the editor opened before: renames, sending the old price.
+    await expect(
+      caller().materials.update({
+        id: part.id,
+        openedAt: opened.updatedAt,
+        name: `${part.name} renamed`,
+        costPerUnit: 2,
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+    const [now] = (await caller().materials.list()).filter(
+      m => m.id === part.id
+    );
+    expect(Number(now.costPerUnit), "A's price is kept").toBe(5);
+  });
+});

@@ -142,6 +142,8 @@ type Material = {
   packQty: string | null;
   packLabel: string | null;
   packPrice: string | null;
+  /** When the row was last saved; the editor sends it back (staleEdit.ts). */
+  updatedAt: Date;
 };
 
 /**
@@ -394,7 +396,8 @@ function MaterialRow({
   /** Rendering the Archived view — different actions, no inline editing. */
   isArchived?: boolean;
   /** Resolves true once saved; false if refused (the toast says why). */
-  onSave: (id: number, draft: Draft) => Promise<boolean>;
+  /** `openedAt`: the row's updatedAt when the editor opened (shared/staleEdit.ts). */
+  onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onSuggestAliases: SuggestAliases;
   onRevert: (material: Material) => void;
   onRemove: (material: Material) => void;
@@ -422,6 +425,8 @@ function MaterialRow({
   */
   const [markupDraft, setMarkupDraft] = useState("");
   const [openedWith, setOpenedWith] = useState<Draft | null>(null);
+  /** The row as saved when the editor opened — sent with Save. */
+  const [openedAt, setOpenedAt] = useState<Date>(material.updatedAt);
   /**
    * Which warning opened the editor, if one did — "Needs price" lands the
    * cursor in the price box and says why, instead of the person having to
@@ -490,6 +495,7 @@ function MaterialRow({
     };
     setDraft(opened);
     setOpenedWith(opened);
+    setOpenedAt(material.updatedAt);
     setMoreOpen(false);
     setEditing(true);
   };
@@ -522,7 +528,7 @@ function MaterialRow({
     }
     // Only when something ABOUT THE MATERIAL changed — see markupDraft above.
     if (JSON.stringify(draft) !== JSON.stringify(openedWith)) {
-      if (!(await onSave(material.id, draft))) return;
+      if (!(await onSave(material.id, draft, openedAt))) return;
     }
     setEditing(false);
   };
@@ -1458,11 +1464,12 @@ export default function MaterialsLibraryPage() {
   });
 
   const handleSave = useCallback(
-    async (id: number, draft: Draft) => {
+    async (id: number, draft: Draft, openedAt: Date) => {
       setBusyId(id);
       try {
         const result = await updateMaterial.mutateAsync({
           id,
+          openedAt,
           name: draft.name.trim(),
           unitOfSale: draft.unitOfSale,
           // The box typed last is the one sent: a pack price is divided on
