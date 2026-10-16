@@ -104,7 +104,20 @@ export default function MaterialDatabasePage() {
 
   const updateMaterial = trpc.materials.update.useMutation({
     onError: error => toast.error(errorText(error)),
-    onSuccess: () => refresh(),
+    onSuccess: result => {
+      // The saved row (new `updatedAt` included) into every cached copy of
+      // the list at once, so the Catalog editor opened straight after this
+      // does not carry an old timestamp into the stale-save guard
+      // (shared/staleEdit.ts) and refuse this person's own next save.
+      const saved = result?.material;
+      if (saved && !result.forked)
+        utils.materials.list.setQueriesData(undefined, {}, old =>
+          Array.isArray(old)
+            ? old.map(row => (row.id === saved.id ? { ...row, ...saved } : row))
+            : old
+        );
+      refresh();
+    },
   });
 
   // Run once per query; `rows` filters it, the correction note reads it.
