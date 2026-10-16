@@ -1,5 +1,15 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-16 (fourth night, done 04:08), track-b only
+
+- Q5 label built; A's two Plans faults fixed (resent marks, legend link);
+  Plans deep test (16 tools x 4 sizes), marks-never-vanish test (found and
+  fixed a reload double-save), hard PDFs (password/damaged refused before
+  upload), scale-check offer (+ two phone faults fixed), demo-tag offer.
+  Maps: `plans-test-map.md`. Logs: `overnight-log-b.md` fourth night.
+- Gate green through 303d86bf; local smoke 218/6 in 12.5 min (note for A
+  below). Not merged to local-dev.
+
 ## FOR TRACK A, 2026-10-16 04:15 — the smoke run is longer now (Gate is yours)
 
 - Five new smoke specs from B tonight (`plans`, `marks`, `pdfs`, `demo`

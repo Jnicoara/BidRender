@@ -323,3 +323,16 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
   strip with tap-to-highlight. Built the missing upload offer ("Use these
   tags" / "Not now"), and `e2e/smoke/demo.spec.ts` covers all of it at
   laptop and phone; offer and highlight proved by breaking. View only.
+
+## Item 7 — break-it + safe todo (03:55–04:08) · `c2729505`
+
+- Break-it on tonight's features: undoing "Pick what they are" puts the
+  marks back in Unassigned (2 → 0 → 2); Count on a locked bid refuses in
+  words; the scale route refuses a change on a locked bid, so the new offer
+  can't move one. Nothing new broke.
+- Measured (todo): `takeoffSummary.forBid` 21–46 ms at 500 sheets / 3,000
+  marks. Full local smoke 218 passed / 6 skipped in 12.5 min (was 6.3) —
+  note left for A (the Gate is A's).
+- Left in todo: a plan that cannot be opened (attached before tonight's
+  probe) leaves the counts panel on "loading…".
+- Ended 04:08. Dev server stopped; MySQL 3307 left running.
