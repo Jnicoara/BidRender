@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **A bid link that leads nowhere now says so in a second, not eight.** A
+  deleted bid, or a link to another company's, sat on "Loading bid…" while
+  the app asked three more times for an answer that could not change. Only
+  connection and server hiccups are retried now.
+
 - **A bid whose tax area was archived now says so.** It said "This bid has
   no job address", which sent people to the address when what happened was
   that the area picked for the bid had been archived. The note now names

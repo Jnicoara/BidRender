@@ -8,6 +8,7 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import { registerServiceWorker } from "@/lib/registerServiceWorker";
 import { markStagingEnvironment } from "@/lib/appEnvironment";
+import { shouldRetryRead } from "@/lib/queryRetry";
 import StagingBand from "@/components/StagingBand";
 import { NewVersionBar } from "@/components/NewVersionBar";
 import { DataUnreachableBar } from "@/components/DataUnreachableBar";
@@ -41,7 +42,11 @@ import "./index.css";
   useMutation keeps its own result, so 0 loses nothing.
 */
 const queryClient = new QueryClient({
-  defaultOptions: { mutations: { gcTime: 0 } },
+  defaultOptions: {
+    mutations: { gcTime: 0 },
+    // "Not found" / "not yours" are answers, not hiccups (@/lib/queryRetry).
+    queries: { retry: shouldRetryRead },
+  },
 });
 
 const redirectToLoginIfUnauthorized = (
