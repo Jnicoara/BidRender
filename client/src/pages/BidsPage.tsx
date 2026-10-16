@@ -135,6 +135,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 import { ExampleTags } from "@/components/ExampleTags";
 import { exampleSummary, exampleWarning } from "@shared/exampleTags";
+import { unassignedSentence } from "@shared/unassignedCount";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { MostUsedRow } from "@/components/MostUsedRow";
 import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
@@ -784,6 +785,7 @@ export default function BidsPage({
     problems,
     staleRates,
     dropsNotPriced,
+    unassignedMarks,
     warningsFrozenAt,
   } = detailQuery.data;
   const lockedWarningsNote = frozenWarningsNote(warningsFrozenAt, {
@@ -2016,6 +2018,26 @@ export default function BidsPage({
                     {dropsNotPriced === 1 ? "it is" : "they are"} priced. Pick
                     what each drop is made of on its count, on the{" "}
                     <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
+              {/*
+                UNASSIGNED MARKS (references/count-first-plan.md): counted with
+                nothing named, so no line holds them. Said here, under the
+                totals that cannot include them; the total's own wording is
+                left alone (Q2). A priced print is blocked until they are
+                picked.
+              */}
+              {unassignedMarks > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {unassignedSentence(unassignedMarks)}
+                    </span>{" "}
+                    A priced proposal cannot print until they are picked: open
+                    Unassigned on the <PlansLink bidId={bidId} /> and choose
+                    what they are.
                   </p>
                 </div>
               )}

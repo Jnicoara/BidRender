@@ -1101,6 +1101,15 @@ export const bidsRouter = router({
          * with the rest on a locked bid.
          */
         dropsNotPriced: warnings.counts.dropsNotPriced,
+        /**
+         * Marks in the bid's Unassigned count (references/count-first-plan.md):
+         * said under the totals and a priced print blocked until they are
+         * picked. Not in the not-priced tally — the total reads as it did.
+         */
+        unassignedMarks: await db.bidUnassignedMarks(
+          bid.id,
+          ctx.scope.dataUserId
+        ),
         /** The lock's instant when the counts above are frozen, else null. */
         warningsFrozenAt: warnings.frozenAt,
         /**

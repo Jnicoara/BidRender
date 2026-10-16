@@ -170,6 +170,12 @@ export type PinLook = {
 export type PinCount = {
   id: number;
   label: string;
+  /**
+   * The bid's Unassigned count (references/count-first-plan.md). Its pins
+   * wear "?" in a circle — a question, not a thing — and it takes no letter
+   * from anybody else.
+   */
+  unassigned?: boolean;
   /** The linked assembly's name, for the default letter and family. */
   assemblyName?: string | null;
   /** The linked assembly's category — the family's last default. */
@@ -260,6 +266,9 @@ function bump(base: string, used: ReadonlySet<string>): string {
   }
 }
 
+/** What an Unassigned mark wears (references/count-first-plan.md). */
+export const UNASSIGNED_PIN_LETTER = "?";
+
 /**
  * Letter and colour for every count on one bid. Pass EVERY count on the bid,
  * not one sheet's, or the same count would wear different letters on
@@ -293,10 +302,18 @@ export function pinStylesForBid(
     letterSource.set(count.id, source);
   };
 
+  // The Unassigned count: "?", outside the alphabet everyone else shares.
+  for (const count of byFirstUse)
+    if (count.unassigned) {
+      letters.set(count.id, UNASSIGNED_PIN_LETTER);
+      letterSource.set(count.id, "automatic");
+    }
+
   // A letter somebody chose for this count or its symbol: first, and never
   // renumbered — two of them that collide are SHOWN, not silently fixed.
   const firmLetterOwners = new Map<string, number[]>();
   for (const count of byFirstUse) {
+    if (count.unassigned) continue;
     const chosen = firm(count, cleanLetter, "letter");
     if (!chosen) continue;
     letters.set(count.id, chosen.value);
@@ -360,14 +377,15 @@ export function pinStylesForBid(
   const styles = new Map<number, PinStyle>();
   for (const count of byFirstUse) {
     const family = deviceFamily(count);
-    const shape =
-      firm(count, cleanShape, "shape") ??
-      (cleanShape(count.chosen?.assembly?.shape)
-        ? {
-            value: cleanShape(count.chosen?.assembly?.shape)!,
-            source: "assembly" as const,
-          }
-        : null);
+    const shape = count.unassigned
+      ? { value: "circle" as const, source: "automatic" as const }
+      : (firm(count, cleanShape, "shape") ??
+        (cleanShape(count.chosen?.assembly?.shape)
+          ? {
+              value: cleanShape(count.chosen?.assembly?.shape)!,
+              source: "assembly" as const,
+            }
+          : null));
     const letter = letters.get(count.id) ?? initial(count.label);
     const color = colors.get(count.id)!;
     styles.set(count.id, {

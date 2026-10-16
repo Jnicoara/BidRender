@@ -39,6 +39,13 @@ export function isUnassignedCount(group: {
   return group.kind === "plain" && group.label === UNASSIGNED_COUNT_LABEL;
 }
 
+/** What the print block and the bid say about unassigned marks. */
+export function unassignedSentence(marks: number): string {
+  return marks === 1
+    ? "1 mark on the plans is unassigned — nothing says what it is."
+    : `${marks} marks on the plans are unassigned — nothing says what they are.`;
+}
+
 /** A count's name as a person reads it — never the stored reserved label. */
 export function countDisplayName(label: string): string {
   return label === UNASSIGNED_COUNT_LABEL ? UNASSIGNED_COUNT_NAME : label;

@@ -529,6 +529,7 @@ import {
 import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
+import { UNASSIGNED_COUNT_NAME } from "@shared/unassignedCount";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import {
@@ -5634,6 +5635,10 @@ export default function TakeoffPage({
   const createGroup = trpc.takeoffGroups.create.useMutation({
     onError: e => toast.error(e.message),
   });
+  /** The bid's one Unassigned count: "Just count" (count-first-plan.md). */
+  const unassignedGroup = trpc.takeoffGroups.unassigned.useMutation({
+    onError: e => toast.error(e.message),
+  });
 
   /**
    * Every count on this BID, and where each one stands with the bid.
@@ -5852,7 +5857,11 @@ export default function TakeoffPage({
           row.sendability.reason === "already-on-bid",
         sendable: row.sendability.sendable,
         // Made by name, with nothing from the library behind it (§ 8a).
-        byNameOnly: row.kind === "plain" || row.kind === "typed",
+        // Not the Unassigned count: it has no name to link an assembly to,
+        // and asks what its marks are instead.
+        byNameOnly:
+          !row.unassigned && (row.kind === "plain" || row.kind === "typed"),
+        unassigned: row.unassigned,
         // Remove / relocate labor lines (shared/roleLines.ts).
         laborRolesWaiting: row.laborRolesWaiting,
         laborRolesOnBid: row.laborRolesOnBid,
@@ -6161,6 +6170,30 @@ export default function TakeoffPage({
       refreshFor("marksMoved");
     },
   });
+  /**
+   * "Pick what they are" on the Unassigned count (count-first-plan.md): find
+   * or make the count the answer names — the way the Count picker does — and
+   * move EVERY unassigned mark, on every sheet, into it. Same move, undo and
+   * refresh as "Move to". A refusal was already said by the mutation.
+   */
+  const assignUnassigned = useCallback(
+    async (
+      fromGroupId: number,
+      to: { assembly: { id: number } } | { name: string }
+    ) => {
+      const target = await ("assembly" in to
+        ? groupForAssembly.mutateAsync({ bidId, assemblyId: to.assembly.id })
+        : createGroup.mutateAsync({
+            bidId,
+            label: to.name,
+            reuseExisting: true,
+          })
+      ).catch(() => null);
+      if (!target) return;
+      moveStamps.mutate({ fromGroupId, groupId: target.id });
+    },
+    [bidId, groupForAssembly, createGroup, moveStamps]
+  );
   /*
     MARKING WHAT A MARK IS — new, existing to remain, remove, relocate (pin
     plan § 7). Only a new mark is priced (shared/markStatus.ts), so this moves
@@ -8510,23 +8543,25 @@ export default function TakeoffPage({
     return visibleRuns.filter(r => (r.parentRunId ?? r.id) === root);
   }, [hideOtherRuns, tracing, selectedRunId, visibleRuns]);
 
-  const stampGroups = useMemo(
-    () =>
-      groupStamps(
-        visibleStamps.map(st => ({
-          id: st.id,
-          sheetId: st.sheetId,
-          groupId: st.groupId,
-          name: st.name,
-          assemblyId: st.assemblyId,
-          assemblyCategory: st.assemblyCategory ?? null,
-          x: st.x,
-          y: st.y,
-          status: st.status,
-        }))
-      ),
-    [visibleStamps]
-  );
+  const stampGroups = useMemo(() => {
+    const groups = groupStamps(
+      visibleStamps.map(st => ({
+        id: st.id,
+        sheetId: st.sheetId,
+        groupId: st.groupId,
+        name: st.name,
+        assemblyId: st.assemblyId,
+        assemblyCategory: st.assemblyCategory ?? null,
+        x: st.x,
+        y: st.y,
+        status: st.status,
+      }))
+    );
+    // The Unassigned count first: it is the one asking a question.
+    const held = (g: (typeof groups)[number]) =>
+      g.groupId !== null && bridgeByGroup.get(g.groupId)?.unassigned === true;
+    return [...groups.filter(held), ...groups.filter(g => !held(g))];
+  }, [visibleStamps, bridgeByGroup]);
 
   /**
    * A stamp sitting on a run's end that nothing has claimed yet.
@@ -10718,6 +10753,11 @@ export default function TakeoffPage({
                       createGroup.mutateAsync({ bidId, label })
                     );
                   }}
+                  onJustCount={() =>
+                    armWhileCreating(UNASSIGNED_COUNT_NAME, null, null, () =>
+                      unassignedGroup.mutateAsync({ bidId })
+                    )
+                  }
                 />
                 {/*
                 COUNT AGAIN (pin plan § 11.6). A sheet change puts the count
@@ -12810,6 +12850,7 @@ export default function TakeoffPage({
                 onLinkAssembly={(id, assemblyId) =>
                   setGroupSource.mutate({ id, assemblyId })
                 }
+                onAssignUnassigned={(id, to) => void assignUnassigned(id, to)}
                 sendingGroupId={
                   sendToBid.isPending ? (sendToBid.variables?.id ?? null) : null
                 }

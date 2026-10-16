@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Just count now, pick what it is later.** In the Plans screen's Count
+  picker, "Just count" (or Enter with nothing typed) lets you tap marks
+  without naming anything. They show as "?" pins under an amber
+  "Unassigned" count; "Pick what they are…" turns every one of them, on
+  every sheet, into an assembly or a named count in one step (with Undo).
+  Until then the bid warns under its total and a priced proposal can't be
+  printed. Nothing about the bid's money changes.
 - **Groundwork for "just count, pick the item later" (server side).** A bid
   can now hold one "Unassigned" count for marks nobody has named yet. It
   never goes onto the bid, its marks will block printing a priced proposal

@@ -15,8 +15,10 @@ import {
   countDisplayName,
   isReservedLabel,
   isUnassignedCount,
+  unassignedSentence,
 } from "../shared/unassignedCount";
 import { labelSchema } from "./routers/takeoffGroupsRouter";
+import { pinStylesForBid } from "../shared/pinLetters";
 
 const unassigned: BridgeGroup = {
   id: 7,
@@ -45,6 +47,13 @@ describe("the Unassigned count", () => {
     });
   });
 
+  it("the print block says how many, in words", () => {
+    expect(unassignedSentence(1)).toBe(
+      "1 mark on the plans is unassigned — nothing says what it is."
+    );
+    expect(unassignedSentence(3)).toMatch(/^3 marks .* they are\.$/);
+  });
+
   it("is shown as Unassigned, never by its stored label", () => {
     expect(countDisplayName(UNASSIGNED_COUNT_LABEL)).toBe("Unassigned");
     expect(countDisplayName("Exit signs")).toBe("Exit signs");
@@ -52,6 +61,17 @@ describe("the Unassigned count", () => {
     expect(
       isUnassignedCount({ kind: "assembly", label: UNASSIGNED_COUNT_LABEL })
     ).toBe(false);
+  });
+
+  it("its pins wear '?' in a circle, and take no letter from anybody", () => {
+    const styles = pinStylesForBid([
+      { id: 1, label: UNASSIGNED_COUNT_LABEL, unassigned: true },
+      { id: 2, label: "Doorbell" },
+      { id: 3, label: "Duplex receptacle" },
+    ]);
+    expect(styles.get(1)).toMatchObject({ letter: "?", shape: "circle" });
+    expect(styles.get(2)?.letter).toBe("D");
+    expect(styles.get(3)?.letter).not.toBe("?");
   });
 
   it("cannot be typed: a label starting with __ is refused", () => {

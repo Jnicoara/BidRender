@@ -315,6 +315,7 @@ export default function BidRenderShell() {
           onFixLine={lineId =>
             navigate("bids", { id: activeProjectId, fixLineId: lineId })
           }
+          onOpenPlans={() => navigate("takeoff", { id: activeProjectId })}
         />
       );
     }

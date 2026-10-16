@@ -1,5 +1,13 @@
 # Count first, pick the item later — plan (Track B, 2026-10-15 night)
 
+> **BUILT the same night** on track-b (`745da6da` server, then the screens).
+> As built, beyond the text below: typing "Unassigned" as a count's name is
+> refused too (two rows reading "Unassigned" would look alike); "Add a drop"
+> is not offered on the Unassigned row (a drop is a fact about what a device
+> is); assigning reuses `takeoffStamps.moveToGroup` with a new `fromGroupId`,
+> so it has Undo like "Move to"; the pin is "?" in a circle in an ordinary
+> palette colour (the palette is closed — the CSV relies on it).
+
 Owner, 2026-10-15: _"Just count, pick the item later": a count with no item
 yet shows as "Unassigned" and blocks a priced print until assigned (like "not
 priced"). Plan first, then build. Park anything that changes a total._
