@@ -375,6 +375,8 @@ Not urgent if keys are created with no expiration, which is now the rule.
       a signed plan link is a bearer credential). **Which request hung is
       NOT known** (`trace: "off"`); if the warning names one, chase it.
       No warning in the next 4 runs (Gate 37970377380 and its 3 re-runs).
+      Still none on 2026-10-15 night: Gate 38853660685's smoke log has no
+      `[smoke]` line at all (96 passed / 2 skipped). Track A, grep of the log.
 - [x] **Smoke flow test 5: a Legend click that did not arm, 2026-10-09 —
       FOUND AND FIXED (A, same day). A real wrong count, not a flaky test.**
       Gate 37970377380, smoke attempt 2, nothing deploying. "Link CI SWITCH"
