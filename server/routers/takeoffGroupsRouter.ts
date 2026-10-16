@@ -583,6 +583,26 @@ export const takeoffGroupsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      /*
+        Two refusals its siblings already make (break-it, 2026-10-16;
+        server/renameCount.test.ts). The Unassigned count is the holding pen:
+        its marks are named by picking what they are (moveToGroup), never by
+        turning the pen into an ordinary count, which made them sendable and
+        lifted the print block with nobody having said what they are. And a
+        locked bid's counts do not change, as `setLaborRoleHours` refuses.
+      */
+      if (isReservedLabel(group.label))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Unassigned marks are named by picking what they are, not by renaming the count.",
+        });
+      const bid = await requireBid(group.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be renamed"),
+        });
       await refuseDuplicate(
         group.bidId,
         ctx.scope.dataUserId,

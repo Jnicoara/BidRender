@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A count can no longer be renamed on a locked bid, and the "Unassigned"
+  count can't be renamed into an ordinary one.** Renaming the Unassigned
+  count used to turn marks nobody had named into a normal count, which
+  lifted the block on printing a priced quote. Those marks are named by
+  picking what they are, as before. No screen offered either rename; a
+  direct request could.
 - **A "Field" role for crews is built, and it cannot reach a price.** A Field
   member gets a Jobs list, each job's Plans (sheets, marks, counts by name
   and quantity, runs and footage) and the materials list. Nothing can be
