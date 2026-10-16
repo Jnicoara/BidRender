@@ -2657,6 +2657,9 @@ const MarkLayer = memo(function MarkLayer({
         return (
           <g
             key={`${placed.pending ? "pending" : "stamp"}-${placed.id}`}
+            // For the browser tests: which mark this is, and whether saved
+            // (e2e/smoke/marks.spec.ts checks each sits where it was put).
+            data-mark={placed.pending ? "pending" : placed.id}
             style={{
               transform: `translate(${pos.x}px, ${pos.y}px) scale(var(${isSelected ? "--mark-s-sel" : "--mark-s"}))`,
             }}

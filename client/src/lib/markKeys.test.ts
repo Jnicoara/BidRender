@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { markKey, newMarkSession } from "./markKeys";
+import { markKey, newMarkSession, recoveredKeys } from "./markKeys";
 
 describe("the key a mark is sent with", () => {
   it("is the same for the same mark in one page load (so a resend is caught)", () => {
@@ -22,6 +22,24 @@ describe("the key a mark is sent with", () => {
 
   it("fits the server's 64-character limit", () => {
     expect(markKey(newMarkSession(), -123456).length).toBeLessThanOrEqual(64);
+  });
+
+  it("a RECOVERED batch is resent with the keys it was first sent with", () => {
+    const s = newMarkSession();
+    const part = [{ key: markKey(s, -1) }, { key: markKey(s, -2) }];
+    expect(recoveredKeys(part)).toEqual([markKey(s, -1), markKey(s, -2)]);
+    // An older queue (no keys, or one missing) goes without — as before.
+    expect(recoveredKeys([{}, { key: markKey(s, -2) }])).toBeUndefined();
+    expect(recoveredKeys([{ key: "" }])).toBeUndefined();
+  });
+
+  it("the crash queue stores each mark's key, and recovery sends them", () => {
+    const src = readFileSync(
+      new URL("../pages/TakeoffPage.tsx", import.meta.url),
+      "utf8"
+    );
+    expect(src).toContain("key: markKey(MARK_SESSION, m.key),");
+    expect(src).toContain("keys: recoveredKeys(part),");
   });
 
   it("is what the Plans screen sends — never the bare queue number", () => {

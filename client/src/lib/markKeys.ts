@@ -26,3 +26,26 @@ export const MARK_SESSION = newMarkSession();
 export function markKey(session: string, queueKey: number | string): string {
   return `${session}:${queueKey}`.slice(0, 64);
 }
+
+/**
+ * The keys to resend a RECOVERED batch with — the ones its marks were first
+ * sent with, stored beside them in the crash queue (`QueuedStamp.key`).
+ *
+ * Found by e2e/smoke/marks.spec.ts (2026-10-16): a mark placed just before a
+ * reload was in flight AND in the stored queue; the server saved it, the
+ * reload recovered it from storage and sent it again WITHOUT a key, and it
+ * was on the bid twice. With its original key the server places it once.
+ *
+ * All or nothing: a batch with one keyless mark (a queue from an older
+ * build) goes without keys, exactly as every recovery did before.
+ */
+export function recoveredKeys(
+  part: readonly { key?: unknown }[]
+): string[] | undefined {
+  const keys = part.map(m => m.key);
+  return keys.every(
+    (k): k is string => typeof k === "string" && k.length > 0 && k.length <= 64
+  )
+    ? (keys as string[])
+    : undefined;
+}

@@ -530,7 +530,7 @@ import { canRetryWithFreshUrl, isExpiredPlanUrl } from "@/lib/planUrlRefresh";
 import { readPlanSpot, withoutPlanSpot } from "@/lib/planSpotLink";
 import { groupStamps } from "@shared/takeoffCounts";
 import { UNASSIGNED_COUNT_NAME } from "@shared/unassignedCount";
-import { MARK_SESSION, markKey } from "@/lib/markKeys";
+import { MARK_SESSION, markKey, recoveredKeys } from "@/lib/markKeys";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import {
@@ -6902,7 +6902,14 @@ export default function TakeoffPage({
           // A provisional count's id means nothing after a reload; its marks
           // are mirrored once the count exists (`armWhileCreating`).
           .filter(m => m.sheetId === sheetId && !isProvisionalGroup(m.groupId))
-          .map(m => ({ groupId: m.groupId, x: m.x, y: m.y, status: m.status }))
+          .map(m => ({
+            groupId: m.groupId,
+            x: m.x,
+            y: m.y,
+            status: m.status,
+            // The key it is sent with, so a recovery resend counts once.
+            key: markKey(MARK_SESSION, m.key),
+          }))
       );
     },
     [bidId]
@@ -8133,6 +8140,9 @@ export default function TakeoffPage({
             sheetId,
             groupId: group.id,
             at: part.map(st => ({ x: st.x, y: st.y })),
+            // The keys they were first sent with: a mark that DID land
+            // before the reload is not placed again (@/lib/markKeys).
+            keys: recoveredKeys(part),
             status: queuedStampStatus(part[0]),
           });
           recovered += part.length;
