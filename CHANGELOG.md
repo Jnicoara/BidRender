@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A password-protected or damaged plan file is refused before it
+  uploads, with what to do about it.** It used to upload, attach to the bid,
+  and then show "PasswordException: No password given" or "Invalid PDF
+  structure" with a Try again button that could never work. Now it says the
+  file is password-protected (save a copy without the password) or damaged
+  or incomplete (print it to a new PDF, or ask for the file again), and
+  nothing is attached. Scanned plans, turned pages, mixed sheet sizes, a
+  huge vector sheet and a 500-sheet set were all checked and open as they
+  should.
+
 - **Fixed: a mark placed just before reloading the page could be saved
   twice.** The page keeps unsent marks safe across a crash and sends them
   again after a reload; if the first send had in fact arrived, the mark was

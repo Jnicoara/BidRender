@@ -113,7 +113,8 @@ import { groupByCircuit } from "@/lib/circuitGroups";
 import { outlineFromTaps } from "@shared/homerunFootage";
 import { outlineNeeded } from "@/lib/planOutline";
 import { captureOutlived } from "@/lib/captureLifetime";
-import { planFailureText } from "@/lib/planFailure";
+import { planFailureText, planFileProblemText } from "@/lib/planFailure";
+import { probePlanFile } from "@/lib/probePlanFile";
 import {
   isNetworkFailure,
   markRetryDelay,
@@ -2808,24 +2809,30 @@ function PlanPane({
   }, [go, page, pageCount]);
 
   if (error) {
+    const failure = planFailureText("open", doc.filename, error);
     return (
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="text-center max-w-sm">
           <FileText className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
-          <p className="text-sm font-medium">
-            {planFailureText("open", doc.filename, error).title}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {planFailureText("open", doc.filename, error).detail}
-          </p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-3"
-            onClick={() => setOpenNonce(n => n + 1)}
-          >
-            Try again
-          </Button>
+          <p className="text-sm font-medium">{failure.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{failure.detail}</p>
+          {failure.canRetry ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-3"
+              onClick={() => setOpenNonce(n => n + 1)}
+            >
+              Try again
+            </Button>
+          ) : (
+            // A file problem: trying again opens the same file. Say how to
+            // put it right instead (hard-PDF drill, 2026-10-16).
+            <p className="text-xs text-muted-foreground mt-3">
+              Remove it with the bin beside its name under Documents, then
+              upload the new copy.
+            </p>
+          )}
         </div>
       </div>
     );
@@ -10061,6 +10068,16 @@ export default function TakeoffPage({
           `${file.name} is not a PDF inside, whatever it is named. Export a real PDF and try again.`,
           { retryable: false }
         );
+        return;
+      }
+
+      // Can it be OPENED? A password or a damaged file used to upload,
+      // attach, and only then fail on the drawing (hard-PDF drill,
+      // 2026-10-16). Fails open: only a sure file problem stops it.
+      const probe = await probePlanFile(file);
+      if (!probe.ok) {
+        const words = planFileProblemText(probe.problem, file.name);
+        fail(words.title, { detail: words.detail, retryable: false });
         return;
       }
 

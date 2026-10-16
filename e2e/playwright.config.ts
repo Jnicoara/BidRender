@@ -65,7 +65,7 @@ export default defineConfig({
     {
       name: "desktop",
       dependencies: ["setup"],
-      testMatch: /(flow|screens|version|plans|marks)\.spec\.ts/,
+      testMatch: /(flow|screens|version|plans|marks|pdfs)\.spec\.ts/,
       use: { viewport: { width: 1440, height: 900 } },
     },
     {
