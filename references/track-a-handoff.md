@@ -4,6 +4,20 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## C ready e9dfc0ff (2026-10-16 14:35, Gate 38968275571 green, full code run)
+
+`git push origin e9dfc0ff:local-dev` (fast-forward: contains local-dev
+`0628f8c9`). **No `drizzle/` change.** What it adds on top of local-dev:
+ONE `DraftNumberInput` (B's API + C's `parseTypedNumber` reading and
+show-what-is-held on blur; C's copy deleted, all tests kept); Q-IMP1 built
+(a price list naming one material at two prices refuses it); the
+unsaved-changes guard on every library editor and Clients; the Dashboard,
+Find a bid and archive priced for the whole list at once (250 bids 460 →
+85 ms; golden bids now hold each card to its bid screen); add-material
+labor hours read the way they are checked. The first merge Gate was RED
+(`priceHistoryDoor.test.ts` could not see B's generic fork) — fixed in
+28d99416. S2 for scope-tags 6b is below.
+
 ## FOR A — S2 `scope_prompts` (scope-tags step 6b), FINAL 2026-10-16 (Track C)
 
 Replaces the 2026-10-12 S2 draft in `track-b-handoff.md`. Additive, step 1
