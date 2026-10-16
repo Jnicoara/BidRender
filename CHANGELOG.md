@@ -6,6 +6,33 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Tested: one company can never see or change another company's work.**
+  A test acts as a second company and calls every one of the app's 388
+  server actions with the first company's ids. Nothing leaked and nothing
+  changed. It runs on every check.
+- **Tested: file storage, AI and email can each go down and come back.**
+  While down, the app says so plainly and loses nothing. When the service
+  returns, the app picks up again by itself, with no restart.
+- **A brand-new database builds from scratch and prices every test bid to
+  the cent.** A backup restored on this machine came back with every one of
+  4,386 bids at the same total. This used the real backup code, and nothing
+  was sent to the cloud.
+- **Speed checked on a big company** (61 bids, a 500-sheet plan set, 5,000
+  marks on one sheet). Every screen opened well under 2 seconds. The
+  dashboard slows as bids pile up, so that is on the list to fix before it
+  matters.
+- **The proposal, the quote-app panel and the spreadsheet export now match
+  the bid screen to the cent** on every test bid. "Price pending" shows
+  exactly when something isn't priced.
+- **The pricing sheet loader keeps a pack you type** on the rows marked
+  "pack not checked", so the row stops being flagged and shops get the
+  right pack size.
+- **The end-of-pricing name changes are ready as one checked list** (560
+  changes, from every recorded name-review answer). Nothing is applied yet;
+  16 answers need the owner's word first.
+- **The helper tools are type-checked too**, which found three real mistakes
+  in older tools, now fixed.
+
 - **A dropped connection can no longer make the Plans screen count marks
   twice.** If taps reached the server but the answer was lost, the screen
   resent them and each one was counted again (3 receptacles became 6). The
