@@ -27,7 +27,9 @@ This is the human-readable companion to the git history — read this to see wha
   line left blank was recorded as taking no time, which made Performance
   look better than the job was and could suggest cutting an assembly's
   hours. A blank total is now refused, and By assembly asks for every line
-  by name (or use One total for a rough figure).
+  by name (or use One total for a rough figure). Hour suggestions no
+  longer learn from a 0-hour line, so old blanks can no longer suggest
+  setting an assembly to 0 hours.
 
 - **Fixed: typing "15%" as your company profit saved 0%.** On Settings ›
   Pricing, a percent sign, a comma decimal or an emptied box in profit,

@@ -29,7 +29,9 @@ brand-variants pass by design and needs nothing from you now.
   blank total is refused, and By assembly needs every line ("…or use One
   total"); `closeout-blank-line-{before,after}.png`. → **A runs a
   read-only list on live of close-out lines at exactly 0 actual hours, for
-  you to check with those shops.** A real 0 is possible but rare.
+  you to check with those shops.** A real 0 is possible but rare. (The
+  hour SUGGESTIONS no longer learn from a 0 — three of them offered to set
+  an assembly to 0 h; Performance totals still include them.)
 - **Q-QTY1 ⚠ CHANGES BID MONEY (already saved data)** — Typing a decimal
   quantity KEY BY KEY into an assembly's material box, or a kit's assembly
   box, stored it 10× or 100× too big: "1.5" saved as **15**, "2.25" as
