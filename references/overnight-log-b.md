@@ -195,7 +195,7 @@ start.
   count test red on one-at-a-time forks. 204 fork tests green. Morning Q2
   closed. stress-results-b.md round 9. Gate green on c0542084.
 
-## Item 6 — count first, pick the item later (22:50–23:35) · `00948893` plan, `745da6da` server, `b6b8ad2e` screens
+## Item 6 — count first, pick the item later (22:50–23:20) · `00948893` plan, `745da6da` server, `b6b8ad2e` screens
 
 - Plan: `references/count-first-plan.md` (answers overhaul § 16.5; § 16
   points at it). One Unassigned count per bid, reserved label nobody can
@@ -206,7 +206,7 @@ start.
   bid strip, assign by name); probe marks removed from bid 1728369.
   device:touch 84/0, client tests 1642, server suites 302. Morning Q5.
 
-## Item 7 — user levels + trade-ready core, PLAN ONLY (23:40–00:00) · see commit
+## Item 7 — user levels + trade-ready core, PLAN ONLY (23:05–23:25) · `17222fa0`
 
 - `references/user-levels-plan.md`: levels as a third axis beside role and
   tier (L1–L6), and a trade survey (55 sites, the key ones spot-checked:
