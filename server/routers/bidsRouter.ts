@@ -72,9 +72,18 @@ import { isLaborRoleLine } from "../../shared/roleLines";
 import { canUpdateMath, reasonsBetween } from "../../shared/mathVersion";
 import {
   leaveDraft,
+  mathUpdateWorthOffering,
   moveBidToMathVersion,
   refreezeTaxRate,
 } from "../bidProtection";
+
+/**
+ * Why "Update to the current math" cannot run yet, in the strip's words —
+ * the version-2 repair has $0 run lines to price and no run rate to price
+ * them at (server/bidProtection.ts).
+ */
+const NEEDS_RUN_RATE_MESSAGE =
+  "This Draft has traced runs priced at $0 an hour, and there is no labor rate for traced runs to price them at. Pick one in Settings › Pricing (or give the picked role a rate in Labor rates) first, then update.";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { resolveForkedRow } from "../../shared/forkedRows";
 import {
@@ -674,8 +683,12 @@ export const bidsRouter = router({
           totalAfter: Number(row.totalAfter),
           reason: row.reason,
         })),
-        /** "Update to the current math" is offered (owner Q22) — a button only. */
-        canUpdate: canUpdateMath(bid),
+        /**
+         * "Update to the current math" is offered (owner Q22) — a button
+         * only, and only when it would do something (bidProtection.ts
+         * `mathUpdateWorthOffering`).
+         */
+        canUpdate: await mathUpdateWorthOffering(bid),
       };
     }),
 
@@ -704,7 +717,10 @@ export const bidsRouter = router({
         seen: true,
         dryRun: true,
       });
-      if (!result.moved) return null;
+      if (!result.moved)
+        return result.reason === "needs-run-rate"
+          ? { blocked: NEEDS_RUN_RATE_MESSAGE }
+          : null;
       return {
         totalBefore: result.totalBefore,
         totalAfter: result.totalAfter,
@@ -723,13 +739,19 @@ export const bidsRouter = router({
           message:
             "Only an unlocked Draft on older math can be updated. Sent, won, lost and locked bids keep the math they were priced by.",
         });
-      return moveBidToMathVersion({
+      const result = await moveBidToMathVersion({
         bid,
         userId: ctx.scope.dataUserId,
         at: new Date(),
         // The person was shown old → new before pressing (mathUpdatePreview).
         seen: true,
       });
+      if (!result.moved && result.reason === "needs-run-rate")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: NEEDS_RUN_RATE_MESSAGE,
+        });
+      return result;
     }),
 
   /**

@@ -21,6 +21,22 @@
       "reason": "Added bid 9 (markup-extras): wire extra, makeup, item markup override, profit as margin. Bids 1-8 unchanged.",
       "hash": "cd54bbc579f58559",
       "changed": ["markup-extras"]
+    },
+    {
+      "date": "2026-10-16",
+      "reason": "math version 2 (N4 run-rate repair, button-only): a new bid starts on 2; no number moved",
+      "hash": "5bd6766c26319ce5",
+      "changed": [
+        "counts",
+        "homerun",
+        "drops",
+        "remove-relocate",
+        "scope-tags",
+        "labor-only",
+        "free-count",
+        "op-and-tax",
+        "markup-extras"
+      ]
     }
   ],
   "bids": [
@@ -94,7 +110,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 1094.1,
@@ -337,7 +353,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 511.33,
@@ -549,7 +565,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 365.83,
@@ -699,7 +715,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 188.8,
@@ -880,7 +896,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 225.3,
@@ -999,7 +1015,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 1200,
@@ -1122,7 +1138,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 4058.6,
@@ -1404,7 +1420,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Active",
         "incomplete": false,
         "totals.directCost": 1047.67,
@@ -1695,7 +1711,7 @@
         }
       ],
       "totals": {
-        "mathVersion": 1,
+        "mathVersion": 2,
         "status": "Draft",
         "incomplete": false,
         "totals.directCost": 544.21,

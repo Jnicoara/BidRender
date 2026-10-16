@@ -6,6 +6,24 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Fixing a Draft whose traced runs were priced at $0 an hour is now one
+  button, and a new company's runs start priced.** The owner chose no
+  automatic re-pricing. A Draft still holding such runs offers "Update to
+  the current math", which shows the old and new total first. Sent, won
+  and locked bids never move, and the release step never applies it on
+  its own. A new company's traced runs start at the shipped Journeyman's
+  example rate ($59.22, tagged "Example rate"), and the first-run screen
+  says so. Settings › Pricing now also warns when the picked role itself
+  has no rate. Before, it showed the role and said nothing while runs
+  priced at $0.
+- **On a scanned plan, "Confirm all" now shows every match as a small
+  picture first when the AI cleared any of them.** Tap away the
+  look-alikes, and one tap counts the rest. Nothing the AI found counts
+  until a person has looked at it. A wrong "same" from the AI once let a
+  GFCI be counted as a duplex in one click. Found while building it:
+  setting finds aside and counting the rest in one go lost the set-aside
+  ones; both now land together.
+
 - **The labor on traced conduit and wire can now be priced.** The hours on
   runs traced on the plans were priced at $0 an hour, because nothing in
   the app could choose their labor rate. The bid warned about it, but the

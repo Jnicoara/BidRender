@@ -1,5 +1,24 @@
 # Track B handoff — 2026-10-05
 
+## FROM TRACK A, 2026-10-16 (later) — A edited YOUR Find all matching files, on the owner's order (N1)
+
+The owner answered N1 directly to A ("build on track-a-night"), so A made
+the change in your files rather than handing it over. **Merge with care**
+if you have work in these:
+
+- `client/src/lib/findMatchingSession.ts`: `MatchItem.aiCleared` (set by
+  `applyAiAnswers` when "same" took off the scan-unread flag),
+  `confirmAllNeedsReview`, `reviewedDecisions`.
+- `client/src/components/takeoff/FindMatching.tsx`: `cropMatchPicture`
+  (the AI's crop moved here from TakeoffPage, so the grid shows the exact
+  picture the AI judged), the review grid inside `MatchPanel`, and new props
+  `renderRegion` and `onConfirmReviewed`.
+- `client/src/pages/TakeoffPage.tsx`: `decideFoundMany` / `confirmReviewed`.
+  **A real fault, found on screen:** `decideFound` writes state built from
+  the last render, so two calls in a row lost the first (set-aside finds
+  came back "clear"). The grid now sends both lists in one call. Any other
+  place that calls `decideFound` twice in one handler has the same fault.
+
 ## FROM TRACK A, 2026-10-16 — a legend link does not reach the count already made (yours, not touched)
 
 Found by A's whole-job browser journey (`e2e/journey/journey.spec.ts`,

@@ -545,3 +545,44 @@ draft's hand-typed START times ran ahead of the clock. Ends were always
   picked in Settings and every printed number = hand math. Fault 2 (legend
   link) → `track-b-handoff.md`.
 - 03:42 Gate 38887304438 **green** on e34c4be2 (run-rate fix + journey). Queue complete; run 4 end.
+
+## Day session 2026-10-16 (owner present) — land, N4 + N1 built, N2, live checks
+
+- Step 1: local-dev fast-forwarded `26670c62..cff5a50b`. Gate 38935039725
+  green; smoke 96 passed / 2 skipped; staging `/api/version` commit
+  `cff5a50b`.
+- **N4 (owner: no automatic re-price; new companies start on Journeyman
+  $59.22 "Example rate"):** math version 2, `buttonOnly` — the release step
+  stops below it (`releaseTargetFor`); "Update to the current math" writes
+  the company run rate onto a Draft's $0 run lines (`shared/runRateRepair.ts`,
+  `moveBidToMathVersion`), refuses when there is no rate to use, and is
+  offered only when it would change something. New company's first
+  pricing_defaults row points at the shipped Journeyman. Tests
+  `server/runRateRepair.test.ts` 6 (red with the write removed: "expected
+  90.73 to be 330.73"; red with the default removed). Golden file: only
+  `mathVersion 1 → 2` moved (logged reason).
+- Found on screen, fixed: (1) the Settings picker used a plain `find`, so a
+  forked Journeyman read "Not set" — now `resolveLaborRate`; (2) a PICKED
+  role at $0 said nothing while runs priced at $0 — now amber "has no rate
+  yet". Local check: $210 → $418 = 4 h × $52, button gone after.
+- **N1 (owner: review grid before AI-found finds count):** `aiCleared`,
+  `confirmAllNeedsReview`, `reviewedDecisions`, the grid in `MatchPanel`.
+  Checked on a scanned copy of the counting fixture with the AI call faked
+  in the browser (0 requests reached the server): 11 pictures, 2 tapped
+  away, Count 9. **Found on screen, fixed:** two `decideFound` calls in one
+  handler lost the first (set-aside came back "clear") → `decideFoundMany`.
+  Told B (`track-b-handoff.md`).
+- Journey 3/3 on a throwaway fresh DB (`bidrender_test_journey_a`, dropped):
+  laptop 38 s, iPad 29 s, phone 57 s. On `bidrender_local` it failed BEFORE
+  anything changed today: that copy's duplex starter holds "Wall plate",
+  the seed says the nylon duplex plate — the local copy was replaced with
+  an older one since yesterday's green run.
+- Full suite before the golden update: 457 files passed, 1 failed (golden
+  `mathVersion` only), 1 skipped.
+- **Live DB, read-only** (READ ONLY session + transaction, rolled back):
+  N4 0 run lines on live at all; Q-DEF1 3 companies at 0/0/0 — the
+  never-set defaults — and only 2 Drafts follow them (bid 23 user 1, bid 25
+  smoke user 1421), both with 0 lines; Q-QTY1 0 assembly lines, 0 kit items
+  (10 kit items in all); Q-TAX1 0 tax areas on live; Q-CLOSE1 0 close-outs
+  on live; run-type extras ≥ 10% none (no company run types, runs or extra
+  defaults with one).

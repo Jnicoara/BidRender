@@ -15,21 +15,70 @@
  * the window.
  */
 import { createPortal } from "react-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronRight, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MatchBox } from "@/lib/findMatching";
+import type { PageRect } from "@shared/planRegion";
 import {
   aiBatch,
   NEW_LOOK_REASON,
   clearOpen,
+  confirmAllNeedsReview,
   itemKind,
+  reviewedDecisions,
   summary,
   type ItemKind,
   type MatchItem,
 } from "@/lib/findMatchingSession";
 import { DEMOLITION_REASON } from "@/lib/scanMatching";
+
+/** Renders a region of the sheet (the PDF worker), as TakeoffPage passes it. */
+export type RenderRegion = (
+  rect: PageRect,
+  scale: number
+) => Promise<{ bitmap: ImageBitmap }>;
+
+/**
+ * A small picture of one spot on the sheet, with a red box on the symbol —
+ * what the AI is sent about a scan find, and what the review grid shows.
+ * ONE function, so the person reviews exactly the picture the AI judged.
+ * 180 dpi (2.5 px a point), a crop of 52–68 pt round the spot: the sizes
+ * measured in scanned-plans-plan.md § 4.
+ */
+export async function cropMatchPicture(
+  renderRegion: RenderRegion,
+  x: number,
+  y: number,
+  halfWidth: number,
+  halfHeight: number
+): Promise<string> {
+  const scale = 2.5;
+  const half = Math.max(26, 1.6 * Math.max(halfWidth, halfHeight));
+  const { bitmap } = await renderRegion(
+    { x: x - half, y: y - half, width: 2 * half, height: 2 * half },
+    scale
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const k = canvas.width / (2 * half);
+  ctx.strokeStyle = "#e11d48";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(
+    (half - halfWidth - 2) * k,
+    (half - halfHeight - 2) * k,
+    (2 * halfWidth + 4) * k,
+    (2 * halfHeight + 4) * k
+  );
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
 
 /**
  * The labels tied to a find (@/lib/findMatching, `tieLabels`) — a
@@ -161,6 +210,17 @@ export type MatchPanelState =
       ai: { busy: boolean; message: string | null };
     };
 
+/**
+ * The review grid's state (owner N1): which finds it shows, the picture of
+ * each as it arrives, and the ones tapped away. Local to the panel — like
+ * every unconfirmed find, nothing of it is stored.
+ */
+type ReviewState = {
+  ids: number[];
+  pictures: Record<number, string | "failed">;
+  dropped: Set<number>;
+};
+
 export function MatchPanel({
   label,
   existingLabel,
@@ -168,14 +228,23 @@ export function MatchPanel({
   chromeTarget,
   canAskAi,
   onAskAi,
+  renderRegion,
   savedLooks,
   onSearchLooks,
   onConfirm,
+  onConfirmReviewed,
   onConfirmExisting,
   onReject,
   onNext,
   onClose,
 }: {
+  /** Draws the review grid's pictures (`cropMatchPicture`). */
+  renderRegion: RenderRegion;
+  /**
+   * The grid's one tap: count `confirm`, set `reject` aside — ONE call, so
+   * the two decisions land together (two calls in a row lost the first).
+   */
+  onConfirmReviewed: (confirm: number[], reject: number[]) => void;
   /** The AI reader is on for this company: the scan button may be shown. */
   canAskAi: boolean;
   /** One press, one small call, about the next AI_BATCH copies. */
@@ -200,18 +269,64 @@ export function MatchPanel({
   onNext: () => void;
   onClose: () => void;
 }) {
-  // Escape closes the search, and only the search: taken in the capture
-  // phase so it does not also put the count down.
+  const [review, setReview] = useState<ReviewState | null>(null);
+  // A new search, or the results going away, closes the grid.
+  const resultsItems = state.phase === "results" ? state.items : null;
+  useEffect(() => {
+    if (!resultsItems) setReview(null);
+  }, [resultsItems]);
+
+  // Escape closes the grid if it is open, otherwise the search — and only
+  // that: taken in the capture phase so it does not also put the count down.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      onClose();
+      if (review) setReview(null);
+      else onClose();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, [onClose, review]);
+
+  /** Open the grid on every find Confirm all would take, and draw each. */
+  const openReview = (items: readonly MatchItem[]) => {
+    const shown = clearOpen(items);
+    setReview({ ids: shown.map(i => i.id), pictures: {}, dropped: new Set() });
+    void (async () => {
+      // One at a time: the worker renders one region per call anyway, and
+      // pictures arriving in order read better than a burst at the end.
+      for (const item of shown) {
+        let picture: string | "failed";
+        try {
+          picture = await cropMatchPicture(
+            renderRegion,
+            item.x,
+            item.y,
+            item.halfWidth,
+            item.halfHeight
+          );
+        } catch {
+          picture = "failed";
+        }
+        setReview(r =>
+          r && r.ids.includes(item.id)
+            ? { ...r, pictures: { ...r.pictures, [item.id]: picture } }
+            : r
+        );
+      }
+    })();
+  };
+
+  const toggleDrop = (id: number) =>
+    setReview(r => {
+      if (!r) return r;
+      const dropped = new Set(r.dropped);
+      if (dropped.has(id)) dropped.delete(id);
+      else dropped.add(id);
+      return { ...r, dropped };
+    });
 
   let body: React.ReactNode;
   if (state.phase === "boxing") {
@@ -255,12 +370,102 @@ export function MatchPanel({
         {state.text}
       </p>
     );
+  } else if (review) {
+    const byId = new Map(state.items.map(i => [i.id, i] as const));
+    const kept = review.ids.length - review.dropped.size;
+    const finish = () => {
+      const { confirm, reject } = reviewedDecisions(
+        state.items,
+        review.ids,
+        review.dropped
+      );
+      onConfirmReviewed(confirm, reject);
+      setReview(null);
+    };
+    body = (
+      <>
+        <p className="text-xs" role="status" aria-live="polite">
+          Check each one is a {label}. Tap any that is not to leave it out.
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          {review.ids.map((id, n) => {
+            const item = byId.get(id);
+            const picture = review.pictures[id];
+            const dropped = review.dropped.has(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleDrop(id)}
+                aria-pressed={!dropped}
+                aria-label={`Find ${n + 1}${item?.aiCleared ? ", cleared by the AI" : ""}: ${dropped ? "left out — tap to count it" : "counted — tap to leave it out"}`}
+                className={cn(
+                  "relative aspect-square overflow-hidden rounded-md border bg-white",
+                  dropped
+                    ? "border-rose-500 ring-2 ring-rose-500/60"
+                    : "border-border"
+                )}
+              >
+                {picture && picture !== "failed" ? (
+                  <img
+                    src={picture}
+                    alt=""
+                    className={cn(
+                      "h-full w-full object-contain",
+                      dropped && "opacity-30"
+                    )}
+                  />
+                ) : (
+                  <span className="absolute inset-0 flex items-center justify-center text-[10px] text-slate-500">
+                    {picture === "failed" ? "No picture" : "…"}
+                  </span>
+                )}
+                {item?.aiCleared && (
+                  <span
+                    className="absolute left-0.5 top-0.5 rounded bg-slate-900/80 px-1 text-[9px] font-semibold text-sky-300"
+                    title="The AI said this is the same"
+                  >
+                    AI
+                  </span>
+                )}
+                {dropped && (
+                  <X className="absolute inset-0 m-auto h-8 w-8 text-rose-500" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {kept} will be counted
+          {review.dropped.size > 0 ? `, ${review.dropped.size} left out` : ""}.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={finish}>
+            <Check className="w-3 h-3" />
+            {kept > 0
+              ? `Count ${kept}`
+              : `Leave out all ${review.dropped.size}`}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => setReview(null)}
+          >
+            Back
+          </Button>
+        </div>
+      </>
+    );
   } else {
     const s = summary(state.items);
     const sel = state.items.find(i => i.id === state.selectedId) ?? null;
     const selKind = sel ? itemKind(sel) : null;
     const clear = clearOpen(state.items);
     const askable = state.scan ? aiBatch(state.items) : [];
+    // Owner N1: a find the AI made clear is counted only after the grid.
+    const needsReview = confirmAllNeedsReview(state.items);
+    const aiClearedCount = clear.filter(i => i.aiCleared).length;
     body = (
       <>
         <p className="text-xs" role="status" aria-live="polite">
@@ -341,7 +546,11 @@ export function MatchPanel({
             size="sm"
             className="h-7 gap-1.5 text-xs"
             disabled={clear.length === 0}
-            onClick={() => onConfirm(clear.map(i => i.id))}
+            onClick={() =>
+              needsReview
+                ? openReview(state.items)
+                : onConfirm(clear.map(i => i.id))
+            }
           >
             <Check className="w-3 h-3" /> Confirm all {clear.length} clear
           </Button>
@@ -372,6 +581,13 @@ export function MatchPanel({
             </Button>
           )}
         </div>
+        {needsReview && (
+          <p className="text-xs text-muted-foreground mt-1.5">
+            {aiClearedCount} of the clear ones{" "}
+            {aiClearedCount === 1 ? "was" : "were"} cleared by the AI, so
+            Confirm all shows you every one as a picture first.
+          </p>
+        )}
         {state.ai.message && (
           <p className="text-xs text-muted-foreground mt-1.5" role="status">
             {state.ai.message}

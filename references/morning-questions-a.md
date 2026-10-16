@@ -7,6 +7,15 @@ was decided and is in `overnight-log-a.md`.
 
 ### N4 (TOP). Traced runs' labor was priced at $0/h on every bid — FIXED going forward; existing lines are your call
 
+> **DECIDED and BUILT 2026-10-16 (owner):** no automatic re-price. A Draft
+> takes the run rate only through "Update to the current math" (math
+> version 2, button-only; old → new shown); sent and locked bids never
+> move. A NEW company's run rate starts on the shipped Journeyman at its
+> $59.22 example rate, tagged "Example rate"; setup says so. Tests
+> `server/runRateRepair.test.ts` (red with the write or the default
+> removed); shots `overnight-shots/a/9-*`, `10-*`. **Live, read-only:**
+> 0 run lines on live at all, so nothing is saved wrong there.
+
 Found by the whole-job browser journey. A traced run's lines (conduit, wire,
 fittings sent from the Plans screen) price their hours at the company's
 `pricing_defaults.defaultLaborRateId`, and **nothing in the app could set
@@ -55,6 +64,12 @@ unless you want B to hold the line.
 
 ### N1. On a SCAN, should an "AI says same" find be allowed into Confirm all? (affects counts)
 
+> **DECIDED and BUILT 2026-10-16 (owner):** Confirm all first opens a
+> review grid — every match as a small picture, tap to drop look-alikes,
+> one tap confirms the rest. Nothing AI-found counts until that review.
+> Tests in `client/src/lib/countingScan.test.ts` (saved fake answers, no
+> money); shots `overnight-shots/a/11-*`.
+
 Found by the counting deep test (`client/src/lib/countingScan.test.ts`),
 with saved fake AI answers and no money spent. On a scanned sheet every find
 starts flagged ("the tag beside it is not read"), so **Confirm all takes
@@ -74,6 +89,9 @@ pressing Confirm all, but that one press now trusts the AI.
 Nothing changed tonight. It's a count decision, so it's yours.
 
 ### N2. The migration snapshot gap 0059–0163: the condition is met, but where should the commit go?
+
+> **DECIDED 2026-10-16 (owner): A** — committed on local-dev, then
+> local-dev pushed to staging by hand.
 
 You said: apply the draft on the branch only if `drizzle-kit generate` then
 says "no changes". **Measured tonight, in a throwaway worktree:** with

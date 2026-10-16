@@ -4042,15 +4042,13 @@ export async function seedStarterLaborSteps(): Promise<void> {
     const have = new Set(shipped.map(r => r.stepKey));
     const missing = STARTER_LABOR_STEPS.filter(step => !have.has(step.key));
     if (missing.length === 0) return;
-    await db
-      .insert(laborSteps)
-      .values(
-        missing.map(step => ({
-          userId: null,
-          stepKey: step.key,
-          ...starterStepFields(step),
-        }))
-      );
+    await db.insert(laborSteps).values(
+      missing.map(step => ({
+        userId: null,
+        stepKey: step.key,
+        ...starterStepFields(step),
+      }))
+    );
   }, undefined);
 }
 
@@ -4670,9 +4668,16 @@ export async function getPricingDefaults(
   // trade was asked for, which for every caller today is `all`.
   const wanted = normalizeTradeId(trade);
   try {
-    await db
-      .insert(pricingDefaults)
-      .values({ userId, trade: wanted, ...FALLBACK_PRICING_DEFAULTS });
+    await db.insert(pricingDefaults).values({
+      userId,
+      trade: wanted,
+      ...FALLBACK_PRICING_DEFAULTS,
+      // A NEW company's traced runs start on the shipped Journeyman, at its
+      // tagged example rate (owner, N4, 2026-10-16). Only here, where the
+      // company's first row is born: an existing company keeps what it has,
+      // and one that clears the picker stays cleared.
+      defaultLaborRateId: await shippedRunLaborRoleId(),
+    });
   } catch (error) {
     // Another request created it between our read and our write. See
     // isDuplicateKey — the row exists now, which is all the caller wanted.
@@ -4683,6 +4688,76 @@ export async function getPricingDefaults(
     .from(pricingDefaults)
     .where(eq(pricingDefaults.userId, userId));
   return resolveForTrade(created, trade);
+}
+
+/**
+ * The shipped role a new company's traced runs are priced by: the starter
+ * Journeyman, which ships at a tagged example rate (baselineLaborRates.ts).
+ * NULL when it is missing or retired — the run rate then starts unset and
+ * Settings › Pricing says so in amber, as before.
+ */
+export const SHIPPED_RUN_LABOR_ROLE = "Journeyman";
+
+export async function shippedRunLaborRoleId(): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db
+    .select({ id: laborRates.id })
+    .from(laborRates)
+    .where(
+      and(
+        isNull(laborRates.userId),
+        eq(laborRates.name, SHIPPED_RUN_LABOR_ROLE),
+        eq(laborRates.isActive, true)
+      )
+    )
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/**
+ * The rate a traced-run line freezes when it is sent: the company's run
+ * role (`defaultLaborRateId`), following a fork, as an hourly cost. $0 and
+ * not an example when no role is picked. ONE reader for the send and the
+ * math-version-2 repair, so the two cannot disagree.
+ */
+export async function getRunLaborRate(
+  userId: number
+): Promise<{ cost: number; wasExample: boolean; name: string | null }> {
+  const [rates, defaults] = await Promise.all([
+    getLibraryLaborRates(userId),
+    getPricingDefaults(userId),
+  ]);
+  const row = resolveLaborRate(rates, defaults?.defaultLaborRateId ?? null);
+  return {
+    cost: hourlyCostOf(row),
+    wasExample: row?.isExampleRate === true,
+    name: row?.name ?? null,
+  };
+}
+
+/**
+ * Math version 2's write: the run rate onto the given $0 run lines of ONE
+ * bid. Called only by `moveBidToMathVersion`, for an unlocked Draft the
+ * person chose to update (shared/runRateRepair.ts).
+ */
+export async function setRunLineLaborRates(
+  bidId: number,
+  lineIds: number[],
+  rate: { cost: number; wasExample: boolean }
+): Promise<void> {
+  if (lineIds.length === 0) return;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(bidLineItems)
+    .set({
+      snapshotLaborRate: rate.cost.toFixed(4),
+      snapshotLaborRateWasExample: rate.wasExample,
+    })
+    .where(
+      and(eq(bidLineItems.bidId, bidId), inArray(bidLineItems.id, lineIds))
+    );
 }
 
 /**
@@ -4715,9 +4790,16 @@ export async function updatePricingDefaults(
   const exact = rows.find(row => normalizeTradeId(row.trade) === wanted);
   if (!exact) {
     try {
-      await db
-        .insert(pricingDefaults)
-        .values({ userId, trade: wanted, ...FALLBACK_PRICING_DEFAULTS });
+      await db.insert(pricingDefaults).values({
+        userId,
+        trade: wanted,
+        ...FALLBACK_PRICING_DEFAULTS,
+        // The company's FIRST row, born on a write: the same run role a read
+        // would have given it (getPricingDefaults). `data` still wins below.
+        ...(rows.length === 0
+          ? { defaultLaborRateId: await shippedRunLaborRoleId() }
+          : {}),
+      });
     } catch (error) {
       // Lost the create race; the UPDATE below writes the winner's row.
       if (!isDuplicateKey(error)) throw error;
@@ -15009,18 +15091,14 @@ export async function addRunTypeRowToBid(
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
-  const [materialRows, rates, defaults, markupRuleSet] = await Promise.all([
+  const [materialRows, runRate, markupRuleSet] = await Promise.all([
     getMaterialsByIds([input.materialId], userId),
-    getLibraryLaborRates(userId),
-    getPricingDefaults(userId),
+    getRunLaborRate(userId),
     getMarkupRuleSet(userId),
   ]);
   // Follows a fork, like every other read of a stored material id.
   const material = resolveMaterial(materialRows, input.materialId);
   if (!material) throw new Error("Material not found");
-
-  const rateRow = resolveLaborRate(rates, defaults?.defaultLaborRateId ?? null);
-  const laborRate = hourlyCostOf(rateRow);
 
   await releaseArchivedPlanSlot(bidId, {
     runTypeId: input.runTypeId,
@@ -15042,8 +15120,8 @@ export async function addRunTypeRowToBid(
     // A traced run carries no job-condition modifiers of its own. They describe
     // an operation, and this is a length of pipe.
     snapshotModifierPct: "0.0000",
-    snapshotLaborRate: laborRate.toFixed(4),
-    snapshotLaborRateWasExample: rateRow?.isExampleRate === true,
+    snapshotLaborRate: runRate.cost.toFixed(4),
+    snapshotLaborRateWasExample: runRate.wasExample,
     snapshotModifierNames: [],
     sortOrder: await nextBidSortOrder(bidId),
   });
