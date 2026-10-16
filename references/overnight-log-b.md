@@ -309,3 +309,17 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
   Fixed (Trace goes down first; a run in progress asks to be finished).
   The check bar overlapped its buttons at 390 px — fixed. Looked at laptop
   and phone. Proved both by breaking.
+
+## A's handoff — a legend link did not reach the count already made (03:38–03:42) · `3f613a30`
+
+- `linkSymbol` takes the bid and adopts its by-name counts of the symbol
+  through the card's own rules, now one helper (`server/groupSource.ts`).
+  `server/legendLinkAdopts.test.ts`, red without it. Note for A in the
+  handoff.
+
+## Item 6 — demo vs new clarity (03:43–03:50) · `303d86bf`
+
+- Most was built (status plan § 1, § 2a): banner, demo places as Remove,
+  strip with tap-to-highlight. Built the missing upload offer ("Use these
+  tags" / "Not now"), and `e2e/smoke/demo.spec.ts` covers all of it at
+  laptop and phone; offer and highlight proved by breaking. View only.
