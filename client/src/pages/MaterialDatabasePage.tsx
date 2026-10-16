@@ -591,7 +591,8 @@ function ImportPriceListDialog({
                 {result.refused
                   .slice(0, 20)
                   .map(
-                    c => `${c.name} (${c.prices.map(p => money(p)).join(" / ")})`
+                    c =>
+                      `${c.name} (${c.prices.map(p => money(p)).join(" / ")})`
                   )
                   .join(", ")}
                 {result.refused.length > 20
