@@ -77,3 +77,9 @@ Suggested answers are what was built.
    under it and the print is blocked. — **Your call** (it changes what a
    total says, so parked).
 3. The Unassigned count never becomes a bid line. — **Keep it so.**
+
+## Q6. User levels and other trades — plan only, questions inside
+
+`references/user-levels-plan.md` asks L1–L6 (is a level a plan you sell or
+a per-person mode; does Takeoff show money; names) and T1–T6 (which trade
+is second; may the no-number, no-migration steps 1–3 start). Nothing built.

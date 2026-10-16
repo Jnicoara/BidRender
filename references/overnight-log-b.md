@@ -205,3 +205,20 @@ start.
 - Looked at laptop + phone 390 end to end (picker, "?" pins, print block,
   bid strip, assign by name); probe marks removed from bid 1728369.
   device:touch 84/0, client tests 1642, server suites 302. Morning Q5.
+
+## Item 7 — user levels + trade-ready core, PLAN ONLY (23:40–00:00) · see commit
+
+- `references/user-levels-plan.md`: levels as a third axis beside role and
+  tier (L1–L6), and a trade survey (55 sites, the key ones spot-checked:
+  `category` and `pathType` are MySQL ENUMs; `shippedTrades`/`tradeApplies`
+  have no non-test callers) with a build order and T1–T6. Nothing built.
+- Survey notes worth keeping (file:line): run model `shared/takeoffQuantities.ts`
+  53/57-103/767-925; `shared/runNoWire.ts`; `shared/branchWire.ts` 58,95-160;
+  `shared/runFittings.ts` 148-187; `shared/runBends.ts` 81; prompts
+  `server/planReading.ts` 60,139, `planCopilotRouter.ts` 596,
+  `server/tieBreak.ts` 88,191, `shared/aliasSuggestions.ts` 216;
+  `PlanLookUp.tsx` 453-468; `client/src/lib/cadLayers.ts` 41-80;
+  `shared/accountingExport.ts` 100; `bidsRouter.ts` 456.
+- Also tonight (item 8 / todo): moveToGroup toast fix `04bb1d2e`;
+  bids.dashboard measured 240/440/840 ms at 50/100/200 marked bids
+  (`90fcb4fc`, no code change).
