@@ -64,3 +64,16 @@ the trace panel sits at the bottom of the drawing. Every touch size passes.
 ## Q4. One real-finger check on your phone (2 minutes)
 
 On your phone, open any bid with a plan set → **Plans**, go to a drawing sheet. Tap **Count**, type any name, Enter; tap the drawing once, tap **Undo**, tap once more — after a second "This sheet:" should say **1 mark**. Then **… → Trace**, tap two points apart on the drawing, then tap **Finish** — one straight run should appear between your two taps (not stop early or add a third point), and "This sheet:" should show its feet. Staging is fine for this (use a throwaway bid); just tell me which step didn't do what's described.
+
+## Q5. "Just count, pick the item later" — three small choices (built, none blocks)
+
+Built tonight (`references/count-first-plan.md` § 5 has them in full).
+Suggested answers are what was built.
+
+1. A count you NAMED but linked to nothing still goes to the bid and is
+   priced there (level 1, your 2026-09-25 decision) — it is not
+   "Unassigned". — **Keep it so.**
+2. The bid total does NOT say "+ N marks unassigned"; the warning sits
+   under it and the print is blocked. — **Your call** (it changes what a
+   total says, so parked).
+3. The Unassigned count never becomes a bid line. — **Keep it so.**

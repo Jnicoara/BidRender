@@ -193,4 +193,15 @@ start.
   run type 7.0 → 0.48, assembly 18.8 → 1.3 s. One fork code path for one
   shop or many (`forkForOwners`). Copies counted correct; new statement-
   count test red on one-at-a-time forks. 204 fork tests green. Morning Q2
-  closed. stress-results-b.md round 9.
+  closed. stress-results-b.md round 9. Gate green on c0542084.
+
+## Item 6 — count first, pick the item later (22:50–23:35) · `00948893` plan, `745da6da` server, `b6b8ad2e` screens
+
+- Plan: `references/count-first-plan.md` (answers overhaul § 16.5; § 16
+  points at it). One Unassigned count per bid, reserved label nobody can
+  type, never sent, blocks a priced print; bid total wording untouched.
+- Caught by its own test: the counts list computed sendability after
+  swapping in the display name, so the holding pen read sendable — fixed.
+- Looked at laptop + phone 390 end to end (picker, "?" pins, print block,
+  bid strip, assign by name); probe marks removed from bid 1728369.
+  device:touch 84/0, client tests 1642, server suites 302. Morning Q5.

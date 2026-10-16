@@ -8,6 +8,8 @@
   merged in (`04693306`, Gate 38855439414 green); zoom at 5,000 marks
   149–166 → 33 ms a step (`0e554ad6`); first starter change at 2,006 shops
   6.2 s → 0.46 s, assembly 18.8 → 1.3 s (`3f4402e6`, `forkForOwners`).
+  "Just count, pick the item later" planned and built
+  (`count-first-plan.md`; `745da6da`, `b6b8ad2e`; morning Q5).
   Running notes: `overnight-log-b.md` third night.
 
 ## WHERE B STANDS — 2026-10-15 (second morning), 375 px TOUCH FIXED
