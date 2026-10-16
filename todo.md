@@ -1652,6 +1652,10 @@ Design: `references/homerun-footage-plan.md` § 4.
       temporary `console.log` around them) before guessing — the runner's
       MySQL 8.0 may plan `getMaterialById` differently. **Done when** the CI
       number is explained, and either fixed or written beside the limit.
+      **Next CI run (Gate 38857671207): 3 ms**, split by `[speed-detail]`
+      into 1 ms read / 1 ms write — NOT reproduced, so most likely one slow
+      moment on a shared runner. Left open to watch: if `[speed]` shows it
+      again, the detail lines now say where.
 - [x] **DONE 2026-10-15 night (Track A, on `track-a-night`), option (b):**
       `server/passwordHashing.ts` runs `bcryptjs` in up to 4 worker threads;
       `authRouter` and the starter editor's store use it. Same hashes, no new

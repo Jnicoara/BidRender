@@ -309,3 +309,14 @@ Smallest risk first; everything here is a test fixture or a todo entry.
   `GOLDEN_UPDATE_REASON`, history `changed: ["markup-extras"]`. Two owner
   questions added to `golden-bids-to-check.md` § 9 (makeup 12" at each
   end; extra on installed length, makeup after it).
+- 22:48 Gate 38856736105 **green** on `f9e80c3b` (items 5 + 6). Pushed through `dabfc76e` (bid 9, speed detail, handoff, todo); its Gate running.
+- 23:01 Final Gate 38857671207 **green** on `dabfc76e`. The
+  material save is 3 ms in CI this time (`[speed-detail]` 1 ms read /
+  1 ms write): the 221 ms did not reproduce. Burst stall 13 ms.
+
+## Run 3 end — 23:01
+
+Nothing pushed except `track-a-night` after step 1's authorised local-dev
+fast-forward. No migrations, no DB rules, no live or staging database. One
+dev server (port 3017, test DB), stopped and verified gone. MySQL 3307 left
+running.
