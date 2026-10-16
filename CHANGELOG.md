@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Typing a decimal into a quantity or percent box no longer multiplies it
+  by ten.** In the run-type editor's extra and makeup boxes, an assembly's
+  or kit's part quantities and an assembly step's count, the box redrew
+  itself after each key, so the point in "2." vanished and "2.5" saved as 25. The box now keeps what was typed.
+- **The Plans screen for a bid that no longer exists says so.** It used to
+  wait through three retries and then say the plans "could not load — try
+  again", which read as a connection problem. It now says the bid doesn't
+  exist (deleted, or a wrong link) and offers the way back to your bids.
+
 - **After uploading plans, demolition sheets are offered their tag.** When a
   sheet's title says DEMOLITION, a bar above the drawing names it and offers
   "Use these tags" (or "Not now"). A tagged sheet shows its amber "DEMO

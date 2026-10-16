@@ -396,7 +396,7 @@ import {
   type ProvisionalOutcome,
 } from "@/lib/provisionalCount";
 import { earlyTextKey, sheetsToCatchUp } from "@/lib/scaleCatchUp";
-import { plansPane } from "@/lib/plansPane";
+import { isMissingBid, plansPane, retryUnlessMissing } from "@/lib/plansPane";
 import {
   UPLOAD_PREVIEW_NOTE,
   localPlanKey,
@@ -3226,13 +3226,19 @@ export default function TakeoffPage({
   onBack: () => void;
 }) {
   const utils = trpc.useUtils();
-  const { data: bid } = trpc.bids.get.useQuery({ id: bidId });
+  const { data: bid, error: bidError } = trpc.bids.get.useQuery(
+    { id: bidId },
+    { retry: retryUnlessMissing }
+  );
   const {
     data: docs = [],
     isLoading,
     isError: docsFailed,
+    error: docsError,
     refetch: refetchDocs,
-  } = trpc.bidPdfs.list.useQuery({ bidId });
+  } = trpc.bidPdfs.list.useQuery({ bidId }, { retry: retryUnlessMissing });
+  /** The server said this bid is not there — deleted, or never was. */
+  const bidMissing = isMissingBid(bidError) || isMissingBid(docsError);
   /*
     The pane, and whether the list is KNOWN. A list that failed arrives as the
     default [], which is not "this bid has no plans": the pane must not offer
@@ -3255,6 +3261,7 @@ export default function TakeoffPage({
     isError: docsFailed,
     count: docs.length,
     previewing: uploadPreview !== null,
+    missing: bidMissing,
   });
   const docsKnown = pane === "plans" || pane === "empty";
 
@@ -4007,15 +4014,12 @@ export default function TakeoffPage({
   const tagOffer = useMemo(
     () =>
       doc && doc.id === freshSetId && !tagOfferClosed
-        ? workTagOffer(
-            sheets,
-            id => {
-              const entry = jumpList.find(j => j.sheetId === id);
-              return entry
-                ? { title: entry.title, number: entry.number }
-                : { title: sheets.find(s => s.id === id)?.name ?? "" };
-            }
-          )
+        ? workTagOffer(sheets, id => {
+            const entry = jumpList.find(j => j.sheetId === id);
+            return entry
+              ? { title: entry.title, number: entry.number }
+              : { title: sheets.find(s => s.id === id)?.name ?? "" };
+          })
         : [],
     [doc, freshSetId, tagOfferClosed, sheets, jumpList]
   );
@@ -6252,13 +6256,14 @@ export default function TakeoffPage({
       fromGroupId: number,
       to: { assembly: { id: number } } | { name: string }
     ) => {
-      const target = await ("assembly" in to
-        ? groupForAssembly.mutateAsync({ bidId, assemblyId: to.assembly.id })
-        : createGroup.mutateAsync({
-            bidId,
-            label: to.name,
-            reuseExisting: true,
-          })
+      const target = await (
+        "assembly" in to
+          ? groupForAssembly.mutateAsync({ bidId, assemblyId: to.assembly.id })
+          : createGroup.mutateAsync({
+              bidId,
+              label: to.name,
+              reuseExisting: true,
+            })
       ).catch(() => null);
       if (!target) return;
       moveStamps.mutate({ fromGroupId, groupId: target.id });
@@ -10494,7 +10499,7 @@ export default function TakeoffPage({
               header is one line and the drawing gets the rest. Same three
               actions, same handlers — no phone-only copy of what they do.
             */}
-            {phone && (
+            {phone && !bidMissing && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -10531,7 +10536,7 @@ export default function TakeoffPage({
               cost, so it must not sit behind a finished, priced bid. It stays
               outlined rather than filled because adding a plan is still the
               louder action on this screen. */}
-            {!phone && (
+            {!phone && !bidMissing && (
               <>
                 <Button
                   size="sm"
@@ -11808,6 +11813,30 @@ export default function TakeoffPage({
       {pane === "loading" ? (
         <div className="flex-1 p-6">
           <div className="h-full rounded-xl border border-border bg-card animate-pulse" />
+        </div>
+      ) : pane === "missing" ? (
+        // The server's answer, not a lost one: no "try again", which could
+        // never help, and no hint that the connection is at fault.
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div
+            role="alert"
+            className="w-full max-w-lg rounded-2xl border border-border bg-card p-10 text-center"
+          >
+            <p className="text-base font-medium">This bid doesn&apos;t exist</p>
+            <p className="text-sm text-muted-foreground mt-1.5">
+              It was deleted, or this link points at a bid that was never in
+              your company. Your connection is fine.
+            </p>
+            <Button
+              size="sm"
+              className="mt-4"
+              onClick={() => {
+                window.location.hash = "#/dashboard";
+              }}
+            >
+              Go to your bids
+            </Button>
+          </div>
         </div>
       ) : pane === "failed" ? (
         // Never the upload box: that would say this bid has no plans.

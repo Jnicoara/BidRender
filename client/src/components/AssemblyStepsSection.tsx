@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import {
   Select,
   SelectContent,
@@ -227,11 +228,10 @@ export function AssemblyStepsSection({
                     </span>
                   </span>
                   <span className="flex items-center gap-1">
-                    <Input
-                      value={String(line.count)}
-                      onChange={e => {
-                        const n = Number(e.target.value);
-                        if (Number.isFinite(n) && n > 0)
+                    <DraftNumberInput
+                      value={line.count}
+                      onValue={n => {
+                        if (n !== null && n > 0)
                           update(index, { ...line, count: n });
                       }}
                       onFocus={selectOnFocus}

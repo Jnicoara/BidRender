@@ -80,6 +80,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -1009,16 +1010,15 @@ function AssemblyBuilder({
                       aria-hidden
                       className="basis-full h-0 order-last md:hidden"
                     />
-                    <Input
-                      value={String(line.qty)}
-                      onChange={e => {
-                        const qty = Number(e.target.value);
+                    <DraftNumberInput
+                      value={line.qty}
+                      onValue={next => {
+                        // Blank is 0, as it always was here.
+                        const qty = next ?? 0;
                         setDraft(d => ({
                           ...d,
                           materials: d.materials.map((l, i) =>
-                            i === index
-                              ? { ...l, qty: Number.isNaN(qty) ? 0 : qty }
-                              : l
+                            i === index ? { ...l, qty } : l
                           ),
                         }));
                       }}

@@ -57,6 +57,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -384,15 +385,14 @@ function KitBuilder({
                     <span className="text-xs text-muted-foreground shrink-0">
                       {item.category}
                     </span>
-                    <Input
-                      value={String(item.qty)}
-                      onChange={e => {
-                        const qty = Number(e.target.value);
+                    <DraftNumberInput
+                      value={item.qty}
+                      onValue={next => {
+                        // Blank is 0, as it always was here.
+                        const qty = next ?? 0;
                         setItems(current =>
                           (current ?? []).map((it, i) =>
-                            i === index
-                              ? { ...it, qty: Number.isNaN(qty) ? 0 : qty }
-                              : it
+                            i === index ? { ...it, qty } : it
                           )
                         );
                       }}
