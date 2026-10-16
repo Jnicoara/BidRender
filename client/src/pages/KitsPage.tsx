@@ -74,6 +74,8 @@ import { money } from "@/lib/money";
 import { hoursNotSetWords } from "@/lib/notPricedTotal";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -172,6 +174,27 @@ function KitBuilder({
     );
   }
   const draftItems = items ?? [];
+
+  // Unsaved work asks before Back or a nav link throws it away
+  // (@/lib/unsavedGuard), compared as what Save would send.
+  const toSave = (
+    n: string,
+    d: string,
+    list: { assemblyId: number; qty: number | string }[]
+  ) => ({
+    name: n.trim(),
+    description: d.trim() || null,
+    items: list.map(i => [i.assemblyId, Number(i.qty)]),
+  });
+  const savedForm = isNew
+    ? toSave("", "", [])
+    : loaded && items !== null
+      ? toSave(loaded.name, loaded.description ?? "", loaded.items)
+      : null;
+  const leave = useUnsavedGuard(
+    savedForm !== null &&
+      !sameToSave(toSave(name, description, draftItems), savedForm)
+  );
 
   const refresh = useCallback(() => {
     void utils.kits.list.invalidate();
@@ -292,7 +315,7 @@ function KitBuilder({
             size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs"
-            onClick={onBack}
+            onClick={() => leave(onBack)}
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Kits
           </Button>

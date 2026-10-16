@@ -37,7 +37,9 @@ import { PageLoading } from "@/components/PageLoading";
  * Plans, Materials and More; More holds the rest.
  */
 import { useApp } from "@/contexts/AppContext";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { askToLeave, hasUnsaved } from "@/lib/unsavedGuard";
+import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
 import { useAuth } from "@/_core/hooks/useAuth";
 const loadSettingsPage = reloadingImport(() => import("@/pages/SettingsPage"));
 const SettingsPage = preloadable(loadSettingsPage, PageLoading);
@@ -344,8 +346,26 @@ export default function BidRenderShell() {
     }
   }, [navigate, previousRoute]);
 
+  /** The address the screen is showing — where a declined leave returns to. */
+  const shownHref = useRef(window.location.href);
   useEffect(() => {
     const onHashChange = () => {
+      /*
+        An editor holds unsaved work (@/lib/unsavedGuard): put the address
+        back and ask first. Discard follows the link it was asked about.
+        Back fires popstate AND hashchange; the second sees the address
+        already put back and changes nothing.
+      */
+      const href = window.location.href;
+      if (href !== shownHref.current && hasUnsaved()) {
+        const target = window.location.hash;
+        window.history.replaceState(null, "", shownHref.current);
+        askToLeave(() => {
+          window.location.hash = target;
+        });
+        return;
+      }
+      shownHref.current = href;
       const state = getCurrentRouteState();
       setRouteState(prev => {
         setPreviousRoute(prev.route);
@@ -714,6 +734,7 @@ export default function BidRenderShell() {
       className="relative flex h-dvh w-full overflow-hidden bg-background"
       style={{ zoom: uiFontScale }}
     >
+      <UnsavedChangesDialog />
       {/* ── Desktop Sidebar ─────────────────────────────────────── */}
       {/*
         ── It opens from its BUTTONS, not from anywhere over it ────────────────

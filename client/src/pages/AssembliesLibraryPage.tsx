@@ -41,6 +41,8 @@ import { componentLaborUnit, laborForAssembly } from "@shared/materialLabor";
 import { unpricedPartsIn } from "@shared/lineNotPriced";
 import { LaborRateQuickEdit } from "@/components/LaborRateQuickEdit";
 import { resolveLaborRate } from "@shared/laborRateLookup";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -765,6 +767,31 @@ function AssemblyBuilder({
     ratesLoaded && draft.laborRateId !== null && !selectedRate;
   const laborRate = selectedRate?.effectiveHourlyRate ?? 0;
 
+  /*
+    Unsaved work asks before Back or a nav link throws it away
+    (@/lib/unsavedGuard). Compared as what Save would send, with the role
+    resolved the way the effect below re-points it, so opening a recipe whose
+    role was forked is not "a change". `initial` follows the server, so a
+    saved form is clean again once the save comes back.
+  */
+  const toSave = (d: Draft) => ({
+    name: d.name.trim(),
+    category: d.category,
+    trade: d.trade,
+    projectType: d.projectType,
+    base: hoursToSave(d.baseLaborHours),
+    overhead: parseTypedNumber(d.overheadLaborHours),
+    role: resolveLaborRate(laborRates, d.laborRateId)?.id ?? d.laborRateId,
+    materials: d.materials.map(m => [m.materialId, m.qty, m.isBranchWhip]),
+    modifierIds: d.modifierIds,
+    laborOnly: d.laborOnly,
+    mountHeightTypeKey: d.mountHeightTypeKey,
+    remove: hoursToSave(d.removeLaborHours),
+    relocate: hoursToSave(d.relocateLaborHours),
+    steps: d.steps,
+  });
+  const leave = useUnsavedGuard(!sameToSave(toSave(draft), toSave(initial)));
+
   // Re-point the draft at the fork once one exists. Without this the role
   // dropdown blanks out after a quick edit — its value is an id the list no
   // longer contains — and saving would persist the superseded reference.
@@ -891,7 +918,7 @@ function AssemblyBuilder({
             size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs"
-            onClick={onCancel}
+            onClick={() => leave(onCancel)}
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Back
           </Button>

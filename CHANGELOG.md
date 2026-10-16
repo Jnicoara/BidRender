@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-16]
+
+- **Leaving the assembly or kit editor with unsaved changes now asks
+  first.** Back, a menu link, the browser's Back button or closing the tab
+  used to throw a half-built recipe away without a word. Now it asks
+  "Discard your changes?", and Keep editing leaves everything as typed.
+  An untouched or just-saved editor still leaves straight away.
+
 ## [2026-10-15]
 
 - **Fixed: after signing out, the next company to sign in on the same
