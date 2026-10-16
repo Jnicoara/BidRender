@@ -38,7 +38,13 @@ is stale or the system is not in the state you think it is.
    `pricing_defaults.profitSetAt`, `overheadSetAt`, no default; no FK),
    applied to the **staging DB after a staging backup**, code reads it
    (NULL = never set → the amber "not set" label; a Settings save stamps
-   it). B and C merge local-dev afterwards.
+   it). **Plus 0165** — B's bid methods + prevailing wage (BM-M1..M10, owner
+   2026-10-16), same staging backup, same step. B and C merge local-dev
+   afterwards. **Status 2026-10-16 evening:** B landed `230c18f5` and
+   `edcee8bc` (via `6eac3e6c`); C landed `e9dfc0ff` (via `0fc489bf`);
+   **smoke red** on local-dev since C (step-bar names collide with B's
+   selectors; tablet undo intermittent) — handed to B and C; the candidate
+   needs it green.
 4. **Candidate** = the commit staging serves after step 3. Neither B nor C
    touches `drizzle/` (checked 2026-10-16).
 
@@ -87,13 +93,21 @@ the drizzle snapshot, and tests. **Not riding:** the end-of-pricing load
 (dry run, 656 changes approved — its own release), Q-IMP1 refuse,
 the durable mark key column, the users.email UNIQUE.
 
-### Migrations: 0152–0164, all ADDITIVE (step 1 = before the push; step 3 empty)
+### Migrations: 0152–0165, all ADDITIVE (step 1 = before the push; step 3 empty)
 
-12 files 0152–0163 (no `UPDATE` in any; 22 new FKs) + 0164 (N5, two
-nullable columns, 0 FKs). **Expect "Applied 13 migrations … all 165",
-FKs 205/205.** 0156 (`bids.lockedWarnings`) and 0157–0159 (`materials`
-pack columns — read on every materials read) and 0164 (read by the bid
-screen) MUST be on live before the push.
+12 files 0152–0163 (no `UPDATE` in any; 22 new FKs) + **0164** (N5, two
+nullable `pricing_defaults` columns, 0 FKs) + **0165** (B's bid methods +
+prevailing wage, BM-M1..M10: 2 tables, 8 nullable columns, 4 FKs). **Expect
+"Applied 14 migrations … all 166", FKs 209/209** (183 → 209). 0156
+(`bids.lockedWarnings`), 0157–0159 (`materials` pack columns — read on
+every materials read), 0164 and 0165 (columns on `bids`, `labor_rates`,
+`bid_line_items`, `pricing_defaults` — read by every bare `select()` on
+them) MUST be on live before the push. Rehearsed 2026-10-16 on a restored
+copy of STAGING (`staging-2026-10-16T22-38-12Z-before-0164-0165.sql`, 87/87
+counts): 164 → 166, re-run nothing, schema "matches", FKs 209/209, 1,554
+bids 0 differ (old code vs new). The bid-methods code is inert until B
+wires it (every bid prices the old stacked way while `pricingMethod` is
+NULL).
 
 ### Owner decisions — ANSWERED 2026-10-16
 
@@ -135,8 +149,8 @@ The wording below was the question as asked.
 
 P1. Candidate's Gate green **including smoke** (B's smoke now ~13 min).
 P2. `git diff 60479773 <candidate> --stat -- drizzle` shows **exactly**
-0152–0164 `.sql`, `meta/_journal.json`, `meta/0163_snapshot.json` (and
-`meta/0164_snapshot.json` if N5's file was generated), `schema.ts`.
+0152–0165 `.sql`, `meta/_journal.json`, `meta/0163_snapshot.json`,
+`meta/0164_snapshot.json`, `meta/0165_snapshot.json`, `schema.ts`.
 Anything else: stop.
 P3. Rehearse on a FRESH restored copy of live with the candidate (as § Night
 prep P4), plus: `applyMathVersion.mts` dry run → **"0 Draft(s) to move …
@@ -150,9 +164,9 @@ differ.
 | Step | What A does                                                                                                                 | **You approve when you see**                                                                               |
 | ---- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | 1    | Freeze merges (tell B, C). Pre-flight: live `/api/version` = `60479773`; candidate = staging's commit; Gate+smoke green; P2 | **Approval A** — "pre-flight clean, candidate `<sha>`"                                                     |
-| 2    | `backup.mts` + `verifyBackup.mts KEEP_SCRATCH=1`; P3 rehearsal on THAT copy                                                 | **Approval B** — counts = manifest; 13 applied → 165, FKs 205; totals 0 differ; math "0 to move"           |
+| 2    | `backup.mts` + `verifyBackup.mts KEEP_SCRATCH=1`; P3 rehearsal on THAT copy                                                 | **Approval B** — counts = manifest; 14 applied → 166, FKs 209; totals 0 differ; math "0 to move"           |
 | 3    | Read-only on live: `schemaDrift` (152/183), `bidTotals` from a `60479773` worktree, `starterDrift` (read, kept)             | (no approval — recorded)                                                                                   |
-| 4    | `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts`                           | prints "Applied 13 … all 165"; second run nothing; drift "matches", 205/205; site still serving `60479773` |
+| 4    | `ALLOW_REMOTE_DATABASE=yes DOTENV_CONFIG_PATH=.env.production.local pnpm tsx scripts/migrate.mts`                           | prints "Applied 14 … all 166"; second run nothing; drift "matches", 209/209; site still serving `60479773` |
 | 5    | `git checkout main && git merge --ff-only <candidate> && git push origin main && git checkout local-dev`                    | **Approval C** — you say "push"; then `/api/version` commit = candidate, `builtAt` after the push          |
 | 6    | First boot: DO logs one `[seed] starter:` line (N/P/H/L as rehearsed); renamed 0, retired 0, deleted 0                      | matches the rehearsal                                                                                      |
 | 7    | `bidTotals --compare` vs step 3                                                                                             | "ok all N bid(s) unchanged"                                                                                |
