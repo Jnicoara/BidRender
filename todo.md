@@ -1626,7 +1626,16 @@ Design: `references/homerun-footage-plan.md` § 4.
       § 3, guard 3). The tap-to-place path stays as it is.
       `references/device-audit.md` § "Left to do".
 
-### Plans: a plan that cannot be opened leaves the counts panel saying "loading…" (Track B, 2026-10-16)- [ ] Only a damaged or password-protected set attached BEFORE 2026-10-16      can show it (the upload now refuses those — `probePlanFile`). The drawing      says what is wrong, but no sheet rows exist, so the sheet's mark list      never loads and the line reads "This sheet: loading…" for ever. Fix:      route PlanPane's open error up and let the panel say "This plan could      not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts` work.
+### Plans: a plan that cannot be opened leaves the counts panel saying "loading…" (Track B, 2026-10-16)
+
+- [ ] Only a damaged or password-protected set attached BEFORE 2026-10-16
+      can show it (the upload now refuses those — `probePlanFile`). The
+      drawing says what is wrong, but no sheet rows exist, so the sheet's
+      mark list never loads and the line reads "This sheet: loading…" for
+      ever. Fix: route PlanPane's open error up and let the panel say "This
+      plan could not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts`
+      work.
+
 ### Before beta: speed of the summary, and two missing Undos
 
 - [ ] **MEASURED 2026-10-16 (Track B), server side only:** `takeoffSummary.forBid` 21–46 ms, `takeoffGroups.list` 16–23 ms, on 500 sheets with 3,000 marks in 10 counts (test DB; numbers beside the code). Still open: the panel's first paint, and a set with many traced runs. Was:
