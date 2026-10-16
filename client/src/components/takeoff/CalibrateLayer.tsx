@@ -49,6 +49,7 @@ import {
   assessSpan,
   checkCalibration,
   checkHeadline,
+  scaleFromCheck,
   compareToStandardScales,
   describeErrorImpact,
   parseLengthText,
@@ -338,6 +339,34 @@ export function CalibrateLayer({
     [checkMeasuredInches, checkExpectedInches]
   );
 
+  /**
+   * The scale this DISAGREEING check says the sheet is — offered, never
+   * applied by itself (owner, 2026-10-15; references/scale-check-plan.md).
+   */
+  const offered = useMemo(
+    () => scaleFromCheck(appliedRatio, check),
+    [appliedRatio, check]
+  );
+  const [offerError, setOfferError] = useState<string | null>(null);
+  /**
+   * Take the offer: the same `onApply` as setting a scale (flash, undo, the
+   * lock refusal). The measured points stay, so the same dimension is
+   * checked again at once — and now agrees, which is the proof.
+   */
+  const takeOffered = async () => {
+    if (!offered) return;
+    setOfferError(null);
+    try {
+      await onApply(offered.text);
+    } catch (error) {
+      setOfferError(
+        error instanceof Error ? error.message : "Could not save that scale."
+      );
+      return;
+    }
+    setAppliedRatio(offered.ratio);
+  };
+
   /** Back to setting, keeping nothing — a redo is a fresh measurement. */
   const startOver = () => {
     setPhase("set");
@@ -390,10 +419,15 @@ export function CalibrateLayer({
         aria-live="polite"
       >
         <Ruler className="w-3.5 h-3.5 shrink-0 text-[#F5C518]" />
-        <span className="font-medium">{title}</span>
-        <span className="text-muted-foreground">·</span>
-        <span className="truncate">{instruction}</span>
-        {extra}
+        <span className="font-medium shrink-0">{title}</span>
+        <span className="text-muted-foreground shrink-0">·</span>
+        {/*
+          The instruction is what gives on a narrow screen; the buttons never
+          do. Without min-w-0 nothing shrank, and at 390 px "Skip the check"
+          was drawn over "Cancel" (2026-10-16).
+        */}
+        <span className="truncate min-w-0">{instruction}</span>
+        <span className="shrink-0 flex items-center">{extra}</span>
         {coarse ? (
           /*
             A finger has no Escape, so the bar carries what Escape does as a
@@ -402,7 +436,7 @@ export function CalibrateLayer({
           */
           <button
             type="button"
-            className="text-xs font-medium text-muted-foreground hover:text-foreground px-2"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground px-2 shrink-0"
             onClick={() => {
               if (points.length > 0) {
                 onPointsChange(points.slice(0, -1));
@@ -715,6 +749,30 @@ export function CalibrateLayer({
             <TriangleAlert className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           )}
           <span>{checkHeadline(check)}</span>
+        </p>
+      )}
+      {/*
+        THE FIX, OFFERED (owner, 2026-10-15): the dimension just measured
+        says what the scale is. One tap sets it; nothing sets it by itself.
+      */}
+      {offered && (
+        <Button
+          size="sm"
+          className="h-auto min-h-7 py-1 gap-1.5 text-xs w-full justify-start whitespace-normal text-left"
+          onClick={() => void takeOffered()}
+          disabled={busy}
+          title="Set this sheet to the scale this measured dimension says — you can undo it"
+        >
+          <Check className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            Use <span className="font-mono">{offered.label}</span> — what this
+            dimension says
+          </span>
+        </Button>
+      )}
+      {offerError && (
+        <p className="text-xs text-destructive" role="alert">
+          {offerError}
         </p>
       )}
       <div className="flex items-center gap-2">

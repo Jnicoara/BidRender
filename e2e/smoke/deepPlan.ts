@@ -25,6 +25,13 @@ export const DEEP = {
   traceTo: { x: 1500, y: 300 },
 } as const;
 
+/** A printed 20'-0" dimension on sheet 2: 360 pt, so 1/4" = 1'-0". */
+export const DEEP_DIMENSION = {
+  from: { x: 600, y: 1300 },
+  to: { x: 960, y: 1300 },
+  says: `20'`,
+} as const;
+
 /** 1100 pt at 1/4" = 1'-0" (18 pt per foot) is 61.11 ft. */
 export const TRACE_FEET = 1100 / 18;
 
@@ -99,6 +106,11 @@ export function deepSheets(): Sheet[] {
     text(100, 1590, 20, `SCALE: 1/4" = 1'-0"`),
     "4 w 400 300 m 1500 300 l 1500 1100 l 400 1100 l h S",
     text(2300, 100, 48, "E-202"),
+    // A printed dimension: 20'-0" over 360 pt, which is 1/4" = 1'-0".
+    `1 w ${DEEP_DIMENSION.from.x} ${DEEP_DIMENSION.from.y} m ${DEEP_DIMENSION.to.x} ${DEEP_DIMENSION.to.y} l S`,
+    `1 w ${DEEP_DIMENSION.from.x} ${DEEP_DIMENSION.from.y - 10} m ${DEEP_DIMENSION.from.x} ${DEEP_DIMENSION.from.y + 10} l S`,
+    `1 w ${DEEP_DIMENSION.to.x} ${DEEP_DIMENSION.to.y - 10} m ${DEEP_DIMENSION.to.x} ${DEEP_DIMENSION.to.y + 10} l S`,
+    text(740, 1310, 12, `20'-0"`),
   ];
   for (const p of DEEP.sheet2)
     two.push(`${p.x - HALF} ${p.y - HALF} 28 28 re f`);

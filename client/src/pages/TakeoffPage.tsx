@@ -3423,6 +3423,20 @@ export default function TakeoffPage({
    */
   const [calibrateSession, setCalibrateSession] = useState(0);
   const startCalibrating = (mode: "set" | "check") => {
+    /*
+      THE TRACE TOOL GOES DOWN FIRST. On a phone the scale chip shows only
+      while tracing, so "Check it" was always tapped with Trace armed — and
+      the taps meant for the two ends of a dimension drew a run instead
+      (found by e2e/smoke/plans.spec.ts, 2026-10-16). A run already in
+      progress is not thrown away for this: finish or discard it first.
+    */
+    if (tracing) {
+      if (tracePoints.length > 0) {
+        toast.info("Finish or discard this run first, then check the scale.");
+        return;
+      }
+      setTracing(false);
+    }
     setCalibratePoints([]);
     setCalibrateMode(mode);
     setCalibrateSession(n => n + 1);

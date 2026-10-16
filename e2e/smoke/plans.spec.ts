@@ -13,6 +13,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   DEEP,
+  DEEP_DIMENSION,
   DEEP_PAGE,
   DEEP_TEXT,
   TRACE_FEET,
@@ -448,6 +449,54 @@ test('scale may be wrong: 1/8" against a 1/4" title and 36" doors; Use it puts i
   await expect
     .poll(async () => (await sheetOn(1)).scaleText)
     .toBe(`1/4" = 1'-0"`);
+});
+
+test("scale check: a printed 20' dimension finds a wrong scale; the offer fixes it", async () => {
+  // Sheet 2 set WRONG (1/8") on purpose; its 20'-0" dimension says 1/4".
+  await goToPage(2);
+  const sheet = await sheetOn(2);
+  await trpc(
+    page.request,
+    "bidPdfs.setSheetScale",
+    { id: sheet.id, scaleText: `1/8" = 1'-0"` },
+    true
+  );
+  await page.reload();
+  await expect(canvas()).toBeVisible({ timeout: 90_000 });
+  await goToPage(2);
+  if (phone) {
+    // The phone shows the scale only while tracing.
+    await act(page.getByRole("button", { name: /More tools|Tools/ }).first());
+    await act(page.getByRole("menuitem", { name: /^Trace/ }).first());
+  }
+  await act(page.getByRole("button", { name: /^Check it$/ }).first());
+  await placeAt(DEEP_DIMENSION.from);
+  await placeAt(DEEP_DIMENSION.to);
+  await page.locator("#calibrate-check").fill(DEEP_DIMENSION.says);
+  // Warned, and offered — nothing changed yet.
+  await expect(
+    page.getByText(/Off by|too (long|short)|half|double/i).first()
+  ).toBeVisible();
+  expect((await sheetOn(2)).scaleText).toBe(`1/8" = 1'-0"`);
+  const offer = page.getByRole("button", {
+    name: /Use 1\/4" = 1'-0" — what this dimension says/,
+  });
+  await act(offer.first());
+  await expect
+    .poll(async () => {
+      const s = (await sheets()).find(x => x.pageNumber === 2) as Sheet & {
+        scaleRatio?: number | string | null;
+      };
+      return Math.round(Number(s.scaleRatio) * 1000) / 1000;
+    })
+    .toBe(48);
+  // The same dimension, checked again at the new scale: it agrees now.
+  await expect(
+    page.getByText(/Agrees — the scale checks out/).first()
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  if (phone) await page.keyboard.press("Escape");
+  await goToPage(1);
 });
 
 test("sheet cards: each page shows its number and title", async () => {

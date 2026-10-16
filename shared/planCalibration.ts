@@ -54,6 +54,7 @@
  * input, with no bias in it, which is the whole distinction.
  */
 import { POINTS_PER_INCH } from "./takeoffGeometry";
+import { describeScale } from "./planScale";
 
 const INCHES_PER_FOOT = 12;
 
@@ -458,6 +459,37 @@ export function checkCalibration(
     suspectFactor,
     message: `This sheet's scale makes that ${size}% too ${direction}.${factorNote}`,
   };
+}
+
+/**
+ * The scale a DISAGREEING check says the sheet really is (owner, 2026-10-15:
+ * "warns if the sheet scale is off … and offers to fix it";
+ * references/scale-check-plan.md).
+ *
+ * The dimension just measured already answers the question: if a printed
+ * 20' measures 10' at the scale set, the sheet is drawn at twice that ratio.
+ * So `ratio × expected ÷ measured`, named by `describeScale` — a standard
+ * name only within its 0.5% snap, because a sheet printed 3% small should be
+ * set to what it measures, not to its title. An OFFER: applied only when the
+ * estimator taps it. Null when the check agrees or there is nothing to read.
+ */
+export function scaleFromCheck(
+  currentRatio: number | null,
+  check: CalibrationCheck | null
+): { ratio: number; text: string; label: string } | null {
+  if (!check || check.agrees) return null;
+  if (
+    currentRatio === null ||
+    !Number.isFinite(currentRatio) ||
+    currentRatio <= 0
+  )
+    return null;
+  const ratio = (currentRatio * check.expectedInches) / check.measuredInches;
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  // Saved as calibration saves it — the exact ratio, `1:N` — and SHOWN by
+  // name. `describeScale`'s `1" = 4'-1"` rounds to the inch, about 1% off
+  // at this size: the very error a check exists to remove.
+  return { ratio, text: `1:${ratio.toFixed(6)}`, label: describeScale(ratio) };
 }
 
 /**

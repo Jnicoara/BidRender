@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Checking a scale against a printed dimension now offers the fix.**
+  Tap "Check it", tap the two ends of a dimension, type what it says: if
+  the sheet's scale is off by more than 2%, the card says so and offers
+  "Use 1/4" = 1'-0" — what this dimension says". One tap sets it (and can be
+  undone); the scale never changes by itself. On a phone, "Check it" used
+  to leave the trace tool armed, so the two taps drew a run instead of
+  measuring — fixed, and the check's bar no longer runs its buttons
+  together on a narrow screen.
+
 - **A password-protected or damaged plan file is refused before it
   uploads, with what to do about it.** It used to upload, attach to the bid,
   and then show "PasswordException: No password given" or "Invalid PDF

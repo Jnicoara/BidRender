@@ -44,6 +44,7 @@ test and nothing earlier.
 | 13 | Homeruns | toggle shows the arrow tagged A-1,3 | L P S (not on a phone, by design) | toggle does nothing (`HomerunsView.tsx`) | L |
 | 14 | Heights | set the job's run height 10 ft → chip "Runs at 10…" | L P S (chip not on a phone) | the save does nothing (`JobHeightsChip.tsx`) | L |
 | 15 | Scale may be wrong | 1/8" against a 1/4" title and 36" doors → "Scale may be wrong", Use it → 1/4" | L P S (chip only while tracing on a phone) | Use it does nothing (`ScaleControl.tsx`) | L |
+| 17 | Scale check (item 5) | sheet 2 set wrong (1/8"); Check it, tap the ends of its printed 20'-0", type 20': warned, scale unchanged; "Use 1/4" = 1'-0" — what this dimension says" sets ratio 48; same dimension now agrees | L P S Ph | the offer does nothing; on the phone, Check it leaving Trace armed | L; Ph |
 | 16 | Sheet cards | each page's card shows E-201 / E-202 / E-001 | L P S Ph | the card's number is blanked (`SheetIndex.tsx`) | L |
 
 **Not covered here, and why.** AI tools (Reader, ask-AI) are off locally
