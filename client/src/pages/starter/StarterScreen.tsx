@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { ExampleTags } from "@/components/ExampleTags";
 import { SearchCorrectionNote } from "@/components/SearchCorrectionNote";
 import { money, unitCost } from "@/lib/money";
+import { needsPricing } from "@shared/materialPricing";
 import { materialSearchIndex, searchMaterials } from "@/lib/materialSearch";
 import {
   STARTER_TABS,
@@ -359,12 +360,16 @@ function MaterialLine({ m, onEdit }: { m: MaterialRow; onEdit: () => void }) {
         )}
       </div>
       <div className="flex items-baseline gap-2 text-sm tabular-nums">
-        <span className={cn(m.notPriced && "text-amber-400 font-semibold")}>
-          {unitCost(m.costPerUnit)}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          / {unitLabel(m.unitOfSale)}
-        </span>
+        {m.notPriced ? (
+          <span className="text-xs text-amber-400">not priced</span>
+        ) : (
+          <>
+            <span>{unitCost(m.costPerUnit)}</span>
+            <span className="text-xs text-muted-foreground">
+              / {unitLabel(m.unitOfSale)}
+            </span>
+          </>
+        )}
         <ExampleTags
           line={{ snapshotPriceWasExample: m.isExamplePrice }}
           why={STARTER_WHY}
@@ -520,9 +525,13 @@ function AssemblyParts({
                   )}
                 </td>
                 <td className="py-1 text-right tabular-nums whitespace-nowrap">
-                  {p.costPerUnit === null
-                    ? ""
-                    : `${unitCost(p.costPerUnit)} / ${p.unitOfSale ? unitLabel(p.unitOfSale) : ""}`}
+                  {p.costPerUnit === null ? (
+                    ""
+                  ) : needsPricing(p.costPerUnit) ? (
+                    <span className="text-xs text-amber-400">not priced</span>
+                  ) : (
+                    `${unitCost(p.costPerUnit)} / ${p.unitOfSale ? unitLabel(p.unitOfSale) : ""}`
+                  )}
                 </td>
                 <td className="w-9 py-0.5 text-right">
                   {p.name !== null && (
@@ -571,17 +580,11 @@ function LaborRatesTab({
               {r.rateType === "salary" ? "salaried" : "hourly"} · {r.trade}
             </span>
             <span className="flex w-44 items-baseline justify-end gap-2 text-sm tabular-nums">
-              <span
-                className={cn(
-                  r.needsRate &&
-                    !r.isExampleRate &&
-                    "text-amber-400 font-semibold"
-                )}
-              >
-                {money(r.hourlyRate)} / h
-              </span>
-              {r.needsRate && !r.isExampleRate && (
+              {r.needsRate && !r.isExampleRate ? (
+                // Not "$0.00 / h": a rate nobody set is not a free hour.
                 <span className="text-xs text-amber-400">rate not set</span>
+              ) : (
+                <span>{money(r.hourlyRate)} / h</span>
               )}
               <ExampleTags
                 line={{ snapshotLaborRateWasExample: r.isExampleRate }}

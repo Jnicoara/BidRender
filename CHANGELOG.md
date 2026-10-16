@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **An unpriced starter item no longer shows "$0.00".** The starter editor,
+  its change log and a shop's starter Updates now say "not priced" (and
+  "rate not set" for a labor rate) instead of a dollar amount that reads as
+  free. The stored value was always the "not priced" zero; only the wording
+  was wrong.
 - **On a small phone you can now select several marks by finger.** The
   "marks selected" panel used to fill the top half of the drawing with its
   extra controls, so a second mark under it could not be tapped. With a

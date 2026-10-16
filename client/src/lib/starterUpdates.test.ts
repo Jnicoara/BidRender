@@ -10,6 +10,7 @@ import {
   formatUpdateValue,
   partSentence,
   recountWarning,
+  starterPriceText,
   updatesCardText,
 } from "./starterUpdates";
 
@@ -21,6 +22,19 @@ describe("values read as stored", () => {
     expect(formatUpdateValue("laborRates", "hourlyCost", "42.5")).toMatch(
       /42\.50 \/ h$/
     );
+  });
+
+  // Owner, 2026-10-15: after an Undo the starter editor read "$0.00" for a
+  // price nobody has set. The column stores 0 for "not priced"
+  // (shared/materialPricing.ts), and a $0.00 reads as a part that is free.
+  it("an unpriced price says 'not priced', never $0.00", () => {
+    for (const zero of ["0.0000", "0", 0, null]) {
+      expect(formatUpdateValue("materials", "costPerUnit", zero)).toBe(
+        "not priced"
+      );
+      expect(starterPriceText(zero)).toBe("not priced");
+    }
+    expect(starterPriceText("1.2300")).toMatch(/1\.23/);
   });
 
   it("a fraction is the percent people say (0.10 = 10%)", () => {

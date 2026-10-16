@@ -8,6 +8,18 @@
  * that can go red (CLAUDE.md § "A rule with no red to go to").
  */
 import { money, unitCost } from "@/lib/money";
+import { needsPricing } from "@shared/materialPricing";
+
+/**
+ * A material price as the starter screens show it. The column stores 0 for
+ * "nobody has priced this" (shared/materialPricing.ts), and "$0.00" reads as
+ * a part that costs nothing — so an unpriced one says so in words.
+ */
+export function starterPriceText(
+  costPerUnit: string | number | null | undefined
+): string {
+  return needsPricing(costPerUnit) ? "not priced" : unitCost(Number(costPerUnit));
+}
 
 export type UpdateTable =
   | "materials"
@@ -154,6 +166,7 @@ export function formatUpdateValue(
   value: unknown,
   names: Record<string, string> = {}
 ): string {
+  if (field === "costPerUnit") return starterPriceText(value as string | null);
   if (value === null || value === undefined || value === "")
     return field !== null && INHERITS[field] ? INHERITS[field] : "not set";
   if (field === null) return String(value);
@@ -161,11 +174,9 @@ export function formatUpdateValue(
     return names[String(value)] ?? "another item";
   if (typeof value === "boolean") return value ? "yes" : "no";
   if (MONEY.has(field))
-    return field === "costPerUnit"
-      ? unitCost(Number(value))
-      : field === "hourlyCost" || field === "baseWage"
-        ? `${money(Number(value))} / h`
-        : money(Number(value));
+    return field === "hourlyCost" || field === "baseWage"
+      ? `${money(Number(value))} / h`
+      : money(Number(value));
   if (HOURS.has(field)) return `${plain(value)} h`;
   // Every percent column is stored as a FRACTION (0.1000 = 10%: waste in
   // drizzle/schema.ts takeoff_run_types, the burden parts in 0134, a
