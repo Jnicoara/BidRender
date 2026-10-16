@@ -6,6 +6,13 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: Job close-out recorded empty boxes as 0 hours.** Leaving the
+  total blank recorded "the job took 0 hours", and in By assembly every
+  line left blank was recorded as taking no time, which made Performance
+  look better than the job was and could suggest cutting an assembly's
+  hours. A blank total is now refused, and By assembly asks for every line
+  by name (or use One total for a rough figure).
+
 - **Fixed: typing "15%" as your company profit saved 0%.** On Settings ›
   Pricing, a percent sign, a comma decimal or an emptied box in profit,
   overhead or productivity was saved as 0% — with "Company default saved"

@@ -21,6 +21,15 @@ brand-variants pass by design and needs nothing from you now.
   nothing moves). → **A runs a read-only list on live of companies whose
   default profit or overhead is exactly 0, for you to ask them about.**
   A 0 can be deliberate; nothing is changed automatically.
+- **Q-CLOSE1 ⚠ CHANGES PERFORMANCE NUMBERS (already saved data)** — Job
+  close-out recorded a BLANK total as 0 hours, and in "By assembly" every
+  line left blank as 0 actual hours (seen on screen). Those zeros feed
+  Performance (delivered margin reads too good) and the hour suggestions
+  ("this assembly takes less time than you think"). Fixed on track-c: a
+  blank total is refused, and By assembly needs every line ("…or use One
+  total"); `closeout-blank-line-{before,after}.png`. → **A runs a
+  read-only list on live of close-out lines at exactly 0 actual hours, for
+  you to check with those shops.** A real 0 is possible but rare.
 - **Q-QTY1 ⚠ CHANGES BID MONEY (already saved data)** — Typing a decimal
   quantity KEY BY KEY into an assembly's material box, or a kit's assembly
   box, stored it 10× or 100× too big: "1.5" saved as **15**, "2.25" as

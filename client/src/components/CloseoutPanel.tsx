@@ -34,6 +34,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { useCompany } from "@/hooks/useCompany";
 import type { CloseoutMode } from "@shared/closeout";
@@ -197,8 +198,11 @@ export function CloseoutPanel({ bidId }: { bidId: number }) {
   };
 
   const submit = () => {
+    // Read like every other number box. Number() made a BLANK total 0 hours
+    // and a blank line 0 actual hours — "the job took no time", which then
+    // fed Performance and the hour suggestions (break-it, 2026-10-15).
     if (mode === "total") {
-      const parsed = Number(total);
+      const parsed = total.trim() === "" ? NaN : parseTypedNumber(total);
       if (!Number.isFinite(parsed) || parsed < 0) {
         toast.error("Enter the hours the job took.");
         return;
@@ -212,15 +216,30 @@ export function CloseoutPanel({ bidId }: { bidId: number }) {
       return;
     }
 
-    const lines = formLines
-      .map(line => ({
-        assemblyId: line.assemblyId,
-        assemblyName: line.assemblyName,
-        qty: line.qty,
-        estimatedHours: line.estimatedHours,
-        actualHours: Number(lineHours[line.key] ?? ""),
-      }))
-      .filter(line => Number.isFinite(line.actualHours));
+    // Every line needs its hours. A blank used to be recorded as 0 ("took no
+    // time"), and skipping it instead would leave it off the close-out for
+    // good — the form is built from the recorded lines once there are any —
+    // while the comparison still set the partial actual against the whole
+    // estimate. So a blank or unreadable line is refused by name; a partial
+    // count belongs in One total.
+    const missing = formLines.find(line => {
+      const text = (lineHours[line.key] ?? "").trim();
+      const n = text === "" ? NaN : parseTypedNumber(text);
+      return !Number.isFinite(n) || n < 0;
+    });
+    if (missing) {
+      toast.error(
+        `Enter the hours for ${missing.assemblyName} — every assembly needs its hours here. For a rough total, use One total.`
+      );
+      return;
+    }
+    const lines = formLines.map(line => ({
+      assemblyId: line.assemblyId,
+      assemblyName: line.assemblyName,
+      qty: line.qty,
+      estimatedHours: line.estimatedHours,
+      actualHours: parseTypedNumber(lineHours[line.key] ?? ""),
+    }));
 
     if (lines.length === 0) {
       toast.error("Enter hours against at least one assembly.");
