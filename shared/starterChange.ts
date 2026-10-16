@@ -138,6 +138,10 @@ export const STARTER_FIELDS: Record<
       "workersCompPct",
       "insurancePct",
       "benefitsPct",
+      // 0165 (BM-M4): what an hour is CHARGED at under method A — money on
+      // every line priced that way, so a shipped value changing reaches a
+      // shop only as an offer, like hourlyCost. Ships NULL.
+      "chargeRate",
     ],
     [],
     // Hourly vs salaried changes what every amount above MEANS — a unit.
