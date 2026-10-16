@@ -6,6 +6,19 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **The sign-in cookie can no longer be used by another website.** It was
+  set so that pages on other sites could send requests carrying a signed-in
+  person’s session; now only BidRidge’s own pages, and links into it, carry
+  it. Takes effect at each person’s next sign-in. A switch for how the
+  sign-in limits recognise a sender is also ready, off until checked on live.
+
+- **The server now recovers by itself when the database comes back after a
+  network hiccup.** Before, a database that stopped answering for a while
+  could leave the app unable to read anything until it was restarted, while
+  still reporting itself as running. Now a stuck connection is thrown away
+  after 30 seconds and replaced, and a new health address says honestly
+  whether the server can reach its database.
+
 - **Labor rates keep your typing when a save fails,** the same as modifiers:
   a refused edit reopens with what you typed, and adding a role only says
   "Added" once it really is. A rate typed with a dollar sign ("$45") is now
@@ -105,6 +118,33 @@ This is the human-readable companion to the git history — read this to see wha
   second. The signed-out landing page is unchanged.
 
 ## [2026-10-14]
+
+- **Invitation-only sign-up is ready behind a switch, and the switch is
+  off.** When the owner turns it on, a new account needs an invitation: one
+  from the owner creates a new company with the seats it names, and one from
+  a company joins that company directly, with no stray empty company. Until
+  then sign-up works exactly as before. The sign-up screens that go with it
+  are not built yet.
+
+- **A safe, checked way to remove the four empty duplicate companies one
+  live sign-up was given.** It only ever removes a company with nothing in
+  it but its owner, keeps the one the person actually works in, and refuses
+  outright if anything has changed since it was last looked at. Not run on
+  live; waiting for the owner's yes on release day.
+
+- **The automatic test run costs far fewer minutes, ahead of the code going
+  private.** A push that only changes notes now runs just the checks that
+  read notes, and a version that already passed every test is not tested
+  again; nothing that could change a result is skipped. The same change
+  fixes tonight's outage, where every test run failed because the public
+  source of its database software refused to hand it over.
+
+- **A new account now gets exactly one company, even when its first screen
+  sends many requests at once.** One live sign-up had ended up owning five
+  identical companies created in the same second, which quietly gave one
+  account five sets of team seats. Sign-up now waits its turn and checks
+  again before creating anything. (Code only; not live yet. The database
+  rule that makes this impossible at the source is drafted for later.)
 
 - **BidRidge opens much faster on a phone.** The first screen used to
   download the code for every screen in the app — about 834 KB, roughly 4

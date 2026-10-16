@@ -4,7 +4,68 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## NOW — 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
+## NOW — 2026-10-15 morning, session 45: Q-DB1 + parked security, on `track-a-night`
+
+Same branch, still not on local-dev. Gate **38746107689 green** on `30e45889`.
+
+- **Q-DB1 FIXED** (`q-db1-plan.md`): a query or connection wait past 30 s
+  destroys its connection (`server/dbDeadline.ts`, pool built in
+  `server/appPool.ts`); `GET /api/health` asks the database (3 s). Drill test
+  red without it. **Owner:** point App Platform’s health check at
+  `/api/health` (§ 3).
+- **Security** (`security-parked-a.md`): A-S9b fixed (cookie `Lax`); A-S12
+  switch `CLIENT_IP_FROM` ready, unset = unchanged, needs a live header look;
+  A-S13 not done (needs R2 proof); A-S14 fixed yesterday.
+- **Q-AUTH1** in `todo.md` under the stress tests.
+- Two Gates went red on the way, both test faults now fixed (log).
+
+## (earlier) 2026-10-14 night, session 44: OVERNIGHT RUN on `track-a-night` (not local-dev)
+
+Branch `track-a-night` from `origin/local-dev` `d0152f60`; pushed only
+there. Nothing touched staging/live, no deploy, no migration outside a
+throwaway local schema. Item-by-item record: `overnight-log-a.md`; owner
+questions: `morning-questions-a.md` (5).
+
+**Gate runs on `track-a-night`:** 38683716637 RED (MySQL image pull refused
+— the outage, not the code); 38684649809 green (preinstalled MySQL);
+38685881731 green (FULL/DOCS/SEEN, mode full); 38687119248 green (item 3);
+38687906570 green (items 4–5 + second pass, mode full); the final docs-only
+push is the first real DOCS run (result in the log).
+
+**To land it:** the owner merges `track-a-night` into local-dev (fast-
+forward if local-dev has not moved: `git checkout local-dev && git merge
+--ff-only origin/track-a-night && git push origin local-dev`). No `drizzle/`
+change, so staging auto-deploys. B and C's Gates need the MySQL fix in it.
+
+- **1. Signup race FIXED in code** (`signup-race-plan.md`): per-user named
+  lock + re-check inside, `withNamedLock` in `db.ts`.
+  `personalCompanyRace.test.ts` is a normal test (12 parallel), red without
+  the lock. DB rule drafted in `references/drafts/personal-company-unique.sql`
+  (NOT in `drizzle/`), rehearsed on a throwaway schema.
+- **Gate OUTAGE fixed (on this branch only):** every track's Gate failed
+  tonight pulling MySQL from AWS's mirror ("Data limit exceeded"). Test job
+  now uses the runner's preinstalled MySQL. **B and C stay red until this
+  reaches local-dev** (owner's merge).
+- **2. Private repo** (`private-repo-plan.md`): measured ≈ 17,400 billed
+  min/month; Gate now FULL / DOCS / SEEN (+ drizzle-guard folded in) →
+  ≈ 10,000. Still ~5× the free 2,000 — **money decision in
+  `morning-questions-a.md` § 1 before the switch**, or Actions stop ≈ day 6.
+  DigitalOcean reads the repo through the GitHub app per our docs (check § 4).
+- **3. Next live release** planned (`next-live-release-plan.md` § "Night
+  prep 2026-10-14"): 0152–0163 before the push (expect 164, 205/205), boot
+  change, pack fix, signup fix, then companies 5–8 via the new
+  `scripts/removeRaceCompanies.mts` (dry run; `--apply --expect 5,6,7,8`).
+  **Blocked on owner: the boot change vs Q1** (pricing load not in seed yet).
+- **4. Invite gate, server half BUILT, OFF** (`invite-gate-plan.md` § 12 —
+  the plan itself was only on `a-plans`; now in references). Table is 0107
+  (already live). `SIGNUP_INVITE_ONLY=on` closes open signup; codes work
+  either way. UI not built. `users.email` UNIQUE drafted in
+  `references/drafts/`.
+- **5. Cleanup, measured** (`night-cleanup-2026-10-14.md`): drizzle snapshot
+  draft that makes `generate` honest again (0059–0163 hole; proved in scratch);
+  dead tables listed (11, nothing dropped); `scripts/` typecheck re-measured.
+
+## (earlier) 2026-10-14, session 43: live companies #4–#8 — a SIGNUP RACE, read-only check
 
 **Nothing on live was changed or deleted.** Read with two throwaway
 SELECT-only scripts (`START TRANSACTION READ ONLY`, deleted after use).

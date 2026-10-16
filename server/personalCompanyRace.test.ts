@@ -49,34 +49,50 @@ describeDb("personal company on a new account's first requests", () => {
   beforeEach(clear);
   afterAll(clear);
 
-  // `it.fails` ON PURPOSE, 2026-10-14: this is the bug, reproduced (8 of 8
-  // runs made 8 companies). The fix waits for the owner (track-a-handoff.md
-  // session 43); a red test on local-dev would stop every track's Gate. When
-  // the fix lands this goes RED — change it to `it` in the same commit.
-  it.fails(
-    "eight first requests at once leave ONE company and one membership",
-    async () => {
-      const user = await freshUser();
-      const scopes = await Promise.all(
-        Array.from({ length: 8 }, () => resolveScope(user))
-      );
-      const db = (await getDb())!;
-      const owned = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(eq(companies.ownerUserId, USER));
-      const memberships = await db
-        .select({ id: companyMembers.id })
-        .from(companyMembers)
-        .where(eq(companyMembers.userId, USER));
-      expect(owned).toHaveLength(1);
-      expect(memberships).toHaveLength(1);
-      // Every request was answered with that one company.
-      expect(new Set(scopes.map(s => s.companyId))).toEqual(
-        new Set([owned[0].id])
-      );
-    }
-  );
+  // Was `it.fails` until the fix (2026-10-14): without the lock, 8 of 8 runs
+  // made 8 companies. Twelve requests is more than the pool's ten
+  // connections, which is the case where a holder that needed a second
+  // connection would wait behind its own waiters (withNamedLock, db.ts).
+  it("twelve first requests at once leave ONE company and one membership", async () => {
+    const user = await freshUser();
+    const scopes = await Promise.all(
+      Array.from({ length: 12 }, () => resolveScope(user))
+    );
+    const db = (await getDb())!;
+    const owned = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.ownerUserId, USER));
+    const memberships = await db
+      .select({ id: companyMembers.id })
+      .from(companyMembers)
+      .where(eq(companyMembers.userId, USER));
+    expect(owned).toHaveLength(1);
+    expect(memberships).toHaveLength(1);
+    // Every request was answered with that one company.
+    expect(new Set(scopes.map(s => s.companyId))).toEqual(
+      new Set([owned[0].id])
+    );
+  });
+
+  it("a suspended member is still refused, never handed a new company", async () => {
+    const user = await freshUser();
+    await resolveScope(user);
+    const db = (await getDb())!;
+    await db
+      .update(companyMembers)
+      .set({ status: "suspended" })
+      .where(eq(companyMembers.userId, USER));
+    const results = await Promise.allSettled(
+      Array.from({ length: 4 }, () => resolveScope(user))
+    );
+    expect(results.every(r => r.status === "rejected")).toBe(true);
+    const owned = await db
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.ownerUserId, USER));
+    expect(owned).toHaveLength(1);
+  });
 
   it("a later request finds the company the first one made", async () => {
     const user = await freshUser();

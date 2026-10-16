@@ -67,7 +67,9 @@ describe("auth.logout", () => {
     expect(clearedCookies[0]?.options).toMatchObject({
       maxAge: -1,
       secure: true,
-      sameSite: "none",
+      // Lax since 2026-10-15 (A-S9b, server/_core/cookies.ts). Clearing still
+      // removes an older None cookie: browsers match on name and path.
+      sameSite: "lax",
       httpOnly: true,
       path: "/",
     });

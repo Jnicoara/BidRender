@@ -1,0 +1,8 @@
+# The tests that READ documentation. The Gate runs exactly these when a push
+# changes nothing but docs (*.md, references/) — see gate.yml, "DOCS".
+# server/docsOnlyGate.test.ts fails if a test that reads a .md file is
+# missing here, so a new one cannot quietly lose its docs-only run.
+server/sourceHygiene.test.ts
+server/starterAssembliesPlan.test.ts
+server/starterAssembliesSeed.test.ts
+server/docsOnlyGate.test.ts

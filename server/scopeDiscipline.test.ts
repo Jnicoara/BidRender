@@ -39,6 +39,8 @@ const ACTOR_SCOPED: Record<string, string> = {
     "First-run and checklist flags live on the user, not the company — two people in one company each dismiss their own. The checklist FACTS it reads are company-scoped; see the file.",
   "companyRouter.ts":
     "Membership administration. Acts on people by id within ctx.scope.companyId, and never uses an id to scope DATA.",
+  "signupInvitesRouter.ts":
+    "Records which platform admin made a new-company invite (createdByUserId) — authorship, never a data scope. The router is admin-only and holds no contractor data.",
 };
 
 /**
@@ -73,6 +75,8 @@ const ADMIN_ONLY: Record<string, string> = {
     "Reports AI spend across every account, so seeing it is seeing across companies. It reads only counts and money — never a prompt, a question or a reply — so there is no contractor data here to scope.",
   "seatLimitsRouter.ts":
     "Reads and sets each company's seat limit — a platform decision until billing makes it one, never a company role's. Reads counts only, no contractor data.",
+  "signupInvitesRouter.ts":
+    "New-company invites (invite-gate-plan.md § 2): only the platform admin may let a new company in (stage-4 owner answer 6). Reads invite rows only — an address, a seat count, dates — never a contractor's data.",
 };
 
 /**

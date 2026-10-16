@@ -13,6 +13,9 @@ import { createContext } from "./context";
 import { ENV } from "./env";
 import { serveStatic, setupVite } from "./vite";
 import { slowRequestLogger } from "../slowRequests";
+import { sql } from "drizzle-orm";
+import { getDb } from "../db";
+import { databaseHealth } from "../health";
 import { purgeArchivedBidsHandler } from "../scheduled/purgeArchivedBids";
 import { BACKUP_PATH, backupToR2Handler } from "../scheduled/backupToR2";
 import { PLAN_UPLOAD_PATH, planUploadHandler } from "../planUpload";
@@ -168,6 +171,21 @@ async function startServer() {
         process.env.NODE_ENV === "development" ? "development" : "production",
       now: new Date().toISOString(),
     });
+  });
+
+  // Can this server reach its database now? server/health.ts (Q-DB1). Not
+  // /api/version, which touches no database and so answered 200 from a server
+  // wedged on stuck connections.
+  app.get("/api/health", async (_req, res) => {
+    const answer = await databaseHealth(async () => {
+      const db = await getDb();
+      if (!db) throw new Error("no database");
+      await db.execute(sql`SELECT 1`);
+    });
+    res
+      .set("Cache-Control", "no-store")
+      .status(answer.status)
+      .json(answer.body);
   });
 
   // development mode uses Vite, production mode uses static files

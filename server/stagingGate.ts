@@ -35,6 +35,9 @@
  * GET /api/version stays open, so `curl` can check which build is running
  * (deploying.md § 6) without a password. It reveals a build time and a commit
  * hash, nothing about any data.
+ * GET /api/health stays open too, so a health checker (which has no
+ * password) can ask whether this server reaches its database; it answers
+ * "ok" or "unreachable" and nothing else (server/health.ts).
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import express, {
@@ -224,7 +227,11 @@ export function registerStagingGate(
   );
 
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === "GET" && req.path === "/api/version") return next();
+    if (
+      req.method === "GET" &&
+      (req.path === "/api/version" || req.path === "/api/health")
+    )
+      return next();
     if (hasValidGateCookie(req.headers.cookie, password)) {
       // The band cookie can be lost on its own — cleared by hand, or expired a
       // moment before the gate's. Then staging opens with no STAGING band,

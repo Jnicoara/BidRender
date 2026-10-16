@@ -1695,6 +1695,23 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
+- [ ] **Stress test Q-AUTH1 (Track C's sign-in burst, 2026-10-15; Track A
+      to fix): 11 sign-ins at once stall EVERY other request ~0.7 s.**
+      Measured on the production build (`references/stress-results.md` "Sign-in
+      burst", on `track-c`): 11/11 sign-ins ok at ~680 ms each; an ordinary bid
+      read went from p50 42 ms / max 73 ms to **701 ms**, and only one read got
+      through while they ran. Cause: `bcryptjs` (pure JavaScript, cost 12)
+      hashes on the main thread, and its "async" chunks do not yield enough.
+      Sign-up, change-password and reset hash too, so a burst of any of them
+      does the same. **Fix options (no stored hash changes either way — the
+      `$2a$/$2b$` format is the same):** (a) native `bcrypt` (a compiled
+      dependency — check it builds on App Platform's image, and that
+      `bcryptjs`-made hashes verify unchanged); (b) keep `bcryptjs` and run
+      `hash`/`compare` in a small `worker_threads` pool (no new dependency;
+      size it to the instance's CPUs). Prefer (b) if (a) needs build changes.
+      **Done when** the same burst leaves the bid read under ~150 ms p95, the
+      existing auth tests pass unchanged, and a hash made before the change
+      still signs in. Re-run C's burst script to measure, before and after.
 - [x] **DONE 2026-10-10 (Track B):** the remove gets the same
       "Removed circuit X." toast with Undo as every other delete
       (`notUndoableWired.test.ts`). Was:
@@ -3678,6 +3695,7 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
   - [x] **`server/takeoffBridgeFlow.test.ts` — fixed 2026-09-26, `3e8e973`.** The fork assertion read `forked!.id`, `undefined` because `assemblies.update` returns `{ assembly, forked }`, so that one assertion could never fail; it is now `expect(forked.assembly?.id).not.toBe(baselineId)`. **Correcting what was written here before:** "the test proves nothing" was too strong. Measured against an update made never to fork, the OLD test still went red — two assertions later, on a snapshot-hours mismatch (`expected 0.5 to be 1.25`), blaming the wrong thing. The new line fails at the fork itself (`expected 14391 not to be 14391`). The missing `category` was stated as `"Devices"`, which is what MySQL had been storing (measured, even under strict mode).
   - [x] **`server/permissions.test.ts` — the shipped type defect, fixed and deployed 2026-09-26, `e899092`.** The two `as unknown as [CompanyRole, …]` casts in `companyRouter.ts` are gone; `role: "owner"` is now a compile error and the `@ts-expect-error` lines are used. **Correcting the fix proposed here before:** no literal tuple was needed and `shared/permissions.ts` did not change — the cast was a zod 3 workaround, and zod 4's `z.enum` takes the already-correctly-typed filtered array. Emitted JS for the file is byte-identical, so the runtime refusal is the same code; checked live before and after the deploy (owner refused by `invalid_value` against `["admin","estimator","viewer"]`, the three normal roles invite).
   - [ ] **`tsconfig.json` sets no `target`.** Its only visible effect so far: iterating a Set, Map or `matchAll`, and top-level `await`, do not compile, so the codebase uses `Array.from(...)` (now in tests too). Deliberately not changed in passing: Vite and esbuild read `target` (it sets the default for `useDefineForClassFields`), so it can change how shipped classes compile. Decide it on purpose. **It is also what keeps `scripts/` out of `pnpm check`:** measured 2026-09-26, including all of `scripts/` reports 43 errors in 11 files, 42 of them this (39 top-level `await`, 2 iterations, 1 top-level `for await`) and 1 ordinary type error (TS2345). `migrate.mts` and `schemaDrift.mts`, both run against production during a deploy, are among them. Settle `target`, fix the one, then add `scripts/**/*` to `include`. **Scripts half DONE 2026-10-14 (Track C):** `tsconfig.scripts.json` (extends this one, adds only `target: ES2022`) is the second pass of `pnpm check`; the 63 tools compile, after fixing two real drifts (rehearseBackfill renamed fields, groundShareImpact hand-built run). The ROOT `target` (shipped code) is still undecided — this item stays open for that.
+        **Re-measured 2026-10-14 (Track A night, before Track C added `tsconfig.scripts.json` the same day, which fixed both of those scripts; `references/night-cleanup-2026-10-14.md` § 3):** the gap has grown — `scripts/` now adds **589 errors in 56 files** (564 top-level `await`, 11 iterations); with `target: ES2022` that falls to **5 real errors in 2 stale one-off scripts** (`rehearseBackfill.mts`, `groundShareImpact.mts`), and the app's own check stays at **0** with `ES2022`. The `useDefineForClassFields` question above is still the decision to make first. Measure with `--incremental false`: the shared `tsBuildInfoFile` otherwise hands one config's answer to another.
   - [x] **Flipped the exclusion — 2026-09-26.** `pnpm check` now compiles every test file (`server/**`, `client/src/**`, `scripts/**/*.test.ts`) under the same `compilerOptions`. Verified: clean on the codebase (534 files, up from 379 — the 151 tests, the 2 scripts they import, a JSON fixture and `pricing/movedFromSheet.ts`, both imported by tests); a planted error in a test fails it (exit 2, naming the line); warm run ~3.8 s → ~4.2 s, cold unchanged within noise; shipped output byte-identical once the build timestamp and the filename hashes it feeds are normalised (23/23 files, old config vs new).
 
 ## Material markup (references/material-markup.md)
