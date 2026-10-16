@@ -60,8 +60,8 @@ if (!beforeFolder) {
   );
   process.exit(1);
 }
-/** Past the guard above: the folder is given. Typed so later code can rely on it. */
-const productionFolder: string = beforeFolder;
+// Checked above; named again so the narrowing reaches the closures below.
+const beforeDir: string = beforeFolder;
 
 const SCHEMA = process.env.REHEARSE_SCHEMA ?? "bidrender_rehearsal";
 
@@ -240,6 +240,13 @@ async function main() {
         },
       } as never);
       const t = await caller.takeoffRuns.totals({ bidId: bid.id });
+      // The totals were split into BOUGHT and INSTALLED on 2026-09-29
+      // (server/runTypeFootageCore.ts). This rehearsal compares what a bid
+      // BUYS before and after a backfill, so it reads the bought figures;
+      // `wireBoughtFeet` is every conductor bought with the ground as a
+      // share of it (shared/materialsList.ts BoughtFootage) — what the old
+      // single `wireFeet` counted. Found by type-checking scripts/,
+      // 2026-10-16: the script had read three fields that no longer exist.
       out.set(bid.id, {
         conduitFeet: t.conduitBoughtFeet,
         cableFeet: t.cableBoughtFeet,
@@ -268,7 +275,7 @@ async function main() {
   };
 
   // ── 3. Bring it to production's state, then measure ───────────────────────
-  const atProduction = await applyFrom(productionFolder);
+  const atProduction = await applyFrom(beforeDir);
   console.log(
     `brought to production's state: ${atProduction.applied} migrations applied`
   );

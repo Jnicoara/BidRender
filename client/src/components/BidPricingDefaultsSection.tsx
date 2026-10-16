@@ -40,6 +40,7 @@ import {
   parseTypedPercent,
 } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { hourlyCostOf, resolveLaborRate } from "@shared/laborRateLookup";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { errorText } from "@/lib/errorText";
@@ -435,6 +436,84 @@ export function BidPricingDefaultsSection() {
           and every existing bid still set to follow it.
         </CompanyDefaultNotice>
       </div>
+
+      {/* ── Labor rate for traced runs ───────────────────────────────────── */}
+      <RunLaborRate
+        value={defaults.defaultLaborRateId ?? null}
+        onPick={id => save.mutate({ defaultLaborRateId: id })}
+      />
     </section>
+  );
+}
+
+/**
+ * Which labor role prices the hours on TRACED RUNS — the conduit, wire and
+ * fittings sent from the Plans screen (`pricing_defaults.defaultLaborRateId`).
+ * Nothing could set it before 2026-10-16, so every run line froze at $0 an
+ * hour. Unset is said in amber, with what it costs, never shown as a blank.
+ * A line freezes its rate when it is sent: picking here moves runs sent from
+ * now on, not ones already on a bid.
+ *
+ * A new company starts on the shipped Journeyman (owner, N4, 2026-10-16),
+ * tagged "Example rate" until the shop types its own. The pick is resolved
+ * through `resolveLaborRate`, as the server prices it: editing a shipped
+ * role FORKS it, and a plain `find` on the stored id then showed "Not set"
+ * while runs were priced at the fork's rate (found 2026-10-16).
+ */
+function RunLaborRate({
+  value,
+  onPick,
+}: {
+  value: number | null;
+  onPick: (id: number | null) => void;
+}) {
+  const { data: rates } = trpc.laborRates.list.useQuery();
+  const picked = resolveLaborRate(rates ?? [], value) ?? null;
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div>
+        <Label htmlFor="run-labor-rate" className="text-sm">
+          Labor rate for traced runs
+        </Label>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          The role whose hourly rate prices the hours on conduit, wire and
+          fittings you trace on the plans. It applies to runs sent from now on;
+          runs already on a bid keep the rate they were sent with.
+        </p>
+      </div>
+      <select
+        id="run-labor-rate"
+        value={picked?.id ?? ""}
+        onChange={e =>
+          onPick(e.target.value === "" ? null : Number(e.target.value))
+        }
+        className="h-8 w-full max-w-xs rounded-md border border-input bg-background px-2 text-sm"
+      >
+        <option value="">Not set</option>
+        {(rates ?? []).map(r => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+      </select>
+      {!picked ? (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Not set — the hours on traced runs are priced at $0 an hour.
+        </p>
+      ) : !(hourlyCostOf(picked) > 0) ? (
+        // Picked, but the role itself has no rate: just as $0 as unset, and
+        // it said nothing (found on screen 2026-10-16, a Journeyman at $0).
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          {picked.name} has no rate yet — the hours on traced runs are priced at
+          $0 an hour. Give it a rate in Labor rates, or pick another role.
+        </p>
+      ) : picked.isExampleRate ? (
+        <p className="text-xs text-sky-600 dark:text-sky-400">
+          Example rate ${Number(picked.hourlyCost).toFixed(2)} an hour —
+          BidRidge's number, not yours. Set {picked.name}'s rate in Labor rates,
+          or pick another role.
+        </p>
+      ) : null}
+    </div>
   );
 }

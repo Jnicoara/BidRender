@@ -16,6 +16,7 @@
  */
 import { pinCountsFor } from "../shared/pinCounts";
 import { pinStylesForBid, type PinStyle } from "../shared/pinLetters";
+import { isUnassignedCount } from "../shared/unassignedCount";
 import * as db from "./db";
 
 export async function pinStylesForBidFromDb(
@@ -34,6 +35,7 @@ export async function pinStylesForBidFromDb(
         label: g.label,
         assemblyId: g.assemblyId,
         look: { shape: g.markShape, letter: g.markLetter, color: g.markColor },
+        unassigned: isUnassignedCount(g),
       })),
       assemblies,
       symbols.map(s => ({

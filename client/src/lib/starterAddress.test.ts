@@ -38,6 +38,7 @@ describe("the tab in the address", () => {
   it("reads a known tab, and falls back to the first", () => {
     expect(starterTabFromHash("#assemblies")).toBe("assemblies");
     expect(starterTabFromHash("#/run-types")).toBe("run-types");
+    expect(starterTabFromHash("#changes")).toBe("changes");
     expect(starterTabFromHash("")).toBe("materials");
     expect(starterTabFromHash("#bids")).toBe("materials");
   });

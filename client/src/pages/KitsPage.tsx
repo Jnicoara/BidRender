@@ -56,8 +56,8 @@ import {
 } from "@/lib/libraryScope";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { Input } from "@/components/ui/input";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -443,13 +443,15 @@ function KitBuilder({
                     </span>
                     <DraftNumberInput
                       value={item.qty}
-                      onValueChange={qty =>
+                      onValue={next => {
+                        // Blank is 0, as it always was here.
+                        const qty = next ?? 0;
                         setItems(current =>
                           (current ?? []).map((it, i) =>
                             i === index ? { ...it, qty } : it
                           )
-                        )
-                      }
+                        );
+                      }}
                       className="h-7 w-20 text-sm text-right"
                       inputMode="decimal"
                       onFocus={selectOnFocus}

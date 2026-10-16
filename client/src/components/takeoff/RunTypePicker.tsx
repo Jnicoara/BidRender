@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/popover";
 import { MaterialPicker } from "@/components/MaterialPicker";
 import { selectOnFocus } from "@/lib/selectOnFocus";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { smartSearch } from "@/lib/smartSearch";
 import { matchesTradeQuery } from "@shared/tradeSizeQuery";
 import { compareBySize } from "@shared/materialSizeOrder";
@@ -296,20 +297,14 @@ function ExtraDraftField({
   max: number;
   ariaLabel: string;
 }) {
+  // The box keeps the TEXT: rebuilding it from the number dropped the point
+  // in "2." and saved "2.5" as 25 (lib/draftNumberText.ts).
   return (
     <span className="flex items-center gap-1">
-      <Input
-        value={value === null ? "" : String(value)}
-        onChange={e => {
-          const raw = e.target.value.trim();
-          if (raw === "") {
-            onChange(null);
-            return;
-          }
-          const next = Number(raw);
-          if (!Number.isFinite(next)) return;
-          onChange(Math.min(max, Math.max(0, next)));
-        }}
+      <DraftNumberInput
+        value={value}
+        onValue={onChange}
+        max={max}
         onFocus={selectOnFocus}
         inputMode="decimal"
         placeholder="company"

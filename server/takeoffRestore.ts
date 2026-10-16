@@ -43,6 +43,7 @@ import {
   type TakeoffGroup,
 } from "../drizzle/schema";
 import { getDb } from "./db";
+import { countDisplayName } from "../shared/unassignedCount";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -344,7 +345,8 @@ export async function restoreGroup(
       .limit(1);
     if (sameName)
       refuse(
-        `A count called "${snapshot.group.label}" has been started since, so this one cannot be put back beside it.`
+        // The display name: the Unassigned count's stored label is reserved.
+        `A count called "${countDisplayName(snapshot.group.label)}" has been started since, so this one cannot be put back beside it.`
       );
     try {
       await tx.insert(takeoffGroups).values(snapshot.group);

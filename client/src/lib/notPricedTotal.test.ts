@@ -20,6 +20,31 @@ import { money, moneyWhole } from "./money";
 
 const lines = (n: number) => ({ lines: n, parts: 0, hours: 0 });
 
+describe("unassigned marks: a LABEL on the total, nothing more (owner Q5, 2026-10-15)", () => {
+  const withMarks = (n: number) => ({ ...lines(0), unassigned: n });
+
+  it("the bid total says them", () => {
+    expect(notPricedSuffix(withMarks(3))).toBe("+ 3 marks unassigned");
+    expect(notPricedSuffix(withMarks(1))).toBe("+ 1 mark unassigned");
+    expect(notPricedSuffix({ ...lines(2), unassigned: 1 })).toBe(
+      "+ 2 lines not priced, 1 mark unassigned"
+    );
+    expect(bidNotPricedCount([], 0, 4).unassigned).toBe(4);
+  });
+
+  it("only the whole-bid rows: not Materials, not Labor", () => {
+    expect(notPricedSuffix(materialsShare(withMarks(3)))).toBe("");
+    expect(notPricedSuffix(laborShare(withMarks(3)))).toBe("");
+  });
+
+  it("label only: it does not count as leaving money out", () => {
+    expect(anyNotPriced(withMarks(3))).toBe(false);
+    expect(notPricedHeadline(withMarks(3)).text).toBe(
+      notPricedHeadline(lines(0)).text
+    );
+  });
+});
+
 describe("a total with unpriced lines says so", () => {
   it("adds the count to the figure", () => {
     expect(totalWithNotPriced(moneyWhole(4210), lines(4))).toBe(

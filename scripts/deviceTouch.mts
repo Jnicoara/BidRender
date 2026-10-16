@@ -110,6 +110,28 @@ async function marksOnSheet(page: Page): Promise<number> {
  * places nothing" first passed with the touch router switched OFF: the stray
  * mark was real, it just had not been sent yet.
  */
+/** For each point, the centre of the drawn mark nearest to it, as it is now. */
+async function nearestMarks(page: Page, near: Pt[]): Promise<Pt[]> {
+  const centres: Pt[] = await page
+    .locator("svg g.cursor-pointer")
+    .evaluateAll(gs =>
+      gs.map(g => {
+        const r = g.getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      })
+    );
+  return near.map(p =>
+    centres.reduce(
+      (best, c) =>
+        Math.hypot(c.x - p.x, c.y - p.y) <
+        Math.hypot(best.x - p.x, best.y - p.y)
+          ? c
+          : best,
+      centres[0] ?? p
+    )
+  );
+}
+
 async function settle(page: Page, expect?: number) {
   if (expect === undefined) {
     await page.waitForTimeout(2500);
@@ -175,7 +197,7 @@ async function runAt(size: DeviceSize) {
     );
     check(!sideways, "no sideways scroll on the plan viewer");
 
-    if (size.name === "phone") {
+    if (size.name.startsWith("phone")) {
       // The bar under the drawing opens the bottom sheet; Done closes it.
       await page
         .getByRole("button", { name: /Open the panel/ })
@@ -295,16 +317,25 @@ async function runAt(size: DeviceSize) {
       .getByRole("button", { name: new RegExp(`Counting ${label}`) })
       .tap();
     await page.waitForTimeout(300);
-    if (size.name === "phone") {
+    if (size.name.startsWith("phone")) {
       await tapButton(page, /More tools/);
       await page.getByRole("menuitem", { name: /Select several marks/ }).tap();
     } else {
       await tapButton(page, /^Select$/);
     }
     await page.waitForTimeout(300);
-    await tapAt(cdp, p1);
+    /*
+      Tap the marks where they ARE now, not where they were placed. Putting
+      the count down can move the drawing (on a phone it rose 25 px — the
+      "Counting …" line above it goes), and tapping the old points then
+      landed beside the marks: "no pill" in about half of runs, from
+      2026-10-01 onward (measured 2026-10-15, references/stress-results-b.md
+      round 6).
+    */
+    const [m1, m2] = await nearestMarks(page, [p1, p2]);
+    await tapAt(cdp, m1);
     await page.waitForTimeout(250);
-    await tapAt(cdp, p2);
+    await tapAt(cdp, m2);
     await page.waitForTimeout(400);
     const pill = await page
       .locator("text=/\\d+ marks? selected/")
@@ -337,7 +368,7 @@ async function runAt(size: DeviceSize) {
     // 7. CAPTURE: a one-finger drag draws the box (the touch router hands it
     //    to the capture layer) and the name card appears. Cancelled, so the
     //    shared legend is not touched.
-    if (size.name === "phone")
+    if (size.name.startsWith("phone"))
       await page
         .getByRole("button", { name: /Open the panel/ })
         .first()
@@ -384,7 +415,7 @@ async function runAt(size: DeviceSize) {
     await page.waitForTimeout(3500);
     const lineBefore =
       (await page.locator("text=/This sheet:/").first().textContent()) ?? "";
-    if (size.name === "phone") {
+    if (size.name.startsWith("phone")) {
       await tapButton(page, /More tools/);
       await page
         .getByRole("menuitem", { name: /^Trace/ })
@@ -456,7 +487,10 @@ for (const name of sizeNames) {
   if (!size) throw new Error(`No size called ${name}`);
   await runAt(size).catch(e => {
     failures++;
-    console.log(`  FAIL ${size.name}: ${(e as Error).message.split("\n")[0]}`);
+    // The first lines name the locator that timed out, not just "Timeout".
+    console.log(
+      `  FAIL ${size.name}: ${(e as Error).message.split("\n").slice(0, 3).join(" | ")}`
+    );
   });
 }
 console.log(

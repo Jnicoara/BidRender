@@ -45,6 +45,10 @@ export function MathChangeStrip({ bidId }: { bidId: number }) {
     void utils.takeoffGroups.list.invalidate({ bidId });
     void utils.proposals.document.invalidate({ bidId });
     void utils.quoteApp.get.invalidate({ bidId });
+    // Version 2 rewrites line rates (bids.get above carries the lines): the
+    // dashboard's totals and a line's "fix this" options move with them.
+    void utils.bids.dashboard.invalidate();
+    void utils.bids.fixLineOptions.invalidate();
   };
 
   const dismiss = trpc.bids.dismissMathChanges.useMutation({
@@ -62,6 +66,12 @@ export function MathChangeStrip({ bidId }: { bidId: number }) {
 
   const changes = state.data?.changes ?? [];
   const canUpdate = state.data?.canUpdate ?? false;
+  // The update cannot run yet (version 2 with no run rate): the reason, and
+  // no Update button — a button that can only fail is not a choice.
+  const blocked =
+    preview.data && "blocked" in preview.data ? preview.data.blocked : null;
+  const ready =
+    preview.data && !("blocked" in preview.data) ? preview.data : null;
   if (changes.length === 0 && !canUpdate) return null;
 
   return (
@@ -95,11 +105,13 @@ export function MathChangeStrip({ bidId }: { bidId: number }) {
       {canUpdate && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-2.5">
           <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">
-            {confirming && preview.data
-              ? mathUpdatePreviewSentence(preview.data, money)
-              : confirming && preview.isLoading
-                ? "Working out what would change…"
-                : "This Draft is priced by older math. Nothing changes unless you update it."}
+            {confirming && blocked
+              ? blocked
+              : confirming && ready
+                ? mathUpdatePreviewSentence(ready, money)
+                : confirming && preview.isLoading
+                  ? "Working out what would change…"
+                  : "This Draft is priced by older math. Nothing changes unless you update it."}
           </p>
           {confirming ? (
             <div className="flex shrink-0 gap-2">
@@ -109,16 +121,18 @@ export function MathChangeStrip({ bidId }: { bidId: number }) {
                 className="h-8 text-xs"
                 onClick={() => setConfirming(false)}
               >
-                Keep as is
+                {blocked ? "Close" : "Keep as is"}
               </Button>
-              <Button
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => update.mutate({ bidId })}
-                disabled={!preview.data || update.isPending}
-              >
-                {update.isPending ? "Updating…" : "Update"}
-              </Button>
+              {!blocked && (
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => update.mutate({ bidId })}
+                  disabled={!ready || update.isPending}
+                >
+                  {update.isPending ? "Updating…" : "Update"}
+                </Button>
+              )}
             </div>
           ) : (
             <Button

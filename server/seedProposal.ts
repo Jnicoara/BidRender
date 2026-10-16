@@ -105,8 +105,16 @@ export type SeedSource = {
 };
 
 /** Held, with this reason, because the tag must travel with its number. */
+/*
+  applyStarterChange DOES write the tag with its number now (Track B,
+  2026-10-14: `exampleTagAfter`, shared/starterChange.ts), so this hold can
+  be lifted where the tag the change would write equals the seed's. Lifting
+  it is `starterDrift --apply`'s call — Track A's (starter-offers-plan.md § 4
+  step 1). Until then a logged change a person made is reported live-ahead
+  BEFORE this hold is considered (`isLiveAhead`).
+*/
 const TAG_SPLIT =
-  "its Example tag would change too, and applyStarterChange cannot write the tag with the number yet (Track C)";
+  "its Example tag would change too; applyStarterChange now writes the tag with the number, but starterDrift --apply has not been switched over yet (Track A)";
 const NO_DOOR_HIDE =
   "a retire is a hide; hideStarterItem is not built yet (Track C)";
 const NO_DOOR_EXTRAS = "run-type extras are not in applyStarterChange yet";
@@ -135,6 +143,18 @@ class Collector {
    * One field that differs from the seed. Its kind decides where it goes;
    * a field a person changed on the screen and still holds is live-ahead.
    */
+  /**
+   * A person changed this field (screen, sheet, copy) and the row still holds
+   * it. Asked BEFORE any tag-split hold: since applyStarterChange writes the
+   * Example tag with its number (Track B, 2026-10-14), a logged price also
+   * moved its tag, so the tag differing from the seed is that same change,
+   * not a split.
+   */
+  isLiveAhead(table: StarterTable, rowId: number, field: string): boolean {
+    const entry = this.logged.get(`${table}|${rowId}|${field}`);
+    return Boolean(entry && entry.source !== "seed" && entry.rowHoldsNew);
+  }
+
   field(
     table: StarterTable,
     rowId: number,
@@ -144,8 +164,7 @@ class Collector {
     seed: unknown
   ) {
     if (sameStarterValue(live, seed)) return;
-    const entry = this.logged.get(`${table}|${rowId}|${field}`);
-    if (entry && entry.source !== "seed" && entry.rowHoldsNew) {
+    if (this.isLiveAhead(table, rowId, field)) {
       this.liveAhead.push({ row, field, live, seed });
       return;
     }
@@ -311,9 +330,10 @@ async function materialDiff(
       const seed = seedValue[field];
       if (sameStarterValue(n(live), n(seed))) continue;
       const splits =
-        (field === "costPerUnit" && priceTagSplits) ||
-        ((field === "laborHours" || field === "fieldBendLaborHours") &&
-          hoursTagSplits);
+        !c.isLiveAhead("materials", row.id, field) &&
+        ((field === "costPerUnit" && priceTagSplits) ||
+          ((field === "laborHours" || field === "fieldBendLaborHours") &&
+            hoursTagSplits));
       if (splits) {
         c.hold(label, `${field} ${String(live)} -> ${String(seed)}`, TAG_SPLIT);
         continue;
@@ -419,8 +439,18 @@ async function laborRateDiff(c: Collector) {
           ]
       ),
     ];
-    const differing = diffs.filter(d => d[3]);
-    if (tagSplits) {
+    // A field a person changed and still holds is live-ahead, tag and all.
+    for (const d of diffs.filter(
+      d => d[3] && c.isLiveAhead("laborRates", row.id, d[0])
+    ))
+      c.field("laborRates", row.id, label, d[0], d[1], d[2] ?? null);
+    const differing = diffs.filter(
+      d => d[3] && !c.isLiveAhead("laborRates", row.id, d[0])
+    );
+    const aheadOnly =
+      differing.length === 0 &&
+      diffs.some(d => d[3] && c.isLiveAhead("laborRates", row.id, d[0]));
+    if (tagSplits && !aheadOnly) {
       c.hold(
         label,
         [
@@ -565,7 +595,10 @@ function hoursWithTag(
       );
     return;
   }
-  if (row.isExampleHours !== true) {
+  if (
+    row.isExampleHours !== true &&
+    !c.isLiveAhead("assemblies", row.id, field)
+  ) {
     c.hold(
       label,
       `${field} ${String(row[field])} -> ${String(seed)}`,

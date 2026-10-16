@@ -3,6 +3,56 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Smoke takes 13 min, was 6.3 — how to get it back near 6 without dropping a test (Track B, 2026-10-16, NOT done)
+
+**Measured 2026-10-16**, full local smoke on track-b after merging local-dev
+`cff5a50b` (`pnpm smoke --reporter=dot,json`, dev server on 127.0.0.1:3002,
+one worker): **222 passed / 6 skipped, 13.2 min wall.** Per file, summed test
+time:
+
+| File         | Min  | Projects         | New?       |
+| ------------ | ---- | ---------------- | ---------- |
+| screens.spec | 3.63 | 4                | no         |
+| marks.spec   | 3.14 | 4 (≈46 s each)   | 2026-10-16 |
+| plans.spec   | 1.74 | 4 (22–35 s each) | 2026-10-16 |
+| flow.spec    | 1.44 | desktop          | no         |
+| touch.spec   | 1.24 | 2 tablets        | no         |
+| pdfs.spec    | 0.82 | desktop          | 2026-10-16 |
+| demo.spec    | 0.24 | desktop + phone  | 2026-10-16 |
+
+**Nothing old got slower.** screens + flow + touch = 6.3 min, the old total.
+The doubling is the four files added on 2026-10-16: **5.9 min.** The slowest
+single tests are old (touch 37 s per tablet; flow 7 at 27 s, flow 9 at 24 s).
+Fixed waits (`waitForTimeout`) are not the cost: there are few, and short.
+If these numbers do not match a later run, find out why before acting on
+this list. The suite or the machine has changed.
+
+**Ways to cut it, all keeping every test at every size, biggest first:**
+
+1. **Two or three workers, one smoke account each.** `workers: 1` exists
+   because every spec shares one account: `sweepLeftovers` deletes every
+   "CI smoke" bid and every "CI " symbol, so a second worker would delete
+   the first one's bid mid-test. Give each worker its own account (a
+   per-worker login in `auth.setup.ts`, `SMOKE_EMAIL_2`/`_3` on staging),
+   and the sweep and symbols stop colliding. The work is browser-side and
+   the server is staging, so 2 workers should be about 6.5–7 min and 3
+   about 4.5–5. _Estimate, not measured._ Needs A: staging accounts and Gate
+   secrets.
+2. **One uploaded plan per project, shared.** Each file creates its own
+   throwaway bid and uploads a fixture in `beforeAll` (marks, plans, demo,
+   screens, flow, touch), once per project it runs in.
+   A per-project fixture bid, reset between files by deleting marks rather
+   than re-uploading, would save the upload and first sheet render each
+   time. Smaller than 1. Measure one setup before deciding.
+3. **Order the long, size-free work to run alongside the short.** With
+   workers > 1, put touch (37 s × 2) and flow (86 s) in different workers
+   from screens, so the slowest file is not last on its own.
+
+**Not on this list on purpose:** running the size-free marks checks
+(reload, offline, lost answer, second session) at one size instead of four
+would save about 2 min. That drops runs the owner asked for at four sizes,
+so it is the owner's call, not a speed fix.
+
 ## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
 
 - [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
@@ -1742,16 +1792,34 @@ Design: `references/homerun-footage-plan.md` § 4.
       § 3, guard 3). The tap-to-place path stays as it is.
       `references/device-audit.md` § "Left to do".
 
+### Plans: a plan that cannot be opened leaves the counts panel saying "loading…" (Track B, 2026-10-16)
+
+- [ ] Only a damaged or password-protected set attached BEFORE 2026-10-16
+      can show it (the upload now refuses those — `probePlanFile`). The
+      drawing says what is wrong, but no sheet rows exist, so the sheet's
+      mark list never loads and the line reads "This sheet: loading…" for
+      ever. Fix: route PlanPane's open error up and let the panel say "This
+      plan could not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts`
+      work.
+
 ### Before beta: speed of the summary, and two missing Undos
 
-- [ ] **Owner, 2026-09-30: measure the whole-plan-set summary on a 500-sheet
+- [ ] **MEASURED 2026-10-16 (Track B), server side only:** `takeoffSummary.forBid` 21–46 ms, `takeoffGroups.list` 16–23 ms, on 500 sheets with 3,000 marks in 10 counts (test DB; numbers beside the code). Still open: the panel's first paint, and a set with many traced runs. Was:
+      **Owner, 2026-09-30: measure the whole-plan-set summary on a 500-sheet
       set.** `takeoffSummary.forBid` runs `takeoffGroups.list` and
       `takeoffRunTypes.bridgeForBid` for the whole bid on every refresh, and
       `sendAll` rebuilds it again before sending. It has only been looked at on
       a scratch bid with 7 items. Time it (server ms and the panel's first
       paint) on a real 500-sheet set with marks and runs spread across it, and
       write the numbers next to the code. No number is claimed here yet.
-- [ ] **Stress test (B, 2026-10-10): time the DASHBOARD for a company with
+- [ ] **MEASURED 2026-10-15 (Track B), not fixed:** `bids.dashboard`
+      ~240 / ~440 / ~840 ms at 50 / 100 / 200 marked bids (test DB, server
+      ms, one count of 3 marks per bid) — ~4.2 ms per marked bid, linear,
+      in `db.dropsNotPricedForBids` (numbers next to it). Fix when a real
+      company nears 100 marked live bids: load heights, runs and scales for
+      all bids in one pass. Not a `dropKind` pre-filter — a count's drop
+      type can come from its assembly. Card first paint not measured.
+      Was: **Stress test (B, 2026-10-10): time the DASHBOARD for a company with
       50+ bids that have marks.** Since "N drops not priced" reached the
       lists (`db.dropsNotPricedForBids`), every bid card with a mark loads
       that bid's takeoff on each read (4 bids at a time). Only looked at on a
@@ -1759,6 +1827,23 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
+- [ ] **Durable "a mark is placed once per key" (Track A, 2026-10-16) —
+      WRONG-NUMBER RISK, partly closed.** A batch of marks resent after a lost
+      answer counted twice. Closed in memory on `track-a-night`
+      (`server/markReplay.ts`: `takeoffStamps.drop` `keys`, a day, one
+      server) — once Track B's one line sends the keys
+      (`track-b-handoff.md`). Still open across a restart or a second
+      instance. **Durable fix:** `takeoff_stamps.clientKey VARCHAR(64) NULL` + UNIQUE (`bidId`, `clientKey`) — ADDITIVE, NULL for every existing
+      row — then `drop` inserts with `INSERT … ON DUPLICATE KEY` semantics
+      and reads the ids back. **Done when** `markReplay.test.ts` passes with
+      the in-memory map cleared between the two sends.
+- [ ] **Dashboard time grows with the number of bids (Track A, 2026-10-16,
+      measured).** `server/speedBigData.test.ts` (`SPEED_BIG_DATA=1`): 61
+      bids → `bids.dashboard` + `archived` median **493 ms**; 1 bid → 39 ms
+      in the Gate. About 8 ms a bid, so ≈ 2 s near 250 bids for one company.
+      Fine today. **Done when** the dashboard pages or sums in SQL, and the
+      big-data run at 250 bids stays under 1 s (raise the fixture's bid
+      count in that test to prove it).
 - [ ] **Speed limit outlier (Track A, 2026-10-15 night): pricing a material
       takes 221 ms in CI against 6 ms on a laptop** — every other save is
       2–14 ms in CI (`server/speedLimits.test.ts`, Gate 38855631644, lines

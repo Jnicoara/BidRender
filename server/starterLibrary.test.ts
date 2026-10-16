@@ -16,13 +16,20 @@
  * starter editors made per run, `starter-lib-test-*@example.com`.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, isNull, like } from "drizzle-orm";
+import { and, eq, inArray, isNull, like } from "drizzle-orm";
 import { COOKIE_NAME } from "@shared/const";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
-import { assemblies, materials, users } from "../drizzle/schema";
+import {
+  assemblies,
+  companies,
+  laborRates,
+  materials,
+  starterChangeBatches,
+  users,
+} from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { createStarterEditor } from "./starterEditor/store";
 import { STARTER_COOKIE, signStarterToken } from "./starterEditor/session";
@@ -189,6 +196,200 @@ withDb("the baseline screen's reads", () => {
     if (first) {
       const one = await api.starterLibrary.assembly({ id: first.id });
       expect(one.id).toBe(first.id);
+    }
+  });
+
+  it("previewEdit's counts are what applyEdit does; the log shows it; undo puts it back (plan test 14)", async () => {
+    const api = caller(await starterCookie("done"));
+    const db = (await getDb())!;
+    const [probe] = await db
+      .insert(materials)
+      .values({
+        name: `starter-lib-test preview probe ${Date.now()}`,
+        unitOfSale: "each",
+        costPerUnit: "2.0000",
+        category: "Receptacles",
+        trade: "electrical",
+      })
+      .$returningId();
+    const batchIds: number[] = [];
+    try {
+      const edit = {
+        kind: "field" as const,
+        table: "materials" as const,
+        rowId: probe.id,
+        field: "costPerUnit",
+        newValue: "2.5",
+      };
+      // One shop already priced it itself: not pinned, but offered.
+      const [someShop] = await db
+        .select({ owner: companies.ownerUserId })
+        .from(companies)
+        .limit(1);
+      await db.insert(materials).values({
+        userId: someShop.owner,
+        baselineId: probe.id,
+        name: `starter-lib-test preview probe copy`,
+        unitOfSale: "each",
+        costPerUnit: "9.0000",
+      });
+      const companiesNow = (
+        await db.select({ id: companies.id }).from(companies)
+      ).length;
+      const preview = await api.starterLibrary.previewEdit(edit);
+      expect(preview.reach).toBe("offer");
+      expect(preview.pins).toBe(companiesNow - 1);
+      expect(preview.offered).toBe(preview.pins + 1);
+      expect(preview.newValue).toBe("2.5000");
+      // The preview wrote nothing: the row as it was, and no fork beyond the
+      // one made by hand above (a preview counts pins, it makes none).
+      const [still] = await db
+        .select()
+        .from(materials)
+        .where(eq(materials.id, probe.id));
+      expect(still.costPerUnit).toBe("2.0000");
+      expect(
+        await db
+          .select({ id: materials.id })
+          .from(materials)
+          .where(eq(materials.baselineId, probe.id))
+      ).toHaveLength(1); // only the copy made by hand above
+
+      const applied = await api.starterLibrary.applyEdit(edit);
+      batchIds.push(applied.batchId!);
+      expect(applied.applied[0].pins).toBe(preview.pins);
+
+      // A finding field reaches everyone and pins nobody.
+      const words = await api.starterLibrary.previewEdit({
+        ...edit,
+        field: "searchAliases",
+        newValue: "probe words",
+      });
+      expect(words).toMatchObject({ reach: "everyone", pins: 0 });
+
+      // A unit is refused with the reason, not a 500.
+      expect(
+        await codeOf(
+          api.starterLibrary.previewEdit({
+            ...edit,
+            field: "unitOfSale",
+            newValue: "foot",
+          })
+        )
+      ).toBe("BAD_REQUEST");
+
+      const log = await api.starterLibrary.changeLog({
+        limit: 10,
+        includeSeed: false,
+      });
+      const entry = log.find(b => b.batchId === applied.batchId)!;
+      expect(entry.editorName).toBe("Starter lib test");
+      expect(entry.changes[0]).toMatchObject({
+        table: "materials",
+        field: "costPerUnit",
+        oldValue: "2.0000",
+        newValue: "2.5000",
+        pins: preview.pins,
+        undoneByChangeId: null,
+      });
+
+      const undoPreview = await api.starterLibrary.undoBatch({
+        batchId: applied.batchId!,
+        preview: true,
+      });
+      expect(undoPreview.undoable).toEqual([entry.changes[0].changeId]);
+      const undone = await api.starterLibrary.undoBatch({
+        batchId: applied.batchId!,
+        preview: false,
+      });
+      batchIds.push(undone.result!.batchId!);
+      const [back] = await db
+        .select()
+        .from(materials)
+        .where(eq(materials.id, probe.id));
+      expect(back.costPerUnit).toBe("2.0000");
+      const after = await api.starterLibrary.changeLog({
+        limit: 10,
+        includeSeed: false,
+      });
+      expect(
+        after.find(b => b.batchId === applied.batchId)!.changes[0]
+          .undoneByChangeId
+      ).not.toBeNull();
+    } finally {
+      if (batchIds.length)
+        await db
+          .delete(starterChangeBatches)
+          .where(inArray(starterChangeBatches.id, batchIds));
+      await db.delete(materials).where(eq(materials.baselineId, probe.id));
+      await db.delete(materials).where(eq(materials.id, probe.id));
+    }
+  });
+
+  it("a rate edit writes the wage AND the rate it makes, as one batch", async () => {
+    const api = caller(await starterCookie("done"));
+    const db = (await getDb())!;
+    const [probe] = await db
+      .insert(laborRates)
+      .values({
+        name: `starter-lib-test rate probe ${Date.now()}`,
+        rateType: "hourly",
+        hourlyCost: "56.4000",
+        baseWage: "40.0000",
+        payrollTaxPct: "0.1000",
+        workersCompPct: "0.0700",
+        insurancePct: "0.0400",
+        benefitsPct: "0.2000",
+        isExampleRate: true,
+      })
+      .$returningId();
+    const batchIds: number[] = [];
+    try {
+      const preview = await api.starterLibrary.rateEdit({
+        rowId: probe.id,
+        field: "baseWage",
+        value: 45,
+        preview: true,
+      });
+      expect(preview.preview!.lines.map(l => [l.field, l.newValue])).toEqual([
+        ["baseWage", "45.0000"],
+        ["hourlyCost", "63.4500"],
+      ]);
+      // Typing the rate itself is refused on a broken-down rate.
+      expect(
+        await codeOf(
+          api.starterLibrary.rateEdit({
+            rowId: probe.id,
+            field: "hourlyCost",
+            value: 70,
+            preview: true,
+          })
+        )
+      ).toBe("BAD_REQUEST");
+      const saved = await api.starterLibrary.rateEdit({
+        rowId: probe.id,
+        field: "baseWage",
+        value: 45,
+        preview: false,
+      });
+      batchIds.push(saved.applied!.batchId!);
+      expect(saved.applied!.applied).toHaveLength(2);
+      const [row] = await db
+        .select()
+        .from(laborRates)
+        .where(eq(laborRates.id, probe.id));
+      expect([row.baseWage, row.hourlyCost, row.isExampleRate]).toEqual([
+        "45.0000",
+        "63.4500",
+        true,
+      ]);
+    } finally {
+      if (batchIds.length)
+        await db
+          .delete(starterChangeBatches)
+          .where(inArray(starterChangeBatches.id, batchIds));
+      await db.delete(laborRates).where(eq(laborRates.baselineId, probe.id));
+      await db.delete(laborRates).where(eq(laborRates.id, probe.id));
     }
   });
 

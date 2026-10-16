@@ -122,6 +122,13 @@ warning above and its one-count fix.
 
 ### a. Sheet tags on upload
 
+> **The upload offer was BUILT 2026-10-16 (Track B, owner item 6):** a one-line
+> bar on a set uploaded in this tab, naming the sheets whose title suggests
+> a tag, with "Use these tags" / "Not now" (`client/src/lib/workTagOffer.ts`,
+> `e2e/smoke/demo.spec.ts`). Suggestions come only from DEMOLITION / DEMO
+> titles (`suggestedWorkTag`), so an ordinary set sees nothing. The row
+> menu, the banner and the status strip shipped earlier.
+
 - After an upload, the sheet list offers a tag per sheet: **Demo / New work
   / Both**, pre-filled as a SUGGESTION from the title ("DEMOLITION" → Demo,
   using `sheetTitleBlock`'s existing words) and from CAD layers. The

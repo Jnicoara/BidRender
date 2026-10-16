@@ -65,13 +65,14 @@ export default defineConfig({
     {
       name: "desktop",
       dependencies: ["setup"],
-      testMatch: /(flow|screens|version|newScreens|guide)\.spec\.ts/,
+      testMatch:
+        /(flow|screens|version|plans|marks|pdfs|demo|newScreens|guide)\.spec\.ts/,
       use: { viewport: { width: 1440, height: 900 } },
     },
     {
       name: "phone",
       dependencies: ["setup"],
-      testMatch: /screens\.spec\.ts/,
+      testMatch: /(screens|plans|marks|demo)\.spec\.ts/,
       use: { viewport: { width: 390, height: 844 }, ...touch },
     },
     {
@@ -88,13 +89,13 @@ export default defineConfig({
     {
       name: "tablet-portrait",
       dependencies: ["setup"],
-      testMatch: /(screens|touch|newScreens|guide)\.spec\.ts/,
+      testMatch: /(screens|touch|plans|marks|newScreens|guide)\.spec\.ts/,
       use: { viewport: { width: 820, height: 1180 }, ...touch },
     },
     {
       name: "tablet-landscape",
       dependencies: ["setup"],
-      testMatch: /(screens|touch|newScreens|guide)\.spec\.ts/,
+      testMatch: /(screens|touch|plans|marks|newScreens|guide)\.spec\.ts/,
       use: { viewport: { width: 1180, height: 820 }, ...touch },
     },
   ],

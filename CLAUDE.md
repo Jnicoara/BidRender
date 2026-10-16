@@ -362,18 +362,16 @@ compiling, the change broke a fixture's contract with the code, which is
 exactly what the gate is for. Fix the fixture honestly — CLAUDE.md's rules
 against weakening an assertion apply to types too.
 
-**`scripts/` is covered too, since 2026-10-14** — by a second pass,
-`tsc -p tsconfig.scripts.json`, which `pnpm check` runs after the first. It
-extends `tsconfig.json` and adds only `target: ES2022`, which the tools need
-(top-level `await`, iteration); the root config, which Vite and esbuild
-read for SHIPPED code, still sets no `target`, so nothing that ships compiles
-differently (`todo.md` keeps that decision open). Turning it on found two
-real faults hidden since the fields were renamed: `rehearseBackfill.mts`
-read `conduitFeet`/`cableFeet`/`wireFeet` (renamed `…BoughtFeet` on
-2026-09-29, so it would have compared `undefined` with `undefined`), and
-`groundShareImpact.mts` built a run by hand that dropped `typedLengthInches`.
-Until then (measured 2026-09-26) the 63 `.mts` tools, `migrate.mts` and
-`schemaDrift.mts` among them, were checked by nothing.
+**`scripts/` and `pricing/` tools are covered too, since 2026-10-16**, by a
+second config (`tsconfig.scripts.json`, target ES2022 for top-level `await`)
+that `pnpm check` runs after the main one. Turning it on found three real
+faults, all fixed: `rehearseBackfill.mts` read three totals fields renamed
+on 2026-09-29, `groundShareImpact.mts` hand-built a run without its typed
+length, and the pricing-sheet builder left brand rows' Type column
+undefined. The main `tsconfig.json` target is still its own decision
+(`todo.md`); the second file exists so that decision does not block this.
+Until 2026-10-16 this paragraph said these tools were NOT covered (43 errors
+measured 2026-09-26, mostly the missing target).
 
 **Measuring the wrong thing looks exactly like measuring.** The first attempt to
 check the re-run behaviour ran the file once against a database that had two

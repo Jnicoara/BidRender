@@ -37,6 +37,8 @@ export function pinCountsFor(
     label: string;
     assemblyId: number | null;
     look?: PinLook | null;
+    /** The bid's Unassigned count: its pins wear "?" (count-first-plan.md). */
+    unassigned?: boolean;
   }[],
   assemblies: readonly ({
     id: number;
@@ -71,6 +73,7 @@ export function pinCountsFor(
     return {
       id: g.id,
       label: g.label,
+      unassigned: g.unassigned === true,
       assemblyName: assembly?.name ?? null,
       assemblyCategory: assembly?.category ?? null,
       chosen: {

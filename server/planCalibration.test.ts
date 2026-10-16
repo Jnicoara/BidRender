@@ -9,9 +9,11 @@
 import { describe, it, expect } from "vitest";
 import {
   assessSpan,
+  checkCalibration,
   compareToStandardScales,
   parseLengthText,
   ratioFromCalibration,
+  scaleFromCheck,
 } from "../shared/planCalibration";
 import { COMMON_SCALES, parseScaleText } from "../shared/planScale";
 import { POINTS_PER_INCH } from "../shared/takeoffGeometry";
@@ -281,5 +283,32 @@ describe("the error the span warning is warning about", () => {
     expect(a.quality).toBe("short");
     const feetWrongOn200 = (a.errorPercent / 100) * 200;
     expect(feetWrongOn200).toBeGreaterThan(5);
+  });
+});
+
+describe("scaleFromCheck: the scale a measured dimension says (owner, 2026-10-15)", () => {
+  // 1/4" = 1'-0" is a ratio of 48; 1/8" = 1'-0" is 96.
+  it("a dimension that reads half its printed size says the scale is double", () => {
+    // Set at 1/4", a printed 20' dimension measures 10' → the sheet is 1/8".
+    const check = checkCalibration(10 * 12, 20 * 12)!;
+    expect(check.agrees).toBe(false);
+    const s = scaleFromCheck(48, check)!;
+    expect(s.ratio).toBeCloseTo(96, 6);
+    expect(s.label).toBe(`1/8" = 1'-0"`);
+    // And the text is one the scale route reads back to the same ratio.
+    expect(parseScaleText(s.text)?.ratio).toBeCloseTo(96, 6);
+  });
+
+  it("a sheet printed 3% small is set to what it measures, not snapped to the title's", () => {
+    const check = checkCalibration(20 * 12 * 0.97, 20 * 12)!;
+    const s = scaleFromCheck(48, check)!;
+    expect(s.label).not.toBe(`1/4" = 1'-0"`);
+    expect(parseScaleText(s.text)?.ratio).toBeCloseTo(48 / 0.97, 4);
+  });
+
+  it("offers nothing when the check agrees, or cannot be read", () => {
+    expect(scaleFromCheck(48, checkCalibration(240, 241)!)).toBeNull();
+    expect(scaleFromCheck(null, checkCalibration(120, 240)!)).toBeNull();
+    expect(scaleFromCheck(48, null)).toBeNull();
   });
 });

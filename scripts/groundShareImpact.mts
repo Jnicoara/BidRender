@@ -106,9 +106,9 @@ for (const run of conduitRuns) {
       })
     : ({ ok: false, reason: "no-scale", message: "" } as const);
   const flatFeet = measurability.ok
-    ? // From the ROW (tracedRunOf), so a typed length is honoured like the
-      // app honours it — the hand-built object here dropped it once the
-      // field was added, which only a typecheck of scripts/ could see.
+    ? // The row, not hand-picked fields: a hand-built run dropped the typed
+      // length, so a run with a length typed in measured its points instead
+      // (found type-checking scripts/, 2026-10-16).
       runFeet(tracedRunOf(run), measurability.ratio)
     : null;
 

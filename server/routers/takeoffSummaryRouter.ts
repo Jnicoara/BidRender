@@ -107,7 +107,14 @@ function describe(item: SummaryItem): string {
 }
 
 export const takeoffSummaryRouter = router({
-  /** Everything on the plan set, sorted into on the bid / not yet, with why. */
+  /**
+   * Everything on the plan set, sorted into on the bid / not yet, with why.
+   *
+   * MEASURED (Track B, 2026-10-16, test DB): 21–46 ms server time on a bid
+   * with 500 sheets, 3,000 marks in 10 counts on 60 of them, no runs. The
+   * panel's first paint was not measured, and a set with many traced runs
+   * (the run-type bridge) was not either.
+   */
   forBid: procedure
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(({ input, ctx }) =>

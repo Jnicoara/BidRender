@@ -74,3 +74,61 @@ export const EXAMPLE_WAGES: Readonly<Record<string, number>> = {
   Apprentice: 26,
   Helper: 24,
 };
+
+// ─── A starter rate edit: the part AND the rate it makes, together ───────────
+
+export const RATE_PARTS = [
+  "baseWage",
+  "payrollTaxPct",
+  "workersCompPct",
+  "insurancePct",
+  "benefitsPct",
+] as const;
+export type RatePart = (typeof RATE_PARTS)[number];
+
+/**
+ * The fields ONE edit to a shipped labor rate must write, in one batch
+ * (references/starter-offers-plan.md; Track B 2026-10-15):
+ *
+ *   broken down  a part changes, and `hourlyCost` is re-made from the parts
+ *                by `loadedRate` — the same arithmetic the company's own
+ *                editor uses. Typing the rate itself is refused: it would
+ *                leave the rate disagreeing with its own breakdown.
+ *   not broken   the hourly rate itself.
+ *   salaried     the salary or the hours a year (the hourly figure is
+ *                derived on read, `hourlyCostOf`).
+ *
+ * Values arrive as the server stores them: parts as FRACTIONS (0.10 = 10%).
+ */
+export function rateEditFields(
+  row: StoredParts & { rateType: string },
+  field: string,
+  value: number
+): Array<{ field: string; value: string | number }> | { refused: string } {
+  if (!Number.isFinite(value) || value < 0)
+    return { refused: "Must be a number of 0 or more." };
+  if (row.rateType === "salary") {
+    if (field === "annualSalary" || field === "annualHours")
+      return [{ field, value }];
+    return { refused: "A salaried role changes by its salary or its hours." };
+  }
+  const parts = readParts(row);
+  if (parts) {
+    if (!(RATE_PARTS as readonly string[]).includes(field))
+      return {
+        refused:
+          "This rate is its wage plus burden. Change the wage or a burden part; the rate follows.",
+      };
+    if (field === "baseWage" && value <= 0)
+      return { refused: "The wage must be above 0." };
+    const next = { ...parts, [field]: value } as LoadedParts;
+    return [
+      { field, value },
+      { field: "hourlyCost", value: loadedRate(next).toFixed(4) },
+    ];
+  }
+  if (field === "hourlyCost") return [{ field, value }];
+  return {
+    refused: "This rate isn't broken into wage and burden; change the rate.",
+  };
+}

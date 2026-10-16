@@ -3,11 +3,12 @@
  * builds the screen). What the shipped starter holds today: materials,
  * assemblies with their parts, labor rates and run types.
  *
- * ── Read only, on purpose, until the change log exists ──────────────────────
- * Every starter change must be pinned, logged and offered (§ 2, § 4), and the
- * tables for that are BS-M3 to BS-M6, not applied yet. A write here before
- * them would be a change no company is protected from and nobody can undo.
- * `references/track-b-handoff.md` lists what waits on them.
+ * ── Writes go through applyStarterChange, and nothing else ──────────────────
+ * Every starter change must be pinned, logged and offered (§ 2, § 4). The
+ * write routes (`previewEdit`, `applyEdit`, `undoBatch`; Track B 2026-10-14,
+ * starter-offers-plan.md § 4 steps 3–4) call `server/starterChanges.ts` and
+ * never write a shared row themselves. Read only until then, because a write
+ * before the change log would be a change no company is protected from.
  *
  * ── Every route is `starterEditorProcedure` ─────────────────────────────────
  * Never the public, protected, admin or a company builder (not even named in
@@ -35,6 +36,66 @@ import { needsPricing } from "../../shared/materialPricing";
 import { hourlyCostOf } from "../../shared/laborRateLookup";
 import { needsRate } from "../../shared/laborRatePricing";
 import { assemblyHours } from "../../shared/assemblyHours";
+import { RATE_PARTS, rateEditFields } from "../../shared/loadedRate";
+import {
+  StarterChangeRefused,
+  applyStarterChange,
+  previewStarterChange,
+  previewStarterChanges,
+  starterChangeLog,
+  undoStarterBatch,
+} from "../starterChanges";
+
+/**
+ * One edit the screen may send: a field of a starter row, or a recipe line's
+ * quantity. `applyStarterChange` re-checks every rule (kind, unit, value,
+ * shared row) — this only shapes the input.
+ */
+const editInput = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("field"),
+    table: z.enum([
+      "materials",
+      "assemblies",
+      "laborRates",
+      "modifiers",
+      "runTypes",
+    ]),
+    rowId: z.number().int().positive(),
+    field: z.string().min(1).max(64),
+    newValue: z.union([
+      z.string().max(2000),
+      z.number(),
+      z.boolean(),
+      z.null(),
+    ]),
+  }),
+  z.object({
+    kind: z.literal("part_field"),
+    table: z.literal("assemblies"),
+    rowId: z.number().int().positive(),
+    childTable: z.literal("assembly_materials"),
+    childRefId: z.number().int().positive(),
+    field: z.enum(["qty", "overrideLaborHours"]),
+    newValue: z.union([z.string().max(64), z.number(), z.null()]),
+  }),
+]);
+
+/** A refused starter change is the editor's to read, every reason listed. */
+async function refusedAsBadRequest<T>(work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (err) {
+    if (err instanceof StarterChangeRefused)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: err.problems
+          .map(p => p.replace(/^change \d+: /, ""))
+          .join("\n"),
+      });
+    throw err;
+  }
+}
 
 /** A decimal column that may be unset: NULL stays NULL, never 0. */
 function decimalOrNull(value: string | number | null): number | null {
@@ -57,6 +118,8 @@ export const starterLibraryRouter = router({
       isExamplePrice: row.isExamplePrice === true,
       laborHours: decimalOrNull(row.laborHours),
       isExampleLaborHours: row.isExampleLaborHours === true,
+      stickLengthFeet: decimalOrNull(row.stickLengthFeet),
+      strapSpacingFeet: decimalOrNull(row.strapSpacingFeet),
       isSpecialty: row.isSpecialty === true,
       searchAliases: row.searchAliases,
       description: row.description,
@@ -122,11 +185,140 @@ export const starterLibraryRouter = router({
       trade: row.trade,
       rateType: row.rateType,
       hourlyRate: hourlyCostOf(row),
+      // The stored figures, for the edit dialog (parts are fractions).
+      hourlyCost: decimalOrNull(row.hourlyCost),
+      annualSalary: decimalOrNull(row.annualSalary),
+      annualHours: decimalOrNull(row.annualHours),
+      baseWage: decimalOrNull(row.baseWage),
+      payrollTaxPct: decimalOrNull(row.payrollTaxPct),
+      workersCompPct: decimalOrNull(row.workersCompPct),
+      insurancePct: decimalOrNull(row.insurancePct),
+      benefitsPct: decimalOrNull(row.benefitsPct),
       needsRate: needsRate(row),
       isExampleRate: row.isExampleRate === true,
       version: row.version,
     }));
   }),
+
+  // ── Writes: one field per Confirm, through applyStarterChange only ────────
+
+  /**
+   * What saving this one field would do — "Pins N shops… offers it to M" —
+   * measured by doing it and rolling it back (`previewStarterChange`), so
+   * Confirm cannot do something else. A refusal arrives as BAD_REQUEST with
+   * every reason, in the words `applyStarterChange` uses.
+   */
+  previewEdit: starterEditorProcedure
+    .input(editInput)
+    .query(({ input }) =>
+      refusedAsBadRequest(() => previewStarterChange(input))
+    ),
+
+  /** Save one field: ONE batch, pinned, logged, offered (owner Q5). */
+  applyEdit: starterEditorProcedure
+    .input(editInput.and(z.object({ note: z.string().max(500).optional() })))
+    .mutation(({ ctx, input }) => {
+      const { note, ...change } = input;
+      return refusedAsBadRequest(() =>
+        applyStarterChange({
+          editorUserId: ctx.starterEditor.user.id,
+          source: "screen",
+          note,
+          changes: [change],
+        })
+      );
+    }),
+
+  /**
+   * A shipped labor rate: the part AND the rate it makes, in ONE batch
+   * (`rateEditFields`, shared/loadedRate.ts) — a one-field change would
+   * leave the rate disagreeing with its own breakdown. `preview: true`
+   * answers like previewEdit; false saves.
+   */
+  rateEdit: starterEditorProcedure
+    .input(
+      z.object({
+        rowId: z.number().int().positive(),
+        field: z.enum([
+          ...RATE_PARTS,
+          "hourlyCost",
+          "annualSalary",
+          "annualHours",
+        ]),
+        value: z.number().finite(),
+        preview: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const row = (await db.getStarterLaborRates()).find(
+        r => r.id === input.rowId
+      );
+      if (!row)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "No starter labor rate has that id.",
+        });
+      const fields = rateEditFields(row, input.field, input.value);
+      if ("refused" in fields)
+        throw new TRPCError({ code: "BAD_REQUEST", message: fields.refused });
+      const changes = fields.map(f => ({
+        kind: "field" as const,
+        table: "laborRates" as const,
+        rowId: row.id,
+        field: f.field,
+        newValue: f.value,
+      }));
+      if (input.preview)
+        return {
+          preview: await refusedAsBadRequest(() =>
+            previewStarterChanges(changes)
+          ),
+          applied: null,
+        };
+      return {
+        preview: null,
+        applied: await refusedAsBadRequest(() =>
+          applyStarterChange({
+            editorUserId: ctx.starterEditor.user.id,
+            source: "screen",
+            changes,
+          })
+        ),
+      };
+    }),
+
+  /** The change log, newest first. */
+  changeLog: starterEditorProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(50),
+        includeSeed: z.boolean().default(false),
+      })
+    )
+    .query(({ input }) => starterChangeLog(input)),
+
+  /**
+   * Undo a batch: `preview: true` says what would go back and what cannot
+   * (changed again since), writing nothing; then the real call (owner Q6).
+   * The undo is a NEW batch — the log is append-only — and is offered to
+   * shops that took the change, like any change.
+   */
+  undoBatch: starterEditorProcedure
+    .input(
+      z.object({
+        batchId: z.number().int().positive(),
+        preview: z.boolean(),
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      refusedAsBadRequest(() =>
+        undoStarterBatch({
+          batchId: input.batchId,
+          editorUserId: ctx.starterEditor.user.id,
+          preview: input.preview,
+        })
+      )
+    ),
 
   /** The shipped run types and the parts each one names. */
   runTypes: starterEditorProcedure.query(async () => {

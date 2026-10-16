@@ -23,6 +23,7 @@ import {
   heightTypeLabel,
 } from "./takeoffHeights";
 import type { PagePoint } from "./takeoffGeometry";
+import { countDisplayName } from "./unassignedCount";
 import {
   emptySplit,
   isPricedMark,
@@ -81,7 +82,8 @@ export function stampName(stamp: {
   assemblyName?: string | null;
 }): string {
   const label = stamp.groupLabel?.trim();
-  if (label) return label;
+  // The Unassigned count reads as such, never as its reserved label.
+  if (label) return countDisplayName(label);
   const snapshot = stamp.assemblyName?.trim();
   if (snapshot) return snapshot;
   return "Unnamed count";

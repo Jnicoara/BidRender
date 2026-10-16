@@ -1067,14 +1067,16 @@ function AssemblyBuilder({
                     />
                     <DraftNumberInput
                       value={line.qty}
-                      onValueChange={qty =>
+                      onValue={next => {
+                        // Blank is 0, as it always was here.
+                        const qty = next ?? 0;
                         setDraft(d => ({
                           ...d,
                           materials: d.materials.map((l, i) =>
                             i === index ? { ...l, qty } : l
                           ),
-                        }))
-                      }
+                        }));
+                      }}
                       className="h-7 w-20 text-sm text-right shrink-0 md:shrink order-last md:order-none"
                       inputMode="decimal"
                       onFocus={e => {

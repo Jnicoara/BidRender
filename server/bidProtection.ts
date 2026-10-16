@@ -24,10 +24,13 @@
  * and after each of the three and asserts the total is unchanged.
  */
 import {
+  canUpdateMath,
+  changesBetween,
   CURRENT_MATH_VERSION,
   mathVersionOf,
   reasonsBetween,
 } from "../shared/mathVersion";
+import { needsRunRate, withRunRate } from "../shared/runRateRepair";
 import type { Bid } from "../drizzle/schema";
 import {
   bidRollup,
@@ -52,25 +55,33 @@ const toDecimal4 = (value: number) => value.toFixed(4);
  * so every `atLeast(bid, n)` branch the rollup reaches takes the branch that
  * version would. Nothing is written.
  *
- * Today no PRICING branch reads the version: version 1 decides whether remove
- * and relocate marks can be SENT as labor (shared/roleLines.ts
- * `roleCountsOnBid`), and a bid below 1 has no such lines to price. So a bid
- * prices the same at 0 and at 1 — which is why moving Drafts to 1 writes no
- * change rows. A later version that changes a price branches in the rollup,
- * and this function then returns two different numbers with no change here.
+ * Version 1 reads no PRICING branch: it decides whether remove and relocate
+ * marks can be SENT as labor (shared/roleLines.ts `roleCountsOnBid`), and a
+ * bid below 1 has no such lines to price. So a bid prices the same at 0 and
+ * at 1 — which is why moving Drafts to 1 writes no change rows.
+ *
+ * Version 2 changes LINES rather than the rollup: a bid crossing it prices
+ * its $0 run lines at the company's run rate (shared/runRateRepair.ts), and
+ * `moveBidToMathVersion` writes that rate onto them. A bid already at 2 or
+ * above is priced from its lines as they are — anything still at $0 there
+ * was sent at $0 under version 2 and is not this function's to change.
  */
 export async function priceBidAtVersion(
   bid: Bid,
   userId: number,
   version: number
 ) {
-  const [lines, expenses, company, rules, jurisdictions] = await Promise.all([
-    db.getRollupLines(bid.id, userId),
-    db.getBidExpenseLines(bid.id),
-    companyDefaultsFor(userId),
-    taxRulesFor(userId),
-    db.getTaxJurisdictions(userId),
-  ]);
+  const crossesRunRate = crossesVersion2(mathVersionOf(bid), version);
+  const [stored, expenses, company, rules, jurisdictions, runRate] =
+    await Promise.all([
+      db.getRollupLines(bid.id, userId),
+      db.getBidExpenseLines(bid.id),
+      companyDefaultsFor(userId),
+      taxRulesFor(userId),
+      db.getTaxJurisdictions(userId),
+      crossesRunRate ? db.getRunLaborRate(userId) : null,
+    ]);
+  const lines = runRate ? withRunRate(stored, runRate) : stored;
   const { totals, notPriced, incomplete } = bidRollup(
     { ...bid, mathVersion: version },
     lines,
@@ -118,7 +129,10 @@ export async function moveBidToMathVersion(input: {
       totalAfter: number;
       changeRecorded: boolean;
     }
-  | { moved: false; reason: "not-draft" | "locked" | "already-there" }
+  | {
+      moved: false;
+      reason: "not-draft" | "locked" | "already-there" | "needs-run-rate";
+    }
 > {
   const { bid, userId, at } = input;
   const to = input.to ?? CURRENT_MATH_VERSION;
@@ -128,12 +142,34 @@ export async function moveBidToMathVersion(input: {
     return { moved: false, reason: "locked" };
   if (from >= to) return { moved: false, reason: "already-there" };
 
+  // Version 2: the $0 run lines this move would price. With no run rate to
+  // price them at, moving would spend the bid's one chance on nothing (a bid
+  // at 2 is never repaired again), so it is refused until a rate is picked.
+  let repair: { ids: number[]; rate: { cost: number; wasExample: boolean } } = {
+    ids: [],
+    rate: { cost: 0, wasExample: false },
+  };
+  if (crossesVersion2(from, to)) {
+    const [lines, rate] = await Promise.all([
+      db.getBidLineItems(bid.id),
+      db.getRunLaborRate(userId),
+    ]);
+    const ids = lines.filter(needsRunRate).map(line => line.id);
+    if (ids.length > 0 && !(rate.cost > 0))
+      return { moved: false, reason: "needs-run-rate" };
+    repair = { ids, rate };
+  }
+
   const [before, after] = await Promise.all([
     priceBidAtVersion(bid, userId, from),
     priceBidAtVersion(bid, userId, to),
   ]);
   const changed = before.totalDue !== after.totalDue;
   if (!input.dryRun) {
+    // Lines first: if the version write then failed, the bid would still be
+    // below 2 and a second press finds nothing left at $0 — never the other
+    // way round, a bid at 2 holding lines nobody can repair.
+    await db.setRunLineLaborRates(bid.id, repair.ids, repair.rate);
     await db.updateBid(bid.id, userId, { mathVersion: to });
     if (changed) {
       await db.insertBidMathChange({
@@ -155,6 +191,33 @@ export async function moveBidToMathVersion(input: {
     totalAfter: after.totalDue,
     changeRecorded: changed && !input.dryRun,
   };
+}
+
+/** Whether a move from `from` to `to` takes version 2 (the run-rate repair). */
+function crossesVersion2(from: number, to: number): boolean {
+  return from < 2 && to >= 2;
+}
+
+/**
+ * Whether the bid screen should OFFER "Update to the current math".
+ *
+ * `canUpdateMath` says whether it is allowed. This also asks whether it
+ * would do anything, because a button-only change (version 2) is never
+ * taken by the release step: without this every Draft on version 1 would
+ * carry the strip for good, on bids where the update changes nothing. So a
+ * Draft whose only pending changes are button-only is offered the update
+ * only when one of them applies to it — for version 2, a $0 run line with
+ * hours. A pending change the release step would take is offered as before.
+ */
+export async function mathUpdateWorthOffering(bid: Bid): Promise<boolean> {
+  if (!canUpdateMath(bid)) return false;
+  const pending = changesBetween(mathVersionOf(bid), CURRENT_MATH_VERSION);
+  if (pending.some(change => !change.buttonOnly)) return true;
+  if (pending.some(change => change.version === 2)) {
+    const lines = await db.getBidLineItems(bid.id);
+    if (lines.some(needsRunRate)) return true;
+  }
+  return false;
 }
 
 // ─── Freezing the settings (Q16) ───────────────────────────────────────────────

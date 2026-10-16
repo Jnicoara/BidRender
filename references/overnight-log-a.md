@@ -320,3 +320,290 @@ Nothing pushed except `track-a-night` after step 1's authorised local-dev
 fast-forward. No migrations, no DB rules, no live or staging database. One
 dev server (port 3017, test DB), stopped and verified gone. MySQL 3307 left
 running.
+
+# Run 4 — 2026-10-15 night (second queue)
+
+## Step 1 — land track-a-night on local-dev — 23:36
+
+Fast-forward `a4c97280..26670c62`, no `drizzle/` change. Gate on local-dev
+running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
+
+## Item 2 (part 1) — feature test map — 23:38 → 23:50
+
+- Four read-only search agents read CHANGELOG.md in four slices and looked
+  up each feature's test by name. ~600 rows in
+  `references/feature-test-map.md`, STRONG / WEAK / NONE / REMOVED, with
+  the search terms used for every NONE.
+- Bid-number WEAK rows picked out for tests next: kit after fork, whip dial,
+  edited shipped modifier, priced starter → assembly, locked extras, stale
+  labor rate, dashboard line with no hours, groundwork migrations.
+
+## Counting deep test (owner: most important) — 23:40 →
+
+- `client/src/lib/testPlanPdf.testHelper.ts` writes real PDFs (no
+  library); `client/src/lib/countingDeep.test.ts` reads them through the
+  screen's own pdf.js → vectorGeometry → findMatching path.
+- **Accuracy (before = after, no matcher change needed):** 8 symbol cases on
+  sheet 1 (duplex 10/10, GFCI 3/3, bare circle 3/3, J-box 4/4, smoke 4/4,
+  troffer 6/6, bare rectangle 3/3, switch 5/5); hard sheet duplex 9/11
+  (the two at 45° missed by design); sheet 2 via a sheet-1 template: all
+  found. **Confirm all wrong = 0 everywhere**; every look-alike offered is
+  flagged.
+- **Found:** a troffer in an edge-to-edge grid could not be boxed (every
+  edge and diagonal runs on into neighbours, so all is taken as "lines
+  through") and the screen said "Nothing is drawn inside that box" — false.
+  Now `TOUCHING_SYMBOLS_MESSAGE` says why and what to do. 100% not
+  possible from line work there; the person taps them.
+- **Proved it bites:** MIN_COVERAGE 0.8 → 0.5 made 5 of 13 cases red;
+  restored.
+- Step 1 result: local-dev Gate 38862215110 **green** — smoke 96 passed / 2 skipped; staging /api/version commit 26670c62.
+- Scan copy (`countingScan.test.ts`, opencv.js, 150 dpi + noise): every
+  true copy found on all 6 symbols; EVERY find needs a look (words not read
+  on a scan), so Confirm all takes none. Golden counts frozen (exact
+  look-alike lists — may differ on Linux font rendering; watch the Gate).
+- AI reading with saved FAKE answers (`server/countingAiFake.test.ts`,
+  `invokeLLM` mocked): parser takes only the 4 closed answers; one press =
+  one call; nothing on the bid moves; unreachable AI changes nothing; AI off
+  refuses before any call. Client: answers never confirm; right answers →
+  Confirm all takes 9 of 10 duplexes (the wire-through one keeps a
+  weaker-likeness flag), no look-alike. A WRONG "same" lets that copy into
+  Confirm all → **morning question N1**.
+- **Real bug — offline then back online:** a batch resent after a lost
+  answer wrote every mark twice. Server fix `server/markReplay.ts` (keys,
+  in memory, red before, `markReplay.test.ts` 5/5; stamp neighbours 84/84).
+  Screen half is ONE line in TakeoffPage (B's file) → `track-b-handoff.md`.
+  Durable column → todo. Noted at the TOP of morning questions (N0).
+- Manual counting (`server/countingManual.test.ts`, users 9915/9916): two
+  people tapping at once on two sheets, undo/redo, status, location tag,
+  owner-furnished — every step's total = hand math (table in
+  `references/stress-results-a.md`, Track A's own file: `stress-results.md`
+  is Track C's on `track-c`, kept apart to avoid a merge clash).
+- 00:03 counting deep test done except mouse-vs-finger, which rides
+  the browser journey (item 3).
+- Gate 38863505561 **green** on 24ca6a72 (counting part 1). Pushed 291e719b + 887fe193.
+
+## Item 2 (part 2) — bid-number gap tests — 00:03 → 00:09
+
+- `server/bidNumberGaps.test.ts` (user 9917): (1) a kit prices the
+  company's COPY of an edited starter assembly — 2 × 3 h = 6 h, $360.
+  **Proved:** kit lookup switched to the stored id → red (0 h), restored.
+  (2) a LOCKED bid keeps run lines when company extras change: 110 ft /
+  $93.50 locked, 125 ft / $106.25 after unlock (the unlock half is the
+  built-in contrast). **Breaking the lock itself to watch it go red was
+  REFUSED by the auto-mode safety check** ("security test removal"); not
+  worked around, file restored at once.
+- (3) stale labor rate flagged through the router (50 → 72, price frozen,
+  none on Won) — **proved** red with the flag emptied; (4) whip dial 1,000 →
+  1,150 ft, boxes 40 — **proved** red with the dial ignored. Both restored,
+  no diff. Map's "Gaps closed" updated; remaining bid-number gaps listed.
+- 00:09 item 2 stopped here to keep the queue moving.
+
+## Items 4 + 5 — fresh start, backup drill — 00:09 → 00:17
+
+- Fresh start: 164 migrations from zero (36 s), 87 tables / 205 FKs, seed
+  1,717 materials, golden bids exact, starter-protection tests pass;
+  `server/freshShop.test.ts` (new shop sees the whole starter, owns none).
+- Backup drill (`scripts/backupDrill.mts` + `bidTotalsDump.mts`): real
+  backup/verify with a local folder target. 87 tables / 38,851 rows
+  restored = manifest; 4,386 bids, **0 differ**, $1,748,599.67 both
+  sides. PARTIAL only for 13 test-fixture files never on this disk. Both
+  throwaway DBs dropped, scratch folder removed. Write-up in
+  `references/stress-results-a.md`.
+- **Gate 38865031567 RED (1st for this item):** countingScan gfci/smoke —
+  the look-alike lists differ on Linux (text rasterises differently), as
+  predicted. Found/missed/Confirm all still exact there. Fixed: exact on
+  the safety numbers, look-alikes held to the circle family.
+
+## Item 7 — company separation — 00:17 → 00:23
+
+- `server/companySeparation.test.ts` (users 9919/9920): a probe over
+  appRouter itself — every procedure (388, skipping auth/starter realms),
+  each A id in each id field, other fields from the zod schema. **0 read
+  leaks, 0 write leaks** in 4,755 calls (728 answered within B's own
+  scope); A's bid, library and per-table row counts unchanged; B's
+  dashboard/archive show nothing of A's. Control test: the same reads as A
+  DO show the marker, so the detector can fire. AI mocked (no spend).
+  ~63 s locally (adds ~1–2 min to a full Gate).
+
+## Item 6 — failure drills — 00:23 → 00:27
+
+- `server/failureDrills.test.ts` 7/7: storage (fake S3 on/off via
+  R2_PLANS_ENDPOINT) — down throws (proxy 502), never "missing"; delete while
+  down = failed, left for the sweep; back = opens, no restart. AI — down
+  honest + nothing changed; back answers. Email — real door, fake key,
+  fetch replaced: no answer = notSent; 429 pauses with "later"; lifts next
+  day and sends. No real service touched. Removed one tautological assert.
+
+## Item 8 — speed on big data — 00:27 → 00:29
+
+- `server/speedBigData.test.ts` (on demand, SPEED_BIG_DATA=1, user 9922):
+  61 bids w/ marks, 500-sheet set, 5,000 marks on a sheet, full catalog.
+  All inside limits; slowest Dashboard 493 ms (grows ~8 ms/bid → todo).
+  Free memory read 1.94 GB at the start (journey agent's dev server up) —
+  a vitest run, no server/browser started by me; heavy work held.
+
+## Item 9 — golden bids on printed/exported output — 00:29 → 00:34
+
+- Added to `server/goldenBids.test.ts`: for all 9 golden bids, the
+  proposal prints "Price pending" EXACTLY when the bid screen says something
+  is not priced, and otherwise its total = Total due to the cent; the
+  quote-app panel's totalDueCents and preTaxCents match; the takeoff
+  spreadsheet's Direct cost matches and its rows add up. All green.
+- False alarm on the way, recorded: the labor-only bid's document carries
+  $1,200 with `pricePending: true` (printed as "Price pending") — the
+  first check read the figure, not the flag. The quote-app panel is an
+  internal-tier feature read off the session, so those reads use an
+  internal-tier caller (a tier never changes a price).
+- Gate 38866950752 **green** on 35807ccc (item 7; CI separation 388 procs,
+  782 answered, 0 leaks).
+
+## Item 10 — typed PACK QTY on PACK NOT CHECKED rows — 00:34 → 00:40
+
+- Found the real gap: the loader already priced price ÷ any pack qty, but
+  never KEPT the pack — the row stayed NOT CHECKED and the pack offered to
+  shops stayed each / 1. Now: `typedPackFor` (shared/starterSheetChecks.ts)
+  takes Pack size + qty on a NOT CHECKED row; refuses a different qty on a
+  DECIDED row (names starterPacks.ts); records nothing on ordinary rows
+  (unchanged). Loader writes `server/seed/materials/starterPacksTyped.ts`
+  (empty today); `mergeTypedPacks` folds it in and takes those names off
+  PACK_NOT_CHECKED; loader judges against the AS-DECIDED lists so a rerun
+  keeps them. `server/typedPacks.test.ts` 10; pack/sheet neighbours 55/55.
+- Dry run on the real sheet: no refusals, "packs typed …: 0 set". Nothing
+  loaded, no sheet rebuild.
+
+## Item 13 — migration snapshot hole — 00:40 → 00:43
+
+- Throwaway worktree (node_modules junction, removed link-first; worktree
+  removed, real node_modules intact): draft 0163_snapshot.json in
+  drizzle/meta → `drizzle-kit generate`: **"No schema changes, nothing to
+  migrate"**. Without it: a 0164 migration of **339 statements**.
+- **PARKED (morning question N2), not committed:** any drizzle/ commit
+  turns the track-branch Gate red by design, and on local-dev it stops the
+  staging auto-deploy until staging matches. Recommended: ride the next
+  live release.
+
+## Item 12 — release plan updated — 00:44
+
+- `next-live-release-plan.md` § "Since 2026-10-15": items 7–18 (Q-DB1,
+  cookie, CLIENT_IP_FROM, Q-AUTH1, invite screens, tests, find message,
+  markReplay, upload guard, typed packs, snapshot N2, end-of-pricing list),
+  each with where it is, what the day needs, and whether it moves a total;
+  the backup drill and bidTotalsDump as day checks. Doc only.
+
+## Item 14a — type-check: tests already covered; scripts/ and pricing/ now too — 00:44 → 00:49
+
+- Tests: already in `pnpm check` (tsconfig includes them; closed earlier).
+- `tsconfig.scripts.json` (target ES2022, scripts/ + pricing/ .mts/.ts):
+  6 errors → 0, three real faults fixed — rehearseBackfill read renamed
+  totals (now conduit/cable/wire BOUGHT feet), groundShareImpact dropped the
+  typed length (now `tracedRunOf(row)`), pricing builder's brand rows had
+  no Type. `pnpm check` = both configs (72 s locally). CLAUDE.md paragraph
+  updated (it said these were not covered).
+
+## Item 11 — end-of-pricing job prep — 00:44 → 00:51 (agents ran from 00:44)
+
+- Two agents turned every recorded owner answer (6 shelf reviews + pack
+  scan) into `pricing/end-of-pricing-answers.json` — 560 changes, each with
+  its quote; every name checked against BASELINE_MATERIALS.
+- `pricing/endOfPricing.mts`: dry run only (`--apply` refuses — the apply
+  IS the end-of-pricing load); checks names, rename collisions (case
+  ignored), chains, new-row clashes; then the LOCAL DB read-only
+  (`bidrender_local`, guard on): row present/active, company copies.
+  **0 problems** after folding one new row's pack into its add entry.
+  Report `pricing/end-of-pricing-dry-run.md`. 16 OPEN + 27 CHECK →
+  morning question N3. Nothing applied.
+
+## Item 14b — safe todo items: the last bid-number test gaps — 00:51 → 00:55
+
+- bidNumberGaps +3: edited shipped modifier keeps applying (**proved**:
+  stored-id lookup → red at 1 h vs 1.15 h, restored, no diff); priced
+  starter material reaches an assembly ($6.90 not $0); dashboard card
+  counts a priced no-hours line ($15, hours not set 1, = bid screen).
+  Map: every money row now has a test.
+
+(Run 4 heading times corrected at 00:56 from the commit stamps: the first
+draft's hand-typed START times ran ahead of the clock. Ends were always
+`date`. Same slip as run 3; from here every time is read from the clock.)
+- 00:56 Gate 38868672873 **green** on 188758b6 (items 6, 8, 9, 10). Pushing items 11–14.
+
+## Item 3 — whole-job browser journey — resumed 03:26
+
+- The journey agent was stopped at the usage limit after laptop and iPad
+  passed; its dev server was killed then. Resumed: memory 5.6 GB, ONE dev
+  server (3018, test DB), stopped after (tree killed, port free).
+- **Real fault (N4, top of morning questions): traced runs' labor was $0/h
+  everywhere** — `defaultLaborRateId` had no way in. Fixed going
+  forward: `bids.setPricingDefaults` field (refuses another company's
+  role) + Settings › Pricing "Labor rate for traced runs" (amber when
+  unset; screenshots 7-/8- laptop+phone, saved, kept after reload, no
+  sideways scroll). Test `bidNumberGaps` ($0 → 4 h × $60 = $240);
+  fixture helper now uses the router (golden bids unchanged).
+- Caught a false sentence before it shipped: the help text said "use Send
+  again to update them" — resendLine refills price and hours, never the
+  rate. Text now says only what is true.
+- Journey: 3/3 pass (laptop 38 s, iPad 34 s, phone 59 s) with the run rate
+  picked in Settings and every printed number = hand math. Fault 2 (legend
+  link) → `track-b-handoff.md`.
+- 03:42 Gate 38887304438 **green** on e34c4be2 (run-rate fix + journey). Queue complete; run 4 end.
+
+## Day session 2026-10-16 (owner present) — land, N4 + N1 built, N2, live checks
+
+- Step 1: local-dev fast-forwarded `26670c62..cff5a50b`. Gate 38935039725
+  green; smoke 96 passed / 2 skipped; staging `/api/version` commit
+  `cff5a50b`.
+- **N4 (owner: no automatic re-price; new companies start on Journeyman
+  $59.22 "Example rate"):** math version 2, `buttonOnly` — the release step
+  stops below it (`releaseTargetFor`); "Update to the current math" writes
+  the company run rate onto a Draft's $0 run lines (`shared/runRateRepair.ts`,
+  `moveBidToMathVersion`), refuses when there is no rate to use, and is
+  offered only when it would change something. New company's first
+  pricing_defaults row points at the shipped Journeyman. Tests
+  `server/runRateRepair.test.ts` 6 (red with the write removed: "expected
+  90.73 to be 330.73"; red with the default removed). Golden file: only
+  `mathVersion 1 → 2` moved (logged reason).
+- Found on screen, fixed: (1) the Settings picker used a plain `find`, so a
+  forked Journeyman read "Not set" — now `resolveLaborRate`; (2) a PICKED
+  role at $0 said nothing while runs priced at $0 — now amber "has no rate
+  yet". Local check: $210 → $418 = 4 h × $52, button gone after.
+- **N1 (owner: review grid before AI-found finds count):** `aiCleared`,
+  `confirmAllNeedsReview`, `reviewedDecisions`, the grid in `MatchPanel`.
+  Checked on a scanned copy of the counting fixture with the AI call faked
+  in the browser (0 requests reached the server): 11 pictures, 2 tapped
+  away, Count 9. **Found on screen, fixed:** two `decideFound` calls in one
+  handler lost the first (set-aside came back "clear") → `decideFoundMany`.
+  Told B (`track-b-handoff.md`).
+- Journey 3/3 on a throwaway fresh DB (`bidrender_test_journey_a`, dropped):
+  laptop 38 s, iPad 29 s, phone 57 s. On `bidrender_local` it failed BEFORE
+  anything changed today: that copy's duplex starter holds "Wall plate",
+  the seed says the nylon duplex plate. **Corrected later the same day:**
+  I first wrote that the local copy had been replaced with an older one.
+  It was not — its tables date 2026-09-15 to 10-14, nothing was created
+  today, and no track's handoff or log mentions a restore. Yesterday's
+  green journey ran on the TEST database (this log, "3018, test DB"). The
+  real cause: the starter cover swap reaches an EXISTING database only
+  through `scripts/repairStarterCovers.mts`, run by hand at a release, and
+  it has never been run on `bidrender_local`.
+- Full suite before the golden update: 457 files passed, 1 failed (golden
+  `mathVersion` only), 1 skipped.
+- **Live DB, read-only** (READ ONLY session + transaction, rolled back):
+  N4 0 run lines on live at all; Q-DEF1 3 companies at 0/0/0 — the
+  never-set defaults — and only 2 Drafts follow them (bid 23 user 1, bid 25
+  smoke user 1421), both with 0 lines; Q-QTY1 0 assembly lines, 0 kit items
+  (10 kit items in all); Q-TAX1 0 tax areas on live; Q-CLOSE1 0 close-outs
+  on live; run-type extras ≥ 10% none (no company run types, runs or extra
+  defaults with one).
+- **N3 recorded** (owner: yes to all 16 picks; mud rings for approval): 16
+  OPEN → 0, each a `decided` entry plus its changes (+61 renames, +7 rows,
+  +11 search-word removals, +3 additions, descriptions ±2). The 30 mud
+  rings are `pendingApproval` and listed in the dry run (5 renames of
+  today's rows to the 1/2" raise, 25 new). Dry run: 626 changes + 30
+  waiting, 0 problems; `--apply` still refuses.
+- **"Profit / overhead not set"** (owner): amber strip on the bid with a
+  Settings › Pricing button, label only (`shared/marginsNotSet.ts`, flag
+  on `bids.get`). Test `server/marginsNotSet.test.ts` 4 (red with the
+  field forced off: 2 fail). On screen (fresh local account): both → set
+  profit 15% in Settings → back, the strip moved to "Overhead not set" with
+  no reload; phone no sideways scroll. Shots `12-*`. Limit parked as N5.
+- **Who replaced `bidrender_local`?** Nobody — see the correction above.
+  Rule written in all three handoffs: never replace or restore a shared
+  local DB without saying so in the handoff first.

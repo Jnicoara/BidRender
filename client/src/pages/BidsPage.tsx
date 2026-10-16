@@ -92,6 +92,7 @@ import { BidStepBar } from "@/components/BidStepBar";
 import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
 import { QuantityLockPanel } from "@/components/QuantityLockPanel";
 import { MathChangeStrip } from "@/components/MathChangeStrip";
+import { MarginsNotSetStrip } from "@/components/MarginsNotSetStrip";
 import {
   countUnpricedLaborLines,
   groupStaleRates,
@@ -136,6 +137,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 import { ExampleTags } from "@/components/ExampleTags";
 import { exampleSummary, exampleWarning } from "@shared/exampleTags";
+import { unassignedSentence } from "@shared/unassignedCount";
 import { NotPricedTotal } from "@/components/NotPricedTotal";
 import { MostUsedRow } from "@/components/MostUsedRow";
 import { BuildFromPartsPanel } from "@/components/BuildFromPartsPanel";
@@ -812,6 +814,7 @@ export default function BidsPage({
     problems,
     staleRates,
     dropsNotPriced,
+    unassignedMarks,
     warningsFrozenAt,
   } = detailQuery.data;
   const lockedWarningsNote = frozenWarningsNote(warningsFrozenAt, {
@@ -877,7 +880,11 @@ export default function BidsPage({
    * lines that are otherwise priced (0087). Through the same rule the server's
    * cards use, so this screen and the search result for it cannot disagree.
    */
-  const notPricedTally = bidNotPricedCount(lines, dropsNotPriced);
+  const notPricedTally = bidNotPricedCount(
+    lines,
+    dropsNotPriced,
+    unassignedMarks
+  );
   /** "Homeruns: Measured, +15% routing · 12 homeruns", when there are any. */
   const homerunLine = homeruns?.rows.length
     ? {
@@ -1231,6 +1238,8 @@ export default function BidsPage({
         {/* "Total changed because…" and "Update to the current math" (owner
             Q14, Q22). Here and on Quick bid; never on the proposal. */}
         <MathChangeStrip bidId={bidId} />
+        {/* A company default of 0 nobody chose — label only (owner, 2026-10-16). */}
+        <MarginsNotSetStrip marginsNotSet={detailQuery.data?.marginsNotSet} />
         {/* minmax(0,1fr) on a phone, not the implicit `auto` column: an auto
             track is as wide as its widest child's longest unbreakable line,
             which made the whole bid 445 px wide on a 390 px phone. */}
@@ -2074,6 +2083,26 @@ export default function BidsPage({
                     {dropsNotPriced === 1 ? "it is" : "they are"} priced. Pick
                     what each drop is made of on its count, on the{" "}
                     <PlansLink bidId={bidId} />.
+                  </p>
+                </div>
+              )}
+              {/*
+                UNASSIGNED MARKS (references/count-first-plan.md): counted with
+                nothing named, so no line holds them. Said here, under the
+                totals that cannot include them; the total also says
+                "+ N marks unassigned" (owner Q5, label only). A priced print waits until they are
+                picked.
+              */}
+              {unassignedMarks > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-[#F5C518]/40 bg-[#F5C518]/10 px-2.5 py-2 my-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#F5C518] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-snug text-muted-foreground">
+                    <span className="text-foreground font-medium">
+                      {unassignedSentence(unassignedMarks)}
+                    </span>{" "}
+                    A priced proposal cannot print until they are picked: open
+                    Unassigned on the <PlansLink bidId={bidId} /> and choose
+                    what they are.
                   </p>
                 </div>
               )}

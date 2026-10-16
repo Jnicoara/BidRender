@@ -1,5 +1,17 @@
 # Track C — handoff, 2026-10-06
 
+## RULE, ALL TRACKS (owner, 2026-10-16): never replace or restore a shared local DB unannounced
+
+**Never replace, restore, re-copy or drop a shared local database
+(`bidrender_local`, `bidrender_test_localdev`) without first writing it in
+your handoff:** which database, from what, when, and why. All three tracks
+and the owner work against the same MySQL on 3307, so an unannounced swap
+reads to everyone else as a fault in their code. Throwaway databases you
+create and drop yourself are exempt. (Prompted by a false alarm: on
+2026-10-16 A wrote that `bidrender_local` had been replaced; nobody had —
+it was a release step never run there. The rule stands anyway: the cost of
+saying it is one line.)
+
 ## (newest) 2026-10-16, day — waiting for B on local-dev
 
 - B's work (track-b) was NOT on local-dev at 09:50; watched every 15 min.

@@ -192,6 +192,18 @@ test("3. symbols capture; a rename sticks and can be reset", async () => {
     const nameBox = page.getByRole("textbox", { name: "Symbol name" });
     await nameBox.fill(name);
     await page.getByRole("button", { name: "Save symbol" }).click();
+    /*
+      Save first searches the whole sheet for look-alikes ("Checking against
+      this sheet…") and only then writes, so wait for THAT to finish — the
+      card closes on a save and stays open on any question or error — before
+      looking for the row. Measured 2026-10-16, local dev: 0.35–0.53 s, and
+      3.5–4.3 s with the CPU slowed 6x; the default 20 s wait was spent on a
+      scan that grows with the machine, not on the save. A card that never
+      closes still fails here, naming the step.
+    */
+    await expect(page.getByText("Name this symbol")).toHaveCount(0, {
+      timeout: 60_000,
+    });
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
 

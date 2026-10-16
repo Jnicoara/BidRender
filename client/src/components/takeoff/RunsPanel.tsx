@@ -1050,6 +1050,11 @@ export type GroupBridgeState = {
    */
   byNameOnly?: boolean;
   /**
+   * The bid's Unassigned count (references/count-first-plan.md): marks with
+   * nothing named. The card asks what they are instead of offering Send.
+   */
+  unassigned?: boolean;
+  /**
    * Remove / relocate LABOR (shared/roleLines.ts): the kinds this count has
    * marks for and the bid has no line for yet — the card's fix-it sends them —
    * and the kinds already on the bid. Optional for callers that never send.
@@ -1266,6 +1271,7 @@ export function RunsPanel({
   linkAssemblies,
   buildBidId,
   onLinkAssembly,
+  onAssignUnassigned,
   sendingGroupId,
   onJumpTo,
   onRemoveStamp,
@@ -1415,6 +1421,15 @@ export function RunsPanel({
   /** The bid, so a link search that finds nothing can build one. */
   buildBidId?: number;
   onLinkAssembly?: (groupId: number, assemblyId: number) => void;
+  /**
+   * Say what the Unassigned count's marks are — an assembly from
+   * `linkAssemblies`, or a name — and move every one of them, on every
+   * sheet, into that count (references/count-first-plan.md).
+   */
+  onAssignUnassigned?: (
+    groupId: number,
+    to: { assembly: SearchableAssembly } | { name: string }
+  ) => void;
   /** The count currently crossing, so its own control can say so. */
   sendingGroupId?: number | null;
   /** Move the viewer to a mark on the drawing and highlight it. */
@@ -1557,6 +1572,8 @@ export function RunsPanel({
   const [circuitName, setCircuitName] = useState("");
   /** The count whose "which assembly?" search is open, if any. */
   const [linkingGroupId, setLinkingGroupId] = useState<number | null>(null);
+  /** The Unassigned count whose "Pick what they are" search is open. */
+  const [assigningGroupId, setAssigningGroupId] = useState<number | null>(null);
 
   /*
     BRING THE SELECTION INTO VIEW (§ 1 rule 4). Opening the Runs tab for a
@@ -1857,6 +1874,61 @@ export function RunsPanel({
                       ? undefined
                       : bridge?.get(group.groupId);
                   if (!state) return null;
+                  /*
+                    THE UNASSIGNED COUNT (references/count-first-plan.md):
+                    never Send — it asks what its marks are. Amber, because
+                    until it is answered a priced print is blocked.
+                  */
+                  if (state.unassigned) {
+                    const open = assigningGroupId === group.groupId;
+                    return (
+                      <div className="mt-1 space-y-1.5">
+                        <p className="text-xs text-amber-400">
+                          Nothing says what{" "}
+                          {state.bidCount === 1
+                            ? "this mark is"
+                            : `these ${state.bidCount} marks are`}{" "}
+                          yet — a priced print waits until they are picked.
+                        </p>
+                        {!quantitiesLocked &&
+                          onAssignUnassigned &&
+                          linkAssemblies &&
+                          (open ? (
+                            <div className="rounded border border-border bg-muted/20 p-2 space-y-1.5">
+                              <p className="text-xs text-muted-foreground">
+                                What are they? Every mark on every sheet moves
+                                into that count.
+                              </p>
+                              <AssemblySearchList
+                                assemblies={linkAssemblies}
+                                buildBidId={buildBidId}
+                                onPick={assembly => {
+                                  onAssignUnassigned(group.groupId as number, {
+                                    assembly,
+                                  });
+                                  setAssigningGroupId(null);
+                                }}
+                                onPickName={name => {
+                                  onAssignUnassigned(group.groupId as number, {
+                                    name,
+                                  });
+                                  setAssigningGroupId(null);
+                                }}
+                                onCancel={() => setAssigningGroupId(null)}
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setAssigningGroupId(group.groupId)}
+                              className="text-xs underline underline-offset-2 text-[#F5C518] hover:text-[#F5C518]/80"
+                            >
+                              Pick what they are…
+                            </button>
+                          ))}
+                      </div>
+                    );
+                  }
                   if (state.onBid) {
                     return (
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -1951,6 +2023,9 @@ export function RunsPanel({
                 set once on the count, shown once set. */}
                 {group.groupId !== null &&
                   groupDrops?.get(group.groupId) &&
+                  // Not on Unassigned marks: a drop is a fact about WHAT a
+                  // device is, and nothing says that yet.
+                  !bridge?.get(group.groupId)?.unassigned &&
                   onSetGroupDrop && (
                     <GroupDrop
                       info={groupDrops.get(group.groupId)!}

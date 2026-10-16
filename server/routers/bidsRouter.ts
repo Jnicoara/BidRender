@@ -70,11 +70,21 @@ import {
 } from "../../shared/handPricedLines";
 import { isLaborRoleLine } from "../../shared/roleLines";
 import { canUpdateMath, reasonsBetween } from "../../shared/mathVersion";
+import { marginsNotSet } from "../../shared/marginsNotSet";
 import {
   leaveDraft,
+  mathUpdateWorthOffering,
   moveBidToMathVersion,
   refreezeTaxRate,
 } from "../bidProtection";
+
+/**
+ * Why "Update to the current math" cannot run yet, in the strip's words —
+ * the version-2 repair has $0 run lines to price and no run rate to price
+ * them at (server/bidProtection.ts).
+ */
+const NEEDS_RUN_RATE_MESSAGE =
+  "This Draft has traced runs priced at $0 an hour, and there is no labor rate for traced runs to price them at. Pick one in Settings › Pricing (or give the picked role a rate in Labor rates) first, then update.";
 import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
 import { resolveForkedRow } from "../../shared/forkedRows";
 import {
@@ -691,8 +701,12 @@ export const bidsRouter = router({
           totalAfter: Number(row.totalAfter),
           reason: row.reason,
         })),
-        /** "Update to the current math" is offered (owner Q22) — a button only. */
-        canUpdate: canUpdateMath(bid),
+        /**
+         * "Update to the current math" is offered (owner Q22) — a button
+         * only, and only when it would do something (bidProtection.ts
+         * `mathUpdateWorthOffering`).
+         */
+        canUpdate: await mathUpdateWorthOffering(bid),
       };
     }),
 
@@ -721,7 +735,10 @@ export const bidsRouter = router({
         seen: true,
         dryRun: true,
       });
-      if (!result.moved) return null;
+      if (!result.moved)
+        return result.reason === "needs-run-rate"
+          ? { blocked: NEEDS_RUN_RATE_MESSAGE }
+          : null;
       return {
         totalBefore: result.totalBefore,
         totalAfter: result.totalAfter,
@@ -740,13 +757,19 @@ export const bidsRouter = router({
           message:
             "Only an unlocked Draft on older math can be updated. Sent, won, lost and locked bids keep the math they were priced by.",
         });
-      return moveBidToMathVersion({
+      const result = await moveBidToMathVersion({
         bid,
         userId: ctx.scope.dataUserId,
         at: new Date(),
         // The person was shown old → new before pressing (mathUpdatePreview).
         seen: true,
       });
+      if (!result.moved && result.reason === "needs-run-rate")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: NEEDS_RUN_RATE_MESSAGE,
+        });
+      return result;
     }),
 
   /**
@@ -1071,6 +1094,11 @@ export const bidsRouter = router({
         units,
         totals,
         settings,
+        /**
+         * "Profit / overhead not set" — the bid follows a company default
+         * of 0 (shared/marginsNotSet.ts). A label; it moves no number.
+         */
+        marginsNotSet: marginsNotSet(settings),
         company,
         /** The linked client record, or null. */
         client: client ?? null,
@@ -1123,6 +1151,15 @@ export const bidsRouter = router({
          * with the rest on a locked bid.
          */
         dropsNotPriced: warnings.counts.dropsNotPriced,
+        /**
+         * Marks in the bid's Unassigned count (references/count-first-plan.md):
+         * said under the totals and a priced print blocked until they are
+         * picked. The total also says "+ N marks unassigned" (owner Q5, a label only).
+         */
+        unassignedMarks: await db.bidUnassignedMarks(
+          bid.id,
+          ctx.scope.dataUserId
+        ),
         /** The lock's instant when the counts above are frozen, else null. */
         warningsFrozenAt: warnings.frozenAt,
         /**
@@ -2170,10 +2207,32 @@ export const bidsRouter = router({
          * pricing_defaults.materialMarkupPct. Always a markup, never a margin.
          */
         materialMarkupPct: markupPctSchema.nullable().optional(),
+        /**
+         * The labor role a TRACED RUN's hours are priced at (the run lines
+         * sent from the Plans screen). Until 2026-10-16 nothing could set
+         * this, so every run line froze at $0/h (found by the whole-job
+         * journey test; morning question N4). NULL clears it. Setting it
+         * moves no existing line — each line froze its rate when sent — only
+         * runs sent afterwards (Send again does not refresh a rate — shared/resendLine.ts refills only price and hours).
+         */
+        defaultLaborRateId: z.number().int().positive().nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const patch: Record<string, unknown> = {};
+      if (input.defaultLaborRateId !== undefined) {
+        if (input.defaultLaborRateId !== null) {
+          // One of THIS company's roles (or a shipped one it can see) —
+          // never another company's id.
+          const rates = await db.getLibraryLaborRates(ctx.scope.dataUserId);
+          if (!rates.some(r => r.id === input.defaultLaborRateId))
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "That labor role is not in your library.",
+            });
+        }
+        patch.defaultLaborRateId = input.defaultLaborRateId;
+      }
       if (input.materialMarkupPct !== undefined) {
         patch.materialMarkupPct =
           input.materialMarkupPct === null

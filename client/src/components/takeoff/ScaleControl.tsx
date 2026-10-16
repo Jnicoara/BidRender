@@ -84,7 +84,14 @@ export function ScaleControl({
   onRefused,
   doubt = null,
   onKeepScale,
+  compact = false,
 }: {
+  /**
+   * The phone's trace toolbar: one row has to hold the mode, this and Fit.
+   * Drops the two quiet notes — "· not checked" (the "Check it" link beside
+   * it says the same) and "· scan, can't check by code". Warnings stay.
+   */
+  compact?: boolean;
   /**
    * What the scale check (@/lib/scaleCheck) made of the scale set, read off
    * this page's drawing. NULL until it has run, or once kept.
@@ -345,7 +352,8 @@ export function ScaleControl({
                     {pageSize.label} page
                   </span>
                 ) : (
-                  unchecked && (
+                  unchecked &&
+                  !compact && (
                     <span className="text-[0.65rem] text-muted-foreground">
                       · not checked
                     </span>
@@ -720,7 +728,7 @@ export function ScaleControl({
           )}
         </span>
       )}
-      {isSet && doubt?.kind === "cannotCheck" && (
+      {isSet && !compact && doubt?.kind === "cannotCheck" && (
         <span
           className="text-[0.65rem] text-muted-foreground shrink-0"
           title={doubt.message}

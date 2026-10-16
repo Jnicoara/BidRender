@@ -15,7 +15,7 @@
     "ai:smoke": "tsx scripts/aiSmokeTest.mts",
     "build": "tsx scripts/build.mts",
     "start": "cross-env NODE_ENV=production node dist/index.js",
-    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
+    "check": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "format": "prettier --write .",
     "test": "vitest run",
     "smoke": "playwright test -c e2e/playwright.config.ts",

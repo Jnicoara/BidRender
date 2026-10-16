@@ -22,8 +22,8 @@ import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { Input } from "@/components/ui/input";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import {
   Select,
   SelectContent,
@@ -231,8 +231,10 @@ export function AssemblyStepsSection({
                   <span className="flex items-center gap-1">
                     <DraftNumberInput
                       value={line.count}
-                      allow={n => n > 0}
-                      onValueChange={count => update(index, { ...line, count })}
+                      onValue={n => {
+                        if (n !== null && n > 0)
+                          update(index, { ...line, count: n });
+                      }}
                       onFocus={selectOnFocus}
                       inputMode="decimal"
                       className="h-8 w-14 text-sm text-right"

@@ -21,7 +21,11 @@ import { isNull, lt, or } from "drizzle-orm";
 import { bids } from "../drizzle/schema";
 import { getDb } from "../server/db";
 import { moveBidToMathVersion } from "../server/bidProtection";
-import { CURRENT_MATH_VERSION } from "../shared/mathVersion";
+import {
+  CURRENT_MATH_VERSION,
+  mathVersionOf,
+  releaseTargetFor,
+} from "../shared/mathVersion";
 import { assertWritableDatabase } from "./databaseGuard";
 
 const apply = process.argv.includes("--apply");
@@ -44,18 +48,30 @@ const below = await db
 console.log(
   `${apply ? "APPLY" : "DRY RUN"}: ${below.length} bid(s) below math version ${CURRENT_MATH_VERSION}`
 );
-const tally = { moved: 0, totalChanged: 0, notDraft: 0, locked: 0 };
+const tally = {
+  moved: 0,
+  totalChanged: 0,
+  notDraft: 0,
+  locked: 0,
+  buttonOnly: 0,
+};
 for (const bid of below) {
+  // Never past a button-only change (version 2, the run-rate repair): the
+  // owner chose that a Draft takes it only when somebody presses "Update to
+  // the current math" and has seen old → new (N4, 2026-10-16).
+  const to = releaseTargetFor(mathVersionOf(bid));
   const r = await moveBidToMathVersion({
     bid,
     userId: bid.userId,
     at,
+    to,
     seen: false,
     dryRun: !apply,
   });
   if (!r.moved) {
     if (r.reason === "not-draft") tally.notDraft += 1;
     if (r.reason === "locked") tally.locked += 1;
+    if (r.reason === "already-there") tally.buttonOnly += 1;
     // Counted, not listed: a non-Draft bid stays below the version forever,
     // and 3,452 "stays" lines (rehearsal, 2026-10-12) buried the Drafts the
     // owner has to read.
@@ -71,6 +87,6 @@ for (const bid of below) {
   );
 }
 console.log(
-  `${apply ? "done" : "dry run done"}: ${tally.moved} Draft(s) ${apply ? "moved" : "to move"} (${tally.totalChanged} with a moved total), ${tally.notDraft} non-Draft and ${tally.locked} locked stay.`
+  `${apply ? "done" : "dry run done"}: ${tally.moved} Draft(s) ${apply ? "moved" : "to move"} (${tally.totalChanged} with a moved total), ${tally.notDraft} non-Draft and ${tally.locked} locked stay, ${tally.buttonOnly} wait for the button (a button-only change is next).`
 );
 process.exit(0);

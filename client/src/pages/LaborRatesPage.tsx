@@ -21,6 +21,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { cn } from "@/lib/utils";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
@@ -967,6 +968,7 @@ export default function LaborRatesPage() {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-6 py-5">
+        <LibraryTabs group="laborRates" current="rates" />
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <Input

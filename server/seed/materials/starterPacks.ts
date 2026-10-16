@@ -23,7 +23,10 @@
  * - `from` names the decision or the listing. "Guessed" is not a source.
  * - A row whose pack nobody could settle goes in `PACK_NOT_CHECKED`, not
  *   here: it ships `each` / 1 and the sheet says so on the row.
+ * - A pack the owner TYPES on such a row comes back through the loader
+ *   (starterPacksTyped.ts) and is folded in by `mergeTypedPacks` below.
  */
+import { STARTER_PACKS_TYPED } from "./starterPacksTyped";
 
 export type StarterPack = {
   /** The words on the sheet: "box of 25", "10 ft stick", "per foot (…)". */
@@ -1003,11 +1006,55 @@ function keyed<T>(list: readonly [string, T][], what: string) {
   return out;
 }
 
-export const STARTER_PACKS: Readonly<Record<string, StarterPack>> = keyed(
-  entries,
-  "STARTER_PACKS"
+/**
+ * Fold the packs the owner TYPED on not-checked rows (starterPacksTyped.ts,
+ * written by the loader) into the written packs, and take those names off
+ * the not-checked list. A typed pack for a name that was not on that list
+ * is refused here too: the sheet never moves a decided pack.
+ */
+export function mergeTypedPacks(
+  written: Readonly<Record<string, StarterPack>>,
+  unsureList: Readonly<Record<string, string>>,
+  typed: Readonly<Record<string, { label: string; qty: number }>>
+): {
+  packs: Record<string, StarterPack>;
+  notChecked: Record<string, string>;
+} {
+  const packs: Record<string, StarterPack> = { ...written };
+  const left: Record<string, string> = { ...unsureList };
+  for (const [name, t] of Object.entries(typed)) {
+    if (!(name in unsureList))
+      throw new Error(
+        `STARTER_PACKS_TYPED: "${name}" was not PACK NOT CHECKED — its pack is decided in starterPacks.ts`
+      );
+    packs[name] = {
+      label: t.label,
+      qty: t.qty,
+      from: "owner, typed in the pricing sheet",
+    };
+    delete left[name];
+  }
+  return { packs, notChecked: left };
+}
+
+/**
+ * The lists AS DECIDED here, before any typed pack is folded in. The loader
+ * judges a sheet row against these: a row typed last time is still a
+ * not-checked row this time, so loading the same sheet twice keeps it
+ * (the generated file is rebuilt whole on every load).
+ */
+export const STARTER_PACKS_DECIDED: Readonly<Record<string, StarterPack>> =
+  keyed(entries, "STARTER_PACKS");
+export const PACK_NOT_CHECKED_AS_FOUND: Readonly<Record<string, string>> =
+  keyed(notChecked, "PACK_NOT_CHECKED");
+
+const merged = mergeTypedPacks(
+  STARTER_PACKS_DECIDED,
+  PACK_NOT_CHECKED_AS_FOUND,
+  STARTER_PACKS_TYPED
 );
-export const PACK_NOT_CHECKED: Readonly<Record<string, string>> = keyed(
-  notChecked,
-  "PACK_NOT_CHECKED"
-);
+
+export const STARTER_PACKS: Readonly<Record<string, StarterPack>> =
+  merged.packs;
+export const PACK_NOT_CHECKED: Readonly<Record<string, string>> =
+  merged.notChecked;

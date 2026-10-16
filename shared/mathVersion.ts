@@ -9,7 +9,8 @@
  * New bids start at `CURRENT_MATH_VERSION`. A Draft is brought forward by
  * Track A's release step (`scripts/applyMathVersion.mts`) or by the person
  * pressing "Update to the current math" — never by a migration, never by
- * viewing.
+ * viewing. A change marked `buttonOnly` (version 2) is the button's alone:
+ * the release step stops below it (`releaseTargetFor`).
  *
  * ── How a math change is written ─────────────────────────────────────────────
  * Add an entry below, then branch on it where the math changed:
@@ -32,6 +33,12 @@ export type MathChange = {
   date: string;
   /** Finishes the sentence "Total changed … because". */
   reason: string;
+  /**
+   * Taken ONLY by the person pressing "Update to the current math", never by
+   * the release step (`releaseTargetFor`). For a change that re-prices lines
+   * already on a Draft, which the owner wants shown and chosen, not applied.
+   */
+  buttonOnly?: true;
 };
 
 export const MATH_CHANGES: readonly MathChange[] = [
@@ -44,6 +51,19 @@ export const MATH_CHANGES: readonly MathChange[] = [
     // "CAN now add": updating a bid sends nothing by itself — a person sends
     // the labor from the count (found by looking, 2026-10-12).
     reason: "remove and relocate marks can now add labor to the bid",
+  },
+  {
+    version: 2,
+    date: "2026-10-16",
+    // Traced runs' labor froze at $0 an hour on every bid, because nothing
+    // could set the run labor rate (morning-questions-a.md N4, found
+    // 2026-10-16). Owner: no automatic re-price — a Draft takes this only by
+    // the button, old → new shown; sent and locked bids never move. Moving a
+    // bid across it writes the run rate onto its $0 run lines
+    // (shared/runRateRepair.ts, server/bidProtection.ts).
+    reason:
+      "the hours on traced runs sent with no labor rate are now priced at your labor rate for traced runs",
+    buttonOnly: true,
   },
 ];
 
@@ -66,6 +86,21 @@ export function atLeast(
 /** The changes a bid takes moving from `from` to `to`, oldest first. */
 export function changesBetween(from: number, to: number): MathChange[] {
   return MATH_CHANGES.filter(c => c.version > from && c.version <= to);
+}
+
+/**
+ * How far the RELEASE STEP may move a bid holding version `from`: up to, not
+ * including, the first button-only change above it. A button-only change is
+ * the person's to take, and every change after it builds on it, so the
+ * release step stops there.
+ */
+export function releaseTargetFor(from: number): number {
+  let target = from;
+  for (const change of changesBetween(from, CURRENT_MATH_VERSION)) {
+    if (change.buttonOnly) break;
+    target = change.version;
+  }
+  return target;
 }
 
 /** "a; b" — the reasons a move from `from` to `to` brings, for one sentence. */

@@ -36,6 +36,40 @@ F13 / F11 / panel-label offers, the starter editor sign-in page, scope 6a,
 the phone bottom bar, and docs/answers. `git log 60479773..<candidate>
 --no-merges` is the change set — read it on the day.
 
+### Since 2026-10-15 — added to this release (Track A, PAPER ONLY)
+
+Items 4 and 6 above are **on local-dev now** (`track-a-night` landed
+2026-10-15 22:01 and 23:36, Gates and smoke green). New since, in landing
+order: on local-dev up to `26670c62`, then `track-a-night` (needs the owner's
+fast-forward). **None needs a migration.**
+
+| #   | Item                                                                                                                                                                  | Where                            | What the day needs                                                                                                   | Moves a total?                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 7   | **Q-DB1**: a query past 30 s drops its connection; `GET /api/health` asks the database (`q-db1-plan.md`)                                                              | local-dev                        | after the push, point App Platform's health check at `/api/health` (owner, § 3); `DB_QUERY_DEADLINE_MS` unset = 30 s | No                                                         |
+| 8   | **A-S9b**: session cookie `SameSite=Lax`                                                                                                                              | local-dev                        | nothing; takes effect at each person's next sign-in                                                                  | No                                                         |
+| 9   | **A-S12**: `CLIENT_IP_FROM` switch, unset = today                                                                                                                     | local-dev                        | leave unset until one live request's headers are read (`security-parked-a.md`)                                       | No                                                         |
+| 10  | **Q-AUTH1**: bcrypt in worker threads                                                                                                                                 | local-dev                        | after the push: re-run C's sign-in burst on staging first                                                            | No                                                         |
+| 11  | **Invite sign-up screens** (switch OFF) + invitee seat-refusal words                                                                                                  | local-dev                        | nothing while `SIGNUP_INVITE_ONLY` is unset                                                                          | No                                                         |
+| 12  | **Test-only**: golden bids (9, on printed/exported output too), speed limits, sign-in burst, counting deep test, company-separation probe, failure drills, fresh shop | `track-a-night`                  | nothing — tests                                                                                                      | No                                                         |
+| 13  | **Find all matching**: touching fixtures get an honest message                                                                                                        | `track-a-night`                  | nothing                                                                                                              | No (a message)                                             |
+| 14  | **A resent batch of marks counted once** (`server/markReplay.ts`) — inert until Track B sends `keys` from the Plans screen                                            | `track-a-night` (+ B's one line) | nothing; durable column is a later migration (`todo.md`)                                                             | Only a count that would have DOUBLED (morning question N0) |
+| 15  | **Upload size guard** — prepared, NOT wired (`a-s13-upload-size-plan.md`)                                                                                             | `track-a-night`                  | nothing until the staging-bucket proof                                                                               | No                                                         |
+| 16  | **Pricing loader keeps typed packs** on PACK NOT CHECKED rows (`starterPacksTyped.ts`, empty)                                                                         | `track-a-night`                  | nothing until the end-of-pricing load                                                                                | No                                                         |
+| 17  | **Drizzle snapshot 0163** — makes `drizzle-kit generate` say "No schema changes" (339 statements without it)                                                          | `references/drafts/` only        | owner's pick, morning question N2 (recommended: this release, as one `drizzle/meta` step)                            | No (metadata)                                              |
+| 18  | **End-of-pricing change list** (`pricing/end-of-pricing-dry-run.md`, script dry run only)                                                                             | `track-a-night`                  | **not this release** — it rides the end-of-pricing load, and the boot change still waits on Q1                       | Names/aliases only in the dry run                          |
+
+**Checks added for the day** (all on local, all read-only against live):
+
+- `scripts/backupDrill.mts` is the local version of the backup-verify step:
+  the real backup and restore code. On the local copy, 4,386 bids came back
+  with 0 total differences (`stress-results-a.md`).
+- `scripts/bidTotalsDump.mts` prices every bid with the bid screen's maths.
+  Run it before and after the push against a COPY of live, for a total-by-total
+  comparison of the whole database.
+- If the printed counts differ from these, **stop and find out why before
+  going on**: either this line is stale or the system is not in the state you
+  think it is.
+
 ### STOP FIRST: the boot change and owner Q1 disagree
 
 Owner Q1 (2026-10-13, `boot-seed-plan.md` § 7): the boot change ships **in

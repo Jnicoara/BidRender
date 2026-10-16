@@ -203,15 +203,37 @@ const layerIdsByDoc = new Map<string, Promise<Map<string, string>>>();
  * Asked only when a sheet has a homerun, so a set without any never pays.
  */
 const panelsByDoc = new Map<string, Promise<PanelSchedule[]>>();
+
+/** A message's schedule pages: a list of page numbers, or null for all. */
+function schedulePagesOf(msg: unknown): readonly number[] | null {
+  const pages = (msg as { schedulePages?: unknown }).schedulePages;
+  return Array.isArray(pages) && pages.every(n => Number.isInteger(n))
+    ? (pages as number[])
+    : null;
+}
 function panelsInDoc(
   doc: import("pdfjs-dist").PDFDocumentProxy,
-  hash: string
+  hash: string,
+  /**
+   * The pages whose stored text could hold a schedule (`bidPdfs.schedulePages`,
+   * from the text read at upload), or null to read every page as before. On
+   * the 500-sheet test set, reading every page pulled the whole 270 MB file
+   * through this worker for ~30 s after the first sheet drew, and every sheet
+   * render waited behind it (Track B stress pass, 2026-10-15): 21 pages there
+   * have a "CKT" header.
+   */
+  pages: readonly number[] | null
 ): Promise<PanelSchedule[]> {
-  let read = panelsByDoc.get(hash);
+  const key = `${hash}|${pages === null ? "all" : pages.join(",")}`;
+  let read = panelsByDoc.get(key);
   if (!read) {
     read = (async () => {
       const panels: PanelSchedule[] = [];
-      for (let n = 1; n <= doc.numPages; n++) {
+      const toRead =
+        pages === null
+          ? Array.from({ length: doc.numPages }, (_, i) => i + 1)
+          : pages.filter(n => n >= 1 && n <= doc.numPages);
+      for (const n of toRead) {
         const page = await doc.getPage(n);
         const viewport = page.getViewport({ scale: 1 });
         const content = await page.getTextContent();
@@ -233,7 +255,7 @@ function panelsInDoc(
       }
       return panels;
     })();
-    panelsByDoc.set(hash, read);
+    panelsByDoc.set(key, read);
     if (panelsByDoc.size > 2)
       panelsByDoc.delete(panelsByDoc.keys().next().value!);
   }
@@ -1050,7 +1072,9 @@ self.onmessage = async (e: MessageEvent) => {
         type: "homeruns",
         reqId,
         homeruns,
-        panels: homeruns.length ? await panelsInDoc(doc, hash) : [],
+        panels: homeruns.length
+          ? await panelsInDoc(doc, hash, schedulePagesOf(msg))
+          : [],
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });
@@ -1091,7 +1115,9 @@ self.onmessage = async (e: MessageEvent) => {
         type: "circuits",
         reqId,
         words: tagged ? words : [],
-        panels: tagged ? await panelsInDoc(doc, hash) : [],
+        panels: tagged
+          ? await panelsInDoc(doc, hash, schedulePagesOf(msg))
+          : [],
       });
     } catch (err) {
       self.postMessage({ type: "error", reqId, message: String(err) });

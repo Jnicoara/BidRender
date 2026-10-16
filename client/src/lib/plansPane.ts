@@ -13,7 +13,7 @@
  * shown is still the best answer, and swapping it for an error would be the
  * same fault from the other side.
  */
-export type PlansPane = "loading" | "failed" | "empty" | "plans";
+export type PlansPane = "loading" | "failed" | "missing" | "empty" | "plans";
 
 export function plansPane(list: {
   isLoading: boolean;
@@ -24,9 +24,36 @@ export function plansPane(list: {
    * a row (Gap 6.1, @/lib/localPlanSource). The plans, not the upload box.
    */
   previewing?: boolean;
+  /**
+   * The server said this bid is not there (deleted, or a link to one that
+   * never was). Not a connection fault, and "try again" can never help, so
+   * it gets its own pane rather than "failed" (owner, 2026-10-16).
+   */
+  missing?: boolean;
 }): PlansPane {
+  if (list.missing) return "missing";
   if (list.count > 0 || list.previewing) return "plans";
   if (list.isError) return "failed";
   if (list.isLoading) return "loading";
   return "empty";
+}
+
+/**
+ * Whether a tRPC error is the server saying the bid is not there. Read from
+ * the error's code, never its wording.
+ */
+export function isMissingBid(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const data = (error as { data?: { code?: unknown } | null }).data;
+  return data?.code === "NOT_FOUND";
+}
+
+/**
+ * React Query's retry rule for the Plans screen's bid reads: a dropped
+ * connection is tried again (three times, the default), a missing bid is
+ * not — retrying it only kept the skeleton up through three retries before
+ * landing on "Could not load", which read as a connection problem.
+ */
+export function retryUnlessMissing(failures: number, error: unknown): boolean {
+  return !isMissingBid(error) && failures < 3;
 }

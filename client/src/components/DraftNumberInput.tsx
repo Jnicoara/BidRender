@@ -1,53 +1,68 @@
 /**
- * A number box inside a form that keeps what is being TYPED, not the number.
+ * A number box in a DRAFT form (one with its own Save button) that keeps the
+ * text as typed. Every box that rebuilt its text from the number dropped the
+ * point in "2." and turned "2.5" into 25 — see lib/draftNumberText.ts.
  *
- * Rendering `value={String(qty)}` from the number loses every in-between
- * state: "2." becomes "2" before the next key arrives, so typing 2.25 stored
- * 225 (assembly components, kit items and assembly steps, found 2026-10-15).
- * This holds the text, hands the parent a number only when the text is one
- * (`draftNumber`), and on blur shows the number actually held — so a typo
- * reverts in front of the person instead of sitting there looking saved.
+ * On blur the box shows the number actually HELD, so text that was clamped
+ * ("250" in a 0–100 box), refused ("0x10") or declined by the caller (a step
+ * count of 0) changes in front of the person instead of sitting there looking
+ * saved. Tracks B and C each built one of these on 2026-10-15; this is the
+ * merge of the two (B's blank-aware API, C's parsing and blur).
  */
-import { useEffect, useState, type ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { Input } from "@/components/ui/input";
-import { draftNumber, formatForEdit } from "@/lib/inlineEdit";
+import {
+  draftNumberFrom,
+  typeDraftNumber,
+  type DraftNumber,
+} from "@/lib/draftNumberText";
 
 type Props = Omit<ComponentProps<typeof Input>, "value" | "onChange"> & {
-  value: number;
-  onValueChange: (n: number) => void;
-  /** Which numbers this box takes. Default: 0 or more. */
-  allow?: (n: number) => boolean;
+  value: number | null;
+  /** null is a blank box; the caller decides what blank means. */
+  onValue: (next: number | null) => void;
+  min?: number;
+  max?: number;
 };
 
 export function DraftNumberInput({
   value,
-  onValueChange,
-  allow,
+  onValue,
+  min = 0,
+  max = Number.POSITIVE_INFINITY,
   onBlur,
   ...rest
 }: Props) {
-  const [text, setText] = useState(() => formatForEdit(value));
-
-  // A value changed from outside (a row replaced, a reset) shows; the echo of
-  // our own change does not, or "2." would still snap to "2".
-  useEffect(() => {
-    setText(current =>
-      draftNumber(current, allow) === value ? current : formatForEdit(value)
-    );
-    // `allow` is usually an inline arrow; only the number should resync.
-  }, [value]);
-
+  const [draft, setDraft] = useState<DraftNumber>(() => draftNumberFrom(value));
+  const [seen, setSeen] = useState(value);
+  /** The next value change is this box's own edit coming back. */
+  const [echo, setEcho] = useState(false);
+  // Only a value changed from OUTSIDE (another row opened, a reset, a rounding
+  // the caller applied) replaces the text. Checking against the draft instead
+  // would redraw "2." as "2" again whenever a caller declined a value. And a
+  // box just emptied stays empty when the caller stores blank as 0 — showing
+  // that 0 made "clear, then type 2.5" read "02.5".
+  if (value !== seen) {
+    setSeen(value);
+    setEcho(false);
+    const blankEcho = echo && draft.value === null;
+    if (value !== draft.value && !blankEcho) setDraft(draftNumberFrom(value));
+  }
   return (
     <Input
       {...rest}
-      value={text}
+      value={draft.text}
       onChange={e => {
-        setText(e.target.value);
-        const n = draftNumber(e.target.value, allow);
-        if (n !== null && n !== value) onValueChange(n);
+        const next = typeDraftNumber(draft, e.target.value, max, min);
+        setDraft(next);
+        if (next.value !== draft.value) {
+          setEcho(true);
+          onValue(next.value);
+        }
       }}
       onBlur={e => {
-        setText(formatForEdit(value));
+        setDraft(draftNumberFrom(value));
+        setEcho(false);
         onBlur?.(e);
       }}
     />
