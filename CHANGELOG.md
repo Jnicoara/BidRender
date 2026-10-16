@@ -14,6 +14,9 @@ This is the human-readable companion to the git history — read this to see wha
   goes for an open edit or a half-typed new entry on the Materials, Labor
   rates, Job conditions and Clients screens (their Cancel buttons still
   just cancel).
+- **The Dashboard's "drops not priced" check is about a fifth faster** for
+  a company with many bids, because it reads the company's height settings
+  once instead of once per bid. The numbers it shows are unchanged.
 
 ## [2026-10-15]
 

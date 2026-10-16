@@ -15685,25 +15685,23 @@ export async function refreshRunTypeLineQty(
 export async function heightContextForBid(
   bidId: number,
   userId: number,
-  bidDistributionInches: number | null
+  bidDistributionInches: number | null,
+  /**
+   * The company's half, when a caller asking about MANY bids has already
+   * loaded it once (`dropsNotPricedForBids`). The same four reads either
+   * way — only how often they run changes.
+   */
+  shared?: CompanyHeights
 ): Promise<HeightContext> {
   const [
-    defaults,
-    company,
+    { defaults, company, extraDefaults, runTypes },
     job,
-    extraDefaults,
-    runTypes,
     linkedMarks,
     sheetCeilings,
     heightAreas,
   ] = await Promise.all([
-    getHeightDefaults(userId),
-    getMountingHeights(userId),
+    shared ?? companyHeights(userId),
     getBidMountingHeights(bidId, userId),
-    // Extra and makeup ride on this context so no caller can load the heights
-    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
-    getExtraDefaults(userId),
-    getRunTypesFor(userId, true),
     // A linked run end reads its mark's height (vertical-drops-plan § 2).
     getMarksLinkedByRuns(bidId, userId),
     // The ceiling at every box: sheet heights and height areas
@@ -15723,6 +15721,25 @@ export async function heightContextForBid(
     heightAreas,
   });
 }
+
+/**
+ * The height settings every bid of one company reads alike: the shop's
+ * defaults and heights, its extra/makeup defaults and its run types. Loaded
+ * once for a whole list of bids instead of once per bid (todo.md "The
+ * Dashboard's drops not priced check under heavy load").
+ */
+export async function companyHeights(userId: number) {
+  const [defaults, company, extraDefaults, runTypes] = await Promise.all([
+    getHeightDefaults(userId),
+    getMountingHeights(userId),
+    // Extra and makeup ride on this context so no caller can load the heights
+    // and forget them (server/runVerticals.ts, `HeightContext.extras`).
+    getExtraDefaults(userId),
+    getRunTypesFor(userId, true),
+  ]);
+  return { defaults, company, extraDefaults, runTypes };
+}
+export type CompanyHeights = Awaited<ReturnType<typeof companyHeights>>;
 
 /** Each sheet's own ceiling on a bid (0109). NULL follows the job. */
 export async function getSheetCeilings(bidId: number, userId: number) {
@@ -15821,12 +15838,14 @@ export async function getMarksLinkedByRuns(bidId: number, userId: number) {
  */
 export async function bidDropsNotPriced(
   bidId: number,
-  userId: number
+  userId: number,
+  /** Loaded once by a caller asking about many bids — see heightContextForBid. */
+  shared?: CompanyHeights
 ): Promise<number> {
   const bid = await getBidById(bidId, userId);
   if (!bid) return 0;
   const [heights, runs, scales] = await Promise.all([
-    heightContextForBid(bidId, userId, bid.distributionHeightInches),
+    heightContextForBid(bidId, userId, bid.distributionHeightInches, shared),
     getRunsForBid(bidId, userId),
     getSheetScalesForBid(bidId, userId),
   ]);
@@ -15940,10 +15959,12 @@ export async function dropsNotPricedForBids(
   */
   const candidates = await bidsWithADropKind(withMarks, userId);
   const asking = withMarks.filter(id => candidates.has(id));
+  // The company's heights are the same for every bid here: read once.
+  const shared = asking.length > 0 ? await companyHeights(userId) : undefined;
   for (let i = 0; i < asking.length; i += 4) {
     const batch = asking.slice(i, i + 4);
     const counts = await Promise.all(
-      batch.map(id => bidDropsNotPriced(id, userId))
+      batch.map(id => bidDropsNotPriced(id, userId, shared))
     );
     batch.forEach((id, k) => {
       if (counts[k] > 0) out.set(id, counts[k]);

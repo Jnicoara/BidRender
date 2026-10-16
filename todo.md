@@ -1841,6 +1841,14 @@ Measurements: `references/code-first-ceiling.md` § d.
       stamps, runs, scales) into one query each for the whole list; then,
       only with Track A, a bigger pool (live connection limits). Never a
       cache that could show yesterday's count.
+      **Step 1 DONE 2026-10-16 (Track C):** the company's half of the
+      heights (`companyHeights`: defaults, heights, extra defaults, run
+      types) is read once per list, not per bid. Measured on the local copy
+      with one dropping count on each of 163 marked bids:
+      `dropsNotPricedForBids` 521 → 395–424 ms (alone, no load). The same
+      four reads, so the same answers (155 bids compared, and the five
+      drops-count test files pass). Next, if needed: batch groups, stamps,
+      runs and scales per list.
 
 ### Number boxes in forms with a Save button read only plain numbers (Track C, 2026-10-15)
 
