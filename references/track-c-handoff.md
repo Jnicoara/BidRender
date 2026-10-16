@@ -15,6 +15,12 @@
   `references/golden-measurements.md`): 13 drawings, 0.01 in tolerance,
   proven red with a 0.5 % scale error; the app measures right everywhere,
   on screen too (mouse/touch, 0/90/270°, fit/zoomed).
+- Break-it: a blank tax-rate part saved as 0 % (fixed, Q-TAX1); two
+  people saving one assembly silently undid each other (fixed for
+  assemblies with `shared/staleEdit.ts`; kits/materials/labor/modifiers in
+  `todo.md`). **Gate:** first real CI run after the merge — 4 red, all
+  tests that had never run in CI (A's new public routes; no file store in
+  CI) — fixed.
 
 ## 2026-10-15, day — answers, before/after screenshots, two todo items
 

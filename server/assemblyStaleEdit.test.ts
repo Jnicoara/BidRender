@@ -1,0 +1,178 @@
+/**
+ * TWO PEOPLE, ONE ASSEMBLY (break-it, 2026-10-15 night; shared/staleEdit.ts).
+ *
+ * The editor saves its whole form. Seen on screen: A changed a quantity to 4
+ * and saved; B, who had opened the assembly before that, renamed it and
+ * saved — and the quantity went back to 1, with B told "Assembly saved."
+ *
+ * Through the real router against the test database. Red before the guard:
+ * B's save went through and A's 4 was gone.
+ *
+ * The column keeps whole seconds, so each save here waits past a second
+ * boundary — two saves inside one second are the documented gap.
+ */
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
+import { appRouter } from "./routers";
+import { getDb } from "./db";
+import { assemblies, materials, users } from "../drizzle/schema";
+import type { TrpcContext } from "./_core/context";
+import { STALE_EDIT_MESSAGE, savedSinceOpened } from "../shared/staleEdit";
+
+const USER = 9878;
+const hasDb = Boolean(process.env.DATABASE_URL);
+const withDb = hasDb ? describe : describe.skip;
+
+const caller = () =>
+  appRouter.createCaller({
+    user: { id: USER, openId: `test-stale-edit-${USER}`, role: "user" },
+  } as unknown as TrpcContext);
+
+async function newPart(input: { name: string; costPerUnit: number }) {
+  return (await caller().materials.create(input))!;
+}
+
+async function newAssembly(
+  input: Parameters<ReturnType<typeof caller>["assemblies"]["create"]>[0]
+) {
+  return (await caller().assemblies.create(input))!;
+}
+
+const nextSecond = () => new Promise(resolve => setTimeout(resolve, 1100));
+
+describe("savedSinceOpened", () => {
+  it("compares in whole seconds, the column's precision", () => {
+    const at = new Date("2026-10-15T22:00:00.000Z");
+    expect(savedSinceOpened(at, new Date("2026-10-15T22:00:00.900Z"))).toBe(
+      false
+    );
+    expect(savedSinceOpened(at, new Date("2026-10-15T21:59:59.000Z"))).toBe(
+      true
+    );
+  });
+
+  it("never refuses a caller that did not say when it opened", () => {
+    expect(savedSinceOpened(new Date(), undefined)).toBe(false);
+    expect(savedSinceOpened(new Date(), null)).toBe(false);
+  });
+});
+
+beforeAll(async () => {
+  if (!hasDb) return;
+  const database = (await getDb())!;
+  const [existing] = await database
+    .select()
+    .from(users)
+    .where(eq(users.id, USER))
+    .limit(1);
+  if (!existing)
+    await database.insert(users).values({
+      id: USER,
+      openId: `test-stale-edit-${USER}`,
+      name: "Stale edit fixture",
+    });
+});
+
+beforeEach(async () => {
+  if (!hasDb) return;
+  const database = (await getDb())!;
+  await database.delete(assemblies).where(eq(assemblies.userId, USER));
+  await database.delete(materials).where(eq(materials.userId, USER));
+});
+
+withDb("an assembly saved by two editors", () => {
+  it("refuses the save from a screen opened before the other save, and keeps the other's change", async () => {
+    const part = await newPart({
+      name: `Stale edit part ${Date.now()}`,
+      costPerUnit: 2,
+    });
+    const created = await newAssembly({
+      name: `Stale edit ${Date.now()}`,
+      category: "General",
+      baseLaborHours: 1,
+      materials: [{ materialId: part.id, qty: 1 }],
+    });
+    // Both open it.
+    const opened = (await caller().assemblies.get({ id: created.id }))!;
+    const openedAt = opened.updatedAt;
+    await nextSecond();
+
+    // A changes the quantity and saves.
+    await caller().assemblies.update({
+      id: created.id,
+      openedAt,
+      materials: [{ materialId: part.id, qty: 4, isBranchWhip: false }],
+    });
+    await nextSecond();
+
+    // B, still on the screen opened before that, renames and saves.
+    await expect(
+      caller().assemblies.update({
+        id: created.id,
+        openedAt,
+        name: "Renamed by B",
+        materials: [{ materialId: part.id, qty: 1, isBranchWhip: false }],
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+
+    const now = (await caller().assemblies.get({ id: created.id }))!;
+    expect(now.name, "B's rename did not land").toBe(opened.name);
+    expect(
+      now.materials.map(m => Number(m.qty)),
+      "A's quantity is kept"
+    ).toEqual([4]);
+  });
+
+  it("lets the same editor save twice: its own save moves what it opened with", async () => {
+    const created = await newAssembly({
+      name: `Stale edit twice ${Date.now()}`,
+      category: "General",
+      baseLaborHours: 1,
+      materials: [],
+    });
+    const opened = (await caller().assemblies.get({ id: created.id }))!;
+    await nextSecond();
+    const first = await caller().assemblies.update({
+      id: created.id,
+      openedAt: opened.updatedAt,
+      name: "First save",
+    });
+    await nextSecond();
+    await caller().assemblies.update({
+      id: created.id,
+      openedAt: first.assembly!.updatedAt,
+      name: "Second save",
+    });
+    expect((await caller().assemblies.get({ id: created.id }))!.name).toBe(
+      "Second save"
+    );
+  });
+
+  it("a recipe-only save still counts as a save", async () => {
+    const part = await newPart({
+      name: `Stale edit recipe ${Date.now()}`,
+      costPerUnit: 1,
+    });
+    const created = await newAssembly({
+      name: `Stale edit recipe ${Date.now()}`,
+      category: "General",
+      baseLaborHours: 1,
+      materials: [],
+    });
+    const opened = (await caller().assemblies.get({ id: created.id }))!;
+    await nextSecond();
+    // Only the child rows change — the assembly row itself does not.
+    await caller().assemblies.update({
+      id: created.id,
+      materials: [{ materialId: part.id, qty: 2, isBranchWhip: false }],
+    });
+    await nextSecond();
+    await expect(
+      caller().assemblies.update({
+        id: created.id,
+        openedAt: opened.updatedAt,
+        name: "Stale",
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+  });
+});

@@ -1287,6 +1287,21 @@ All additive and nullable. Specs are in the plans named.
       their soft picture, because a re-capture never replaces an existing
       thumbnail; remove the symbol and capture it again to get a sharp one.
 
+### LOST DATA: two people saving the same library item — assemblies guarded, the rest not yet (Track C, 2026-10-15 night)
+
+- [ ] **A whole-form Save from a screen opened before someone else's save puts
+      their change back, silently.** Seen on screen on the assembly editor: A
+      set a quantity to 4 and saved; B (opened earlier) renamed and saved;
+      the quantity went back to 1 and B was told "Assembly saved." **Fixed for
+      assemblies** (`shared/staleEdit.ts`: the editor sends `openedAt`, the
+      server refuses with "Someone saved this after you opened it…" and
+      changes nothing; `server/assemblyStaleEdit.test.ts`, red without the
+      guard; shots `two-editors-{before,after}.png`). Whole seconds (the
+      column's precision) — two saves inside one second slip through.
+      **Same shape, not yet guarded:** the kit editor (whole item list),
+      the Materials row editor, Labor rates and Modifiers (smaller forms,
+      fewer fields, same risk). Add `openedAt` to each update the same way.
+
 ### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed
 
 **Found** rehearsing the LT1/LT2 repair: adding a $0 fixture line to the

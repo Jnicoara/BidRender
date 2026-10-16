@@ -1511,6 +1511,24 @@ export default function AssembliesLibraryPage() {
     void utils.assemblies.list.invalidate();
   }, [utils]);
 
+  // When the open editor's form was taken from the saved row: the editor
+  // builds its form ONCE, on opening, so this is set then — and moved on by
+  // its own saves — never by a later refetch, which would let a save put
+  // back someone else's change (shared/staleEdit.ts).
+  const [openedAt, setOpenedAt] = useState<{ id: number; at: Date } | null>(
+    null
+  );
+  const openedDetail = editingId !== null ? detailQuery.data : undefined;
+  useEffect(() => {
+    if (editingId === null) setOpenedAt(null);
+    else if (openedDetail)
+      setOpenedAt(current =>
+        current?.id === openedDetail.id
+          ? current
+          : { id: openedDetail.id, at: openedDetail.updatedAt }
+      );
+  }, [editingId, openedDetail]);
+
   const createAssembly = trpc.assemblies.create.useMutation({
     onError: error => toast.error(errorText(error)),
     onSettled: refresh,
@@ -1519,6 +1537,9 @@ export default function AssembliesLibraryPage() {
   const updateAssembly = trpc.assemblies.update.useMutation({
     onError: error => toast.error(errorText(error)),
     onSuccess: result => {
+      // The form now holds what was just saved, so it is "opened" as of it.
+      if (result?.assembly)
+        setOpenedAt({ id: result.assembly.id, at: result.assembly.updatedAt });
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
       else toast.success("Assembly saved.");
@@ -1700,6 +1721,7 @@ export default function AssembliesLibraryPage() {
           updateAssembly.mutate(
             {
               id: detail.id,
+              ...(openedAt?.id === detail.id ? { openedAt: openedAt.at } : {}),
               name: draft.name,
               category: draft.category,
               trade: draft.trade,
