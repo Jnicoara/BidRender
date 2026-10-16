@@ -64,6 +64,25 @@ export function parseTypedNumber(text: string): number {
 }
 
 /**
+ * What a half-typed number in a form box means right now (2026-10-15).
+ *
+ * The component quantity boxes rendered `String(qty)` straight from the
+ * number, so "2." re-rendered as "2" and the dot was gone before the next key:
+ * typing 2.25 stored 225. The box now holds the TEXT (`DraftNumberInput`) and
+ * only hands a number on when the text is one the person could mean — null
+ * for blank, a trailing dot's partial ("2." is 2, the same number, so
+ * nothing moves), or anything `parseTypedNumber` refuses or `accept` rejects.
+ */
+export function draftNumber(
+  text: string,
+  accept: (n: number) => boolean = n => n >= 0
+): number | null {
+  if (text.trim() === "") return null;
+  const n = parseTypedNumber(text);
+  return Number.isFinite(n) && accept(n) ? n : null;
+}
+
+/**
  * Decide what Enter or blur means for a numeric field.
  *
  * Invalid input REVERTS rather than erroring. An inline field has nowhere to

@@ -30,6 +30,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { parseTypedNumber } from "@/lib/inlineEdit";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -845,7 +846,9 @@ function AssemblyBuilder({
       ["Remove", draft.removeLaborHours],
       ["Relocate", draft.relocateLaborHours],
     ] as const) {
-      const n = Number(value);
+      // The same reading hoursToSave uses: with Number() here, "0x10" passed
+      // this check and then saved as NOT SET (2026-10-15).
+      const n = parseTypedNumber(value);
       if (value.trim() !== "" && (Number.isNaN(n) || n < 0)) {
         toast.error(
           `${word} hours must be 0 or more, or left blank for not set.`
@@ -1011,19 +1014,16 @@ function AssemblyBuilder({
                       aria-hidden
                       className="basis-full h-0 order-last md:hidden"
                     />
-                    <Input
-                      value={String(line.qty)}
-                      onChange={e => {
-                        const qty = Number(e.target.value);
+                    <DraftNumberInput
+                      value={line.qty}
+                      onValueChange={qty =>
                         setDraft(d => ({
                           ...d,
                           materials: d.materials.map((l, i) =>
-                            i === index
-                              ? { ...l, qty: Number.isNaN(qty) ? 0 : qty }
-                              : l
+                            i === index ? { ...l, qty } : l
                           ),
-                        }));
-                      }}
+                        }))
+                      }
                       className="h-7 w-20 text-sm text-right shrink-0 md:shrink order-last md:order-none"
                       inputMode="decimal"
                       onFocus={e => {

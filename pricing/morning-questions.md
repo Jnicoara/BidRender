@@ -9,6 +9,26 @@ Every EARLIER review (Conduit through Fasteners & Anchors) is fully
 answered; the only open item there is Breakers Q9, which waits for the
 brand-variants pass by design and needs nothing from you now.
 
+## ⚠⚠ NIGHT 3 (2026-10-15 → 16) — WRONG NUMBERS FOUND, fixed on track-c, need your call on what is already saved
+
+- **Q-QTY1 ⚠ CHANGES BID MONEY (already saved data)** — Typing a decimal
+  quantity KEY BY KEY into an assembly's material box, or a kit's assembly
+  box, stored it 10× or 100× too big: "1.5" saved as **15**, "2.25" as
+  **225** (the box dropped the dot as it was typed; pasting was fine).
+  Seen on screen on the old build, both screens; fixed on track-c
+  (`DraftNumberInput`; shots `assembly-qty-typed-2_25-{before,after}.png`,
+  `kit-qty-typed-2_25-{before,after}.png`). The fix changes nothing
+  already stored. **Should A run a READ-ONLY list on live of every
+  company assembly line and kit item whose quantity is a whole number of
+  10 or more, for you to eyeball?** → **Yes, list only, change nothing.**
+  A shop's own fix is editing the assembly; bids already priced from a
+  wrong one keep their frozen line until re-added. Shipped starters are
+  not affected (they come from the seed files, not typing).
+- **Q-QTY2** — same bug, assembly WORK STEPS "How many" box (×N): fixed by
+  the same component; not shown on screen (needs a work step set up) —
+  unit-tested only. → **Nothing to decide**; noted so you know it was
+  the same fault.
+
 ## ⚠ AT THE TOP — these change a starter or what a bid line counts
 
 0. ⚠ **CHANGES BID MONEY (a new feature, not built)** — "Copy this bid" (competitors all have it): when a bid is copied, should the copy be re-priced at **today's** library prices, or keep the **original's frozen** prices? → **Re-price at today's** — a copy is a new bid, and last year's numbers on it would be a quiet wrong price. Affects: what every copied bid totals. Sketch: `references/overnight-parked.md` P4.

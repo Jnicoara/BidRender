@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Fixed: typing a decimal quantity in an assembly or kit saved it 10× or
+  100× too big.** Typing 1.5 into a material's quantity on an assembly (or
+  an assembly's quantity in a kit) lost the decimal point as it was typed
+  and saved 15; 2.25 saved 225. The box now keeps exactly what you type,
+  and a typo snaps back to the last real number when you leave the box.
+  The same fix covers the "how many" box on an assembly's work steps.
+  Assemblies saved before this are unchanged — check any with a suspicious
+  whole-number quantity.
+
 - **The sign-in cookie can no longer be used by another website.** It was
   set so that pages on other sites could send requests carrying a signed-in
   person’s session; now only BidRidge’s own pages, and links into it, carry

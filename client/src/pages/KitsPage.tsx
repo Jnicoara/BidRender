@@ -56,6 +56,7 @@ import {
 } from "@/lib/libraryScope";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DraftNumberInput } from "@/components/DraftNumberInput";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -403,18 +404,15 @@ function KitBuilder({
                     <span className="text-xs text-muted-foreground shrink-0">
                       {item.category}
                     </span>
-                    <Input
-                      value={String(item.qty)}
-                      onChange={e => {
-                        const qty = Number(e.target.value);
+                    <DraftNumberInput
+                      value={item.qty}
+                      onValueChange={qty =>
                         setItems(current =>
                           (current ?? []).map((it, i) =>
-                            i === index
-                              ? { ...it, qty: Number.isNaN(qty) ? 0 : qty }
-                              : it
+                            i === index ? { ...it, qty } : it
                           )
-                        );
-                      }}
+                        )
+                      }
                       className="h-7 w-20 text-sm text-right"
                       inputMode="decimal"
                       onFocus={selectOnFocus}

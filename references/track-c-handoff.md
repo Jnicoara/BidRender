@@ -1,6 +1,14 @@
 # Track C — handoff, 2026-10-06
 
-## (newest) 2026-10-15, day — answers, before/after screenshots, two todo items
+## (newest) 2026-10-15 → 16, night 3 — see `references/overnight-log.md` § night 3
+
+- Merged local-dev (A's Gate fix) into track-c; signup keeps both the
+  sign-up limits (C) and the invite gate (A).
+- **Wrong number fixed:** assembly / kit quantity boxes stored 2.25 as 225
+  when typed. Q-QTY1 at the top of `pricing/morning-questions.md` asks
+  for a read-only live list of suspicious saved quantities.
+
+## 2026-10-15, day — answers, before/after screenshots, two todo items
 
 - `references/morning-answers-c.md` (18 one-liners); screenshots in
   `references/overnight-shots/before-after/` (README lists every pair).
