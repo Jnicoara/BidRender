@@ -11,6 +11,10 @@
   editor's extra % / makeup boxes (`RunTypePicker.tsx` `ExtraDraftField`)
   have the same dropped-dot fault (2.5 → 25) — Q-QTY3; list in `todo.md`
   under the `parseTypedNumber` item.
+- **Golden measurements** (`server/goldenMeasurements.test.ts`,
+  `references/golden-measurements.md`): 13 drawings, 0.01 in tolerance,
+  proven red with a 0.5 % scale error; the app measures right everywhere,
+  on screen too (mouse/touch, 0/90/270°, fit/zoomed).
 
 ## 2026-10-15, day — answers, before/after screenshots, two todo items
 

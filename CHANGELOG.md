@@ -6,6 +6,14 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-15]
 
+- **Golden measurements: every change is now checked against drawings with
+  known true lengths.** Thirteen test drawings — 1/8", 3/16", 1/4",
+  engineering and metric scales, rotated pages, a half-size print, a scan,
+  short, long and many-cornered runs, clicked at five zoom levels by mouse
+  and by touch — must come out within a hundredth of an inch, or the
+  automatic test run fails. Today they all do, and a traced 40 ft run
+  measured exactly 40 ft on screen by mouse and finger, upright and turned.
+
 - **Every remaining number box now reads what you typed the same way.** On
   the Count screen, a kit button pressed with a quantity the app could not
   read used to add the kit once anyway; it now says "Enter a quantity
