@@ -193,6 +193,11 @@ function KitBuilder({
   const updateKit = trpc.kits.update.useMutation({
     onError: error => toast.error(errorText(error)),
     onSuccess: result => {
+      // The cached kit becomes the saved one, so reopening it before the
+      // refetch lands does not carry the old `updatedAt` into the next save
+      // (the stale-save guard would refuse it; shared/staleEdit.ts).
+      if (result?.kit)
+        utils.kits.get.setData({ id: result.kit.id }, result.kit);
       toast.success(
         result?.forked
           ? "Saved as your own copy — the starter is unchanged."

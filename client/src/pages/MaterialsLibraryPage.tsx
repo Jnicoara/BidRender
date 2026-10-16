@@ -1537,6 +1537,14 @@ export default function MaterialsLibraryPage() {
               }
             : {}),
         });
+        // The saved row, new `updatedAt` and all, straight into the list, so
+        // reopening the editor before the refetch lands does not carry the
+        // old one into the stale-save guard (shared/staleEdit.ts).
+        const saved = result.material;
+        if (saved && !result.forked)
+          utils.materials.list.setData({ status: view }, old =>
+            old?.map(row => (row.id === saved.id ? { ...row, ...saved } : row))
+          );
         if (result.forked) {
           toast.success(
             `Saved as your own copy — the starter "${result.material?.name}" is unchanged.`
@@ -1553,7 +1561,7 @@ export default function MaterialsLibraryPage() {
         setBusyId(null);
       }
     },
-    [updateMaterial, refetch]
+    [updateMaterial, refetch, utils, view]
   );
 
   /**

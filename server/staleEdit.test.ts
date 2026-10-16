@@ -15,7 +15,14 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { assemblies, kits, materials, users } from "../drizzle/schema";
+import {
+  assemblies,
+  kits,
+  laborRates,
+  materials,
+  modifiers,
+  users,
+} from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { STALE_EDIT_MESSAGE, savedSinceOpened } from "../shared/staleEdit";
 
@@ -77,6 +84,8 @@ beforeEach(async () => {
   if (!hasDb) return;
   const database = (await getDb())!;
   await database.delete(kits).where(eq(kits.userId, USER));
+  await database.delete(laborRates).where(eq(laborRates.userId, USER));
+  await database.delete(modifiers).where(eq(modifiers.userId, USER));
   await database.delete(assemblies).where(eq(assemblies.userId, USER));
   await database.delete(materials).where(eq(materials.userId, USER));
 });
@@ -246,5 +255,66 @@ withDb("a material saved by two editors", () => {
       m => m.id === part.id
     );
     expect(Number(now.costPerUnit), "A's price is kept").toBe(5);
+  });
+});
+
+withDb("a labor rate and a modifier saved by two editors", () => {
+  it("refuses the older screen's save of a labor rate, keeping the other's rate", async () => {
+    const rate = (await caller().laborRates.create({
+      name: `Stale rate ${Date.now()}`,
+      rateType: "hourly",
+      hourlyCost: 40,
+    }))!;
+    const opened = (await caller().laborRates.list()).find(
+      r => r.id === rate.id
+    )!;
+    await nextSecond();
+    await caller().laborRates.update({
+      id: rate.id,
+      openedAt: opened.updatedAt,
+      hourlyCost: 55,
+    });
+    await nextSecond();
+    await expect(
+      caller().laborRates.update({
+        id: rate.id,
+        openedAt: opened.updatedAt,
+        name: "Renamed by B",
+        hourlyCost: 40,
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+    const now = (await caller().laborRates.list()).find(r => r.id === rate.id)!;
+    expect(Number(now.hourlyCost), "A's rate is kept").toBe(55);
+  });
+
+  it("refuses the older screen's save of a modifier, keeping the other's percent", async () => {
+    const modifier = (await caller().modifiers.create({
+      name: `Stale modifier ${Date.now()}`,
+      laborAdjustmentPct: 0.1,
+    }))!;
+    const opened = (await caller().modifiers.list({ status: "active" })).find(
+      m => m.id === modifier.id
+    )!;
+    await nextSecond();
+    await caller().modifiers.update({
+      id: modifier.id,
+      openedAt: opened.updatedAt,
+      laborAdjustmentPct: 0.25,
+    });
+    await nextSecond();
+    await expect(
+      caller().modifiers.update({
+        id: modifier.id,
+        openedAt: opened.updatedAt,
+        name: "Renamed by B",
+        laborAdjustmentPct: 0.1,
+      })
+    ).rejects.toThrow(STALE_EDIT_MESSAGE);
+    const now = (await caller().modifiers.list({ status: "active" })).find(
+      m => m.id === modifier.id
+    )!;
+    expect(now.laborAdjustmentPctValue, "A's percent is kept").toBeCloseTo(
+      0.25
+    );
   });
 });

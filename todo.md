@@ -1287,9 +1287,9 @@ All additive and nullable. Specs are in the plans named.
       their soft picture, because a re-capture never replaces an existing
       thumbnail; remove the symbol and capture it again to get a sharp one.
 
-### LOST DATA: two people saving the same library item — assemblies guarded, the rest not yet (Track C, 2026-10-15 night)
+### LOST DATA: two people saving the same library item — DONE for all five library editors (Track C, 2026-10-15 night)
 
-- [ ] **A whole-form Save from a screen opened before someone else's save puts
+- [x] **A whole-form Save from a screen opened before someone else's save puts
       their change back, silently.** Seen on screen on the assembly editor: A
       set a quantity to 4 and saved; B (opened earlier) renamed and saved;
       the quantity went back to 1 and B was told "Assembly saved." **Fixed for
@@ -1302,8 +1302,15 @@ All additive and nullable. Specs are in the plans named.
       without it; `two-kit-editors-after.png`) **and Materials** (the row
       editor; a price kept, `two-material-editors-after.png` — rows have no
       self-saving price box, so a person's own row edit cannot trip it).
-      **Same shape, not yet guarded:**, Labor rates and Modifiers (smaller forms,
-      fewer fields, same risk). Add `openedAt` to each update the same way.
+      **Labor rates and Modifiers too** — all five editors now send
+      `openedAt` (`server/staleEdit.test.ts`, 9 cases, each red without its
+      guard). **Found by measuring, then fixed:** with a slow connection a
+      person who saved and reopened at once was refused by their OWN first
+      save (the list still held the old timestamp); every editor now writes
+      the saved row into its cache on success — checked on screen with every
+      refetch held 4 s, all five editors, two saves each, none refused.
+      Other forms that save whole (bid settings, proposal text, clients) were
+      not looked at — same check if one ever shows the symptom.
 
 ### WRONG-NUMBER RISK: older bid lines read their assembly's recipe LIVE (Track A, 2026-10-06) — report only, not fixed
 

@@ -91,6 +91,8 @@ type LaborRate = {
   workersCompPct?: string | null;
   insurancePct?: string | null;
   benefitsPct?: string | null;
+  /** When the row was last saved; the editor sends it back (staleEdit.ts). */
+  updatedAt: Date;
 };
 
 /** Mirrors the bounds the router enforces. */
@@ -464,7 +466,7 @@ function LaborRateRow({
 }: {
   rate: LaborRate;
   /** Resolves false when the save was refused (its toast says why). */
-  onSave: (id: number, draft: Draft) => Promise<boolean>;
+  onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onRevert: (rate: LaborRate) => void;
   onRemove: (rate: LaborRate) => void;
 }) {
@@ -480,7 +482,10 @@ function LaborRateRow({
     field: NeedsField;
     why: string;
   } | null>(null);
+  /** The row as saved when the editor opened — sent with Save (staleEdit.ts). */
+  const [openedAt, setOpenedAt] = useState<Date>(rate.updatedAt);
   const openEditor = (opened: { field: NeedsField; why: string } | null) => {
+    setOpenedAt(rate.updatedAt);
     setDraft(draftFrom(rate));
     setOpenedFor(opened);
     setEditing(true);
@@ -507,7 +512,7 @@ function LaborRateRow({
     // being lost (todo.md, 2026-10-15).
     const typed = draft;
     setEditing(false);
-    void onSave(rate.id, typed).then(saved => {
+    void onSave(rate.id, typed, openedAt).then(saved => {
       if (saved) return;
       setDraft(typed);
       setEditing(true);
@@ -811,6 +816,15 @@ export default function LaborRatesPage() {
       ),
     onError: (error, _vars, context) => rollback(context, error),
     onSuccess: result => {
+      // The saved row, new `updatedAt` and all, straight into the list: a
+      // reopen before the refetch lands would otherwise carry the old one,
+      // and the stale-save guard would refuse this person's own next save
+      // (seen with a slow connection, 2026-10-15; shared/staleEdit.ts).
+      const saved = result?.laborRate;
+      if (saved)
+        utils.laborRates.list.setData(undefined, old =>
+          old?.map(row => (row.id === saved.id ? saved : row))
+        );
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
     },
@@ -844,7 +858,7 @@ export default function LaborRatesPage() {
   }, [rates, query, scope]);
 
   const handleSave = useCallback(
-    (id: number, draft: Draft) => {
+    (id: number, draft: Draft, openedAt: Date) => {
       const parts =
         draft.rateType === "hourly" && draft.breakdown
           ? breakdownParts(draft.breakdown)
@@ -852,6 +866,7 @@ export default function LaborRatesPage() {
       return updateRate
         .mutateAsync({
           id,
+          openedAt,
           name: draft.name.trim(),
           rateType: draft.rateType,
           // Parts when built from a wage; otherwise null, so parts that no

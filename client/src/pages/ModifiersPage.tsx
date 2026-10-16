@@ -74,6 +74,8 @@ type Modifier = {
   laborAdjustmentPctValue: number;
   status: "active" | "archived" | "deleted";
   archivedAt: Date | string | null;
+  /** When the row was last saved; the editor sends it back (staleEdit.ts). */
+  updatedAt: Date;
 };
 
 /** Mirrors the router bounds: −100% to +1000%. */
@@ -161,12 +163,14 @@ function ModifierRow({
 }: {
   modifier: Modifier;
   /** Resolves false when the save was refused (its toast says why). */
-  onSave: (id: number, draft: Draft) => Promise<boolean>;
+  onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onRevert: (modifier: Modifier) => void;
   onArchive: (modifier: Modifier) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  /** The row as saved when the editor opened — sent with Save. */
+  const [openedAt, setOpenedAt] = useState<Date>(modifier.updatedAt);
 
   const save = () => {
     const problem = validateDraft(draft);
@@ -179,7 +183,7 @@ function ModifierRow({
     // leaving the person to type it all again (todo.md, 2026-10-15).
     const typed = draft;
     setEditing(false);
-    void onSave(modifier.id, typed).then(saved => {
+    void onSave(modifier.id, typed, openedAt).then(saved => {
       if (saved) return;
       setDraft(typed);
       setEditing(true);
@@ -265,6 +269,7 @@ function ModifierRow({
               name: modifier.name,
               percent: String(toPercent(modifier.laborAdjustmentPctValue)),
             });
+            setOpenedAt(modifier.updatedAt);
             setEditing(true);
           }}
           title={
@@ -426,6 +431,15 @@ export default function ModifiersPage() {
       ),
     onError: (error, _vars, context) => rollbackActive(context, error),
     onSuccess: result => {
+      // The saved row, new `updatedAt` and all, straight into the list: a
+      // reopen before the refetch lands would otherwise carry the old one,
+      // and the stale-save guard would refuse this person's own next save
+      // (seen with a slow connection, 2026-10-15; shared/staleEdit.ts).
+      const saved = result?.modifier;
+      if (saved)
+        utils.modifiers.list.setData({ status: "active" }, old =>
+          old?.map(row => (row.id === saved.id ? saved : row))
+        );
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
     },
@@ -477,10 +491,11 @@ export default function ModifiersPage() {
   }, [active]);
 
   const handleSave = useCallback(
-    (id: number, draft: Draft) => {
+    (id: number, draft: Draft, openedAt: Date) => {
       return updateModifier
         .mutateAsync({
           id,
+          openedAt,
           name: draft.name.trim(),
           laborAdjustmentPct: toFraction(typedPercent(draft.percent)),
         })

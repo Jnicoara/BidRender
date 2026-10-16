@@ -1537,9 +1537,17 @@ export default function AssembliesLibraryPage() {
   const updateAssembly = trpc.assemblies.update.useMutation({
     onError: error => toast.error(errorText(error)),
     onSuccess: result => {
-      // The form now holds what was just saved, so it is "opened" as of it.
-      if (result?.assembly)
+      // The form now holds what was just saved, so it is "opened" as of it —
+      // and the cached detail becomes the saved row, so closing and
+      // reopening before the refetch lands does not reopen the OLD row,
+      // whose `updatedAt` the guard would refuse (slow connection, 2026-10-15).
+      if (result?.assembly) {
         setOpenedAt({ id: result.assembly.id, at: result.assembly.updatedAt });
+        const saved = result.assembly;
+        utils.assemblies.get.setData({ id: saved.id }, old =>
+          old ? { ...old, ...saved } : old
+        );
+      }
       if (result?.forked)
         toast.success("Saved as your own copy — the starter is unchanged.");
       else toast.success("Assembly saved.");
