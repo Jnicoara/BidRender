@@ -1723,9 +1723,9 @@ Design: `references/homerun-footage-plan.md` § 4.
       plan could not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts`
       work.
 
-### Plans: a mouse in an ~820 px window leaves the drawing ~80 px wide (Track B, 2026-10-16, NOT fixed — layout policy)
+### Plans: a mouse in an ~820 px window leaves the drawing ~80 px wide (Track B, 2026-10-16) — FIXED same day, owner's call
 
-- [ ] `plansLayout` gives a mouse at 768 px or wider the laptop layout, with
+- [x] **DONE 2026-10-16 (owner: "start the side panel folded"):** `openingPanels` folds the sheet list at the start when both panels would leave the drawing under 400 px (≈ under 1,140 px at default widths; not stored). 820 px: drawing 80 → 310 px; 900: 160 → 390; 1440, iPad, phone unchanged (`narrow-laptop-*.png`). Was: `plansLayout` gives a mouse at 768 px or wider the laptop layout, with
       the sheet list AND the panel open beside the drawing. At 820 x 1180
       the drawing gets about 80 px, and a damaged plan's message wraps one
       word per line (`references/overnight-shots/b/plans-unopenable-ipad.png`).

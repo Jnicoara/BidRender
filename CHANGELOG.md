@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **In a narrow laptop window the Plans drawing gets room.** With the sheet
+  list and the counts panel both open, an 820 px window left the drawing
+  about 80 px wide. Now, when both would leave it under 400 px, the screen
+  opens with the sheet list folded (one click brings it back). At 820 px the
+  drawing gets 310 px. Wider windows, tablets and phones open as before, and
+  the choice you have saved is not changed.
 - **A mark or a traced run can only be saved on a sheet of its own bid.**
   The server checked that a sheet belonged to the company, not to the bid
   the mark was sent with. So a mark could be written onto another bid's

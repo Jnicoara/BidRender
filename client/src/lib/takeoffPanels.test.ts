@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   PANELS_DEFAULT,
+  openingPanels,
   PANEL_LIMITS,
   setPanelWidth,
   isFocusMode,
@@ -97,5 +98,37 @@ describe("panel widths", () => {
       workWidth: 9999,
     });
     expect(parsePanelState(stored).workWidth).toBe(PANEL_LIMITS.work.max);
+  });
+});
+
+describe("a narrow laptop window opens with the sheet list folded", () => {
+  const laptop = (width: number) => ({ width, layout: "laptop" as const });
+
+  it("folds the sheet list at 820 and 900 px and keeps the counted-items panel", () => {
+    for (const width of [820, 900, 1100])
+      expect(openingPanels(PANELS_DEFAULT, laptop(width))).toEqual({
+        ...PANELS_DEFAULT,
+        sheets: false,
+      });
+  });
+
+  it("leaves a window with room for the drawing as stored", () => {
+    // 1140 − 100 − 240 − 400 = 400 px of drawing: enough.
+    expect(openingPanels(PANELS_DEFAULT, laptop(1140))).toBe(PANELS_DEFAULT);
+    expect(openingPanels(PANELS_DEFAULT, laptop(1440))).toBe(PANELS_DEFAULT);
+    // Narrower panels make room too: 1000 − 100 − 180 − 280 = 440.
+    const slim = { ...PANELS_DEFAULT, sheetsWidth: 180, workWidth: 280 };
+    expect(openingPanels(slim, laptop(1000))).toBe(slim);
+  });
+
+  it("leaves a tablet, a phone and focus mode as stored", () => {
+    expect(
+      openingPanels(PANELS_DEFAULT, { width: 820, layout: "tablet" })
+    ).toBe(PANELS_DEFAULT);
+    expect(openingPanels(PANELS_DEFAULT, { width: 390, layout: "phone" })).toBe(
+      PANELS_DEFAULT
+    );
+    const focused = toggleFocus(PANELS_DEFAULT);
+    expect(openingPanels(focused, laptop(820))).toBe(focused);
   });
 });

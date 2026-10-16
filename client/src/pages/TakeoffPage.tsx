@@ -261,6 +261,7 @@ import { SheetChip } from "@/components/takeoff/SheetChip";
 import { SidePanel } from "@/components/takeoff/SidePanel";
 import {
   PANELS_DEFAULT,
+  openingPanels,
   PANELS_STORAGE_KEY,
   PANEL_LIMITS,
   isFocusMode,
@@ -271,6 +272,7 @@ import {
   togglePanel,
   type PanelState,
 } from "@/lib/takeoffPanels";
+import { plansLayout } from "@/lib/plansLayout";
 import { StampPicker } from "@/components/takeoff/StampPicker";
 import {
   RunTypePicker,
@@ -3339,11 +3341,22 @@ export default function TakeoffPage({
    */
   const [panels, setPanels] = useState<PanelState>(() => {
     if (typeof window === "undefined") return PANELS_DEFAULT;
+    let stored = PANELS_DEFAULT;
     try {
-      return parsePanelState(window.localStorage.getItem(PANELS_STORAGE_KEY));
+      stored = parsePanelState(window.localStorage.getItem(PANELS_STORAGE_KEY));
     } catch {
-      return PANELS_DEFAULT;
+      // Private browsing: the default, as if nothing had been chosen.
     }
+    // A narrow laptop window opens with the sheet list folded, so the drawing
+    // gets room (`openingPanels`). Not written back to storage.
+    return openingPanels(stored, {
+      width: window.innerWidth,
+      layout: plansLayout({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        coarse: window.matchMedia("(pointer: coarse)").matches,
+      }),
+    });
   });
   const updatePanels = useCallback(
     (next: PanelState | ((current: PanelState) => PanelState)) => {
