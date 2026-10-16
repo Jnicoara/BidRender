@@ -15681,7 +15681,11 @@ export async function bidDropsNotPriced(
   return drops.reduce((n, d) => n + d.notPricedDrops, 0);
 }
 
-/** Every mark in one count on one bid, any sheet and status — for a move. */
+/**
+ * Every mark in one count on one bid, any live sheet and status — for a move.
+ * A deleted plan set's leftovers (only on a database without its foreign
+ * keys) are not moved: they count nowhere, and moving them would change no number.
+ */
 export async function stampIdsInGroup(
   groupId: number,
   userId: number,
@@ -15696,7 +15700,8 @@ export async function stampIdsInGroup(
       and(
         eq(takeoffStamps.groupId, groupId),
         eq(takeoffStamps.userId, userId),
-        eq(takeoffStamps.bidId, bidId)
+        eq(takeoffStamps.bidId, bidId),
+        onLivePlanSheet(takeoffStamps.sheetId, bidId)
       )
     );
   return rows.map(r => r.id);

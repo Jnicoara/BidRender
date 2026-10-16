@@ -3,6 +3,56 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Smoke takes 13 min, was 6.3 — how to get it back near 6 without dropping a test (Track B, 2026-10-16, NOT done)
+
+**Measured 2026-10-16**, full local smoke on track-b after merging local-dev
+`cff5a50b` (`pnpm smoke --reporter=dot,json`, dev server on 127.0.0.1:3002,
+one worker): **222 passed / 6 skipped, 13.2 min wall.** Per file, summed test
+time:
+
+| File         | Min  | Projects         | New?       |
+| ------------ | ---- | ---------------- | ---------- |
+| screens.spec | 3.63 | 4                | no         |
+| marks.spec   | 3.14 | 4 (≈46 s each)   | 2026-10-16 |
+| plans.spec   | 1.74 | 4 (22–35 s each) | 2026-10-16 |
+| flow.spec    | 1.44 | desktop          | no         |
+| touch.spec   | 1.24 | 2 tablets        | no         |
+| pdfs.spec    | 0.82 | desktop          | 2026-10-16 |
+| demo.spec    | 0.24 | desktop + phone  | 2026-10-16 |
+
+**Nothing old got slower.** screens + flow + touch = 6.3 min, the old total.
+The doubling is the four files added on 2026-10-16: **5.9 min.** The slowest
+single tests are old (touch 37 s per tablet; flow 7 at 27 s, flow 9 at 24 s).
+Fixed waits (`waitForTimeout`) are not the cost: there are few, and short.
+If these numbers do not match a later run, find out why before acting on
+this list. The suite or the machine has changed.
+
+**Ways to cut it, all keeping every test at every size, biggest first:**
+
+1. **Two or three workers, one smoke account each.** `workers: 1` exists
+   because every spec shares one account: `sweepLeftovers` deletes every
+   "CI smoke" bid and every "CI " symbol, so a second worker would delete
+   the first one's bid mid-test. Give each worker its own account (a
+   per-worker login in `auth.setup.ts`, `SMOKE_EMAIL_2`/`_3` on staging),
+   and the sweep and symbols stop colliding. The work is browser-side and
+   the server is staging, so 2 workers should be about 6.5–7 min and 3
+   about 4.5–5. _Estimate, not measured._ Needs A: staging accounts and Gate
+   secrets.
+2. **One uploaded plan per project, shared.** Each file creates its own
+   throwaway bid and uploads a fixture in `beforeAll` (marks, plans, demo,
+   screens, flow, touch), once per project it runs in.
+   A per-project fixture bid, reset between files by deleting marks rather
+   than re-uploading, would save the upload and first sheet render each
+   time. Smaller than 1. Measure one setup before deciding.
+3. **Order the long, size-free work to run alongside the short.** With
+   workers > 1, put touch (37 s × 2) and flow (86 s) in different workers
+   from screens, so the slowest file is not last on its own.
+
+**Not on this list on purpose:** running the size-free marks checks
+(reload, offline, lost answer, second session) at one size instead of four
+would save about 2 min. That drops runs the owner asked for at four sizes,
+so it is the owner's call, not a speed fix.
+
 ## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
 
 - [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
@@ -1667,8 +1717,7 @@ Design: `references/homerun-footage-plan.md` § 4.
       (`server/markReplay.ts`: `takeoffStamps.drop` `keys`, a day, one
       server) — once Track B's one line sends the keys
       (`track-b-handoff.md`). Still open across a restart or a second
-      instance. **Durable fix:** `takeoff_stamps.clientKey VARCHAR(64) NULL`
-      + UNIQUE (`bidId`, `clientKey`) — ADDITIVE, NULL for every existing
+      instance. **Durable fix:** `takeoff_stamps.clientKey VARCHAR(64) NULL` + UNIQUE (`bidId`, `clientKey`) — ADDITIVE, NULL for every existing
       row — then `drop` inserts with `INSERT … ON DUPLICATE KEY` semantics
       and reads the ids back. **Done when** `markReplay.test.ts` passes with
       the in-memory map cleared between the two sends.
