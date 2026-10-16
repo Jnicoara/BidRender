@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import LoginPage from "@/pages/LoginPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { isResetAddress } from "@/lib/resetLink";
+import { inviteCodeFromHash, isSignupAddress } from "@/lib/signupLink";
 import LandingPageContainer from "@/pages/landing/LandingPageContainer";
 import { addressAfterSignOut, landingAfterSignIn } from "@/lib/signInLanding";
 import { Loader2 } from "lucide-react";
@@ -79,10 +80,22 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [signInNotice, setSignInNotice] = useState<string | undefined>(
     expired ?? undefined
   );
+  /**
+   * On a sign-up link — `#/signup`, usually `?invite=<code>` from an invite
+   * (@/lib/signupLink). Read once, like the reset address; the code is kept
+   * here and the form sends it with the sign-up.
+   */
+  const [signupLink, setSignupLink] = useState(() =>
+    isSignupAddress(window.location.hash)
+      ? { code: inviteCodeFromHash(window.location.hash) }
+      : null
+  );
 
   useEffect(() => {
     const onHash = () => {
       if (isResetAddress(window.location.hash)) setResetting(true);
+      if (isSignupAddress(window.location.hash))
+        setSignupLink({ code: inviteCodeFromHash(window.location.hash) });
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -167,11 +180,29 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
 
   if (!user) {
-    if (signingIn)
+    if (signingIn || signupLink)
       return (
         <LoginPage
           notice={signInNotice}
+          initialMode={signupLink ? "signup" : "login"}
+          inviteCode={signupLink?.code ?? null}
+          onJoinWaitlist={() => {
+            setSignupLink(null);
+            setSigningIn(false);
+            // The landing page's early-access form (LandingPage.tsx
+            // SIGNUP_ANCHOR); the landing page renders on this same address.
+            window.location.hash = "#early-access";
+          }}
           onSuccess={() => {
+            // Off the sign-up address, so the invite code does not stay in
+            // the address bar or land the app on an address it does not have.
+            if (isSignupAddress(window.location.hash))
+              window.history.replaceState(
+                null,
+                "",
+                window.location.pathname + window.location.search
+              );
+            setSignupLink(null);
             // Whatever is in the address now is either a link this person
             // followed while signed out, or nothing in particular — the
             // sign-out above cleared anything left over from last time. See

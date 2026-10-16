@@ -7,7 +7,8 @@
  * Only `scripts/createStarterEditor.mts` calls `createStarterEditor` and
  * `resetStarterEditorFactor`. No route does.
  */
-import bcrypt from "bcryptjs";
+// Off the main thread, like the app's own sign-in (server/passwordHashing.ts).
+import { hashPassword, verifyPassword } from "../passwordHashing";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import {
@@ -99,7 +100,7 @@ export async function createStarterEditor(
     throw new Error(
       `An account already uses ${email}. The starter editor needs an address no company login uses.`
     );
-  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+  const passwordHash = await hashPassword(input.password, SALT_ROUNDS);
   const [inserted] = await db.insert(users).values({
     openId: `starter_${nanoid(24)}`,
     name: input.name,
@@ -162,7 +163,7 @@ export async function resetStarterEditorPassword(
   await db
     .update(users)
     .set({
-      passwordHash: await bcrypt.hash(password, SALT_ROUNDS),
+      passwordHash: await hashPassword(password, SALT_ROUNDS),
       sessionsValidAfter: sessionCutoff(now),
     })
     .where(eq(users.id, user.id));
@@ -181,10 +182,10 @@ export async function checkStarterPassword(
 ): Promise<User | null> {
   const user = await starterEditorByEmail(email);
   if (!user?.passwordHash) {
-    await bcrypt.hash("dummy_timing_guard", SALT_ROUNDS);
+    await hashPassword("dummy_timing_guard", SALT_ROUNDS);
     return null;
   }
-  return (await bcrypt.compare(password, user.passwordHash)) ? user : null;
+  return (await verifyPassword(password, user.passwordHash)) ? user : null;
 }
 
 export type SecondStep =

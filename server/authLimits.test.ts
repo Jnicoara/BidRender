@@ -28,11 +28,13 @@ vi.mock("./db", () => ({
   updateUserPassword: vi.fn(),
 }));
 
-vi.mock("bcryptjs", () => ({
-  default: {
-    hash: vi.fn(async (pw: string) => `hashed:${pw}`),
-    compare: vi.fn(async (pw: string, hash: string) => hash === `hashed:${pw}`),
-  },
+// Hashing runs in worker threads since Q-AUTH1 (server/passwordHashing.ts),
+// which a bcryptjs module mock cannot reach — mocked at that door instead.
+vi.mock("./passwordHashing", () => ({
+  hashPassword: vi.fn(async (pw: string) => `hashed:${pw}`),
+  verifyPassword: vi.fn(
+    async (pw: string, hash: string) => hash === `hashed:${pw}`
+  ),
 }));
 
 vi.mock("./_core/sdk", () => ({

@@ -375,6 +375,8 @@ Not urgent if keys are created with no expiration, which is now the rule.
       a signed plan link is a bearer credential). **Which request hung is
       NOT known** (`trace: "off"`); if the warning names one, chase it.
       No warning in the next 4 runs (Gate 37970377380 and its 3 re-runs).
+      Still none on 2026-10-15 night: Gate 38853660685's smoke log has no
+      `[smoke]` line at all (96 passed / 2 skipped). Track A, grep of the log.
 - [x] **Smoke flow test 5: a Legend click that did not arm, 2026-10-09 —
       FOUND AND FIXED (A, same day). A real wrong count, not a flaky test.**
       Gate 37970377380, smoke attempt 2, nothing deploying. "Link CI SWITCH"
@@ -1730,7 +1732,32 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
-- [ ] **Stress test Q-AUTH1 (Track C's sign-in burst, 2026-10-15; Track A
+- [ ] **Speed limit outlier (Track A, 2026-10-15 night): pricing a material
+      takes 221 ms in CI against 6 ms on a laptop** — every other save is
+      2–14 ms in CI (`server/speedLimits.test.ts`, Gate 38855631644, lines
+      `[speed]`). Under the 1 s limit, so the Gate is green; 35× the laptop
+      is the odd part. `materials.update` is three queries (`getMaterialById`,
+      `updateMaterial`, `getMaterialById`), so time each one in a CI run (a
+      temporary `console.log` around them) before guessing — the runner's
+      MySQL 8.0 may plan `getMaterialById` differently. **Done when** the CI
+      number is explained, and either fixed or written beside the limit.
+      **Next CI run (Gate 38857671207): 3 ms**, split by `[speed-detail]`
+      into 1 ms read / 1 ms write — NOT reproduced, so most likely one slow
+      moment on a shared runner. Left open to watch: if `[speed]` shows it
+      again, the detail lines now say where.
+- [x] **DONE 2026-10-15 night (Track A, on `track-a-night`), option (b):**
+      `server/passwordHashing.ts` runs `bcryptjs` in up to 4 worker threads;
+      `authRouter` and the starter editor's store use it. Same hashes, no new
+      dependency. `server/signInBurst.test.ts` (6 real cost-12 sign-ins
+      through `auth.login`, event-loop ticker): longest stall **874 ms before,
+      24 ms after** (limit 150), burst 1,811 → 586 ms; the hash it signs in
+      with is made by plain `bcryptjs`, so old passwords still work. Proved
+      from an esbuild bundle too. NOT re-measured with C's script on the
+      production build (no dev/prod server run tonight, memory) — do that on
+      staging after merge. `auth.email.test.ts` mocked `bcryptjs` by name;
+      its mock moved to `./passwordHashing`, same fake hashes, no assertion
+      changed. Was:
+      **Stress test Q-AUTH1 (Track C's sign-in burst, 2026-10-15; Track A
       to fix): 11 sign-ins at once stall EVERY other request ~0.7 s.**
       Measured on the production build (`references/stress-results.md` "Sign-in
       burst", on `track-c`): 11/11 sign-ins ok at ~680 ms each; an ordinary bid
@@ -3085,8 +3112,12 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 ## Follow-ups from v5.129 — Docs & Changelog
 
-- [ ] `references/deploying.md` § 8 says login is "OAuth-only; no password flow is wired up despite `passwordHash` existing on `users`" — untrue since v5.127/5.128. `server/routers/authRouter.ts` has bcrypt signup, login and change-password. That table is what someone reads to size the work of leaving Manus, and it currently overstates it by a whole login system.
-- [ ] `server/backup.test.ts` uses `"bidrender-backups"` as a fixture bucket name. Harmless test data — the real bucket is `bidsoftware` — but it is now the last place that string survives, so it will read like the configured value to whoever finds it next.
+- [x] **Already true, checked 2026-10-15 night (Track A):** `deploying.md`
+      no longer contains "OAuth-only" or "no password flow" (grep, both
+      phrases). Was: `references/deploying.md` § 8 says login is "OAuth-only; no password flow is wired up despite `passwordHash` existing on `users`" — untrue since v5.127/5.128. `server/routers/authRouter.ts` has bcrypt signup, login and change-password. That table is what someone reads to size the work of leaving Manus, and it currently overstates it by a whole login system.
+- [x] **DONE 2026-10-15 night (Track A):** the fixture is now
+      `"fixture-backup-bucket"`; `bidrender-backups` appears nowhere in
+      `server/` or `scripts/`. Was: `server/backup.test.ts` uses `"bidrender-backups"` as a fixture bucket name. Harmless test data — the real bucket is `bidsoftware` — but it is now the last place that string survives, so it will read like the configured value to whoever finds it next.
 - [ ] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
 
 ## Migration cutover — DigitalOcean App Platform
@@ -3102,7 +3133,10 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 ## Manus removal — what is left
 
-- [ ] Remove the dead Manus branch inside `server/_core/storageProxy.ts`. Since v5.141 it only ran when the storage backend was `manus`, which is no longer a backend, so it cannot be reached. **The `/manus-storage` web address itself stays exactly as it is** — it is written into `bid_pdfs.url` and the legacy `projects.pdfUrl` for every file already stored, so renaming it would break every existing plan link at once. It serves disk and R2 now; only the name is historical.
+- [x] **Already gone, checked 2026-10-15 night (Track A):** no `"manus"`
+      backend name in `storageProxy.ts` or `storageBackend.ts`; the proxy
+      resolves only disk and R2 (`resolveReadBackend`). The route name
+      stays, as below. Was: Remove the dead Manus branch inside `server/_core/storageProxy.ts`. Since v5.141 it only ran when the storage backend was `manus`, which is no longer a backend, so it cannot be reached. **The `/manus-storage` web address itself stays exactly as it is** — it is written into `bid_pdfs.url` and the legacy `projects.pdfUrl` for every file already stored, so renaming it would break every existing plan link at once. It serves disk and R2 now; only the name is historical.
 - [ ] Remove `BUILT_IN_FORGE_API_KEY` and `BUILT_IN_FORGE_API_URL` when the Manus AI fallback in `server/_core/llm.ts` goes. Nothing else needs them once that and the proxy branch above are gone. Neither is set on DigitalOcean, so that fallback is already dead on the live site — the app runs on `ANTHROPIC_API_KEY`. They are still read by `server/_core/env.ts`, which is what defines `ENV.forgeApiUrl` / `ENV.forgeApiKey`.
 
 ### Docs (group F)
@@ -3410,7 +3444,12 @@ DATABASE_URL='mysql://user:pass@127.0.0.1:3307/bidrender_test' pnpm test
 
 `pnpm db:push` against that same URL first, once, to create the tables.
 
-- [ ] Create `bidrender_test` and make it the default for `pnpm test`, so the
+- [x] **Superseded — closed 2026-10-15 night (Track A):** the suite now
+      REFUSES any database whose name does not say test (`vitest.config.ts`
+      setup; seen tonight: "Refusing to run tests against
+      \"bidrender_local\""), so a bare `pnpm test` no longer writes to dev
+      data — it stops. Each checkout uses its own `*_test*` database. Was:
+      Create `bidrender_test` and make it the default for `pnpm test`, so the
       safe path is the one you get by typing the obvious command. A guard that
       has to be remembered is not a guard. Until then, treat a bare
       `pnpm test` as "this writes to my dev data" — it does.
@@ -3739,7 +3778,10 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 - [x] **BUILT 2026-09-27 (Track B): "Export takeoff" (CSV).** On the Takeoff screen beside "Materials list", and "Takeoff" in the bid's Send menu. One table by sheet and one for the whole bid, same columns: plan file, page, sheet, title, Count/Run, item, **Status (Draft / Finished)**, unit, quantity, traced ft, vertical ft, wire ft, ground ft, note. Then notes saying what is not in it: no extra (§ 5j is not built), no fittings (they are on the Materials list), no suggested runs, and untyped runs by count. **Quantities only**, by the owner's decision: prices come later as an explicit choice, off by default. Run footage goes through `groupRunFootage` over `loadRunFootageInput`, the bid's own path, split by sheet and status. `server/takeoffExport.test.ts` holds the file equal to `footageByRunType` and `countStampsByGroup` on a bid with three sheets at three scales. **A measurement nobody took is blank, not 0:** a no-scale sheet's feet, a cable's wire and ground, and a vertical figure whose ends have no heights are all blank (the new `endsNotCountedCount` tells an uncounted 0 from a real one). On screen, "Bar layout check": one mark added, the next export read 3 + 1 = 4; mark removed afterwards. The original request follows.
       **There is no way to take a takeoff out of the app as numbers.** Asked 2026-09-19, and it is a door the product promised early: numbers come off the plans and go into whatever the estimator already uses. Two CSVs exist and neither is it. The **materials list** (Takeoff → "Materials list" → CSV, and the same dialog on the bid) is a SUPPLIER document — quantities with no prices, and `shared/materialsList.ts` has nowhere to put one on purpose; traced runs arrive in it as one lump of conduit, one of cable and one of wire, because nothing carries the run TYPE through to it. The **accounting export** (`shared/accountingExport.ts`) is the bid's money in QuickBooks invoice shape, with cost and margin deliberately absent. What is missing is the takeoff itself: **every count by type with its quantity, and every run by type with its traced, vertical and extra footage**, per sheet and for the bid, with the sheet each came from. Most of it is already computed — `takeoffGroups.list` has the counts, `takeoffRuns.totals` has the footage, `shared/csvWrite.ts` writes the file — so this is a new shape over existing numbers rather than new arithmetic. **Two things to get right:** it is an internal document, so unlike the supplier list it MAY carry prices, and the choice of whether it does has to be explicit rather than inherited from whichever builder was copied; and it must say what it does not include, the way the materials list already does about verticals and extra. See `references/plan-viewer-overhaul.md` § 5j for the extra footage it will have to show once that exists. **Build § 5n first** — an export of run footage by type, taken from a palette in which no type names a material, writes rows that carry a name and no specification.
 
-- [ ] **Typecheck the tests.** `tsconfig.json` excludes `**/*.test.ts`, so `pnpm check` — the correctness gate — covers no test file at all. Measured 2026-09-20: making one field required produced 0 errors from `pnpm check` and 28 from a config that includes tests; after fixing those, **33 pre-existing errors remain across ten test files** (`server/pricing.test.ts` 7, `server/auth.email.test.ts` 4, `client/src/lib/tradeContent.test.ts` 4, and the rest in ones and twos). **Re-measured 2026-09-26: 124 errors across 23 files** — it has nearly quadrupled in six days, because nothing checks it. Largest: `server/takeoffMath.test.ts` 38, `server/materialMarkupAgreement.test.ts` 26, `server/accountingExport.test.ts` 12, `server/takeoffVerticals.test.ts` 8, `server/pricing.test.ts` 7. `server/v545.test.ts` had 2 and is now clean. Measured with a tsconfig that extends the real one and drops only the `**/*.test.ts` exclusion. **The growth is the argument for doing this soon:** every week it waits, the piece gets bigger. **Why it matters more than it looks:** every forcing function added on 2026-09-20 — the required field, the props union, the row-taking mapper — is enforced in `server/`, `shared/` and `client/src/` and is silently absent in the tests, so a fixture can construct a shape the production code cannot. That is the difference between a type-level guarantee and a type-level suggestion. **Do it as its own piece, not inside another change:** the 33 have to be read individually, and the failure mode of hurrying is a test "fixed" by weakening what it asserts. Flip the exclusion, fix them, and the gate finally means what CLAUDE.md says it means.
+- [x] **DONE 2026-09-26 (CLAUDE.md § "`pnpm check` covers the tests");
+      entry closed 2026-10-15 night (Track A):** `tsconfig.json`'s `exclude`
+      is `node_modules`, `build`, `dist` only, and `pnpm check` is clean.
+      Was: **Typecheck the tests.** `tsconfig.json` excludes `**/*.test.ts`, so `pnpm check` — the correctness gate — covers no test file at all. Measured 2026-09-20: making one field required produced 0 errors from `pnpm check` and 28 from a config that includes tests; after fixing those, **33 pre-existing errors remain across ten test files** (`server/pricing.test.ts` 7, `server/auth.email.test.ts` 4, `client/src/lib/tradeContent.test.ts` 4, and the rest in ones and twos). **Re-measured 2026-09-26: 124 errors across 23 files** — it has nearly quadrupled in six days, because nothing checks it. Largest: `server/takeoffMath.test.ts` 38, `server/materialMarkupAgreement.test.ts` 26, `server/accountingExport.test.ts` 12, `server/takeoffVerticals.test.ts` 8, `server/pricing.test.ts` 7. `server/v545.test.ts` had 2 and is now clean. Measured with a tsconfig that extends the real one and drops only the `**/*.test.ts` exclusion. **The growth is the argument for doing this soon:** every week it waits, the piece gets bigger. **Why it matters more than it looks:** every forcing function added on 2026-09-20 — the required field, the props union, the row-taking mapper — is enforced in `server/`, `shared/` and `client/src/` and is silently absent in the tests, so a fixture can construct a shape the production code cannot. That is the difference between a type-level guarantee and a type-level suggestion. **Do it as its own piece, not inside another change:** the 33 have to be read individually, and the failure mode of hurrying is a test "fixed" by weakening what it asserts. Flip the exclusion, fix them, and the gate finally means what CLAUDE.md says it means.
   - **2026-09-26: 124 → 4**, one commit per file (21 commits, `db116dd`..`72c11fa`), each with that file's test count identical before and after, no cast / `any` / `@ts-ignore`, no assertion weakened. The recurring causes were fixtures behind a type that grew (`separateGround`, `productivityPct`, `materialMarkup`, four `User` columns), `Partial` being shallow, read-backs typed `| undefined`, a nullable `breakdown` (from `88270df`), and the missing `target` below.
   - [x] **`server/takeoffBridgeFlow.test.ts` — fixed 2026-09-26, `3e8e973`.** The fork assertion read `forked!.id`, `undefined` because `assemblies.update` returns `{ assembly, forked }`, so that one assertion could never fail; it is now `expect(forked.assembly?.id).not.toBe(baselineId)`. **Correcting what was written here before:** "the test proves nothing" was too strong. Measured against an update made never to fork, the OLD test still went red — two assertions later, on a snapshot-hours mismatch (`expected 0.5 to be 1.25`), blaming the wrong thing. The new line fails at the fork itself (`expected 14391 not to be 14391`). The missing `category` was stated as `"Devices"`, which is what MySQL had been storing (measured, even under strict mode).
   - [x] **`server/permissions.test.ts` — the shipped type defect, fixed and deployed 2026-09-26, `e899092`.** The two `as unknown as [CompanyRole, …]` casts in `companyRouter.ts` are gone; `role: "owner"` is now a compile error and the `@ts-expect-error` lines are used. **Correcting the fix proposed here before:** no literal tuple was needed and `shared/permissions.ts` did not change — the cast was a zod 3 workaround, and zod 4's `z.enum` takes the already-correctly-typed filtered array. Emitted JS for the file is byte-identical, so the runtime refusal is the same code; checked live before and after the deploy (owner refused by `invalid_value` against `["admin","estimator","viewer"]`, the three normal roles invite).

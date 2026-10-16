@@ -1,4 +1,6 @@
-import bcrypt from "bcryptjs";
+// bcrypt runs in worker threads so a burst of sign-ins cannot stall every
+// other request (Q-AUTH1, server/passwordHashing.ts).
+import { hashPassword, verifyPassword } from "../passwordHashing";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME, DATA_UNAVAILABLE_MSG } from "@shared/const";
@@ -285,7 +287,7 @@ export const authRouter = router({
         const user = await signUpWithInvite(found, {
           email: input.email.toLowerCase(),
           name: input.name ?? input.email.split("@")[0],
-          passwordHash: await bcrypt.hash(input.password, SALT_ROUNDS),
+          passwordHash: await hashPassword(input.password, SALT_ROUNDS),
           openId: `email_${nanoid(24)}`,
           now,
         });
@@ -299,7 +301,7 @@ export const authRouter = router({
         };
       }
 
-      const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+      const passwordHash = await hashPassword(input.password, SALT_ROUNDS);
       // Generate a stable openId for email/password users
       const openId = `email_${nanoid(24)}`;
 
@@ -378,11 +380,11 @@ export const authRouter = router({
 
       if (!user || !user.passwordHash) {
         // Constant-time guard: hash a dummy password to prevent timing attacks
-        await bcrypt.hash("dummy_timing_guard", SALT_ROUNDS);
+        await hashPassword("dummy_timing_guard", SALT_ROUNDS);
         throw wrong();
       }
 
-      const valid = await bcrypt.compare(input.password, user.passwordHash);
+      const valid = await verifyPassword(input.password, user.passwordHash);
       if (!valid) throw wrong();
       // The starter editor signs in only at starterAuth, with its second
       // step. Refused here with the same words as a wrong password, so this
@@ -440,7 +442,7 @@ export const authRouter = router({
           code: "TOO_MANY_REQUESTS",
           message: tooManySignIns(wait),
         });
-      const valid = await bcrypt.compare(
+      const valid = await verifyPassword(
         input.currentPassword,
         user.passwordHash
       );
@@ -454,14 +456,14 @@ export const authRouter = router({
 
       // Against the stored hash, not the typed current password: bcrypt
       // reads only 72 bytes, so two different strings can be one password.
-      if (await bcrypt.compare(input.newPassword, user.passwordHash))
+      if (await verifyPassword(input.newPassword, user.passwordHash))
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: SAME_AS_CURRENT_PASSWORD,
         });
 
       await refuseLeakedPassword(input.newPassword);
-      const newHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+      const newHash = await hashPassword(input.newPassword, SALT_ROUNDS);
       // Ends every session issued before now — this device's included…
       await db.updateUserPassword(user.id, newHash);
       // …so this device gets a fresh one and stays signed in, while every
@@ -624,7 +626,7 @@ export const authRouter = router({
       const currentHash = await db.getResetTokenPasswordHash(
         hashResetToken(input.token)
       );
-      if (currentHash && (await bcrypt.compare(input.newPassword, currentHash)))
+      if (currentHash && (await verifyPassword(input.newPassword, currentHash)))
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: SAME_AS_CURRENT_PASSWORD,
@@ -632,7 +634,7 @@ export const authRouter = router({
       // Also before the claim, so a refused password leaves the link usable.
       await refuseLeakedPassword(input.newPassword);
 
-      const passwordHash = await bcrypt.hash(input.newPassword, SALT_ROUNDS);
+      const passwordHash = await hashPassword(input.newPassword, SALT_ROUNDS);
       const userId = await db.completePasswordReset(
         hashResetToken(input.token),
         passwordHash
