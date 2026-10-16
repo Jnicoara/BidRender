@@ -489,3 +489,13 @@ running. Owner added mid-step: COUNTING DEEP TEST goes right after item 2.
   markReplay, upload guard, typed packs, snapshot N2, end-of-pricing list),
   each with where it is, what the day needs, and whether it moves a total;
   the backup drill and bidTotalsDump as day checks. Doc only.
+
+## Item 14a — type-check: tests already covered; scripts/ and pricing/ now too — 00:52 → 00:49
+
+- Tests: already in `pnpm check` (tsconfig includes them; closed earlier).
+- `tsconfig.scripts.json` (target ES2022, scripts/ + pricing/ .mts/.ts):
+  6 errors → 0, three real faults fixed — rehearseBackfill read renamed
+  totals (now conduit/cable/wire BOUGHT feet), groundShareImpact dropped the
+  typed length (now `tracedRunOf(row)`), pricing builder's brand rows had
+  no Type. `pnpm check` = both configs (72 s locally). CLAUDE.md paragraph
+  updated (it said these were not covered).
