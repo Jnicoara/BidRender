@@ -2381,6 +2381,32 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       symbol learning later. Nothing may export, pool or share it — even the
       anonymised half — until users have agreed to terms that say so. Not
       blocking the log itself; blocking the first read of it.
+- [ ] **Copy pass leftovers (C, night 4, 2026-10-16) — each checked in code,
+      not fixed tonight:**
+      - **"Overridden on this bid" on every bid that has left Draft.** The
+        freeze (`freezeBidSettings`) writes the company's overhead, profit
+        and productivity into the bid's own columns, and
+        `resolveBidPricingSettings` calls any non-null column "bid", so a
+        sent bid nobody touched reads "Overridden on this bid" and "for
+        this bid" (BidsPage ~2959, 2976, 3080, 3165). Telling "frozen" from
+        "typed" needs a record of which the freeze wrote — a column (A) or
+        a rule; owner/A decision.
+      - **Assemblies list "Hours" column** says "hours not set" for an
+        assembly priced from its timed steps (the list rows carry no hours
+        source). The editor and its preview were fixed tonight.
+      - **A price typed back to $0** is stamped `priceUpdatedAt` and reads
+        "current" on Supplier pricing (`db.ts` ~2445); `priceAge` reads
+        only the date.
+      - **Dashboard "Out for bid"** sums Draft and Active; Drafts have not
+        gone out. Wording is the owner's (headline).
+      - **"Archived" vs "Recently deleted"** — Bids search says "include
+        archived bids" for the state the rest of the app now calls
+        Recently deleted.
+      - **"Open the bid…"** in `NotPricedTotal` / `IncompletePriceTag` also
+        shows ON the bid; and `NOT_PRICED_TOTAL_WHY` says unpriced lines
+        "add nothing" while a labor-with-$0-material line adds its labor.
+      - **Branding "printed at about 1.5 inches wide"** depends on the
+        logo's shape (capped 220×64 px; a square logo is ~0.7 in).
 - [ ] **AI correction log, the symbol picture (client half) — Plans screen,
       for B or after B's night** (C, 2026-10-16). The log is written
       (`server/aiCorrections.ts`, every path in the plan plus Move-to-count

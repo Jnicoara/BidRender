@@ -44,6 +44,7 @@ import {
   INVITABLE_ROLES,
   CAPABILITY_LABEL,
   capabilitiesFor,
+  outranks,
   roleLabel,
   type CompanyRole,
 } from "@shared/permissions";
@@ -347,48 +348,55 @@ export default function TeamPage({ onBack }: { onBack?: () => void }) {
                         : roleLabel(member.role)}
                     </span>
 
-                    {canManage && member.role !== "owner" && !isSelf && (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Select
-                          value={member.role}
-                          onValueChange={v =>
-                            setRole.mutate({
-                              userId: member.userId,
-                              role: v as Exclude<CompanyRole, "owner">,
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-7 w-32 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {INVITABLE_ROLES.map(role => (
-                              <SelectItem key={role} value={role}>
-                                {roleLabel(role)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs"
-                          onClick={() =>
-                            setStatus.mutate({
-                              userId: member.userId,
-                              status:
-                                member.status === "suspended"
-                                  ? "active"
-                                  : "suspended",
-                            })
-                          }
-                        >
-                          {member.status === "suspended"
-                            ? "Restore"
-                            : "Suspend"}
-                        </Button>
-                      </div>
-                    )}
+                    {/* Only people you outrank — the server's own rule
+                        (companyRouter setRole/setStatus). An admin was shown
+                        controls for another admin that always refused. */}
+                    {canManage &&
+                      member.role !== "owner" &&
+                      !isSelf &&
+                      access.role !== null &&
+                      outranks(access.role, member.role as CompanyRole) && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <Select
+                            value={member.role}
+                            onValueChange={v =>
+                              setRole.mutate({
+                                userId: member.userId,
+                                role: v as Exclude<CompanyRole, "owner">,
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-7 w-32 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {INVITABLE_ROLES.map(role => (
+                                <SelectItem key={role} value={role}>
+                                  {roleLabel(role)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() =>
+                              setStatus.mutate({
+                                userId: member.userId,
+                                status:
+                                  member.status === "suspended"
+                                    ? "active"
+                                    : "suspended",
+                              })
+                            }
+                          >
+                            {member.status === "suspended"
+                              ? "Restore"
+                              : "Suspend"}
+                          </Button>
+                        </div>
+                      )}
                   </div>
                 );
               })}
