@@ -1675,14 +1675,18 @@ Two pieces, owner-approved to build before beta. They came out of the
 coverage checks in `references/coverage-check.md`, which list what the
 starters miss. These two catch what a list cannot.
 
-- [ ] **(a) No-match search log.** When a picker search (assembly or
+- [x] **BOTH BUILT (checked 2026-10-16):** (a) `server/routers/searchMissesRouter.ts`
+      + the Admin screen's "searches that found nothing"
+      (`server/searchMissLog.test.ts`); (b) `components/BuildFromPartsPanel.tsx`,
+      reached from the Count picker, the assembly search and Quick bid.
+- [x] **(a) No-match search log.** When a picker search (assembly or
       material) returns nothing, record the search words: company id, the
       words, and the date. **No prices and no bid contents** — only the
       words typed. Add a simple list the owner can view (admin), newest
       first, with repeats counted. **No AI** reads it or suggests from it.
       It shows what people look for and do not find, so the next catalog
       and starter work follows real searches, not guesses.
-- [ ] **(b) "Build it from parts here."** When a user cannot find an
+- [x] **(b) "Build it from parts here."** When a user cannot find an
       assembly, let them build one from parts on the spot, use it on the
       bid, and save it to their library. Ties to
       `references/never-stuck-plan.md` (the owner's rule: a user must never
