@@ -197,7 +197,8 @@ test("scale: the printed scale is OFFERED, never applied; Use it sets it", async
 });
 
 test("count: type a name, mark three, the server holds three where they were put", async () => {
-  await act(page.getByRole("button", { name: /^Count/ }).first());
+  // The toolbar's Count tool by its exact name (the step bar's is "Step: Count").
+  await act(page.getByRole("button", { name: "Count", exact: true }).first());
   await page
     .getByPlaceholder("Search, or type anything to count it…")
     .fill("Deep receptacle");
@@ -277,7 +278,8 @@ test("select two marks and delete them; Undo puts both back where they were", as
 });
 
 test("Just count: marks land in Unassigned; Pick what they are names them all", async () => {
-  await act(page.getByRole("button", { name: /^Count/ }).first());
+  // The toolbar's Count tool by its exact name (the step bar's is "Step: Count").
+  await act(page.getByRole("button", { name: "Count", exact: true }).first());
   await act(page.getByRole("button", { name: /Just count/ }).first());
   await placeAt({ x: 1000, y: 500 });
   await placeAt({ x: 1100, y: 500 });

@@ -116,6 +116,7 @@ import {
   packetSchema,
   sealPacket,
 } from "../restorePacket";
+import { fieldJob } from "../../shared/fieldJobs";
 
 /** Lines priced at an older labor rate than their role has now. */
 async function staleRatesFor(
@@ -135,6 +136,12 @@ async function staleRatesFor(
  * without anyone remembering to tag it. See _core/trpc.ts.
  */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 const nameSchema = z.string().trim().min(1).max(255);
 const qtySchema = z.number().min(0).max(999999);
@@ -376,6 +383,29 @@ export const bidsRouter = router({
   list: procedure.query(async ({ ctx }) => {
     return db.getBidsByUser(ctx.scope.dataUserId);
   }),
+
+  /**
+   * The company's live jobs WITHOUT money, for a Field member's job list
+   * (references/field-and-coowner-plan.md § 1, F2). Fields named one by one
+   * (`fieldJob`): a column added to `bids` later reaches this list only when
+   * somebody writes it here (CLAUDE.md § "Where to be structural, and where
+   * to be explicit"). `server/fieldNoPrices.test.ts` checks the answer.
+   */
+  fieldList: plansRead.query(async ({ ctx }) =>
+    (await db.getBidsByUser(ctx.scope.dataUserId)).map(fieldJob)
+  ),
+
+  /**
+   * What the Plans screen's header needs about its bid — the name — and
+   * nothing priced. Every role reads this one, so the Plans screen sends no
+   * money-carrying query for its header. NOT_FOUND like `bids.get`, so the
+   * "This bid doesn't exist" pane still knows (@/lib/plansPane).
+   */
+  basics: plansRead
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) =>
+      fieldJob(await requireBid(input.id, ctx.scope.dataUserId))
+    ),
 
   /**
    * Every bid with enough to place it on the dashboard: its own fields plus a

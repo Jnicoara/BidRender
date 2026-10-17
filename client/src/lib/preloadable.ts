@@ -33,10 +33,17 @@ type Module<P> = { default: ComponentType<P> };
 export type Preloadable<P> = FunctionComponent<P> & {
   /** Start loading now; resolves when the module is here. Safe to repeat. */
   preload: () => Promise<Module<P>>;
+  /**
+   * Fetch ahead in the background, nobody waiting: through `load.quiet`
+   * when the loader has one (@/lib/lazyPage `reloadingImport`), so a failure
+   * here never reloads the tab — it is forgotten, and the page's own render
+   * asks again (and may reload) only if somebody opens it.
+   */
+  prefetch: () => Promise<void>;
 };
 
 export function preloadable<P extends object>(
-  load: () => Promise<Module<P>>,
+  load: (() => Promise<Module<P>>) & { quiet?: () => Promise<Module<P>> },
   Fallback: ComponentType = () => null
 ): Preloadable<P> {
   let loaded: ComponentType<P> | null = null;
@@ -73,5 +80,14 @@ export function preloadable<P extends object>(
     if (failure) throw failure;
     return Page ? createElement(Page, props) : createElement(Fallback);
   };
-  return Object.assign(Component, { preload });
+  const prefetch = (): Promise<void> => {
+    if (loaded || pending) return Promise.resolve();
+    return (load.quiet ?? load)().then(
+      mod => {
+        loaded ??= mod.default;
+      },
+      () => {}
+    );
+  };
+  return Object.assign(Component, { preload, prefetch });
 }

@@ -3,6 +3,29 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Field and Co-owner — after FR-M1 (Track B, 2026-10-16, waits for A)
+
+`references/field-and-coowner-plan.md`. **Built on track-b with no column:**
+`plans.view` (Field's only capability; every role has it), the roles' rules
+(`PLANNED_ROLES`, `ROLE_RANK`, `mayGrant`), 17 Plans reads opened to it,
+`bids.fieldList` / `bids.basics`, the Jobs screen, Field's nav, the Plans
+screen view-only for anyone without `bids.edit`, and
+`server/fieldNoPrices.test.ts` (every route in the app, as a Field member).
+Looked at with a real `field` row on a throwaway DB
+(`references/overnight-shots/b/field-*.png`). After A applies FR-M1:
+
+1. Move `"coowner"` and `"field"` from `PLANNED_ROLES` into `COMPANY_ROLES`
+   (stored order: append, as the enum) so `INVITABLE_ROLES` includes Field.
+2. Crew page: offer Field in invites and role changes; offer Co-owner in
+   role changes only, and only to the owner or a co-owner (`mayGrant`).
+3. `companyRouter.setRole` / `setStatus`: the owner may act on a co-owner;
+   co-owners not on each other (already true by `outranks`). Add a test.
+4. `server/fieldNoPrices.test.ts`: store the member as `field` and drop the
+   `capabilitiesFor` mock.
+5. **Built 2026-10-16, NOT looked at yet:** a view-only Plans screen no longer
+   shows each count row's undo and bin icons (they were greyed, as on a
+   locked bid). Look at it with the first real Field login.
+
 ## Bid methods — wiring left (Track B, 2026-10-16, waits for A's BM-M1..M10)
 
 `references/bid-methods-plan.md`, all 16 picks approved. **Built on track-b
@@ -1860,9 +1883,9 @@ Design: `references/homerun-footage-plan.md` § 4.
       plan could not be opened" instead. Found by `e2e/smoke/pdfs.spec.ts`
       work.
 
-### Plans: a mouse in an ~820 px window leaves the drawing ~80 px wide (Track B, 2026-10-16, NOT fixed — layout policy)
+### Plans: a mouse in an ~820 px window leaves the drawing ~80 px wide (Track B, 2026-10-16) — FIXED same day, owner's call
 
-- [ ] `plansLayout` gives a mouse at 768 px or wider the laptop layout, with
+- [x] **DONE 2026-10-16 (owner: "start the side panel folded"):** `openingPanels` folds the sheet list at the start when both panels would leave the drawing under 400 px (≈ under 1,140 px at default widths; not stored). 820 px: drawing 80 → 310 px; 900: 160 → 390; 1440, iPad, phone unchanged (`narrow-laptop-*.png`). Was: `plansLayout` gives a mouse at 768 px or wider the laptop layout, with
       the sheet list AND the panel open beside the drawing. At 820 x 1180
       the drawing gets about 80 px, and a damaged plan's message wraps one
       word per line (`references/overnight-shots/b/plans-unopenable-ipad.png`).

@@ -179,3 +179,41 @@ function readWidth(value: unknown, key: PanelKey): number {
 export function serialisePanelState(state: PanelState): string {
   return JSON.stringify(state);
 }
+
+/**
+ * What the laptop layout spends beside the two panels: the app's nav rail,
+ * the panels' fold handles and borders. MEASURED 2026-10-16 on "Bar layout
+ * check": at 1440 px with panels of 240 + 400 the drawing pane was 700 px,
+ * so 1440 − 640 − 700 = 100.
+ */
+export const LAPTOP_CHROME_PX = 100;
+
+/**
+ * The least drawing worth opening on. Below it the screen opens with the
+ * sheet list folded. Measured with both panels open, 2026-10-16: 820 px gave
+ * the drawing ~80 px and 900 px gave 160 — a drawing nobody can mark on
+ * (owner: "start the side panel folded so the drawing gets room").
+ */
+export const MIN_OPENING_DRAWING_PX = 400;
+
+/**
+ * The arrangement the screen OPENS with. When both panels would leave the
+ * drawing under `MIN_OPENING_DRAWING_PX`, the sheet list starts folded and
+ * the counted-items panel stays — the panel is what a takeoff reads, the
+ * sheet list is one tap away. With the default widths that is a window under
+ * about 1,140 px. Only the start: nothing is written back, so the remembered
+ * choice still holds in a wide window, and a person who opens the list keeps
+ * it open while the page is open. Laptop layout only (a tablet and a phone
+ * lay out differently); focus mode and an already-folded list stay as stored.
+ */
+export function openingPanels(
+  stored: PanelState,
+  window: { width: number; layout: "phone" | "tablet" | "laptop" }
+): PanelState {
+  if (window.layout !== "laptop" || isFocusMode(stored) || !stored.sheets)
+    return stored;
+  const work = stored.work ? stored.workWidth : 0;
+  const drawing = window.width - LAPTOP_CHROME_PX - stored.sheetsWidth - work;
+  if (drawing >= MIN_OPENING_DRAWING_PX) return stored;
+  return { ...stored, sheets: false };
+}

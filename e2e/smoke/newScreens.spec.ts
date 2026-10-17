@@ -164,6 +164,16 @@ test("step bar: shows where the bid stands, and Next goes there", async ({
   await expect(steps).toBeVisible();
   const next = steps.getByRole("button", { name: /Next:/ });
   await expect(next).toBeVisible();
+  // Each step answers to its OWN name, never the bare tool word: on the Plans
+  // screen "Count" and "Runs" are toolbar buttons too, and a shared name sent
+  // the smoke's "Count" to the step (2026-10-16).
+  for (const step of ["Plans", "Scale", "Count", "Runs", "Review", "Print"])
+    await expect(
+      steps.getByRole("button", { name: `Step: ${step}`, exact: true })
+    ).toHaveCount(1);
+  await expect(
+    steps.getByRole("button", { name: "Count", exact: true })
+  ).toHaveCount(0);
   expect(await layoutProblems(page)).toEqual([]);
   await shot(page, "step-bar", info.project.name);
   const before = page.url();

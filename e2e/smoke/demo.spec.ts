@@ -128,7 +128,9 @@ test("a demolition title is OFFERED its tag after upload; nothing is tagged unti
 });
 
 test("marks on the demo sheet start as Remove; on new work, as new", async () => {
-  await act(page.getByRole("button", { name: /^Count/ }).first());
+  // The toolbar's Count tool by its exact name — `/^Count/` also matched the
+  // step bar's "Count" above it, which came first (2026-10-16).
+  await act(page.getByRole("button", { name: "Count", exact: true }).first());
   await page
     .getByPlaceholder("Search, or type anything to count it…")
     .fill("Demo receptacle");

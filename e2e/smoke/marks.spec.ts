@@ -240,7 +240,8 @@ test("marks on two sheets and a run, saved where they were put", async () => {
   await page.reload();
   await expect(canvas()).toBeVisible({ timeout: 90_000 });
   await fit();
-  await act(page.getByRole("button", { name: /^Count/ }).first());
+  // The toolbar's Count tool by its exact name (the step bar's is "Step: Count").
+  await act(page.getByRole("button", { name: "Count", exact: true }).first());
   await page
     .getByPlaceholder("Search, or type anything to count it…")
     .fill("Kept receptacle");

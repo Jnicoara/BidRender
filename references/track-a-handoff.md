@@ -89,6 +89,40 @@ reads to everyone else as a fault in their code. Throwaway databases you
 create and drop yourself are exempt. (Prompted by A's own false alarm on
 2026-10-16 — nobody had replaced `bidrender_local`; see session 48.)
 
+## FROM B — 2026-10-16 evening: Field and Co-owner roles, SQL draft FR-M1 for A
+
+**Owner: "PLAN then BUILD 'Field' role … and 'Co-owner' role. Migrations:
+throwaway DB only, SQL drafts for A."** Plan:
+`references/field-and-coowner-plan.md`. One draft, ADDITIVE (step 1; step 3
+empty): the two values are APPENDED, so every stored role keeps its value
+and its index.
+
+```sql
+-- FR-M1  two more company roles: co-owner, field
+ALTER TABLE `company_members` MODIFY `role`
+  enum('owner','admin','estimator','viewer','coowner','field')
+  NOT NULL DEFAULT 'estimator';
+ALTER TABLE `company_invites` MODIFY `role`
+  enum('owner','admin','estimator','viewer','coowner','field')
+  NOT NULL DEFAULT 'estimator';
+```
+
+**Schema, same commit:** `COMPANY_ROLE_VALUES` in `drizzle/schema.ts` gains
+`"coowner", "field"` at the END. (Rank is code — `ROLE_RANK` in
+`shared/permissions.ts` — not the enum order.)
+
+**Tested by B on a throwaway DB** (`bidrender_test_field_throwaway`, 164
+migrated from zero, FR-M1 applied, then dropped): both ALTERs clean; on a
+probe table with the old enum, rows 'owner','admin','estimator','viewer'
+kept their values AND indexes 1–4 and 'field' stored at 6. A dev server on
+that DB with a real `field` member: the scope read `["plans.view"]`, the job
+list carried no money, `bids.get` was refused, and the Plans screen at
+laptop / iPad / phone sent no request the server refused. No FK change.
+
+**After you apply it,** B moves the two roles into `COMPANY_ROLES`, the Crew
+page offers them, and `server/fieldNoPrices.test.ts` uses a real Field row
+(`todo.md` § "Field and Co-owner — after FR-M1").
+
 ## FROM B — 2026-10-16: Bid methods + prevailing wage, SQL drafts BM-M1..M10 for A
 
 **Owner: "BUILD BID METHODS + PREVAILING WAGE … put final SQL drafts
