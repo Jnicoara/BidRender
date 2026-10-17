@@ -1356,9 +1356,14 @@ All additive and nullable. Specs are in the plans named.
       **3004 does NOT have** "Move to…", the review page's jump-to-spot link,
       or Find all matching (`895cd7c`…`74b040a`) — moving it to them reloads
       his page, so ask first.
-- [ ] **Whoever merges track-c: two small conflicts in `LegendPanel.tsx`
+- [x] **CLOSED 2026-10-16 (checked, not assumed):** both items below are
+      done — track-c has been merged into local-dev many times since, and
+      `258718d` and the 60,000-character thumbnail limit
+      (`SYMBOL_THUMBNAIL_MAX_CHARS` in `shared/symbolCapture.ts`) are on
+      `origin/main`, i.e. live.
+- [x] **Whoever merges track-c: two small conflicts in `LegendPanel.tsx`
       with Track B's 8a.** Keep BOTH buttons, and B's `text-xs`.
-- [ ] **Capture fixes (258718d + blur fix) must ship in the next live
+- [x] **Capture fixes (258718d + blur fix) must ship in the next live
       release.** Both are on `track-c` only (2026-09-30). Checked that day:
       live (`3ca33dc`) and staging (`0af50a6`) both still draw the "Name
       this symbol" box inside the zoom transform (`SymbolCapture.tsx`, the
@@ -1573,6 +1578,7 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       it is shown again. Refusing the edits server-side needs ONE guard in
       every route that writes under a bid, the plan-screen routes (Track B)
       included — or an owner decision that editing in the trash is fine.
+      **Asked 2026-10-16: Q-ARCH1 in `pricing/morning-questions.md`.**
 
 ### Price-list import: one material at two prices is REFUSED (owner, 2026-10-16, Q-IMP1)
 

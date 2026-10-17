@@ -47,6 +47,12 @@ pricing tier — so it hides screens and is never a lock on the server).
 - **TR5** A company's trades → **set in Settings, default electrical**;
   signup asks the level only.
 - **TR6** QuickBooks "Electrical work" → **booked by each line's trade.**
+- **Q-ARCH1 (from todo.md, drill 2026-10-15)** A bid in Recently deleted
+  can still be EDITED from another tab (lines, quantities, name) — the
+  screen already says "This bid is in Recently deleted … Restore". Refuse
+  every edit on the server until it is restored? → **Yes, refuse** ("Restore
+  it first"). Affects: one guard on every route that writes under a bid,
+  Plans-screen routes included (B's).
 
 ## ⚠⚠ NIGHT 3 (2026-10-15 → 16) — WRONG NUMBERS FOUND, fixed on track-c, need your call on what is already saved
 
