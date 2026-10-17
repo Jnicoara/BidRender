@@ -1981,6 +1981,13 @@ Design: `references/homerun-footage-plan.md` § 4.
       query and the cards' first paint with 50, 100 and 200 marked bids, and
       write the numbers next to the code. Do it with the 500-sheet item
       above. No number is claimed here yet.
+- [ ] **DRAFTED 2026-10-16 night as 0168 — applies after the live release
+      (freeze).** `references/drafts/migrations-0168/`: `clientKey` +
+      UNIQUE (`bidId`, `clientKey`), `drop` keyed by the database (INSERT
+      IGNORE, ids read back by key; a key with no mark is refused, never
+      reported placed), `server/markReplay.ts` deleted, restore refuses a
+      duplicate. Red-first: two racing sends of one batch counted 6 for 3
+      on the candidate (`markReplay.test.ts`), 3 with the draft. Original:
 - [ ] **Durable "a mark is placed once per key" (Track A, 2026-10-16) —
       WRONG-NUMBER RISK, partly closed.** A batch of marks resent after a lost
       answer counted twice. Closed in memory on `track-a-night`
@@ -3811,6 +3818,10 @@ path is ever revived, give it the same treatment first.
       attached items stay out. No migration for v1. **Handoff for Track A**
       (§ 10): H1 a quote bucket per expense, and H2 the example-price flag
       with a saved copy on each bid line.
+- [x] **CLOSED 2026-10-16 night (Track A, checked against the schema):
+      `takeoff_stamps.dropExcluded` is in 0098**, read by `shared/groupDrops.ts`
+      and `takeoffStampsRouter` (tests `groupDrops`, `runDropCases`,
+      `selectionDrop`). This box was never ticked. Original entry:
 - [ ] **Track A (migration): remove ONE mark's drop.** Asked for with "Undo
       drops" (built 2026-09-29, `34f8515`) and not built, because a drop is
       set on the count and nothing on `takeoff_stamps` can exclude one mark.
@@ -3857,6 +3868,8 @@ path is ever revived, give it the same treatment first.
       mark (`startStampId`/`endStampId`) and then prices its own drop there.
       Not a mark count, so the status rule does not touch it; new conduit to
       an existing device can be real work. Found by the 2026-10-05 audit.
+- [x] **CLOSED 2026-10-16 night (Track A): `takeoff_stamps.status` is in
+      0098** (`MARK_STATUSES`, `shared/markStatus.ts`). Original entry:
 - [ ] **(was) Track A (migration): a STATUS on each mark — new / existing to
       remain / remove / relocate — so an existing device is never priced as
       new.** Asked for 2026-10-01 from the reader-accuracy hand count: many
@@ -3892,6 +3905,9 @@ path is ever revived, give it the same treatment first.
       (`new`/`existing`/`remove`/`relocate`, NULL read as `new`), recorded in
       Track C's `todo.md` on `track-c`. B's style editor waits for the nine
       columns, and the status looks (§ 7) wait for the status column.
+- [x] **CLOSED 2026-10-16 night (Track A): `takeoff_stamps.rotation` /
+      `mirrored` are in 0098 and `symbol_looks.connectDx` / `connectDy` in
+      0102.** Original entry:
 - [ ] **Track A (migration): the CONNECT POINT columns — put them in the
       batch above.** Built without them 2026-10-01 (Track B): runs now meet
       wall devices at the wall found in the drawing, by device family
@@ -3950,6 +3966,8 @@ path is ever revived, give it the same treatment first.
       Also still open from step 1: the ring-around-the-symbol at reading
       zoom, faint marks, the CSV "Pin" column, and the step 0 measurements
       (`LETTER_MIN_PX` 14 is still a judgement).
+- [x] **CLOSED 2026-10-16 night (Track A): `symbol_links.originalLabel` is
+      in 0101.** Original entry:
 - [ ] **Track A (migration, optional): `symbol_links.originalLabel
 varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       (Track B) WITHOUT a column: `label` is the new name and `lookupKey` keeps
@@ -4355,6 +4373,8 @@ counts need no rule of their own. `shared/runNetwork.ts` is the module.
       sizes, priced with cover and gasket). Nothing offers `body` yet, and a
       stored one still counts as unanswered. The owner's answers T1–T6 and the
       full design are in `references/materials-track-c-plan.md` § 4. In order:
+  - [x] **CLOSED 2026-10-16 night (Track A): `teeBody` is in
+        `runMaterialRole` since 0096.** The wiring below is separate. Original:
   - [ ] **Track A — additive migration:** append `teeBody` to
         `bid_line_items.runMaterialRole` (like 0084/0085, no UPDATE). It
         goes out BEFORE the code. Needed because bid lines are keyed by run
