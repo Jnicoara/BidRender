@@ -4,6 +4,40 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## STAGING serves `00777dba` — NOT yet "staging ready for his check": ONE phone smoke step red (B's)
+
+`curl https://staging.bidridge.com/api/version` → `00777dba`, built
+06:04 UTC. Gate 39008514897: test ✓, deploy ✓, smoke **257 passed, 2
+skipped, 1 failed** — `[phone] plans.spec.ts:245` "select two marks … Undo",
+red 5/5 in the repeat; written up for B (`track-b-handoff.md` top). When B's
+fix lands and the smoke is green, this line becomes "staging ready for his
+check <commit>". Everything below can be clicked now meanwhile.
+
+**What to click on staging (laptop, then iPad/phone):**
+1. **New menu** — left: Dashboard, Bids, Plans, Clients · Library:
+   Materials, Assemblies · bottom: Performance, Labor rates, Recently
+   deleted, Settings, Crew. Phone: Dashboard, Bids, Plans, Materials, More.
+2. **Bids list** (`/bids`) — search a bid, open it, Back says "Bids".
+   **Plans list** (`/plans`) — every bid with drawings, Upload a plan.
+3. **Bid page** — total on the right, "Profit/overhead not set" amber if
+   unset (button to Settings › Pricing), "Update to the current math" on a
+   Draft with old → new.
+4. **Step bar** — Plans › Scale › Count › Runs › Review › Print, one
+   "Next" button.
+5. **Updates** — the starter-offer card (nothing moves until Accept).
+6. **"Just count"** — Count tool → Just count → marks land in Unassigned →
+   "Pick what they are".
+7. **Bid methods choice under Settings › Pricing** — **not on staging
+   tonight** (B's bid methods + Q8 not landed; Q-A1 in
+   `pricing/morning-questions.md`).
+8. Tonight's two fixes: type 20 into Settings › Pricing › Profit right as
+   the page opens — it stays 20; two tabs saving one assembly — the second
+   is told to reload.
+
+**B's phone check:** on your phone, Plans → Tools → "Select several
+marks", tap two marks — it should say "2 marks selected"; Delete, then
+Undo puts both back. This is exactly the step that is red in CI.
+
 ## A — OVERNIGHT QUEUE 2026-10-16 → 17 (status per item; log: `overnight-log.md` § Track A)
 
 Owner Q8: a shop with material markup KEEPS today's markup math on new
