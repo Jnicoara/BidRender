@@ -25,7 +25,7 @@
  * other's rows.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { appRouter } from "./routers";
 import {
   getDb,
@@ -239,10 +239,15 @@ describe.skipIf(!hasDb)("the migration's backfill", () => {
     // The claim from ASSEMBLIES_PLAN.md, asserted: the labor rate structure is
     // shared across trades regardless of unlock. A starter role tagged
     // `electrical` would vanish from a plumbing estimator's list.
+    //
+    // Shipped rows only (no owner). Until 2026-10-16 this read EVERY row, so
+    // a company's own rate on another trade — the cross-company attack
+    // suite's user writes one — failed it, depending on which file ran first.
     const dbc = await getDb();
     const starters = await dbc!
       .select({ trade: laborRates.trade })
-      .from(laborRates);
+      .from(laborRates)
+      .where(isNull(laborRates.userId));
     expect(starters.length).toBeGreaterThan(0);
     for (const row of starters) expect(row.trade).toBe(TRADE_ALL);
   });

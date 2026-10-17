@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Every fix to an AI-found mark is now recorded.** When someone accepts,
+  dismisses, re-labels, deletes, moves or tags a mark the plan reader
+  proposed, one row goes into the AI correction log: what the AI said, what
+  the person changed it to, the sheet and the company. It is written after the
+  edit and can never slow or block it, nothing in the app reads it yet, and
+  the part meant for sharing later carries no names. Hand-placed marks are
+  never logged. The Settings switch to turn it off comes with the next
+  database change.
+
 - **Searching a material by its old name now always finds it.** Typing
   '5/6" wafer LED downlight' (how that light used to be named) found
   nothing, because "5/6"" read as a size no light has. It now finds the

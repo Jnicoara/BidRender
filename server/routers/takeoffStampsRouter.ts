@@ -107,6 +107,11 @@ import {
   type StampSnapshot,
 } from "../takeoffRestore";
 import { placedBefore, rememberPlaced } from "../markReplay";
+import {
+  findingsForGroupOnSheet,
+  findingsForStamps,
+  logAiCorrections,
+} from "../aiCorrections";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -511,6 +516,16 @@ export const takeoffStampsRouter = router({
         [input.id],
         ctx.scope.dataUserId
       );
+      // The snapshot lists every AI finding the delete unlinked; a hand mark
+      // has none and logs nothing (server/aiCorrections.ts).
+      logAiCorrections(
+        ctx.scope,
+        snapshot.findings.map(f => ({
+          action: "deleted" as const,
+          findingId: f.findingId,
+          stampId: f.stampId,
+        }))
+      );
       return {
         success: true,
         undo: sealPacket(STAMPS_PACKET, ctx.scope.dataUserId, snapshot),
@@ -541,6 +556,14 @@ export const takeoffStampsRouter = router({
       const { removed, snapshot } = await deleteStampsWithSnapshot(
         ids,
         ctx.scope.dataUserId
+      );
+      logAiCorrections(
+        ctx.scope,
+        snapshot.findings.map(f => ({
+          action: "deleted" as const,
+          findingId: f.findingId,
+          stampId: f.stampId,
+        }))
       );
       return {
         removed,
@@ -625,12 +648,32 @@ export const takeoffStampsRouter = router({
         const assembly = await db.getAssemblyById(group.assemblyId, userId);
         assemblyCategory = assembly?.category ?? null;
       }
+      const aiMarks = await findingsForStamps(
+        current.filter(row => row.groupId !== group.id).map(row => row.id),
+        userId
+      );
       const moved = await db.moveStampsToGroup(ids, userId, group.bidId, {
         groupId: group.id,
         assemblyId: group.assemblyId,
         assemblyName: group.kind === "assembly" ? group.label : null,
         assemblyCategory,
       });
+      // An AI mark counted as something else is a re-label of what the AI
+      // said; there is no separate action for it in 0108's list.
+      logAiCorrections(
+        ctx.scope,
+        aiMarks.map(f => ({
+          action: "relabelled" as const,
+          findingId: f.findingId,
+          stampId: f.stampId,
+          userValue: {
+            via: "moveToGroup",
+            groupId: group.id,
+            assemblyId: group.assemblyId,
+          },
+          userAssemblyId: group.assemblyId,
+        }))
+      );
 
       const byGroup = new Map<number | null, number[]>();
       for (const row of current) {
@@ -897,6 +940,18 @@ export const takeoffStampsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await db.setStampLocation(input.id, ctx.scope.dataUserId, input.location);
+      // Read and written behind the response: a tag never waits on the log.
+      logAiCorrections(
+        ctx.scope,
+        findingsForStamps([input.id], ctx.scope.dataUserId).then(aiMarks =>
+          aiMarks.map(f => ({
+            action: "location_set" as const,
+            findingId: f.findingId,
+            stampId: f.stampId,
+            userValue: { location: input.location },
+          }))
+        )
+      );
       return { success: true };
     }),
 
@@ -934,6 +989,21 @@ export const takeoffStampsRouter = router({
         ctx.scope.dataUserId,
         input.groupId,
         input.location
+      );
+      logAiCorrections(
+        ctx.scope,
+        findingsForGroupOnSheet(
+          input.sheetId,
+          input.groupId,
+          ctx.scope.dataUserId
+        ).then(aiMarks =>
+          aiMarks.map(f => ({
+            action: "location_set" as const,
+            findingId: f.findingId,
+            stampId: f.stampId,
+            userValue: { location: input.location },
+          }))
+        )
       );
       return { success: true };
     }),

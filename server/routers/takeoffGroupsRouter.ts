@@ -42,6 +42,7 @@ import {
   restoreGroup,
   type GroupSnapshot,
 } from "../takeoffRestore";
+import { logAiCorrections } from "../aiCorrections";
 import {
   GROUP_PACKET,
   openPacket,
@@ -1042,6 +1043,17 @@ export const takeoffGroupsRouter = router({
       const result = await deleteGroupWithSnapshot(
         group.id,
         ctx.scope.dataUserId
+      );
+      // One row per AI mark the count took with it, marked as a group delete
+      // so "renamed my count and started over" can be filtered out (owner
+      // Q3, 2026-09-29).
+      logAiCorrections(
+        ctx.scope,
+        (result?.snapshot.marks.findings ?? []).map(f => ({
+          action: "deleted_with_group" as const,
+          findingId: f.findingId,
+          stampId: f.stampId,
+        }))
       );
       return {
         removed: result?.removed ?? 0,

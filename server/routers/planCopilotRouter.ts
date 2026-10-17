@@ -72,6 +72,7 @@ import { symbolLookupKey } from "../../shared/takeoffCounts";
 import type { CopilotRunStatus } from "../../drizzle/schema";
 import * as db from "../db";
 import { groupForAssembly } from "../assemblyGroup";
+import { logAiCorrections } from "../aiCorrections";
 import {
   MAX_TEXT_CHARS,
   PLAN_READ_MAX_TOKENS,
@@ -966,6 +967,17 @@ export const planCopilotRouter = router({
         )
       );
 
+      // After the edit, never awaited (server/aiCorrections.ts).
+      logAiCorrections(
+        ctx.scope,
+        placing.map(({ row }, index) => ({
+          action: "accepted" as const,
+          findingId: row.id,
+          stampId: stampIds[index] ?? null,
+          userValue: { stampId: stampIds[index] ?? null },
+        }))
+      );
+
       return { placed: placing.length, refused: refusals };
     }),
 
@@ -992,6 +1004,16 @@ export const planCopilotRouter = router({
               null
             )
           )
+      );
+      // One row per proposal that CHANGED to dismissed; dismissing one twice
+      // is one correction.
+      logAiCorrections(
+        ctx.scope,
+        rows
+          .filter(
+            row => row.status !== "confirmed" && row.status !== "dismissed"
+          )
+          .map(row => ({ action: "dismissed" as const, findingId: row.id }))
       );
       return { dismissed: rows.length };
     }),
@@ -1074,6 +1096,24 @@ export const planCopilotRouter = router({
         reason:
           "You corrected this one — it will be read this way from now on.",
       });
+
+      // The update above overwrote the finding's assembly and tier with the
+      // user's answer, so what the AI SAID goes in from `finding`, read
+      // before it; the log's own read of the row would see the correction.
+      logAiCorrections(ctx.scope, [
+        {
+          action: "relabelled",
+          findingId: finding.id,
+          aiSaid: {
+            assemblyId: finding.assemblyId,
+            assemblyName: finding.assemblyName,
+            confidence: finding.confidence,
+            score: finding.score,
+          },
+          userValue: { symbolLinkId: link.id, assemblyId: link.assemblyId },
+          userAssemblyId: link.assemblyId,
+        },
+      ]);
 
       return {
         symbolLabel: link.label,

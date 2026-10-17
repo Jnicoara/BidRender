@@ -1,5 +1,18 @@
 # Track C — handoff, 2026-10-06
 
+## (newest) 2026-10-16 → 17, night 4 — queue
+
+1. Gate on 7cb6aca9 — **green**; "C ready cd1dde67" in `track-a-handoff.md`.
+2. AI correction logging (before the first outside invite) — in progress.
+3. User levels behind an OFF setting.
+4. Layout audit, non-Plans screens (shots in `references/overnight-shots/`).
+5. Copy accuracy pass.
+6. Break-it loop (Bids, Materials, Assemblies, Settings, Crew, quote-app, print).
+7. Regression re-runs.
+8. todo.md items without A, B or the owner.
+
+Progress per item: `references/overnight-log.md` § night 4.
+
 ## Migrations 0164 + 0165 on local-dev and staging (2026-10-16 ~23:30 UTC) — merge local-dev, migrate your test DB
 
 A's N5 (`0164`: `pricing_defaults.profitSetAt`, `overheadSetAt`) and B's

@@ -28,6 +28,7 @@ import {
   restoreSheet,
   type SheetSnapshot,
 } from "../takeoffRestore";
+import { logAiCorrections } from "../aiCorrections";
 
 const procedure = scoped("bids.view", "bids.edit");
 
@@ -73,6 +74,17 @@ export const takeoffSheetRouter = router({
           { id: sheet.id, bidId: sheet.bidId },
           userId
         );
+      // Starting a sheet over is not "this mark was wrong", so it is logged
+      // the way a whole count's delete is, and marked so it can be told apart.
+      logAiCorrections(
+        ctx.scope,
+        snapshot.stamps.findings.map(f => ({
+          action: "deleted_with_group" as const,
+          findingId: f.findingId,
+          stampId: f.stampId,
+          userValue: { via: "clearSheet" },
+        }))
+      );
       return {
         removedRuns,
         removedMarks,

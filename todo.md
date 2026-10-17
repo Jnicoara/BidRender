@@ -2381,6 +2381,19 @@ GROUP BY name HAVING COUNT(*) > 1 LIMIT 1
       symbol learning later. Nothing may export, pool or share it — even the
       anonymised half — until users have agreed to terms that say so. Not
       blocking the log itself; blocking the first read of it.
+- [ ] **AI correction log, the symbol picture (client half) — Plans screen,
+      for B or after B's night** (C, 2026-10-16). The log is written
+      (`server/aiCorrections.ts`, every path in the plan plus Move-to-count
+      and Clear sheet), but every row says `cropStatus = "unavailable"`:
+      the cut-out has to be taken in the browser from the drawn page
+      (`ai-correction-log-plan.md` § 5, branch a-plans — mint the shareId
+      before the insert, return it as `correctionId`, `attachCrop`
+      mutation, window size MEASURED on the fixture bid's E-sheets). Rows
+      written before it lands stay without a picture.
+- [ ] **AI correction log opt-out — needs A's column** (C, 2026-10-16).
+      Draft SQL in `track-a-handoff.md`; the Settings switch and the
+      "logs nothing" test are built on branch `c-ai-log-optout`. Must reach
+      live WITH the log, before the first outside invite.
 - [ ] **Point DV34's recipe at the new surface-raceway names when they are
       added** (owner, 2026-10-07, review sheet). DV34 is held for four
       `missingParts` ("Surface raceway, 10 ft", "… device box", "… cover
