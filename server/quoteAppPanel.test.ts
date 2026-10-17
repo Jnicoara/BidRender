@@ -22,7 +22,7 @@ import { eq, inArray } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { bidRollup, type RollupLine } from "./bidPricing";
 import { getDb } from "./db";
-import { bids, users, type Bid } from "../drizzle/schema";
+import { bidLineItems, bids, users, type Bid } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import { apportionWorkPrice, toCents } from "../shared/pricing";
@@ -573,6 +573,18 @@ describe.skipIf(!hasDb)("quoteApp.get on a real bid", () => {
     );
     const misc = d.scopes[0].buckets.find(b => b.bucket === "Misc")!;
     expect(misc.rows).toEqual([{ name: "City permit", cents: 8500 }]);
+    expect(d.examplePricedLines).toBe(0);
+
+    // A line priced from BidRidge's example price warns here as it does
+    // before printing (copy pass 2026-10-16: the count was hard-wired to 0,
+    // so "N lines use an example price" could never appear).
+    const db = await getDb();
+    await db!
+      .update(bidLineItems)
+      .set({ snapshotPriceWasExample: true })
+      .where(eq(bidLineItems.bidId, bid.id));
+    const again = ready(await caller().quoteApp.get({ bidId: bid.id }));
+    expect(again.examplePricedLines).toBe(1);
   });
 
   it("opens a bid with an unpriced line, listing it and no figures", async () => {

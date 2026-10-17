@@ -373,10 +373,18 @@ const Row = ({
 
 function CostPreview({
   draft,
+  workHours,
   laborRate,
   modifierPcts,
 }: {
   draft: Draft;
+  /**
+   * The work hours the server prices with — typed, else the timed steps,
+   * else not set (assemblyHoursSource). Until 2026-10-16 the preview read
+   * the hours box alone, so an assembly priced from its steps showed "hours
+   * not set" and $0 labor beside "Priced from its steps: 1.5 h".
+   */
+  workHours: number | null;
   laborRate: number;
   modifierPcts: Array<{ name: string; laborAdjustmentPct: number }>;
 }) {
@@ -396,7 +404,7 @@ function CostPreview({
           costPerUnit: m.costPerUnit,
           qty: m.qty,
         })),
-        baseLaborHours: hoursToSave(draft.baseLaborHours),
+        baseLaborHours: workHours,
         overheadLaborHours: parseTypedNumber(draft.overheadLaborHours) || 0,
         modifiers: modifierPcts,
         laborRate,
@@ -406,7 +414,7 @@ function CostPreview({
     }
   }, [
     draft.materials,
-    draft.baseLaborHours,
+    workHours,
     draft.overheadLaborHours,
     modifierPcts,
     laborRate,
@@ -1423,7 +1431,7 @@ function AssemblyBuilder({
                   the company-wide productivity factor in Settings.
                 </p>
                 {parseTypedNumber(draft.overheadLaborHours) > 0 &&
-                assemblyHours(draft.baseLaborHours) === null ? (
+                stepHours.source.hours === null ? (
                   <p className="text-xs text-[#F5C518]">
                     Hours not set — the overhead hours are not priced on their
                     own until the work hours are.
@@ -1550,6 +1558,7 @@ function AssemblyBuilder({
           <div className="lg:sticky lg:top-0 h-fit">
             <CostPreview
               draft={draft}
+              workHours={stepHours.source.hours}
               laborRate={laborRate}
               modifierPcts={appliedModifiers}
             />

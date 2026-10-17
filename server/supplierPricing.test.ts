@@ -128,6 +128,25 @@ describe.skipIf(!hasDb)("supplier pricing on the real catalog", () => {
     expect(priceAge(material!.priceUpdatedAt, new Date())).toBe("fresh");
   });
 
+  it("stamps it on a NEW material typed with a price, too", async () => {
+    // Until 2026-10-16 only an edit stamped it: a material added at $5.00
+    // read "No price yet" on Supplier pricing (copy pass).
+    const created = await caller().materials.create({
+      name: `Priced at birth ${Date.now()}${Math.random()}`,
+      unitOfSale: "each",
+      costPerUnit: 5,
+      category: "Receptacles",
+    });
+    expect(priceAge(created!.priceUpdatedAt, new Date())).toBe("fresh");
+    const unpriced = await caller().materials.create({
+      name: `Unpriced at birth ${Date.now()}${Math.random()}`,
+      unitOfSale: "each",
+      costPerUnit: 0,
+      category: "Receptacles",
+    });
+    expect(priceAge(unpriced!.priceUpdatedAt, new Date())).toBe("unpriced");
+  });
+
   it("does not move the price date when something else is edited", async () => {
     // The reason priceUpdatedAt is not updatedAt: renaming a material must not
     // make a nine-month-old price look like this week's.

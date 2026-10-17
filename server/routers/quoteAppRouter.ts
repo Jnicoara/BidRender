@@ -30,6 +30,7 @@ import {
   type QuoteAppDoc,
 } from "../../shared/quoteAppExport";
 import { warningCountsForBid } from "../bidWarnings";
+import { exampleSummary } from "../../shared/exampleTags";
 import * as db from "../db";
 
 /**
@@ -97,9 +98,11 @@ export const quoteAppRouter = router({
             charged: line.charged,
           })),
         },
-        // Track A's example-price flag (plan § 10, H2) does not exist yet,
-        // so no line can be example-priced. Fed from it the day it lands.
-        examplePricedLines: 0,
+        // Lines priced from example numbers, from their frozen flags — the
+        // same count the proposal warns with before printing. Until
+        // 2026-10-16 this was a hard 0 under a comment saying the flag did
+        // not exist yet; it had existed since 0132–0134.
+        examplePricedLines: exampleSummary(lines).lines,
         // The same read as the bid page's warning strip, frozen on a locked
         // bid as it is there (server/bidWarnings.ts, F13).
         planWarnings: quotePlanWarnings(

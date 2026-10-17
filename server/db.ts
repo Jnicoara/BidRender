@@ -2374,6 +2374,12 @@ export async function createMaterial(
         ? {
             costPerUnit: price.write.costPerUnit,
             packPrice: price.write.packPrice,
+            // A real price typed at birth is a price checked today; without
+            // this, Supplier pricing read "No price yet" beside $5.00. A $0
+            // stays unstamped, which is what "unpriced" means there.
+            ...(Number(price.write.costPerUnit) > 0
+              ? { priceUpdatedAt: new Date() }
+              : {}),
           }
         : {}),
     });
