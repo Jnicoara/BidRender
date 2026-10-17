@@ -14229,11 +14229,26 @@ index e6537b0d..ee695dd3 100644
    ]
  );
  
+diff --git a/server/backup.test.ts b/server/backup.test.ts
+index 7c2bf8e6..f37abbf0 100644
+--- a/server/backup.test.ts
++++ b/server/backup.test.ts
+@@ -447,6 +447,10 @@ describe("stored files", () => {
+           // scope_prompts.shippedKey (0166, Track C's S2) — the shipped
+           // prompt's stable name the seed matches by. An id, not a file.
+           "shippedKey",
++          // takeoff_stamps.clientKey (0168) — the Plans screen's key for the
++          // click that placed a mark (page load + queue number). An id, not
++          // a file.
++          "clientKey",
+         ].includes(column)
+       ) {
+         continue;
 diff --git a/server/db.ts b/server/db.ts
-index a9e70f9b..5c61af80 100644
+index a9e70f9b..9907be4f 100644
 --- a/server/db.ts
 +++ b/server/db.ts
-@@ -12634,6 +12634,50 @@ export async function createStampsReturningIds(
+@@ -12634,6 +12634,53 @@ export async function createStampsReturningIds(
    return rows.map((_, index) => first + index);
  }
  
@@ -14257,6 +14272,9 @@ index a9e70f9b..5c61af80 100644
 +    .where(
 +      and(
 +        eq(takeoffStamps.bidId, bidId),
++        // A mark on a deleted plan set is not a placed mark (the caller then
++        // refuses that key rather than reporting a dead mark as placed).
++        onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId),
 +        inArray(takeoffStamps.clientKey, [...keys])
 +      )
 +    );
