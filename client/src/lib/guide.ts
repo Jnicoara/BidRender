@@ -106,7 +106,7 @@ const STEP_TEXT: Record<BidStep, { title: string; body: string }> = {
   },
   review: {
     title: "Check the bid",
-    body: "Go down the lines, the hours and the total. A line that says Not priced needs a price before this goes to a customer.",
+    body: "Go down the lines, the hours and the total — and send any counts still waiting on the plans. A line that says Not priced needs a price before this goes to a customer.",
   },
   print: {
     title: "Print it or send it",

@@ -120,6 +120,36 @@ describe.skipIf(!hasDb)("starter kits", () => {
   });
 });
 
+describe.skipIf(!hasDb)("a kit with labor but no material price", () => {
+  it("says how many of its assemblies have material not priced", async () => {
+    // Labor with $0 material is never fully priced (CLAUDE.md, 2026-10-05).
+    // The kit's Direct cost read as complete until 2026-10-16 (copy pass).
+    const rates = await caller().laborRates.list();
+    const noParts = await caller().assemblies.create({
+      name: `Kit labor only by accident ${Date.now()}${Math.random()}`,
+      category: "Devices",
+      baseLaborHours: 1,
+      laborRateId: rates[0]?.id ?? null,
+    });
+    const ticked = await caller().assemblies.create({
+      name: `Kit labor only on purpose ${Date.now()}${Math.random()}`,
+      category: "Devices",
+      baseLaborHours: 1,
+      laborRateId: rates[0]?.id ?? null,
+      laborOnly: true,
+    });
+    const kit = await caller().kits.create({
+      name: `Not priced kit ${Date.now()}${Math.random()}`,
+      items: [
+        { assemblyId: noParts!.id, qty: 1 },
+        { assemblyId: ticked!.id, qty: 1 },
+      ],
+    });
+    const priced = await caller().kits.price({ id: kit!.id });
+    expect(priced.totals.materialNotPriced).toBe(1);
+  });
+});
+
 describe.skipIf(!hasDb)("kit cost rollup", () => {
   /** A kit of two known assemblies, both priced against Journeyman. */
   async function fixture() {

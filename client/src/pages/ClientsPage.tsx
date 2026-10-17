@@ -67,6 +67,7 @@ import { searchClients, isCreatableClient } from "@/lib/clientPicker";
 import { errorText } from "@/lib/errorText";
 import { sameToSave } from "@/lib/unsavedGuard";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
+import { loadedCountLabel } from "@/lib/loadedCount";
 
 type ClientKind = "company" | "individual";
 
@@ -412,7 +413,10 @@ export default function ClientsPage() {
                 {tab === "active" ? "Working list" : "Archived"}
                 <span className="ml-1.5 text-muted-foreground/70">
                   {view === tab && !listQuery.isLoadingError
-                    ? visible.length
+                    ? loadedCountLabel(
+                        visible.length,
+                        Boolean(listQuery.hasNextPage)
+                      )
                     : ""}
                 </span>
               </button>

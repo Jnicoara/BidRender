@@ -562,6 +562,17 @@ function KitBuilder({
                       {money(priceQuery.data.totals.directCost)}
                     </span>
                   </div>
+                  {/* Labor with $0 material is never fully priced — the
+                      same "+ material not priced" a bid line carries. */}
+                  {priceQuery.data.totals.materialNotPriced > 0 && (
+                    <p className="text-[11px] text-[#F5C518] text-right">
+                      + {priceQuery.data.totals.materialNotPriced}{" "}
+                      {priceQuery.data.totals.materialNotPriced === 1
+                        ? "assembly's"
+                        : "assemblies'"}{" "}
+                      material not priced
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground pt-2">
                     Live from today's library. Costs freeze only when the kit is
                     added to a bid.

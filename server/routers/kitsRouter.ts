@@ -95,7 +95,7 @@ async function priceAssemblyAt(
   const laborRate = hourlyCostFor(cache.rates, detail.laborRateId);
 
   // Hours not set add no labor and are flagged, never priced as 0 h (D1).
-  return previewAssembly({
+  const breakdown = previewAssembly({
     materials: detail.materials.map(m => ({
       costPerUnit: Number(m.costPerUnit),
       qty: Number(m.qty),
@@ -110,6 +110,15 @@ async function priceAssemblyAt(
     laborRate,
     quantity: qty,
   });
+  return {
+    ...breakdown,
+    /**
+     * $0 material on an assembly not ticked "Labor only" — never fully
+     * priced, the rule a bid line follows (lineMaterialNotPriced).
+     */
+    materialNotPriced:
+      detail.laborOnly !== true && breakdown.materialCost === 0,
+  };
 }
 
 export const kitsRouter = router({
@@ -186,6 +195,9 @@ export const kitsRouter = router({
            * is not in the figures above, and the screen says how many.
            */
           hoursNotSet: priced.filter(p => p.breakdown.hoursNotSet).length,
+          /** Assemblies whose material is not priced: not in the total. */
+          materialNotPriced: priced.filter(p => p.breakdown.materialNotPriced)
+            .length,
         },
       };
     }),
