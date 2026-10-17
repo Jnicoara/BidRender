@@ -192,7 +192,9 @@ test("plan store DOWN: the plan says it cannot open, the bid's money is untouche
   await attached;
   await expect(sheetCanvas(page)).toBeVisible({ timeout: 90_000 });
 
-  execSync(`chmod -R a-rwx "${STORAGE}"`);
+  // The folder itself: with its x bit gone nothing inside can be reached
+  // (a recursive chmod fails on the very folder it just locked).
+  execSync(`chmod a-rwx "${STORAGE}"`);
   try {
     await page.reload();
     await expect(
