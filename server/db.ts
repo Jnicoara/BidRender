@@ -6415,6 +6415,34 @@ export async function getBidPdfSheet(
   return row;
 }
 
+/**
+ * The sheet, only when its plan set is attached to `bidId`. For a WRITE that
+ * names a bid and a sheet separately: without it a mark sent with one bid's
+ * id onto another bid's sheet was written — counted on neither, drawn on the
+ * other — and passed the first bid's lock check (server/sheetOnBid.test.ts).
+ */
+export async function getBidPdfSheetOnBid(
+  id: number,
+  bidId: number,
+  userId: number
+): Promise<BidPdfSheet | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db
+    .select({ sheet: bidPdfSheets })
+    .from(bidPdfSheets)
+    .innerJoin(bidPdfs, eq(bidPdfs.id, bidPdfSheets.bidPdfId))
+    .where(
+      and(
+        eq(bidPdfSheets.id, id),
+        eq(bidPdfSheets.userId, userId),
+        eq(bidPdfs.bidId, bidId)
+      )
+    )
+    .limit(1);
+  return row?.sheet;
+}
+
 // ─── Sheet numbers, titles and page text (read at upload) ─────────────────────
 
 /** One page's number and title, as the client sees them. */
@@ -8300,6 +8328,9 @@ export function pricingSnapshotOf(
     // (`tracedPartAnswers`) are not a snapshot and are not copied — a length
     // typed on one room is not a fact about the next.
     snapshotTracedParts: line.snapshotTracedParts,
+    // And its frozen charge rate (0165, method A): a copy charges the hour
+    // at the rate the original froze.
+    snapshotChargeRate: line.snapshotChargeRate,
     snapshotAt: line.snapshotAt,
   };
 }

@@ -774,6 +774,7 @@ describe("Materials + Labor = Direct cost, to the cent", () => {
       laborCost: 0,
       directCost: 0,
       materialMarkup: 0,
+      laborMarkup: 0,
       costWithMarkup: 0,
     });
   });

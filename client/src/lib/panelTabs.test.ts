@@ -84,6 +84,20 @@ describe("the pinned 'This sheet' line (answer 6)", () => {
     }
   });
 
+  /*
+    A plan that cannot be opened has no sheet rows, so the lists are never
+    asked for and "loading…" stayed for ever (todo.md, 2026-10-16).
+  */
+  it("says the plan could not be opened, rather than loading for ever", () => {
+    expect(sheetLine({ counts: null, runs: null, planUnopened: true })).toBe(
+      "This sheet: the plan could not be opened"
+    );
+    // Lists that DID arrive say what is on the sheet, whatever the drawing did.
+    expect(sheetLine({ counts: [], runs: [], planUnopened: true })).toBe(
+      "This sheet: 0 marks · 0 items"
+    );
+  });
+
   it("still says 0 marks when the sheet really has none", () => {
     expect(sheetLine({ counts: [], runs: [] })).toBe(
       "This sheet: 0 marks · 0 items"
