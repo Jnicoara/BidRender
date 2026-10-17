@@ -35,7 +35,14 @@ candidate `448d1281`:** two sends of one 3-mark batch at once → 6 marks
   adds none); dropped after.
 - `markReplay` (7 tests incl. the race and the other-bid key) + the
   restore/stamp suites on that DB: 74 passed.
-- Full suite: Gate on `a-next-batch` `5c693986` (result in the handoff).
+- Full suite: the first Gate (`5c693986`) found two guards the draft
+  broke, both fixed in `99e60f55`: `backup.test.ts` read `clientKey` as a
+  stored-file column (named as an id, like `shippedKey`), and
+  `quantitiesIgnoreDeletedPlans` caught the key lookup reading marks by
+  bid alone (now live plan sheets only — a mark on a deleted set is not
+  "placed"). A third red, `personalCompanyRace`, passed locally and on the
+  re-run (flaky on the runner). **Full suite GREEN on `99e60f55`** (Gate
+  39007343041).
 
 ## To apply, after live and after 0166 + 0167
 
