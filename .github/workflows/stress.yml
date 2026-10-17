@@ -1,0 +1,136 @@
+# STRESS — the stage-7 harness (owner's overnight queue, 2026-10-16, item 5).
+# Manual only: push a branch named `stress-<anything>`, or start it from the
+# Actions tab once this file is on the default branch. Never on an everyday
+# push, and never on the laptop (low memory).
+#
+# A brand-new MySQL on the runner, migrated and seeded exactly as the Gate
+# does, so a stress fixture can never touch a real database:
+#
+#   server  — vitest with STRESS=1 / SPEED_BIG_DATA=1:
+#             server/speedBigData.test.ts   250 bids x 50 marks (Dashboard,
+#                                            Bids list, bid page, print)
+#             server/stressManyUsers.test.ts 24 people on one company at once
+#             server/stressPlanSet.test.ts   a 300 MB, 400-sheet set
+#   browser — the real app built and started on the runner (disk storage, AI
+#             off), driven by Playwright (e2e/stress/): a fully marked
+#             company's screens, a large set uploaded through the screen and
+#             page 1 drawn, and the same on a throttled "slow 3G" connection.
+#
+# Timings print as `[stress]` lines; references/stress-results.md keeps them,
+# and anything over the speed limits goes to todo.md with its cause.
+# Correctness (lost marks, a save that silently undoes another) FAILS the run.
+# Nothing here deploys or reaches staging or live.
+name: Stress
+
+on:
+  push:
+    branches: ["stress-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Loopback and `test` in the name: what scripts/databaseGuard.ts requires.
+  # root / root is the runner image's throwaway default; not a secret.
+  DATABASE_URL: mysql://root:root@127.0.0.1:3306/bidrender_test_stress
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Start MySQL (preinstalled on the runner)
+        run: |
+          sudo systemctl start mysql.service
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -uroot -proot --silent && break
+            sleep 2
+          done
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE bidrender_test_stress CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+      - name: Migrate and seed
+        run: |
+          npx tsx scripts/migrate.mts
+          npx tsx scripts/seedBaseline.mts
+      - name: Stress (server)
+        env:
+          STRESS: "1"
+          SPEED_BIG_DATA: "1"
+          NODE_OPTIONS: --max-old-space-size=4096
+        # pipefail: a failed test must fail the step through the `tee`.
+        run: |
+          set -o pipefail
+          npx vitest run --reporter=verbose \
+            server/speedBigData.test.ts \
+            server/stressManyUsers.test.ts \
+            server/stressPlanSet.test.ts \
+            2>&1 | tee stress-server.log
+      - name: The timings
+        if: always()
+        run: grep -E '\[(stress|speed|speed-detail)\]' stress-server.log || true
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # The staging smoke account: never at the same time as a Gate smoke or a
+    # smoke-repeat run.
+    concurrency:
+      group: staging-smoke
+      cancel-in-progress: false
+    env:
+      SMOKE_BASE_URL: https://staging.bidridge.com
+      SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+      SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+      SMOKE_STAGING_PASSWORD: ${{ secrets.SMOKE_STAGING_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+      - name: What staging serves
+        run: curl -fsS https://staging.bidridge.com/api/version
+      - name: Stress (browser, staging)
+        run: |
+          set -o pipefail
+          npx playwright test -c e2e/stress/playwright.config.ts 2>&1 | tee stress-browser.log
+      - name: The timings
+        if: always()
+        run: grep -E '\[stress\]' stress-browser.log || true
+      # Same sealing as gate.yml: a trace carries the passwords and the
+      # session cookie, and the repo is public.
+      - name: Seal the failure traces
+        if: failure()
+        env:
+          TRACE_KEY: ${{ secrets.SMOKE_STAGING_PASSWORD }}${{ secrets.SMOKE_PASSWORD }}
+        run: |
+          find e2e/.results -name trace.zip -print0 2>/dev/null |
+            while IFS= read -r -d '' trace; do
+              openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+                -pass env:TRACE_KEY -in "$trace" -out "${trace%.zip}.trace.enc"
+              rm -f "$trace"
+            done
+      - name: Keep the failure screenshots and sealed traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-failures
+          path: |
+            e2e/.results/**/*.png
+            e2e/.results/**/*.trace.enc
+            !e2e/.auth/**
+          retention-days: 7
+          if-no-files-found: ignore
