@@ -78,6 +78,9 @@ jobs:
         run: grep -E '\[(stress|speed|speed-detail)\]' stress-server.log || true
 
   browser:
+    # "[server only]" in the pushed commit's message skips this job — e.g. while
+    # a local-dev smoke is due and should not wait behind this one.
+    if: ${{ !contains(github.event.head_commit.message, '[server only]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     # The staging smoke account: never at the same time as a Gate smoke or a
