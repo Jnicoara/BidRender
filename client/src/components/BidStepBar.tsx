@@ -131,7 +131,10 @@ export function BidStepBar({
       </ol>
       {next &&
         (STEP_PLACE[next] === here ? (
-          <span className="ml-auto shrink-0 text-muted-foreground">
+          // h-7, the button's height: the bar must not change height when
+          // the next step moves off this screen, or the drawing under it
+          // re-fits mid-count (B, 2026-10-16, measured 24 -> 28 px).
+          <span className="ml-auto shrink-0 h-7 leading-7 text-muted-foreground">
             Next: <span className="text-foreground">{NEXT_LABEL[next]}</span> —
             here
           </span>

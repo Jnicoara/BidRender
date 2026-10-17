@@ -92,6 +92,12 @@ function toBridgeLine(line: {
 
 /** This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`. */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 /**
  * What a counted thing may be called.
@@ -193,7 +199,7 @@ export const takeoffGroupsRouter = router({
    * count following, the list and the drawing disagree with nothing on screen
    * to say which is right.
    */
-  list: procedure
+  list: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.bidId, ctx.scope.dataUserId);
@@ -578,6 +584,26 @@ export const takeoffGroupsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const group = await requireGroup(input.id, ctx.scope.dataUserId);
+      /*
+        Two refusals its siblings already make (break-it, 2026-10-16;
+        server/renameCount.test.ts). The Unassigned count is the holding pen:
+        its marks are named by picking what they are (moveToGroup), never by
+        turning the pen into an ordinary count, which made them sendable and
+        lifted the print block with nobody having said what they are. And a
+        locked bid's counts do not change, as `setLaborRoleHours` refuses.
+      */
+      if (isReservedLabel(group.label))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Unassigned marks are named by picking what they are, not by renaming the count.",
+        });
+      const bid = await requireBid(group.bidId, ctx.scope.dataUserId);
+      if (bid.quantitiesLockedAt !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: lockedEditRefusal("its counts cannot be renamed"),
+        });
       await refuseDuplicate(
         group.bidId,
         ctx.scope.dataUserId,

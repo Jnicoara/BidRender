@@ -63,6 +63,8 @@ const NAV_LEVEL: Record<Route, WorkLevel> = {
   settings: "takeoff",
   team: "takeoff",
   admin: "takeoff",
+  // The Field role's Jobs list (B, 2026-10-16): the ROLE decides it.
+  jobs: "takeoff",
   welcome: "takeoff",
   clients: "estimate",
   "library-labor-rates": "estimate",

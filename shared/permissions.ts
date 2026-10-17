@@ -47,9 +47,44 @@
 export const COMPANY_ROLES = ["owner", "admin", "estimator", "viewer"] as const;
 export type CompanyRole = (typeof COMPANY_ROLES)[number];
 
+/**
+ * Two more roles, decided and built (references/field-and-coowner-plan.md)
+ * but not yet STORABLE: `company_members.role` holds only the four above
+ * until Track A applies FR-M1. Every rule below already covers them, so the
+ * day the column does, they move into COMPANY_ROLES and nothing else changes.
+ *
+ *   coowner  every capability, like the owner; the data stays filed under
+ *            the one owner's id. Cannot act on the owner or another co-owner.
+ *   field    plans, counts and the materials list — NO money, anywhere.
+ */
+export const PLANNED_ROLES = ["coowner", "field"] as const;
+export type PlannedRole = (typeof PLANNED_ROLES)[number];
+/** Any role a rule must answer for: stored today, or planned. */
+export type RoleName = CompanyRole | PlannedRole;
+
+/** Every role, most to least privileged. The order `outranks` reads. */
+export const ROLE_RANK: readonly RoleName[] = [
+  "owner",
+  "coowner",
+  "admin",
+  "estimator",
+  "viewer",
+  "field",
+];
+
 /** Whether `a` sits strictly above `b`. Equal roles do not outrank each other. */
-export function outranks(a: CompanyRole, b: CompanyRole): boolean {
-  return COMPANY_ROLES.indexOf(a) < COMPANY_ROLES.indexOf(b);
+export function outranks(a: RoleName, b: RoleName): boolean {
+  return ROLE_RANK.indexOf(a) < ROLE_RANK.indexOf(b);
+}
+
+/**
+ * May someone in role `actor` hand out role `role`? Never one above their
+ * own, and never `owner` (that is a transfer). An admin may still make an
+ * admin, as today; only the owner or a co-owner may make a co-owner.
+ */
+export function mayGrant(actor: RoleName, role: RoleName): boolean {
+  if (role === "owner") return false;
+  return !outranks(role, actor);
 }
 
 // ─── Capabilities ─────────────────────────────────────────────────────────────
@@ -62,6 +97,15 @@ export function outranks(a: CompanyRole, b: CompanyRole): boolean {
  * he open the pricing page". Adding a screen usually needs no new capability.
  */
 export const CAPABILITIES = [
+  /**
+   * See a job's PLANS: sheets, marks, counts by name and quantity, traced
+   * runs and their footage, and the materials list — and nothing with a
+   * price. The ONLY capability a Field member holds, so every route not
+   * opened to it on purpose refuses them (references/field-and-coowner-plan.md
+   * § 1). A route opened to it must answer with no money in it;
+   * `server/fieldNoPrices.test.ts` calls every route in the app to check.
+   */
+  "plans.view",
   /** Open bids, their line items, totals and proposals. */
   "bids.view",
   /** Create, price, edit and archive bids; run takeoff; export. */
@@ -136,11 +180,17 @@ export type Capability = (typeof CAPABILITIES)[number];
  *              performing overall. See "analytics.view" for why that last one
  *              sits with the money settings rather than with the bid work.
  *   viewer     reads. For a customer contact, a partner, or a new hire.
+ *   coowner    everything, like the owner (planned — see PLANNED_ROLES).
+ *   field      `plans.view` ONLY: a crew member sees the plans, the counts and
+ *              what to pull, and no price anywhere (planned).
  */
-export const ROLE_CAPABILITIES: Record<CompanyRole, readonly Capability[]> = {
+export const ROLE_CAPABILITIES: Record<RoleName, readonly Capability[]> = {
   owner: CAPABILITIES,
+  coowner: CAPABILITIES,
   admin: CAPABILITIES,
+  field: ["plans.view"],
   estimator: [
+    "plans.view",
     "bids.view",
     "bids.edit",
     "library.view",
@@ -149,16 +199,22 @@ export const ROLE_CAPABILITIES: Record<CompanyRole, readonly Capability[]> = {
     "clients.view",
     "clients.edit",
   ],
-  viewer: ["bids.view", "library.view", "pricing.view", "clients.view"],
+  viewer: [
+    "plans.view",
+    "bids.view",
+    "library.view",
+    "pricing.view",
+    "clients.view",
+  ],
 };
 
 /** May this role do this? The only question callers should be asking. */
-export function can(role: CompanyRole, capability: Capability): boolean {
+export function can(role: RoleName, capability: Capability): boolean {
   return ROLE_CAPABILITIES[role].includes(capability);
 }
 
 /** Everything a role may do, for showing a member what their access covers. */
-export function capabilitiesFor(role: CompanyRole): readonly Capability[] {
+export function capabilitiesFor(role: RoleName): readonly Capability[] {
   return ROLE_CAPABILITIES[role];
 }
 
@@ -333,6 +389,7 @@ export function inviteRejection(
  * screen showed the raw codes ("bids.view") until 2026-10-14.
  */
 export const CAPABILITY_LABEL: Record<Capability, string> = {
+  "plans.view": "See plans, what was counted and traced, and the materials list",
   "bids.view": "See bids and proposals",
   "bids.edit": "Build, price and send bids",
   "bids.delete": "Delete archived bids forever",
@@ -349,5 +406,6 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
 
 /** A role as the screen says it: "Estimator", never "estimator". */
 export function roleLabel(role: string): string {
+  if (role === "coowner") return "Co-owner";
   return role ? role[0].toUpperCase() + role.slice(1) : role;
 }

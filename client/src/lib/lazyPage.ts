@@ -45,9 +45,21 @@ function reloadWhenBackOnline(): Promise<never> {
   return new Promise<never>(() => {});
 }
 
-/** A page module loader that reloads the tab once on a missing chunk. */
-export function reloadingImport<T>(load: () => Promise<T>): () => Promise<T> {
-  return () =>
+/**
+ * A page module loader that reloads the tab once on a missing chunk.
+ *
+ * Its `quiet` is the same load WITHOUT that: for fetching ahead in the
+ * background (`preloadable`'s `prefetch`). A reload is the answer for a
+ * page somebody OPENED; a background fetch that met a dropped signal had
+ * armed "reload when back online" for a page nobody asked for, and the tab
+ * reloaded under the person when the signal returned — the tool they had
+ * armed gone, a tap after it placing nothing (B, 2026-10-16: the smoke's
+ * "lost answer" step, offline within 4 s of opening Plans).
+ */
+export function reloadingImport<T>(
+  load: () => Promise<T>
+): (() => Promise<T>) & { quiet: () => Promise<T> } {
+  const reloading = () =>
     load().catch((error: unknown) => {
       if (typeof navigator !== "undefined" && navigator.onLine === false)
         return reloadWhenBackOnline();
@@ -70,4 +82,5 @@ export function reloadingImport<T>(load: () => Promise<T>): () => Promise<T> {
       // Never settles: the page is going away.
       return new Promise<T>(() => {});
     });
+  return Object.assign(reloading, { quiet: load });
 }

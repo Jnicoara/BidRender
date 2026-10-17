@@ -40,6 +40,29 @@ describe("undo while a mark is still saving", () => {
     expect(stillSavingMessage([])).toBeNull();
   });
 
+  it("a mark the server CONFIRMED is not still saving — its step is on the stack (2026-10-16)", () => {
+    // The drawn copy waits for the sheet's list to come back; an Undo in
+    // that window was refused, which is what made the tablet smoke flaky.
+    expect(stillSavingMessage([{ sent: true, saved: true }])).toBeNull();
+    // One confirmed and one still in flight: still saving.
+    expect(
+      stillSavingMessage([{ sent: true, saved: true }, { sent: true }])
+    ).toBe("Still saving — try again in a second.");
+  });
+
+  it("the flush marks a batch saved right after pushing its step, before the list refetch", () => {
+    const flush = src.slice(
+      src.indexOf("const flushStamps = useCallback("),
+      src.indexOf("flushStampsRef.current = flushStamps;")
+    );
+    const pushed = flush.indexOf("pushUndo({");
+    const saved = flush.indexOf("{ ...m, saved: true }");
+    const refetch = flush.indexOf("listForSheet.invalidate");
+    expect(pushed).toBeGreaterThan(-1);
+    expect(saved).toBeGreaterThan(pushed);
+    expect(saved).toBeLessThan(refetch);
+  });
+
   it("is asked by stepBack BEFORE any step is taken, and only for undo", () => {
     const body = stepBackBody();
     const asked = body.indexOf("stillSavingMessage(pendingStamps.current)");

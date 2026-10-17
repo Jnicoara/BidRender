@@ -82,6 +82,12 @@ import { isLaborRoleLine } from "../../shared/roleLines";
  * without anyone remembering to tag it. See _core/trpc.ts.
  */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 export const materialsListRouter = router({
   /**
@@ -91,7 +97,7 @@ export const materialsListRouter = router({
    * finished, so the caller never has to branch on completeness — an empty list
    * is a document with no entries, not an error.
    */
-  get: procedure
+  get: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }): Promise<MaterialsListDoc> => {
       const bid = await db.getBidById(input.bidId, ctx.scope.dataUserId);
