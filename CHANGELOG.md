@@ -43,6 +43,23 @@ This is the human-readable companion to the git history — read this to see wha
   opens with the sheet list folded (one click brings it back). At 820 px the
   drawing gets 310 px. Wider windows, tablets and phones open as before, and
   the choice you have saved is not changed.
+- **Searching a material by its old name now always finds it.** Typing
+  '5/6" wafer LED downlight' (how that light used to be named) found
+  nothing, because "5/6"" read as a size no light has. It now finds the
+  light under its current name, first.
+- **A height area can now be reshaped after it is drawn.** In Ceilings,
+  "Reshape" on an area lets you tap a corner and tap where it goes, add a
+  corner between two, or remove one — then Done. Before, a wrong outline
+  had to be deleted and drawn again. Works with a finger on a tablet.
+- **"For your quote app" now takes you straight to the line that needs
+  fixing.** When an unpriced line blocks the figures, each one in the list
+  has a "Fix this line" button that closes the panel and opens that line's
+  price box on the bid — instead of only saying where to go.
+- **"Needs pricing" on the Materials screen now also lists BidRidge's
+  example prices, not only $0 ones.** When the starter catalog ships with
+  example prices, those rows are still not your prices — they show the
+  number with an "Example price" tag you can click to set your own, and
+  they count in "Needs pricing". Bid lines are unchanged.
 - **The step bar's buttons now have their own names for screen readers
   and tests: "Step: Count", "Step: Runs" and so on.** On the Plans screen
   the step bar sits above tools also called "Count" and "Runs", so asking

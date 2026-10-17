@@ -63,13 +63,54 @@ create and drop yourself are exempt. (Prompted by a false alarm: on
 it was a release step never run there. The rule stands anyway: the cost of
 saying it is one line.)
 
-## (newest) 2026-10-16, day — waiting for B on local-dev
+## ALL TRACKS, when you merge `dddcf3e1` or later: local times shift once
 
-- B's work (track-b) was NOT on local-dev at 09:50; watched every 15 min.
-  When it lands with smoke green: merge local-dev into track-c, fix
-  conflicts (likely `server/db.ts` near `bidDropsNotPriced`, CHANGELOG
-  `## [2026-10-16]`, todo), Gate green, give the owner the `!` push line.
-- Shipped on track-c meanwhile: "Discard your changes?" guard on every
+The app's pool is now UTC on the wire and in the session, as production and
+the Gate already were (`server/appPool.ts`). A time the app WROTE into your
+LOCAL database before this, under your laptop's Pacific session, now reads
+7 h later. Local test data only — production never had the split, and a
+fresh test DB is unaffected. Nothing to run; just don't chase it as a bug.
+
+## (newest) 2026-10-16, evening — smoke fix, levels plan, todo items
+
+- **Smoke red since C landed (0fc489bf), fixed on track-c `843a032e`:**
+  the step bar (laptop, Plans screen) shared "Count"/"Runs" with the
+  toolbar — its buttons are now "Step: Count" etc. (visible words
+  unchanged); smoke clicks the toolbar's exact "Count"; the step-bar spec
+  asserts each "Step: X". The PDF-open check read the guide strip's "a run
+  can't be measured" as an error — it now skips the Guide `<aside>`.
+  Local smoke on the 5 affected specs: all those green. **Not C's, for
+  B/A:** the phone "select two marks … Undo" fails locally on B's
+  `230c18f5` too (and with the guide off); the "LOST ANSWER" marks test
+  fails locally on desktop and phone.
+- **Plan only:** `references/user-levels-plan.md` rewritten for the
+  owner's 2026-10-16 decision (a level is a person's way of working,
+  picked at signup, switchable, not a tier); UL2–UL9, TR1–TR6 and Q-ARCH1
+  at the top of `pricing/morning-questions.md`.
+- **Built:** Materials "Needs pricing" counts example prices
+  (`needsYourPrice`); quote-app panel "Fix this line"; reshape a height
+  area. Several stale todo items closed with evidence.
+- `c-scope-prompts` (6b) waits for S2 AFTER the live release — leave it.
+
+## 2026-10-16, afternoon — C ready e9dfc0ff; 6b waits for S2
+
+- **B landed and is merged.** "C ready e9dfc0ff" is at the top of
+  `track-a-handoff.md` (Gate 38968275571 green); A lands it. One
+  `DraftNumberInput` (B's API + C's parsing/blur). The first merge Gate was
+  red: C's `priceHistoryDoor.test.ts` could not see B's generic
+  `forkForOwners` — the scan now can.
+- **Scope tags 6b is BUILT on local branch `c-scope-prompts`** (not pushed:
+  C pushes track-c only; it holds a `drizzle/schema.ts` commit, a0180e50,
+  that is A's to land). Final S2 SQL + the schema.ts text are in
+  `track-a-handoff.md`. **When S2 is on local-dev:** merge local-dev into
+  track-c, then merge `c-scope-prompts` taking A's schema.ts, migrate
+  `bidrender_test_c`, run `server/scopePromptsLibrary.test.ts`, push.
+- Q-IMP1 built; lists (Dashboard / Find a bid / archive) priced together
+  (250 bids 460 → 85 ms); guide mode was already finished.
+- **For B:** `starterOffers.ts` reads Drafts' runs without the live-sheet
+  rule — todo.md, and `quantitiesIgnoreDeletedPlans.test.ts` names it as
+  its one known gap.
+- Earlier today: "Discard your changes?" guard on every
   library editor + Clients (`lib/unsavedGuard.ts`, `hooks/useUnsavedGuard`,
   one dialog in the shell); dashboard drops check reads company heights
   once per list (`companyHeights` in db.ts).

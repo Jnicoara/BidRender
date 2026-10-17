@@ -28,6 +28,10 @@ import {
   roleRankFor,
 } from "../shared/materialSearchRank";
 import { compareBySize } from "../shared/materialSizeOrder";
+import {
+  materialSearchIndex,
+  searchMaterials,
+} from "../client/src/lib/materialSearch";
 import { commonnessPoints } from "../shared/materialCommonness";
 import {
   RENAMED_BASELINE_MATERIALS,
@@ -424,27 +428,16 @@ describe("the searches that must not regress, against the shipped catalog", () =
  * SECOND").
  */
 describe("an old name finds the row it was renamed to, first", () => {
-  const index = BASELINE_MATERIALS.map((row, i) => ({
-    id: String(i),
-    description: row.name,
-    searchAliases: row.searchAliases,
-  }));
-  const FAMILIES = familySizes(BASELINE_MATERIALS);
+  // The SAME pipeline every search box runs (client/src/lib/materialSearch.ts
+  // `searchMaterials`), not a copy of it: until 2026-10-16 this built its own
+  // match-then-rank, so a fix in the real one (the old-name rescue) would not
+  // have reached this loop. No usage, so commonness is the starter rank.
+  const index = materialSearchIndex(
+    BASELINE_MATERIALS.map((row, i) => ({ ...row, id: i }))
+  );
   const NOW = new Date("2026-09-26T12:00:00Z");
-  const ranked = (query: string): string[] => {
-    const { results, searchedQuery } = smartSearchCorrected(index, query, 80);
-    return rankMaterialHits(
-      results.map(hit => ({
-        row: BASELINE_MATERIALS[Number(hit.item.id)],
-        score: hit.score,
-      })),
-      searchedQuery,
-      {
-        families: FAMILIES,
-        commonness: row => commonnessPoints(row.name, undefined, NOW),
-      }
-    ).map(row => row.name);
-  };
+  const ranked = (query: string): string[] =>
+    searchMaterials(index, query, 80, new Map(), NOW).rows.map(row => row.name);
 
   /**
    * Old spellings that cannot be searched for at all, for a reason that is
@@ -452,9 +445,10 @@ describe("an old name finds the row it was renamed to, first", () => {
    * is fixed and this test will then hold it to ranking first.
    */
   const NOT_A_RANKING_PROBLEM: Record<string, string> = {
-    // Reads as the fraction five-sixths and finds nothing — todo.md,
-    // "5/6" wafer LED downlight (the old spelling) reads as a fraction".
-    '5/6" wafer LED downlight': "size parsing",
+    // ('5/6" wafer LED downlight' stood here — "size parsing" — until
+    // 2026-10-16: the matcher read 5/6" as a size and found nothing. The
+    // search now lets an old name's row in before ranking, so the loop
+    // holds it to first place like every other rename.)
     // The old name names a SIZE the row is not (catalog reality check,
     // 2026-10-09): the triple-gang box became the stocked 3/4" one, and the
     // 1-1/4" strut the real 7/8" (P3300). A 1/2" or 1-1/4" search must not

@@ -12,7 +12,8 @@ new host.
 ## The one-line version
 
 Of the settings below, the **Cloudflare R2 ones survive a move** (they are
-yours, not Manus's), **five have to be regenerated** on any new host, and the
+yours, not Manus's), **three are required** on any new host (§ 1 — it said
+"five" until 2026-10-16, counting two OAuth variables nothing needs now), and the
 rest are either optional or derived from the choices you make. The one that
 catches people out is `JWT_SECRET`, which signs two different things.
 
@@ -20,13 +21,20 @@ catches people out is `JWT_SECRET`, which signs two different things.
 
 ## 1. Required — the app will not work without these
 
-| Name                    | Where the value comes from today | On a new host                                            |
-| ----------------------- | -------------------------------- | -------------------------------------------------------- |
-| `DATABASE_URL`          | Manus environment settings       | **Regenerate.** Your new MySQL host issues it.           |
-| `JWT_SECRET`            | Manus environment settings       | **Keep or regenerate — see the warning below.**          |
-| `OAUTH_SERVER_URL`      | Manus environment settings       | **Regenerate.** Points at whatever replaces Manus login. |
-| `VITE_APP_ID`           | Manus environment settings       | **Regenerate.** Identifies the app to the login system.  |
-| `VITE_OAUTH_PORTAL_URL` | Manus environment settings       | **Regenerate.** The browser-facing half of login.        |
+| Name           | Where the value comes from today           | On a new host                                                                                                                                                                        |
+| -------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL` | DigitalOcean app settings (`.env` locally) | **Regenerate.** Your new MySQL host issues it.                                                                                                                                       |
+| `JWT_SECRET`   | DigitalOcean app settings (`.env` locally) | **Keep or regenerate — see the warning below.**                                                                                                                                      |
+| `VITE_APP_ID`  | DigitalOcean app settings (`.env` locally) | **Keep — any non-empty string.** Every session token carries it, and `sdk.verifySession` refuses a token whose `appId` is empty: unset, nobody stays signed in (checked 2026-10-16). |
+
+**Corrected 2026-10-16.** This table said all five came from "Manus
+environment settings" and listed `OAUTH_SERVER_URL` and
+`VITE_OAUTH_PORTAL_URL` as required. Sign-in is email and password in our own
+`users` table (CLAUDE.md § Architecture), so those two are now **optional**:
+unset, the server logs "Manus login is off" (`server/_core/sdk.ts`) and the
+login link is the landing page `/` (`client/src/const.ts` `getLoginUrl`).
+`VITE_APP_ID` is the one of the three that is still load-bearing, for the
+reason in its row — checked against the code, not assumed.
 
 > **`JWT_SECRET` signs sessions AND file URLs.** It is not only the login
 > cookie. Stored-file links carry a signed, expiring token in the path
@@ -39,17 +47,18 @@ catches people out is `JWT_SECRET`, which signs two different things.
 > re-made by logging in, URLs are re-minted on the next page load — but do it
 > deliberately rather than by accident.
 
-> **`VITE_OAUTH_PORTAL_URL` missing crashes the whole app, not just login.**
-> `getLoginUrl` builds a `new URL()` from it inside `AuthGuard`, which is a
-> whole-app error boundary. You get a red `Invalid URL` page and no route renders
-> at all. It looks like a broken build; it is a missing variable.
+> **No longer true (fixed in code; this warning stood until 2026-10-16):
+> `VITE_OAUTH_PORTAL_URL` missing used to crash the whole app.** `getLoginUrl`
+> built a `new URL()` from it inside `AuthGuard`, a whole-app error boundary —
+> a red `Invalid URL` page and no route. `client/src/const.ts` now returns `/`
+> when it is unset, so leave it unset.
 
 ## 2. Legacy — read but no longer load-bearing
 
 | Name                     | Where the value comes from today | On a new host                                |
 | ------------------------ | -------------------------------- | -------------------------------------------- |
-| `BUILT_IN_FORGE_API_URL` | Not set on DigitalOcean          | **Leave unset.** Dead code path.             |
-| `BUILT_IN_FORGE_API_KEY` | Not set on DigitalOcean          | **Leave unset.** Same.                       |
+| `BUILT_IN_FORGE_API_URL` | Not set anywhere                 | **Read by nothing since 2026-10-16.**        |
+| `BUILT_IN_FORGE_API_KEY` | Not set anywhere                 | **Read by nothing since 2026-10-16.**        |
 | `OWNER_OPEN_ID`          | Your own account id              | **Regenerate.** Owner-tier features need it. |
 
 **These two used to do double duty — object storage AND the LLM gateway. They do
@@ -59,13 +68,11 @@ neither now.**
   through `server/storage.ts`, chosen by `PLAN_STORAGE`. See § 6, which used to
   describe replacing Forge storage and now describes what actually exists.
 - **AI moved out earlier.** Every call goes through `server/llm` on
-  `ANTHROPIC_API_KEY`. The Forge gateway survives only as a fallback in
-  `server/_core/llm.ts` for when no Anthropic key is set, and since neither
-  variable is configured on DigitalOcean, that fallback is already dead on the
-  live site.
-
-Removing them entirely is tracked in `todo.md` § Manus removal. They are still
-read by `server/_core/env.ts`, which is the only reason they are listed at all.
+  `ANTHROPIC_API_KEY`. The Forge gateway survived as a fallback in
+  `server/_core/llm.ts` (and a presign path in `storageProxy.ts`) until
+  2026-10-16, dead because neither variable was set anywhere; both are gone,
+  and `server/_core/env.ts` no longer reads them. Listed here only so a
+  reader who finds them in an old note knows they do nothing.
 
 > **An error reading `OPENAI_API_KEY is not configured` means no Anthropic key.**
 > The message is wrong twice over: there is no OpenAI dependency anywhere in this
