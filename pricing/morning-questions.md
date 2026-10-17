@@ -9,6 +9,45 @@ Every EARLIER review (Conduit through Fasteners & Anchors) is fully
 answered; the only open item there is Breakers Q9, which waits for the
 brand-variants pass by design and needs nothing from you now.
 
+## NEW 2026-10-16 — user levels + trade-ready core (PLAN ONLY, nothing built)
+
+Plan: `references/user-levels-plan.md` (replaces B's 10-15 draft: you
+decided a level is how a PERSON works, picked at signup, switchable, not a
+pricing tier — so it hides screens and is never a lock on the server).
+
+- **UL2** The three levels' screens (table in plan § 1.2: Takeoff = plans,
+  counts, quantities, export; Estimate adds pricing, proposal, clients,
+  labor rates; Pro adds Performance, close-out, QuickBooks) → **yes, as a
+  start**. Affects: what each level's menu shows.
+- **UL3** On Takeoff, is money shown anywhere? → **No — quantities only.**
+  Prices still exist, just not shown. Affects: bid page, Dashboard cards.
+- **UL4** On Takeoff, the library? → **Materials and Assemblies visible,
+  price columns hidden.** Affects: what a Takeoff user picks counts from.
+- **UL5** A link to a screen your level hides → **open it, with one line:
+  "This is part of Estimate. Switch · Not now".** Never a dead end.
+- **UL6** Per person or per company? → **Per person**; an invitee starts
+  on the owner's level. Affects: a field counter and an estimator in one
+  company each see their own view.
+- **UL7** Signup and existing users → **signup asks once (default
+  Estimate); every existing user is Pro**, so nobody's screen changes on
+  the day it ships. Needs one new column on users (A, additive).
+- **UL8** The guide and step bar follow the level → **yes**: Takeoff's
+  last step is "Export the quantities", not "Print it".
+- **UL9** Names → yours to pick ("Takeoff / Estimate / Pro" for now);
+  the code stores a key, so renaming is wording only.
+- **TR1** Second trade → **plumbing** (closest to what exists). Affects:
+  which real takeoff the run model is designed against.
+- **TR2** Start trade steps 1–3 now (new rows say their trade, content
+  keyed by trade, AI prompts take the bid's trades) → **yes**; no number
+  moves, no migration.
+- **TR3** Take shelf categories out of the database ENUM → **yes, before
+  any second trade** (a migration for A).
+- **TR4** Give the scope-prompts table a trade column now, inside the
+  still-unrun S2 draft → **yes** — one line now vs a second migration later.
+- **TR5** A company's trades → **set in Settings, default electrical**;
+  signup asks the level only.
+- **TR6** QuickBooks "Electrical work" → **booked by each line's trade.**
+
 ## ⚠⚠ NIGHT 3 (2026-10-15 → 16) — WRONG NUMBERS FOUND, fixed on track-c, need your call on what is already saved
 
 - **Q-DEF1 ⚠⚠ CHANGES BID MONEY (already saved data), the widest one** —
