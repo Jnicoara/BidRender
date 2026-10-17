@@ -73,6 +73,11 @@ jobs:
           exit 1
       - name: The whole-job journey (laptop, iPad, phone)
         run: npx playwright test -c e2e/journey/playwright.config.ts
+      # After the journey, because a drill STOPS this runner's MySQL and locks
+      # the plan folder (e2e/drills/drills.spec.ts) — and restarts both.
+      - name: Failure drills (database down, plan store down)
+        if: success() || failure()
+        run: npx playwright test -c e2e/drills/playwright.config.ts
       - name: App log tail
         if: always()
         run: tail -80 app.log || true
@@ -83,6 +88,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: journey-failures
-          path: e2e/.results/journey/**/*.png
+          path: |
+            e2e/.results/journey/**/*.png
+            e2e/.results/drills/**/*.png
           retention-days: 7
           if-no-files-found: ignore
