@@ -270,6 +270,11 @@ jobs:
     if: needs.deploy-staging.outputs.deployed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # One staging smoke account: never at the same time as a smoke-repeat run
+    # (.github/workflows/smoke-repeat.yml). Queued, never cancelled.
+    concurrency:
+      group: staging-smoke
+      cancel-in-progress: false
     env:
       SMOKE_BASE_URL: https://staging.bidridge.com
       SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}

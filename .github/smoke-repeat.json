@@ -1,0 +1,5 @@
+{
+  "specs": ["plans.spec.ts", "marks.spec.ts", "demo.spec.ts"],
+  "repeat": 5,
+  "projects": ["desktop", "phone", "tablet-portrait", "tablet-landscape"]
+}
