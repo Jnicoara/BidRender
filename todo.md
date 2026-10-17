@@ -3461,7 +3461,7 @@ now runs 32 passed / 0 failed. See below for what the grant was.
   does not exist on 3306 at all. Check with `SELECT @@port, @@datadir;` before
   granting; an access-denied from the wrong server looks just like a bad password.
 
-- [ ] `server/backup/verifyBackup.ts` built its scratch connection with `mysqlConnection(scratchDatabaseUrl)` and no environment argument, so it inherited `DATABASE_CA_CERT` — **production's** certificate — and applied it to whatever local server the restore was pointed at. Fixed 2026-09-19; `VERIFY_DATABASE_CA_CERT` now covers a scratch server that needs its own TLS.
+- [x] `server/backup/verifyBackup.ts` built its scratch connection with `mysqlConnection(scratchDatabaseUrl)` and no environment argument, so it inherited `DATABASE_CA_CERT` — **production's** certificate — and applied it to whatever local server the restore was pointed at. Fixed 2026-09-19; `VERIFY_DATABASE_CA_CERT` now covers a scratch server that needs its own TLS.
 
   Worth keeping as a written-down shape rather than a closed ticket. It was dormant for as long as `DATABASE_CA_CERT` was unset and broke the moment production moved to a managed database — the failure was `self-signed certificate in certificate chain` from the LOCAL server, naming a certificate that belongs to the database not being restored into. Nothing about the message points at the cause. The nightly verification would have failed the same way and just as quietly, leaving backups that nobody was confirming. Proved by changing that one variable and watching the error become a different one.
 
@@ -3621,7 +3621,11 @@ Check that last one before dropping the stash. Then don't reach for stash again:
 to test something against a clean tree, use `git worktree add` — a separate
 directory, so nothing touches the files you are working in.
 
-- [ ] Make `pnpm test` pass on a clean checkout so the workaround above can be
+- [x] **DONE (checked 2026-10-16):** the Gate runs the full suite on a fresh
+      checkout and a brand-new migrated, seeded database on every push
+      (`.github/workflows/gate.yml`), green today (run 38989986720); use a
+      worktree, never stash, to test a clean tree.
+- [x] Make `pnpm test` pass on a clean checkout so the workaround above can be
       deleted. Tracked under "Test suite health" above; noted here too because
       this is the section someone reads when something inexplicable happens.
 
