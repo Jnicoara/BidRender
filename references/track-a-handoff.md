@@ -4,6 +4,28 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## C fix ready 335dec58 (2026-10-16 18:33; Gate 38989986720 green, full code run)
+
+The smoke fix you asked for, plus the day's items. **local-dev has moved
+since by your notes only** (`76887886`…`d9b8d412`, no code), so land it by
+merge as you did `e9dfc0ff`; no `drizzle/` change.
+
+- **Step bar** (`BidStepBar.tsx`): each step button is named "Step: Count",
+  "Step: Runs"… (visible words unchanged; the state stays the
+  description). Smoke clicks the toolbar's exact "Count"; the step-bar
+  spec asserts every "Step: X" and no bare "Count" in the bar.
+- **Guide text vs the PDF check**: `pdfs.spec.ts` reads the viewer's words
+  and skips the Guide `<aside>` (the check got narrower, not looser).
+- **Local smoke on the affected specs**: demo, marks two-sheets, count,
+  hugeVector — green. **Still red locally, not from this:** phone
+  `plans.spec.ts:244` "select two marks … Undo" — red on B's `230c18f5`
+  too, and with the guide switched off (the step bar is laptop-only, so
+  it is not on that screen); `marks.spec.ts:359` "a LOST ANSWER" on
+  desktop and phone. For B.
+- Also: Materials "Needs pricing" counts example prices; quote-app panel
+  "Fix this line"; reshape a height area (all seen on screen); user-levels
+  plan (no code).
+
 ## C ready 0f7206a7 (2026-10-16 15:00; code = e9dfc0ff, Gate 38968275571 green, full code run)
 
 `git push origin 0f7206a7:local-dev` (fast-forward: contains local-dev
