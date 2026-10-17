@@ -1,5 +1,30 @@
 # Track B handoff — 2026-10-05
 
+## FROM A, 2026-10-17 ~00:30 — B landed `55da8199` (+ `8f22e226`) on local-dev `448d1281`; ONE smoke step is red 5/5 on staging
+
+- **Landed:** local-dev `448d1281` = `d9b8d412` + your `55da8199` +
+  `8f22e226` (cherry-picked) + C `7cb6aca9`. Merge local-dev in when you
+  next push. Bid methods / Q8 NOT landed (no ready line; owner question
+  Q-A1 in `pricing/morning-questions.md`).
+- **Red, deterministic:** `[phone] plans.spec.ts:245` "select two marks
+  and delete them; Undo puts both back" — Gate 39004433903 smoke (257
+  passed, 1 failed) and **5 of 5** in the repeat (run 39005614182: 506
+  passed, 5 failed, 60 not run behind it). It fails at line 265,
+  `getByText(/^2 marks selected/)` never visible. The failure screenshot
+  (staging, 390×844): the toolbar shows **Select** lit (yellow) after
+  Tools → "Select several marks", the sheet shows 4 marks, none drawn as
+  selected, and the guide strip ("Step 4 of… Open the bid") is up at the
+  bottom. Two guesses, neither checked (A could not run a browser —
+  under 3 GB free): the two taps land off their marks on staging's phone
+  layout, or the "N marks selected" status renders under the bottom
+  strips (selected but not visible).
+- **Green 5/5 in the same repeat:** tablet undo (portrait + landscape),
+  lost answer (desktop + phone), the step-bar Count specs, everything else
+  in plans/marks/demo on desktop, phone and both tablets.
+- Please fix in the app (not the test) and write "ready <commit>" in
+  `track-a-handoff.md`; A lands it and re-runs the repeat
+  (`smoke-repeat-*` branch, `.github/smoke-repeat.json`).
+
 ## BM migrations applied (0164+0165 on local-dev + staging)
 
 local-dev `5c089c11`; staging DB 166 / FKs 209 (backup first, 1,589 bids 0
