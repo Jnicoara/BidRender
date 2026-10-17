@@ -234,11 +234,28 @@ function moneyFields(value: unknown, path = ""): string[] {
   return found;
 }
 
-/** A figure as a standalone number in the text (materialsList.test.ts). */
+/**
+ * A figure as a standalone number in the text (materialsList.test.ts).
+ *
+ * The backslashes are DOUBLED because this is a template literal: written
+ * single, `\d` arrived as `d` and `\.` as `.`, so "1.26" matched inside any
+ * longer number holding those digits — a coordinate like 411.26 — and the
+ * Gate went red on a mark position (2026-10-16). The check below holds it.
+ */
 function asAFigure(n: number): RegExp {
-  const fixed = n.toFixed(2).replace(".", "\.");
-  return new RegExp(`(?<![\d.])${fixed}0*(?!\d)`);
+  const fixed = n.toFixed(2).replace(".", "\\.");
+  return new RegExp(`(?<![\\d.])${fixed}0*(?!\\d)`);
 }
+
+describe("the figure matcher itself", () => {
+  it("finds a figure standing alone, and never inside another number", () => {
+    expect(asAFigure(1.26).test('{"cost":1.26}')).toBe(true);
+    expect(asAFigure(1.26).test('{"cost":"1.2600"}')).toBe(true);
+    expect(asAFigure(1.26).test('{"x":411.26}')).toBe(false);
+    expect(asAFigure(1.26).test('{"x":1.267}')).toBe(false);
+    expect(asAFigure(1.26).test('{"x":"1x26"}')).toBe(false);
+  });
+});
 
 describe("every route a Field member reaches answers without a price", () => {
   it("has no money-named number and none of this bid's figures", async () => {
