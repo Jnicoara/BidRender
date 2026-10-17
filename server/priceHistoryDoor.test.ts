@@ -38,6 +38,8 @@ const ALLOWED: Record<string, Record<string, string>> = {
     seedBaselineMaterialsFrom: "inserts SHIPPED rows (userId NULL)",
     reactivateBaselineMaterials: "shared rows, isActive only",
     stampMaterialTrade: "shared rows, trade only",
+    claimOwnRowVersion:
+      "the stale-save claim: updatedAt only, never a price (server/staleSave.ts)",
   },
 };
 

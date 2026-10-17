@@ -2010,6 +2010,12 @@ Design: `references/homerun-footage-plan.md` § 4.
       Fine today. **Done when** the dashboard pages or sums in SQL, and the
       big-data run at 250 bids stays under 1 s (raise the fixture's bid
       count in that test to prove it).
+- [x] **CLOSED 2026-10-16 night (Track A): not reproduced in three later
+      CI runs** — 3 ms (Gate 38857671207), 5 ms with `[speed-detail]` 1 ms
+      read / 3 ms write / 5 ms whole (Gate 39003076893 on `448d1281`), and
+      the stress job's big company (save 3–4 ms). Explained as one slow
+      moment on a shared runner, as suspected. The `[speed-detail]` lines
+      stay, so a return says where at once. Original entry:
 - [ ] **Speed limit outlier (Track A, 2026-10-15 night): pricing a material
       takes 221 ms in CI against 6 ms on a laptop** — every other save is
       2–14 ms in CI (`server/speedLimits.test.ts`, Gate 38855631644, lines

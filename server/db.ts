@@ -1694,15 +1694,13 @@ export async function withNamedLock<T>(
 }
 
 /** The library tables whose editors send `openedAt` (shared/staleEdit.ts). */
-const VERSIONED_TABLES = {
-  assemblies,
-  kits,
-  modifiers,
-  clients,
-  laborRates,
-  materials,
-} as const;
-export type VersionedTable = keyof typeof VERSIONED_TABLES;
+export type VersionedTable =
+  | "assemblies"
+  | "kits"
+  | "modifiers"
+  | "clients"
+  | "laborRates"
+  | "materials";
 
 /**
  * Claim the saved version an editor opened, so ONE save wins it.
@@ -1729,6 +1727,11 @@ export type VersionedTable = keyof typeof VERSIONED_TABLES;
  * every other company's open editor on that starter look stale.
  *
  * Returns false when somebody else claimed that version first.
+ *
+ * Each table is written by NAME, never a table handed in: the price door's
+ * guard (server/priceHistoryDoor.test.ts) refuses a run-time table, and the
+ * `materials` claim below sets `updatedAt` only — never a price — which is
+ * the reason it gives that guard.
  */
 export async function claimOwnRowVersion(
   tableName: VersionedTable,
@@ -1738,21 +1741,60 @@ export async function claimOwnRowVersion(
 ): Promise<boolean> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const table = VERSIONED_TABLES[tableName];
   const openedSeconds = Math.floor(new Date(openedAt).getTime() / 1000);
-  const [claim] = await db
-    .update(table)
-    .set({
-      updatedAt: sql`GREATEST(CURRENT_TIMESTAMP, ${table.updatedAt} + INTERVAL 1 SECOND)`,
-    })
-    .where(
-      and(
-        eq(table.id, id),
-        eq(table.userId, dataUserId),
-        sql`UNIX_TIMESTAMP(${table.updatedAt}) = ${openedSeconds}`
-      )
+  const bump = (updatedAt: AnyMySqlColumn) => ({
+    updatedAt: sql`GREATEST(CURRENT_TIMESTAMP, ${updatedAt} + INTERVAL 1 SECOND)`,
+  });
+  const opened = (
+    idCol: AnyMySqlColumn,
+    userCol: AnyMySqlColumn,
+    updatedAt: AnyMySqlColumn
+  ) =>
+    and(
+      eq(idCol, id),
+      eq(userCol, dataUserId),
+      sql`UNIX_TIMESTAMP(${updatedAt}) = ${openedSeconds}`
     );
-  return claim.affectedRows === 1;
+  let affected: number;
+  switch (tableName) {
+    case "assemblies":
+      [{ affectedRows: affected }] = await db
+        .update(assemblies)
+        .set(bump(assemblies.updatedAt))
+        .where(opened(assemblies.id, assemblies.userId, assemblies.updatedAt));
+      break;
+    case "kits":
+      [{ affectedRows: affected }] = await db
+        .update(kits)
+        .set(bump(kits.updatedAt))
+        .where(opened(kits.id, kits.userId, kits.updatedAt));
+      break;
+    case "modifiers":
+      [{ affectedRows: affected }] = await db
+        .update(modifiers)
+        .set(bump(modifiers.updatedAt))
+        .where(opened(modifiers.id, modifiers.userId, modifiers.updatedAt));
+      break;
+    case "clients":
+      [{ affectedRows: affected }] = await db
+        .update(clients)
+        .set(bump(clients.updatedAt))
+        .where(opened(clients.id, clients.userId, clients.updatedAt));
+      break;
+    case "laborRates":
+      [{ affectedRows: affected }] = await db
+        .update(laborRates)
+        .set(bump(laborRates.updatedAt))
+        .where(opened(laborRates.id, laborRates.userId, laborRates.updatedAt));
+      break;
+    case "materials":
+      [{ affectedRows: affected }] = await db
+        .update(materials)
+        .set(bump(materials.updatedAt))
+        .where(opened(materials.id, materials.userId, materials.updatedAt));
+      break;
+  }
+  return affected === 1;
 }
 
 /**

@@ -27,6 +27,8 @@ let page: Page;
 let bidId = 0;
 let bidName = "";
 let total = "";
+/** Every dollar figure on the bid page before anything was taken away. */
+let figuresBefore: string[] = [];
 
 async function trpc<T>(proc: string, input?: unknown, mutation = false) {
   const body = { json: input ?? null };
@@ -128,6 +130,15 @@ test("a priced bid, seen on screen", async () => {
 
   await open(`/#/bids/${bidId}`);
   await expect(page.getByText(total).first()).toBeVisible();
+  // Settled: the same figures twice in a row.
+  await expect
+    .poll(async () => {
+      const now = await dollars();
+      const same = JSON.stringify(now) === JSON.stringify(figuresBefore);
+      figuresBefore = now;
+      return same && now.length > 0;
+    })
+    .toBe(true);
 });
 
 test("database DOWN: every screen says so, and states no number", async () => {
@@ -161,7 +172,9 @@ test("database BACK: the open screen recovers by itself, the total unchanged", a
   execSync("sudo systemctl start mysql.service");
   // No reload, no click: it retries by itself every few seconds.
   await expect(page.getByText(total).first()).toBeVisible({ timeout: 90_000 });
-  expect(await dollars()).not.toContain("$0.00");
+  // Every figure exactly as before the outage — a real $0.00 line (overhead
+  // left off, no tax) is fine; a figure that MOVED is not.
+  await expect.poll(dollars, { timeout: 30_000 }).toEqual(figuresBefore);
 });
 
 test("plan store DOWN: the plan says it cannot open, the bid's money is untouched; BACK: it opens", async () => {
