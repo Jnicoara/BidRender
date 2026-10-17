@@ -3040,44 +3040,22 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 ## v5.50 — RBAC + Assembly Builder + Admin Feature Flags
 
-### Step 1: RBAC
+> **Closed 2026-10-16 (Track C):** this is the PLAN copy of the section
+> below, which records it "(COMPLETE)". Since then every piece was replaced
+> on purpose, so nothing here is owed: roles are company roles
+> (owner / admin / estimator / viewer, `shared/permissions.ts`); the
+> `featureFlags` table is retired for access tiers (`FEATURES`,
+> CLAUDE.md § Architecture); `master_*` assemblies are the legacy model
+> (assemblies + `AssembliesLibraryPage` replaced them); the Admin screen is
+> `AdminSettingsPage`; the `ProjectAssembliesTab` / `BidSummaryTab` /
+> `BomRfqTab` screens were deleted.
 
-- [ ] Add "contractor" to the role enum in schema.ts (alongside "user" and "admin")
-- [ ] Push DB migration for role enum change
-- [ ] Expose ctx.user.role to frontend via auth.me query
-- [ ] Add useIsAdmin() and useIsContractor() hooks to frontend
-
-### Step 2: Assemblies DB (already exists — verify and document)
-
-- [ ] Confirm master_assemblies, master_assembly_items tables are live
-- [ ] Confirm masterAssembliesRouter procedures are wired and functional
-- [ ] Confirm laborHours field exists on assembly items
-
-### Step 3: Assembly Builder UI
-
-- [ ] Create standalone AssemblyBuilderPage accessible from sidebar
-- [ ] List all master assemblies with search/filter
-- [ ] Create/edit assembly: name, description, phase, add items from materials DB with qty
-- [ ] Show labor hours total per assembly (sum of item qty × masterLaborHours)
-- [ ] Wire to masterAssembliesRouter (list, create, update, addItem, removeItem)
-
-### Step 4: Feature Flags System
-
-- [ ] Add feature_flags table: id, flagKey (unique), label, description, enabledForContractors, updatedAt
-- [ ] Push DB migration for feature_flags table
-- [ ] Add featureFlagsRouter: getAll (admin), upsert (admin), getForUser (public — returns only keys + enabled state, no admin data)
-- [ ] Add featureFlagsRouter to appRouter
-- [ ] Add useFeatureFlag(key) hook to frontend that reads from getForUser query
-
-### Step 5: Admin Settings Page
-
-- [ ] Create AdminSettingsPage accessible ONLY when role === "admin"
-- [ ] Add "Admin" nav item to sidebar (only visible to admins)
-- [ ] Feature Flags section: list all flags with toggle switches, label, description
-- [ ] Seed the "enable_labor_units" flag (default: OFF for contractors)
-- [ ] Gate all labor-related UI in ProjectAssembliesTab, BidSummaryTab, BomRfqTab behind useFeatureFlag("enable_labor_units")
-- [ ] Gate labor data in tRPC responses: strip laborHours fields from projectAssemblies/projectItems list when flag is OFF for contractor role
-- [ ] TypeScript: 0 errors after all changes
+- [x] Step 1 RBAC — superseded by company roles (`shared/permissions.ts`)
+- [x] Step 2 master assemblies — legacy model, replaced by `assemblies`
+- [x] Step 3 Assembly builder — `AssembliesLibraryPage`
+- [x] Step 4 Feature flags — retired; access tiers (`FEATURES`)
+- [x] Step 5 Admin settings — `AdminSettingsPage`; the labor gating it
+      described applied to screens since deleted
 
 ## v5.50 — RBAC + Assembly Builder + Feature Flags (COMPLETE)
 
