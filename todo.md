@@ -3350,7 +3350,7 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 - [x] **DONE 2026-10-15 night (Track A):** the fixture is now
       `"fixture-backup-bucket"`; `bidrender-backups` appears nowhere in
       `server/` or `scripts/`. Was: `server/backup.test.ts` uses `"bidrender-backups"` as a fixture bucket name. Harmless test data — the real bucket is `bidsoftware` — but it is now the last place that string survives, so it will read like the configured value to whoever finds it next.
-- [ ] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
+- [x] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
 
 ## Migration cutover — DigitalOcean App Platform
 
@@ -3391,11 +3391,24 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 **Found by the sweep — stale but harmless (historical record, or already labelled):**
 
-- [ ] `references/periodic-updates.md` documents the Manus scheduler end to end — `manus-heartbeat`, AGENT cron, `user.isCron`, six-field expressions. Low priority **only because it already opens with a prominent header saying all of it is historical and describing what replaced it.** That header is what makes it honest rather than dangerous. Worth trimming eventually; do not remove the header before then.
-- [ ] `references/database-digitalocean.md` mentions Manus throughout, almost all of it accurate history of how the DigitalOcean database was built and why it was not restored from the old one. Only the line saying plan files are "still Manus storage; replacing it is its own job" is stale.
-- [ ] `references/backups.md` § 1 points the reader at `deploying.md` § 8 for "four Manus services" — a pointer to one of the wrong entries above. Fix alongside it.
-- [ ] `references/takeoff-spec.md` — the two matches are the ordinary word "forget". No action; noted so the next sweep does not re-check it.
-- [ ] `references/environment.md` § 1 lists `DATABASE_URL`, `JWT_SECRET` and the three OAuth variables as coming from "Manus environment settings" — they come from DigitalOcean now. Noticed 2026-09-17 while fixing § 2 and § 6, and deliberately left: only the source column is wrong, and the harder question sitting underneath it is whether `OAUTH_SERVER_URL` / `VITE_APP_ID` / `VITE_OAUTH_PORTAL_URL` still belong under "the app will not work without these" at all, now that sign-in is email and password. `VITE_OAUTH_PORTAL_URL` may still crash `AuthGuard` when absent; that wants checking against the code rather than assuming, and it overlaps Manus removal group B (`getLoginUrl`, `oauth.ts`). Fix the column and answer the question in one pass.
+- [x] **CLOSED 2026-10-16 (Track C) — the six doc items below:**
+      `periodic-updates.md` KEPT as is (its header says plainly that it is
+      historical and what replaced it; trimming would delete the reasoning
+      it is kept for); `database-digitalocean.md` line annotated "since done:
+      R2, v5.141"; `backups.md` § 1 needs nothing (it no longer says "four
+      Manus services" and `deploying.md` § 8 is right now);
+      `takeoff-spec.md` no action, as written; `environment.md` § 1 fixed
+      AND the question answered against the code — `OAUTH_SERVER_URL` and
+      `VITE_OAUTH_PORTAL_URL` are optional (unset = Manus login off, login
+      link `/`), but **`VITE_APP_ID` is still required**: `verifySession`
+      refuses a token with an empty `appId`, so unset, nobody stays signed
+      in. Its stale "missing portal URL crashes the app" warning corrected.
+      v5.129 in CHANGELOG: **no** — docs-only, the exemption CLAUDE.md gives.
+- [x] `references/periodic-updates.md` documents the Manus scheduler end to end — `manus-heartbeat`, AGENT cron, `user.isCron`, six-field expressions. Low priority **only because it already opens with a prominent header saying all of it is historical and describing what replaced it.** That header is what makes it honest rather than dangerous. Worth trimming eventually; do not remove the header before then.
+- [x] `references/database-digitalocean.md` mentions Manus throughout, almost all of it accurate history of how the DigitalOcean database was built and why it was not restored from the old one. Only the line saying plan files are "still Manus storage; replacing it is its own job" is stale.
+- [x] `references/backups.md` § 1 points the reader at `deploying.md` § 8 for "four Manus services" — a pointer to one of the wrong entries above. Fix alongside it.
+- [x] `references/takeoff-spec.md` — the two matches are the ordinary word "forget". No action; noted so the next sweep does not re-check it.
+- [x] `references/environment.md` § 1 lists `DATABASE_URL`, `JWT_SECRET` and the three OAuth variables as coming from "Manus environment settings" — they come from DigitalOcean now. Noticed 2026-09-17 while fixing § 2 and § 6, and deliberately left: only the source column is wrong, and the harder question sitting underneath it is whether `OAUTH_SERVER_URL` / `VITE_APP_ID` / `VITE_OAUTH_PORTAL_URL` still belong under "the app will not work without these" at all, now that sign-in is email and password. `VITE_OAUTH_PORTAL_URL` may still crash `AuthGuard` when absent; that wants checking against the code rather than assuming, and it overlaps Manus removal group B (`getLoginUrl`, `oauth.ts`). Fix the column and answer the question in one pass.
 
 ## Test suite health
 
