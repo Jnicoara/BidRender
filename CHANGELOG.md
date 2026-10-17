@@ -6,6 +6,8 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-17]
 
+- **More room for the drawing on the Plans screen.** A new "Slim" button beside Focus hides the bid header and shows the tools as icons only (laptop: 150 px of toolbar becomes 75). It is remembered in this browser, and "Full toolbar" brings everything back. The drop-heights warning keeps its words either way.
+- **The Plans screen tells a finger what it does.** On a phone or tablet, the first tip is "Tap to drop a point or a mark · drag to move the sheet · pinch to zoom".
 - **Material markup by price brackets.** Under Settings › Pricing › More options, a shop can mark up material by what it costs ("$1–$10: 40%") instead of one %. Brackets read the purchase price, so a 500 ft spool is one $200 purchase. Overlapping brackets are refused; a gap falls to the company %. Nothing changes until the shop picks "Price brackets", and lines already on a bid keep their markup. The suggested starter brackets fill the boxes and say they are a starter.
 - **Prevailing wage sets.** Labor rates › More options now saves each wage determination (base wage and fringe per classification, the date set) and reminds you to re-check it after six months. A bid can be set to one: it asks whether registered apprentices will work the job (unanswered costs apprentices at the journeyman rate), shows each classification's prevailing cost beside your own rate, and warns before printing a bid whose wage set is due a re-check. It does not re-price lines yet — that is an open question for the owner.
 

@@ -55,7 +55,7 @@ export function CeilingsToggle({
       onClick={() => onChange(!on)}
     >
       <ArrowUpToLine className="w-3.5 h-3.5" />
-      Ceilings
+      <span className="tool-label">Ceilings</span>
     </Button>
   );
 }

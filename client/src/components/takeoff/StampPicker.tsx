@@ -188,7 +188,8 @@ export function StampPicker({
             The popover has always asked "What are you counting?", so the
             button was the odd one out.
           */}
-          <MapPin className="w-3.5 h-3.5" /> Count
+          <MapPin className="w-3.5 h-3.5" />{" "}
+          <span className="tool-label">Count</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

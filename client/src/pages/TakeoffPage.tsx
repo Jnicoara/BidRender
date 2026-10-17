@@ -72,6 +72,8 @@ import {
   MapPin,
   Ruler,
   Maximize2,
+  ChevronsUp,
+  ChevronsDown,
   Minimize2,
   Minus,
   Trash2,
@@ -537,6 +539,7 @@ import { groupStamps } from "@shared/takeoffCounts";
 import { UNASSIGNED_COUNT_NAME } from "@shared/unassignedCount";
 import { MARK_SESSION, markKey, recoveredKeys } from "@/lib/markKeys";
 import { workTagOffer, workTagOfferText } from "@/lib/workTagOffer";
+import { readSlimToolbar, writeSlimToolbar } from "@/lib/slimToolbar";
 import { LayersPanel } from "@/components/takeoff/LayersPanel";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import {
@@ -2919,7 +2922,7 @@ function PlanPane({
       >
         <Maximize2 className="w-3.5 h-3.5" />
         {/* The phone keeps the icon: its toolbar row has no room for words. */}
-        {!fitOnly && "Fit"}
+        {!fitOnly && <span className="tool-label">Fit</span>}
       </Button>
     </div>
   );
@@ -3397,6 +3400,15 @@ export default function TakeoffPage({
     []
   );
   const focusMode = isFocusMode(panels);
+  /** Slim toolbar (@/lib/slimToolbar): more drawing, same tools. */
+  const [slimToolbar, setSlimToolbar] = useState(() =>
+    readSlimToolbar(typeof window === "undefined" ? undefined : localStorage)
+  );
+  const toggleSlimToolbar = () =>
+    setSlimToolbar(on => {
+      writeSlimToolbar(localStorage, !on);
+      return !on;
+    });
 
   /**
    * Focus mode: one key on, the same key off.
@@ -6888,6 +6900,7 @@ export default function TakeoffPage({
         0,
     // A note tag to tap (step 5c). Detail links (5d) join this when built.
     tappable: noteTaps && tapSpots.length > 0,
+    touch: coarse,
   };
   const tip =
     doc &&
@@ -10545,7 +10558,7 @@ export default function TakeoffPage({
         another plan — and none of it is reached mid-count. The tool bar below
         stays, because that is the bar you work from.
       */}
-      {!focusMode && (
+      {!focusMode && !(slimToolbar && !phone) && (
         <div
           className={cn(
             "border-b border-border shrink-0",
@@ -10731,7 +10744,15 @@ export default function TakeoffPage({
         longer leaves the sheet cropped at the bottom with nothing to say so.
       */}
       {docs.length > 0 && (
-        <div className="border-b border-border bg-card px-3 py-1.5 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        <div
+          className={cn(
+            "border-b border-border bg-card px-3 py-1.5 shrink-0 flex flex-wrap items-center gap-x-2 gap-y-1.5",
+            // Icons only; each name stays for a screen reader and a test.
+            slimToolbar && !phone && "[&_.tool-label]:sr-only"
+          )}
+          data-slim={slimToolbar && !phone ? "true" : undefined}
+          data-testid="plans-toolbar"
+        >
           <SheetChip
             sheets={sheets}
             identities={identities}
@@ -11111,7 +11132,7 @@ export default function TakeoffPage({
                   aria-pressed={Boolean(checkSession)}
                 >
                   <ListChecks className="w-3.5 h-3.5" />
-                  Check sheet
+                  <span className="tool-label">Check sheet</span>
                 </Button>
               )}
 
@@ -11163,7 +11184,9 @@ export default function TakeoffPage({
                     tool this is; colour on the drawing says which TYPE, and a
                     tinted toolbar would be teaching the older code. */}
                     <ConduitIcon className="w-3.5 h-3.5" />{" "}
-                    {armedRunType.conduit?.label ?? "Conduit"}
+                    <span className="tool-label">
+                      {armedRunType.conduit?.label ?? "Conduit"}
+                    </span>
                   </Button>
                   {/*
                 Change what the tool is holding, without starting a trace.
@@ -11224,7 +11247,9 @@ export default function TakeoffPage({
                     aria-label={`Trace cable: ${armedRunType.cable?.label ?? "Cable"}`}
                   >
                     <CableIcon className="w-3.5 h-3.5" />{" "}
-                    {armedRunType.cable?.label ?? "Cable"}
+                    <span className="tool-label">
+                      {armedRunType.cable?.label ?? "Cable"}
+                    </span>
                   </Button>
                   <RunTypePicker
                     pathType="cable"
@@ -11285,7 +11310,7 @@ export default function TakeoffPage({
                     title="Drag a box to copy part numbers and notes (T)"
                   >
                     <TextSelect className="w-3.5 h-3.5" />
-                    Copy text
+                    <span className="tool-label">Copy text</span>
                     {selectingText && <X className="w-3 h-3" />}
                   </Button>
                 </>
@@ -11359,7 +11384,7 @@ export default function TakeoffPage({
                         onClick={deleteSelection}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        {state.label}
+                        <span className="tool-label">{state.label}</span>
                       </Button>
                     );
                   })()}
@@ -11382,7 +11407,7 @@ export default function TakeoffPage({
                       }
                     >
                       <SquareDashedMousePointer className="w-3.5 h-3.5" />
-                      Select
+                      <span className="tool-label">Select</span>
                     </Button>
                   )}
                   {/*
@@ -11558,7 +11583,7 @@ export default function TakeoffPage({
             {canEdit && activeSheet && (!phone || tracing) && (
               <ScaleControl
                 sheet={activeSheet}
-                compact={phone}
+                compact={phone || slimToolbar}
                 wanted={
                   !measurability?.ok && (reachingForMeasure || calibrating)
                 }
@@ -11829,6 +11854,32 @@ export default function TakeoffPage({
 
             {!phone && <div className="w-px h-4 bg-border" />}
 
+            {/* Slim: the bid header away and the tools to icons — the
+                drawing gets the room, nothing is put out of reach. */}
+            <Button
+              hidden={phone}
+              size="sm"
+              variant={slimToolbar ? "default" : "ghost"}
+              className="h-7 gap-1.5 px-2 text-xs"
+              onClick={toggleSlimToolbar}
+              title={
+                slimToolbar
+                  ? "Show the full toolbar and the bid header again"
+                  : "Slim toolbar — icons only, bid header away, more room for the drawing"
+              }
+              aria-pressed={slimToolbar}
+              data-testid="slim-toolbar"
+            >
+              {slimToolbar ? (
+                <ChevronsDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronsUp className="w-3.5 h-3.5" />
+              )}
+              <span className="tool-label">
+                {slimToolbar ? "Full toolbar" : "Slim"}
+              </span>
+            </Button>
+
             {/* No Focus on the phone: it has no side panels to put away. */}
             <Button
               hidden={phone}
@@ -11848,7 +11899,7 @@ export default function TakeoffPage({
               ) : (
                 <Maximize2 className="w-3.5 h-3.5" />
               )}
-              Focus
+              <span className="tool-label">Focus</span>
             </Button>
           </div>
         </div>

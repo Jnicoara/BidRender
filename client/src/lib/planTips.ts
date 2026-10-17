@@ -23,6 +23,10 @@
  */
 
 export const PLAN_TIP_IDS = [
+  // First, and only on a touch screen (owner, 2026-10-17 item 4): a finger
+  // already tells "move the plan" from "drop a point" (@/lib/touchGesture);
+  // what a new tablet user lacked was being TOLD.
+  "touchGestures",
   "notesSheet",
   "sheetKind",
   "drawingTaps",
@@ -67,6 +71,8 @@ export type TipSheetState = {
   sheetKindShown: boolean;
   /** A keyed-note tag or detail link was found on this sheet (§ 6). */
   tappable: boolean;
+  /** A finger is the pointer (coarse pointer): the gestures tip applies. */
+  touch: boolean;
 };
 
 export function nextTip(
@@ -75,6 +81,7 @@ export function nextTip(
 ): PlanTipId | null {
   if (seen.off) return null;
   const onScreen: Record<PlanTipId, boolean> = {
+    touchGestures: sheet.touch,
     notesSheet: sheet.hasNotesSheet,
     sheetKind: sheet.sheetKindShown,
     drawingTaps: sheet.tappable,
@@ -106,6 +113,11 @@ export function tipText(
   notesSheetLabel: string | null
 ): { title: string; body: string } {
   switch (id) {
+    case "touchGestures":
+      return {
+        title: "Your finger on the plan",
+        body: "Tap to drop a point or a mark · drag to move the sheet · pinch to zoom. With a tool in hand, a drag still moves the sheet — only a tap places.",
+      };
     case "notesSheet":
       return {
         title: "Start with the notes sheet",

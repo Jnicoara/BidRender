@@ -28,6 +28,7 @@ import { placeTip, tipText, type PlanTipId, type Rect } from "@/lib/planTips";
 
 /** Where each tip looks for its control, first match that is on screen. */
 const ANCHORS: Record<PlanTipId, string[]> = {
+  touchGestures: ["drawing"],
   notesSheet: ["sheets"],
   sheetKind: ["sheet-kind"],
   drawingTaps: ["drawing"],

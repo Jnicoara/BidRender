@@ -21,9 +21,23 @@ const everything: TipSheetState = {
   hasNotesSheet: true,
   sheetKindShown: true,
   tappable: true,
+  // A mouse: the finger tip is a touch screen's alone (its own test below).
+  touch: false,
 };
 
 describe("nextTip", () => {
+  it("on a touch screen, tells the finger's gestures first; never with a mouse", () => {
+    expect(nextTip(NO_TIPS_SEEN, { ...everything, touch: true })).toBe(
+      "touchGestures"
+    );
+    const seen = markTipSeen(NO_TIPS_SEEN, "touchGestures");
+    expect(nextTip(seen, { ...everything, touch: true })).toBe("notesSheet");
+    expect(nextTip(NO_TIPS_SEEN, everything)).toBe("notesSheet");
+    expect(tipText("touchGestures", null).body).toMatch(
+      /Tap to drop a point.*drag to move the sheet.*pinch to zoom/
+    );
+  });
+
   it("goes through the four in order, one at a time", () => {
     let seen = NO_TIPS_SEEN;
     const shown: string[] = [];
@@ -61,6 +75,7 @@ describe("nextTip", () => {
       hasNotesSheet: false,
       sheetKindShown: false,
       tappable: false,
+      touch: false,
     };
     const seen = markTipSeen(NO_TIPS_SEEN, nextTip(NO_TIPS_SEEN, bare)!);
     expect(seen.seen).toEqual(["lookUp"]);
