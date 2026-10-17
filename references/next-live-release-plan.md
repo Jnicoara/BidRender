@@ -13,6 +13,63 @@
 > matched § 5g. The rest of this file is the record of that release; the
 > section below is the start of the NEXT one.
 
+## CANDIDATE REFRESH — 2026-10-16 → 17 night (Track A, PAPER ONLY; read with "RELEASE SOON" below, which still holds the fix list and the day's steps)
+
+Nothing below touched live except one READ-ONLY dump. **If what a command
+prints on the day does not match these figures, stop and find out why
+before going on** — either this is stale or live is not in the state it
+was in tonight.
+
+### What the candidate is
+
+| Part                                                                                                                                          | Commit                           | In?                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| local-dev before tonight (A's N4/N1/N5, B `230c18f5`+`edcee8bc`, C `e9dfc0ff`, 0164+0165)                                                     | `d9b8d412`                       | yes                                                                                                          |
+| B's smoke fixes (tablet undo `PendingMark.saved`, lost answer preload, phone pane heights) + C's step-bar names (cherry-picked)               | `55da8199`                       | yes                                                                                                          |
+| B's `fieldNoPrices` test matcher fix (test only)                                                                                              | `8f22e226` (cherry-pick)         | yes                                                                                                          |
+| C's smoke fix + night items (old-name search, reshape height area, "Fix this line", Needs pricing counts example prices, UTC pool `dddcf3e1`) | `7cb6aca9` (contains `335dec58`) | yes                                                                                                          |
+| = landed tonight                                                                                                                              | **`448d1281`** on local-dev      | yes                                                                                                          |
+| A: stale-save race fix (six editors; one conditional UPDATE)                                                                                  | `ad37ca26` (track-a-night)       | lands next                                                                                                   |
+| A: Settings › Pricing refetch no longer wipes typing                                                                                          | `0edb23e0` (track-a-night)       | lands next                                                                                                   |
+| A: workflows (smoke-repeat, stress, regression), journey + drills specs — CI only, nothing the app runs                                       | track-a-night                    | lands next                                                                                                   |
+| B: bid methods wiring (`eef749b1` `e65f8e32` `89068f91`) + **Q8** "How do you bid?" (`c6b5feec`)                                              | track-b                          | **only when B writes "ready" with Gate green** — owner Q8: bid methods ship WITH the Q8 guard, never without |
+
+**`drizzle/` (P2):** `git diff 60479773 448d1281 --stat -- drizzle` =
+exactly `0152`–`0165` `.sql`, `meta/0163`–`0165_snapshot.json`,
+`_journal.json`, `schema.ts` (19 files). track-a-night's `drizzle/` is
+identical. B's bid-methods commits add no migration (B, checked).
+
+### REHEARSAL on a NEW copy of live — 2026-10-17 05:02–05:10 UTC (nothing changed on live)
+
+Copy: `scripts/_tmpCopyDb.mts`, read-only on live →
+`live-2026-10-17T05-02-41Z-rehearsal-copy.sql` (scratchpad) → 80 tables,
+**5,561 rows** (same as last night's copy: live has not changed),
+`bidrender_scratch_live_rehearsal2`, **80/80 counts equal**; dropped after.
+Live code = worktree `60479773`; candidate = track-a-night (`448d1281` +
+the two A fixes; same `drizzle/`).
+
+| Step on the copy                                                     | Printed                                                                                                                                                             | As planned  |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Drift before (live code)                                             | 152 recorded, "matches", **183/183** FKs                                                                                                                            | ✓           |
+| `bidTotals` before (live code)                                       | 2 bids (23, 25) for 2 owners                                                                                                                                        | ✓           |
+| `migrate.mts` (candidate)                                            | **"Applied 14 migrations … all 166"**; re-run "Nothing to apply"; "matches"; **209/209**                                                                            | ✓           |
+| Live code on the migrated copy (the window between migrate and push) | "ok all 2 bid(s): totalDue unchanged"                                                                                                                               | ✓           |
+| First boot (`seedBaseline`, candidate)                               | `[seed] starter: finding fields applied 0; proposed 0 (not applied), held 0, live ahead 0`                                                                          | ✓           |
+| Census after first boot                                              | 4 users, 8 companies, 8 members, 2 bids, 0 lines; 1,935 shared materials (1,717 active), 224 starters, 6 shared roles, 3 settings rows; 0 bids with `pricingMethod` | ✓ unchanged |
+| `starterDrift.mts`                                                   | proposed 0, held 0, live ahead 0                                                                                                                                    | ✓           |
+| `freezeSentBids.mts` (dry)                                           | 0 non-Draft, 0 to lock, 0 to freeze                                                                                                                                 | ✓           |
+| `applyMathVersion.mts` (dry) — **math step counts**                  | 2 bids below v2: **0 Drafts to move, 0 non-Draft/locked, 2 wait for the button**                                                                                    | ✓           |
+| `removeRaceCompanies --owner 3036` (dry)                             | **removable [5, 6, 7, 8]**                                                                                                                                          | ✓           |
+| `--apply --expect 5,6,7,8` (COPY ONLY), then dry                     | removed [5,6,7,8]; kept 4, 0 others; dry again `removable: []`                                                                                                      | ✓           |
+| Totals at the end                                                    | live code AND candidate: "ok all 2 bid(s): totalDue unchanged; not-priced and incomplete unchanged"                                                                 | ✓           |
+
+**Golden bids unchanged:** `server/goldenBids.test.ts` +
+`goldenBidsCompare` are in the full suite — green on the candidate (Gate
+39003076893 on `448d1281`). **Bid methods:** not in this candidate yet; if
+B's lands, this section gets the proof that existing bids price the same
+under it (live has 2 bids with 0 lines, so the stronger proof is staging's
+~1,589 bids, old code vs new — see below when done).
+
 ## RELEASE SOON — written 2026-10-16 (Track A, PAPER ONLY; supersedes the two sections below for this release)
 
 Live is **`60479773` / 152 migrations / 183 FKs**. This release carries
@@ -113,7 +170,7 @@ NULL).
 
 - **D1 = YES**: ship the boot change this release; **Q1 is waived**. Later
   price changes reach live through the logged path (`starterDrift.mts
-  --apply` / `applyStarterChange`), never a re-stamp on boot.
+--apply` / `applyStarterChange`), never a re-stamp on boot.
   (`boot-seed-plan.md` Q1 and `morning-questions-a.md` § 3 say so too.)
 - **D2 = YES**: remove live companies 5–8 (user 3036) **after the day's
   verified backup** — step 8 below.
@@ -152,20 +209,20 @@ Copy: `scripts/_tmpCopyDb.mts`, read-only on live →
 `bidrender_scratch_live_rehearsal`, **80/80 counts equal**. Live code =
 worktree at `60479773`; candidate = local-dev `5c089c11`.
 
-| Step on the copy                          | Printed                                                                                                   | As planned |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------- |
-| Drift before (live code)                  | 152 recorded, "matches", **183/183** FKs                                                                  | ✓          |
-| Census before                             | 4 users, 8 companies, 8 members; 2 bids (Draft, math v1, 0 lines); 1,935 shared materials (1,717 active), 224 starters, 6 shared roles; 3 settings rows, run rate NULL | — |
-| `bidTotals` before (live code)            | 2 bids (23, 25), $0.00                                                                                    | ✓          |
-| `migrate.mts` (candidate)                 | **"Applied 14 migrations … all 166"**; re-run "Nothing to apply"; "matches"; **209/209**                  | ✓          |
-| Live code on the migrated copy            | "ok all 2 bid(s): totalDue unchanged"                                                                     | ✓ (window between migrate and push is safe) |
-| First boot (`seedBaseline`, candidate)    | `[seed] starter: finding fields applied 0; proposed 0 (not applied), held 0, live ahead 0`; census unchanged (nothing inserted, renamed, retired or deleted) | ✓ |
-| `starterDrift.mts` (read)                 | 0 / 0 / 0 / 0                                                                                             | ✓          |
-| `freezeSentBids.mts` (dry)                | 0 non-Draft, 0 to lock, 0 to freeze                                                                       | ✓          |
-| `applyMathVersion.mts` (dry)              | **0 Draft(s) to move, 2 wait for the button** (v2 is button-only)                                         | ✓          |
-| `removeRaceCompanies --owner 3036` (dry)  | kept **4**; `removable: [5, 6, 7, 8]`                                                                     | ✓          |
-| `--apply --expect 5,6,7,8` (COPY), dry    | removed [5,6,7,8]; after: kept 4, 0 others; dry again `removable: []`; census companies 8→4, members 8→4, nothing else | ✓ |
-| Totals at the end                         | live code: "ok all 2 bid(s) unchanged"; candidate: bids 23, 25 $0.00, 0 lines                              | ✓          |
+| Step on the copy                         | Printed                                                                                                                                                                | As planned                                  |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Drift before (live code)                 | 152 recorded, "matches", **183/183** FKs                                                                                                                               | ✓                                           |
+| Census before                            | 4 users, 8 companies, 8 members; 2 bids (Draft, math v1, 0 lines); 1,935 shared materials (1,717 active), 224 starters, 6 shared roles; 3 settings rows, run rate NULL | —                                           |
+| `bidTotals` before (live code)           | 2 bids (23, 25), $0.00                                                                                                                                                 | ✓                                           |
+| `migrate.mts` (candidate)                | **"Applied 14 migrations … all 166"**; re-run "Nothing to apply"; "matches"; **209/209**                                                                               | ✓                                           |
+| Live code on the migrated copy           | "ok all 2 bid(s): totalDue unchanged"                                                                                                                                  | ✓ (window between migrate and push is safe) |
+| First boot (`seedBaseline`, candidate)   | `[seed] starter: finding fields applied 0; proposed 0 (not applied), held 0, live ahead 0`; census unchanged (nothing inserted, renamed, retired or deleted)           | ✓                                           |
+| `starterDrift.mts` (read)                | 0 / 0 / 0 / 0                                                                                                                                                          | ✓                                           |
+| `freezeSentBids.mts` (dry)               | 0 non-Draft, 0 to lock, 0 to freeze                                                                                                                                    | ✓                                           |
+| `applyMathVersion.mts` (dry)             | **0 Draft(s) to move, 2 wait for the button** (v2 is button-only)                                                                                                      | ✓                                           |
+| `removeRaceCompanies --owner 3036` (dry) | kept **4**; `removable: [5, 6, 7, 8]`                                                                                                                                  | ✓                                           |
+| `--apply --expect 5,6,7,8` (COPY), dry   | removed [5,6,7,8]; after: kept 4, 0 others; dry again `removable: []`; census companies 8→4, members 8→4, nothing else                                                 | ✓                                           |
+| Totals at the end                        | live code: "ok all 2 bid(s) unchanged"; candidate: bids 23, 25 $0.00, 0 lines                                                                                          | ✓                                           |
 
 **What this does not cover:** the candidate will be whatever local-dev
 holds once smoke is green (C's step-bar fix and B's undo fix land first).
@@ -197,9 +254,9 @@ differ.
 | 5    | `git checkout main && git merge --ff-only <candidate> && git push origin main && git checkout local-dev`                    | **Approval C** — you say "push"; then `/api/version` commit = candidate, `builtAt` after the push          |
 | 6    | First boot: DO logs one `[seed] starter:` line (N/P/H/L as rehearsed); renamed 0, retired 0, deleted 0                      | matches the rehearsal                                                                                      |
 | 7    | `bidTotals --compare` vs step 3                                                                                             | "ok all N bid(s) unchanged"                                                                                |
-| 8    | D2 = yes: save the 8 rows to JSON, dry run (kept 4, removable [5,6,7,8]), then `--apply --expect 5,6,7,8`                  | dry run prints exactly kept 4 / removable [5,6,7,8]; after: kept 4, 0 others; totals unchanged             |
+| 8    | D2 = yes: save the 8 rows to JSON, dry run (kept 4, removable [5,6,7,8]), then `--apply --expect 5,6,7,8`                   | dry run prints exactly kept 4 / removable [5,6,7,8]; after: kept 4, 0 others; totals unchanged             |
 | 9    | Point App Platform's health check at `/api/health` (Q-DB1)                                                                  | you click it in DO (owner's console)                                                                       |
-| 9b   | D4: read live's env vars (record), set `SIGNUP_INVITE_ONLY=on` (redeploys); then a sign-up with no invite is refused        | you set it in DO; `/api/version` same commit, new `builtAt`; refusal seen on bidridge.com                   |
+| 9b   | D4: read live's env vars (record), set `SIGNUP_INVITE_ONLY=on` (redeploys); then a sign-up with no invite is refused        | you set it in DO; `/api/version` same commit, new `builtAt`; refusal seen on bidridge.com                  |
 | 10   | Owner opens a bid and its plans; A records `deploying.md` § 11 "LIVE: `<candidate>`"                                        | **Approval D** — done                                                                                      |
 
 **Rollback:** DO → Activity → Rollback to `60479773` (safe: every migration

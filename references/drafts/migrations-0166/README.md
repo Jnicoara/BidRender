@@ -5,11 +5,11 @@ staging or live until the live release (candidate 0152–0165) is done.** It
 lives here, not in `drizzle/`, because the Gate refuses any `drizzle/`
 commit on a `track-*` branch.
 
-| File | What | From | Kind |
-| --- | --- | --- | --- |
-| `0166_scope_prompts.sql` | table `scope_prompts` (+1 FK, 2 unique keys, 1 index) | Track C, S2 (scope-tags step 6b), final 2026-10-16 (`track-a-handoff.md` "FOR A — S2") | ADDITIVE, step 1, step 3 empty |
-| `0167_field_coowner_roles.sql` | `company_members.role` and `company_invites.role` gain `coowner`, `field` — **appended**, so every stored role keeps its value and index | Track B, FR-M1 (`field-and-coowner-plan.md`) | ADDITIVE, step 1, step 3 empty |
-| `next-batch-drizzle.patch` | the whole `drizzle/` change: both `.sql`, `meta/0166_snapshot.json`, `meta/0167_snapshot.json`, `_journal.json`, `schema.ts` (C's `scopePrompts` declaration; `COMPANY_ROLE_VALUES` + `"coowner", "field"`) | generated | apply with `git apply` on local-dev |
+| File                           | What                                                                                                                                                                                                        | From                                                                                   | Kind                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------- |
+| `0166_scope_prompts.sql`       | table `scope_prompts` (+1 FK, 2 unique keys, 1 index)                                                                                                                                                       | Track C, S2 (scope-tags step 6b), final 2026-10-16 (`track-a-handoff.md` "FOR A — S2") | ADDITIVE, step 1, step 3 empty      |
+| `0167_field_coowner_roles.sql` | `company_members.role` and `company_invites.role` gain `coowner`, `field` — **appended**, so every stored role keeps its value and index                                                                    | Track B, FR-M1 (`field-and-coowner-plan.md`)                                           | ADDITIVE, step 1, step 3 empty      |
+| `next-batch-drizzle.patch`     | the whole `drizzle/` change: both `.sql`, `meta/0166_snapshot.json`, `meta/0167_snapshot.json`, `_journal.json`, `schema.ts` (C's `scopePrompts` declaration; `COMPANY_ROLE_VALUES` + `"coowner", "field"`) | generated                                                                              | apply with `git apply` on local-dev |
 
 ## How it was made and tested
 
@@ -23,13 +23,19 @@ commit on a `track-*` branch.
   zero**, re-run "Nothing to apply", "Database matches the schema",
   **FKs 210/210** (209 + `scope_prompts_userId_users_id_fk`). Enum probe:
   six members, one per role → `owner 1, admin 2, estimator 3, viewer 4,
-  coowner 5, field 6` — the four existing values keep their indexes.
+coowner 5, field 6` — the four existing values keep their indexes.
 - Full suite on that DB: **7,732 passed, 1 failed** — `backup.test.ts`
   "lists every column … that holds a storage key": its name pattern caught
   `scope_prompts.shippedKey`, which names a shipped prompt, not a file.
   Added to that test's named exceptions (in the patch); then 33/33.
   Nothing else failed.
 - `server/backup.test.ts` is the one non-`drizzle/` file in the patch.
+- **Re-tested 2026-10-16 night on the landing candidate `448d1281`** (B's
+  and C's smoke fixes in): the patch applies clean; throwaway DB
+  `bidrender_test_next_a` 168 applied from zero, re-run "Nothing to apply",
+  "Database matches the schema", FKs 210/210, dropped; **full suite green
+  in the Gate** on `a-next-batch` `24c5519f` (run 39003361591). No new SQL
+  drafts from B or C tonight, so nothing is numbered 0168+ yet.
 
 ## To apply, after live is done
 
