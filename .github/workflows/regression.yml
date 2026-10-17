@@ -1,0 +1,88 @@
+# REGRESSION — the whole-job journey in CI (owner's overnight queue,
+# 2026-10-16, item 4). Manual: push a branch named `regression-<anything>`,
+# or start it from the Actions tab once this file is on the default branch.
+#
+# The rest of the regression list — the feature test map's tests, company
+# separation on every route (server/crossCompanyAttack.test.ts), golden bids,
+# golden measurements and the speed limits — is the full vitest suite, which
+# the Gate runs on every push; this workflow adds the one piece that needs a
+# running app: e2e/journey/ — a NEW account signs up through the screen and
+# bids a whole job, every printed number checked against hand math, at
+# laptop, iPad and phone sizes.
+#
+# The app runs ON THE RUNNER (dev mode, as the journey is run by hand), on a
+# brand-new MySQL migrated and seeded as the Gate does, with disk storage, AI
+# off and scheduled jobs off. Nothing reaches staging or live; the journey's
+# config refuses anything but a local address.
+name: Regression
+
+on:
+  push:
+    branches: ["regression-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  journey:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/bidrender_test_journey
+      # Throwaway values for a server that lives for one job on one runner.
+      JWT_SECRET: ci-journey-only-not-a-secret-0123456789abcdef
+      VITE_APP_ID: ci-journey
+      CRON_SECRET: ci-journey-cron
+      LOCAL_STORAGE_DIR: ${{ github.workspace }}/.ci-storage
+      DISABLE_AI_FEATURES: "true"
+      DISABLE_SCHEDULED_JOBS: "true"
+      PORT: "3018"
+      SMOKE_BASE_URL: http://127.0.0.1:3018
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+      - name: Start MySQL, migrate, seed
+        run: |
+          sudo systemctl start mysql.service
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -uroot -proot --silent && break
+            sleep 2
+          done
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE bidrender_test_journey CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+          npx tsx scripts/migrate.mts
+          npx tsx scripts/seedBaseline.mts
+      - name: Start the app
+        run: |
+          mkdir -p "$LOCAL_STORAGE_DIR"
+          NODE_ENV=development nohup npx tsx server/_core/index.ts > app.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:3018/api/version && exit 0
+            sleep 2
+          done
+          echo "::error::the app did not answer on 3018 within 3 minutes"
+          tail -50 app.log
+          exit 1
+      - name: The whole-job journey (laptop, iPad, phone)
+        run: npx playwright test -c e2e/journey/playwright.config.ts
+      - name: App log tail
+        if: always()
+        run: tail -80 app.log || true
+      # The journey's accounts are throwaway and local to this runner; a trace
+      # still holds the sign-up password, so it is not uploaded at all.
+      - name: Keep the failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-failures
+          path: e2e/.results/journey/**/*.png
+          retention-days: 7
+          if-no-files-found: ignore
