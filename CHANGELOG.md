@@ -19,9 +19,6 @@ This is the human-readable companion to the git history — read this to see wha
   load in the background a few seconds after the app opens. If the signal
   dropped in those seconds, the tab reloaded when it returned, and the tool
   you had picked up was lost. Only a page you actually open can reload now.
-- **The step bar's step for the screen you are on is no longer a button.**
-  On Plans, "Count" was a button that went nowhere and had the same name as
-  the Count tool.
 - **A count can no longer be renamed on a locked bid, and the "Unassigned"
   count can't be renamed into an ordinary one.** Renaming the Unassigned
   count used to turn marks nobody had named into a normal count, which
