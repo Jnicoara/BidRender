@@ -4,6 +4,27 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## C ready c1200829 (2026-10-17 09:58; Gate 39008557638 green on rerun, full code run)
+
+`c1200829` = track-c's night 4 merged with local-dev `448d1281` (your
+landing merges and B's Field / step-bar / Plans work). **No `drizzle/`
+change.** Fast-forward unless local-dev moved again. What it adds: the AI
+correction log is written (`server/aiCorrections.ts`, write-only, scan
+test); Back restores a list's scroll; the Plans list's one primary; ~35
+copy corrections; 9 wrong-number/state fixes, each with a test (stale-tab
+deleted assemblies/materials refused, Heights reach count, quote-app
+example count, material price dates, assembly preview step hours, kit
+"material not priced", Clients "50+", Crew controls, $0 price unpriced).
+The two SQL drafts below still wait for you.
+
+**Flaky, yours:** the first run went red on `personalCompanyRace.test.ts`
+(both tests: a fresh user got FORBIDDEN from `resolveScope`, so
+`createPersonalCompany` returned nothing — likely its 10 s
+`withNamedLock` timing out under the full parallel suite). It passes
+alone 3/3 locally and the rerun was green. Nothing in C's change touches
+company creation or user 9964. Also: local-dev's own Gate on `00777dba`
+had smoke red (test green) — not looked into by C.
+
 ## DRAFT migration for A — AI correction log opt-out (C, 2026-10-16 22:10)
 
 The owner wants the AI correction log live before the first outside invite,
@@ -23,7 +44,7 @@ Schema line (in `companies`, after `starterSeenAt`):
 The code behind it — `loggingOn()` in `server/aiCorrections.ts`,
 `company.correctionLogSetting` / `setCorrectionLogSetting`
 (`settings.edit`), the switch in Settings → Account, 2 tests — is on C's
-LOCAL branch `c-ai-log-optout` (`94333e7b`), rehearsed on a throwaway DB
+LOCAL branch `c-ai-log-optout` (`fd82d023`, current with track-c), rehearsed on a throwaway DB
 (167 applied, 19/19 + scans green, on screen at three sizes). When the
 column is on local-dev, tell C and C merges it. **Ship the column and the
 switch WITH the log, never the log alone to live.**
@@ -41,7 +62,7 @@ Schema (in `users`, after `sessionsValidAfter`):
 `workLevel: mysqlEnum("workLevel", ["takeoff", "estimate", "pro"]),`
 — and `"workLevel"` joins `PUBLIC_USER_FIELDS` in `shared/publicUser.ts`
 (the drift test fails otherwise). Code on C's local `c-user-levels`
-(`fecebd3c`, stacked on `c-ai-log-optout`), behind the internal
+(`e6a157a0`, stacked on `c-ai-log-optout`), behind the internal
 `work.levels` feature, so merging it changes nothing for a standard
 account. Rehearsed on a throwaway DB (168 applied).
 
