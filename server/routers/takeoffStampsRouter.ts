@@ -106,7 +106,6 @@ import {
   restoreStamps,
   type StampSnapshot,
 } from "../takeoffRestore";
-import { placedBefore, rememberPlaced } from "../markReplay";
 
 /**
  * This router's gate: a query needs `bids.view`, a mutation needs `bids.edit`.
@@ -373,7 +372,8 @@ export const takeoffStampsRouter = router({
           /**
            * The screen's key for each click, one for one with `at`. A key
            * already placed on this bid is not placed again, so a batch resent
-           * after a lost answer counts once (server/markReplay.ts). Optional:
+           * after a lost answer counts once (`takeoff_stamps.clientKey`,
+           * unique per bid — 0168; server/markReplay.test.ts). Optional:
            * an older screen and the crash-recovery queue send none.
            */
           keys: z.array(z.string().min(1).max(64)).max(500).optional(),
@@ -432,40 +432,54 @@ export const takeoffStampsRouter = router({
         assemblyCategory = assembly?.category ?? null;
       }
 
-      /*
-        A resent batch: the clicks whose key already placed a mark on this bid
-        are not placed again. Their earlier ids go back in their place, so
-        the screen's undo covers exactly the marks it drew.
-      */
-      const now = Date.now();
-      const earlier = input.at.map((_, i) =>
-        input.keys ? placedBefore(input.bidId, input.keys[i], now) : null
-      );
-      const fresh = input.at
-        .map((point, i) => ({ point, i }))
-        .filter(({ i }) => earlier[i] === null);
-      if (fresh.length === 0)
-        return {
-          dropped: 0,
-          ids: earlier.filter((id): id is number => id !== null),
-        };
+      const row = (point: { x: number; y: number }) => ({
+        bidId: input.bidId,
+        sheetId: input.sheetId,
+        userId: ctx.scope.dataUserId,
+        groupId: group.id,
+        assemblyId: group.assemblyId,
+        assemblyName: group.kind === "assembly" ? group.label : null,
+        assemblyCategory,
+        location: input.location,
+        x: point.x.toFixed(4),
+        y: point.y.toFixed(4),
+        status: input.status === "new" ? null : input.status,
+      });
 
+      /*
+        KEYED (the Plans screen): a mark is placed once per (bid, key), held
+        by the database (0168 `clientKey`, unique per bid), so a batch resent
+        after a lost answer counts once — after a restart, on another
+        instance, or racing its own first send. The ids go back BY KEY, in
+        click order: the earlier mark where a key had placed one, else the
+        new one, so the screen's undo covers exactly the marks it drew.
+      */
+      if (input.keys) {
+        const keys = input.keys;
+        const before = await db.getStampIdsByClientKeys(input.bidId, keys);
+        const fresh = input.at
+          .map((point, i) => ({ point, key: keys[i] }))
+          .filter(({ key }) => !before.has(key));
+        const dropped = await db.createKeyedStamps(
+          fresh.map(({ point, key }) => ({ ...row(point), clientKey: key }))
+        );
+        const after = await db.getStampIdsByClientKeys(input.bidId, keys);
+        const ids = keys.map(key => after.get(key));
+        // INSERT IGNORE skips a row for any refusal, not only a taken key —
+        // a sheet removed this second, say. A key with no mark behind it is a
+        // mark NOT placed, and saying "placed" would be a count that is short.
+        if (ids.some(id => id === undefined))
+          throw new TRPCError({
+            code: "CONFLICT",
+            message:
+              "Some of those marks could not be placed — the sheet or count may have just been removed. Reload the sheet and place them again.",
+          });
+        return { dropped, ids: ids as number[] };
+      }
+
+      // UNKEYED (the crash-recovery queue, an older screen): placed as sent.
       // The ids go back so the screen can offer "undo: N marks placed".
-      const ids = await db.createStampsReturningIds(
-        fresh.map(({ point }) => ({
-          bidId: input.bidId,
-          sheetId: input.sheetId,
-          userId: ctx.scope.dataUserId,
-          groupId: group.id,
-          assemblyId: group.assemblyId,
-          assemblyName: group.kind === "assembly" ? group.label : null,
-          assemblyCategory,
-          location: input.location,
-          x: point.x.toFixed(4),
-          y: point.y.toFixed(4),
-          status: input.status === "new" ? null : input.status,
-        }))
-      );
+      const ids = await db.createStampsReturningIds(input.at.map(row));
 
       /*
         `createStampsReturningIds` assumes one insert's ids are consecutive,
@@ -479,29 +493,7 @@ export const takeoffStampsRouter = router({
         sheetId: input.sheetId,
         groupId: group.id,
       });
-
-      // Remembered only when every id is confirmed as this insert's own:
-      // pairing a key with a guessed id would make a later resend skip a
-      // mark that was never written.
-      if (input.keys && confirmed.length === fresh.length)
-        rememberPlaced(
-          input.bidId,
-          fresh.map(({ i }, k) => ({
-            key: input.keys![i],
-            stampId: confirmed[k],
-          })),
-          now
-        );
-      if (earlier.every(id => id === null))
-        return { dropped: input.at.length, ids: confirmed };
-      // In click order: the earlier id where a key had placed one, else the
-      // new one. All or nothing, as above — no ids if any is unconfirmed.
-      let next = 0;
-      const all =
-        confirmed.length === fresh.length
-          ? earlier.map(id => id ?? confirmed[next++])
-          : [];
-      return { dropped: fresh.length, ids: all };
+      return { dropped: input.at.length, ids: confirmed };
     }),
 
   /**

@@ -9,9 +9,13 @@
  * of 3 became 6, with nothing on screen to say so.
  *
  * Each queued mark already carries a key on the screen. `takeoffStamps.drop`
- * now takes those keys and places each key once (server/markReplay.ts). A
- * batch without keys — an older screen, the crash-recovery queue — behaves
- * exactly as before.
+ * now takes those keys and places each key once. A batch without keys — an
+ * older screen, the crash-recovery queue — behaves exactly as before.
+ *
+ * Since 0168 the database holds the key (`takeoff_stamps.clientKey`, unique
+ * per bid), so this holds across a server restart, on a second instance and
+ * for two sends racing each other. Until then it was an in-memory map
+ * (`server/markReplay.ts`, deleted with 0168) that a restart emptied.
  *
  * Fixture user 9914.
  */
@@ -25,7 +29,6 @@ import {
   own,
   rate,
 } from "./bidBuilders.testHelper";
-import { forgetMarkKeysForTests } from "./markReplay";
 
 const USER = 9914;
 dropFixtureUsersAfterAll([USER]);
@@ -58,7 +61,6 @@ describe.skipIf(!hasDb)("a resent batch of marks", () => {
     });
     if (!("id" in g)) throw new Error("expected one count");
     groupId = g.id as number;
-    forgetMarkKeysForTests();
   }, 60_000);
 
   const marks = async () =>
@@ -111,6 +113,47 @@ describe.skipIf(!hasDb)("a resent batch of marks", () => {
       at: [{ x: 100, y: 100 }],
     });
     expect(await marks()).toBe(5);
+  });
+
+  it("two sends of one batch AT ONCE (the resend racing the first send) place it once", async () => {
+    const c = as(USER);
+    const batch = {
+      bidId,
+      sheetId,
+      groupId,
+      at: at(3, 6000),
+      keys: ["race-1", "race-2", "race-3"],
+    };
+    const [a, b] = await Promise.all([
+      c.takeoffStamps.drop(batch),
+      c.takeoffStamps.drop(batch),
+    ]);
+    expect(await marks()).toBe(8);
+    expect(a.ids).toEqual(b.ids);
+    expect(a.dropped + b.dropped).toBe(3);
+  });
+
+  it("the same key on ANOTHER bid is another mark", async () => {
+    const c = as(USER);
+    const other = await bidWithSheet(c, USER, "Replay other");
+    const otherCount = await c.takeoffGroups.forAssembly({
+      bidId: other.bidId,
+      assemblyId: (await c.assemblies.list()).find(
+        a => a.name === "Replay receptacle, complete"
+      )!.id,
+    });
+    if (!("id" in otherCount)) throw new Error("expected one count");
+    await c.takeoffStamps.drop({
+      bidId: other.bidId,
+      sheetId: other.sheetId,
+      groupId: otherCount.id as number,
+      at: at(1, 3000),
+      keys: ["k-1"],
+    });
+    expect(
+      (await c.takeoffStamps.listForSheet({ sheetId: other.sheetId })).length
+    ).toBe(1);
+    expect(await marks()).toBe(8);
   });
 
   it("keys must match the clicks one for one", async () => {

@@ -1177,6 +1177,13 @@
       "when": 1792197702353,
       "tag": "0167_field_coowner_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "5",
+      "when": 1792213895086,
+      "tag": "0168_takeoff_stamps_client_key",
+      "breakpoints": true
     }
   ]
 }

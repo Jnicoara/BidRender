@@ -12634,6 +12634,50 @@ export async function createStampsReturningIds(
   return rows.map((_, index) => first + index);
 }
 
+/**
+ * The marks already placed on this bid under these screen keys, key → id
+ * (0168 `clientKey`). What makes a resend count once — after a restart and
+ * on another instance too, which the in-memory map it replaced
+ * (`server/markReplay.ts`, deleted with 0168) could not.
+ */
+export async function getStampIdsByClientKeys(
+  bidId: number,
+  keys: readonly string[]
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (keys.length === 0) return out;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const rows = await db
+    .select({ id: takeoffStamps.id, clientKey: takeoffStamps.clientKey })
+    .from(takeoffStamps)
+    .where(
+      and(
+        eq(takeoffStamps.bidId, bidId),
+        inArray(takeoffStamps.clientKey, [...keys])
+      )
+    );
+  for (const row of rows) if (row.clientKey) out.set(row.clientKey, row.id);
+  return out;
+}
+
+/**
+ * Insert keyed marks, skipping any whose (bid, key) is already taken — two
+ * resends racing each other both get here, and the unique key lets exactly
+ * one row per key in (INSERT IGNORE). Returns how many rows went in; the
+ * caller reads the ids back by key (`getStampIdsByClientKeys`), never by the
+ * consecutive-id arithmetic above, which a skipped row would throw off.
+ */
+export async function createKeyedStamps(
+  rows: (InsertTakeoffStamp & { clientKey: string })[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(takeoffStamps).ignore().values(rows);
+  return result.affectedRows;
+}
+
 // ─── Materials list (supplier quote request) ──────────────────────────────────
 
 /**

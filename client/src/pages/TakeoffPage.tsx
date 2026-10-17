@@ -7188,7 +7188,7 @@ export default function TakeoffPage({
           at: batch.map(m => ({ x: m.x, y: m.y })),
           // One per click: a batch resent after a LOST answer (the server
           // wrote it, the reply never came) places each mark once, not
-          // twice (server/markReplay.ts; Track A's counting deep test).
+          // twice (`takeoff_stamps.clientKey`, 0168; markReplay.test.ts).
           // Never the bare queue number, which restarts every page load:
           // see @/lib/markKeys.
           keys: batch.map(m => markKey(MARK_SESSION, m.key)),

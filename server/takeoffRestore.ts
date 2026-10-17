@@ -42,7 +42,7 @@ import {
   type TakeoffStamp,
   type TakeoffGroup,
 } from "../drizzle/schema";
-import { getDb } from "./db";
+import { getDb, isDuplicateKey } from "./db";
 import { countDisplayName } from "../shared/unassignedCount";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -218,6 +218,13 @@ async function restoreStampsIn(
     if (isMissingParent(error))
       refuse(
         "The sheet those marks were on has been removed since, so they cannot be put back."
+      );
+    // The same mark again — by id, or by its screen key (0168): a resend
+    // placed it back after the delete. Putting a second copy back would
+    // count it twice.
+    if (isDuplicateKey(error))
+      refuse(
+        "Those marks are already back on the sheet, so nothing was put back twice."
       );
     throw error;
   }

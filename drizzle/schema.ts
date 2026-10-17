@@ -4574,6 +4574,15 @@ export const takeoffStamps = mysqlTable(
      * (0112). NULL = never read. Not a pricing input.
      */
     labelWords: text("labelWords"),
+    /**
+     * The Plans screen's key for the click that placed this mark (0168), so
+     * a batch resent after a lost answer places each mark ONCE — across a
+     * restart and across instances, which the in-memory map in
+     * server/markReplay.ts cannot. NULL = placed without a key (every mark
+     * before 0168, the crash-recovery queue, an older screen); MySQL lets
+     * any number of NULLs share the unique index below.
+     */
+    clientKey: varchar("clientKey", { length: 64 }),
 
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -4583,6 +4592,7 @@ export const takeoffStamps = mysqlTable(
     index("takeoff_stamps_sheetId_idx").on(t.sheetId),
     index("takeoff_stamps_userId_idx").on(t.userId),
     index("takeoff_stamps_groupId_idx").on(t.groupId),
+    unique("takeoff_stamps_bid_clientKey_uq").on(t.bidId, t.clientKey),
   ]
 );
 
