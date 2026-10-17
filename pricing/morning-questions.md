@@ -9,6 +9,21 @@ Every EARLIER review (Conduit through Fasteners & Anchors) is fully
 answered; the only open item there is Breakers Q9, which waits for the
 brand-variants pass by design and needs nothing from you now.
 
+## TRACK A — overnight 2026-10-16 → 17 (parked: money / release scope)
+
+- **Q-A1 ⚠ MONEY — bid methods in THIS live release, or the next?** Your
+  Q8 answer: bid methods never ship without the "How do you bid?" guard. B
+  built the guard tonight (`c6b5feec`) but kept adding bid-methods pieces
+  after it (price brackets, `b1da7480`) and has written no "ready" line.
+  **Suggested: the NEXT release.** This candidate (`448d1281` + A's two
+  fixes) is rehearsed on a fresh live copy and its smoke is one flaky phone
+  step from green; bid methods change how every new bid of a markup shop
+  prices, so it deserves its own staging check and its own proof that
+  existing bids price the same (staging's ~1,589 bids, old code vs new).
+  Affects: the "bid methods choice under Pricing settings" item on your
+  staging click list — it is NOT on staging tonight. Nothing on live moves
+  either way.
+
 ## NEW 2026-10-16 — user levels + trade-ready core (PLAN ONLY, nothing built)
 
 Plan: `references/user-levels-plan.md` (replaces B's 10-15 draft: you
