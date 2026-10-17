@@ -71,6 +71,14 @@ pricing tier — so it hides screens and is never a lock on the server).
   cents each, `references/ai-reader-cost.md`) but a read that finds nothing
   costs money for nothing. Affects: AI spend per sheet; nothing without the
   button.
+- **Q-PACK1** Pack sizes now exist on materials (a box of 100 wire nuts, a
+  500 ft spool). Should the purchase list round up to whole PACKS? →
+  **Yes for things counted by the piece or box (100 wire nuts → "1 box of
+  100"), NO for anything bought by the foot** — wire and pipe are cut to
+  length at the counter, so 330 ft must not become a 500 ft spool. Shown as
+  "2 × box of 100 (200)". Affects: quantities on the materials list sent to
+  suppliers; never a bid price. (D5 in `starter-assemblies-plan.md` left
+  packs for when pack sizes existed.)
 - **Q-ARCH1 (from todo.md, drill 2026-10-15)** A bid in Recently deleted
   can still be EDITED from another tab (lines, quantities, name) — the
   screen already says "This bid is in Recently deleted … Restore". Refuse

@@ -4605,7 +4605,7 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       fast toggle. Decide where "above lay-in" lives (run, run type, or sheet
       area) before building — check `references/takeoff-spec.md` D3 first,
       which rejected a form on every run.
-- [ ] **Purchase list rounds to whole PACKS, not only whole pieces** (owner,
+- [ ] **Q-PACK1 (owner, 2026-10-16: pack sizes now exist — by the piece only, or feet too?).** **Purchase list rounds to whole PACKS, not only whole pieces** (owner,
       2026-09-29, starter assemblies plan D5). Built: `orderQty` in
       `shared/materialsList.ts` rounds a piece or box UP to whole after the
       sum, so a quarter tube never reaches a supplier. Not built: rounding to
