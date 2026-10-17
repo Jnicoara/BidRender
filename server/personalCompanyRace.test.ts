@@ -53,6 +53,30 @@ describeDb("personal company on a new account's first requests", () => {
   // made 8 companies. Twelve requests is more than the pool's ten
   // connections, which is the case where a holder that needed a second
   // connection would wait behind its own waiters (withNamedLock, db.ts).
+  /*
+    NO REQUEST IS REFUSED in the race, either (2026-10-17). A request that
+    found no membership, then asked "does ANY membership exist?" after
+    another request had just made the company, skipped provisioning and was
+    refused "not part of a company yet" — a new account's first screen with
+    errors on it. Red 1 run in 12 locally and twice in the Gate in two hours
+    (39005697973, 39051186712), so it is hammered: 20 fresh accounts, 12
+    first requests each.
+  */
+  it("twenty new accounts × twelve first requests: every request answered, never refused", async () => {
+    for (let round = 0; round < 20; round++) {
+      await clear();
+      const user = await freshUser();
+      const results = await Promise.allSettled(
+        Array.from({ length: 12 }, () => resolveScope(user))
+      );
+      const refused = results.filter(r => r.status === "rejected");
+      expect(
+        refused.map(r => String((r as PromiseRejectedResult).reason)),
+        `round ${round}`
+      ).toEqual([]);
+    }
+  }, 120_000);
+
   it("twelve first requests at once leave ONE company and one membership", async () => {
     const user = await freshUser();
     const scopes = await Promise.all(

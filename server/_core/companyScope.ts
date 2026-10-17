@@ -221,8 +221,16 @@ export async function resolveScope(user: User): Promise<RequestScope> {
   // Only provision for someone who has never belonged anywhere. A suspended
   // member HAS a membership, and must be refused rather than handed a fresh
   // company that would make the suspension a no-op.
-  if (!membership && !(await hasAnyMembership(user.id))) {
-    membership = await createPersonalCompany(user);
+  if (!membership) {
+    if (await hasAnyMembership(user.id))
+      // A membership exists NOW that did not a moment ago: on a new account's
+      // first screen another request may have just made the personal company
+      // (createPersonalCompany). Read it again. Until 2026-10-17 this request
+      // was refused "not part of a company yet" — errors on the first screen
+      // (Gate 39005697973, 39051186712). A suspended member still reads null
+      // here and is still refused below.
+      membership = await findMembership(user.id);
+    else membership = await createPersonalCompany(user);
   }
 
   if (!membership) {

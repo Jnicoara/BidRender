@@ -4,6 +4,14 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-17]
+
+- **A brand-new account's first screen no longer shows "not part of a
+  company yet" errors.** The first screen asks the server several things at
+  once; while one request was setting up the new account's company,
+  another could look at the wrong moment and be refused. Now it looks
+  again and finds the company. Suspended members are still refused.
+
 ## [2026-10-16]
 
 - **A percentage typed in Settings › Pricing is no longer wiped while you
