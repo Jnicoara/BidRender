@@ -23,7 +23,28 @@ create and drop yourself are exempt. (Prompted by a false alarm: on
 it was a release step never run there. The rule stands anyway: the cost of
 saying it is one line.)
 
-## (newest) 2026-10-16, afternoon — C ready e9dfc0ff; 6b waits for S2
+## (newest) 2026-10-16, evening — smoke fix, levels plan, todo items
+
+- **Smoke red since C landed (0fc489bf), fixed on track-c `843a032e`:**
+  the step bar (laptop, Plans screen) shared "Count"/"Runs" with the
+  toolbar — its buttons are now "Step: Count" etc. (visible words
+  unchanged); smoke clicks the toolbar's exact "Count"; the step-bar spec
+  asserts each "Step: X". The PDF-open check read the guide strip's "a run
+  can't be measured" as an error — it now skips the Guide `<aside>`.
+  Local smoke on the 5 affected specs: all those green. **Not C's, for
+  B/A:** the phone "select two marks … Undo" fails locally on B's
+  `230c18f5` too (and with the guide off); the "LOST ANSWER" marks test
+  fails locally on desktop and phone.
+- **Plan only:** `references/user-levels-plan.md` rewritten for the
+  owner's 2026-10-16 decision (a level is a person's way of working,
+  picked at signup, switchable, not a tier); UL2–UL9, TR1–TR6 and Q-ARCH1
+  at the top of `pricing/morning-questions.md`.
+- **Built:** Materials "Needs pricing" counts example prices
+  (`needsYourPrice`); quote-app panel "Fix this line"; reshape a height
+  area. Several stale todo items closed with evidence.
+- `c-scope-prompts` (6b) waits for S2 AFTER the live release — leave it.
+
+## 2026-10-16, afternoon — C ready e9dfc0ff; 6b waits for S2
 
 - **B landed and is merged.** "C ready e9dfc0ff" is at the top of
   `track-a-handoff.md` (Gate 38968275571 green); A lands it. One
