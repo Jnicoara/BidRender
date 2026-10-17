@@ -4,6 +4,30 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## DRAFT migration for A — AI correction log opt-out (C, 2026-10-16 22:10)
+
+The owner wants the AI correction log live before the first outside invite,
+with a Settings switch that stops it. The log itself is on track-c
+(`c4b86603`, writes into 0108's `ai_correction_log`, no `drizzle/` change).
+The switch needs one column. **Additive, step 1, nothing to backfill:**
+
+```sql
+-- 0166_companies_ai_correction_log_off.sql (number = next free when you write it)
+ALTER TABLE `companies` ADD `aiCorrectionLogOffAt` timestamp;
+```
+
+NULL = logging on (every company today); a time = off since then.
+Schema line (in `companies`, after `starterSeenAt`):
+`aiCorrectionLogOffAt: timestamp("aiCorrectionLogOffAt"),`
+
+The code behind it — `loggingOn()` in `server/aiCorrections.ts`,
+`company.correctionLogSetting` / `setCorrectionLogSetting`
+(`settings.edit`), the switch in Settings → Account, 2 tests — is on C's
+LOCAL branch `c-ai-log-optout` (`94333e7b`), rehearsed on a throwaway DB
+(167 applied, 19/19 + scans green, on screen at three sizes). When the
+column is on local-dev, tell C and C merges it. **Ship the column and the
+switch WITH the log, never the log alone to live.**
+
 ## C ready cd1dde67 (2026-10-16 21:35; code = 7cb6aca9, Gate 38992731395 green, full code run)
 
 `cd1dde67` = `7cb6aca9` + a merge of your notes (`d9b8d412`), nothing

@@ -72,6 +72,13 @@ From screens that exist today (`client/src/lib/appRoutes.ts` `Route`).
 | Crew (`team`)                                         | owner/admin role | owner/admin role | owner/admin role |
 | Settings (other panels), Recently deleted, Admin      | ✓                | ✓                | ✓                |
 
+> **Overridden for the Proposal row, owner's brief 2026-10-16 night 4:**
+> "every level can still reach every bid's totals and print". The Proposal
+> is a per-bid surface, not a menu entry, so no level hides it; levels hide
+> MENU entries only (`client/src/lib/workLevel.ts`, built behind an internal
+> feature). Money hiding (UL3, UL4) and the step bar (UL8) are not built:
+> the brief says a level hides screens only, and both wait for answers.
+
 **UL2. Is this the split?** — Suggested: **yes as a start**; the line that
 matters is Takeoff ↔ Estimate (UL3). Crew follows the ROLE, not the level,
 because hiding it from an owner on Takeoff would stop them inviting anyone.
