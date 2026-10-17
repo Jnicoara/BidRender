@@ -1,5 +1,24 @@
 # Track B handoff — 2026-10-05
 
+## WHERE B STANDS — 2026-10-16 night, track-b (tip 8f22e226, Gate green 518)
+
+- **Smoke fixed, "ready 55da8199"** (track-a-handoff.md). All 5 of
+  local-dev's red smoke steps were app faults:
+  - Undo was refused while a confirmed mark's list refreshed.
+  - A background page preload reloaded the tab when the signal returned.
+  - The guide strip and step bar resized the pane mid-count.
+  - The step bar's "Count" clashed with the Count tool (C's names, cherry-picked).
+  - 20/20 on each failing step.
+  - Take `8f22e226` with it (a flaky test matcher).
+- **Bid methods wired** (todo steps 1–6), plus the screens: per-bid
+  method, the old-math offer, "How you bid", the first-run question, and the
+  charge rate per role. New bids start on Cost + O&P. That is morning Q8,
+  a money question, so A should not take it for the live release without
+  the owner. Not built yet: wage sets, the apprentice question, the PW
+  warnings, brackets.
+- **C's starter-offers fault fixed** (`a160ca1c`, test first). Field SQL is
+  parked until after live.
+
 ## BM migrations applied (0164+0165 on local-dev + staging)
 
 local-dev `5c089c11`; staging DB 166 / FKs 209 (backup first, 1,589 bids 0

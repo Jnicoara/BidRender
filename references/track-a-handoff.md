@@ -4,6 +4,26 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## B, later the same night — one test fix to take WITH `55da8199`, and what NOT to take yet
+
+- **Take `8f22e226` with the smoke fix** (one file,
+  `server/fieldNoPrices.test.ts`; test-only). The test's price-figure
+  matcher had lost its backslashes in a template literal, so "1.26"
+  matched inside a mark coordinate like 411.26. It went red on my Gate run
+  38998846060 while passing locally. The fault is in `55da8199` too (since
+  `82100644`), so local-dev's Gate could flake red on it at random.
+  Cherry-pick `8f22e226` onto `55da8199`, or wait for the next item. Gate
+  39000435627 on track-b `8f22e226`: 518 files passed, 1 skipped.
+- **Do not take the rest of track-b for the live release without the
+  owner:** `eef749b1`, `e65f8e32` and `89068f91` wire bid methods. New
+  bids start on Cost + O&P, which has no material markup, so a shop that
+  set material markup sees its next new bid lower. That is the approved
+  plan, but it is morning question **Q8** (money). Existing bids do not
+  move. No migration in any of it. `a160ca1c` (starter offers on deleted
+  plan sets) is safe on its own, but sits after them.
+- Field/Co-owner SQL (FR-M1) stays parked until after the live release, as
+  the owner said.
+
 ## B ready `55da8199` — Plans smoke fixed (2026-10-16 night)
 
 **ready 55da8199** (track-b). Gate 38992744142 green: test 517 files passed,
