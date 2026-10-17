@@ -1879,7 +1879,8 @@ Design: `references/homerun-footage-plan.md` § 4.
 
 ### Starter offers: Drafts listed from runs on DELETED plan sets (for Track B, found by C 2026-10-16)
 
-- [ ] **`server/starterOffers.ts` `attachDrafts`** reads the Drafts' runs
+- [x] **DONE 2026-10-16 (B):** `attachDrafts` filters `onLivePlanSheet(takeoffRuns.sheetId, takeoffRuns.bidId)`; a fifth fixture bid in `server/starterOffers.test.ts` (an unlocked Draft whose only run is on a plan set deleted without cascade) made test 8 red first; the known-gap entry is gone from `quantitiesIgnoreDeletedPlans.test.ts`. Was:
+      **`server/starterOffers.ts` `attachDrafts`** reads the Drafts' runs
       with `inArray(takeoffRuns.bidId, draftIds)` and no live-sheet rule,
       so a run left on a deleted plan set can list a Draft as "would
       re-count" when nothing on it would move. Every quantity read filters

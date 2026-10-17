@@ -10028,7 +10028,7 @@ export async function getRunsForSheet(
  * key checks off and holds every read against a bid that never had them; it
  * also fails if a bid-wide read of marks or runs is written without this.
  */
-function onLivePlanSheet(
+export function onLivePlanSheet(
   sheetId: typeof takeoffRuns.sheetId | typeof takeoffStamps.sheetId,
   /**
    * The bid, or — for a read across a LIST of bids — the row's own bid

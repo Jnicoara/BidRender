@@ -6,6 +6,7 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Starter updates no longer name a Draft that would not change.** A run left on a deleted plan set could list its Draft as one an update would re-count. It now looks only at plan sheets that still exist, as every count does.
 - **Bids now price by their own method, and new bids start on Cost + O&P.**
   - A bid made from today takes the company's pricing method. That is Cost +
     O&P unless the company picks Markup + charge rate, and Cost + O&P puts no

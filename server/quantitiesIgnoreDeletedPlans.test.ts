@@ -248,15 +248,10 @@ describe("every bid-wide read of marks or runs goes through onLivePlanSheet", ()
     }
     // Not vacuous: the four reads that exist today are found.
     expect(found.length).toBeGreaterThanOrEqual(4);
-    // ONE KNOWN GAP, found the day `inArray` was added to the pattern
-    // (2026-10-16): starter offers list the Drafts a re-count would move by
-    // reading their runs with no live-sheet rule, so a run on a deleted plan
-    // set can list a Draft that would not move. Track B's file (todo.md);
-    // when it is fixed this list goes red until the entry is removed.
-    const knownGaps = ["starterOffers.ts"];
-    expect(bare.map(where => path.basename(where.split(":")[0]))).toEqual(
-      knownGaps
-    );
+    // No known gaps. The one found the day `inArray` joined the pattern —
+    // starter offers listing Drafts from runs on deleted plan sets — was
+    // fixed the same day (Track B, server/starterOffers.test.ts).
+    expect(bare).toEqual([]);
   });
 });
 

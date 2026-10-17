@@ -538,7 +538,16 @@ async function attachDrafts(ownerUserId: number, offers: StarterOffer[]) {
   const runs = await handle
     .select({ bidId: takeoffRuns.bidId, runTypeId: takeoffRuns.runTypeId })
     .from(takeoffRuns)
-    .where(inArray(takeoffRuns.bidId, draftIds));
+    // Runs on a LIVE plan sheet only, as every quantity read takes them: a
+    // run left on a deleted plan set re-counts nothing, so it must not list
+    // its Draft as one that would move (found by Track C, 2026-10-16;
+    // server/starterOffers.test.ts, the deleted-plans bid).
+    .where(
+      and(
+        inArray(takeoffRuns.bidId, draftIds),
+        db.onLivePlanSheet(takeoffRuns.sheetId, takeoffRuns.bidId)
+      )
+    );
   const groups = await handle
     .select({
       bidId: takeoffGroups.bidId,

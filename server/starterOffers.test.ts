@@ -16,6 +16,7 @@
  *   L (9854) created after the changes: reads the latest, no offer.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createConnection } from "mysql2/promise";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { forkMaterial, getDb } from "./db";
@@ -222,6 +223,56 @@ describeDb("starter updates for a shop (starter-offers-plan.md § 6)", () => {
         ],
         runTypeId: probe.runType,
       });
+    }
+    /*
+      A FIFTH bid, an unlocked Draft whose only run sits on a plan set that
+      was DELETED without its cascade — what a database with no foreign keys
+      leaves behind (server/db.ts `onLivePlanSheet`). Nothing on it would
+      re-count, so no offer may list it. Before 2026-10-16 `attachDrafts`
+      read runs by bid alone and did (todo.md, found by Track C): test 8's
+      "exactly the draft" went red on it.
+    */
+    {
+      const bid = (await caller(A).bids.create({
+        name: `${PROBE} deleted plans`,
+        trades: ["electrical"],
+      }))!;
+      bidsOf.deletedPlans = bid.id;
+      const [pdf] = await database.insert(bidPdfs).values({
+        bidId: bid.id,
+        userId: A,
+        filename: "Gone.pdf",
+        storageKey: `test/${bid.id}/gone.pdf`,
+        byteSize: 1024,
+        pageCount: 1,
+        sortOrder: 0,
+      });
+      await caller(A).bidPdfs.ensureSheets({
+        bidPdfId: pdf.insertId,
+        pageCount: 1,
+      });
+      const [sheet] = await caller(A).bidPdfs.sheets({
+        bidPdfId: pdf.insertId,
+      });
+      await database.insert(takeoffRuns).values({
+        bidId: bid.id,
+        sheetId: sheet.id,
+        userId: A,
+        name: "Run on a deleted set",
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+        ],
+        runTypeId: probe.runType,
+      });
+      const conn = await createConnection(process.env.DATABASE_URL!);
+      try {
+        await conn.query("SET FOREIGN_KEY_CHECKS = 0");
+        await conn.query("DELETE FROM bid_pdfs WHERE id = ?", [pdf.insertId]);
+      } finally {
+        await conn.query("SET FOREIGN_KEY_CHECKS = 1");
+        await conn.end();
+      }
     }
     await caller(A).bids.update({ id: bidsOf.active, status: "Active" });
     await caller(A).bids.update({ id: bidsOf.won, status: "Won" });
