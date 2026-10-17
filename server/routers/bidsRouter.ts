@@ -17,7 +17,12 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireCapability, router, scoped } from "../_core/trpc";
-import { PRICING_METHODS, type PricingMethod } from "../../shared/bidMethods";
+import {
+  PRICING_METHODS,
+  howYouBidOpen,
+  newBidMethod,
+  type PricingMethod,
+} from "../../shared/bidMethods";
 import {
   ASSEMBLY_CATEGORIES,
   BID_STATUSES,
@@ -2358,6 +2363,23 @@ export const bidsRouter = router({
   /** Company-level pricing defaults — the fallback every bid inherits. */
   pricingDefaults: procedure.query(async ({ ctx }) => {
     return db.getPricingDefaults(ctx.scope.dataUserId);
+  }),
+
+  /**
+   * "How do you bid?" — owner Q8. What the company's NEW bids are created
+   * with (`newBidMethod`), and whether the one-time question is still open:
+   * a company with material markup that never chose a method keeps the old
+   * math on new bids until it answers. Answered through
+   * `setPricingDefaults({ pricingMethod })`, which closes it for good.
+   * Read-only; creates no row.
+   */
+  howYouBid: procedure.query(async ({ ctx }) => {
+    const state = await db.companyMethodState(ctx.scope.dataUserId);
+    return {
+      ...state,
+      newBids: newBidMethod(state),
+      open: howYouBidOpen(state),
+    };
   }),
 
   /**

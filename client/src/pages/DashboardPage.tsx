@@ -41,6 +41,7 @@ import { type PendingArchive } from "@/lib/archiveBid";
 import { GettingStartedChecklist } from "@/components/GettingStartedChecklist";
 import { StarterUpdatesCard } from "@/components/library/StarterUpdatesCard";
 import { ExampleRatesBanner } from "@/components/ExampleRatesBanner";
+import { HowYouBidCard } from "@/components/BidMethodControls";
 import { NavigationHelper } from "@/components/NavigationHelper";
 import { BidSearchPanel } from "@/components/BidSearchPanel";
 import { NewBidMenu, StartBidCards } from "@/components/StartBidCards";
@@ -547,6 +548,7 @@ export default function DashboardPage({
           <SampleBidCard onOpenBid={onOpenBid} />
           <ExampleRatesBanner className="max-w-xl" />
           <StarterUpdatesCard className="max-w-xl" />
+          <HowYouBidCard className="max-w-xl" />
           <GettingStartedChecklist />
           <NavigationHelper className="max-w-xl" />
         </div>

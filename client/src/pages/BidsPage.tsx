@@ -79,7 +79,12 @@ import { UnitLinkBadge } from "@/components/UnitLinkBadge";
 import { UnitTemplateActions } from "@/components/UnitTemplateActions";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import { useCompany } from "@/hooks/useCompany";
-import { BidMethodRow, OldMathOffer } from "@/components/BidMethodControls";
+import {
+  BidMethodRow,
+  OldMathOffer,
+  methodSummary,
+  useMethodSource,
+} from "@/components/BidMethodControls";
 import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { AccountingExportDialog } from "@/components/AccountingExportDialog";
 import { QuoteAppPanel } from "@/components/QuoteAppPanel";
@@ -396,6 +401,9 @@ export default function BidsPage({
 
   const utils = trpc.useUtils();
   const detailQuery = trpc.bids.get.useQuery({ id: bidId });
+  // The method's source for the shut Pricing panel — before the early
+  // return below, as every hook here is.
+  const methodSource = useMethodSource(detailQuery.data?.bid.pricingMethod);
   const { data: homeruns } = trpc.homeruns.forBid.useQuery({ bidId });
   const { data: assemblies = [], isSuccess: assembliesReady } =
     trpc.assemblies.list.useQuery();
@@ -2966,11 +2974,11 @@ export default function BidsPage({
             <CollapsiblePanel
               id="bid-pricing"
               title="Pricing settings"
-              summary={
+              summary={`${methodSummary(bid.pricingMethod, methodSource)} · ${
                 overriddenHere.length > 0
-                  ? `Overridden on this bid — ${overriddenHere.join(", ")}`
-                  : "Following your company defaults"
-              }
+                  ? `overridden on this bid — ${overriddenHere.join(", ")}`
+                  : "following your company defaults"
+              }`}
               badge={
                 overriddenHere.length > 0 ? (
                   <Badge variant="outline" className="text-[10px]">

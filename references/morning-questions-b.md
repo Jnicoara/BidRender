@@ -127,3 +127,12 @@ but not of what a shop sees on its next one.
 — **Suggested: 3** (nobody's next bid changes without being asked), but
 it is yours. Until you answer, 1 is what is on track-b. It lands only when
 A lands it.
+
+**Q8 ANSWERED 2026-10-16 (owner: option 3) — built.** A company with material
+markup set that never chose a method keeps today's math on new bids until it
+answers "How do you bid?" (Dashboard card, one button per method; Settings ›
+Pricing says "Not chosen yet"). The golden op-and-tax bid built as a NEW bid
+of such a shop stays $1,369.54 (`server/howYouBid.test.ts`, red without the
+rule). The bid's Pricing settings now tags its method "Company standard" or
+"This job only"; changing one bid never changes the company or another bid
+(same test).

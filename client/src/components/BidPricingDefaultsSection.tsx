@@ -49,7 +49,7 @@ import { Button } from "@/components/ui/button";
 import {
   PRICING_METHODS,
   PRICING_METHOD_LABEL,
-  methodForNewBid,
+  newBidMethod,
 } from "@shared/bidMethods";
 
 /** Fraction (0.1) → percent string ("10"). Blank stays blank. */
@@ -63,6 +63,7 @@ export function BidPricingDefaultsSection() {
   const utils = trpc.useUtils();
   const defaultsQuery = trpc.bids.pricingDefaults.useQuery();
   const defaults = defaultsQuery.data;
+  const howYouBid = trpc.bids.howYouBid.useQuery();
 
   const save = trpc.bids.setPricingDefaults.useMutation({
     onSuccess: () => {
@@ -72,6 +73,8 @@ export function BidPricingDefaultsSection() {
       // Bids inherit rather than copy, so anything on screen showing a price
       // needs re-reading, not just this form.
       void utils.bids.pricingDefaults.invalidate();
+      // The method and the material markup both decide "How do you bid?".
+      void utils.bids.howYouBid.invalidate();
       void utils.bids.dashboard.invalidate();
       void utils.bids.get.invalidate();
       // A new default markup changes what "Re-apply markup rules" would do on
@@ -139,8 +142,12 @@ export function BidPricingDefaultsSection() {
     ) : null;
 
   const isPercentage = defaults.overheadMode === "percentage";
-  // What new bids take: NULL (never chosen) is Cost + O&P (`methodForNewBid`).
-  const method = methodForNewBid(defaults.pricingMethod);
+  // What new bids take (`newBidMethod`): NULL never chosen is Cost + O&P,
+  // or today's math for a company with material markup (owner Q8) — then
+  // neither button is pressed, because neither is what new bids get.
+  const method = howYouBid.data
+    ? newBidMethod(howYouBid.data)
+    : (defaults.pricingMethod ?? undefined);
 
   return (
     <section className="grid gap-4 xl:grid-cols-2 xl:items-start">
@@ -170,6 +177,12 @@ export function BidPricingDefaultsSection() {
           <p className="text-xs text-muted-foreground mt-0.5">
             The method every new bid starts with.
           </p>
+          {method === null && (
+            <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+              Not chosen yet. Until you pick one, new bids keep today's math:
+              your material markup, then overhead and profit on top of it.
+            </p>
+          )}
         </div>
         <div
           className="flex flex-wrap gap-2"

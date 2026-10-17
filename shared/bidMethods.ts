@@ -66,6 +66,43 @@ export function methodForNewBid(
   return companyMethod ?? "cost_op";
 }
 
+/**
+ * What a company has said about how it bids, read from its settings
+ * (`db.companyMethodState`). `usesMaterialMarkup` is a company % or any
+ * markup rule in force (an accepted starter counts; an unaccepted one does
+ * not, because it prices nothing).
+ */
+export type CompanyMethodState = {
+  method: PricingMethod | null;
+  usesMaterialMarkup: boolean;
+};
+
+/**
+ * The method a NEW bid is created with — owner Q8, 2026-10-16.
+ *
+ * A company that never chose a method and HAS material markup set keeps the
+ * old math (NULL) on its new bids until it answers "How do you bid?": Cost +
+ * O&P drops material markup, so its next bid would otherwise price lower
+ * than yesterday's with nobody asked (golden op-and-tax: $1,369.54 →
+ * $1,349.40). A company with no markup loses nothing on Cost + O&P, so it
+ * gets the owner's default straight away.
+ */
+export function newBidMethod(
+  company: CompanyMethodState
+): PricingMethod | null {
+  if (company.method !== null) return company.method;
+  return company.usesMaterialMarkup ? null : "cost_op";
+}
+
+/**
+ * Whether the one-time "How do you bid?" question is still open: exactly
+ * the companies whose new bids `newBidMethod` keeps on the old math.
+ * Answering it (choosing a method) closes it for good.
+ */
+export function howYouBidOpen(company: CompanyMethodState): boolean {
+  return newBidMethod(company) === null;
+}
+
 // ─── Per line ────────────────────────────────────────────────────────────────
 
 /**

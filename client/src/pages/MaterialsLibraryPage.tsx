@@ -449,6 +449,8 @@ function MaterialRow({
   const setOverride = trpc.bids.setItemMarkupOverride.useMutation({
     onSuccess: () => {
       void utils.bids.markupRules.invalidate();
+      // A first item markup can open "How do you bid?" (owner Q8).
+      void utils.bids.howYouBid.invalidate();
       // A Draft bid's "Re-apply markup rules" offer counts on this.
       void utils.bids.markupReapplyPreview.invalidate();
     },

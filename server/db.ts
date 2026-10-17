@@ -32,7 +32,11 @@ import {
 } from "../shared/markStatus";
 import { foldedStatus } from "../shared/twinFold";
 import { CURRENT_MATH_VERSION } from "../shared/mathVersion";
-import { methodForNewBid, type PricingMethod } from "../shared/bidMethods";
+import {
+  newBidMethod,
+  type CompanyMethodState,
+  type PricingMethod,
+} from "../shared/bidMethods";
 import {
   InsertUser,
   InsertProject,
@@ -6081,13 +6085,15 @@ export async function createBid(data: InsertBid): Promise<number> {
   const [result] = await db.insert(bids).values({
     ...data,
     mathVersion: data.mathVersion ?? CURRENT_MATH_VERSION,
-    // And on the company's METHOD (bid-methods-plan.md § 7): a bid created
-    // with NULL would price by the old stacked math forever — which is what
-    // NULL means, and only bids made before methods existed may hold it.
+    // And on the company's METHOD (bid-methods-plan.md § 7). NULL is the old
+    // stacked math: bids made before methods existed, and — owner Q8 — new
+    // bids of a company with material markup that has not yet answered "How
+    // do you bid?" (`newBidMethod`). Answering does not move those bids; each
+    // Draft offers the choice itself (OldMathOffer).
     pricingMethod:
       data.pricingMethod !== undefined
         ? data.pricingMethod
-        : methodForNewBid(await companyPricingMethod(data.userId)),
+        : newBidMethod(await companyMethodState(data.userId)),
   });
   return result.insertId;
 }
@@ -6095,18 +6101,39 @@ export async function createBid(data: InsertBid): Promise<number> {
 /**
  * The company's method for new bids, READ ONLY — never `getPricingDefaults`,
  * which creates the row it does not find. NULL (no row, or never chosen) is
- * Cost + O&P through `methodForNewBid`.
+ * resolved by `newBidMethod`: Cost + O&P, or the old math for a company with
+ * material markup set (owner Q8).
  */
-export async function companyPricingMethod(
+export async function companyMethodState(
   userId: number
-): Promise<PricingMethod | null> {
+): Promise<CompanyMethodState> {
   const db = await getDb();
-  if (!db) return null;
-  const rows = await db
-    .select()
-    .from(pricingDefaults)
-    .where(eq(pricingDefaults.userId, userId));
-  return resolveForTrade(rows, TRADE_ALL)?.pricingMethod ?? null;
+  if (!db) return { method: null, usesMaterialMarkup: false };
+  const [rows, rules] = await Promise.all([
+    db.select().from(pricingDefaults).where(eq(pricingDefaults.userId, userId)),
+    db
+      .select({
+        markupPct: markupRules.markupPct,
+        isStarter: markupRules.isStarter,
+        acceptedAt: markupRules.acceptedAt,
+      })
+      .from(markupRules)
+      .where(eq(markupRules.userId, userId)),
+  ]);
+  const row = resolveForTrade(rows, TRADE_ALL);
+  const companyPct =
+    row?.materialMarkupPct === null || row?.materialMarkupPct === undefined
+      ? 0
+      : Number(row.materialMarkupPct);
+  // The same "in force" rule as getMarkupRuleSet: an unaccepted starter
+  // prices nothing, so it is not markup this company would lose.
+  const ruleInForce = rules.some(
+    r => (!r.isStarter || r.acceptedAt !== null) && Number(r.markupPct) > 0
+  );
+  return {
+    method: row?.pricingMethod ?? null,
+    usesMaterialMarkup: companyPct > 0 || ruleInForce,
+  };
 }
 
 export async function updateBid(
@@ -13982,7 +14009,7 @@ export async function seedSampleProject(
     isSample: true,
     // A new bid starts on the current math and method, as createBid's do.
     mathVersion: CURRENT_MATH_VERSION,
-    pricingMethod: methodForNewBid(await companyPricingMethod(userId)),
+    pricingMethod: newBidMethod(await companyMethodState(userId)),
     clientId: client.insertId,
     clientName: content.clientName,
     siteAddress: content.siteAddress,
