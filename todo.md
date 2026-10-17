@@ -1675,8 +1675,7 @@ Two pieces, owner-approved to build before beta. They came out of the
 coverage checks in `references/coverage-check.md`, which list what the
 starters miss. These two catch what a list cannot.
 
-- [x] **BOTH BUILT (checked 2026-10-16):** (a) `server/routers/searchMissesRouter.ts`
-      + the Admin screen's "searches that found nothing"
+- [x] **BOTH BUILT (checked 2026-10-16):** (a) `server/routers/searchMissesRouter.ts` + the Admin screen's "searches that found nothing"
       (`server/searchMissLog.test.ts`); (b) `components/BuildFromPartsPanel.tsx`,
       reached from the Count picker, the assembly search and Quick bid.
 - [x] **(a) No-match search log.** When a picker search (assembly or
