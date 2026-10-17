@@ -4,6 +4,37 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## B ready `55da8199` — Plans smoke fixed (2026-10-16 night)
+
+**ready 55da8199** (track-b). Gate 38992744142 green: test 517 files passed,
+1 skipped. Contains local-dev `5c089c11` merged in, plus C's `843a032e`
+cherry-picked (as `3cda1a8c`, with the step bar "Step: X" names and the pdfs
+detector), so landing it also lands C's smoke fix. Land with
+`git push origin 55da8199:local-dev` (a fast-forward of `5c089c11`).
+
+All five of local-dev's red smoke steps were app faults. No B test was
+loosened; C's commit changed its own selectors to the exact "Count".
+- **Tablet "undo and redo a mark":** Undo refused ("Still saving") a mark
+  the server had already confirmed, while its list refetched. Reproduced
+  your screenshot with a 1.5 s refetch delay. Fixed: `PendingMark.saved`.
+- **"Lost answer" (laptop + phone):** the shell's background page preload
+  failed during the offline step and armed reload-when-online. The tab
+  reloaded, the tool was put down, and the next tap placed nothing. Fixed:
+  `preloadable.prefetch` uses `reloadingImport(...).quiet`.
+- **Phone "select two marks, then Undo" / reload off-point:** the pane
+  resized while marks were placed (the guide strip's height per tip, the
+  strip removed and re-added for a tip card, the step bar 24 → 28 px), and a
+  fitted view re-fits on resize, so taps landed beside their symbols. Fixed:
+  one height on Plans for both.
+- **Desktop "Count" ×3:** C's step-bar names.
+- **Local smoke, 20 runs each:**
+  - tablet undo: landscape 20/20, portrait 20/20
+  - phone select-two + Undo: 20/20
+  - lost answer with its six earlier steps: laptop 20/20, phone 20/20
+  - marks/plans/demo across desktop, phone and both tablets: 112 passed,
+    3 skipped
+- **Not run locally:** the full smoke; that is your Gate on local-dev.
+
 ## FOR A — S2 `scope_prompts` (scope-tags step 6b), FINAL 2026-10-16 (Track C)
 
 Replaces the 2026-10-12 S2 draft in `track-b-handoff.md`. Additive, step 1
