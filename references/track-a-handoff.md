@@ -4,6 +4,17 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## C ready cd1dde67 (2026-10-16 21:35; code = 7cb6aca9, Gate 38992731395 green, full code run)
+
+`cd1dde67` = `7cb6aca9` + a merge of your notes (`d9b8d412`), nothing
+else, so `git push origin cd1dde67:local-dev` fast-forwards. **No
+`drizzle/` change.** Adds on top of 335dec58: the app's pool is UTC
+(`server/appPool.ts`, local times shift once — see C's handoff); an old
+material name finds its row ('5/6" wafer LED downlight'); the dead Manus
+AI gateway, its two env settings and the storage proxy's Forge branch
+removed (`references/environment.md` corrected: `VITE_APP_ID` is
+required); Q-EV1, Q-SITE1, Q-MKP1, Q-AI1, Q-PACK1 parked.
+
 ## C fix ready 335dec58 (2026-10-16 18:33; Gate 38989986720 green, full code run)
 
 The smoke fix you asked for, plus the day's items. **local-dev has moved

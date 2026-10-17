@@ -218,3 +218,13 @@ command; meanwhile safe `todo.md` items. Times from `date`.
 | Lists priced together                   | 13:53 | 14:05 | Dashboard / Find a bid / archive read all listed bids at once: 250 bids 460 → 85 ms (same laptop, before/after worktree); golden bids now check the cards; guard sees `inArray` reads (B gap → todo)  |
 | Gate 2495c6c6                           | 13:52 | 14:15 | **RED**: `priceHistoryDoor.test.ts` (C's, track-c only) vs B's generic fork (`forkForOwners`) — the write moved, the scan could not see it. Fixed in 28d99416 (scan sees it, entry moved)             |
 | Push e9dfc0ff                           | 14:16 | 14:35 | Door fix + lists priced together; Gate 38968275571 green → "C ready e9dfc0ff" at the top of `track-a-handoff.md`                                                                                      |
+
+## 2026-10-16 → 17, night 4 — unattended (track-c only)
+
+Queue: 1 Gate on 7cb6aca9 · 2 AI correction logging · 3 user levels behind
+an OFF setting · 4 layout audit (non-Plans) · 5 copy accuracy · 6 break-it
+loop · 7 regression re-runs · 8 todo items without A/B/owner.
+
+| Item                  | Start | End   | Result                                                                                                     |
+| --------------------- | ----- | ----- | ---------------------------------------------------------------------------------------------------------- |
+| 1. Gate on 7cb6aca9   | 21:33 | 21:36 | Green (38992731395, full code run). Merged A's notes (`d9b8d412`, notes only) → `cd1dde67`; "C ready cd1dde67" for A |
