@@ -19,7 +19,7 @@ export function IncompletePriceTag({
   return (
     <span
       className={`text-xs font-normal font-sans text-red-500 ${className}`}
-      title="Something on this bid can't be priced, so this figure leaves it out. Open the bid to see what."
+      title="Something on this bid can't be priced, so this figure leaves it out. The bid lists what."
     >
       incomplete
     </span>

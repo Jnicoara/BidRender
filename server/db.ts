@@ -2447,8 +2447,13 @@ export async function updateMaterial(
         ...safe,
         costPerUnit: price.write.costPerUnit,
         packPrice: price.write.packPrice,
-        // An import stamps every row with one time; anything else, now.
-        priceUpdatedAt: (safe.priceUpdatedAt as Date | undefined) ?? new Date(),
+        // An import stamps every row with one time; anything else, now. A
+        // price typed back to $0 is unpriced again, not a price checked
+        // today (2026-10-16: it read "current" on Supplier pricing).
+        priceUpdatedAt:
+          Number(price.write.costPerUnit) > 0
+            ? ((safe.priceUpdatedAt as Date | undefined) ?? new Date())
+            : null,
         isPinnedCopy: unpinOnEdit(materials.isPinnedCopy),
         updatedAt: new Date(),
       })

@@ -281,7 +281,11 @@ export function BidSearchPanel({
           </div>
 
           <label className="space-y-1">
-            <span className="text-xs text-muted-foreground">Archived</span>
+            {/* "Recently deleted" everywhere else since 2026-10-14; this
+                filter said "Archived" for the same state. */}
+            <span className="text-xs text-muted-foreground">
+              Recently deleted
+            </span>
             <Select
               value={archive}
               onValueChange={v => setArchive(v as ArchiveScope)}
@@ -290,9 +294,9 @@ export function BidSearchPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="live">Not archived</SelectItem>
-                <SelectItem value="all">Include archived</SelectItem>
-                <SelectItem value="archived">Archived only</SelectItem>
+                <SelectItem value="live">Leave them out</SelectItem>
+                <SelectItem value="all">Include them</SelectItem>
+                <SelectItem value="archived">Only those</SelectItem>
               </SelectContent>
             </Select>
           </label>
@@ -339,7 +343,7 @@ export function BidSearchPanel({
           <p className="text-sm font-medium">No bids match</p>
           <p className="text-xs text-muted-foreground mt-1">
             {filtered
-              ? "Try fewer filters, or include archived bids."
+              ? "Try fewer filters, or include recently deleted bids."
               : "Bids you create will show up here."}
           </p>
         </div>
@@ -368,7 +372,7 @@ export function BidSearchPanel({
                     )}
                     {bid.archivedAt && (
                       <span className="ml-2 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-                        archived
+                        deleted
                       </span>
                     )}
                   </span>

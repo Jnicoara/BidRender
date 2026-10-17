@@ -145,6 +145,13 @@ describe.skipIf(!hasDb)("supplier pricing on the real catalog", () => {
       category: "Receptacles",
     });
     expect(priceAge(unpriced!.priceUpdatedAt, new Date())).toBe("unpriced");
+
+    // And a price typed back to $0 is unpriced again, not "current".
+    const { material: zeroed } = await caller().materials.update({
+      id: created!.id,
+      costPerUnit: 0,
+    });
+    expect(priceAge(zeroed!.priceUpdatedAt, new Date())).toBe("unpriced");
   });
 
   it("does not move the price date when something else is edited", async () => {
