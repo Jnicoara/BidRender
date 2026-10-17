@@ -760,11 +760,11 @@ test("a new account bids a whole job, and every printed number matches hand math
     await placeAt(page, { x: 450, y: 1000 }, touch);
     if (touch) {
       await placeAt(page, { x: 1350, y: 1000 }, true);
-      // "Finish 50'-0"" — the button says the length it will commit.
-      await expect(page.getByRole("button", { name: /^Finish / })).toHaveText(
-        new RegExp(`Finish\\s*${TRACED_FT}'-0"`)
-      );
-      await press(page.getByRole("button", { name: /^Finish / }));
+      // The length it will commit. On touch it sits beside a bare "Finish"
+      // in its own "Run total" readout (B, eb94729a: the pill docks to the
+      // bottom on touch); on a mouse it is inside the button.
+      await expect(page.getByLabel("Run total")).toHaveText(`${TRACED_FT}'-0"`);
+      await press(page.getByRole("button", { name: /^Finish/ }));
     } else {
       const end = await sheetPoint(page, { x: 1350, y: 1000 });
       await page.mouse.dblclick(end.x, end.y);
