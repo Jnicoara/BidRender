@@ -75,6 +75,13 @@ export function BidStepBar({
                 type="button"
                 onClick={() => go(step)}
                 aria-current={state === "next" ? "step" : undefined}
+                // Its own name, "Step: Count": on the Plans screen the bar sits
+                // above a toolbar whose tools are ALSO "Count" and "Runs", and
+                // a name shared by two buttons is one nobody can ask for — the
+                // smoke test's "Count" landed on the step instead of the tool
+                // (2026-10-16). The visible label is unchanged; the title
+                // below ("Count — done") is still read as the description.
+                aria-label={`Step: ${STEP_LABEL[step]}`}
                 title={
                   state === "done"
                     ? `${STEP_LABEL[step]} — done`

@@ -37,6 +37,12 @@ async function outcome(page: Page) {
       /could not|couldn't|can't|cannot|not a PDF|password|damaged|isn't|unreadable|failed/i
     )
     .filter({ visible: true })
+    // The viewer's words, never the guide strip's tip under it: the Scale
+    // tip says a run "can't be measured", which read as this file's error
+    // while the drawing was open too (2026-10-16, Gate 38973693447).
+    .and(
+      page.locator('xpath=self::*[not(ancestor::aside[@aria-label="Guide"])]')
+    )
     .first();
   await expect(drawn.or(said)).toBeVisible({ timeout: 60_000 });
   if (await drawn.isVisible()) return { opened: true, text: "" };

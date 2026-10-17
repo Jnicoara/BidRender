@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **The step bar's buttons now have their own names for screen readers
+  and tests: "Step: Count", "Step: Runs" and so on.** On the Plans screen
+  the step bar sits above tools also called "Count" and "Runs", so asking
+  for "Count" could reach the wrong button. The words on screen are
+  unchanged.
 - **The Dashboard, the Bids list and the archive open about five times
   faster for a company with many bids.** They priced every bid one at a
   time; now they read all the listed bids together. Measured on 250 bids:
