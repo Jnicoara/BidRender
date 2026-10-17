@@ -350,7 +350,7 @@ export function CloseoutPanel({ bidId }: { bidId: number }) {
                         </span>{" "}
                         would have made this estimate right. Shown as a reading
                         — changing the company factor in Settings moves every
-                        bid still following it.
+                        Draft bid still following it.
                       </p>
                     )}
 

@@ -15498,7 +15498,9 @@ export async function setBidDistributionHeight(
  *
  * Counts only what a person would count: live bids, excluding the archived and
  * the shipped sample, and excluding bids that have set their own height and so
- * would not move.
+ * would not move. Excludes bids with locked quantities too (2026-10-16): they
+ * keep their numbers, and every bid that has left Draft is locked, so counting
+ * them promised a reach the change does not have.
  */
 export async function countBidsInheritingHeights(
   userId: number
@@ -15513,7 +15515,8 @@ export async function countBidsInheritingHeights(
         eq(bids.userId, userId),
         isNull(bids.archivedAt),
         eq(bids.isSample, false),
-        isNull(bids.distributionHeightInches)
+        isNull(bids.distributionHeightInches),
+        isNull(bids.quantitiesLockedAt)
       )
     );
   return Number(rows[0]?.n ?? 0);

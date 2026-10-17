@@ -50,14 +50,14 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   {
     question: "Trace a conduit or cable run",
     answer:
-      "Open the bid's plans and pick Conduit or Cable, then click box to box. Footage, fittings and wire are added for you.",
+      "Open the bid's plans and pick Conduit or Cable, then click box to box. Send the run to the bid and its footage, fittings and wire go on it.",
     path: "/plans",
     words: "run conduit pipe emt cable romex mc wire footage homerun trace",
   },
   {
     question: "Count a job by hand, without drawings",
     answer:
-      "Dashboard › Quick bid — type what you need and the count. No drawings needed.",
+      "Dashboard › New bid › Quick bid — or Count on a bid you already have. Type what you need and how many; no drawings needed.",
     path: "/dashboard",
     words: "quick bid manual hand no plans without drawings",
   },
@@ -184,7 +184,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   },
   {
     question: "Change my password",
-    answer: "Settings › Account.",
+    answer:
+      "Sign out, then press Forgot password? on the sign-in screen — it sends you a link to set a new one.",
     path: "/settings/account",
     words: "password login sign in account email",
   },
@@ -197,7 +198,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   },
   {
     question: "Keep track of customers",
-    answer: "Clients — who the work is for, with their bids.",
+    answer:
+      "Clients — who the work is for, and how many bids each has. To see those bids, search Bids by client.",
     path: "/clients",
     words: "client customer contractor gc owner contact",
   },

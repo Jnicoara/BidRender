@@ -389,8 +389,10 @@ describe("a line with no price blocks every figure (T3)", () => {
           name: "Panel swap",
           status: "Not priced",
           detail: "labor rate not set",
-          // Audit #17: not "Price them on the bid" — a rate is fixed elsewhere.
-          fix: "Set an hourly rate on the Labor rates screen.",
+          // Audit #17 said "Set an hourly rate on the Labor rates screen", but
+          // the line froze its $0 rate when added, so that never reached it
+          // (copy pass 2026-10-16): Fix this line picks a role with a rate.
+          fix: 'Press "Fix this line" on the bid and pick a labor role with a rate.',
         },
       ]);
   });

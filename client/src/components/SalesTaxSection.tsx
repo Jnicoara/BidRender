@@ -387,7 +387,8 @@ export function SalesTaxSection() {
           <div className="min-w-0">
             <div className="text-sm font-medium">Charge sales tax on bids</div>
             <div className="text-xs text-muted-foreground">
-              With this off, no bid shows a tax line anywhere.
+              With this off, Draft bids show no tax line. Bids that have left
+              Draft keep the tax they had then.
             </div>
           </div>
           <Switch
@@ -622,7 +623,7 @@ export function SalesTaxSection() {
                         className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => archiveArea.mutate({ id: row.id })}
                         aria-label={`Archive ${row.name}`}
-                        title="Archive — bids already using it keep their rate"
+                        title="Archive — bids that have left Draft keep their rate; a Draft using it looks for another area"
                       >
                         <Archive className="w-3.5 h-3.5" />
                       </Button>

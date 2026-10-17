@@ -1472,6 +1472,17 @@ export const bidsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
+      // Deleted in another tab, still in this tab's picker: a bid line priced
+      // from something the library no longer lists is one nobody can find.
+      const assembly = await db.getAssemblyById(
+        input.assemblyId,
+        ctx.scope.dataUserId
+      );
+      if (assembly?.status === "archived")
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `"${assembly.name}" was deleted, so it was not added. Restore it from Recently deleted to use it again.`,
+        });
       const { id, merged } = await refuseOverfullLine(() =>
         db.addAssemblyToBid(
           input.bidId,

@@ -952,8 +952,9 @@ export default function LaborRatesPage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold">Labor rates</h1>
             <p className="text-xs text-muted-foreground">
-              What each role costs you per hour. Starter rates are placeholders,
-              not market data — replace them with your own.
+              What each role costs you per hour. Starter rates are BidRidge's
+              examples, and bids price with them until you replace them with
+              what your crew actually costs you.
             </p>
           </div>
           <Button

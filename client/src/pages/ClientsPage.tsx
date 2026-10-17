@@ -183,8 +183,8 @@ function ClientForm({
       {/* Said plainly, because the two addresses are easy to conflate and
           getting it wrong is what would put the wrong tax on a bid later. */}
       <p className="text-xs text-muted-foreground -mt-1">
-        Where the client is. The job address is set per bid — one client can
-        have work in several places.
+        Where the client is. A bid uses this as its job address unless you type
+        one on the bid — one client can have work in several places.
       </p>
 
       <Textarea
@@ -380,8 +380,9 @@ export default function ClientsPage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold">Clients</h1>
             <p className="text-xs text-muted-foreground">
-              Who the work is for. Attach one to a bid and its details fill in
-              the proposal — the bid keeps whatever you type on it directly.
+              Who the work is for. Attach one to a bid and its name and address
+              fill in the proposal — the bid keeps whatever you type on it
+              directly.
             </p>
           </div>
           {view === "active" && !adding && (
@@ -423,7 +424,7 @@ export default function ClientsPage() {
             <Input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search name, contact, address, phone…"
+              placeholder="Search name, address, email, phone…"
               className="h-8 pl-9 text-sm"
               aria-label="Search clients"
             />
@@ -479,7 +480,7 @@ export default function ClientsPage() {
                 ? `Nothing matches “${query}”.`
                 : view === "archived"
                   ? "Nothing archived."
-                  : "No clients yet. Add one and its details fill in the proposal."}
+                  : "No clients yet. Add one and its name and address fill in the proposal."}
             </p>
             {!query && view === "active" && (
               <p className="text-xs text-muted-foreground/70 mt-1">

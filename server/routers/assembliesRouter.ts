@@ -154,6 +154,28 @@ const updateSchema = z.object({
 
 const toDecimal = (value: number) => value.toFixed(4);
 
+/**
+ * A material deleted in another tab, picked from this tab's stale list, is
+ * not put into a recipe (server/deletedInStaleTab.test.ts). Only NEW lines
+ * are checked: a recipe that already holds a since-deleted material must
+ * still save its other edits.
+ */
+async function refuseDeletedMaterials(
+  userId: number,
+  materialIds: readonly number[],
+  alreadyIn: ReadonlySet<number>
+): Promise<void> {
+  for (const id of Array.from(new Set(materialIds))) {
+    if (alreadyIn.has(id)) continue;
+    const material = await db.getMaterialById(id, userId);
+    if (material?.status === "archived")
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `"${material.name}" was deleted, so it was not added. Restore it from Recently deleted to use it again.`,
+      });
+  }
+}
+
 export const assembliesRouter = router({
   /** The working list, or the archive. Never returns `deleted` tombstones. */
   /**
@@ -236,6 +258,11 @@ export const assembliesRouter = router({
     }),
 
   create: procedure.input(createSchema).mutation(async ({ input, ctx }) => {
+    await refuseDeletedMaterials(
+      ctx.scope.dataUserId,
+      input.materials.map(line => line.materialId),
+      new Set()
+    );
     await requireKnownKind(
       input.mountHeightTypeKey ?? null,
       ctx.scope.dataUserId
@@ -304,6 +331,14 @@ export const assembliesRouter = router({
     if (savedSinceOpened(target.updatedAt, openedAt))
       throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
 
+    if (materials) {
+      const current = await db.getAssemblyDetail(id, ctx.scope.dataUserId);
+      await refuseDeletedMaterials(
+        ctx.scope.dataUserId,
+        materials.map(line => line.materialId),
+        new Set(current?.materials.map(line => line.materialId) ?? [])
+      );
+    }
     // Checked BEFORE the fork, so a refusal leaves no fork behind. Every
     // stored reference must be this company's or shared (libraryRefs.ts).
     await requireLibraryRefs(ctx.scope.dataUserId, {

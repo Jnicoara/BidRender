@@ -98,7 +98,7 @@ const SECTION_INFO: Record<SettingsSection, { label: string; blurb: string }> =
     proposal: {
       label: "Proposal",
       blurb:
-        "How every proposal is laid out. Changes the look of new documents, never the price of a bid.",
+        "How every proposal is laid out — including ones already sent, when opened again — never the price of a bid.",
     },
     display: {
       label: "Display",

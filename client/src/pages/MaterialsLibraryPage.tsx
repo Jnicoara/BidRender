@@ -301,7 +301,7 @@ function validateDraft(draft: Draft): string | null {
     ] as const) {
       const value = feetValue(text);
       if (value !== null && !(value > 0 && value <= 100))
-        return `${what} must be between 0 and 100 ft, or blank.`;
+        return `${what} must be more than 0 and no more than 100 ft, or blank.`;
     }
     const fromBox = feetValue(strapFromBoxFeet);
     if (fromBox !== null && !(fromBox >= 0 && fromBox <= 100))
@@ -2047,7 +2047,7 @@ export default function MaterialsLibraryPage() {
 
         <p className={cn("text-xs text-muted-foreground mt-2")}>
           {view === "active"
-            ? "Editing a starter material gives you your own copy — the original stays untouched, and you can restore it any time with the undo button. Removing one archives it rather than deleting it."
+            ? "Editing a starter material gives you your own copy — the original stays untouched, and you can restore it any time with the ↺ button on its row. Removing one archives it rather than deleting it."
             : "Restoring puts a material back in the working list. Deleting forever cannot be undone."}
         </p>
       </div>

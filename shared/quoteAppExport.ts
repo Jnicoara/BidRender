@@ -166,7 +166,9 @@ export function quoteGaps(
         name,
         status: "Not priced",
         detail: "labor rate not set",
-        fix: "Set an hourly rate on the Labor rates screen.",
+        // The line froze its rate when it was added, so a rate set on the
+        // Labor rates screen never reaches it; Fix this line does.
+        fix: 'Press "Fix this line" on the bid and pick a labor role with a rate.',
       });
     } else {
       // Hours not set (D1) is its own count (`lineHoursMissing`), said apart

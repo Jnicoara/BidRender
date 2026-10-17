@@ -705,9 +705,10 @@ export default function ProposalPage({
             <AlertDialogDescription>
               {noWork ? (
                 <>
-                  This bid has no lines yet, so the total would be $0.00. The
-                  proposal can't be printed or saved until work is added to the
-                  bid.
+                  Nothing on this bid is work you do yet — no lines, or every
+                  line is By others or Excluded — so the total would be $0.00.
+                  The proposal can't be printed or saved until work is added to
+                  the bid.
                 </>
               ) : !anyNotPriced(notPriced) ? (
                 <>

@@ -714,9 +714,10 @@ export function ProposalSheet({
                     the number; itemising them invites a conversation about which
                     of them the client would like removed.
                   */}
-                  {doc.investment.includesIndirect
-                    ? "Includes all materials, labor, equipment and overhead."
-                    : "Includes all materials and labor."}
+                  {/* One sentence either way since 2026-10-16: the longer one
+                    said "equipment and overhead", but nothing here prices
+                    equipment and it showed when only PROFIT was set. */}
+                  Includes all materials and labor.
                   {tax && !tax.exempt ? " Sales tax included above." : ""}
                 </div>
               </div>

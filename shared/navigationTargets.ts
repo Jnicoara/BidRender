@@ -50,7 +50,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
     label: "Bids",
     path: "#/bids",
     purpose:
-      "Every bid in one list. Find one bid out of hundreds by job name, client or address, and filter by draft, out for bid, won or lost.",
+      "Every bid in one list. Find one bid out of hundreds by job name, client or address, and filter by Draft, Active, Won or Lost.",
   },
   {
     /**
@@ -83,7 +83,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
     label: "Clients",
     path: "#/clients",
     purpose:
-      "The customers you bid for — their contact details, phone number and address. Add a customer, or see which bids belong to one.",
+      "The customers you bid for — their contact details, phone number and address. Add a customer, and see how many bids each has.",
   },
   {
     id: "materials",
@@ -97,7 +97,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
     label: "Supplier pricing",
     path: "#/library/materials?view=pricing",
     purpose:
-      "Put your supply house's prices on the catalog, import a price list, and find the prices nobody has checked in a while. What a material costs, and how old that figure is.",
+      "Put your supply house's prices on the catalog, and find the prices nobody has checked in a while. What a material costs, and how old that figure is.",
   },
   {
     id: "labor-rates",
@@ -174,7 +174,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
      * questions and used to get the same answer.
      */
     id: "settings",
-    label: "Company defaults",
+    label: "Settings › Pricing",
     path: "#/settings/pricing",
     purpose:
       "Company-wide pricing defaults — overhead, profit, markup, target margin and the productivity factor. What every new bid starts from.",
@@ -205,7 +205,7 @@ export const NAVIGATION_TARGETS: NavigationTarget[] = [
     label: "Display",
     path: "#/settings/display",
     purpose:
-      "Light or dark theme, and how big the text is. Make the app easier to read on a big monitor or at arm's length.",
+      "Light or dark theme, text size, the plan crosshair, the bid step bar and guide mode tips. Make the app easier to read on a big monitor or at arm's length.",
   },
   {
     id: "account",

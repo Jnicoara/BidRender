@@ -98,11 +98,11 @@ const STEP_TEXT: Record<BidStep, { title: string; body: string }> = {
   },
   count: {
     title: "Count the devices",
-    body: "Pick a symbol off the legend — a duplex, a 2x4 troffer — then tap each one on the sheet. Every tap is one on the bid.",
+    body: "Pick a symbol off the legend — a duplex, a 2x4 troffer — then tap each one on the sheet. Send the count to the bid once, and every tap after that is added for you.",
   },
   runs: {
     title: "Trace the runs (if the job needs it)",
-    body: "Draw a run from box to box and BidRidge adds the pipe, wire, fittings and labor. Skip it on a job where footage doesn't matter.",
+    body: "Draw a run from box to box, then send it to the bid — the pipe, wire, fittings and labor go on it. Skip it on a job where footage doesn't matter.",
   },
   review: {
     title: "Check the bid",
@@ -197,7 +197,7 @@ export function guideTip(input: {
       id: "sent",
       stepLabel: null,
       title: "It's out",
-      body: "When you hear back, mark the bid Won or Lost on the Dashboard — that's what the Performance numbers are built from.",
+      body: "When you hear back, open the bid and set its status to Won or Lost — that's what the Performance numbers are built from.",
       action: null,
     });
   }

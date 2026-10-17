@@ -52,7 +52,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 
 const ROLE_BLURB: Record<CompanyRole, string> = {
   owner: "Everything, including who else is here.",
-  admin: "Everything except acting on the owner.",
+  admin: "Everything except changing the owner or another admin.",
   estimator: "Builds bids and the library. Cannot change pricing or people.",
   viewer: "Read-only.",
 };

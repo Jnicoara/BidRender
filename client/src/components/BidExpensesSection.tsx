@@ -408,8 +408,8 @@ export function BidExpensesSection({
                 ? `${preview.working ? `${preview.working} = ` : ""}${money(preview.amount)} — added as one charge.`
                 : tile === "drive"
                   ? defaultRate !== null && defaultRate > 0
-                    ? "A flat cost, not labor hours: no modifiers or productivity apply. The rate is your default labor rate — change it for this job if you like."
-                    : "A flat cost, not labor hours. No default labor rate is set — type one here."
+                    ? "A flat cost, not labor hours: no modifiers or productivity apply. The rate is your Labor rate for traced runs (Settings › Pricing) — change it for this job if you like."
+                    : "A flat cost, not labor hours. No Labor rate for traced runs is set in Settings › Pricing — type one here."
                   : "Type the numbers, then Enter."}
           </p>
         </div>

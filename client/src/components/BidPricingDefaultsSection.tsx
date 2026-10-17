@@ -142,8 +142,9 @@ export function BidPricingDefaultsSection() {
         </h3>
         <p className="text-xs text-muted-foreground mt-1">
           What every bid is priced with unless that bid says otherwise. Changing
-          one here moves every bid still set to follow it — finished bids keep
-          the materials, hours and rates they were built from either way.
+          one here moves every Draft bid that follows it. A bid that has left
+          Draft keeps the numbers it had then, and every bid keeps the
+          materials, hours and rates it was built from either way.
         </p>
       </div>
 
@@ -316,7 +317,7 @@ export function BidPricingDefaultsSection() {
 
         <CompanyDefaultNotice>
           This is your company default — it affects every new bid going forward,
-          and every existing bid still set to follow it.
+          and every Draft bid still set to follow it.
         </CompanyDefaultNotice>
       </div>
 
@@ -370,7 +371,7 @@ export function BidPricingDefaultsSection() {
 
         <CompanyDefaultNotice>
           This is your company default — it affects every new bid going forward,
-          and every existing bid still set to follow it.
+          and every Draft bid still set to follow it.
         </CompanyDefaultNotice>
       </div>
 
@@ -433,7 +434,7 @@ export function BidPricingDefaultsSection() {
 
         <CompanyDefaultNotice>
           This is your company default — it affects every new bid going forward,
-          and every existing bid still set to follow it.
+          and every Draft bid still set to follow it.
         </CompanyDefaultNotice>
       </div>
 

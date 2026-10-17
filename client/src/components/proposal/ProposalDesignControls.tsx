@@ -201,7 +201,8 @@ export function ProposalDesignControls({
         {!compact && (
           <p className="text-xs text-muted-foreground mt-1">
             How every proposal you generate is laid out. These are company-wide
-            — they change the look of new documents, never the price of a bid.
+            — they change how every proposal looks, including one already sent
+            when it is opened again, but never the price of a bid.
           </p>
         )}
       </div>

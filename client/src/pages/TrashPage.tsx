@@ -113,9 +113,10 @@ export default function TrashPage({
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold">Recently deleted</h1>
             <p className="text-xs text-muted-foreground">
-              Everything you archived or deleted, in one place. Restore puts it
-              back exactly as it was. Bids are deleted for good {RETENTION_DAYS}{" "}
-              days after you archive them; everything else waits for you.
+              Archived bids, clients, materials, assemblies, kits and modifiers,
+              in one place. Restore puts it back exactly as it was. Bids are
+              deleted for good {RETENTION_DAYS} days after you archive them;
+              everything else waits for you.
             </p>
           </div>
         </div>

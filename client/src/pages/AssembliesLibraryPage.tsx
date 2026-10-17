@@ -2043,7 +2043,7 @@ export default function AssembliesLibraryPage() {
                             name: `${assembly.name} (copy)`,
                           })
                         }
-                        title="Duplicate — a separate assembly, not a copy of this one"
+                        title="Duplicate — a separate copy, not linked to this one"
                         aria-label={`Duplicate ${assembly.name}`}
                       >
                         <CopyIcon className="w-3.5 h-3.5" />
@@ -2105,8 +2105,8 @@ export default function AssembliesLibraryPage() {
         </div>
 
         <p className="text-xs text-muted-foreground mt-2">
-          Adding an assembly to a project snapshots its costs at that moment, so
-          a submitted bid never changes because a material price moved later.
+          Adding an assembly to a bid freezes its costs at that moment, so a
+          submitted bid never changes because a material price moved later.
         </p>
       </div>
 

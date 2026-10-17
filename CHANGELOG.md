@@ -6,6 +6,17 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **About 30 labels, warnings and help lines corrected to say what the app
+  really does.** For example: "Change my password" now points to Forgot
+  password (Account has no password form); the guide says counts and runs
+  reach the bid when you send them; the tax switch, heights and pricing
+  notices say bids that have left Draft keep their numbers; the printed
+  proposal no longer claims to include "equipment". The Heights notice also
+  stopped counting locked bids among those a change re-prices.
+- **A material or assembly deleted in another tab can no longer be added
+  from a screen that still shows it.** It says it was deleted and points to
+  Recently deleted instead.
+
 - **Back now returns to the same place in a list.** Opening a bid from far
   down the Dashboard, Bids or Plans list and pressing Back (the app's or the
   browser's) used to put you back at the top; it now scrolls back to where

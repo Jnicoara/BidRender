@@ -249,9 +249,11 @@ export function HeightsSection() {
           building does not match.
         </p>
         <CompanyDefaultNotice>
-          Changing a height here re-prices every bid that has not set its own —{" "}
-          {bidsInheriting} {bidsInheriting === 1 ? "bid" : "bids"} right now,
-          including ones already sent.
+          Changing a height here re-prices every bid that follows its drawing
+          and has not set its own — {bidsInheriting}{" "}
+          {bidsInheriting === 1 ? "bid" : "bids"} right now. A bid with locked
+          quantities, which includes every bid that has left Draft, keeps its
+          numbers.
         </CompanyDefaultNotice>
       </div>
 
@@ -280,8 +282,9 @@ export function HeightsSection() {
         />
         {distributionHeight.inches === null && (
           <p className="text-xs text-[#F5C518]">
-            No vertical footage is being counted on any job. Set this and the
-            heights below start adding drops and rises to your runs.
+            No vertical footage is counted on jobs that have not set their own
+            distribution height. Set this and the heights below start adding
+            drops and rises to your runs.
           </p>
         )}
       </div>

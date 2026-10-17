@@ -84,8 +84,8 @@ export function PriceHistoryPanel({
             </div>
           ) : entries.length === 0 && !beforeHistory ? (
             <p className="text-sm text-muted-foreground py-6">
-              No price changes recorded yet. Every change from now on is kept
-              here.
+              No price changes recorded yet. Prices you type, import or reset
+              are kept here from now on.
             </p>
           ) : (
             <ul className="divide-y divide-border">

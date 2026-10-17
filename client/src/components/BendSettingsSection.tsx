@@ -116,8 +116,8 @@ export function BendSettingsSection() {
         <div className="space-y-4 pl-5">
           <CompanyDefaultNotice>
             Changing these recounts elbows, field bends and pull points on every
-            job, including bids already sent. A bid with its quantities locked
-            keeps the numbers it has.
+            bid that still follows its drawing. A bid with locked quantities,
+            which includes every bid that has left Draft, keeps its numbers.
           </CompanyDefaultNotice>
 
           <SettingRow
