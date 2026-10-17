@@ -965,6 +965,14 @@ Full reasoning: `references/track-a-handoff.md`, session 28 fourth part.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
+> **Checked against `drizzle/schema.ts` 2026-10-16 (Track C):** every
+> request below whose columns are in the schema is ticked — applied. STILL
+> OPEN, not in the schema: the `bid_panels` header columns (`supplyText`,
+> `mainsText`, `mainsAmps`, `fedFromText`, `connectedKva`, `demandKva`) and
+> the bend columns (`typedBendCount`, `kicksPerBoxEnd`, `kicksAcceptedAt`).
+> `bid_panel_circuits` was built with shorter names (`breaker`, `amps`,
+> `wire`), so it counts as done.
+
 > **0105–0124 ON STAGING (2026-10-07 00:16 UTC) and on local-dev — NOT on
 > live.** Owner: the pairing rules are for the LIVE release, which is gated
 > in `references/live-release-plan.md` (top). B's labor-only tick and
@@ -1006,13 +1014,13 @@ Requests waiting for Track A, which numbers and writes the migrations.
 > `quoteBucket` dropped. (An earlier note here said 0108–0112 for fewer
 > items; superseded.)
 
-- [ ] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
+- [x] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
       sheet's run height (Track B, owner's answer b, 2026-10-05). ADDITIVE,
       nullable, **no DEFAULT** (NULL = follows the job, and must stay
       distinguishable from any answer). Step 1 of the three-step deploy: no
       `UPDATE`, no backfill. Once it lands, Track B makes the run height chain
       run → sheet → job → company. references/vertical-drops-plan.md § 7.
-- [ ] **`assemblies.mountHeightTypeKey VARCHAR(64) NULL`** — the height TYPE
+- [x] **`assemblies.mountHeightTypeKey VARCHAR(64) NULL`** — the height TYPE
       this assembly's device mounts at, a key of the heights list
       (`receptacle`, `switch`, or a company's own) — NOT inches, so it
       re-prices through job → company → shipped like every other height
@@ -1025,7 +1033,7 @@ Requests waiting for Track A, which numbers and writes the migrations.
 track-c, each working today without its column). All ADDITIVE, nullable,
 **no DEFAULT**, no backfill — step 1 of the three-step deploy.
 
-- [ ] **`takeoff_stamps.labelWords TEXT NULL`** — the labels Find all
+- [x] **`takeoff_stamps.labelWords TEXT NULL`** — the labels Find all
       matching tied to a device when it was confirmed (`tieLabels` in
       `client/src/lib/findMatching.ts`: "USB", `54"`, "(E)", "A2"). Today
       they show on the FIND only and are lost when the mark is placed, so a
@@ -1036,7 +1044,7 @@ track-c, each working today without its column). All ADDITIVE, nullable,
   duplicate.** The mark already has `mountHeightInches` +
   `mountHeightSource` (0098, on staging; requested by Track C itself on
   2026-10-01, below). A height read off a label goes THERE.
-- [ ] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
+- [x] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
       first confirmed by hand ("from a new look", multiple-looks-plan.md
       § 4). Today kept per browser (`@/lib/trustedLooks`), so a colleague's
       browser asks again — safe, not shared. NULL = never confirmed.
@@ -1059,7 +1067,7 @@ on UNCC E003 (3 of 3 panels, 42/42 circuits each):
       `connectedKva DECIMAL(9,2) NULL`, `demandKva DECIMAL(9,2) NULL`.
       NULL = not read, or a panel typed in. All as printed — never a
       parsed value standing in for what the drawing says.
-- [ ] **`bid_panel_circuits`** (A's child table; these are the columns C
+- [x] **`bid_panel_circuits`** (A's child table; these are the columns C
       fills): `panelId` FK `bid_panels.id` ON DELETE CASCADE,
       `circuitNumber INT NOT NULL`, `breakerText VARCHAR(16) NULL` (as
       printed: "20/1", "FEED"), `breakerAmps INT NULL`, `poles TINYINT NULL`,
@@ -1082,13 +1090,13 @@ both ADDITIVE, nullable, **no DEFAULT**, no backfill. Searched first:
 nothing in this file or in `migrations-next-batch.md` (a-migrations-plan)
 asks for a column on `takeoff_run_circuits`.
 
-- [ ] **`takeoff_run_circuits.panelCircuitId INT NULL`** — FK
+- [x] **`takeoff_run_circuits.panelCircuitId INT NULL`** — FK
       `bid_panel_circuits.id` ON DELETE SET NULL: the schedule row this
       run's circuit is ("Homerun to 2B-14" → 2B's circuit 14). NULL = not
       tied (typed by hand, or no schedule for that panel). `name` keeps the
       tag as printed ("2B-14"), which it already holds today. Lands with or
       after `bid_panel_circuits`.
-- [ ] **`takeoff_run_circuits.conductorSource VARCHAR(8) NULL`** — where
+- [x] **`takeoff_run_circuits.conductorSource VARCHAR(8) NULL`** — where
       `conductorCount` / `groundCount` came from when the drawing said:
       `'ticks'` or `'note'` ("(3 #12 THWN CU & 1 #12 CU GRD)"). NULL =
       entered by the estimator, as every row is today.
@@ -1186,7 +1194,7 @@ to `bid_panels` / `bid_panel_circuits` / `takeoff_run_circuits` above. All
 ADDITIVE, nullable, **no DEFAULT** (NULL = "not said, follow the level
 above"), no backfill. An area is a SHEET (plan § 4).
 
-- [ ] **On `bids`:**
+- [x] **On `bids`:**
   - `homerunMethod` VARCHAR(16) NULL — `'measured'`, `'average'` or
     `'measuredMin'`; NULL = Measured, the default.
   - `homerunAverageFt` DECIMAL(8,2) NULL.
@@ -1195,18 +1203,18 @@ above"), no backfill. An area is a SHEET (plan § 4).
     applied (a starter is shown, inert until accepted).
   - `homerunRunTypeId` INT NULL, FK `takeoff_run_types.id` ON DELETE SET
     NULL (plan § 8: conductors from the type, never inferred).
-- [ ] **On `bid_pdf_sheets`, the area override:** `homerunMethod`
+- [x] **On `bid_pdf_sheets`, the area override:** `homerunMethod`
       VARCHAR(16) NULL, `homerunAverageFt` DECIMAL(8,2) NULL,
       `homerunMinimumFt` DECIMAL(8,2) NULL. NULL = follow the bid.
       **Ceiling height per area is NOT asked again:** it is
       `bid_pdf_sheets.distributionHeightInches`, already numbered 0108 above.
-- [ ] **On `bid_panels`, where the panel sits on the plan:** `planSheetId`
+- [x] **On `bid_panels`, where the panel sits on the plan:** `planSheetId`
       INT NULL, FK `bid_pdf_sheets.id` ON DELETE SET NULL; `planX` and
       `planY` DECIMAL(10,2) NULL (page points). Today kept per browser
       (`bidridge:panel-spots:`, `@/lib/circuitGroups`); NULL = not placed,
       and Measured then gives no number. Distinct from A's `bidPdfId` /
       `sheetId`, which say where the SCHEDULE is printed.
-- [ ] **On `bid_panel_circuits`, one homerun per circuit** —
+- [x] **On `bid_panel_circuits`, one homerun per circuit** —
       `homerunOverrideFt DECIMAL(8,2) NULL` (typed length, replaces L + V;
       NULL = computed), `homerunFromStampId INT NULL` FK `takeoff_stamps.id`
       ON DELETE SET NULL (the leaving device when not the closest; NULL =
@@ -1214,7 +1222,7 @@ above"), no backfill. An area is a SHEET (plan § 4).
       every homerun starts). A circuit read only from tags (no schedule)
       needs a `bid_panels` row with no schedule behind it — A's "typed in"
       case.
-- [ ] **On `bid_panel_circuits`, the homerun's own ceiling** —
+- [x] **On `bid_panel_circuits`, the homerun's own ceiling** —
       `homerunCeilingInches` INT NULL. NULL = follows the height area, then
       the sheet, job, company (plan § 4). The one-tap height override the
       owner asked for (plan § 6, 2026-10-06: "make overriding a homerun's
@@ -1232,31 +1240,31 @@ above"), no backfill. An area is a SHEET (plan § 4).
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
 DEFAULT**, no backfill — step 1 of the three-step deploy.
 
-- [ ] **`bid_line_items.bidUnitCost DECIMAL(12,4) NULL`** — material per
+- [x] **`bid_line_items.bidUnitCost DECIMAL(12,4) NULL`** — material per
       unit priced ON THIS BID; NULL = none. **SHARED with the price-box item**
       ("Before beta: price an unpriced line right where it blocks you"):
       one column for both, never two. Read by `lineNotPriced` AND its SQL copy
       `lineNotPricedSql` together.
-- [ ] **`bid_line_items.isQuoteItem BOOLEAN NULL`** — this line's material
+- [x] **`bid_line_items.isQuoteItem BOOLEAN NULL`** — this line's material
       comes from a supplier quote. NULL = no. Starts from the assembly's flag.
-- [ ] **`bid_line_items.quoteId INT NULL`** — FK `bid_quotes.id`, ON DELETE
+- [x] **`bid_line_items.quoteId INT NULL`** — FK `bid_quotes.id`, ON DELETE
       SET NULL.
-- [ ] **`bid_line_items.quoteShare DECIMAL(12,2) NULL`** — a typed share of
+- [x] **`bid_line_items.quoteShare DECIMAL(12,2) NULL`** — a typed share of
       a package price. NULL = computed by the spread.
-- [ ] **`bid_line_items.quoteItemKey VARCHAR(255) NULL`** — the frozen "same
+- [x] **`bid_line_items.quoteItemKey VARCHAR(255) NULL`** — the frozen "same
       item" key for carrying the last quote forward.
-- [ ] **`bid_line_items.quoteNote VARCHAR(500) NULL`** — notes for the
+- [x] **`bid_line_items.quoteNote VARCHAR(500) NULL`** — notes for the
       supplier request list (can wait for the first build).
-- [ ] **`assemblies.materialByQuote BOOLEAN NULL`** — new lines from this
+- [x] **`assemblies.materialByQuote BOOLEAN NULL`** — new lines from this
       assembly start as quote items. NULL = no.
-- [ ] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
+- [x] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
       `supplierName VARCHAR(128) NULL` (free text, like
       `materials.supplierName`), `quotedOn DATE NULL`, `packagePrice
 DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
       `carriedFromBidId INT NULL` (provenance only, **no FK** — the old bid may
       be deleted; set = a carried quote, "not updated"), `note VARCHAR(500)
 NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
-- [ ] **The company's quoted-line markup %** (material-markup D4; owner
+- [x] **The company's quoted-line markup %** (material-markup D4; owner
       answer c: ONE company-wide number) — a nullable decimal beside the
       company markup default; A picks the table. NULL = no quoted-line rule.
 
@@ -1323,11 +1331,15 @@ Labor lives on the assembly, never on the material", which 0065 made false
 
 ### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
 
+> **All three applied (checked against `drizzle/schema.ts` 2026-10-16):**
+> `symbol_looks`, `takeoff_stamps.checkAcceptedAt`, and `askKind` /
+> `askFingerprint`.
+
 Check sheet shipped code-only on track-c without any of these; each is behind
 an OFF switch in `shared/sheetCheckSwitches.ts` or is said plainly on screen.
 All additive and nullable. Specs are in the plans named.
 
-- [ ] `symbol_looks` table — a legend look WITH its box, so the check needs no
+- [x] `symbol_looks` table — a legend look WITH its box, so the check needs no
       "Whole legend" in this tab first (today the boxes live in sessionStorage,
       `@/lib/sheetCheckSession`). `references/multiple-looks-plan.md` § 6.
 - [x] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
@@ -1335,9 +1347,9 @@ All additive and nullable. Specs are in the plans named.
       `tieLabels` (`54"`) is what fills it. Lets a height read beside a mark be SAVED on it
       (`MARK_HEIGHT_COLUMN`). NULL must stay distinct from 0.
       `references/check-my-marks-plan.md` § 10.
-- [ ] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past
+- [x] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past
       this check (`MARK_CHECK_ACCEPTED_COLUMN`). check-my-marks-plan § 7.
-- [ ] `ai_usage`/ask log `askKind` + `askFingerprint`, and
+- [x] `ai_usage`/ask log `askKind` + `askFingerprint`, and
       `bid_pdf_sheets.contentHash` — so the same tie on the same drawing is
       never paid for twice. `references/legend-and-notes-automation-plan.md`.
 
@@ -1772,7 +1784,7 @@ floor drop ceiling vs stockroom open to deck)." Per-sheet ceiling height
 stockroom homerun reads ~10 ft short per wire unless overridden one by one.
 Design: `references/homerun-footage-plan.md` § 4.
 
-- [ ] **Build (Track C, after the columns):** draw a box or polygon on a
+- [x] **Build (Track C, after the columns):** draw a box or polygon on a
       sheet, name it, give it a ceiling ("Stockroom — open to deck, 18'-0"").
       Every homerun leaving a device inside it uses that height; a device in
       no area follows the sheet. **Where two areas overlap, the area with
@@ -1800,7 +1812,7 @@ Design: `references/homerun-footage-plan.md` § 4.
       2026-10-07). Today an outline is fixed once drawn: remove and redraw.
       Drag a corner (tablet: tap a corner, tap where it goes), add or drop a
       corner; the server already takes `outline` on `updateHeightArea`.
-- [ ] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
+- [x] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
       else changes):
   - `id`; `bidId` FK `bids.id` ON DELETE CASCADE; `userId` (the company
     owner's id, like every table); `sheetId` FK `bid_pdf_sheets.id` ON
