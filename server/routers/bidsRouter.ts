@@ -17,6 +17,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { requireCapability, router, scoped } from "../_core/trpc";
+import { PRICING_METHODS, type PricingMethod } from "../../shared/bidMethods";
 import {
   ASSEMBLY_CATEGORIES,
   BID_STATUSES,
@@ -201,6 +202,20 @@ async function requireBid(id: number, userId: number) {
   if (!bid)
     throw new TRPCError({ code: "NOT_FOUND", message: "Bid not found." });
   return bid;
+}
+
+/**
+ * Why a bid's method cannot change, or null when it can: a Draft whose
+ * quantities are not locked. In words for the toggle to show.
+ */
+function methodChangeRefusal(
+  bid: Pick<Bid, "status" | "quantitiesLockedAt">
+): string | null {
+  if (bid.status !== "Draft")
+    return "Only a Draft can change how it is priced. This bid has left Draft, so it keeps the method it went out with.";
+  if (bid.quantitiesLockedAt !== null)
+    return lockedEditRefusal("its pricing method cannot change");
+  return null;
 }
 
 /**
@@ -1274,6 +1289,85 @@ export const bidsRouter = router({
    * nothing on a screen that is already correct.
    */
   /**
+   * The bid priced by EACH method, changing nothing (bid-methods-plan.md
+   * § 7): the per-bid toggle shows old → new from it, and the old-math offer
+   * on a Draft names both choices with their prices. The same loads and the
+   * same `bidRollup` as `get`, with only the method swapped, so a figure
+   * here is the figure the bid shows the moment it is chosen.
+   */
+  methodPrices: procedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ input, ctx }) => {
+      const bid = await requireBid(input.id, ctx.scope.dataUserId);
+      const [lines, context, expenseRows] = await Promise.all([
+        db.getRollupLines(bid.id, ctx.scope.dataUserId),
+        listPricingContext(ctx.scope.dataUserId),
+        db.getBidExpenses(bid.id),
+      ]);
+      const expenses = expenseRows.map(row => ({
+        name: row.name,
+        amount: Number(row.amount),
+        taxable: row.taxable,
+        markedUp: row.markedUp,
+      }));
+      const priceAs = (method: PricingMethod | null) => {
+        const { totals, notPriced, incomplete } = bidRollup(
+          { ...bid, pricingMethod: method },
+          lines,
+          context.company,
+          context.tax,
+          expenses
+        );
+        return {
+          method,
+          workPrice: totals.workPrice,
+          totalDue: totals.totalDue,
+          notPriced,
+          incomplete,
+        };
+      };
+      return {
+        current: bid.pricingMethod,
+        /** Whether the method may change: an unlocked Draft only (owner Q14/Q16). */
+        changeable: methodChangeRefusal(bid) === null,
+        options: PRICING_METHODS.map(priceAs),
+        /** The old math's own figure, for a bid still on it. */
+        oldMath: bid.pricingMethod === null ? priceAs(null) : null,
+      };
+    }),
+
+  /**
+   * Choose a bid's method. An unlocked DRAFT only: a bid that has left Draft
+   * keeps the method it was frozen with, as its overhead and profit are
+   * (owner Q16, `freezeBidSettings`). There is no way back to the old math —
+   * it is how bids made before methods priced, not a third choice (§ 7).
+   *
+   * Line snapshots are not rewritten: every line made since 0165 froze its
+   * markup AND its role's charge rate whatever the method, so a switch has
+   * both to read. A line from before 0165 has no charge rate and says so on
+   * Markup + charge rate ("no charge rate") rather than being re-read — the
+   * one snapshot rewrite the plan allows (Q3) is not needed for it to price
+   * honestly, and is left out until the owner wants it.
+   */
+  setPricingMethod: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        method: z.enum(PRICING_METHODS as [PricingMethod, ...PricingMethod[]]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.id, ctx.scope.dataUserId);
+      const refusal = methodChangeRefusal(bid);
+      if (refusal !== null)
+        throw new TRPCError({ code: "BAD_REQUEST", message: refusal });
+      await db.updateBid(bid.id, ctx.scope.dataUserId, {
+        pricingMethod: input.method,
+      });
+      return { id: bid.id, pricingMethod: input.method };
+    }),
+
+  /**
    * The step bar's counts (shared/bidSteps.ts): plan pages, scaled pages,
    * marks, runs, lines and status. Read-only; moves no number.
    */
@@ -2302,10 +2396,21 @@ export const bidsRouter = router({
          * runs sent afterwards (Send again does not refresh a rate — shared/resendLine.ts refills only price and hours).
          */
         defaultLaborRateId: z.number().int().positive().nullable().optional(),
+        /**
+         * The method NEW bids take (bid-methods-plan.md § 7, owner Q1). Moves
+         * no existing bid: each holds its own `pricingMethod` from the day it
+         * was made, and the old math stays NULL. Never NULL here — "not
+         * chosen" is the row before anybody picked, and reads Cost + O&P.
+         */
+        pricingMethod: z
+          .enum(PRICING_METHODS as [PricingMethod, ...PricingMethod[]])
+          .optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const patch: Record<string, unknown> = {};
+      if (input.pricingMethod !== undefined)
+        patch.pricingMethod = input.pricingMethod;
       if (input.defaultLaborRateId !== undefined) {
         if (input.defaultLaborRateId !== null) {
           // One of THIS company's roles (or a shipped one it can see) —

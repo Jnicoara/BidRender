@@ -14,7 +14,11 @@ This is the human-readable companion to the git history — read this to see wha
   - Each line now remembers its role's charge rate beside its cost.
   - The Dashboard, Find a bid and the Performance screen price each bid by
     its method too, so they match the bid screen.
-  - The screens to choose a method are not built yet.
+  - Choosing a method: Settings › Pricing has "How you bid", and a new shop is
+    asked once at setup. A Draft can switch under its Pricing settings, seeing
+    the price each way first. A Draft still on the old math is offered the
+    choice and never moved on its own. Labor rates gains each role's charge
+    rate when you bid that way.
   - On a Markup + charge rate bid, a line whose role has no charge rate says so ("+ 1 line no charge rate") and blocks the printed price, rather than billing that labor at cost. The bid, the Dashboard and the print agree.
 - **Undo now takes back a mark the moment it is saved.** For about a
   second after each mark saved, while its list refreshed, Undo answered

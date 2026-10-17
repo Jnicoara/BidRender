@@ -45,6 +45,12 @@ import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Button } from "@/components/ui/button";
+import {
+  PRICING_METHODS,
+  PRICING_METHOD_LABEL,
+  methodForNewBid,
+} from "@shared/bidMethods";
 
 /** Fraction (0.1) → percent string ("10"). Blank stays blank. */
 const toPercent = (fraction: number | string | null | undefined) =>
@@ -133,6 +139,8 @@ export function BidPricingDefaultsSection() {
     ) : null;
 
   const isPercentage = defaults.overheadMode === "percentage";
+  // What new bids take: NULL (never chosen) is Cost + O&P (`methodForNewBid`).
+  const method = methodForNewBid(defaults.pricingMethod);
 
   return (
     <section className="grid gap-4 xl:grid-cols-2 xl:items-start">
@@ -145,6 +153,59 @@ export function BidPricingDefaultsSection() {
           one here moves every bid still set to follow it — finished bids keep
           the materials, hours and rates they were built from either way.
         </p>
+      </div>
+
+      {/* ── How you bid (bid-methods-plan.md § 7, owner Q1) ─────────────────
+          The method NEW bids take. First, because it decides which of the
+          settings below a new bid uses at all; each one that a method does
+          not use says so rather than vanishing. Moves no existing bid: each
+          keeps its own method, and a Draft can change its own under its
+          Pricing settings. */}
+      <div
+        className="xl:col-span-2 rounded-lg border border-border bg-card p-4 space-y-3"
+        data-testid="company-method"
+      >
+        <div>
+          <Label className="text-sm">How you bid</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            The method every new bid starts with.
+          </p>
+        </div>
+        <div
+          className="flex flex-wrap gap-2"
+          role="radiogroup"
+          aria-label="How you bid"
+        >
+          {PRICING_METHODS.map(m => (
+            <Button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={method === m}
+              variant={method === m ? "default" : "outline"}
+              size="sm"
+              className="h-auto py-2 text-left whitespace-normal max-w-xs"
+              disabled={save.isPending}
+              onClick={() => method !== m && save.mutate({ pricingMethod: m })}
+            >
+              <span>
+                <span className="block text-xs font-semibold">
+                  {PRICING_METHOD_LABEL[m]}
+                </span>
+                <span className="block text-[11px] font-normal opacity-80">
+                  {m === "cost_op"
+                    ? "Material and labor at cost, then overhead and profit."
+                    : "Material marked up, labor at each role's charge rate."}
+                </span>
+              </span>
+            </Button>
+          ))}
+        </div>
+        <CompanyDefaultNotice>
+          This is your company default for bids started from now on. A bid
+          already made keeps its own method; a Draft can change it under its
+          Pricing settings.
+        </CompanyDefaultNotice>
       </div>
 
       {/* ── Material markup ──────────────────────────────────────────────────
@@ -163,8 +224,8 @@ export function BidPricingDefaultsSection() {
           <p className="text-xs text-muted-foreground mt-0.5">
             Added to each line's material cost when it goes on a bid, unless the
             material has its own markup on the Materials screen. Leave it blank
-            for no markup. Overhead and profit below are added on top of the
-            marked-up material.
+            for no markup. Used by Markup + charge rate bids, and by bids made
+            before methods, where overhead and profit were added on top of it.
           </p>
         </div>
 
@@ -204,12 +265,25 @@ export function BidPricingDefaultsSection() {
           className="h-8 w-36 text-sm"
         />
 
+        {method === "cost_op" && (
+          <p className="text-[11px] text-muted-foreground">
+            Not used in Cost + O&P: new bids add no material markup. Kept for
+            Markup + charge rate, and for bids made before methods.
+          </p>
+        )}
         <CompanyDefaultNotice>
           This is your company default for lines added from now on. Lines
           already on a bid keep their markup — a Draft bid offers "Re-apply
           markup rules" when they differ.
         </CompanyDefaultNotice>
       </div>
+
+      {method === "markup_rate" && (
+        <p className="xl:col-span-2 text-[11px] text-muted-foreground">
+          Overhead and profit: not used in Markup + charge rate, which puts
+          nothing on top. Kept for Cost + O&P bids and bids made before methods.
+        </p>
+      )}
 
       {/* ── Overhead ─────────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-border bg-card p-4 space-y-3">

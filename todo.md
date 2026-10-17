@@ -46,7 +46,18 @@ toggle must refuse a bid outside Draft. Tests: `server/bidMethodSurfaces.test.ts
 Old-math tests say so with `onOldMath` (golden file unchanged). **Step 4
 done too** (`lineChargeRateMissing`, tally `rates`, SQL `ratesMissing`;
 `lineCentsSql` reads the method so a labor-only A line with no rate is Not
-priced in SQL as in the engine). **Left: 5 (screens).**
+priced in SQL as in the engine). **Step 5, built 2026-10-16 night:** the bid's method under Pricing settings
+(Draft only, old → new from `bids.methodPrices`; `bids.setPricingMethod`), the
+old-math OFFER under the total, overhead/profit greyed "not used" on A (and
+an A bid's totals show "Labor at charge rate, over cost" instead of a Profit 0%
+row), "How you bid" on Settings › Pricing with not-used notes, the first-run
+"How do you usually bid?", the charge rate per role on Labor rates (shown when
+the company bids A or any role charges). Shots `overnight-shots/b/methods-*`.
+**Still left of 5:** prevailing-wage sets in Labor + the apprentice question +
+the re-check / below-PW warnings (`shared/prevailingWage.ts` is built, no
+screen), markup brackets on A (`shared/markupBrackets.ts`), and Q3's snapshot
+re-read on a switch (not needed for honest prices: lines since 0165 freeze
+both; older lines say "no charge rate").
 
 ~~**Every bid prices by the old math until these land, and that is enforced in
 one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL.~~ (was) The

@@ -23,6 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { LibraryTabs } from "@/components/library/LibraryTabs";
 import { cn } from "@/lib/utils";
+import { InlineNumberField } from "@/components/InlineNumberField";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { parseTypedNumber, parseTypedPercent } from "@/lib/inlineEdit";
 import { ScopeFilter } from "@/components/library/LibraryControls";
@@ -94,6 +95,9 @@ type LaborRate = {
   workersCompPct?: string | null;
   insurancePct?: string | null;
   benefitsPct?: string | null;
+  /** What the role charges an hour (0165); NULL = not set. Required, so a
+   *  row built without it cannot compile and read as "not set" by accident. */
+  chargeRate: string | null;
   /** When the row was last saved; the editor sends it back (staleEdit.ts). */
   updatedAt: Date;
 };
@@ -468,8 +472,14 @@ function LaborRateRow({
   onSave,
   onRevert,
   onRemove,
+  showCharge,
+  onSaveCharge,
 }: {
   rate: LaborRate;
+  /** Show the charge-rate column (see LaborRatesPage's `showCharge`). */
+  showCharge: boolean;
+  /** Save what the role charges an hour; null clears it. */
+  onSaveCharge: (id: number, chargeRate: number | null) => Promise<unknown>;
   /** Resolves false when the save was refused (its toast says why). */
   onSave: (id: number, draft: Draft, openedAt: Date) => Promise<boolean>;
   onRevert: (rate: LaborRate) => void;
@@ -657,6 +667,33 @@ function LaborRateRow({
         )}
       </span>
 
+      {/*
+        WHAT THE ROLE CHARGES an hour, for Markup + charge rate bids (0165,
+        owner Q4: per role). Blank is "not set", never $0 — on such a bid the
+        role's labor then says "no charge rate" rather than billing at cost
+        (Q5). Edited in place; a line already on a bid keeps what it froze.
+      */}
+      {showCharge && (
+        <span
+          className="md:w-32 shrink-0 flex items-center justify-end gap-1"
+          title="What this role charges an hour on a Markup + charge rate bid"
+        >
+          <span className="text-[10px] text-muted-foreground md:hidden">
+            charges
+          </span>
+          <InlineNumberField
+            value={rate.chargeRate === null ? null : Number(rate.chargeRate)}
+            whenUnset={{ placeholder: "not set" }}
+            onSave={next => onSaveCharge(rate.id, next)}
+            onClear={() => onSaveCharge(rate.id, null)}
+            rules={{ min: 0, max: 99999 }}
+            className="h-7 w-24 text-xs"
+            suffix="/hr"
+            ariaLabel={`Charge rate for ${rate.name}`}
+          />
+        </span>
+      )}
+
       <div className="flex items-center gap-0.5 ml-auto md:ml-0 md:w-28 justify-end shrink-0">
         <Button
           size="sm"
@@ -730,6 +767,20 @@ export default function LaborRatesPage() {
     isLoadingError: ratesFailed,
     refetch: refetchRates,
   } = trpc.laborRates.list.useQuery();
+  /*
+    The CHARGE column (bid-methods-plan.md § 2): shown when the company bids
+    Markup + charge rate, or any role already charges something — simple by
+    default, and never hiding a number somebody typed (CLAUDE.md, "Hide OURS,
+    never THEIRS").
+  */
+  const { data: pricing } = trpc.bids.pricingDefaults.useQuery();
+  const showCharge =
+    pricing?.pricingMethod === "markup_rate" ||
+    rates.some(r => r.chargeRate !== null);
+  const saveCharge = trpc.laborRates.update.useMutation({
+    onError: e => toast.error(errorText(e)),
+    onSettled: () => void utils.laborRates.list.invalidate(),
+  });
   const [scope, setScope] = useState<LibraryScope>("all");
   /** Scope is a view filter only — labor rates have no archive of their own. */
   // (scope is applied in `visible` below, alongside the search filter)
@@ -1027,6 +1078,16 @@ export default function LaborRatesPage() {
             <span className="flex-1">Role</span>
             <span className="w-14 shrink-0">Type</span>
             <span className="w-28 text-right shrink-0">Effective rate</span>
+            {/* The row's charge column (md:w-32) — headed, or every head
+                left of it sits one column off (seen 2026-10-16). */}
+            {showCharge && (
+              <span
+                className="w-32 text-right shrink-0"
+                title="What each role charges an hour on a Markup + charge rate bid"
+              >
+                Charges
+              </span>
+            )}
             <span className="w-28 shrink-0" />
           </div>
 
@@ -1058,6 +1119,10 @@ export default function LaborRatesPage() {
                 onSave={handleSave}
                 onRevert={r => revertRate.mutate({ id: r.id })}
                 onRemove={r => removeRate.mutate({ id: r.id })}
+                showCharge={showCharge}
+                onSaveCharge={(id, chargeRate) =>
+                  saveCharge.mutateAsync({ id, chargeRate })
+                }
               />
             ))
           )}

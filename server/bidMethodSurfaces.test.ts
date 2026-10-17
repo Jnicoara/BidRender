@@ -251,4 +251,38 @@ withDb("a bid priced by its method", () => {
       hours: 0,
     });
   });
+
+  it("methodPrices names each method's price, and choosing one gives exactly that price", async () => {
+    const id = await bidWithLine("Methods: toggle", "120.0000");
+    await onOldMath(id);
+    const before = await c.bids.methodPrices({ id });
+    expect(before.current).toBeNull();
+    expect(before.changeable).toBe(true);
+    expect(before.oldMath?.workPrice).toBeCloseTo(248.05, 2);
+    const priceOf = (m: string) =>
+      before.options.find(o => o.method === m)!.workPrice;
+    expect(priceOf("cost_op")).toBeCloseTo(217.8, 2);
+    expect(priceOf("markup_rate")).toBeCloseTo(245, 2);
+
+    await c.bids.setPricingMethod({ id, method: "markup_rate" });
+    const after = await c.bids.get({ id });
+    expect(after.totals.workPrice).toBeCloseTo(priceOf("markup_rate"), 2);
+    expect((await c.bids.methodPrices({ id })).oldMath).toBeNull();
+  });
+
+  it("refuses to change the method of a bid that left Draft, or is locked", async () => {
+    const active = await bidWithLine("Methods: active", "120.0000");
+    await c.bids.update({ id: active, status: "Active" });
+    await expect(
+      c.bids.setPricingMethod({ id: active, method: "markup_rate" })
+    ).rejects.toThrow(/Only a Draft/);
+    expect((await c.bids.methodPrices({ id: active })).changeable).toBe(false);
+
+    const locked = await bidWithLine("Methods: locked", "120.0000");
+    await c.bids.lockQuantities({ bidId: locked });
+    await expect(
+      c.bids.setPricingMethod({ id: locked, method: "markup_rate" })
+    ).rejects.toThrow(/locked/);
+  });
 });
+

@@ -79,6 +79,7 @@ import { UnitLinkBadge } from "@/components/UnitLinkBadge";
 import { UnitTemplateActions } from "@/components/UnitTemplateActions";
 import { MaterialsListDialog } from "@/components/MaterialsListDialog";
 import { useCompany } from "@/hooks/useCompany";
+import { BidMethodRow, OldMathOffer } from "@/components/BidMethodControls";
 import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { AccountingExportDialog } from "@/components/AccountingExportDialog";
 import { QuoteAppPanel } from "@/components/QuoteAppPanel";
@@ -2730,31 +2731,50 @@ export default function BidsPage({
                   </Button>
                 </div>
               )}
-              {settings.overhead.enabled && (
+              {/*
+                Markup + charge rate puts NO overhead or profit on top (plan
+                § 2): those rows would read "Profit 0%" on a bid that has no
+                profit line at all (seen 2026-10-16). It shows what it does
+                add instead — labor billed at the charge rate, over its cost.
+              */}
+              {bid.pricingMethod === "markup_rate" ? (
                 <div className="flex items-baseline justify-between gap-3 py-1">
                   <span className="text-xs text-muted-foreground">
-                    Overhead
+                    Labor at charge rate, over cost
                   </span>
                   <span className="font-mono text-sm">
-                    {money(totals.overheadAmount)}
+                    {money(totals.laborMarkup)}
                   </span>
                 </div>
-              )}
-              <div className="flex items-baseline justify-between gap-3 py-1">
-                {/* Both numbers, always — "15% markup = 13% margin". A bare
-                    "Markup 15%" is the sentence Part 4 says gets misread. */}
-                <span className="text-xs text-muted-foreground">
-                  Profit {round(settings.profit.value * 100, 2)}%{" "}
-                  {settings.profit.method}{" "}
-                  {otherPercentCaption(
-                    settings.profit.method,
-                    String(settings.profit.value * 100)
+              ) : (
+                <>
+                  {settings.overhead.enabled && (
+                    <div className="flex items-baseline justify-between gap-3 py-1">
+                      <span className="text-xs text-muted-foreground">
+                        Overhead
+                      </span>
+                      <span className="font-mono text-sm">
+                        {money(totals.overheadAmount)}
+                      </span>
+                    </div>
                   )}
-                </span>
-                <span className="font-mono text-sm">
-                  {money(totals.profitAmount)}
-                </span>
-              </div>
+                  <div className="flex items-baseline justify-between gap-3 py-1">
+                    {/* Both numbers, always — "15% markup = 13% margin". A bare
+                      "Markup 15%" is the sentence Part 4 says gets misread. */}
+                    <span className="text-xs text-muted-foreground">
+                      Profit {round(settings.profit.value * 100, 2)}%{" "}
+                      {settings.profit.method}{" "}
+                      {otherPercentCaption(
+                        settings.profit.method,
+                        String(settings.profit.value * 100)
+                      )}
+                    </span>
+                    <span className="font-mono text-sm">
+                      {money(totals.profitAmount)}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="border-t border-border my-2" />
               <div className="flex items-baseline justify-between gap-3 py-1">
                 <span className="text-sm font-medium shrink-0 whitespace-nowrap">
@@ -2905,6 +2925,11 @@ export default function BidsPage({
                   </p>
                 )}
               </div>
+              {access.can("bids.edit") && (
+                <div className="mt-2">
+                  <OldMathOffer bidId={bid.id} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -2954,74 +2979,96 @@ export default function BidsPage({
                 ) : undefined
               }
             >
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    Overhead
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {settings.overheadSource === "bid"
-                      ? "This bid"
-                      : "Company default"}
-                  </Badge>
-                </div>
-                <Select
-                  value={
-                    bid.overheadEnabled === null
-                      ? INHERIT
-                      : bid.overheadEnabled
-                        ? "on"
-                        : "off"
-                  }
-                  onValueChange={value =>
-                    updateBid.mutate({
-                      id: bid.id,
-                      overheadEnabled:
-                        value === INHERIT ? null : value === "on",
-                      ...(value === "on" && bid.overheadValue === null
-                        ? {
-                            overheadMode: company.overheadMode,
-                            overheadValue: company.overheadValue,
-                          }
-                        : {}),
-                    })
-                  }
-                >
-                  <SelectTrigger
-                    className="h-8 text-sm"
-                    aria-label="Overhead setting"
+              <BidMethodRow bidId={bid.id} canEdit={access.can("bids.edit")} />
+              {/*
+                NOT USED IN Markup + charge rate (bid-methods-plan.md § 2): A
+                prices labor at the charge rate and puts nothing on top, so
+                overhead and profit are greyed here, not cleared — they are
+                kept, and count again if the bid goes back to Cost + O&P.
+              */}
+              {bid.pricingMethod === "markup_rate" && (
+                <p className="text-[11px] text-muted-foreground">
+                  Overhead and profit: not used in Markup + charge rate. Kept,
+                  and used again if this bid goes back to Cost + O&P.
+                </p>
+              )}
+              <div
+                className={cn(
+                  "space-y-4",
+                  bid.pricingMethod === "markup_rate" &&
+                    "opacity-50 pointer-events-none"
+                )}
+                aria-disabled={bid.pricingMethod === "markup_rate" || undefined}
+                inert={bid.pricingMethod === "markup_rate" || undefined}
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      Overhead
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {settings.overheadSource === "bid"
+                        ? "This bid"
+                        : "Company default"}
+                    </Badge>
+                  </div>
+                  <Select
+                    value={
+                      bid.overheadEnabled === null
+                        ? INHERIT
+                        : bid.overheadEnabled
+                          ? "on"
+                          : "off"
+                    }
+                    onValueChange={value =>
+                      updateBid.mutate({
+                        id: bid.id,
+                        overheadEnabled:
+                          value === INHERIT ? null : value === "on",
+                        ...(value === "on" && bid.overheadValue === null
+                          ? {
+                              overheadMode: company.overheadMode,
+                              overheadValue: company.overheadValue,
+                            }
+                          : {}),
+                      })
+                    }
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={INHERIT}>
-                      Use company default (
-                      {company.overheadEnabled ? "on" : "off"})
-                    </SelectItem>
-                    <SelectItem value="on">On for this bid</SelectItem>
-                    <SelectItem value="off">Off for this bid</SelectItem>
-                  </SelectContent>
-                </Select>
-                {bid.overheadEnabled === true && (
-                  <div className="flex items-center gap-2">
-                    <Select
-                      value={bid.overheadMode ?? "percentage"}
-                      onValueChange={mode =>
-                        updateBid.mutate({
-                          id: bid.id,
-                          overheadMode: mode as "percentage" | "flat",
-                        })
-                      }
+                    <SelectTrigger
+                      className="h-8 text-sm"
+                      aria-label="Overhead setting"
                     >
-                      <SelectTrigger className="h-7 w-24 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percentage">%</SelectItem>
-                        <SelectItem value="flat">Flat $</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {/*
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={INHERIT}>
+                        Use company default (
+                        {company.overheadEnabled ? "on" : "off"})
+                      </SelectItem>
+                      <SelectItem value="on">On for this bid</SelectItem>
+                      <SelectItem value="off">Off for this bid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {bid.overheadEnabled === true && (
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={bid.overheadMode ?? "percentage"}
+                        onValueChange={mode =>
+                          updateBid.mutate({
+                            id: bid.id,
+                            overheadMode: mode as "percentage" | "flat",
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-7 w-24 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">%</SelectItem>
+                          <SelectItem value="flat">Flat $</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {/*
                       The fifth of this family, and the one that hid: the
                       fallback sat inside a ternary, so an audit that looked
                       for `?? 0` beside a `value` prop walked straight past it.
@@ -3031,78 +3078,80 @@ export default function BidsPage({
                       ever were not, "0%" would read as a decision rather than
                       as a blank.
                     */}
-                    <InlineNumberField
-                      value={
-                        bid.overheadValue === null
-                          ? null
-                          : bid.overheadMode === "flat"
-                            ? Number(bid.overheadValue)
-                            : asPercent(Number(bid.overheadValue))
-                      }
-                      whenUnset={{ placeholder: "company default" }}
-                      onSave={raw =>
-                        updateBid.mutateAsync({
-                          id: bid.id,
-                          overheadValue:
-                            bid.overheadMode === "flat"
-                              ? raw
-                              : fromPercent(raw),
-                        })
-                      }
-                      rules={{ min: 0 }}
-                      className="h-7 w-20 text-xs"
-                      ariaLabel="Overhead value"
-                      suffix={
-                        bid.overheadMode === "flat" ? undefined : "% of cost"
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">Profit</span>
-                  <Badge variant="outline" className="text-xs">
-                    {settings.profitSource === "bid"
-                      ? "This bid"
-                      : "Company default"}
-                  </Badge>
+                      <InlineNumberField
+                        value={
+                          bid.overheadValue === null
+                            ? null
+                            : bid.overheadMode === "flat"
+                              ? Number(bid.overheadValue)
+                              : asPercent(Number(bid.overheadValue))
+                        }
+                        whenUnset={{ placeholder: "company default" }}
+                        onSave={raw =>
+                          updateBid.mutateAsync({
+                            id: bid.id,
+                            overheadValue:
+                              bid.overheadMode === "flat"
+                                ? raw
+                                : fromPercent(raw),
+                          })
+                        }
+                        rules={{ min: 0 }}
+                        className="h-7 w-20 text-xs"
+                        ariaLabel="Overhead value"
+                        suffix={
+                          bid.overheadMode === "flat" ? undefined : "% of cost"
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
-                <Select
-                  value={bid.profitMethod ?? INHERIT}
-                  onValueChange={value =>
-                    updateBid.mutate({
-                      id: bid.id,
-                      profitMethod:
-                        value === INHERIT
-                          ? null
-                          : (value as "markup" | "margin"),
-                      profitValue:
-                        value === INHERIT ? null : company.profitValue,
-                    })
-                  }
-                >
-                  <SelectTrigger
-                    className="h-8 text-sm"
-                    aria-label="Profit method"
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      Profit
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {settings.profitSource === "bid"
+                        ? "This bid"
+                        : "Company default"}
+                    </Badge>
+                  </div>
+                  <Select
+                    value={bid.profitMethod ?? INHERIT}
+                    onValueChange={value =>
+                      updateBid.mutate({
+                        id: bid.id,
+                        profitMethod:
+                          value === INHERIT
+                            ? null
+                            : (value as "markup" | "margin"),
+                        profitValue:
+                          value === INHERIT ? null : company.profitValue,
+                      })
+                    }
                   >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={INHERIT}>
-                      Use company default ({company.profitMethod})
-                    </SelectItem>
-                    <SelectItem value="markup">
-                      Markup % for this bid
-                    </SelectItem>
-                    <SelectItem value="margin">
-                      Target margin % for this bid
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {bid.profitMethod && (
-                  /*
+                    <SelectTrigger
+                      className="h-8 text-sm"
+                      aria-label="Profit method"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={INHERIT}>
+                        Use company default ({company.profitMethod})
+                      </SelectItem>
+                      <SelectItem value="markup">
+                        Markup % for this bid
+                      </SelectItem>
+                      <SelectItem value="margin">
+                        Target margin % for this bid
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {bid.profitMethod && (
+                    /*
                     NULL here means "follow the company default", never zero.
 
                     It was `?? 0`, which was safe only because this field is
@@ -3111,30 +3160,31 @@ export default function BidsPage({
                     on a bid that is inheriting 15%. Now the fallback says what
                     it means and cannot lie about money.
                   */
-                  <InlineNumberField
-                    value={
-                      bid.profitValue === null
-                        ? null
-                        : asPercent(Number(bid.profitValue))
-                    }
-                    whenUnset={{ placeholder: "company default" }}
-                    onSave={raw =>
-                      updateBid.mutateAsync({
-                        id: bid.id,
-                        profitValue: fromPercent(raw),
-                      })
-                    }
-                    // Below 99%: at 100% the target-margin formula divides by zero.
-                    rules={{ min: 0, max: 98.99 }}
-                    className="h-7 w-32 text-xs"
-                    ariaLabel="Profit value"
-                    percentKind={bid.profitMethod}
-                  />
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Markup and target margin are different numbers on the same
-                  cost — the method is always an explicit choice.
-                </p>
+                    <InlineNumberField
+                      value={
+                        bid.profitValue === null
+                          ? null
+                          : asPercent(Number(bid.profitValue))
+                      }
+                      whenUnset={{ placeholder: "company default" }}
+                      onSave={raw =>
+                        updateBid.mutateAsync({
+                          id: bid.id,
+                          profitValue: fromPercent(raw),
+                        })
+                      }
+                      // Below 99%: at 100% the target-margin formula divides by zero.
+                      rules={{ min: 0, max: 98.99 }}
+                      className="h-7 w-32 text-xs"
+                      ariaLabel="Profit value"
+                      percentKind={bid.profitMethod}
+                    />
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Markup and target margin are different numbers on the same
+                    cost — the method is always an explicit choice.
+                  </p>
+                </div>
               </div>
 
               {/*

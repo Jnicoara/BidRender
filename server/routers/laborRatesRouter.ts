@@ -210,10 +210,19 @@ export const laborRatesRouter = router({
          * Hourly roles only.
          */
         breakdown: breakdownSchema.nullable().optional(),
+        /**
+         * What the role CHARGES an hour on a Markup + charge rate bid (0165,
+         * bid-methods-plan.md § 2, owner Q4: per role). NULL clears it — such a
+         * bid then says the role's labor is "no charge rate", never bills it at
+         * cost (Q5). Moves no line already on a bid: each froze its own
+         * (`snapshotChargeRate`). Any role type: a salaried foreman still bills
+         * by the hour.
+         */
+        chargeRate: hourlySchema.nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, breakdown, openedAt, ...rest } = input;
+      const { id, breakdown, openedAt, chargeRate, ...rest } = input;
 
       const target = await db.getLaborRateById(id, ctx.scope.dataUserId);
       if (!target)
@@ -238,6 +247,8 @@ export const laborRatesRouter = router({
       const patch: Record<string, unknown> = {};
       if (rest.name !== undefined) patch.name = rest.name;
       if (rest.trade !== undefined) patch.trade = rest.trade;
+      if (chargeRate !== undefined)
+        patch.chargeRate = chargeRate === null ? null : toDecimal4(chargeRate);
 
       const touchesRate =
         rest.rateType !== undefined ||

@@ -4,7 +4,9 @@
  * ── One real step, not a tour ────────────────────────────────────────────────
  * The full Dashboard is the wrong first thing to show someone: every screen is
  * visible at once and none of them is obviously first. So a new account gets
- * this instead, and it asks for exactly one thing before letting go.
+ * this instead, and it asks for exactly one thing before letting go — plus,
+ * since 2026-10-16, "How do you usually bid?" with Cost + O&P already
+ * picked, so it needs no answer to go on (bid-methods-plan.md, owner Q1).
  *
  * That one thing is the labor rate, and the choice is not arbitrary. An
  * unpriced material understates one line of a bid; the labor rate multiplies
@@ -32,6 +34,11 @@ import { needsRate } from "@shared/laborRatePricing";
 import { resolveLaborRate } from "@shared/laborRateLookup";
 import { NavigationHelper } from "@/components/NavigationHelper";
 import { errorText } from "@/lib/errorText";
+import {
+  PRICING_METHODS,
+  PRICING_METHOD_LABEL,
+  methodForNewBid,
+} from "@shared/bidMethods";
 
 export default function FirstRunPage() {
   const utils = trpc.useUtils();
@@ -57,6 +64,16 @@ export default function FirstRunPage() {
   // above is known to reach runs too, and where to change the role.
   const { data: pricing } = trpc.bids.pricingDefaults.useQuery();
   const runRole = resolveLaborRate(rates, pricing?.defaultLaborRateId ?? null);
+  /*
+    "How do you usually bid?" (bid-methods-plan.md § 7, owner Q1) — one tap,
+    Cost + O&P preselected, saved only when tapped: nothing is written for a
+    shop that leaves it, and an unchosen row already reads Cost + O&P.
+  */
+  const method = methodForNewBid(pricing?.pricingMethod);
+  const setMethod = trpc.bids.setPricingDefaults.useMutation({
+    onError: e => toast.error(errorText(e)),
+    onSettled: () => void utils.bids.pricingDefaults.invalidate(),
+  });
 
   const save = async (id: number) => {
     const raw = drafts[id];
@@ -108,7 +125,8 @@ export default function FirstRunPage() {
           <h1 className="text-2xl font-semibold">Welcome to BidRidge</h1>
         </div>
         <p className="text-sm text-muted-foreground mb-8">
-          One thing before you start bidding, and then you are straight into it.
+          Two quick things before you start bidding, and then you are straight
+          into it.
         </p>
 
         <div className="rounded-xl border border-border bg-card p-5">
@@ -208,6 +226,40 @@ export default function FirstRunPage() {
               You can pick another role in Settings › Pricing.
             </p>
           )}
+        </div>
+
+        <div className="mt-6" data-testid="first-run-method">
+          <p className="text-sm font-medium">How do you usually bid?</p>
+          <div
+            className="mt-2 flex flex-wrap gap-2"
+            role="radiogroup"
+            aria-label="How do you usually bid?"
+          >
+            {PRICING_METHODS.map(m => (
+              <Button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={method === m}
+                variant={method === m ? "default" : "outline"}
+                size="sm"
+                disabled={setMethod.isPending}
+                onClick={() =>
+                  method !== m && setMethod.mutate({ pricingMethod: m })
+                }
+              >
+                {m === "markup_rate"
+                  ? "Markup + hourly rate"
+                  : PRICING_METHOD_LABEL[m]}
+              </Button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {method === "cost_op"
+              ? "Material and labor at cost, then your overhead and profit on top."
+              : "Material marked up, labor billed at an hourly rate per role. You set those rates in Labor rates."}{" "}
+            You can change it in Settings › Pricing.
+          </p>
         </div>
 
         <div className="mt-6 flex items-center gap-3">
