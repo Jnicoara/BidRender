@@ -4,14 +4,20 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
-## STAGING serves `00777dba` — NOT yet "staging ready for his check": ONE phone smoke step red (B's)
+## STAGING serves `4ddb7f97` — NOT yet "staging ready for his check": ONE phone smoke step red (B's)
 
-`curl https://staging.bidridge.com/api/version` → `00777dba`, built
-06:04 UTC. Gate 39008514897: test ✓, deploy ✓, smoke **257 passed, 2
-skipped, 1 failed** — `[phone] plans.spec.ts:245` "select two marks … Undo",
-red 5/5 in the repeat; written up for B (`track-b-handoff.md` top). When B's
-fix lands and the smoke is green, this line becomes "staging ready for his
-check <commit>". Everything below can be clicked now meanwhile.
+`curl https://staging.bidridge.com/api/version` → `4ddb7f97`, built
+17:33 UTC 2026-10-17 (= local-dev, the candidate). Gate 39054218228: test ✓,
+deploy ✓, smoke **257 passed, 2 skipped, 1 failed** — `[phone]
+plans.spec.ts:245` "select two marks … Undo", red on every run since
+`448d1281` and 5/5 in the repeat; written up for B (`track-b-handoff.md`
+top). When B's fix lands and the smoke is green, this line becomes
+"staging ready for his check <commit>". Everything below can be clicked now.
+
+**B posted "ready f4e7987d" (bid methods + Q8 + wage sets + starter
+rename path). NOT landed:** B says not for live without the owner (Q-A1 /
+B's Q9 are money), it changes `server/seed` (the rehearsal would have to be
+redone), and it does not touch the red phone step.
 
 **What to click on staging (laptop, then iPad/phone):**
 1. **New menu** — left: Dashboard, Bids, Plans, Clients · Library:
