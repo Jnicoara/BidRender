@@ -4,6 +4,44 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## FROM B — overnight 2026-10-16/17 (track-b; NOT for the live release without the owner)
+
+- **Q8 done c6b5feec** (owner answered option 3). A company with material
+  markup set that never chose a method keeps the OLD math on new bids until
+  it answers a one-time "How do you bid?" (Dashboard card, Settings ›
+  Pricing). Golden op-and-tax built as a new bid of such a shop stays
+  **$1,369.54** (`server/howYouBid.test.ts`). The bid's Pricing settings
+  says "Company standard" / "This job only"; a per-bid switch moves neither
+  the company nor another bid (same test). Gate 39003780808 green.
+- **ready 6e506bd7** (Gate 39005634082 green): Q8 + the rest of bid methods
+  that needs no column — price brackets (only when a company picks them;
+  read the PACK price) and prevailing-wage sets (Labor rates › More
+  options; on a bid: the set, the apprentice question, prevailing cost
+  beside each role, re-check warning before print). **Moves no number on
+  any existing bid.** No migration. Item 3's status totals test.
+- **Draft for you, BM-M11 — 0166+ on track-a-night, after live (release
+  freeze).** Re-costing a bid's labor at its wage set (plan § 5, owner Q14)
+  needs to know which ROLE a line's labor is; a line freezes only the rate.
+  Additive, nullable, no default, no backfill (NULL = "not recorded", every
+  existing line):
+
+  ```sql
+  -- BM-M11: the role a line's labor was priced from (bid-methods-plan § 5).
+  ALTER TABLE `bid_line_items` ADD COLUMN `snapshotLaborRateId` int NULL;
+  ```
+
+  No FK on purpose: a snapshot keeps the id even if the role is later
+  deleted, as `snapshotLaborRate` keeps the number. Not to be applied
+  until the owner answers morning Q9 (money).
+
+- **Seen while building:** a drizzle `date()` column written from a JS Date
+  goes through the server's zone — measured on this Pacific machine,
+  2026-03-31 stored as 2026-03-30. Live and staging run in UTC, so they are
+  right today; a dev machine is not. `wage_rate_sets.dateSet` is written and
+  read as text in SQL for that reason (`db.ts` `storedDay`). The other
+  date() columns (`priceAsOf`, `starterDate`, `quotedOn`, `bidDate`) are
+  noted in todo.md for whoever touches them next.
+
 ## B, later the same night — one test fix to take WITH `55da8199`, and what NOT to take yet
 
 - **Take `8f22e226` with the smoke fix** (one file,
@@ -34,6 +72,7 @@ detector), so landing it also lands C's smoke fix. Land with
 
 All five of local-dev's red smoke steps were app faults. No B test was
 loosened; C's commit changed its own selectors to the exact "Count".
+
 - **Tablet "undo and redo a mark":** Undo refused ("Still saving") a mark
   the server had already confirmed, while its list refetched. Reproduced
   your screenshot with a 1.5 s refetch delay. Fixed: `PendingMark.saved`.
@@ -300,15 +339,16 @@ old way: …", "Effective margin …"). `bidPricingMethod()` in
 
 Step 1: `track-a-night` landed on local-dev at `26670c62` (Gate + smoke
 96/2 green, staging serves it). Then, on `track-a-night` only:
+
 - **2 feature test map** `references/feature-test-map.md` (~600 features,
   STRONG/WEAK/NONE); every money row now has a test (`server/bidNumberGaps.test.ts`,
   several proved by breaking).
 - **Counting deep test** (owner's top item): `client/src/lib/countingDeep.test.ts`
-  + `countingScan.test.ts` (golden counts; Confirm all never takes a
-  look-alike), `server/countingManual.test.ts` (hand math each step),
-  `server/countingAiFake.test.ts` (fake AI only). **Bug fixed:** a resent
-  batch of marks counted twice → `server/markReplay.ts` (B's one screen line
-  in `track-b-handoff.md`). Results `references/stress-results-a.md`.
+  - `countingScan.test.ts` (golden counts; Confirm all never takes a
+    look-alike), `server/countingManual.test.ts` (hand math each step),
+    `server/countingAiFake.test.ts` (fake AI only). **Bug fixed:** a resent
+    batch of marks counted twice → `server/markReplay.ts` (B's one screen line
+    in `track-b-handoff.md`). Results `references/stress-results-a.md`.
 - **4–9:** fresh start, backup drill (`scripts/backupDrill.mts`,
   `bidTotalsDump.mts`), failure drills, company-separation probe over every
   procedure, big-data speed (on demand), golden bids on proposal / quote

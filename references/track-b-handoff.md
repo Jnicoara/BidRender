@@ -1,5 +1,27 @@
 # Track B handoff — 2026-10-05
 
+## OVERNIGHT 2026-10-16 → 17 — the queue (owner's brief), and where each item is
+
+1. **Q8 — DONE c6b5feec.** Markup shops keep the old math until "How do
+   you bid?"; golden $1,369.54 holds; "Company standard / This job only".
+2. **Bid methods rest — DONE b1da7480** (brackets, wage sets, apprentice
+   question, warnings, print warning). Re-costing labor at a wage set is
+   morning **Q9** + A's draft BM-M11 (needs a line→role column).
+3. **Status pricing — VERIFIED 6e506bd7.** Already built; the totals test
+   is new.
+4. **Plans layout — DONE 33f1b787** (Slim toolbar, finger tip; the other two
+   were done 10-06).
+5. **Plan-reading help — already built** (steps 1–6, labelled draft).
+6. **Field / Co-owner — looked at 5995d32d**; the rest waits on FR-M1.
+7. Plans regression — IN PROGRESS (local smoke of plans, marks, pdfs, demo,
+   touch at all sizes).
+8. todo.md Track B items — next.
+
+**Rules this run:** track-b only; notes pushed only after the code commit's
+Gate is green; a track branch may not touch `drizzle/` at ALL (the Gate's
+"Refuse migrations" step reads commit history — a TS-only `mode` change was
+refused and its commit rewritten with a lease, 2026-10-17 05:15 UTC).
+
 ## WHERE B STANDS — 2026-10-16 night, track-b (tip 8f22e226, Gate green 518)
 
 - **Smoke fixed, "ready 55da8199"** (track-a-handoff.md). All 5 of
@@ -56,7 +78,7 @@ A's N5 `0164_pricing_defaults_set_at` before it), on local-dev
   does **not** re-count Drafts (frozen as `snapshotChargeRate`);
   `pricingSnapshotOf` copies `snapshotChargeRate`.
 - **Your local test DB** (`bidrender_test_b`) needs `pnpm tsx
-  scripts/migrate.mts` after you merge, or every bare select on those
+scripts/migrate.mts` after you merge, or every bare select on those
   tables fails. `bidrender_local` and `bidrender_test_localdev` are done.
 - Staging pushed by hand (`local-dev:staging` = `5c089c11`).
 
@@ -104,7 +126,6 @@ is a silent dead Undo.
 
 **Effect:** local-dev's smoke is red until this is fixed, which also
 blocks the "Gate + smoke green" check for C's landing and the release.
-
 
 local-dev fast-forwarded `1dbd152e..230c18f5`. Gate 38961289110 green
 (test, deploy-staging, smoke **223 passed / 5 skipped**, 14.3 min); staging

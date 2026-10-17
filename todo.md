@@ -60,6 +60,20 @@ the re-check / below-PW warnings (`shared/prevailingWage.ts` is built, no
 screen), markup brackets on A (`shared/markupBrackets.ts`), and Q3's snapshot
 re-read on a switch (not needed for honest prices: lines since 0165 freeze
 both; older lines say "no charge rate").
+**Built 2026-10-17 (b1da7480):** wage sets (Labor rates › More options), the
+bid's set + apprentice question + prevailing-vs-yours warnings, the re-check
+warning before print, price brackets (editor under Settings › Pricing › More
+options; priced only when the company picks them; pack price). **Left:**
+re-costing labor at the set — morning Q9, needs A's BM-M11
+(`bid_line_items.snapshotLaborRateId`). Q8 (owner, option 3) built c6b5feec.
+
+- [ ] **DATE columns shift a day off UTC (found 2026-10-17).** drizzle's
+      `date()` turns a JS Date into a local datetime, so on a Pacific machine
+      `new Date("2026-03-31T00:00:00Z")` stored 2026-03-30 (measured). Live
+      and staging run in UTC, so nothing is wrong there today. Check
+      `priceAsOf`, `starterDate`, `quotedOn` the next time each is touched;
+      `wage_rate_sets.dateSet` already writes and reads text (`db.ts`
+      `storedDay`).
 
 ~~**Every bid prices by the old math until these land, and that is enforced in
 one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL.~~ (was) The

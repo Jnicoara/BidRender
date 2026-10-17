@@ -136,3 +136,19 @@ of such a shop stays $1,369.54 (`server/howYouBid.test.ts`, red without the
 rule). The bid's Pricing settings now tags its method "Company standard" or
 "This job only"; changing one bid never changes the company or another bid
 (same test).
+
+## Q9. Should picking a wage set re-price a bid's labor? (money — needs a column)
+
+Built tonight: wage sets in Labor rates › More options, and on a bid the
+set, "Will registered apprentices work this job?", and each classification's
+prevailing cost beside your own rate, with warnings. It does **not**
+re-price: a bid line remembers its labor RATE but not which ROLE it was, so
+there is nothing safe to swap. The bid says "This compares — it does not
+re-price."
+
+1. **Add the role to each new line (A's draft BM-M11), then a Draft gets a
+   button "Use this wage set — labor $X → $Y"** (your Q14 shape). Lines made
+   before the column can't be matched and keep their rate, said on the line.
+2. Keep it a comparison: set each role's rate yourself before adding lines.
+
+— **Suggested: 1.** Until you answer, 2 is what is on track-b.
