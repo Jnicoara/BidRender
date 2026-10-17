@@ -33,6 +33,7 @@ was in tonight.
 | A: Settings › Pricing refetch no longer wipes typing                                                                                          | `0edb23e0` (track-a-night)       | lands next                                                                                                   |
 | A: workflows (smoke-repeat, stress, regression), journey + drills specs — CI only, nothing the app runs                                       | track-a-night                    | lands next                                                                                                   |
 | B: bid methods wiring (`eef749b1` `e65f8e32` `89068f91`) + **Q8** "How do you bid?" (`c6b5feec`)                                              | track-b                          | **only when B writes "ready" with Gate green** — owner Q8: bid methods ship WITH the Q8 guard, never without |
+| **LANDED after the rehearsal (2026-10-17 ~02:15):** the save race (`ad37ca26` `977b4e82`), Settings typing (`0edb23e0`), a new account's racing first requests never refused (`4ddb7f97`), the CI workflows/specs | **local-dev `4ddb7f97`** = the candidate now | yes — no `drizzle/`, no `server/seed/`, so the rehearsal figures stand (P2 unchanged) |
 
 **`drizzle/` (P2):** `git diff 60479773 448d1281 --stat -- drizzle` =
 exactly `0152`–`0165` `.sql`, `meta/0163`–`0165_snapshot.json`,

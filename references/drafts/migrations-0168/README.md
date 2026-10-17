@@ -55,3 +55,22 @@ candidate `448d1281`:** two sends of one 3-mark batch at once → 6 marks
 4. Before live: the 0168 file goes BEFORE the code (step 1). The code reads
    `clientKey` only in a keyed `drop` and the restore path; a live database
    without the column would fail those, so the column must be there first.
+
+## 0169 — B's BM-M11, `bid_line_items.snapshotLaborRateId` (added 2026-10-17)
+
+Track B left it in `track-a-handoff.md` overnight ("Draft for you, BM-M11").
+**Not applied until the owner answers B's morning Q9 (money).**
+
+- `drizzle/0169_bid_line_snapshot_labor_rate_id.sql`, generated and read:
+  `ALTER TABLE bid_line_items ADD snapshotLaborRateId int;` — exactly B's
+  statement. ADDITIVE, step 1, step 3 empty; NULL = not recorded. No FK,
+  on purpose (B: a snapshot keeps the id after the role is deleted).
+- `server/db.ts` `pricingSnapshotOf` copies it — the REQUIRED snapshot-keys
+  type made that a compile error until it did (a copied line keeps its
+  role, so it is re-costed by the same role).
+- Throwaway DB: **170 applied from zero**, re-run nothing, "matches", FKs
+  **210/210**; forkableReferences, backup, starterChange, goldenBids,
+  companyDefaults green on it; dropped. Full suite: Gate on `a-next-batch`
+  `d5d14ad9`.
+- `bm-m11-0169.patch` is the change on top of the 0168 draft (`99e60f55`).
+  Writing the role onto new lines is B's code, after this lands.
