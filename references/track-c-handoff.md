@@ -3,13 +3,21 @@
 ## (newest) 2026-10-16 → 17, night 4 — queue
 
 1. Gate on 7cb6aca9 — **green**; "C ready cd1dde67" in `track-a-handoff.md`.
-2. AI correction logging (before the first outside invite) — in progress.
-3. User levels behind an OFF setting.
-4. Layout audit, non-Plans screens (shots in `references/overnight-shots/`).
-5. Copy accuracy pass.
-6. Break-it loop (Bids, Materials, Assemblies, Settings, Crew, quote-app, print).
-7. Regression re-runs.
-8. todo.md items without A, B or the owner.
+2. AI correction log — **written** on track-c (`server/aiCorrections.ts`).
+   The Settings opt-out needs A's column: SQL draft in
+   `track-a-handoff.md`, code on LOCAL branch `c-ai-log-optout`
+   (`94333e7b`). Symbol picture (client) waits for the Plans screen.
+3. User levels — rule on track-c (`client/src/lib/workLevel.ts`); wiring
+   on LOCAL branch `c-user-levels` (`fecebd3c`, stacked on the opt-out),
+   behind internal `work.levels`, needs A's `users.workLevel` (draft in
+   `track-a-handoff.md`). **When A's 0166/0167 land: merge
+   `c-ai-log-optout` then `c-user-levels` into track-c, drop C's own
+   migration files and journal entries in favour of A's.**
+4. Layout audit — done (Back keeps scroll; Plans list one primary).
+5. Copy pass — done; leftovers in `todo.md` "Copy pass leftovers".
+6. Break-it — 9 wrong-number/state faults fixed, each with a test.
+7. Regression re-runs — 21 suites green.
+8. todo — copy leftovers fixed where C could; the rest need A/owner.
 
 Progress per item: `references/overnight-log.md` § night 4.
 

@@ -6,6 +6,16 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Numbers that looked complete but weren't now say so.** A kit whose
+  assemblies have labor but unpriced material shows "+ N assemblies'
+  material not priced" under its cost; the quote-app panel now counts lines
+  priced from example prices (it always said none); the assembly cost
+  preview includes labor from timed steps instead of showing $0; Supplier
+  pricing dates a new material's price and treats a price set back to $0 as
+  unpriced; the Clients tabs say "50+" while more are still loading; and
+  Crew no longer shows an admin buttons that another admin's account
+  refuses.
+
 - **About 30 labels, warnings and help lines corrected to say what the app
   really does.** For example: "Change my password" now points to Forgot
   password (Account has no password form); the guide says counts and runs
