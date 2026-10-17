@@ -65,6 +65,7 @@ import {
 } from "../../shared/scopePhrases";
 import type { LineScope } from "../../shared/lineScope";
 import * as db from "../db";
+import { ownsPlanKey } from "../planKeys";
 import { deleteBidPdfWithFile } from "../storedFiles";
 
 /**
@@ -152,7 +153,8 @@ function requireR2(what: string) {
  * as an argument, so each one is its own opportunity to name somebody else's.
  */
 function requireOwnKey(storageKey: string, userId: number, bidId: number) {
-  if (!storageKey.startsWith(`bid-plans/${userId}/${bidId}/`)) {
+  // Prefix AND no climbing out of it — see server/planKeys.ts.
+  if (!ownsPlanKey(storageKey, userId, bidId)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "That upload does not belong to this bid.",
@@ -444,13 +446,9 @@ export const bidPdfsRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: check.message });
       }
 
-      const expectedPrefix = `bid-plans/${ctx.scope.dataUserId}/${input.bidId}/`;
-      if (!input.storageKey.startsWith(expectedPrefix)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "That upload does not belong to this bid.",
-        });
-      }
+      // The same check every multipart call makes (requireOwnKey); it was a
+      // second, bare startsWith here until 2026-10-14.
+      requireOwnKey(input.storageKey, ctx.scope.dataUserId, input.bidId);
 
       const sortOrder = await db.nextBidPdfSortOrder(
         input.bidId,

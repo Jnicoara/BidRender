@@ -3,7 +3,8 @@
  * server/speedLimits.test.ts — a screen's reads under 2 s, a save under 1 s —
  * on a company far bigger than the everyday fixture:
  *
- *   60 bids, each with a sheet and 50 counted marks sent to the bid;
+ *   250 bids (`BIG_BIDS`; 60 until 2026-10-16), each with a sheet and 50
+ *   counted marks sent to the bid;
  *   one bid with a 500-sheet plan set and 5,000 marks on ONE sheet;
  *   the full shipped catalog (seeded).
  *
@@ -32,6 +33,13 @@ const run =
 if (run) dropFixtureUsersAfterAll([USER]);
 
 const SCREEN_LIMIT_MS = 2000;
+/**
+ * The Dashboard on its own: under 1 s at 250 bids (todo.md, "Dashboard time
+ * grows with the number of bids"). Raised from 60 bids on 2026-10-16, when the
+ * lists stopped pricing one bid at a time (`db.getRollupLinesForBids`).
+ */
+const BIG_BIDS = 250;
+const DASHBOARD_LIMIT_MS = 1000;
 const SAVE_LIMIT_MS = 1000;
 const RUNS = 3;
 
@@ -68,8 +76,8 @@ describe.skipIf(!run)("speed on big data", () => {
     const journeyman = await rate(c, "Big journeyman", 60);
     const duplex = await duplexAssembly(c, journeyman);
 
-    // 60 bids, 50 marks each, sent.
-    for (let i = 0; i < 60; i++) {
+    // BIG_BIDS bids, 50 marks each, sent.
+    for (let i = 0; i < BIG_BIDS; i++) {
       const { bidId, sheetId } = await bidWithSheet(
         c,
         USER,
@@ -174,9 +182,12 @@ describe.skipIf(!run)("speed on big data", () => {
       console.log(
         `[big] screen ${name}: median ${t.median.toFixed(0)} ms, max ${t.max.toFixed(0)} ms`
       );
-      if (t.median > SCREEN_LIMIT_MS)
-        over.push(`${name} ${t.median.toFixed(0)} ms`);
+      const limit = name === "Dashboard" ? DASHBOARD_LIMIT_MS : SCREEN_LIMIT_MS;
+      if (t.median > limit) over.push(`${name} ${t.median.toFixed(0)} ms`);
     }
+    expect(built.bids, "the Dashboard is measured on the big list").toBe(
+      BIG_BIDS + 1
+    );
     for (const [name, fn] of Object.entries(saves)) {
       const t = await timeIt(fn);
       console.log(

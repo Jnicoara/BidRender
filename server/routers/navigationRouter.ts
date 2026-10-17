@@ -145,6 +145,13 @@ const FALLBACK: NavigationAnswer = {
  * ordinary "I'm not sure" — a missed navigation hint is not worth an error
  * banner, and the sidebar is right there.
  */
+/** How long the "Find it" helper may take, retries included. */
+export const NAVIGATION_TIMEOUT_MS = 15_000;
+
+/** When the model could not be reached or did not answer in time. */
+export const HELPER_DID_NOT_ANSWER =
+  'The helper didn\'t answer just now. Every screen is in the sidebar, and "Where do I…?" finds them without it.';
+
 function fallbackAfter(reason: string, detail?: unknown): NavigationAnswer {
   console.warn(
     `[navigation] helper call failed: ${reason} (model: ${NAVIGATION_MODEL})`,
@@ -171,6 +178,9 @@ export const navigationRouter = router({
           tools: [NAVIGATE_TOOL],
           toolChoice: "auto",
           maxTokens: 200,
+          // A button someone is watching. Without this a hung service held
+          // the answer for 361 s (failure drill, 2026-10-14).
+          timeoutMs: NAVIGATION_TIMEOUT_MS,
         });
       } catch (error) {
         // Running out of today's allowance is not a failure — it has its own
@@ -187,14 +197,16 @@ export const navigationRouter = router({
             target: null,
           };
         }
-        // The rest: a bad model id, a timeout, an overloaded model. These
-        // pass, so the ordinary "not sure" stands; the message carries the
-        // reason for the log. (A missing or refused key no longer lands here
-        // — it is AiUnavailable, above. This said it did until 2026-10-09.)
-        return fallbackAfter(
+        // The rest: a bad model id, a timeout, an overloaded model, a
+        // service that is down. The helper did not answer, so say THAT —
+        // until 2026-10-14 this said "I'm not sure which screen you want",
+        // blaming the question for an outage (failure drill). The reason
+        // goes to the log.
+        fallbackAfter(
           "request rejected",
           error instanceof Error ? error.message : error
         );
+        return { message: HELPER_DID_NOT_ANSWER, target: null };
       }
 
       const choice = result.choices?.[0]?.message;

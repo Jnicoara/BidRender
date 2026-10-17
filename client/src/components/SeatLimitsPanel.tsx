@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseTypedNumber } from "@/lib/inlineEdit";
 import { selectOnFocus } from "@/lib/selectOnFocus";
 import { cn } from "@/lib/utils";
 import { MAX_SEAT_LIMIT } from "@shared/seats";
@@ -46,7 +47,7 @@ function SeatRow({ row }: { row: Row }) {
     onError: error => setRefusal(error.message),
   });
 
-  const parsed = Number(draft);
+  const parsed = parseTypedNumber(draft);
   const valid =
     draft.trim() !== "" &&
     Number.isInteger(parsed) &&

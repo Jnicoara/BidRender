@@ -20,7 +20,7 @@
  * library is hand-curated and stays small.
  */
 import { pointerMovedHighlight } from "@/lib/pointerHighlight";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { InlineNumberField } from "@/components/InlineNumberField";
@@ -72,6 +72,10 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { smartSearch } from "@/lib/smartSearch";
 import { money } from "@/lib/money";
 import { hoursNotSetWords } from "@/lib/notPricedTotal";
+import { errorText } from "@/lib/errorText";
+import { LoadFailed } from "@/components/LoadFailed";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 const round = (value: number, places = 2) => {
   const factor = 10 ** places;
@@ -137,7 +141,7 @@ function KitBuilder({
   const { data: assemblies = [] } = trpc.assemblies.list.useQuery();
   /** An assembly's hours, set from the kit panel (never-stuck gap 6). */
   const setAssemblyHours = trpc.assemblies.update.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.kits.price.invalidate();
       void utils.assemblies.list.invalidate();
@@ -149,10 +153,15 @@ function KitBuilder({
   const [items, setItems] = useState<KitItem[] | null>(null);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  // When the draft was taken from the saved kit, sent with Save so a save
+  // from a stale screen is refused rather than undoing someone else's
+  // (shared/staleEdit.ts).
+  const [openedAt, setOpenedAt] = useState<Date | null>(null);
 
   // Load the saved kit into the draft once, then leave the draft alone.
   const loaded = detailQuery.data;
   if (!isNew && loaded && items === null) {
+    setOpenedAt(loaded.updatedAt);
     setName(loaded.name);
     setDescription(loaded.description ?? "");
     setItems(
@@ -166,6 +175,27 @@ function KitBuilder({
   }
   const draftItems = items ?? [];
 
+  // Unsaved work asks before Back or a nav link throws it away
+  // (@/lib/unsavedGuard), compared as what Save would send.
+  const toSave = (
+    n: string,
+    d: string,
+    list: { assemblyId: number; qty: number | string }[]
+  ) => ({
+    name: n.trim(),
+    description: d.trim() || null,
+    items: list.map(i => [i.assemblyId, Number(i.qty)]),
+  });
+  const savedForm = isNew
+    ? toSave("", "", [])
+    : loaded && items !== null
+      ? toSave(loaded.name, loaded.description ?? "", loaded.items)
+      : null;
+  const leave = useUnsavedGuard(
+    savedForm !== null &&
+      !sameToSave(toSave(name, description, draftItems), savedForm)
+  );
+
   const refresh = useCallback(() => {
     void utils.kits.list.invalidate();
     if (kitId !== null) {
@@ -175,17 +205,22 @@ function KitBuilder({
   }, [utils, kitId]);
 
   const createKit = trpc.kits.create.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
-      toast.success("Kit created");
+      toast.success("Kit created.");
       onBack();
     },
     onSettled: refresh,
   });
 
   const updateKit = trpc.kits.update.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
+      // The cached kit becomes the saved one, so reopening it before the
+      // refetch lands does not carry the old `updatedAt` into the next save
+      // (the stale-save guard would refuse it; shared/staleEdit.ts).
+      if (result?.kit)
+        utils.kits.get.setData({ id: result.kit.id }, result.kit);
       toast.success(
         result?.forked
           ? "Saved as your own copy — the starter is unchanged."
@@ -236,7 +271,12 @@ function KitBuilder({
     setHighlight(0);
   };
 
+  const saving = useRef(false);
   const save = () => {
+    // One save at a time: a double click sent two creates — two kits. A ref,
+    // set in this call; `isPending` is stale for the second click of a
+    // double click (2026-10-15).
+    if (saving.current) return;
     if (!name.trim()) {
       toast.error("Give the kit a name.");
       return;
@@ -250,9 +290,20 @@ function KitBuilder({
       description: description.trim() || null,
       items: draftItems.map(i => ({ assemblyId: i.assemblyId, qty: i.qty })),
     };
-    if (isNew) createKit.mutate(payload);
-    else updateKit.mutate({ id: kitId!, ...payload });
+    saving.current = true;
+    const done = {
+      onSettled: () => {
+        saving.current = false;
+      },
+    };
+    if (isNew) createKit.mutate(payload, done);
+    else
+      updateKit.mutate(
+        { id: kitId!, ...(openedAt ? { openedAt } : {}), ...payload },
+        done
+      );
   };
+  const busy = createKit.isPending || updateKit.isPending;
 
   const isStarter = loaded?.userId === null;
 
@@ -264,7 +315,7 @@ function KitBuilder({
             size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs"
-            onClick={onBack}
+            onClick={() => leave(onBack)}
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Kits
           </Button>
@@ -279,7 +330,12 @@ function KitBuilder({
               </p>
             )}
           </div>
-          <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={save}>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={save}
+            disabled={busy}
+          >
             <Check className="w-3.5 h-3.5" /> Save kit
           </Button>
         </div>
@@ -539,7 +595,12 @@ export default function KitsPage() {
   const [pendingDelete, setPendingDelete] = useState<PendingItem | null>(null);
 
   const utils = trpc.useUtils();
-  const { data: kits = [], isLoading } = trpc.kits.list.useQuery({
+  const {
+    data: kits = [],
+    isLoading,
+    isLoadingError: kitsFailed,
+    refetch: refetchKits,
+  } = trpc.kits.list.useQuery({
     status: view,
   });
   const { data: archivedRows = [] } = trpc.kits.list.useQuery({
@@ -554,7 +615,7 @@ export default function KitsPage() {
   const visibleKits = useMemo(() => filterByScope(kits, scope), [kits, scope]);
 
   const duplicateKit = trpc.kits.duplicate.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: copy => {
       if (!copy) return;
       toast.success(`Created "${copy.name}" — an independent copy.`);
@@ -564,26 +625,26 @@ export default function KitsPage() {
   });
 
   const revertKit = trpc.kits.revert.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Restored the starter kit"),
     onSettled: refresh,
   });
 
   const archiveKit = trpc.kits.archive.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () =>
-      toast.success("Archived — restore it any time from the Archived tab"),
+      toast.success("Archived — restore it any time from Recently deleted."),
     onSettled: refresh,
   });
 
   const restoreKit = trpc.kits.restore.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Back in the working list."),
     onSettled: refresh,
   });
 
   const deleteKitForever = trpc.kits.deleteForever.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => toast.success("Deleted permanently."),
     onSettled: refresh,
   });
@@ -648,6 +709,11 @@ export default function KitsPage() {
           {isLoading ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
               Loading kits…
+            </div>
+          ) : kitsFailed ? (
+            // A list that failed to load is not an empty one (drill, 2026-10-15).
+            <div className="p-4">
+              <LoadFailed what="your kits" onRetry={() => void refetchKits()} />
             </div>
           ) : visibleKits.length === 0 ? (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
@@ -732,7 +798,7 @@ export default function KitsPage() {
                         onClick={() =>
                           setPendingDelete({ id: kit.id, name: kit.name })
                         }
-                        title="Delete permanently — cannot be undone"
+                        title="Delete forever — cannot be undone"
                         aria-label={`Delete ${kit.name} forever`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

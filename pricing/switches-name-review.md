@@ -231,3 +231,12 @@ surface W1 rather than a toggle row, and a plain "switch" must still surface
 the 15A single-pole first. If a recount finds a starter or run type using
 829, 846 or 861 that this review did not list, stop and find out why before
 retiring or moving them.
+
+## Source rule for the new rows (owner, 2026-10-14)
+
+The new rows this review proposed are checked in
+`pricing/new-rows-source-check.md`. **That file, not the "Listing" column
+above, decides each new row's price:** COMMON (found at Home Depot, Platt
+or Stoneway) takes its Example price from those three only; SPECIALTY is
+still added, with the price blank and "Specialty - price from your
+supplier." Listings above from other sites are comparison only.

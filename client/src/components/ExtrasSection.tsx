@@ -33,6 +33,7 @@ import { InlineNumberField } from "@/components/InlineNumberField";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { asPercent, fromPercent } from "@/lib/inlineEdit";
 import type { ResolvedExtra } from "@shared/runExtras";
+import { errorText } from "@/lib/errorText";
 
 /** "10%", in the estimator's words. */
 function pctText(fraction: number) {
@@ -65,7 +66,7 @@ export function ExtrasSection() {
   const [byType, setByType] = useState(false);
 
   const refresh = () => utils.takeoffHeights.extras.invalidate();
-  const onError = (error: { message: string }) => toast.error(error.message);
+  const onError = (error: { message: string }) => toast.error(errorText(error));
   const setExtras = trpc.takeoffHeights.setExtras.useMutation({
     onSuccess: refresh,
     onError,

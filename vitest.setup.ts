@@ -97,6 +97,16 @@ process.env.DISABLE_AI_FEATURES = "false";
 process.env.ANTHROPIC_API_KEY = "";
 
 /**
+ * ── And no test asks Have I Been Pwned ────────────────────────────────────────
+ *
+ * Sign-up, password change and reset check a new password against a breach
+ * list over the network (server/leakedPasswords.ts). A suite must not depend
+ * on a third party being up, nor send it anything, so the check is off here;
+ * `leakedPasswords.test.ts` hands in its own fetch.
+ */
+process.env.LEAKED_PASSWORD_CHECK = "off";
+
+/**
  * ── Which database, checked again in the process that connects ───────────────
  *
  * vitest.globalSetup.ts already refused the run if `DATABASE_URL` is not a

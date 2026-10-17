@@ -41,6 +41,8 @@ const procedure = scoped("bids.view", "bids.edit");
 const libraryEdit = requireCapability("library.edit");
 
 const hoursSchema = z.number().min(0).max(100000);
+/** The most the frozen estimate column holds (decimal(10,2)). */
+const CLOSEOUT_HOURS_MAX = 99_999_999.99;
 
 async function requireBid(bidId: number, userId: number) {
   const bid = await db.getBidById(bidId, userId);
@@ -261,6 +263,14 @@ export const closeoutRouter = router({
         });
       }
 
+      // decimal(10,2). A bid whose estimate is past it cannot be frozen
+      // honestly, so it is refused in words rather than crashing the save
+      // (weird-input sweep, 2026-10-14). Only reachable with absurd lines.
+      if (!(estimate.totalHours <= CLOSEOUT_HOURS_MAX))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `This bid's estimate (${Math.round(estimate.totalHours).toLocaleString("en-US")} hours) is too large to record a close-out against. Check its quantities.`,
+        });
       await db.saveCloseout(input.bidId, ctx.scope.dataUserId, {
         mode: input.mode,
         totalActualHours:

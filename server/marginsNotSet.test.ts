@@ -12,7 +12,8 @@ import { priceBidAtVersion } from "./bidProtection";
 import { mathVersionOf } from "../shared/mathVersion";
 
 const USER = 9926;
-dropFixtureUsersAfterAll([USER]);
+const OTHER = 9927;
+dropFixtureUsersAfterAll([USER, OTHER]);
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe("the rule, with no database", () => {
@@ -22,25 +23,44 @@ describe("the rule, with no database", () => {
     profitSource: "company" as const,
     overheadSource: "company" as const,
   };
+  const never = { profitSetAt: null, overheadSetAt: null };
   it("flags a 0 taken from the company, never one typed on the bid", () => {
-    expect(marginsNotSet(base)).toEqual({ profit: true, overhead: true });
+    expect(marginsNotSet(base, never)).toEqual({
+      profit: true,
+      overhead: true,
+    });
     expect(
-      marginsNotSet({ ...base, profitSource: "bid", overheadSource: "bid" })
+      marginsNotSet(
+        { ...base, profitSource: "bid", overheadSource: "bid" },
+        never
+      )
     ).toEqual({ profit: false, overhead: false });
     expect(
-      marginsNotSet({
-        ...base,
-        profit: { method: "markup", value: 0.15 },
-        overhead: { enabled: true, mode: "percentage", value: 0.1 },
-      })
+      marginsNotSet(
+        {
+          ...base,
+          profit: { method: "markup", value: 0.15 },
+          overhead: { enabled: true, mode: "percentage", value: 0.1 },
+        },
+        never
+      )
     ).toEqual({ profit: false, overhead: false });
     // Overhead switched on at 0 is still nothing added.
     expect(
-      marginsNotSet({
-        ...base,
-        overhead: { enabled: true, mode: "percentage", value: 0 },
-      }).overhead
+      marginsNotSet(
+        { ...base, overhead: { enabled: true, mode: "percentage", value: 0 } },
+        never
+      ).overhead
     ).toBe(true);
+  });
+  it("N5: a 0 the company SAVED in Settings is a decision, never 'not set'", () => {
+    const at = new Date("2026-10-16T12:00:00Z");
+    expect(
+      marginsNotSet(base, { profitSetAt: at, overheadSetAt: null })
+    ).toEqual({ profit: false, overhead: true });
+    expect(
+      marginsNotSet(base, { profitSetAt: null, overheadSetAt: at })
+    ).toEqual({ profit: true, overhead: false });
   });
   it("says which, and says nothing when both are set", () => {
     expect(marginsNotSetSentence({ profit: true, overhead: true })).toMatch(
@@ -96,15 +116,33 @@ describe.skipIf(!hasDb)("on the bid screen (bids.get)", () => {
     });
   });
 
-  it("a 0 typed on the bid itself is a decision, not 'not set'", async () => {
+  it("N5: a company that SAVES 0% in Settings has decided — the label goes (0164)", async () => {
     await c.bids.setPricingDefaults({
       profitValue: 0,
       overheadEnabled: false,
     });
+    const defaults = await c.bids.pricingDefaults();
+    expect(defaults?.profitSetAt).toBeInstanceOf(Date);
+    expect(defaults?.overheadSetAt).toBeInstanceOf(Date);
     const bid = (await c.bids.create({
+      name: "Margins saved at zero",
+      trades: ["electrical"],
+    }))!;
+    expect((await c.bids.get({ id: bid.id })).marginsNotSet).toEqual({
+      profit: false,
+      overhead: false,
+    });
+  });
+
+  it("a 0 typed on the bid itself is a decision, not 'not set'", async () => {
+    // A company that never saved either group (no stamps).
+    await freshUser(OTHER);
+    const o = as(OTHER);
+    const bid = (await o.bids.create({
       name: "Margins typed on the bid",
       trades: ["electrical"],
     }))!;
+    const c = o;
     expect((await c.bids.get({ id: bid.id })).marginsNotSet).toEqual({
       profit: true,
       overhead: true,

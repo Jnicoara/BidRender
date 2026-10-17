@@ -14,6 +14,7 @@
  * prices the bid.
  */
 import { marginToMarkup, markupToMargin } from "@shared/pricing";
+import { parseTypedPercent } from "./inlineEdit";
 
 export type PercentKind = "markup" | "margin";
 
@@ -45,7 +46,9 @@ export function otherPercentCaption(
 ): string | null {
   const text = typed.trim();
   if (text === "") return null;
-  const pct = Number(text);
+  // The same reading the saves use, so the caption never describes a number
+  // that would not save ("0x10") or stays blank for one that would ("15%").
+  const pct = parseTypedPercent(text);
   if (!Number.isFinite(pct) || pct < 0) return null;
   const fraction = pct / 100;
   if (kind === "markup") {

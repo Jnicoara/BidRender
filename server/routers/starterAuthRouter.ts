@@ -135,7 +135,12 @@ export const starterEditorProcedure = publicProcedure.use(
 export const starterAuthRouter = router({
   /** Step one: email and password. Sets a 5-minute "password" stage cookie. */
   signIn: publicProcedure
-    .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
+    .input(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(1).max(1024),
+      })
+    )
     .mutation(async ({ input, ctx }) => {
       keyOrRefuse();
       const email = input.email.trim().toLowerCase();

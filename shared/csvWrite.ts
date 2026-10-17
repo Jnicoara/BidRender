@@ -19,9 +19,31 @@
  * who opened the file in Excel first.
  */
 
+/**
+ * ── A field that starts like a formula is defused ────────────────────────────
+ * Quoting does not stop a spreadsheet from running `"=HYPERLINK(…)"` or
+ * `"@SUM(…)"` as a formula when the file is opened (CSV injection). Client,
+ * material and bid names are free text any member can type, and the person
+ * who opens the export is usually the owner. So a TEXT field starting with
+ * `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`, which
+ * spreadsheets read as "this is text". A real number — `-12.50`, `+3` —
+ * is left alone, because the accounting import needs negative amounts as
+ * numbers. Security sweep, 2026-10-15.
+ */
+const FORMULA_START = /^[=+\-@\t\r]/;
+const PLAIN_NUMBER = /^[+-]?\d[\d,]*(\.\d+)?$/;
+
+/** The text a spreadsheet will show as text, never run. */
+export function defuseFormula(text: string): string {
+  return FORMULA_START.test(text) && !PLAIN_NUMBER.test(text)
+    ? `'${text}`
+    : text;
+}
+
 /** One field, RFC 4180 quoted. A `"` inside becomes `""`. */
 export function csvCell(value: string | number): string {
-  return `"${String(value).replace(/"/g, '""')}"`;
+  const text = typeof value === "number" ? String(value) : defuseFormula(value);
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 /** One record. */

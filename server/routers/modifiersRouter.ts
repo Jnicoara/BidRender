@@ -17,6 +17,7 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { MODIFIER_STATUSES, type Modifier } from "../../drizzle/schema";
 import * as db from "../db";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -99,12 +100,14 @@ export const modifiersRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
+        /** When the editor took its draft (shared/staleEdit.ts). */
+        openedAt: z.date().optional(),
         name: nameSchema.optional(),
         laborAdjustmentPct: pctSchema.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { id, name, laborAdjustmentPct } = input;
+      const { id, openedAt, name, laborAdjustmentPct } = input;
 
       const target = await db.getModifierById(id, ctx.scope.dataUserId);
       if (!target)
@@ -112,6 +115,10 @@ export const modifiersRouter = router({
           code: "NOT_FOUND",
           message: "Modifier not found.",
         });
+      // The row editor saves its whole form, so a save from a screen opened
+      // before somebody else's would put their change back (staleEdit.ts).
+      if (savedSinceOpened(target.updatedAt, openedAt))
+        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline

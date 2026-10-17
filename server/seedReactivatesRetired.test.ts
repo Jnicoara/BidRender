@@ -33,6 +33,7 @@
  * Reproduced 2026-09-29 by starting this file twice at once; a whole run now
  * holds its database (scripts/testSuiteLock.ts) and the second is refused.
  */
+import { typedPrice } from "./typedPriceFixture";
 import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
@@ -193,7 +194,7 @@ describe.skipIf(!hasDb)("a retired name put back in the catalog", () => {
     // The company prices the starter ($12.50) and then archives it. Both land
     // on their own copy; the starter underneath is untouched.
     const forkId = await forkMaterial(shipped.id, USER);
-    await updateMaterial(forkId, USER, { costPerUnit: "12.5000" });
+    await updateMaterial(forkId, USER, { price: typedPrice(12.5, USER) });
     const archivedId = await archiveMaterial(forkId, USER);
     expect(archivedId).toBe(forkId);
 

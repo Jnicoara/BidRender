@@ -147,7 +147,28 @@ describe("retired addresses", () => {
       route: "library-assemblies",
       view: "modifiers",
     });
-    expect(pathToRoute("#/bids").route).toBe("dashboard");
+    expect(pathToRoute("#/projects").route).toBe("dashboard");
+  });
+
+  // The owner put a Bids list and a Plans list back in the nav on
+  // 2026-10-14. Until then /bids was retired to the Dashboard and these
+  // assertions said so; they now pin the opposite, and that /bids is NOT
+  // rewritten — a retired-path entry left behind would silently send the new
+  // nav item to the Dashboard.
+  it("serves the Bids list at /bids and the Plans list at /plans", () => {
+    expect(pathToRoute("#/bids")).toEqual({ route: "bid-list" });
+    expect(pathToRoute("#/plans")).toEqual({ route: "plans-index" });
+    expect(pathToRoute("/bids")).toEqual({ route: "bid-list" });
+    expect(retiredAddress("#/bids")).toBeNull();
+    expect(retiredAddress("#/plans")).toBeNull();
+    expect(routeToPath("bid-list")).toBe("/bids");
+    expect(routeToPath("plans-index")).toBe("/plans");
+  });
+
+  it("serves Recently deleted at /trash, beside the bid archive", () => {
+    expect(pathToRoute("#/trash")).toEqual({ route: "trash" });
+    expect(routeToPath("trash")).toBe("/trash");
+    expect(pathToRoute("#/archive")).toEqual({ route: "bid-archive" });
   });
 
   it("names the canonical address so the URL can be rewritten", () => {
@@ -155,7 +176,7 @@ describe("retired addresses", () => {
     expect(retiredAddress("#/library/kits")).toBe(
       "/library/assemblies?view=kits"
     );
-    expect(retiredAddress("#/bids")).toBe("/dashboard");
+    expect(retiredAddress("#/projects")).toBe("/dashboard");
   });
 
   it("does not mistake a bid for the retired bids list", () => {
@@ -262,7 +283,8 @@ describe("routeToPath", () => {
   });
 
   it("will not build a per-bid address without a bid", () => {
-    expect(routeToPath("bids")).toBe("/dashboard");
+    // A bid with no id is the Bids list (2026-10-14); it was the Dashboard.
+    expect(routeToPath("bids")).toBe("/bids");
     expect(routeToPath("takeoff")).toBe("/dashboard");
     expect(routeToPath("count")).toBe("/dashboard");
   });

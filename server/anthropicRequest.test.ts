@@ -78,6 +78,22 @@ describe("the parameters that were being dropped", () => {
     expect(sent()).not.toHaveProperty("thinking");
   });
 
+  /**
+   * A caller's deadline is the whole wait (2026-10-14 failure drill: the
+   * defaults held "Find it" for 361 s against a hung service). So it goes to
+   * the SDK as the request timeout with NO retries — three tries of it would
+   * be three times the deadline — and without one the SDK keeps its own.
+   */
+  it("passes a caller's deadline as the request timeout, with no retries", async () => {
+    await invokeAnthropic({ ...base, timeoutMs: 15_000 });
+    expect(create.mock.calls.at(-1)![1]).toEqual({
+      timeout: 15_000,
+      maxRetries: 0,
+    });
+    await invokeAnthropic({ ...base });
+    expect(create.mock.calls.at(-1)![1]).toBeUndefined();
+  });
+
   it("puts tool_choice in the request alongside the tools", async () => {
     await invokeAnthropic({
       ...base,

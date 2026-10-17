@@ -49,4 +49,14 @@ describe("a new assembly's hours", () => {
     expect(hoursToSave("1.25")).toBe(1.25);
     expect(hoursOffer("GFCI receptacle", "1.25").canUse).toBe(true);
   });
+
+  it("read the box as a person types it — never a different number", () => {
+    // A stray dollar sign is still the number on screen.
+    expect(hoursToSave(" $2 ")).toBe(2);
+    // Number() made "0x10" 16 hours; it is not a number here, and the page
+    // refuses it before anything is saved.
+    expect(hoursToSave("0x10")).toBeNull();
+    // A European decimal would otherwise become 15.
+    expect(hoursToSave("1,5")).toBeNull();
+  });
 });

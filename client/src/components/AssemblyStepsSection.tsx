@@ -38,6 +38,7 @@ import {
   type DraftStep,
   type LibraryStep,
 } from "@/lib/assemblyStepsDraft";
+import { errorText } from "@/lib/errorText";
 
 export function AssemblyStepsSection({
   steps,
@@ -68,14 +69,14 @@ export function AssemblyStepsSection({
   const [adding, setAdding] = useState<string>("");
   const utils = trpc.useUtils();
   const setMinutes = trpc.laborSteps.setMinutes.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSettled: () => {
       void utils.laborSteps.list.invalidate();
       void utils.assemblies.get.invalidate();
     },
   });
   const acceptAll = trpc.laborSteps.acceptAll.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: ({ accepted }) =>
       toast.success(
         accepted === 1
@@ -249,10 +250,10 @@ export function AssemblyStepsSection({
                       ariaLabel={`Minutes for ${step.name} — shared by ${step.usedBy} assemblies`}
                       className="w-20"
                       onSave={next =>
-                        setMinutes.mutate({ id: step.id, minutes: next })
+                        setMinutes.mutateAsync({ id: step.id, minutes: next })
                       }
                       onClear={() =>
-                        setMinutes.mutate({ id: step.id, minutes: null })
+                        setMinutes.mutateAsync({ id: step.id, minutes: null })
                       }
                     />
                   ) : (

@@ -407,7 +407,33 @@ import wrote), so its resolver is "the row itself", not `materialItemKey`.
 NOT NULL on the new tables' required columns: a row exists only to hold
 these values; there is no "not yet" state (multi-supplier § 6's argument).
 
+> **Queued after PS-M6 (Track C, 2026-10-14): PH-M1, `material_price_history`**
+> (`references/price-history-plan.md` § 6). It points at `price_imports` and
+> records the pack columns, so it comes after these. `priceWrite` and the
+> history's `priceWhy` travel in one argument to `db.updateMaterial`.
+
 ## 7. Build order for C (once A's columns exist)
+
+> **Step 1 BUILT 2026-10-14 (overnight, Track C, on track-c):**
+> `shared/packPricing.ts` (`priceWrite`, round-up, `packPriceShown`) and the
+> door in `server/db.ts` — `updateMaterial` / `createMaterial` take a price
+> only as a `PricedWrite` (`costPerUnit?: never`, so a conditional spread is
+> caught too). Built together with price-history recording (that plan § 8
+> step 1), as § 6's note said they would travel. `server/packPricing.test.ts`
+> shown red on nearest-rounding.
+>
+> **Step 5 BUILT 2026-10-14 (overnight):** the pack pair in the Materials
+> editor (pack size under More options) and on Supplier pricing; the router
+> rules in `materials.update`. **The sanity warning is NOT built** — it is
+> step 3 and waits on the measured T (Q4/Q8, the Platt export).
+>
+> **Step 6 HALF-BUILT, write HELD:** `realPackFromSheet` (shared/packPricing)
+> maps every shipped row's sheet pack to a real pack (`shippedPacks.test.ts`
+> runs it over the whole catalog). Nothing writes `packQty`/`packLabel` to a
+> shipped row, because Track A's rule in `starterPacks.ts` is that no pack
+> reaches a shop until STARTER_PACKS has been through the owner's sheet.
+> When unheld: new rows take it at insert; existing ones through
+> `seedProposal` as an OFFER field (A's door), never the boot.
 
 1. `shared/packPricing.ts` (`priceWrite`, round-up) + the `updateMaterial`
    union; tests red on round-down and on a stale `packPrice`.

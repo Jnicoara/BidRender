@@ -26,6 +26,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import * as db from "../db";
+import { csvCell } from "../../shared/csvWrite";
 import { clientKey, createRateLimiter } from "../rateLimit";
 
 /**
@@ -141,11 +142,11 @@ export const earlyAccessRouter = router({
    */
   exportCsv: adminProcedure.query(async () => {
     const rows = await db.getEarlyAccessSignups(5000);
-    const escape = (value: string) =>
-      // Quote everything and double any inner quotes. An address cannot contain
-      // a comma, but a future column will, and a CSV that breaks on the day a
-      // field gains a comma is a CSV nobody trusts afterwards.
-      `"${value.replace(/"/g, '""')}"`;
+    // The shared writer (quoting AND formula defusing — shared/csvWrite.ts).
+    // This list is typed by strangers on a public form and opened by an
+    // admin, the exact shape of a CSV-injection attack; it had its own copy
+    // of the quoting, without the defusing, until 2026-10-15.
+    const escape = (value: string) => csvCell(value);
 
     const lines = [
       "email,trade,signed_up_at,notified_at",

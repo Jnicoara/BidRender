@@ -34,7 +34,7 @@ export function NavigationHelper({ className }: { className?: string }) {
     onError: () =>
       setAnswer({
         message:
-          "Could not reach the helper just now. The sidebar has everything too.",
+          "Could not reach the helper just now. Everything is in the menu too.",
         target: null,
       }),
   });
@@ -57,7 +57,10 @@ export function NavigationHelper({ className }: { className?: string }) {
             onKeyDown={e => {
               if (e.key === "Enter") submit();
             }}
-            placeholder="Where do I edit labor rates?"
+            // Says what the box is FOR (owner's saved list, 2026-10-14: "AI
+            // help bar wording"). It read "Where do I edit labor rates?",
+            // which looked like a question somebody had already typed.
+            placeholder="Can't find something? Ask where it is — e.g. labor rates"
             aria-label="Ask where to find something"
             className="h-9 pl-9 text-sm"
           />
@@ -72,7 +75,7 @@ export function NavigationHelper({ className }: { className?: string }) {
           {ask.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            "Ask"
+            "Find it"
           )}
         </Button>
       </div>

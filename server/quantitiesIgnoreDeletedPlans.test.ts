@@ -231,7 +231,9 @@ describe("every bid-wide read of marks or runs goes through onLivePlanSheet", ()
     };
     walk(root);
 
-    const pattern = /eq\(\s*takeoff(Stamps|Runs)\.bidId\b/;
+    // `inArray` too, since 2026-10-16: the list reads (`stampCountsForBids`)
+    // filter by many bids, and a search for `eq(` alone would walk past them.
+    const pattern = /(eq|inArray)\(\s*takeoff(Stamps|Runs)\.bidId\b/;
     const found: string[] = [];
     const bare: string[] = [];
     for (const file of files) {
@@ -246,7 +248,15 @@ describe("every bid-wide read of marks or runs goes through onLivePlanSheet", ()
     }
     // Not vacuous: the four reads that exist today are found.
     expect(found.length).toBeGreaterThanOrEqual(4);
-    expect(bare).toEqual([]);
+    // ONE KNOWN GAP, found the day `inArray` was added to the pattern
+    // (2026-10-16): starter offers list the Drafts a re-count would move by
+    // reading their runs with no live-sheet rule, so a run on a deleted plan
+    // set can list a Draft that would not move. Track B's file (todo.md);
+    // when it is fixed this list goes red until the entry is removed.
+    const knownGaps = ["starterOffers.ts"];
+    expect(bare.map(where => path.basename(where.split(":")[0]))).toEqual(
+      knownGaps
+    );
   });
 });
 

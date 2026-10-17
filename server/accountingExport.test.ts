@@ -200,6 +200,19 @@ describe("the file QuickBooks reads", () => {
     expect(accountingFilename(doc)).toBe("BR-501-quickbooks-2026-08-14.csv");
   });
 
+  it("names the file after the LOCAL date, the one the invoice carries", () => {
+    // 8 pm local on the 14th — the 15th in UTC anywhere behind it. Only a
+    // machine behind UTC can show the old fault red (CI runs in UTC).
+    const evening = buildAccountingExport(
+      source({ bidId: 501 }),
+      new Date(2026, 7, 14, 20, 0)
+    );
+    expect(accountingFilename(evening)).toBe(
+      "BR-501-quickbooks-2026-08-14.csv"
+    );
+    expect(formatQuickBooksDate(evening.invoiceDate)).toBe("08/14/2026");
+  });
+
   it("is readable by a strict CSV reader", () => {
     // Round-tripped through this repo's own RFC 4180 parser: if that can read
     // every row into the right number of fields, so can a spreadsheet.

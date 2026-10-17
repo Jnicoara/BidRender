@@ -422,6 +422,12 @@ read by the new shared price resolver. If Track A prefers no FK (as
 `markup_rules.itemKey`, `schema.ts:4167`), the registry does not see it and
 the key rule must be tested directly instead.
 
+> **Price history (Track C, 2026-10-14): `references/price-history-plan.md`.**
+> Every change of a company's price is recorded in `material_price_history`
+> (PH-M1, keyed on `materialItemKey` like `supplier_prices`). When these
+> tables are built, PH-M2 adds `supplierId` there and supplier-list writes
+> record through the same door. `replacedUnitCost` above stays the undo side.
+
 **Not needed:** a compare-supplier column (viewer setting), a flag column for
 the switch (read-time comparison), a per-line "parts off supplier" count
 (read from `snapshotPriceParts`).

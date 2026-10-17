@@ -20,7 +20,11 @@ import {
 } from "../shared/navigationTargets";
 import { appRouter } from "./routers";
 import { AiUnavailable, invokeLLM } from "./llm";
-import { NAVIGATION_MODEL } from "./routers/navigationRouter";
+import {
+  HELPER_DID_NOT_ANSWER,
+  NAVIGATION_MODEL,
+  NAVIGATION_TIMEOUT_MS,
+} from "./routers/navigationRouter";
 import type { TrpcContext } from "./_core/context";
 
 describe("the navigation allowlist", () => {
@@ -183,8 +187,22 @@ describe("when the helper cannot reach a model", () => {
     // included, and pinned "not sure" for it on purpose — which told a user
     // their question was the problem when the server's key was. A missing or
     // refused key is the case below now.
+    //
+    // NARROWED AGAIN 2026-10-14 (failure drill): the same fault for an
+    // outage — a timeout or a service that is down said "I'm not sure which
+    // screen you want" after 361 s. The helper did not answer, so it says
+    // so, calmly, and points at what works without it.
     expect(answer.target).toBeNull();
-    expect(answer.message).toMatch(/not sure/i);
+    expect(answer.message).toBe(HELPER_DID_NOT_ANSWER);
+    expect(answer.message).not.toMatch(/not sure|error|failed/i);
+  });
+
+  it("asks the model with a deadline a person will wait for", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await caller().navigation.ask({ question: "where are labor rates" });
+    const params = vi.mocked(invokeLLM).mock.calls.at(-1)?.[0];
+    expect(params?.timeoutMs).toBe(NAVIGATION_TIMEOUT_MS);
+    expect(NAVIGATION_TIMEOUT_MS).toBeLessThanOrEqual(20_000);
   });
 
   it("a missing or refused KEY says AI is unavailable — never 'not sure which screen'", async () => {

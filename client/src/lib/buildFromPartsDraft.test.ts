@@ -67,6 +67,20 @@ describe("the build-from-parts draft", () => {
     expect(zero.ok && zero.request.baseLaborHours).toBe(0);
   });
 
+  it("reads a typed quantity or hours as meant — never a different number", () => {
+    const draft = addDraftPart(newBuildDraft("box"), box);
+    const withQty = (qty: string) =>
+      buildRequest({ ...draft, parts: [{ ...draft.parts[0], qty }] });
+    // Number() made "0x10" 16 parts; "1,5" is not a number here.
+    expect(withQty("0x10").ok).toBe(false);
+    expect(withQty("1,5").ok).toBe(false);
+    const grouped = withQty("1,200");
+    expect(grouped.ok && grouped.request.parts[0].qty).toBe(1200);
+    expect(buildRequest({ ...draft, hours: "0x10" }).ok).toBe(false);
+    const hours = buildRequest({ ...draft, hours: "1.5" });
+    expect(hours.ok && hours.request.baseLaborHours).toBe(1.5);
+  });
+
   it("sends the untick as it is", () => {
     const draft = {
       ...addDraftPart(newBuildDraft("fan"), box),

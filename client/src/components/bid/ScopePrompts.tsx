@@ -25,6 +25,7 @@ import {
 } from "@shared/lineScope";
 import type { ScopePrompt } from "@shared/scopePrompts";
 import type { FinderLine } from "./ScopeNoteFinder";
+import { errorText } from "@/lib/errorText";
 
 type Match = { prompt: ScopePrompt; lines: FinderLine[] };
 
@@ -130,7 +131,7 @@ function useDismissScopePrompts(bidId: number) {
     onError: (error, _vars, context) => {
       if (context?.previous)
         utils.bids.get.setData({ id: bidId }, context.previous);
-      toast.error(error.message);
+      toast.error(errorText(error));
     },
     onSuccess: (_result, vars) => {
       if (vars.dismissed)

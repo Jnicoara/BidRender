@@ -10,6 +10,9 @@
  * user's own: `update` forks on demand and reports back which happened, so the
  * UI can say "you now have your own copy" without orchestrating it.
  */
+import { priceWrite } from "../../shared/packPricing";
+import { materialItemKey } from "../../shared/materialMarkup";
+import { readPriceHistory } from "../priceHistoryRead";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
@@ -42,6 +45,7 @@ import { STICK_JOINTS } from "../../shared/runFittings";
 import { MAX_LABOR_UNIT_HOURS } from "../../shared/materialLabor";
 import { RENAMED_BASELINE_MATERIALS } from "../../shared/renamedMaterials";
 import { materialFlagsClearedBy } from "../../shared/exampleTags";
+import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
 import {
   parseLaborSheet,
   planAssemblyHoursImport,
@@ -282,7 +286,10 @@ export const materialsRouter = router({
         userId: ctx.scope.dataUserId,
         name: input.name,
         unitOfSale: input.unitOfSale,
-        costPerUnit: toDecimal(input.costPerUnit),
+        price: {
+          write: priceWrite({ typed: "unit", amount: input.costPerUnit }),
+          why: { source: "typed", actorUserId: ctx.scope.actorUserId },
+        },
         // Absent stays NULL: a new material has no labor unit until somebody
         // says so, and NULL is what the flag and the filter look for.
         laborHours:
@@ -311,6 +318,8 @@ export const materialsRouter = router({
     .input(
       z.object({
         id: z.number().int().positive(),
+        /** When the editor took its draft; a stale save is refused (shared/staleEdit.ts). */
+        openedAt: z.date().optional(),
         name: nameSchema.optional(),
         unitOfSale: z.enum(MATERIAL_UNITS_OF_SALE).optional(),
         costPerUnit: costSchema.optional(),
@@ -335,12 +344,27 @@ export const materialsRouter = router({
          * the bid reads as "Not priced" — never as a free bend.
          */
         fieldBendLaborHours: laborUnitSchema.optional(),
+        /**
+         * PRICE BY THE PACK (pricing-safety-plan § 2, step 5). `packPrice`
+         * is a price typed for the whole pack; the server divides it by the
+         * pack size (shared/packPricing.ts, rounded UP). Never sent with
+         * `costPerUnit` — one box was typed, not both.
+         * `packQty` / `packLabel`: the pack, under the editor's More
+         * options. Omitted leaves it; null clears it back to "sold singly".
+         */
+        packPrice: costSchema.optional(),
+        packQty: z.number().positive().max(100000).nullable().optional(),
+        packLabel: z.string().trim().max(32).nullable().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const {
         id,
+        openedAt,
         costPerUnit,
+        packPrice,
+        packQty,
+        packLabel,
         laborHours,
         fieldBendLaborHours,
         stickLengthFeet,
@@ -361,6 +385,59 @@ export const materialsRouter = router({
           code: "NOT_FOUND",
           message: "Material not found.",
         });
+      // The row editor saves its whole form, so a save from a screen opened
+      // before somebody else's would put their change back — a price, too.
+      if (savedSinceOpened(target.updatedAt, openedAt))
+        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
+
+      if (packPrice !== undefined && costPerUnit !== undefined)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Send the price per unit or per pack, not both.",
+        });
+      // The pack this write divides by: the one sent, else the row's.
+      const qtyAfter =
+        packQty !== undefined
+          ? packQty
+          : target.packQty === null
+            ? null
+            : Number(target.packQty);
+      if (packPrice !== undefined && !(qtyAfter && qtyAfter > 0))
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Set the pack size before typing a pack price.",
+        });
+
+      const write =
+        packPrice !== undefined
+          ? priceWrite({ typed: "pack", amount: packPrice, packQty: qtyAfter! })
+          : costPerUnit !== undefined &&
+              // The same per-unit price sent back (an editor saving a row it
+              // did not reprice) is not a price edit: it must not wipe a
+              // typed pack price with it.
+              !(
+                target.packPrice !== null &&
+                Number(target.costPerUnit) === Number(costPerUnit)
+              )
+            ? priceWrite({ typed: "unit", amount: costPerUnit })
+            : packQty !== undefined &&
+                packQty !== null &&
+                target.packPrice !== null &&
+                Number(target.packQty) !== packQty
+              ? // A new pack size under a typed pack price keeps the pack
+                // price (it is what was typed) and divides again (§ 2.2).
+                priceWrite({
+                  typed: "pack",
+                  amount: Number(target.packPrice),
+                  packQty,
+                })
+              : packQty === null && target.packPrice !== null
+                ? // No pack any more: the per-unit price stands, typed per unit.
+                  priceWrite({
+                    typed: "unit",
+                    amount: Number(target.costPerUnit),
+                  })
+                : null;
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline
@@ -369,8 +446,22 @@ export const materialsRouter = router({
 
       await db.updateMaterial(editableId, ctx.scope.dataUserId, {
         ...rest,
-        ...(costPerUnit !== undefined
-          ? { costPerUnit: toDecimal(costPerUnit), priceUpdatedAt: new Date() }
+        ...(packQty !== undefined
+          ? { packQty: packQty === null ? null : packQty.toFixed(4) }
+          : {}),
+        ...(packLabel !== undefined ? { packLabel: packLabel || null } : {}),
+        // Through the price door (db.updateMaterial): the stored pair, the
+        // `priceUpdatedAt` stamp and the history row, in one transaction.
+        ...(write
+          ? {
+              price: {
+                write,
+                why: {
+                  source: "typed" as const,
+                  actorUserId: ctx.scope.actorUserId,
+                },
+              },
+            }
           : {}),
         /*
           "Example price" / "Example hours" CLEAR when the shop edits that
@@ -379,8 +470,7 @@ export const materialsRouter = router({
           form does not send leaves its flag alone (shared/exampleTags.ts).
         */
         ...materialFlagsClearedBy(target, {
-          costPerUnit:
-            costPerUnit === undefined ? undefined : toDecimal(costPerUnit),
+          costPerUnit: write ? write.costPerUnit : undefined,
           laborHours:
             laborHours === undefined
               ? undefined
@@ -470,7 +560,11 @@ export const materialsRouter = router({
         });
       }
 
-      await db.revertMaterialToBaseline(input.id, ctx.scope.dataUserId);
+      await db.revertMaterialToBaseline(
+        input.id,
+        ctx.scope.dataUserId,
+        ctx.scope.actorUserId
+      );
       return db.getMaterialById(input.id, ctx.scope.dataUserId);
     }),
 
@@ -505,6 +599,34 @@ export const materialsRouter = router({
         ctx.scope.dataUserId
       );
       return { id: archivedId, alreadyArchived: false };
+    }),
+
+  /**
+   * PRICE HISTORY (references/price-history-plan.md § 8 step 2): every
+   * recorded change of this item's price, newest first, 50 a page, plus
+   * BidRidge's example-price changes while the shop used the shipped price.
+   * View-only; anyone who can see Materials can see it (owner Q6).
+   */
+  priceHistory: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        cursor: z.string().max(80).nullish(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const target = await db.getMaterialById(input.id, ctx.scope.dataUserId);
+      if (!target)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Material not found.",
+        });
+      return readPriceHistory({
+        userId: ctx.scope.dataUserId,
+        materialKey: materialItemKey(target),
+        shippedId: target.userId === null ? target.id : target.baselineId,
+        cursor: input.cursor,
+      });
     }),
 
   /** Put an archived material back on the working list. */
@@ -606,6 +728,15 @@ export const materialsRouter = router({
       const renamed: Array<{ from: string; to: string }> = [];
       const stamped = new Date();
 
+      // Pass 1 — which material each row names. No writes yet.
+      const byTarget = new Map<
+        number,
+        {
+          target: (typeof existing)[number];
+          prices: Set<number>;
+          last: number;
+        }
+      >();
       for (const row of input.rows) {
         // A name the company actually has wins outright — including an OLD
         // name on a copy they forked before the rename, which is theirs and
@@ -622,20 +753,45 @@ export const materialsRouter = router({
           unmatched.push(row.name);
           continue;
         }
+        const entry = byTarget.get(target.id) ?? {
+          target,
+          prices: new Set<number>(),
+          last: row.costPerUnit,
+        };
+        entry.prices.add(row.costPerUnit);
+        entry.last = row.costPerUnit;
+        byTarget.set(target.id, entry);
+      }
+
+      // Pass 2 — one write per material. A material the sheet names at two
+      // DIFFERENT prices is REFUSED: its stored price is left exactly as it
+      // was and it is listed with both prices, because picking one would be a
+      // guessed price (owner, 2026-10-16, Q-IMP1 in
+      // pricing/morning-questions.md). Until then the last row won and was
+      // reported; before 2026-10-15 it won silently. The same price twice is
+      // just that price.
+      const refused: Array<{ name: string; prices: number[] }> = [];
+      for (const { target, prices, last } of Array.from(byTarget.values())) {
+        if (prices.size > 1) {
+          refused.push({
+            name: target.name,
+            prices: Array.from(prices).sort((a, b) => a - b),
+          });
+          continue;
+        }
+        const costPerUnit = last;
         const editableId =
           target.userId === null
             ? await db.forkMaterial(target.id, ctx.scope.dataUserId)
             : target.id;
-        // The next row naming the same material — two old spellings of one
-        // row, say — must write the fork, not fork the shipped row again.
-        byName.set(key(target.name), {
-          ...target,
-          id: editableId,
-          userId: ctx.scope.dataUserId,
-        });
 
         await db.updateMaterial(editableId, ctx.scope.dataUserId, {
-          costPerUnit: toDecimal(row.costPerUnit),
+          price: {
+            write: priceWrite({ typed: "unit", amount: costPerUnit }),
+            // No import log row yet (PS-M5's preview/undo is step 4), so
+            // importId stays NULL; the history still says "imported".
+            why: { source: "imported", actorUserId: ctx.scope.actorUserId },
+          },
           supplierName: input.supplierName,
           priceUpdatedAt: stamped,
           // A supplier's price is the shop's own — never "Example price".
@@ -644,7 +800,7 @@ export const materialsRouter = router({
         priced.push(target.name);
       }
 
-      return { priced, unmatched, renamed };
+      return { priced, unmatched, renamed, refused };
     }),
 
   /**

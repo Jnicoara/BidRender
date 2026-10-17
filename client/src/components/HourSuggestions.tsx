@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Lightbulb, X } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
+import { errorText } from "@/lib/errorText";
 
 export function HourSuggestions() {
   const utils = trpc.useUtils();
@@ -31,7 +32,7 @@ export function HourSuggestions() {
   const { data: suggestions = [] } = trpc.closeout.suggestions.useQuery();
 
   const respond = trpc.closeout.respond.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSuccess: (_r, vars) => {
       void utils.closeout.suggestions.invalidate();
       void utils.assemblies.list.invalidate();

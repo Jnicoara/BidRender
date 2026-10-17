@@ -213,6 +213,10 @@ const REGISTRY: Record<string, Entry> = {
     since: "2026-09-21",
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
+  "wage_rate_set_rates.laborRateId": {
+    kind: "exempt",
+    why: "Migration 0165 (B's BM-M7, bid-methods-plan.md § 9), 2026-10-16: nothing reads or writes it yet. The 'unused wage-set role' test below goes red the day server code queries it; then a classification row tied to a SHIPPED role must reach the shop's fork through resolveLaborRate (as assemblies.laborRateId does) — a role the shop edited would otherwise price from the shipped row — and this entry becomes a resolver.",
+  },
   "takeoff_run_type_extras.runTypeId": {
     kind: "exempt",
     why: "Ownership (0135), like assembly_materials.assemblyId: forkRunType copies a shipped type's extras onto the fork, so an extra already points at the type it belongs to.",
@@ -497,6 +501,33 @@ describe("every stored id into a forkable row is accounted for", () => {
         else if (/\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) {
           if (
             fs.readFileSync(full, "utf8").includes("takeoffGroups.laborRateId")
+          )
+            readers.push(path.relative(root, full));
+        }
+      }
+    };
+    walk(root);
+    expect(readers).toEqual([]);
+  });
+
+  it("unused wage-set role: nothing on the server reads wage_rate_set_rates.laborRateId", () => {
+    /*
+      Same shape as the group labor rate above: its entry is `exempt` because
+      nothing reads it (0165, before Track B wires prevailing wage). The day a
+      server file names the column accessor, this goes red and the entry must
+      become a resolver through resolveLaborRate, or say why not.
+    */
+    const root = path.resolve(__dirname);
+    const readers: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) {
+          if (
+            fs
+              .readFileSync(full, "utf8")
+              .includes("wageRateSetRates.laborRateId")
           )
             readers.push(path.relative(root, full));
         }

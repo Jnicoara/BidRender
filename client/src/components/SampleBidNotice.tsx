@@ -19,13 +19,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FlaskConical, Trash2 } from "lucide-react";
 import { SAMPLE_NOTICE } from "@shared/sampleProject";
+import { errorText } from "@/lib/errorText";
 
 export function SampleBidNotice({ bidId }: { bidId: number }) {
   const utils = trpc.useUtils();
   const [busy, setBusy] = useState(false);
 
   const remove = trpc.sample.remove.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSuccess: () => {
       void utils.invalidate();
       toast.success("Sample removed. Nothing of yours was touched.");

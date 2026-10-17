@@ -62,6 +62,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { errorText } from "@/lib/errorText";
 
 /** A per-bid text field for the proposal: client, site address, opening note. */
 function BidField({
@@ -143,6 +144,15 @@ function BidField({
   );
 }
 
+/** This browser's IANA zone, or undefined where Intl cannot say. */
+const BROWSER_TIME_ZONE: string | undefined = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+})();
+
 export default function ProposalPage({
   bidId,
   onBack,
@@ -166,7 +176,10 @@ export default function ProposalPage({
    */
   const [mode, setMode] = useState<"full" | "scope-only">("full");
   const { data, isLoading, error } = trpc.proposals.document.useQuery(
-    { bidId, mode },
+    // The browser's time zone, so the quote is dated by the reader's
+    // calendar, not the server's (UTC on live — dated tomorrow every
+    // American evening, 2026-10-15).
+    { bidId, mode, timeZone: BROWSER_TIME_ZONE },
     // A refusal (an incomplete bid) will refuse again; retrying only delays
     // the sentence that says why.
     { retry: false }
@@ -189,7 +202,7 @@ export default function ProposalPage({
   });
 
   const updateBid = trpc.bids.update.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
     onSettled: () => {
       void utils.proposals.document.invalidate({ bidId });
       void utils.bids.get.invalidate({ id: bidId });
@@ -339,7 +352,7 @@ export default function ProposalPage({
           <p className="text-xs text-muted-foreground">
             {mode === "scope-only"
               ? "Scope only — no prices anywhere on this version"
-              : `${lineCount} line${lineCount === 1 ? "" : "s"} · priced from the snapshot taken when each was added`}
+              : `${lineCount} line${lineCount === 1 ? "" : "s"} · each priced as it was when you added it`}
           </p>
         </div>
 
@@ -493,7 +506,7 @@ export default function ProposalPage({
               hint={
                 client
                   ? bid.clientName
-                    ? `Overrides ${client.name}, the attached client. Clear this to use the record.`
+                    ? `Overrides ${client.name}, the attached client. Clear this to use the client's saved details.`
                     : `Filled from ${client.name}, the attached client. Type here only to address this one proposal differently.`
                   : undefined
               }

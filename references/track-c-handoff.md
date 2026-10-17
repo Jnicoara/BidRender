@@ -23,6 +23,850 @@ create and drop yourself are exempt. (Prompted by a false alarm: on
 it was a release step never run there. The rule stands anyway: the cost of
 saying it is one line.)
 
+## (newest) 2026-10-16, day — waiting for B on local-dev
+
+- B's work (track-b) was NOT on local-dev at 09:50; watched every 15 min.
+  When it lands with smoke green: merge local-dev into track-c, fix
+  conflicts (likely `server/db.ts` near `bidDropsNotPriced`, CHANGELOG
+  `## [2026-10-16]`, todo), Gate green, give the owner the `!` push line.
+- Shipped on track-c meanwhile: "Discard your changes?" guard on every
+  library editor + Clients (`lib/unsavedGuard.ts`, `hooks/useUnsavedGuard`,
+  one dialog in the shell); dashboard drops check reads company heights
+  once per list (`companyHeights` in db.ts).
+
+## 2026-10-15 → 16, night 3 — see `references/overnight-log.md` § night 3
+
+- Merged local-dev (A's Gate fix) into track-c; signup keeps both the
+  sign-up limits (C) and the invite gate (A).
+- **Wrong number fixed:** assembly / kit quantity boxes stored 2.25 as 225
+  when typed. Q-QTY1 at the top of `pricing/morning-questions.md` asks
+  for a read-only live list of suspicious saved quantities.
+- Number-box sweep finished outside B's files. **FOR TRACK B:** the run-type
+  editor's extra % / makeup boxes (`RunTypePicker.tsx` `ExtraDraftField`)
+  have the same dropped-dot fault (2.5 → 25) — Q-QTY3; list in `todo.md`
+  under the `parseTypedNumber` item.
+- **Golden measurements** (`server/goldenMeasurements.test.ts`,
+  `references/golden-measurements.md`): 13 drawings, 0.01 in tolerance,
+  proven red with a 0.5 % scale error; the app measures right everywhere,
+  on screen too (mouse/touch, 0/90/270°, fit/zoomed).
+- **Break-it, widest wrong number:** Settings › Pricing saved "15%" or an
+  emptied box as a 0% COMPANY profit/overhead/productivity (fixed; Q-DEF1
+  asks for a read-only live check).
+- Break-it: a blank tax-rate part saved as 0 % (fixed, Q-TAX1); two
+  people saving one library item silently undid each other — now refused
+  in words in all five editors (`shared/staleEdit.ts`, `openedAt` on each
+  update; a slow-connection self-refusal I introduced was measured and
+  fixed). Job close-out recorded blanks as 0 h (Q-CLOSE1); a blank expense
+  amount added $0; an emptied "Price good for" saved 0 days; an archived
+  condition / removed role sat on assemblies unseen (Q-MOD1). Money
+  cross-check after all of it: 155 bids, 0 disagreements. **Gate:** first
+  real CI run after the merge — 4 red, all tests that had never run in CI
+  (A's new public routes; no file store in CI) — fixed; green since.
+- Later: a second local-dev merge (A's bcrypt worker pool, speed limits,
+  golden bids) — C's auth tests now mock `./passwordHashing`; a dead bid
+  link answers in 1 s, not 8 (`lib/queryRetry.ts`); hour suggestions no
+  longer learn from 0-hour close-out lines; the Clients editor has the
+  stale-save guard too; price-list import reports a material named at two
+  prices (Q-IMP1). Local smoke on the merged build: 140 passed.
+- After 03:00: **company B saw company A's bid list** after A signed out
+  on the same tab (cache kept across sign-out) — fixed, `lib/accountCache.ts`
+  (Q-LEAK1 for A's security list); the quote was dated in UTC (tomorrow
+  every American evening) — fixed; the QuickBooks file name likewise;
+  self-saving percent boxes take "7%".
+- **FOR TRACK B (all in `todo.md` under the `parseTypedNumber` item):**
+  RunTypePicker extra %/makeup (2.5 → 25, Q-QTY3); the Plans screen for a
+  missing bid says "could not load" instead of "could not be opened";
+  smoke flow 3 is intermittent locally (capture warning "also matches CI
+  DUPLEX"), shown not caused by C's change.
+
+## 2026-10-15, day — answers, before/after screenshots, two todo items
+
+- `references/morning-answers-c.md` (18 one-liners); screenshots in
+  `references/overnight-shots/before-after/` (README lists every pair).
+- todo done: number boxes read like every other (Assemblies, Modifiers,
+  Materials, Fix this line); optimistic forms keep a refused edit. Left of
+  the sweep: SeatLimitsPanel (admin) and B's plan-screen components.
+- **Gate is red from `docker pull mysql` being rate-limited** — before any
+  test runs. Re-run it once A's fix lands.
+
+## 2026-10-14 → 15, overnight run #2 — see `references/overnight-log.md`
+
+**Item 1 — security sweep: `references/security-sweep.md`.** 21 findings,
+13 fixed on track-c (not merged). The attacker test
+(`server/crossCompanyAttack.test.ts` + `server/attack/`) runs every route
+as a stranger, a viewer, an estimator and signed-out in ~90 s; every new
+route is attacked automatically.
+
+- **FOR TRACK A (parked, each needs a live look / R2 / changes live
+  behaviour):** A-S9b session cookie `SameSite=None` → `Lax`
+  (`_core/cookies.ts`; the CSRF guard already closes the form-POST hole);
+  A-S12 `clientKey` trusts the FIRST X-Forwarded-For entry — per-sender
+  limits are dodgeable until it reads what DO/Cloudflare actually append;
+  A-S13 signed upload URLs don't bind Content-Length and tickets are
+  unlimited (storage abuse); A-S14 the signup race (yours already).
+- **FOR TRACK A (stress, 2026-10-15) — Q-AUTH1:** 11 sign-ins at once
+  stall every other request ~0.7 s (`bcryptjs` on the main thread).
+  Worker pool or native `bcrypt`; no stored hash changes.
+- **FOR TRACK A (drill, 2026-10-15) — Q-DB1:** a database that stops
+  answering can wedge the server until restart: stuck pooled connections
+  are never thrown away (mysql2's `timeout` returns them out of step), and
+  `/api/version` still says 200. Fix + check App Platform's health check.
+  `references/stress-results.md` "Third round"; `todo.md`.
+- **New guards other tracks will meet:** `server/libraryRefs.ts`
+  (`requireLibraryRefs`) — any route storing a material / assembly /
+  labor rate / modifier / work step / kit id must call it;
+  `server/csrfGuard.ts` — a non-JSON POST to `/api/trpc` is refused (our
+  client and scripts all send JSON); `proposals` writes need
+  `settings.edit`; legacy `masterAssemblies` item db functions take the
+  owner.
+- **For Track B:** `BidRenderShell.tsx` changed — `NavBtn` / `NavSection`
+  moved to module level (they were rebuilt on every render and ate the
+  first tap). `client/src/lib/shellNavStable.test.ts` now fails on ANY
+  component declared inside another in client/src.
+
+**Items 4–6 (the endless part) — what other tracks will meet.**
+Numbers and drills: `references/stress-results.md`; every change in
+`references/overnight-log.md` with BEFORE → AFTER.
+
+- **A valid session the database can't load is SERVICE_UNAVAILABLE, not
+  signed out** (`server/_core/context.ts` `sessionUnavailable`; `auth.me`
+  and both "must be signed in" checks). The client shows "Can't reach
+  BidRidge right now" (`AuthGuard`). A failed list says so
+  (`components/LoadFailed.tsx`) instead of "No bids yet" / "Nothing here".
+- **Signed out mid-edit** keeps the address and says why on the sign-in
+  form (`lib/sessionExpiry.ts`, `main.tsx`).
+- **`InvokeParams.timeoutMs`** (AI): honoured by the Anthropic adapter
+  (timeout, no retries) and the gateway (one AbortSignal). "Find it" uses
+  15 s. **The plan reader has none yet — Q-AI1.**
+- **`shared/csvWrite.ts` `defuseFormula`** — every CSV cell; the
+  early-access export now uses the shared writer.
+- **`parseTypedNumber`** (`lib/inlineEdit.ts`) in every self-saving number
+  box and the Materials editor; other Save forms listed in todo.md.
+- **Races:** a lost `sendToBid` answers CONFLICT; markup override falls
+  back to update; `saveCloseout` takes a bid row lock (`inOneTransaction`).
+  `db.isDuplicateKey` is exported. `server/weirdInputs.test.ts` (edges +
+  twice-at-once over every route) and `server/sendRace.test.ts` guard them.
+- **Dashboard drops check** skips bids with no drop kind (`bidsWithADropKind`):
+  2.4 s → 0.4 s under load.
+- **Pages load on demand** (`BidRenderShell`: every page is `lazy(reloadingImport(...))`; `lib/lazyPage.ts`). **For Track B:** TakeoffPage is now a lazy import in the shell — a merge touching those imports keeps the pattern. 834 → 217 KB before the Dashboard shows.
+- **Sidebar**: one scroll area (the menu vanished on a sideways phone).
+- **Pages are `preloadable`, not `lazy`** (`lib/preloadable.ts`, 2026-10-15).
+  React 19 holds a Suspense reveal ~300 ms; the loader shows its own
+  fallback and swaps the page in with plain state, so the Dashboard shows
+  at ~400 ms instead of ~890. **For Track B:** a new page in the shell is
+  `preloadable(loadX, PageLoading)` and its loader goes in `PAGE_LOADERS`.
+- **A screen that failed to load must say so — never draw from defaults.**
+  Database-down drill (2026-10-15): 16 screens said "No roles yet", sales
+  tax OFF, "0 lines", a bid "may have been deleted", or went blank. Each
+  now shows `LoadFailed`; a section that did `if (!data) return null`
+  returns `LoadFailed` when the query `isError`. App-wide net:
+  `lib/dataReach.ts` + `DataUnreachableBar` (top of the screen, clears
+  itself). **For Track B:** the Plans screen (TakeoffPage) was NOT drilled
+  — it is yours; `isReachFailure(error)` tells "out of reach" from "gone".
+- **`InlineNumberField` shows "saved" only for a save that landed**
+  (2026-10-15). Return the save's promise from `onSave`/`onClear`
+  (`mutateAsync`): the green tick waits for it, and a refused save turns
+  the field red with the typed value kept (Enter retries, Esc reverts).
+  A caller returning nothing still flashes at once — the old fault. **For
+  Track B:** the call sites in `components/takeoff/` (CountLaborNote,
+  HomerunControls, RunsPanel) are untouched; returning `mutateAsync`
+  there gives the Plans screen the same honesty. Also: a page or list
+  keeps its data when a background REFRESH fails — use `isLoadingError`
+  (nothing to show) rather than `isError` for "Couldn't load".
+- **A bid in Recently deleted says so** on the bid page and Count
+  (`components/bid/ArchivedBidNotice.tsx`: deletion date + Restore). The
+  server still accepts edits to an archived bid (`todo.md`). **For Track
+  B:** the Plans screen does not show it — `<ArchivedBidNotice bidId
+archivedAt />` drops in anywhere the bid is loaded.
+- **Validation refusals now read as sentences** (`lib/errorText.ts`,
+  2026-10-15): a zod "too_big"/"too_small" on a string or number becomes
+  "The name is too long — 255 characters at most" and the like, from the
+  issue's path and limit. Anything else keeps the general line. Every
+  `toast.error(errorText(e))` on every track gets it with no change.
+- **Finished mutations are let go at once** (`main.tsx`, mutations
+  `gcTime: 0`, 2026-10-15). Their callbacks closed over the Plans screen's
+  canvas ref and kept the whole drawing alive 5 minutes per visit (+14,590
+  nodes each). **For Track B:** nothing to change in TakeoffPage; but a
+  future `useMutationState` / `useIsMutating` would see no FINISHED
+  mutations — pending ones are unaffected. `references/stress-results.md`
+  "Memory".
+- **Offline is handled, not mistaken for a deploy** (2026-10-15).
+  `reloadingImport` no longer reloads while `navigator.onLine` is false:
+  it waits for `online`, then for held saves (`whenNoPendingWrites`), then
+  reloads once. The top bar says "You're offline". `vite:preloadError`
+  is ignored offline. Anything new that reloads the tab should wait on
+  `whenNoPendingWrites()` the same way.
+- **"Where do I…?" forgives a one-letter typo** (`searchHelp`, exact hits
+  still first).
+
+**FOR TRACK B — smoke flow 3 fails locally, not from tonight's changes.**
+**Update 2026-10-15 03:16: it PASSED in a full desktop run (46/46).** The
+look-alike prompt depends on what the account has already captured, so
+leftover captures from earlier runs are the likely difference — not
+confirmed. If it fails again, look at the account's captured symbols first.
+
+Run locally against `bidrender_local_c` (desktop): capturing "CI SWITCH"
+raises the look-alike check — "This look also matches 4 places a look of CI
+DUPLEX also finds on this sheet. Add it anyway?" — and the test does not
+expect it, so it waits for "CI SWITCH" and fails. Deterministic (2 of 2).
+Re-run with `takeoffStampsRouter.ts` put back to tonight's starting
+commit (13c4bcc2): same failure, so not C's `captureSymbol` change.
+Screenshot: `references/overnight-shots/smoke-flow3-lookalike-local.png`.
+Either the fixture's switch and duplex look alike to the matcher at local
+rendering, or the step should answer "Save anyway". Everything else in the
+smoke suite passed locally (127). With a local-only patch answering "Save anyway", flows 1–15 all pass.
+
+**FOR TRACK B (from the stress run):** the 500-sheet set opens its first
+sheet in ~3.0 s and sheet 400 in ~2.5 s at laptop size ON THE DEV SERVER.
+**On the production build (2026-10-15) it is 1.9 s at laptop and phone, next
+sheet 0.8–1.0 s — just under the 2 s budget, ~100 ms to spare.** Range loading is fine (7.2 MB / 2.1 MB); the time is the
+viewer's open + render. Numbers and method: `references/stress-results.md`. A sheet with 2,000 marks on it draws in 2.0–2.3 s on the dev server — but **0.9–1.1 s on the production build** (re-measured 2026-10-15), so nothing to chase.
+Also: a plan whose file is missing says "could not be opened … (404)" —
+honest, but it could say what to do ("upload it again"). A CORRUPT file
+says "InvalidPDFException: Invalid PDF structure." — pdf.js's words; "This
+file isn't a readable PDF — delete it and upload it again" would serve a
+contractor (screenshot: `overnight-shots/drill-storage-corrupt-15s.png`).
+
+**Item 3 — guide mode: `references/guide-mode.md` (G1–G8).** A one-tip
+strip at the bottom of the main column (`GuideStrip`, mounted in
+`BidRenderShell`) + a local "Where do I…?" (`HelpSearch`). **For Track B:**
+on the Plans screen the strip steps aside while a `PlanTips` card is on
+screen, detected by its **"No more tips"** button text — rename that button
+and update `planTipOnScreen()` in `GuideStrip.tsx` in the same commit.
+`e2e/smoke/guide.spec.ts` goes red if they drift. No TakeoffPage change.
+**`device:audit` now refuses to report when not signed in** (it had
+silently measured the landing page when the server's JWT_SECRET differed).
+
+**Item 2 — e2e + screenshots.** `e2e/smoke/newScreens.spec.ts` (29 pass
+at laptop, iPad both ways, phone 375 — new `phone-375` project in
+`e2e/playwright.config.ts`). Shots: `references/overnight-shots/`. Local
+smoke account on `bidrender_local_c`: smoke-c@example.com (in the
+git-ignored `.env.test.local`), plus estimator-c@example.com as its
+estimator.
+
+## (newest) 2026-10-14, overnight run — see `references/overnight-log.md`
+
+The owner's overnight queue (11 items) is worked in order; each item's
+commit, tests and Gate result are one line in `references/overnight-log.md`.
+Questions that need the owner are in `pricing/morning-questions.md`.
+
+**Item 1 — Fasteners & Anchors: Q1–Q14 all YES as suggested**
+(`pricing/fasteners-anchors-name-review.md` "Owner's answers"), nothing
+applied: the ten renames, Q7 retires `Plastic conduit clip`, Q13 pack
+fixes, and **M1 powder load, M2/M3 3/4" and 1" conduit hangers accepted**
+(COMMON; `new-rows-source-check.md` marks them accepted — still 64
+families, 62 COMMON, 2 SPECIALTY). No starter edit.
+
+**Item 2 — the last three shelves reviewed (read-only, source rule, nothing
+applied), from the owner's live workbook copy** (`C:\dev\BidPhase\pricing`,
+saved 19:29 on 2026-10-14; it already carries the owner's own pack fixes on
+rows 1598, 1602, 1666, 1688, 1693, 1719). All 138 names match
+`BASELINE_MATERIALS` one for one. **The sheet ends at row 1719: every shelf
+now has a review.**
+
+- `pricing/equipment-appliances-name-review.md` — rows 1582–1646, 65 rows:
+  30 OK, 28 need words, 7 owner picks; 39 rows used. **Q1 is a STARTER EDIT
+  (PG19: the generator battery charger line → M1 battery)**; Q11 changes
+  what CW2's pedestal line counts. 26 questions; M1–M4 proposed.
+- `pricing/distribution-equipment-name-review.md` — rows 1647–1691, 45 rows:
+  6 OK, 27 need words, 12 owner picks; 14 rows used by 10 starters. **Q15 is
+  a STARTER EDIT (DV32 loses its separate duplex: the prewired poke-through
+  includes it)**; Q1/Q12/Q13/Q16 make built-to-order gear SPECIALTY (price
+  blank). 19 questions; M1–M5 proposed (M5 conditional).
+- `pricing/consumables-name-review.md` — rows 1692–1719, 28 rows: 5 OK, 20
+  need words, 3 owner picks; 7 rows used. No starter edit. 18 questions;
+  M1–M2 proposed.
+- The 11 proposed rows are in `new-rows-source-check.md` as "waits for".
+
+**Item 3 — `pricing/morning-questions.md`**: the 63 open questions, ⚠ ones
+first (two starter edits: Equipment Q1 → PG19, Distribution Q15 → DV32).
+Later items append anything they park under "From the overnight build work".
+
+**Item 4 — merged `origin/local-dev` as `0c8e324f`** (A's 0157–0163,
+B's plan-reading help 1–5b and phone bottom bar). Conflict only in this
+file, both sides kept. **C's databases are at 164**: `bidrender_test_c`
+matches the schema, 205/205 FKs; `bidrender_local_c` migrated the same
+(still C's scratch copy, not exact — see below).
+
+**Item 5 — layout, built on track-c (NOT merged; nothing changes a bid
+number; no migration).** BEFORE → AFTER rows in `overnight-log.md`.
+
+- **Nav** (`BidRenderShell.tsx`, `appRoutes.ts`): Work = Dashboard, **Bids**
+  (`/bids`, new `BidListPage` — the Dashboard's `BidSearchPanel` full page),
+  **Plans** (`/plans`, new `PlansIndexPage` — every bid with drawings +
+  Upload a plan), Clients; Library = Materials, Assemblies; bottom =
+  Performance, Labor rates, **Recently deleted**, Settings, Crew, Admin.
+  Phone bar: Dashboard, Bids, Plans, Materials, **More** (popover).
+  `/bids` left `RETIRED_PATHS`; CLAUDE.md § Architecture, todo.md and
+  track-b-beta-plan.md record the override. `useStartBid` hook shares the
+  three ways to start a bid.
+- **Recently deleted** (`/trash`, `TrashPage`): archived bids, materials,
+  assemblies, kits, modifiers, clients with Restore — existing calls only.
+- **Bid page**: the rail is client + total (sticky); close-out, extras, tax,
+  pricing settings sit under the lines. Settings › Pricing 2×2 on ≥1280 px.
+- **Back** returns to where a bid was opened from (`BID_ORIGINS`).
+- **Step bar** (`BidStepBar`, rule `shared/bidSteps.ts`, read-only
+  `bids.progress`, refreshed after any mutation in `main.tsx`): bid page and
+  the Plans header (laptop).
+- **Homerun icon** (`HomerunIcon`, solid arrow + ticks); sign-in tagline;
+  help bar wording. **Parked with sketches**: `overnight-parked.md` (slimmer
+  toolbar, touch hint for B's tips, work-tag label).
+- `pnpm device:audit --check` at laptop, both iPads, phone 375: 0 hard faults.
+- **For B when merging**: `TakeoffPage.tsx` changed in ONE place (the
+  header blurb → `BidStepBar`), plus `HomerunsView.tsx`'s icon.
+
+**Items 6 + 7 — pricing safety steps 1, 5, 6 and price-history RECORDING
+(on track-c, NOT merged; no migration — uses A's 0157–0163).**
+
+- **The price door** (`server/db.ts`): `updateMaterial` / `createMaterial`
+  take a price only as `PricedWrite` = `priceWrite` pair
+  (`shared/packPricing.ts`, round UP) + `PriceWhy`; `costPerUnit?: never`
+  catches a spread too. One transaction; a `material_price_history` row
+  only when the number changed. Writers: materials.update/.create,
+  importPrices (importId NULL until PS step 4), save line as assembly,
+  revert to shipped (as `typed` — Q-PH1 drafts a `reverted` enum for A).
+- **Forcing tests**: `priceHistoryDoor.test.ts` (every direct `materials`
+  write must be in a named function; red on a planted write) and
+  `priceHistoryRecording.test.ts` (10). `typedPriceFixture.ts` for fixtures.
+- **Pack entry** on screen (step 5): editor More options + "unit or pack"
+  price row; Supplier pricing pack box. **Sanity warning NOT built** (step 3
+  waits on the Platt export, Q4/Q8).
+- **Step 6**: `realPackFromSheet` built and run over the catalog; NOT
+  written (A's hold until the owner's sheet — Q-PS6).
+- **Price-history screen** also built (item 11): `materials.priceHistory`
+  - `PriceHistoryPanel` (editor › More options › Price history).
+
+**Items 8–11.**
+
+- **Copy** (item 8): the clear fixes, plus `CAPABILITY_LABEL` / `roleLabel`
+  on Crew and one name for deleted things ("Recently deleted"; the bids-only
+  page is "Deleted bids"). The rest, with reasons:
+  `references/copy-review-2026-10-14.md`. Naming decisions C1–C3 are in
+  morning-questions.
+- **Error toasts** (item 11): `client/src/lib/errorText.ts` on 96 sites.
+  **For Track B:** the 67 `toast.error(x.message)` in `TakeoffPage.tsx` and
+  `components/takeoff/` were left alone; the same one-line change applies.
+- **Step-bar switch** (item 9): Settings › Display. Parked ideas:
+  `overnight-parked.md` P4 (copy a bid — a money question), P6.
+- **Scripts typecheck** (item 10): `tsconfig.scripts.json` is the second
+  pass of `pnpm check`.
+- **Todo housekeeping** (item 11): the `aliases()` audit was measured and
+  closed, and the white-box entry closed (B fixed it in `14fead91`).
+- **State at the end:** `pnpm check` green on both passes; tonight's 16
+  test files pass (211 tests); `device:audit --check` shows 0 hard faults
+  at four sizes. Dev server stopped; MySQL 3307 left running. Not merged:
+  everything is on `track-c` only.
+
+## (newest) 2026-10-14, late night — Strut answers, Fasteners & Anchors review; Example-tag item moved to B
+
+**Standing rule: never stop MySQL 3307** (all tracks share it). No dev
+server, no database touched this round.
+
+**Moved to Track B (owner, 2026-10-14):** B owns the whole starter-offers
+build, including the queued rule that `applyStarterChange` writes the
+"Example" tag (§ "MOVED TO TRACK B" below, under the Service Entrance
+entry). **C does not build it.**
+
+**Strut & Supports: Q1–Q9 all YES as suggested**
+(`pricing/strut-supports-name-review.md` "Owner's answers"), nothing
+applied: channel `12 ga, pre-galvanized, slotted`; `{size} EMT strut
+strap`; `Strut channel nut, 3/8"-16, with spring`; fittings by shape and
+holes; `{size} EMT clip, rod/wire hanger`; `Temporary pole, 6x6 x 16 ft
+treated post` (PG20 by key); stiffener kept as a seismic brace; Q8 packs
+(straps, channel nut, wing fitting `each`); **M1 `3/8"-16 x 1" hex bolt,
+zinc` accepted** (COMMON, HD). No starter edit.
+
+**`pricing/fasteners-anchors-name-review.md`** — rows 1568–1581, 14 rows,
+fresh workbook copy (unchanged); matches `BASELINE_MATERIALS` one for one.
+Read-only, under the source rule.
+
+- **Counts:** 2 OK, 10 need words, 2 owner picks. 4 rows used (hanger wire
+  7 starters, wedge anchor 6, beam clamp 3, J-hook 3). No run type.
+- **Strut Q5 check:** `Rod hanger clip` is a rod-to-flange clip (Platt
+  Caddy 6TI24), NOT the Strut EMT clip — neither retires; Q9 renames it.
+- **Could price wrong:** hanger wire priced from a 100 ft roll (~8x low,
+  7 starters); a bare J-hook with no mount (3 data starters); ten anchors
+  and screws with no size; pins with no powder loads.
+- **Packs:** 10 guessed; beam clamp `each`, drop-in `box of 50`, drywall
+  anchor and Tapcon `pack of 75`, toggle `pack of 10`, rest read at the
+  three stores.
+- **Missing:** M1 `.27 cal` powder load (HD), M2/M3 3/4" and 1" conduit
+  hangers (Platt) — in `new-rows-source-check.md` as proposed (now 64
+  families, 62 COMMON, 2 SPECIALTY).
+- **Owner questions:** Q1–Q14, incl. Q7 retire `Plastic conduit clip`.
+  No starter edit proposed.
+
+**Next shelf in app order: Equipment & Appliances (from row 1582).**
+
+## 2026-10-14, night — Connectors answers, Strut & Supports review
+
+**Standing rule (owner, 2026-10-14): never stop MySQL 3307** — every track
+shares it; the owner stops it at end of day. Track C ran no dev server and
+touched no database this round.
+
+**Connectors & Terminations: Q1–Q9 all YES as suggested**
+(`pricing/connectors-terminations-name-review.md` "Owner's answers"), for
+A's end-of-pricing job, nothing applied: the 14 crimp lugs renamed with
+stud size and one description; sleeve descriptions; cord grip ranges;
+`#8-#10 stud` on ring/spade terminals; push-in 3-port; insulated NM staple;
+DIN rail and terminal block named; **Q8 pack fixes for the pack pass**
+(anti-short `bag of 100`, 3/8"/1/2" MC connectors `box of 50`, big
+splices, SE connector and ferrule kit `each`, crimp terminals `bag of
+100`); **Q9 M1 `#6 copper compression lug, 2-hole, 1/4" stud` added**
+(COMMON, Platt). No starter edit.
+
+**`pricing/strut-supports-name-review.md`** — rows 1519–1567, 49 rows,
+fresh workbook copy (unchanged); matches `BASELINE_MATERIALS` one for one.
+Read-only, under the source rule.
+
+- **Counts:** 26 OK, 22 need words, 1 owner pick. 9 rows used (T-grid
+  clips in 5 and 6 starters; PG16, MS5, MH12, DV30, PG20). No run type.
+- **Could price wrong:** strut with no finish (hot-dip ≈ 2x
+  pre-galvanized); strut straps that don't say EMT or rigid; the temp pole
+  post with no length (PG20).
+- **Packs:** 29 guessed from words; straps, channel nut and wing fitting
+  should be `each`.
+- **Missing:** M1 `3/8"-16 x 1" hex bolt, zinc` (COMMON, Home Depot) —
+  added to `new-rows-source-check.md` (now 61 families, 59 COMMON).
+- **Owner questions:** Q1–Q9. No starter edit proposed.
+
+**Next shelf in app order: Fasteners & Anchors (from row 1568).** Its
+`Rod hanger clip` must be checked against Strut Q5.
+
+## (newest) 2026-10-14, end of day — SOURCE RULE for new rows, Low Voltage answers, Connectors & Terminations review
+
+**THE OWNER'S SOURCE RULE (2026-10-14) — A FOLLOWS IT FOR EVERY NEW ROW
+FROM EVERY NAME REVIEW, PAST AND FUTURE:**
+
+- **COMMON** (found at **Home Depot, Platt or Stoneway**): add the row; its
+  **Example price comes from those three only**. Other sites are comparison.
+- **SPECIALTY** (found at none of the three): **still add the row** so it
+  can be counted, with the **price BLANK** (no Example price) and the
+  description **"Specialty - price from your supplier."** The bid's "not
+  priced" warning covers it.
+
+**`pricing/new-rows-source-check.md`** applies it to every accepted new row
+from the 14 earlier reviews plus Connectors M1: **60 families, 58 COMMON,
+2 SPECIALTY** (Life Safety M1 sampling tube and M2 remote test station),
+each with its store, part and link. **It overrides each review's "Listing"
+column for price**; every earlier review now ends with a pointer to it. Five
+rows change what A adds (⚠ in the file): Boxes M9 (fan rating
+unconfirmed), M13 (Arlington FN101F, not Cantex), M16 (Carlon B432A, not
+the 2-gang parts named), Service Entrance M1 (3/0–4/0 only), Low Voltage M3
+(OM3/OM4 LC part). **Breakers H3's condition is met**: Platt Eaton DH361UGK
+or HD Square D VHU361. A also checks that seeding accepts a shipped row
+with no price without writing a $0 example. If A's count of accepted new
+rows differs from 60, stop and find out why.
+
+**Low Voltage: Q1–Q14 all YES as suggested** (review's "Owner's answers").
+No starter edit. Cable rows get descriptions, not renames.
+
+**`pricing/connectors-terminations-name-review.md`** — rows 1422–1518, 97
+rows, fresh workbook copy (unchanged since the Low Voltage read); matches
+`BASELINE_MATERIALS` one for one. Read-only; written under the source rule.
+
+- **Counts:** 71 OK, 25 need words, 1 owner pick. 12 rows used — including
+  `Wire nut, 22-8 AWG (tan/red)` (133 starters), `MC anti-short bushing`
+  (37) and `3/8" MC connector` (36). No run type.
+- **Could price wrong:** P1 anti-short is a guessed box of 25 (Platt sells
+  100s), 3/8" MC connector a guessed box of 25; P2 set-screw splices a
+  box of 100 and the 2" SE connector (PG3, CW3) a box of 25 though sold
+  each; P3 1-hole lugs with no stud size (PG15, PG16). The wire nut's
+  guessed box of 100 happens to be right.
+- **C1:** the crimp lug descriptions contradict their names.
+- **Missing:** M1 `#6 copper compression lug, 2-hole, 1/4" stud` (COMMON,
+  Platt).
+- **Owner questions:** Q1–Q9. No starter edit proposed.
+
+**Next shelf in app order: Strut & Supports (from row 1519).**
+
+## 2026-10-14, latest — Life Safety answers, Low Voltage review
+
+**Life Safety: Q1–Q13 all YES as suggested** (`pricing/life-safety-name-
+review.md` "Owner's answers"), for A's end-of-pricing job, nothing applied.
+That includes **Q12, the one starter edit: CS14's `Relay module, smoke
+alarm` line becomes M1 `Duct detector sampling tube, 2-4 ft duct`, x1**,
+and **all four missing rows**: M1 sampling tube, M2 `Duct detector remote
+test station`, M3 `Magnetic door holder, 24V`, M4 `Hardwired heat alarm,
+120V`. Q9 moves the exit combo to Lighting Hardware. Expected counts for
+A's before-and-after: Life Safety **26 → 29**, Lighting Hardware **+1** —
+if either differs, stop and find out why.
+
+**`pricing/low-voltage-name-review.md`** — rows 1353–1421, 69 rows, fresh
+workbook copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 18 decided (the cable names frozen 2026-10-07), 31 OK, 14
+  need words, 6 owner picks. 28 rows used by starters; no run type.
+- **Could price wrong:** P1 `In-ceiling speaker` is `each` / 1 but sold in
+  pairs (MS10 would price double); P2 racks, the media enclosure and patch
+  panels with no size; P3 one "Landscape light fixture" for four products
+  (LT18).
+- **Packs:** F connectors (box of 25 from a word; sold in 10s and 50s),
+  RJ45 ends (each; sold in 50s), eight low-voltage wall plates (box of 25
+  from "plate"; sold each).
+- **Missing:** M1 landscape spot light, M2 surface mount data box, M3 LC
+  fiber connector, M4 firestop cable pathway.
+- **Owner questions:** Q1–Q14. No starter edit proposed. Cable rows get
+  descriptions, not renames, so `frozen-names.json` does not move.
+
+**Next shelf in app order: Connectors & Terminations (from row 1422).**
+
+## 2026-10-14, later — 480V YES, Grounding answers, A's three items confirmed, Life Safety review
+
+**Breakers, round 3** (`pricing/breakers-name-review.md` "Owner's answers,
+round 3"): **the 480V proposal is YES** — add H1 `30A 3-Pole bolt-on
+breaker, 480Y/277V`, H2 `70A 3-Pole bolt-on breaker, 480Y/277V`, H3 `30A
+non-fused disconnect, 3-pole, NEMA 1, 600V`; PG16 → H2; MH11 → H1 + H3.
+**Owner's condition: A finds a real distributor price for the HU361 (H3)
+before applying it** — not eBay, not the NEMA 3R HU361RB. If none is found,
+stop and ask. Nothing applied.
+
+**Grounding & Bonding: Q1–Q11 all YES as suggested** (review's "Owner's
+answers"). No starter edit; the review's "For A" is the job list.
+
+**A's three items for C (A's `boot-seed-plan.md` § 6, PS-M1..M6 and
+PH-M1) — C agrees with all three, two notes:**
+
+1. **`packQty` and `packLabel` = offer; `packPrice` and
+   `priceCheckAcceptedAt` = not-editable — AGREE.** Qty and label must move
+   together (a label without its qty states a wrong pack — the same
+   companion rule as the example tags), so both are offers. `packPrice` and
+   `priceCheckAcceptedAt` are company values the seed never carries; a fork
+   does not copy a dismissal. **Note 1:** `boot-seed-plan.md` still says
+   `packLabel` is "a finding field (stamped)" (§ 6 opening) and "everyone"
+   (§ 6 list); A updates both lines to "offer" so the plan says one thing.
+   **Note 2:** no `packQty` offer may be generated before § E's 380
+   word-guessed packs are relabelled (`pack-label-scan.md` § E), or every
+   company is offered the guessed packs — `Dishwasher whip` as a box of 100.
+2. **The 3 new material links exempt in `forkableReferences.test.ts` —
+   AGREE.** `material_price_history.materialKey` deliberately names the
+   shared item (`materialItemKey`), never a fork; `material_price_history.
+materialId` and `price_import_rows.materialId` record the row actually
+   written. C's plans called that resolver "the row itself", which is the
+   same thing as exempt. **Note:** the `why` should say "a record of the row
+   written — never re-point it", not "nothing reads it", because the
+   history screen will read these.
+3. **PH-M1 `unitOfSale` as `enum('each','foot','box')` from
+   `MATERIAL_UNITS_OF_SALE` — AGREE.** It is the option C offered; a unit
+   added in one place shows as schema drift. Pack wording ("100 ft coil")
+   is `packLabel`, never a unit. 0163 is C's SQL word for word, checked
+   against `price-history-plan.md` § 6.
+
+(Read from A's checkout `C:\dev\BidPhase`, which was mid-merge — 0157–0163
+staged, `CHANGELOG.md` conflicted. Read only; nothing there touched.)
+
+**`pricing/life-safety-name-review.md`** — rows 1327–1352, 26 rows, fresh
+workbook copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 9 OK, 12 need words, 5 owner picks. 14 rows used by starters;
+  no run type; every row `each` / 1, none on § E.
+- **Could price wrong:** P1 CS14 (commercial duct detector) buys the 120V
+  house-alarm relay and no sampling tube; P2 "smoke detector" finds both
+  the 120V alarm and the system head; P3 panels with no size ($438–$1,444
+  for a 5-zone conventional, $961–$979 for a 50-point addressable).
+- **Missing:** M1 duct detector sampling tube, M2 duct detector remote test
+  station, M3 magnetic door holder, M4 120V heat alarm.
+- **Owner questions:** Q1–Q13. **One starter edit proposed (Q12, waits for
+  a yes): CS14's relay → M1 sampling tube.** Q9 moves the exit combo to
+  Lighting Hardware.
+
+**Next shelf in app order: Low Voltage (from row 1353).**
+
+## 2026-10-14, late — Breakers round 2, Lighting answers, the pack-word list, Grounding & Bonding review
+
+**Breakers, round 2** (`pricing/breakers-name-review.md` "Owner's answers,
+round 2"), for A's end-of-pricing job, nothing applied: **the 22 bolt-on
+moves YES; M6 `40A 2-Pole bolt-on breaker` YES and CW2 moves to it (23
+moves); CS15 stays plug-on.** PG16/MH11: owner said fix them, so the file
+now **proposes** H1 `30A 3-Pole bolt-on breaker, 480Y/277V` (EDB34030,
+$265–$549), H2 `70A 3-Pole bolt-on breaker, 480Y/277V` (EDB34070,
+$329–$360), H3 `30A non-fused disconnect, 3-pole, NEMA 1, 600V` (HU361,
+heavy duty; no distributor price found) and the moves PG16 → H2, MH11 → H1
+
+- H3. **That part waits for the owner's yes.**
+
+**Lighting Hardware: Q1–Q14 all yes as suggested** (Q3 a description, not
+lumens; Q11 A checks first). Recorded in the review's "Owner's answers".
+**The job's starter edits: LT23 and LT26 to the 6 ft whip** (Q12).
+
+**`pricing/pack-label-scan.md` § E — every row whose pack came from a word
+in its name**, as the owner asked: **380 box packs** (84 box of 100, 18 box
+of 10, 278 box of 25) and **47 per-foot rows made a 10 ft stick**, each with
+its row, the word, what the sheet holds now and column I. **4 have a typed
+price, all on packs the owner had already overwritten** (752; flex 154, 155,
+160). 7 marked ACCIDENTAL — **`Dishwasher whip` (RS4) is a "box of 100" from
+"washer"**, `Screwless wall plate` from "screw", and the five lighting rows.
+
+**For A — owner, 2026-10-14: change `pricing/buildStarterSheets.mts` (and
+`packFor` in `pricing/starterSheetLayout.ts`) so the sheet NEVER guesses a
+pack from words in the name.** Packs come from a value written per row; a row
+without one is `each` / 1 and the build lists it. Add a test that fails if
+`packFor` guesses. Relabel § E in the same pass as A–D, before more prices
+are typed. Details in § E "for A".
+
+**`pricing/grounding-bonding-name-review.md`** — rows 1308–1326, 19 rows,
+workbook read from a fresh copy; the sheet matches `BASELINE_MATERIALS` one
+for one. Read-only.
+
+- **Counts:** 5 OK, 1 decided, 10 need words, 3 owner picks. 6 rows used by
+  starters; no run type.
+- **Could price wrong:** P1 the rod clamp (10 starters) and pipe clamp (5)
+  are "box of 25" from the word "clamp"; P2 rods don't say copper-bonded or
+  galvanized; P3 an unnamed exothermic mold ($342–$432, one connection each).
+- **Missing:** M1 exothermic mold handle clamp.
+- **Owner questions:** Q1–Q11. No starter edit proposed.
+
+**Next shelf in app order: Life Safety (from row 1327).**
+
+## 2026-10-14, night — Breakers answers recorded; Lighting Hardware name review
+
+**Breakers, owner's answers** (`pricing/breakers-name-review.md` "Owner's
+answers"), for A's end-of-pricing job: **Q1 and Q3–Q8 yes, as suggested;
+Q9 waits for the brand-variants pass; Q2 yes** (add M1–M5 bolt-on; the
+existing rows become plug-on only, "bolt on" moves to M1–M5) **plus a
+starter list the owner asked for.** Nothing applied.
+
+- **The list (waits for the owner's yes, like the 4" box supports):** of the
+  64 starters that use a breaker row, the 26 `commercial` ones were read;
+  **22 move** to a bolt-on row (9 to M1, 4 to M2, 5 to M3, 3 to M4, PG15 to
+  M5), each with its row now, its bolt-on row and the price change from one
+  supply house (+$21.39 / +$46.22 / +$46.22 / +$173.44 / −$4.07 per
+  breaker). `both` and `residential` starters stay plug-on.
+- **4 do not move:** CW2 (40A; suggested new M6 `40A 2-Pole bolt-on
+breaker`), CS15 (shunt-trip stays plug-in), **PG16 and MH11 feed 480V
+  loads from 120/240V breakers** — and MH11's disconnect is a 240V switch.
+  A new question, raised in the file; nothing changes until answered.
+
+**`pricing/lighting-hardware-name-review.md`** — rows 1149–1307, 159 rows,
+workbook read from a fresh copy; the sheet matches `BASELINE_MATERIALS` one
+for one. Read-only.
+
+- **Counts:** 93 OK, 27 decided (wafer/disc/retrofit sizes; tape channel),
+  8 need words, 31 owner picks. 58 rows used by starters; no run type.
+- **Could price wrong:** P1 five rows got a box pack by accident from
+  `packFor`'s word rules (`pricing/starterSheetLayout.ts` 448/459) — **the
+  pole anchor bolt kit (3 starters) is "box of 100", so a ~$107 set prices
+  at ~$1**; P2 high bay and area light have no wattage ($123 vs $230); P3 a
+  bollard and an EV pedestal priced on a 20 ft pole's footing and bolts; P4
+  GC4's remote head has nothing to run it.
+- **Same pack fault on later shelves:** `Furniture feed connector` (1666),
+  `Strut wing connector` (1557), `2" SE cable connector` (1494).
+- **No 8 ft prefab fixture whip found** (all 6 ft) — LT23/LT26 use one; Q12.
+- **Missing:** M1 `Pole anchor bolt kit, 1" x 36", set of 4` for the 30 ft
+  pole.
+- **Owner questions:** Q1–Q14. Starter edits only if Q12 is yes (LT23, LT26
+  to the 6 ft whip).
+
+**Next shelf in app order: Grounding & Bonding (from row 1308).**
+
+## 2026-10-14, evening — Panels answers recorded; Breakers name review
+
+**Panels, owner's answers** (`pricing/panels-name-review.md` "Owner's
+answers"), for A's end-of-pricing job: **Q1–Q10 all yes, as suggested.**
+Names carry the words; S1–S3 search-word fixes; pole count on every
+disconnect (2-pole), plus 3-pole fused 100A/200A in NEMA 1 and 3R (4 new
+rows); **PG17 → `100A fused disconnect, 3-pole, NEMA 1, 240V`, keeping its
+3 fuses — the job's one starter edit**; generator-ready, 400A, meter
+center (125A per position), meter-main (8-space outdoor), panelboard
+interior (225A) renamed; panel parts generic with descriptions; M1 60A
+fused pullout added. Nothing applied.
+
+**`pricing/breakers-name-review.md`** — rows 1068–1148, 81 rows, workbook
+read from a fresh copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 65 OK, 8 decided (half-size, names frozen), 3 need words
+  (125–200A 3-pole → molded-case), 5 owner picks (accessories). 18 rows used
+  by starters; no run type.
+- **Could price wrong:** P1 plug-on and bolt-on are one row, and its search
+  words say both — commercial starters price panelboard breakers at
+  load-center prices; P2 125–200A 3-pole are ~$475–$525 frame breakers, not
+  plug-ons; P3 back-fed main kit plus a hold-down kit, twice.
+- **No US listing found for a 1/2-inch half-size breaker**, so Q4 asks A to
+  confirm the 2-pole 40A/50A half-size rows before pricing (names stay).
+- **Missing:** M1–M5 bolt-on breakers (20A 1-Pole, 20A/30A 2-Pole, 30A/100A
+  3-Pole).
+- **Owner questions:** Q1–Q9. No starter edit proposed.
+
+**Next shelf in app order: Lighting Hardware (from row 1149).**
+
+## 2026-10-14, later — price history: owner's answers recorded
+
+**`references/price-history-plan.md` § 9: Q1–Q8 all yes, as suggested.**
+Recording ships in the same release as PS-M1..M6, with PH-M1 right behind
+them; the screen comes in a later release. Example-price changes are shown only while the
+shop uses the shipped price; bid-line prices are not recorded; kept
+forever; labor later in its own table; anyone who sees Materials sees it;
+"last changed … before history was kept" shown; one history per item
+with a supplier filter. Nothing built.
+
+**For A:** PH-M1 (§ 6) is a confirmed part of the PS-M1..M6 release, queued
+directly after PS-M6.
+
+**Panels review (`pricing/panels-name-review.md`) Q1–Q10 shown to the
+owner again; still waiting for answers.**
+
+## 2026-10-14, after the restart — PRICE HISTORY plan (plan only)
+
+Items 1–4 of the restart prompt were already in `4eaa756e` (Service Entrance
+answers, Wire & Cable skipped, Panels review, the Example-tag QUEUED entry);
+nothing was redone.
+
+**`references/price-history-plan.md`** — plan only, no code, no migration.
+
+- **One insert-only table, `material_price_history`** (PH-M1, SQL draft in
+  § 6, for A, **queued after PS-M1..M6**): per change of a company's price —
+  per-unit price and the one before, unit, pack qty/label/price, supplier
+  text, sheet date, who (the person), how (`typed` · `imported` ·
+  `import_undone` · `starter_accepted`), Example tag. Keyed on
+  `materialItemKey`, so a fork never splits an item's history.
+- **One door:** `db.updateMaterial`/`createMaterial` take a price only with
+  a `priceWhy` (union type), record in the same transaction, only when the
+  number changed. A source-scan test goes red on a price write elsewhere.
+- **Shipped prices are not copied:** their history is `starter_changes`,
+  read as "BidRidge example price". Accept (not built) records
+  `starter_accepted` — waits on `c6d80249` like the QUEUED item.
+- **View-only, never read by pricing; bid-line prices not recorded.**
+  PH-M2 (`supplierId`) waits for multi-supplier's `suppliers`.
+- **Owner questions Q1–Q8** with suggested answers. Q1 is the urgent one:
+  ship recording with PS-M1..M6, screen after, because nothing can be
+  backfilled.
+- Cross-referenced from `multi-supplier-plan.md` § 6 and
+  `pricing-safety-plan.md` § 6.
+
+## 2026-10-14, latest — Service Entrance answers recorded; Panels name review; one item QUEUED
+
+**Service Entrance, owner's answers**
+(`pricing/service-entrance-name-review.md` "Owner's answers"), for A's
+end-of-pricing job: **Q1–Q8 all yes, as suggested.** Names carry the missing
+words (old names stay search words); one SE cable cap, 1/0–4/0; SE elbows
+1-1/4", 1-1/2", 2" aluminum SLB (the old name is a search word on 2");
+generic bonding jumper kit with the suggested description; `Meter sealing
+ring, ring-type socket`; the adapter ring retired (hidden); `Ground rod
+inspection well, 10", HDPE`; M1 sill plate and M2 SE strap added. **No
+starter edit.** Nothing applied.
+
+**Wire & Cable: no name review** (owner, 2026-10-14). Its names were frozen
+2026-10-07 and SER has its own plan.
+
+**`pricing/panels-name-review.md`** — rows 965–1067, 103 rows, workbook read
+from a fresh copy; the sheet matches `BASELINE_MATERIALS` one for one.
+Read-only.
+
+- **Counts:** 74 OK, 1 decided (400A meter base = CL320), 21 need words, 7
+  owner picks. 21 rows used by starters; no run type.
+- **Could price wrong:** P1 `400A main panel, 42-space` is a $5,700–$7,100
+  commercial load center; P2 "heavy duty" search word on every 240V
+  (general duty) switch; P3 no pole count on any disconnect, so PG17's 3
+  fuses imply a 3-pole switch the row does not name; P4 panel covers $40 or
+  $800; P5 meter centers with no rating per position; P6 an unsized
+  panelboard interior.
+- **Search-word/description gaps (S1–S3):** 12 older main-breaker rows lack
+  the NEMA words, 6 main-lug rows lack the "Main-lug only" description.
+- **Missing:** M1, a 60A fused pullout disconnect.
+- **Owner questions:** Q1–Q10, each with a suggested answer. Q3 (pole
+  count) would make PG17 the job's one starter edit.
+
+**Next shelf in app order: Breakers (from row 1068).**
+
+### MOVED TO TRACK B (owner, 2026-10-14) — `applyStarterChange` writes the "Example" tag
+
+**Track C does not build this.** B owns the whole starter-offers build, this
+rule included; the text below stays as the spec C handed over.
+
+When a starter change sets a price, hours or a rate, `applyStarterChange`
+writes the matching "Example" tag **in the same change**:
+`materials.isExamplePrice` / `isExampleLaborHours`,
+`labor_rates.isExampleRate`, `assemblies.isExampleHours`, and the steps'
+`isExampleMinutes` (`drizzle/schema.ts`; `shared/exampleTags.ts`), so a changed
+starter number is never shown untagged. **Build it only after A's boot
+change (`c6d80249`) lands on local-dev and track-c has merged it**, because
+A's `starterDrift` calls `applyStarterChange`; building it first means two
+versions of the same function to reconcile.
+
+## (newest) 2026-10-14, later — Wall Plates answers recorded; Service Entrance review; Gate green on b11abf2e
+
+**Gate for the local-dev push of `b11abf2e`** (run 38511437076, attempt 2;
+attempt 1 died on a Docker pull before any test): test ✓, deploy-staging ✓,
+**smoke ✓ 96 passed / 2 skipped**, step 10 green. Staging `/api/version`:
+`commit b11abf2e`, built 2026-10-14 04:39:54Z. So F13 and
+`applyStarterChange` are on staging (not live).
+
+**Wall Plates & Misc, owner's answers** (review's "Owner's answers"), for
+A's end-of-pricing job: **Q1–Q10 all yes, as suggested.**
+
+- Q2 retires six generic plates (map in the table).
+- Q5 relabels stainless, midway, oversized, 3- to 6-gang and screwless
+  plates to `each` / 1.
+- Q7 retires the stainless flip cover into the die-cast extra-duty in-use
+  cover.
+- Q10 adds M1 and moves LT17 to it. **That is the job's one starter edit.**
+
+**`pricing/service-entrance-name-review.md`** — rows 955–964, 10 rows,
+workbook read from a fresh copy. Read-only.
+
+- **Counts:** 1 OK (mast guy kit), 3 need words, 2 owner picks, 1 two
+  products in one row ("Meter seal": an $18 sealing ring vs the utility's
+  tag), 3 decided (the masts, already retiring into rigid).
+- **No starter or run type uses the shelf.**
+- **Could price wrong:** a ground rod well at $11 (valve box) vs $100–140;
+  an SE elbow at $23 (1/2") vs $245 (2") with no size; the meter seal; the
+  SE cap priced from HD's conduit "SE cap".
+- **Missing:** M1, an SE cable sill plate; M2, an SE cable strap.
+- **Owner questions:** Q1–Q8.
+
+**Next shelf in app order: Panels (965–1067).** Note: **Wire & Cable (rows
+3–117) has never had a name review.** The reviews began at Conduit. Its
+names were frozen in the 2026-10-07 rename, and SER has its own plan
+(`references/ser-rename-plan.md`), so it may not need one. Say so if it
+does.
+
+## (newest) 2026-10-14 — Wall Plates & Misc name review; C's databases made exact; Gate for b11abf2e
+
+**`pricing/wallplates-misc-name-review.md`** — spreadsheet rows 862–954, 93
+rows, read from a fresh copy of the workbook. Read-only.
+
+- **Counts:** 74 OK (the 2026-10-08 cover family is sound, and every
+  starter's plate matches its device), 11 need words, 8 owner picks.
+- **Could price wrong:**
+  - P1: every plate is `box of 25`, but stainless, midway, oversized and
+    3/4-gang plates are sold each, so a typed price comes out 1/25 of cost.
+  - P2: stainless grade, 430 $1.01 vs 302 $2.91.
+  - P3: the in-use covers on DV8, LT17, MH6 and PG20 do not say
+    "extra-duty", which NEC 406.9(B)(1) requires for 15/20A in a wet
+    location.
+  - P4: six generic plate rows duplicate family rows.
+  - P5: the screwless plate is about 10x a standard one.
+  - P6: Device shim is `each`, but it is sold in 5/25/100 (for the pack
+    scan).
+  - P7: the panel filler plate fits one panel family.
+- **Missing:** M1, a deep in-use cover (for LT17's transformer plug); M2, a
+  GFCI/decorator flip cover.
+- **Owner questions:** Q1–Q10, each with a suggested answer.
+
+**Next shelf: Service Entrance (from row 955).**
+
+**C's databases now match the Gate's** (`schemaDrift.mts`: matches,
+196/196 on both).
+
+- **`bidrender_test_c` was rebuilt the Gate's way:** DROP; CREATE
+  `utf8mb4_unicode_ci`; `scripts/migrate.mts` (157 applied);
+  `scripts/seedBaseline.mts` (1,717 materials, 24 run types). DV33 is clean:
+  `starterAssembliesSeed.test.ts` passes, along with
+  `starterChanges` and `lockedWarningsFrozen` (29/29).
+- **`bidrender_local_c` was fixed IN PLACE, not rebuilt**, because it holds
+  the 4,237 bids `bidTotals` measures and the "Bar layout check" fixture.
+  The drift script's own statements were applied: 3 collation `CONVERT`s
+  and 5 FKs. `bidTotals`: all 4,237 unchanged.
+- **One of the drift script's suggestions cannot run.**
+  `project_assembly_items_projectAssemblyId_project_assemblies_id_fk` is 66
+  characters, so MySQL refuses it (`ER_TOO_LONG_IDENT`). Migration 0004
+  names it `project_assembly_items_projectAssemblyId_fk`, and that name
+  worked. That is a small fault in `scripts/schemaDrift.mts`'s suggested
+  SQL, for whoever next touches it.
+
 ## FROM THE OWNER (2026-10-14, via Track B) — STARTER OFFERS MOVED TO B
 
 **Track B now builds the whole starter-offers feature**

@@ -13,6 +13,7 @@ import { Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { errorText } from "@/lib/errorText";
 
 type Result = Awaited<
   ReturnType<
@@ -36,7 +37,7 @@ export function ImportLaborSheetDialog({
   const [applied, setApplied] = useState<number | null>(null);
 
   const run = trpc.materials.importLaborSheet.useMutation({
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   const doPreview = async () => {

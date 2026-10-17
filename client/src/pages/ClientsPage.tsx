@@ -21,8 +21,9 @@
  * is the same judgement `searchClients` documents: a contractor's customer list
  * is tens of rows. If that changes this needs a cursor query, not a `.slice()`.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { LoadFailed } from "@/components/LoadFailed";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +64,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { searchClients, isCreatableClient } from "@/lib/clientPicker";
+import { errorText } from "@/lib/errorText";
+import { sameToSave } from "@/lib/unsavedGuard";
+import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
 type ClientKind = "company" | "individual";
 
@@ -226,6 +230,21 @@ export default function ClientsPage() {
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
+  // Leaving the screen asks before an open edit or a half-typed new client
+  // is dropped (@/lib/unsavedGuard); Cancel does not — it says discard.
+  const [openedWith, setOpenedWith] = useState<Draft>(emptyDraft);
+  useUnsavedGuard(
+    (editingId !== null && !sameToSave(editDraft, openedWith)) ||
+      (adding && !sameToSave(newDraft, emptyDraft))
+  );
+  /**
+   * When the open editor's draft was taken from the saved client, sent with
+   * Save so a save from an older screen is refused (shared/staleEdit.ts).
+   * This person's own saves are remembered too: the list is paged, so a
+   * reopen before it refetches would otherwise carry the old timestamp.
+   */
+  const [editOpenedAt, setEditOpenedAt] = useState<Date | null>(null);
+  const ownSaves = useRef(new Map<number, Date>());
   const [pendingArchive, setPendingArchive] = useState<{
     id: number;
     name: string;
@@ -266,16 +285,17 @@ export default function ClientsPage() {
       setNewDraft(emptyDraft);
       invalidate();
     },
-    onError: e => toast.error(e.message),
+    onError: e => toast.error(errorText(e)),
   });
 
   const updateClient = trpc.clients.update.useMutation({
-    onSuccess: () => {
+    onSuccess: saved => {
+      if (saved) ownSaves.current.set(saved.id, saved.updatedAt);
       setEditingId(null);
       invalidate();
     },
     onError: e => {
-      toast.error(e.message);
+      toast.error(errorText(e));
       invalidate();
     },
   });
@@ -283,7 +303,7 @@ export default function ClientsPage() {
   const archiveClient = trpc.clients.archive.useMutation({
     onSuccess: () => invalidate(),
     onError: e => {
-      toast.error(e.message);
+      toast.error(errorText(e));
       invalidate();
     },
   });
@@ -291,7 +311,7 @@ export default function ClientsPage() {
   const restoreClient = trpc.clients.restore.useMutation({
     onSuccess: () => invalidate(),
     onError: e => {
-      toast.error(e.message);
+      toast.error(errorText(e));
       invalidate();
     },
   });
@@ -314,9 +334,16 @@ export default function ClientsPage() {
     phone: string | null;
     email: string | null;
     notes: string | null;
+    updatedAt?: Date;
   }) => {
     setEditingId(row.id);
-    setEditDraft({
+    const own = ownSaves.current.get(row.id);
+    setEditOpenedAt(
+      own && (!row.updatedAt || own > row.updatedAt)
+        ? own
+        : (row.updatedAt ?? null)
+    );
+    const opened: Draft = {
       name: row.name,
       kind: row.kind,
       contactName: row.contactName ?? "",
@@ -324,13 +351,16 @@ export default function ClientsPage() {
       phone: row.phone ?? "",
       email: row.email ?? "",
       notes: row.notes ?? "",
-    });
+    };
+    setEditDraft(opened);
+    setOpenedWith(opened);
   };
 
   const submitEdit = () => {
     if (editingId == null) return;
     updateClient.mutate({
       id: editingId,
+      ...(editOpenedAt ? { openedAt: editOpenedAt } : {}),
       name: editDraft.name.trim(),
       kind: editDraft.kind,
       contactName: orNull(editDraft.contactName),
@@ -380,7 +410,9 @@ export default function ClientsPage() {
               >
                 {tab === "active" ? "Working list" : "Archived"}
                 <span className="ml-1.5 text-muted-foreground/70">
-                  {view === tab ? visible.length : ""}
+                  {view === tab && !listQuery.isLoadingError
+                    ? visible.length
+                    : ""}
                 </span>
               </button>
             ))}
@@ -433,6 +465,13 @@ export default function ClientsPage() {
               />
             ))}
           </div>
+        ) : listQuery.isLoadingError ? (
+          // Not "No clients yet" — a list that failed to load is not an
+          // empty one (drill, 2026-10-15; LoadFailed.tsx).
+          <LoadFailed
+            what="your clients"
+            onRetry={() => void listQuery.refetch()}
+          />
         ) : visible.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">
@@ -602,7 +641,9 @@ export default function ClientsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive {pendingArchive?.name}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Archive “{pendingArchive?.name}”?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               They come off the working list and can be restored at any time.
               {pendingArchive && pendingArchive.bidCount > 0 ? (

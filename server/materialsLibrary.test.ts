@@ -7,6 +7,7 @@
  * The merge tests are pure and always run. The rest need a database and are
  * skipped without DATABASE_URL, matching how v545.test.ts expects a real DB.
  */
+import { typedPrice } from "./typedPriceFixture";
 import { describe, it, expect, beforeAll } from "vitest";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
@@ -169,7 +170,7 @@ describe.skipIf(!hasDb)("baseline material seeding", () => {
       userId: USER,
       name: `Decimal probe ${Date.now()}`,
       unitOfSale: "each",
-      costPerUnit: "0.0800",
+      price: typedPrice(0.08, USER),
     });
     const row = await getMaterialById(id, USER);
     expect(row?.costPerUnit).toBe("0.0800");
@@ -437,7 +438,7 @@ describe.skipIf(!hasDb)("fork and revert", () => {
 
     const forkId = await forkMaterial(baselineId, USER);
     await updateMaterial(forkId, USER, {
-      costPerUnit: "99.0000",
+      price: typedPrice(99, USER),
       name: "My edited receptacle",
     });
 
@@ -456,7 +457,7 @@ describe.skipIf(!hasDb)("fork and revert", () => {
       userId: USER,
       name: "Custom widget",
       unitOfSale: "each",
-      costPerUnit: "3.0000",
+      price: typedPrice(3, USER),
     });
     await expect(revertMaterialToBaseline(customId, USER)).rejects.toThrow(
       /no original/i
@@ -504,7 +505,7 @@ describe.skipIf(!hasDb)("ownership", () => {
       userId: OTHER_USER,
       name: "Private to other user",
       unitOfSale: "each",
-      costPerUnit: "1.0000",
+      price: typedPrice(1, USER),
     });
     expect(await getMaterialById(id, USER)).toBeUndefined();
     expect(await getMaterialById(id, OTHER_USER)).toBeDefined();
@@ -515,7 +516,7 @@ describe.skipIf(!hasDb)("ownership", () => {
       userId: OTHER_USER,
       name: "Not yours",
       unitOfSale: "each",
-      costPerUnit: "1.0000",
+      price: typedPrice(1, USER),
     });
     await updateMaterial(id, USER, { name: "hijacked" });
     const row = await getMaterialById(id, OTHER_USER);
@@ -527,7 +528,7 @@ describe.skipIf(!hasDb)("ownership", () => {
       userId: USER,
       name: "Stays mine",
       unitOfSale: "each",
-      costPerUnit: "1.0000",
+      price: typedPrice(1, USER),
     });
     await updateMaterial(id, USER, {
       name: "Renamed",
@@ -543,7 +544,7 @@ describe.skipIf(!hasDb)("ownership", () => {
       userId: USER,
       name: "Temporary",
       unitOfSale: "each",
-      costPerUnit: "1.0000",
+      price: typedPrice(1, USER),
     });
     await archiveMaterial(id, USER);
     const rows = await getLibraryMaterials(USER);

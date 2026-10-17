@@ -51,6 +51,7 @@ import {
   unlockConfirmCopy,
   unlockedNoticeCopy,
 } from "@shared/quantityLock";
+import { errorText } from "@/lib/errorText";
 
 /**
  * How many changed quantities the confirmation lists before summarising.
@@ -98,7 +99,7 @@ export function QuantityLockPanel({
   };
 
   const lock = trpc.bids.lockQuantities.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: result => {
       toast.success(
         result.frozen === 1
@@ -110,7 +111,7 @@ export function QuantityLockPanel({
   });
 
   const unlock = trpc.bids.unlockQuantities.useMutation({
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(errorText(error)),
     onSuccess: () => {
       toast.success("Quantities follow your plans again.");
     },

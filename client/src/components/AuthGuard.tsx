@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { isSignInQuery, shouldDropAccountCache } from "@/lib/accountCache";
 import LoginPage from "@/pages/LoginPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import { isResetAddress } from "@/lib/resetLink";
@@ -7,6 +9,7 @@ import { inviteCodeFromHash, isSignupAddress } from "@/lib/signupLink";
 import LandingPageContainer from "@/pages/landing/LandingPageContainer";
 import { addressAfterSignOut, landingAfterSignIn } from "@/lib/signInLanding";
 import { Loader2 } from "lucide-react";
+import { SESSION_EXPIRED_KEY, expiryNotice } from "@/lib/sessionExpiry";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -30,9 +33,59 @@ interface AuthGuardProps {
  * hash-based, so every app URL shares the single wouter path this wraps.
  */
 export default function AuthGuard({ children }: AuthGuardProps) {
-  const { user, loading, refresh } = useAuth();
+  const { user, loading, refresh, error } = useAuth();
+  /*
+    The server could not reach its data (SERVICE_UNAVAILABLE from auth.me —
+    server/_core/context.ts). NOT "signed out": until 2026-10-14 this fell
+    through to the landing page, so a database blip showed a signed-in
+    contractor "Sign in / Get early access" (failure drill,
+    references/stress-results.md). Retried by itself every 10 s.
+  */
+  const unavailable =
+    !user &&
+    !!error &&
+    (error as { data?: { code?: string } }).data?.code ===
+      "SERVICE_UNAVAILABLE";
+
+  /*
+    The signed-in person changed (signed out, or someone else in): drop every
+    cached read but the sign-in check, so nothing read for one company is on
+    the next one's screen (@/lib/accountCache — company B saw company A's
+    bids after A signed out on the same tab). A database blip is not a
+    change of person, so it leaves the cache and the tracking alone.
+  */
+  const queryClient = useQueryClient();
+  const lastUserId = useRef<number | null>(null);
+  useEffect(() => {
+    if (unavailable || loading) return;
+    const next = user?.id ?? null;
+    if (shouldDropAccountCache(lastUserId.current, next))
+      queryClient.removeQueries({
+        predicate: query => !isSignInQuery(query.queryKey),
+      });
+    lastUserId.current = next;
+  }, [user?.id, unavailable, loading, queryClient]);
+  useEffect(() => {
+    if (!unavailable) return;
+    const timer = window.setInterval(() => refresh(), 10_000);
+    return () => window.clearInterval(timer);
+  }, [unavailable, refresh]);
+  /*
+    Signed out mid-work (client/src/lib/sessionExpiry.ts): read once, then
+    forgotten. With a note the sign-in form opens straight away, saying why,
+    instead of the marketing page.
+  */
+  const [expired] = useState(() => {
+    try {
+      const notice = expiryNotice(sessionStorage.getItem(SESSION_EXPIRED_KEY));
+      sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+      return notice;
+    } catch {
+      return null;
+    }
+  });
   /** A visitor asked to sign in, so the form replaces the marketing page. */
-  const [signingIn, setSigningIn] = useState(false);
+  const [signingIn, setSigningIn] = useState(expired !== null);
   /** Was this browser signed in at some point during this visit? */
   const wasSignedIn = useRef(false);
   /**
@@ -45,7 +98,9 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     isResetAddress(window.location.hash)
   );
   /** Said once on the sign-in form after a reset, then gone. */
-  const [signInNotice, setSignInNotice] = useState<string>();
+  const [signInNotice, setSignInNotice] = useState<string | undefined>(
+    expired ?? undefined
+  );
   /**
    * On a sign-up link — `#/signup`, usually `?invite=<code>` from an invite
    * (@/lib/signupLink). Read once, like the reset address; the code is kept
@@ -122,6 +177,28 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       </div>
     );
   }
+
+  if (unavailable)
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-background px-4">
+        <div className="max-w-sm text-center space-y-3">
+          <p className="text-base font-semibold text-foreground">
+            Can't reach BidRidge right now
+          </p>
+          <p className="text-sm text-muted-foreground">
+            You're still signed in and nothing you saved is lost. This is a
+            problem on our side — it tries again by itself every few seconds.
+          </p>
+          <button
+            type="button"
+            onClick={() => refresh()}
+            className="inline-flex h-9 items-center rounded-md bg-[#F5C518] px-4 text-sm font-medium text-black"
+          >
+            Try again now
+          </button>
+        </div>
+      </div>
+    );
 
   if (!user) {
     if (signingIn || signupLink)

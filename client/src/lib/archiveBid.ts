@@ -39,7 +39,7 @@ export function archiveConfirmCopy(bidName: string): {
   return {
     title: `Archive “${bidName}”?`,
     body:
-      `This bid moves to the Archive and is permanently deleted in ${RETENTION_DAYS} days ` +
+      `This bid moves to Recently deleted and is deleted for good in ${RETENTION_DAYS} days ` +
       `unless you restore it. Nothing about it changes in the meantime — its line items, ` +
       `pricing, plans and status all stay exactly as they are, and you can put it back at ` +
       `any point in that window.`,

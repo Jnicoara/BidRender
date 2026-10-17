@@ -1,3 +1,7 @@
+import { Suspense } from "react";
+import { preloadable } from "@/lib/preloadable";
+import { reloadingImport } from "@/lib/lazyPage";
+import { PageLoading } from "@/components/PageLoading";
 /**
  * BidRenderShell — Main layout shell
  * Desktop: fixed left sidebar (icon-only 64px, expands to 224px when the
@@ -21,30 +25,91 @@
  * The addresses they used to live at are not dead — see RETIRED_PATHS in
  * @/lib/appRoutes, which sends each to the screen that took its job and
  * rewrites the address bar so a bookmark heals itself.
+ *
+ * ── Changed 2026-10-14 (owner): daily work on top, setup at the bottom ──────
+ * Work is now Dashboard, Bids, Plans, Clients — the four things opened every
+ * day — and Library is Materials and Assemblies. Everything set up once and
+ * left alone sits in the bottom group, with Settings: Performance, Labor
+ * rates, Settings, Crew, and Admin for staff. Bids (/bids) and Plans (/plans)
+ * came back as SCREENS with content — a searchable list of every bid, and
+ * every bid with drawings — never as "which one?" choosers, which is what
+ * removed them before. On a phone the five bottom slots are Dashboard, Bids,
+ * Plans, Materials and More; More holds the rest.
  */
 import { useApp } from "@/contexts/AppContext";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { askToLeave, hasUnsaved } from "@/lib/unsavedGuard";
+import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
 import { useAuth } from "@/_core/hooks/useAuth";
-import SettingsPage from "@/pages/SettingsPage";
-import MaterialDatabasePage from "@/pages/MaterialDatabasePage";
+const loadSettingsPage = reloadingImport(() => import("@/pages/SettingsPage"));
+const SettingsPage = preloadable(loadSettingsPage, PageLoading);
+const loadMaterialDatabasePage = reloadingImport(
+  () => import("@/pages/MaterialDatabasePage")
+);
+const MaterialDatabasePage = preloadable(loadMaterialDatabasePage, PageLoading);
 import DashboardPage from "@/pages/DashboardPage";
 import { BackupHealthBanner } from "@/components/BackupHealthBanner";
-import AdminSettingsPage from "@/pages/AdminSettingsPage";
-import MaterialsLibraryPage from "@/pages/MaterialsLibraryPage";
-import LaborRatesPage from "@/pages/LaborRatesPage";
-import StarterUpdatesPage from "@/pages/StarterUpdatesPage";
-import ModifiersPage from "@/pages/ModifiersPage";
-import AssembliesLibraryPage from "@/pages/AssembliesLibraryPage";
-import BidsPage from "@/pages/BidsPage";
-import QuickBidPage from "@/pages/QuickBidPage";
-import TakeoffPage from "@/pages/TakeoffPage";
-import ProposalPage from "@/pages/ProposalPage";
-import BidArchivePage from "@/pages/BidArchivePage";
-import KitsPage from "@/pages/KitsPage";
-import ClientsPage from "@/pages/ClientsPage";
-import TeamPage from "@/pages/TeamPage";
-import FieldJobsPage from "@/pages/FieldJobsPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
+const loadAdminSettingsPage = reloadingImport(
+  () => import("@/pages/AdminSettingsPage")
+);
+const AdminSettingsPage = preloadable(loadAdminSettingsPage, PageLoading);
+const loadMaterialsLibraryPage = reloadingImport(
+  () => import("@/pages/MaterialsLibraryPage")
+);
+const MaterialsLibraryPage = preloadable(loadMaterialsLibraryPage, PageLoading);
+const loadLaborRatesPage = reloadingImport(
+  () => import("@/pages/LaborRatesPage")
+);
+const LaborRatesPage = preloadable(loadLaborRatesPage, PageLoading);
+const loadStarterUpdatesPage = reloadingImport(
+  () => import("@/pages/StarterUpdatesPage")
+);
+const StarterUpdatesPage = preloadable(loadStarterUpdatesPage, PageLoading);
+const loadModifiersPage = reloadingImport(
+  () => import("@/pages/ModifiersPage")
+);
+const ModifiersPage = preloadable(loadModifiersPage, PageLoading);
+const loadAssembliesLibraryPage = reloadingImport(
+  () => import("@/pages/AssembliesLibraryPage")
+);
+const AssembliesLibraryPage = preloadable(
+  loadAssembliesLibraryPage,
+  PageLoading
+);
+const loadBidsPage = reloadingImport(() => import("@/pages/BidsPage"));
+const BidsPage = preloadable(loadBidsPage, PageLoading);
+const loadQuickBidPage = reloadingImport(() => import("@/pages/QuickBidPage"));
+const QuickBidPage = preloadable(loadQuickBidPage, PageLoading);
+const loadTakeoffPage = reloadingImport(() => import("@/pages/TakeoffPage"));
+const TakeoffPage = preloadable(loadTakeoffPage, PageLoading);
+const loadProposalPage = reloadingImport(() => import("@/pages/ProposalPage"));
+const ProposalPage = preloadable(loadProposalPage, PageLoading);
+const loadBidArchivePage = reloadingImport(
+  () => import("@/pages/BidArchivePage")
+);
+const BidArchivePage = preloadable(loadBidArchivePage, PageLoading);
+const loadBidListPage = reloadingImport(() => import("@/pages/BidListPage"));
+const BidListPage = preloadable(loadBidListPage, PageLoading);
+const loadPlansIndexPage = reloadingImport(
+  () => import("@/pages/PlansIndexPage")
+);
+const PlansIndexPage = preloadable(loadPlansIndexPage, PageLoading);
+const loadTrashPage = reloadingImport(() => import("@/pages/TrashPage"));
+const TrashPage = preloadable(loadTrashPage, PageLoading);
+const loadKitsPage = reloadingImport(() => import("@/pages/KitsPage"));
+const KitsPage = preloadable(loadKitsPage, PageLoading);
+const loadClientsPage = reloadingImport(() => import("@/pages/ClientsPage"));
+const ClientsPage = preloadable(loadClientsPage, PageLoading);
+const loadTeamPage = reloadingImport(() => import("@/pages/TeamPage"));
+const TeamPage = preloadable(loadTeamPage, PageLoading);
+const loadAnalyticsPage = reloadingImport(
+  () => import("@/pages/AnalyticsPage")
+);
+const loadFieldJobsPage = reloadingImport(
+  () => import("@/pages/FieldJobsPage")
+);
+const FieldJobsPage = preloadable(loadFieldJobsPage, PageLoading);
+const AnalyticsPage = preloadable(loadAnalyticsPage, PageLoading);
 import FirstRunPage from "@/pages/FirstRunPage";
 import { useCompany } from "@/hooks/useCompany";
 import { trpc } from "@/lib/trpc";
@@ -59,7 +124,21 @@ import {
   Users,
   UsersRound,
   BarChart3,
+  FileStack,
+  Map as MapIcon,
+  MoreHorizontal,
+  Trash2,
+  HelpCircle,
 } from "lucide-react";
+import { GuideStrip } from "@/components/GuideStrip";
+import { HelpSearch } from "@/components/HelpSearch";
+import type { GuideScreen } from "@/lib/guide";
+import type { StepPlace } from "@shared/bidSteps";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { APP_VERSION_LABEL } from "@shared/version";
 import { buildAgeLabel, buildStampLabel } from "@shared/buildStamp";
@@ -81,13 +160,156 @@ import {
  * is what breaks quietly in a restructure — so the mapping is a table that can
  * be asserted without a browser rather than a switch statement in here.
  */
+/**
+ * Screens a bid can be opened FROM that its Back button should return to,
+ * with the word the button shows (owner, 2026-10-14: "Back returns where you
+ * were"). Anything else — a deep link, the welcome screen — goes back to the
+ * Dashboard as before.
+ */
+const BID_ORIGINS: Partial<Record<Route, string>> = {
+  dashboard: "Dashboard",
+  "bid-list": "Bids",
+  "plans-index": "Plans",
+  clients: "Clients",
+  analytics: "Performance",
+  "bid-archive": "Deleted bids",
+  trash: "Recently deleted",
+};
+/** The screens that belong to one bid: moving between them keeps the origin. */
+const BID_SCREENS: ReadonlySet<Route> = new Set<Route>([
+  "bids",
+  "takeoff",
+  "count",
+  "proposal",
+]);
+
 function getCurrentRouteState(): RouteState {
   const hash = window.location.hash;
   if (hash && hash.length > 1) return pathToRoute(hash);
   return pathToRoute(window.location.pathname);
 }
 
+// ── Sidebar nav item helpers ───────────────────────────────────────────────
+//
+// At MODULE level, never inside BidRenderShell (2026-10-14). They were
+// declared inside the shell's render, so every shell re-render made them a
+// NEW component type and React unmounted and rebuilt the whole menu — twice
+// in the first second after load, and again on any later re-render. A tap
+// whose press and release straddled a rebuild landed on a detached button
+// and did nothing: the first tap on Bids after opening the app was lost
+// (found by e2e/smoke/newScreens.spec.ts; client/src/lib/shellNavStable.test.ts
+// keeps them out here).
+const NavBtn = ({
+  onClick,
+  isActive,
+  icon: Icon,
+  label,
+  title,
+}: {
+  onClick: () => void;
+  isActive: boolean;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  title?: string;
+}) => (
+  <button
+    data-nav-trigger
+    onClick={onClick}
+    title={title ?? label}
+    className={cn(
+      "flex items-center gap-3 px-2.5 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
+      "hover:bg-accent hover:text-accent-foreground",
+      isActive ? "bp-tab-active text-foreground" : "text-muted-foreground"
+    )}
+  >
+    <Icon
+      size={20}
+      className={cn("shrink-0", isActive ? "text-[#F5C518]" : "")}
+    />
+    <span
+      className="whitespace-nowrap opacity-0 group-data-[open=true]:opacity-100 transition-opacity duration-150 truncate text-xs"
+      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+    >
+      {label}
+    </span>
+  </button>
+);
+
+/**
+ * A labelled group of nav items.
+ *
+ * ── Why it has two appearances ──────────────────────────────────────────────
+ * The sidebar is 64px of icons until you hover it, so a text heading alone
+ * would leave the grouping invisible in the state the sidebar is in almost
+ * all of the time. Collapsed, each group is separated by a hairline rule;
+ * expanded, that rule is replaced by the actual word. Either way the three
+ * purposes read as three things rather than one long list.
+ *
+ * The headings are plain nouns naming what the group is FOR — Work, Library,
+ * Company — so someone scanning top to bottom can tell daily tools from
+ * building blocks from the things they set up once.
+ */
+const NavSection = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div className="flex flex-col gap-1">
+    <div className="px-2.5 pt-3 pb-1 first:pt-1">
+      <span
+        className="hidden group-data-[open=true]:block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap"
+        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+      >
+        {label}
+      </span>
+      {/* Collapsed stand-in for the heading. aria-hidden because the group is
+          already named for assistive tech by the <nav> aria-label below. */}
+      <span
+        className="block group-data-[open=true]:hidden h-px bg-sidebar-border mx-1"
+        aria-hidden
+      />
+    </div>
+    {children}
+  </div>
+);
+
+/**
+ * Every page's loader, fetched in the background a few seconds after the
+ * first screen is up, so a later click is instant on a good signal — while
+ * the first screen, on a weak one, waits for none of them (stress run,
+ * 2026-10-15: 834 KB → 217 KB gzipped before the Dashboard shows).
+ */
+const PAGE_LOADERS = [
+  SettingsPage.preload,
+  MaterialDatabasePage.preload,
+  AdminSettingsPage.preload,
+  MaterialsLibraryPage.preload,
+  LaborRatesPage.preload,
+  ModifiersPage.preload,
+  AssembliesLibraryPage.preload,
+  BidsPage.preload,
+  QuickBidPage.preload,
+  TakeoffPage.preload,
+  ProposalPage.preload,
+  BidArchivePage.preload,
+  BidListPage.preload,
+  PlansIndexPage.preload,
+  TrashPage.preload,
+  KitsPage.preload,
+  ClientsPage.preload,
+  TeamPage.preload,
+  AnalyticsPage.preload,
+];
+
 export default function BidRenderShell() {
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      for (const load of PAGE_LOADERS) void load().catch(() => {});
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const { uiFontScale } = useApp();
 
   const { user } = useAuth();
@@ -108,6 +330,8 @@ export default function BidRenderShell() {
     getCurrentRouteState()
   );
   const [previousRoute, setPreviousRoute] = useState<Route>("dashboard");
+  /** Where the current bid was opened from — see BID_ORIGINS. */
+  const [bidOrigin, setBidOrigin] = useState<Route>("dashboard");
   /** Whether the desktop nav is widened — see the aside for what opens it. */
   const [navOpen, setNavOpen] = useState(false);
 
@@ -150,11 +374,33 @@ export default function BidRenderShell() {
     }
   }, [navigate, previousRoute]);
 
+  /** The address the screen is showing — where a declined leave returns to. */
+  const shownHref = useRef(window.location.href);
   useEffect(() => {
     const onHashChange = () => {
+      /*
+        An editor holds unsaved work (@/lib/unsavedGuard): put the address
+        back and ask first. Discard follows the link it was asked about.
+        Back fires popstate AND hashchange; the second sees the address
+        already put back and changes nothing.
+      */
+      const href = window.location.href;
+      if (href !== shownHref.current && hasUnsaved()) {
+        const target = window.location.hash;
+        window.history.replaceState(null, "", shownHref.current);
+        askToLeave(() => {
+          window.location.hash = target;
+        });
+        return;
+      }
+      shownHref.current = href;
       const state = getCurrentRouteState();
       setRouteState(prev => {
         setPreviousRoute(prev.route);
+        // Entering a bid from outside it: remember where from. Moving
+        // between the bid, its plans, its count and its proposal does not.
+        if (BID_SCREENS.has(state.route) && !BID_SCREENS.has(prev.route))
+          setBidOrigin(BID_ORIGINS[prev.route] ? prev.route : "dashboard");
         return state;
       });
     };
@@ -223,6 +469,113 @@ export default function BidRenderShell() {
   const isInCount = route === "count";
   const isOnWelcome = route === "welcome";
   const isInAdmin = route === "admin";
+  const isInBidList = route === "bid-list";
+  const isInPlansIndex = route === "plans-index";
+  const isInTrash = route === "trash" || route === "bid-archive";
+  /** Which Work entry a per-bid screen belongs to: the plans to Plans, the
+   *  rest of a bid (the bid, its count, its proposal) to Bids. */
+  const bidsActive = isInBidList || isInBids || isInCount || isInProposal;
+  const plansActive = isInPlansIndex || isInTakeoff;
+  /** What the phone's More menu holds — every destination that is not one
+   *  of the four daily slots, in the laptop's order. */
+  const moreItems = [
+    {
+      label: "Clients",
+      icon: Users,
+      active: isInClients,
+      go: () => navigate("clients"),
+    },
+    {
+      label: "Assemblies",
+      icon: Layers,
+      active: isInLibraryAsms,
+      go: () => navigate("library-assemblies"),
+    },
+    ...(canSeeAnalytics
+      ? [
+          {
+            label: "Performance",
+            icon: BarChart3,
+            active: isInAnalytics,
+            go: () => navigate("analytics"),
+          },
+        ]
+      : []),
+    {
+      label: "Labor rates",
+      icon: HardHat,
+      active: isInLaborRates,
+      go: () => navigate("library-labor-rates"),
+    },
+    {
+      label: "Recently deleted",
+      icon: Trash2,
+      active: isInTrash,
+      go: () => navigate("trash"),
+    },
+    {
+      label: "Where do I…?",
+      icon: HelpCircle,
+      active: false,
+      go: () => setHelpOpen(true),
+    },
+    {
+      label: "Settings",
+      icon: Settings,
+      active: isInSettings,
+      go: () => navigate("settings"),
+    },
+    {
+      label: "Crew",
+      icon: UsersRound,
+      active: isInTeam,
+      go: () => navigate("team"),
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Admin",
+            icon: Shield,
+            active: isInAdmin,
+            go: () => navigate("admin"),
+          },
+        ]
+      : []),
+  ];
+  const moreActive = moreItems.some(item => item.active);
+
+  // ── Guide mode (client/src/lib/guide.ts) ────────────────────────────────
+  // "Where do I…?" opens from the guide strip, the sidebar and More.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const guideScreen: GuideScreen = isOnDashboard
+    ? "dashboard"
+    : isInBids && activeProjectId
+      ? "bid"
+      : isInTakeoff
+        ? "plans"
+        : isInCount
+          ? "count"
+          : isInProposal
+            ? "proposal"
+            : "other";
+  const guideBidId =
+    guideScreen !== "dashboard" && guideScreen !== "other" && activeProjectId
+      ? activeProjectId
+      : null;
+  const guideGo = (place: StepPlace) => {
+    if (!guideBidId) return;
+    navigate(
+      place === "plans"
+        ? "takeoff"
+        : place === "proposal"
+          ? "proposal"
+          : "bids",
+      { id: guideBidId }
+    );
+  };
+  /** The phone's More menu, shut whenever the screen changes. */
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [route, activeView]);
 
   /**
    * Send a brand-new account to the welcome screen instead of the Dashboard.
@@ -259,7 +612,7 @@ export default function BidRenderShell() {
       <div className="flex-1 min-h-0">
         <DashboardPage
           onOpenBid={openBid}
-          onOpenArchive={() => navigate("bid-archive")}
+          onOpenArchive={() => navigate("trash")}
           onOpenPlans={id => navigate("takeoff", { id })}
           onCount={id => navigate("count", { id })}
         />
@@ -275,6 +628,32 @@ export default function BidRenderShell() {
     if (route === "jobs")
       return <FieldJobsPage onOpenPlans={id => navigate("takeoff", { id })} />;
     if (isOnDashboard) return dashboard;
+    if (isInBidList)
+      return (
+        <BidListPage
+          onOpenBid={openBid}
+          onOpenPlans={id => navigate("takeoff", { id })}
+          onCount={id => navigate("count", { id })}
+          onOpenArchive={() => navigate("trash")}
+        />
+      );
+    if (route === "trash")
+      return (
+        <TrashPage
+          onOpenBidArchive={() => navigate("bid-archive")}
+          go={hash => {
+            window.location.hash = hash;
+          }}
+        />
+      );
+    if (isInPlansIndex)
+      return (
+        <PlansIndexPage
+          onOpenBid={openBid}
+          onOpenPlans={id => navigate("takeoff", { id })}
+          onCount={id => navigate("count", { id })}
+        />
+      );
     if (isInSettings)
       return (
         <SettingsPage section={(activeView ?? "pricing") as SettingsSection} />
@@ -299,16 +678,16 @@ export default function BidRenderShell() {
       if (activeView === "modifiers") return <ModifiersPage />;
       return <AssembliesLibraryPage />;
     }
-    // Keyed on the id so a fresh /bids/:id remounts into that bid. There is no
-    // list mode any more — /bids redirects to the Dashboard, which carried the
-    // same search and the same New bid all along.
+    // Keyed on the id so a fresh /bids/:id remounts into that bid. The bare
+    // /bids is the Bids list above (back since 2026-10-14).
     if (isInBids && activeProjectId)
       return (
         <BidsPage
           key={activeProjectId}
           bidId={activeProjectId}
           fixLineId={routeState.fixLineId}
-          onBack={() => navigate("dashboard")}
+          backLabel={BID_ORIGINS[bidOrigin] ?? "Dashboard"}
+          onBack={() => navigate(bidOrigin)}
         />
       );
     if (isInTakeoff && activeProjectId) {
@@ -351,10 +730,7 @@ export default function BidRenderShell() {
     }
     if (isInBidArchive)
       return (
-        <BidArchivePage
-          onBack={() => navigate("dashboard")}
-          onOpenBid={openBid}
-        />
+        <BidArchivePage onBack={() => navigate("trash")} onOpenBid={openBid} />
       );
     if (isInClients) return <ClientsPage />;
     if (isInTeam) return <TeamPage />;
@@ -370,83 +746,6 @@ export default function BidRenderShell() {
   // replays the enter transition instead of swapping content under a static
   // frame — the tab strip is the only thing telling you the screen changed.
   const routeKey = `${route}:${activeView ?? ""}`;
-
-  // ── Sidebar nav item helper ────────────────────────────────────────────────
-  const NavBtn = ({
-    onClick,
-    isActive,
-    icon: Icon,
-    label,
-    title,
-  }: {
-    onClick: () => void;
-    isActive: boolean;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    label: string;
-    title?: string;
-  }) => (
-    <button
-      data-nav-trigger
-      onClick={onClick}
-      title={title ?? label}
-      className={cn(
-        "flex items-center gap-3 px-2.5 py-2.5 rounded-md text-sm font-medium transition-all duration-150",
-        "hover:bg-accent hover:text-accent-foreground",
-        isActive ? "bp-tab-active text-foreground" : "text-muted-foreground"
-      )}
-    >
-      <Icon
-        size={20}
-        className={cn("shrink-0", isActive ? "text-[#F5C518]" : "")}
-      />
-      <span
-        className="whitespace-nowrap opacity-0 group-data-[open=true]:opacity-100 transition-opacity duration-150 truncate text-xs"
-        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-      >
-        {label}
-      </span>
-    </button>
-  );
-
-  /**
-   * A labelled group of nav items.
-   *
-   * ── Why it has two appearances ──────────────────────────────────────────────
-   * The sidebar is 64px of icons until you hover it, so a text heading alone
-   * would leave the grouping invisible in the state the sidebar is in almost
-   * all of the time. Collapsed, each group is separated by a hairline rule;
-   * expanded, that rule is replaced by the actual word. Either way the three
-   * purposes read as three things rather than one long list.
-   *
-   * The headings are plain nouns naming what the group is FOR — Work, Library,
-   * Company — so someone scanning top to bottom can tell daily tools from
-   * building blocks from the things they set up once.
-   */
-  const NavSection = ({
-    label,
-    children,
-  }: {
-    label: string;
-    children: React.ReactNode;
-  }) => (
-    <div className="flex flex-col gap-1">
-      <div className="px-2.5 pt-3 pb-1 first:pt-1">
-        <span
-          className="hidden group-data-[open=true]:block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 whitespace-nowrap"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          {label}
-        </span>
-        {/* Collapsed stand-in for the heading. aria-hidden because the group is
-            already named for assistive tech by the <nav> aria-label below. */}
-        <span
-          className="block group-data-[open=true]:hidden h-px bg-sidebar-border mx-1"
-          aria-hidden
-        />
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <div
@@ -479,6 +778,7 @@ export default function BidRenderShell() {
       className="relative flex h-dvh w-full overflow-hidden bg-background"
       style={{ zoom: uiFontScale }}
     >
+      <UnsavedChangesDialog />
       {/* ── Desktop Sidebar ─────────────────────────────────────── */}
       {/*
         ── It opens from its BUTTONS, not from anywhere over it ────────────────
@@ -530,162 +830,194 @@ export default function BidRenderShell() {
             <span className="text-[#F5C518]">Ridge</span>
           </span>
         </div>
-
         {/*
           Three groups, in the order a job goes: what you open every day, what
           you build once and reuse, and what you set up and forget.
 
-          ── What is deliberately absent ──────────────────────────────────────
-          Bids, Quick bid, Kits, Modifiers and Supplier Pricing are not hidden;
-          they are not destinations. The first two were choosers over lists the
-          Dashboard already shows, and the last three are views of the screen
-          above them in this list. Every one of their addresses still resolves
-          (see RETIRED_PATHS).
+          ── Changed 2026-10-14 (owner) ───────────────────────────────────────
+          Work is the daily work: Dashboard, Bids, Plans, Clients. Bids and
+          Plans are back as SCREENS — every bid as a searchable list, every
+          bid with drawings — so neither dead-ends on "which one?", the fault
+          that took the old Bids list and Quick bid's chooser out of here.
+          Labor rates and Performance moved down to the bottom group with
+          Settings: both are set up or read now and then, not used daily.
 
-          The Archive is not here either, and that is a change: it is offered on
-          the Dashboard and on a bid, but only once something is IN it. A
-          permanent entry to a room that is empty for most users most of the
-          time is a door to nowhere, and it was sitting in the group people
-          scan when they are lost.
-
-          Takeoff is absent for the original reason: it lives at /bids/:id/plans
-          and needs a bid to open, so a top-level entry would dead-end on
-          "which one?" — which is exactly the fault that removed Bids and Quick
-          bid from this list too.
+          Still absent on purpose: Quick bid, Kits, Modifiers and Supplier
+          Pricing (views of other screens; RETIRED_PATHS), and the Archive,
+          which is offered on the Dashboard, the Bids list and a bid only once
+          something is IN it — a permanent door to an empty room is a door to
+          nowhere.
         */}
-        <nav
-          className="flex flex-col gap-1 p-2 flex-1 overflow-y-auto"
-          aria-label="Main"
-        >
-          {/* A Field member's whole nav: their jobs. Everything else in this
-              list is money or company setup (field-and-coowner-plan.md, F3). */}
-          {fieldOnly ? (
-            <NavSection label="Work">
-              <NavBtn
-                onClick={() => navigate("jobs")}
-                isActive={route === "jobs" || isInTakeoff}
-                icon={LayoutDashboard}
-                label="Jobs"
-                title="Jobs — the plans, what was counted, the materials to pull"
-              />
-            </NavSection>
-          ) : (
-            <>
+        {/*
+          ONE scroll area for both groups (2026-10-14). The Work/Library nav
+          used to be the part that gave, with the Company group pinned below
+          it: on a phone turned sideways (375 px tall) it gave everything, and
+          Dashboard, Bids, Plans, Clients, Materials and Assemblies shrank to
+          a zero-height box (found by the rotate drill). Now the Company group
+          is pushed to the bottom by mt-auto when there is room, and the
+          whole menu scrolls together when there is not.
+        */}
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          <nav className="flex flex-col gap-1 p-2 shrink-0" aria-label="Main">
+            {/* A Field member's whole nav: their jobs. Everything else in this
+                list is money or company setup (field-and-coowner-plan.md, F3). */}
+            {fieldOnly ? (
               <NavSection label="Work">
                 <NavBtn
-                  onClick={() => navigate("dashboard")}
-                  isActive={isOnDashboard || isInBids || isInTakeoff}
+                  onClick={() => navigate("jobs")}
+                  isActive={route === "jobs" || isInTakeoff}
                   icon={LayoutDashboard}
-                  label="Dashboard"
-                  title="Dashboard — every bid by stage, and where a new one starts"
-                />
-                {/* Business data about people outside the company, not
-                configuration — so it stays out here rather than going under
-                Company with the settings. It sits next to the Dashboard
-                because a bid is what it attaches to. */}
-                <NavBtn
-                  onClick={() => navigate("clients")}
-                  isActive={isInClients}
-                  icon={Users}
-                  label="Clients"
-                  title="Clients — who the work is for"
-                />
-                {/* Last in Work, and only for those who hold the capability. The
-                one read-only screen in the app: reporting behind a
-                configuration menu is reporting nobody opens. */}
-                {canSeeAnalytics && (
-                  <NavBtn
-                    onClick={() => navigate("analytics")}
-                    isActive={isInAnalytics}
-                    icon={BarChart3}
-                    label="Performance"
-                    title="Performance — win rate and what the work earned"
-                  />
-                )}
-              </NavSection>
-
-              <NavSection label="Library">
-                {/* Materials carries its own supply-house lens as a tab. Two nav
-                entries for one table meant an estimator had to know which
-                address owned the field they wanted to edit. */}
-                <NavBtn
-                  onClick={() => navigate("library-materials")}
-                  isActive={isInLibraryMats}
-                  icon={Boxes}
-                  label="Materials"
-                  title="Materials — the catalog, and your supplier's prices on it"
-                />
-                {/* Rare after setup, but it is the first onboarding step and the
-                rate multiplies every line of every bid, so it stays findable
-                on its own rather than becoming a tab. */}
-                <NavBtn
-                  onClick={() => navigate("library-labor-rates")}
-                  isActive={isInLaborRates}
-                  icon={HardHat}
-                  label="Labor rates"
-                  title="Labor rates — what an hour costs, by role"
-                />
-                {/* Kits and Modifiers are tabs in here: a kit contains assemblies
-                and nothing else, and a modifier adjusts an assembly's labor,
-                so neither means anything without this screen. */}
-                <NavBtn
-                  onClick={() => navigate("library-assemblies")}
-                  isActive={isInLibraryAsms}
-                  icon={Layers}
-                  label="Assemblies"
-                  title="Assemblies — recipes, kits and job-condition modifiers"
+                  label="Jobs"
+                  title="Jobs — the plans, what was counted, the materials to pull"
                 />
               </NavSection>
-            </>
-          )}
-        </nav>
-
-        {/* Company sits outside the scrolling nav so it stays reachable at the
-            bottom however long the Library grows. */}
-        <div className="flex flex-col gap-1 p-2 pt-0 shrink-0">
-          <NavSection label="Company">
-            <NavBtn
-              onClick={() =>
-                fieldOnly
-                  ? navigate("settings", { view: "account" })
-                  : navigate("settings")
-              }
-              isActive={isInSettings}
-              icon={Settings}
-              label={fieldOnly ? "Account" : "Settings"}
-              title={
-                fieldOnly
-                  ? "Account — your password and sign-out"
-                  : "Settings — pricing defaults, branding, tax and display"
-              }
-            />
-            {!fieldOnly && (
+            ) : (
               <>
-                {/* Here rather than in Work: hiring is not a working rhythm, and
-                this screen is invite codes and role assignment. Shown to every
-                member whatever their role — a viewer needs to be able to find
-                out that they are a viewer. */}
-                <NavBtn
-                  onClick={() => navigate("team")}
-                  isActive={isInTeam}
-                  icon={UsersRound}
-                  label="Crew"
-                  title="Crew — who can get into this company"
-                />
-                {/* Admin only, and last: nobody else has it, and those who do do
-                not need it above the things they use. */}
-                {isAdmin && (
+                <NavSection label="Work">
                   <NavBtn
-                    onClick={() => navigate("admin")}
-                    isActive={isInAdmin}
-                    icon={Shield}
-                    label="Admin"
-                    title="Admin settings"
+                    onClick={() => navigate("dashboard")}
+                    isActive={isOnDashboard}
+                    icon={LayoutDashboard}
+                    label="Dashboard"
+                    title="Dashboard — every bid by stage, and where a new one starts"
                   />
-                )}
+                  <NavBtn
+                    onClick={() => navigate("bid-list")}
+                    isActive={bidsActive}
+                    icon={FileStack}
+                    label="Bids"
+                    title="Bids — every bid in one list, searchable"
+                  />
+                  <NavBtn
+                    onClick={() => navigate("plans-index")}
+                    isActive={plansActive}
+                    icon={MapIcon}
+                    label="Plans"
+                    title="Plans — every bid with drawings, and Upload a plan"
+                  />
+                  {/* Business data about people outside the company, not
+                    configuration — so it stays out here rather than going under
+                    Company with the settings. */}
+                  <NavBtn
+                    onClick={() => navigate("clients")}
+                    isActive={isInClients}
+                    icon={Users}
+                    label="Clients"
+                    title="Clients — who the work is for"
+                  />
+                </NavSection>
+
+                <NavSection label="Library">
+                  {/* Materials carries its own supply-house lens as a tab. Two nav
+                    entries for one table meant an estimator had to know which
+                    address owned the field they wanted to edit. */}
+                  <NavBtn
+                    onClick={() => navigate("library-materials")}
+                    isActive={isInLibraryMats}
+                    icon={Boxes}
+                    label="Materials"
+                    title="Materials — the catalog, and your supplier's prices on it"
+                  />
+                  {/* Kits and Modifiers are tabs in here: a kit contains assemblies
+                    and nothing else, and a modifier adjusts an assembly's labor,
+                    so neither means anything without this screen. */}
+                  <NavBtn
+                    onClick={() => navigate("library-assemblies")}
+                    isActive={isInLibraryAsms}
+                    icon={Layers}
+                    label="Assemblies"
+                    title="Assemblies — recipes, kits and job-condition modifiers"
+                  />
+                </NavSection>
               </>
             )}
-          </NavSection>
+          </nav>
+
+          {/* The bottom group: what you set up once or read now and then, with
+            Settings as the anchor. It sat OUTSIDE the scrolling nav, pinned,
+            until 2026-10-14 — which is what squeezed the nav above it to
+            nothing on a short screen. It now shares the one scroll area and
+            sits at the bottom by mt-auto (see the wrapper above). */}
+          <div className="flex flex-col gap-1 p-2 pt-0 shrink-0 mt-auto">
+            <NavSection label="Company">
+              {fieldOnly ? (
+                <NavBtn
+                  onClick={() => navigate("settings", { view: "account" })}
+                  isActive={isInSettings}
+                  icon={Settings}
+                  label="Account"
+                  title="Account — your password and sign-out"
+                />
+              ) : (
+                <>
+                  {/* Only for those who hold the capability. */}
+                  {canSeeAnalytics && (
+                    <NavBtn
+                      onClick={() => navigate("analytics")}
+                      isActive={isInAnalytics}
+                      icon={BarChart3}
+                      label="Performance"
+                      title="Performance — win rate and what the work earned"
+                    />
+                  )}
+                  {/* Rare after setup, but the first onboarding step and the rate
+                    multiplies every line of every bid, so it keeps its own entry
+                    rather than becoming a Settings tab. */}
+                  <NavBtn
+                    onClick={() => navigate("library-labor-rates")}
+                    isActive={isInLaborRates}
+                    icon={HardHat}
+                    label="Labor rates"
+                    title="Labor rates — what an hour costs, by role"
+                  />
+                  {/* Always shown, even empty (owner, 2026-10-14: "one easy-to-find
+                    place"). Unlike the old Archive entry, an empty page here
+                    still says something useful: where deleted things go. */}
+                  <NavBtn
+                    onClick={() => navigate("trash")}
+                    isActive={isInTrash}
+                    icon={Trash2}
+                    label="Recently deleted"
+                    title="Recently deleted — everything archived, with Restore"
+                  />
+                  {/* Guide mode's help search: local, no AI (helpTopics.ts). */}
+                  <NavBtn
+                    onClick={() => setHelpOpen(true)}
+                    isActive={false}
+                    icon={HelpCircle}
+                    label="Where do I…?"
+                    title="Where do I…? — find where anything is done"
+                  />
+                  <NavBtn
+                    onClick={() => navigate("settings")}
+                    isActive={isInSettings}
+                    icon={Settings}
+                    label="Settings"
+                    title="Settings — pricing defaults, branding, tax and display"
+                  />
+                  {/* Shown to every member whatever their role — a viewer needs to
+                    be able to find out that they are a viewer. */}
+                  <NavBtn
+                    onClick={() => navigate("team")}
+                    isActive={isInTeam}
+                    icon={UsersRound}
+                    label="Crew"
+                    title="Crew — who can get into this company"
+                  />
+                  {/* Staff only, and last. */}
+                  {isAdmin && (
+                    <NavBtn
+                      onClick={() => navigate("admin")}
+                      isActive={isInAdmin}
+                      icon={Shield}
+                      label="Admin"
+                      title="Admin"
+                    />
+                  )}
+                </>
+              )}
+            </NavSection>
+          </div>
         </div>
 
         {/*
@@ -736,34 +1068,42 @@ export default function BidRenderShell() {
             <span>
               {isOnDashboard
                 ? "Dashboard"
-                : isInSettings
-                  ? "Settings"
-                  : activeView === "updates" &&
-                      (isInLibraryMats || isInLibraryAsms || isInLaborRates)
-                    ? "Updates"
-                    : isInLibraryMats
-                      ? activeView === "pricing"
-                        ? "Supplier pricing"
-                        : "Materials"
-                      : isInLibraryAsms
-                        ? activeView === "kits"
-                          ? "Kits"
-                          : activeView === "modifiers"
-                            ? "Modifiers"
-                            : "Assemblies"
-                        : isInLaborRates
-                          ? "Labor Rates"
-                          : isInClients
-                            ? "Clients"
-                            : isInTeam
-                              ? "Crew"
-                              : isInAnalytics
-                                ? "Performance"
-                                : isInAdmin
-                                  ? "Admin"
-                                  : route === "jobs"
-                                    ? "Jobs"
-                                    : "Bid"}
+                : route === "trash"
+                  ? "Recently deleted"
+                  : isInBidList
+                    ? "Bids"
+                    : isInPlansIndex
+                      ? "Plans"
+                      : isInSettings
+                        ? "Settings"
+                        : activeView === "updates" &&
+                            (isInLibraryMats ||
+                              isInLibraryAsms ||
+                              isInLaborRates)
+                          ? "Updates"
+                          : isInLibraryMats
+                            ? activeView === "pricing"
+                              ? "Supplier pricing"
+                              : "Materials"
+                            : isInLibraryAsms
+                              ? activeView === "kits"
+                                ? "Kits"
+                                : activeView === "modifiers"
+                                  ? "Modifiers"
+                                  : "Assemblies"
+                              : isInLaborRates
+                                ? "Labor rates"
+                                : isInClients
+                                  ? "Clients"
+                                  : isInTeam
+                                    ? "Crew"
+                                    : isInAnalytics
+                                      ? "Performance"
+                                      : isInAdmin
+                                        ? "Admin"
+                                        : route === "jobs"
+                                          ? "Jobs"
+                                          : "Bid"}
             </span>
           </div>
         </header>
@@ -773,18 +1113,31 @@ export default function BidRenderShell() {
           className="flex-1 min-h-0 overflow-hidden tab-enter"
           key={routeKey}
         >
-          {renderContent()}
+          {/* Pages arrive on demand (lib/lazyPage.ts); a quiet line after
+              300 ms if one is slow, never a blank screen. */}
+          <Suspense fallback={<PageLoading />}>{renderContent()}</Suspense>
         </div>
+
+        {/* Guide mode: one tip, under the work, never over it. */}
+        <GuideStrip
+          screen={guideScreen}
+          bidId={guideBidId}
+          onGo={guideGo}
+          onOpenHelp={() => setHelpOpen(true)}
+        />
+        <HelpSearch open={helpOpen} onOpenChange={setHelpOpen} />
 
         {/*
         ── Mobile Bottom Nav ──────────────────────────────────────────────────
-        Five slots, and now they hold five of the eight real destinations
-        rather than two choosers and three screens. Performance, Crew and Admin
-        are reachable from Settings and are not things anyone does on a phone
-        in a truck.
+        Five slots (owner, 2026-10-14): the four daily ones — Dashboard, Bids,
+        Plans, Materials — and More, which opens everything else in one tap.
+        Each slot now shows its word under the icon; five bare glyphs were a
+        guessing game on the smallest screen.
 
-        It previously spent two of the five on Bids and Quick bid, which on the
-        smallest screen was the most expensive place to put a "which one?".
+        Until 2026-10-14 the slots were Dashboard, Clients, Materials,
+        Assemblies and Settings, and before that two of them were Bids and
+        Quick bid CHOOSERS. Bids and Plans are back as lists with content of
+        their own, which is the difference.
       */}
         {/*
         Not on the Plans screen (track-b-phone-and-readability-plan.md § 3):
@@ -828,32 +1181,26 @@ export default function BidRenderShell() {
                 {
                   label: "Dashboard",
                   icon: LayoutDashboard,
-                  active: isOnDashboard || isInBids || isInTakeoff,
+                  active: isOnDashboard,
                   go: () => navigate("dashboard"),
                 },
                 {
-                  label: "Clients",
-                  icon: Users,
-                  active: isInClients,
-                  go: () => navigate("clients"),
+                  label: "Bids",
+                  icon: FileStack,
+                  active: bidsActive,
+                  go: () => navigate("bid-list"),
+                },
+                {
+                  label: "Plans",
+                  icon: MapIcon,
+                  active: plansActive,
+                  go: () => navigate("plans-index"),
                 },
                 {
                   label: "Materials",
                   icon: Boxes,
                   active: isInLibraryMats,
                   go: () => navigate("library-materials"),
-                },
-                {
-                  label: "Assemblies",
-                  icon: Layers,
-                  active: isInLibraryAsms,
-                  go: () => navigate("library-assemblies"),
-                },
-                {
-                  label: "Settings",
-                  icon: Settings,
-                  active: isInSettings,
-                  go: () => navigate("settings"),
                 },
               ] as const)
           ).map(item => (
@@ -871,11 +1218,59 @@ export default function BidRenderShell() {
                 size={18}
                 className={item.active ? "text-[#F5C518]" : ""}
               />
+              {item.label}
               {item.active && (
                 <span className="absolute top-0 left-0 right-0 h-0.5 bg-[#F5C518] rounded-b" />
               )}
             </button>
           ))}
+          {/* More: everything that is not daily work, in the same order as
+              the laptop's lower groups. One tap opens it; picking closes it
+              (the effect on route above). A Field member has none of them. */}
+          {!fieldOnly && (
+            <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  aria-label="More"
+                  aria-current={moreActive ? "page" : undefined}
+                  className={cn(
+                    "flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-colors duration-150 relative",
+                    moreActive ? "text-[#F5C518]" : "text-muted-foreground"
+                  )}
+                >
+                  <MoreHorizontal
+                    size={18}
+                    className={moreActive ? "text-[#F5C518]" : ""}
+                  />
+                  More
+                  {moreActive && (
+                    <span className="absolute top-0 left-0 right-0 h-0.5 bg-[#F5C518] rounded-b" />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="top"
+                align="end"
+                className="w-56 p-1"
+                aria-label="More destinations"
+              >
+                {moreItems.map(item => (
+                  <button
+                    key={item.label}
+                    onClick={item.go}
+                    aria-current={item.active ? "page" : undefined}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm text-left hover:bg-accent",
+                      item.active ? "text-[#F5C518]" : "text-foreground"
+                    )}
+                  >
+                    <item.icon size={18} className="shrink-0" />
+                    {item.label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
         </nav>
       </main>
     </div>
