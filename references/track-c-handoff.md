@@ -23,6 +23,14 @@ create and drop yourself are exempt. (Prompted by a false alarm: on
 it was a release step never run there. The rule stands anyway: the cost of
 saying it is one line.)
 
+## ALL TRACKS, when you merge `dddcf3e1` or later: local times shift once
+
+The app's pool is now UTC on the wire and in the session, as production and
+the Gate already were (`server/appPool.ts`). A time the app WROTE into your
+LOCAL database before this, under your laptop's Pacific session, now reads
+7 h later. Local test data only — production never had the split, and a
+fresh test DB is unaffected. Nothing to run; just don't chase it as a bug.
+
 ## (newest) 2026-10-16, evening — smoke fix, levels plan, todo items
 
 - **Smoke red since C landed (0fc489bf), fixed on track-c `843a032e`:**
