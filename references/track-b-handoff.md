@@ -1,5 +1,15 @@
 # Track B handoff — 2026-10-05
 
+## BM migrations applied (0164+0165 on local-dev + staging)
+
+local-dev `5c089c11`; staging DB 166 / FKs 209 (backup first, 1,589 bids 0
+differ). **You can wire the bid-methods screens.** Column and table names,
+the three guard-test decisions, and "run `migrate.mts` on
+`bidrender_test_b` after you merge" are in the section "BM migrations
+applied (2026-10-16 ~23:30 UTC)" below. **RELEASE FREEZE** (owner): no new
+migration reaches local-dev until live is done — anything new is drafted
+as 0166+ on track-a-night only.
+
 ## BM migrations applied (2026-10-16 ~23:30 UTC) — merge local-dev, then wire
 
 Your BM-M1..M10 are **migration `0165_bid_methods_prevailing_wage`** (with
