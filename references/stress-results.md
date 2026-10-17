@@ -550,3 +550,49 @@ no half-written file was left on disk. **Passes.** One wording note for B
 (TakeoffPage is B's screen): "rather than retrying" sits beside a Retry
 button; on a full disk a later retry is exactly what works. Screenshots:
 `overnight-shots/drill-upload-refused*.png`.
+
+## Stage-7 harness in CI — Track A, 2026-10-16 night (`.github/workflows/stress.yml`)
+
+Manual: push a `stress-*` branch. **Server job** on a brand-new runner
+MySQL (migrated + seeded like the Gate); **browser job** on staging (smoke
+account, throwaway "CI smoke" bids, swept). Correctness fails the run;
+timings are `[stress]` / `[big]` lines. Limits: a screen 2 s, a save 1 s
+(`server/speedLimits.test.ts`).
+
+### Run 1 — server job, `stress-night` 965769cf (run 39004314728), GREEN
+
+Candidate code = local-dev `448d1281` + the stale-save fix (`ad37ca26`).
+
+| What | Measured | Limit |
+| --- | --- | --- |
+| Big company built: 251 bids × 50 marks sent, + one bid with a 500-sheet set and 5,000 marks on one sheet | 10 s to build | — |
+| Dashboard (251 bids) | median 100 ms | 1 s (Dashboard) |
+| Bid with 5,000 marks | 44 ms | 2 s |
+| Plans, the 5,000-mark sheet | 117 ms | 2 s |
+| Sheet list of 500 | 4 ms | 2 s |
+| Materials (full catalog) | 27 ms | 2 s |
+| Materials list (5,000 marks) | 67 ms | 2 s |
+| Print (proposal document) | 24 ms | 2 s |
+| Place a mark on the 5,000 sheet / rename the bid | 4 ms / 3 ms | 1 s |
+| **24 people at once**, 10 batches of 5 marks each, every third batch resent (lost answer) | median 79 ms, p95 110 ms, max 119 ms a save; **1,200 marks placed, 1,200 counted** (no loss, no double) | 1 s |
+| **24 saves of one assembly** from the same opened version | **1 saved, 23 refused as stale** (was 24 saved — fixed tonight, below) | — |
+| Large set: 308 MB, 400 sheets (streamed writer) | written 0.5 s; pdf.js open 178 ms; sheet 1 / 200 / 400 operator list 50 / 12 / 10 ms | — |
+| Large set on the server: make 400 sheets / list them | 53 ms / 8 ms | 2 s |
+| 100 marks on each of 50 sheets | median 14 ms, max 21 ms a drop; read a sheet median 3 ms | 1 s / 2 s |
+| Bid page + count summary / print on the big set | 76 ms / 38 ms | 2 s |
+
+**Nothing is over a limit.** The fault the harness found was not speed:
+
+- **Two people saving the same library row lost one save.** 24 saves of one
+  assembly from screens opened on the same version all succeeded, the
+  last silently undoing 23. The stale-save check read `updatedAt` and wrote
+  later. Fixed for all six editors with one conditional UPDATE
+  (`server/staleSave.ts`); red-first `server/staleSaveRace.test.ts`
+  (6 racers: 4–6 saved before, exactly 1 after). Whole-second limit left
+  open, in `todo.md`.
+
+**What these numbers are not:** the server job calls the routers in
+process on a runner (no network, no browser). The browser job (staging,
+real network, slow 3G, the 300 MB set uploaded through the Plans screen)
+runs once staging serves the candidate — it shares the smoke account, so
+it never runs beside a Gate smoke.
