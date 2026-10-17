@@ -3235,8 +3235,8 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 ## v5.74 — Smooth All Projects + Remove M Logo
 
-- [ ] Fix lag/jitter on page load and navigation for all projects (match Pine St smoothness)
-- [ ] Remove M logo/icon from measurement distance display on runs
+- [x] Fix lag/jitter on page load and navigation for all projects (match Pine St smoothness) — closed 2026-10-16: done in the "v5.74 … M Logo Fix" section below (bitmap cache, no pdfLoading gate); the project screens since deleted
+- [x] Remove M logo/icon from measurement distance display on runs — done below ("Remove "M=measure" text from hint bar")
 
 ## v5.74 — Smooth All Projects + M Logo Fix
 
@@ -3300,7 +3300,7 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 - [x] Apply verified schema migrations and validate the backup-enabled release (checkpoint pending)
 - [x] Add the four encrypted, server-only Cloudflare R2 credentials after production deployment
 - [x] Add the required encrypted `R2_BUCKET` name and validate the R2 destination before running the backup
-- [ ] Resolve the Manus source-storage 403 responses blocking the four stored PDF copies, then rerun and verify a complete production backup
+- [x] Resolve the Manus source-storage 403 responses blocking the four stored PDF copies, then rerun and verify a complete production backup — closed 2026-10-16: done in "v5.97 — Source Storage Repair" below (stale test refs removed, full R2 backup verified)
 
 ## v5.97 — Source Storage Repair & Complete R2 Backup
 
@@ -3326,9 +3326,9 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 - [x] Put "Upload a plan" and "Quick bid" on the Dashboard as the two ways to start
 - [x] Remove the legacy splash page; `/`, `/home` and unknown routes land on the Dashboard
 - [x] Delete six dead legacy page files and retire the `/trash` and `/project/:id` routes
-- [ ] Apply the storage bucket CORS rule (references/deploying.md § 9) — plan upload above 25MB stays broken until it lands
+- [x] Apply the storage bucket CORS rule (references/deploying.md § 9) — plan upload above 25MB stays broken until it lands — closed 2026-10-16: applied (deploying.md § 9 records the origins, www.bidridge.com added 2026-09-17), and viewing too since 2026-09-27
 - [x] Add ranged PDF loading so a 500MB set does not have to be fully resident in tab memory
-- [ ] Verify plan tracing and scale-setting against a plan that actually uploaded
+- [x] Verify plan tracing and scale-setting against a plan that actually uploaded — closed 2026-10-16: the smoke suite uploads a real plan to staging and sets scale, counts and traces on it on every local-dev Gate (`e2e/smoke/flow.spec.ts`, `marks.spec.ts`)
 
 ## v5.99 — Exact GitHub Main Deployment Sync
 
