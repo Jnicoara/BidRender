@@ -4,6 +4,26 @@ Written for a restart. **Read this first.** The session-by-session history
 it replaces is in git (`git log -p -- references/track-a-handoff.md`); the
 release record is `deploying.md` § 11 "LIVE: `60479773`".
 
+## A — OVERNIGHT QUEUE 2026-10-16 → 17 (status per item; log: `overnight-log.md` § Track A)
+
+Owner Q8: a shop with material markup KEEPS today's markup math on new
+bids until it answers a one-time "How do you bid?" — B builds it; **bid
+methods do not release without it.** So B's `eef749b1`/`e65f8e32`/`89068f91`
+(and `a160ca1c`, which sits after them) are NOT in this candidate.
+
+1. LAND B `55da8199` + `8f22e226` (cherry-picked), C `335dec58` + `7cb6aca9`
+   (Gate green 38992731395) — **in progress**: merged on `a-land-night`
+   `448d1281` (one CHANGELOG conflict, both kept; no `drizzle/`; `pnpm
+   check` clean), Gate 39003076893 running. Smoke-repeat workflow
+   (`dd8c9314`, track-a-night) runs plans/marks/demo ×5 on 4 sizes.
+2. STAGING — waits for 1.
+3. RELEASE PREP — waits for 2.
+4. REGRESSION — waits for 3.
+5. STRESS HARNESS — todo.
+6. FAILURE DRILLS — todo.
+7. POST-RELEASE BATCH re-test — todo.
+8. todo.md Track A items — todo.
+
 ## FOR A — S2 `scope_prompts` (scope-tags step 6b), FINAL 2026-10-16 (Track C)
 
 Replaces the 2026-10-12 S2 draft in `track-b-handoff.md`. Additive, step 1
