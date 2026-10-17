@@ -444,6 +444,9 @@ describe("stored files", () => {
           // the material a price change is for, as itemKey above. An id,
           // not a file.
           "materialKey",
+          // scope_prompts.shippedKey (0166, Track C's S2) — the shipped
+          // prompt's stable name the seed matches by. An id, not a file.
+          "shippedKey",
         ].includes(column)
       ) {
         continue;

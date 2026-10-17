@@ -5680,6 +5680,10 @@ export const COMPANY_ROLE_VALUES = [
   "admin",
   "estimator",
   "viewer",
+  // FR-M1 (B, field-and-coowner-plan.md): APPENDED, so every stored role
+  // keeps its value and index. Rank is code (`ROLE_RANK`), not this order.
+  "coowner",
+  "field",
 ] as const;
 export const MEMBER_STATUS_VALUES = ["active", "suspended"] as const;
 export const ACCESS_TIER_VALUES = ["standard", "internal"] as const;
@@ -6556,3 +6560,32 @@ export const bidHeightAreas = mysqlTable(
 );
 
 export type BidHeightArea = typeof bidHeightAreas.$inferSelect;
+
+export const scopePrompts = mysqlTable(
+  "scope_prompts",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").references(() => users.id, { onDelete: "cascade" }),
+    baselineId: int("baselineId"),
+    /** The shipped prompt's stable key; NULL on every company row. */
+    shippedKey: varchar("shippedKey", { length: 64 }),
+    name: varchar("name", { length: 255 }).notNull(),
+    matchWords: varchar("matchWords", { length: 2048 }).notNull(),
+    notWords: varchar("notWords", { length: 1024 }).default("").notNull(),
+    matchCategories: varchar("matchCategories", { length: 1024 })
+      .default("")
+      .notNull(),
+    isActive: boolean("isActive").default(true).notNull(),
+    sortOrder: int("sortOrder").default(0).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => [
+    unique("scope_prompts_shippedKey_unique").on(t.shippedKey),
+    unique("scope_prompts_user_baseline_unique").on(t.userId, t.baselineId),
+    index("scope_prompts_baselineId_idx").on(t.baselineId),
+  ]
+);
+
+export type ScopePromptRow = typeof scopePrompts.$inferSelect;
+export type InsertScopePromptRow = typeof scopePrompts.$inferInsert;
