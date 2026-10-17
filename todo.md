@@ -4038,7 +4038,14 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       merged. **Still open from the pass:** the layout at the shipped desktop
       width was not seen (the driven window was stuck at 766 px), and the
       Recent plans row at phone width.
-- [ ] **No control removes a single mark (C6), and a dead prop hides that.**
+- [x] **BUILT since (checked 2026-10-16):** select a mark (one is enough) and
+      Delete or the toolbar's Delete removes it, with Undo
+      (`TakeoffPage.tsx` `deleteSelection` → `deleteSelected`; smoke
+      `plans.spec.ts` "select two marks and delete them; Undo puts both
+      back"). **Left for Track B (its file):** `RunsPanel`'s
+      `onRemoveStamp` prop is still never called — drop it so nobody reads
+      it as a second way in.
+- [x] **No control removes a single mark (C6), and a dead prop hides that.**
       Found by the 2026-09-28 screen pass, trying to remove a run's end mark.
       `RunsPanel` accepts `onRemoveStamp` and has never called it (added in
       `ba6702c`, 2026-08-12); nothing else in the client calls
