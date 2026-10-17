@@ -87,8 +87,10 @@ so it is the owner's call, not a speed fix.
 ## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
 
 - [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
-      answered all 12 questions on 2026-10-10 (plan § 6). Waits only on A
-      applying S1 (SQL draft in `track-b-handoff.md`).
+      answered all 12 questions on 2026-10-10 (plan § 6). **2026-10-16:
+      steps 1–7 built except 6b, which is built on Track C's local branch
+      `c-scope-prompts` and waits for A to add `scope_prompts` (S2) AFTER
+      the live release (owner). Left open only for that.**
 - [x] **FIXED 2026-10-12 (`b-role-not-priced`):** the SQL `lineNotPricedSql`
       had no `lineRole` branch, while the TS `lineNotPriced` decides a
       remove / relocate line by its hours alone — so the Dashboard called a
