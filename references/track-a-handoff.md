@@ -11,18 +11,48 @@ bids until it answers a one-time "How do you bid?" — B builds it; **bid
 methods do not release without it.** So B's `eef749b1`/`e65f8e32`/`89068f91`
 (and `a160ca1c`, which sits after them) are NOT in this candidate.
 
-1. LAND B `55da8199` + `8f22e226` (cherry-picked), C `335dec58` + `7cb6aca9`
-   (Gate green 38992731395) — **in progress**: merged on `a-land-night`
-   `448d1281` (one CHANGELOG conflict, both kept; no `drizzle/`; `pnpm
-   check` clean), Gate 39003076893 running. Smoke-repeat workflow
-   (`dd8c9314`, track-a-night) runs plans/marks/demo ×5 on 4 sizes.
-2. STAGING — waits for 1.
-3. RELEASE PREP — waits for 2.
-4. REGRESSION — waits for 3.
-5. STRESS HARNESS — todo.
-6. FAILURE DRILLS — todo.
-7. POST-RELEASE BATCH re-test — todo.
-8. todo.md Track A items — todo.
+1. LAND — **done: local-dev `448d1281`** (= `d9b8d412` + B `55da8199` +
+   `8f22e226` cherry-picked + C `7cb6aca9`, which holds `335dec58`). One
+   CHANGELOG conflict, both kept; no `drizzle/`. Gate 39004433903: test ✓,
+   staging deploy ✓, **smoke 257 passed / 2 skipped / 1 FAILED** — phone
+   `plans.spec.ts:245` "select two marks … Undo" (the Select tool was on,
+   neither tap selected a mark; B had it 20/20 locally). 5× repeat of
+   plans/marks/demo on desktop, phone and both tablets running against
+   staging (`smoke-repeat-night`, run 39005614182) to measure the rate.
+   B's bid methods + Q8 (`c6b5feec`, then `b1da7480` price brackets) NOT
+   landed: no "ready" line — **Q-A1 parked** (suggested: next release).
+2. STAGING — serves `448d1281` (auto-deploy). "staging ready" waits for a
+   green smoke.
+3. RELEASE PREP — **done on paper**: `next-live-release-plan.md` §
+   "CANDIDATE REFRESH". Rehearsal on a NEW live copy (05:02 UTC, 5,561
+   rows): 14 applied → 166 / FKs 209, totals unchanged (live and candidate
+   code), first boot 0/0/0/0, math 0 move / 2 wait, companies 5–8 removed
+   on the copy. P2 exact.
+4. REGRESSION — `regression.yml` (journey laptop/iPad/phone + drills on a
+   runner app). Found and fixed: **Settings › Pricing refetch wiped a
+   typed percentage** (`0edb23e0`); journey drift on the touch trace pill
+   (`a247b279`). Journey 3/3 green on run 39005163560. Full suite (feature
+   map, company separation, golden bids/measurements, speed) = Gate.
+5. STRESS — `stress.yml`; run 1 (server) green, nothing over a limit.
+   **Found and fixed a data-loss race**: concurrent saves of one library
+   row all "won" (`ad37ca26`, `977b4e82`). Browser half (staging) not run
+   yet — it shares the smoke account, so it waits for the smoke to settle.
+   `stress-results.md` § "Stage-7 harness in CI".
+6. FAILURE DRILLS — `e2e/drills` (DB stopped, plan folder locked, in CI);
+   server drills already existed (`failureDrills`, `sessionUnavailable`,
+   `health`). DB-down passes; recovery check fixed to compare figures.
+7. POST-RELEASE BATCH — 0166+0167 re-applied on the candidate: 168 / FKs
+   210, Gate 39003361591 green. **0168 drafted** (durable mark key, a
+   wrong-number risk): race test red on the candidate, green with it;
+   throwaway DB 169 / 210; full Gate on `a-next-batch` running.
+8. todo Track A — speed outlier closed (not reproduced ×3); five
+   "migration" items closed (already in 0096/0098/0101/0102); twin fold
+   closed (live copy census 0); durable key drafted (7). Left: release-time
+   steps already in the plan; the pricing xlsx rebuild (owner: not yet).
+
+**Lands next on local-dev (after track-a-night's Gate):** `ad37ca26` +
+`977b4e82` (save race), `0edb23e0` (Settings typing), CI workflows and
+specs. No `drizzle/`.
 
 ## C fix ready 335dec58 (2026-10-16 18:33; Gate 38989986720 green, full code run)
 
