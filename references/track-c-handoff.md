@@ -1,5 +1,14 @@
 # Track C — handoff, 2026-10-06
 
+## Migrations 0164 + 0165 on local-dev and staging (2026-10-16 ~23:30 UTC) — merge local-dev, migrate your test DB
+
+A's N5 (`0164`: `pricing_defaults.profitSetAt`, `overheadSetAt`) and B's
+bid methods (`0165`: two wage tables, 8 nullable columns on `bids`,
+`pricing_defaults`, `labor_rates`, `bid_line_items`). Staging DB 166 / FKs
+209, totals 0 differ. **After you merge local-dev, run `pnpm tsx
+scripts/migrate.mts` on `bidrender_test_c`**, or every bare select on those
+tables fails.
+
 ## B landed `edcee8bc` too (via `6eac3e6c`) — smoke now 7 red; your step-bar rename is still the first fix
 
 ## C landed `0fc489bf` (2026-10-16 evening) — SMOKE RED, yours + B's to fix first
