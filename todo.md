@@ -1704,6 +1704,15 @@ starters miss. These two catch what a list cannot.
 > print block (gap 10 would jump them to the line's fix), and a "priced on
 > this bid" marker on the line. Quote items (§ 8) may still want their own
 > column — decide there.
+>
+> **2026-10-16 (Track C): both blocks now LEAD to the line's fix rather
+> than holding a second price box.** The Proposal's print block already
+> jumped there (gap 10); the quote-app `Blocked` panel now has "Fix this
+> line" on each line-level gap, which closes the panel and opens that
+> line's fix — the bid page's `goToLineFix`, the same function the `?fix=`
+> arrival calls. One price box (the line's), not three copies. Seen on
+> screen (`overnight-shots/quoteapp-fix-line*.png`). Left: the "priced on
+> this bid" marker.
 
 > **2026-10-05:** quote items (references/quote-items-plan.md § 8) need the
 > SAME per-bid price column as this item (`bidUnitCost`). Build it once:

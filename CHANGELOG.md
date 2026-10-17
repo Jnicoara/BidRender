@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **"For your quote app" now takes you straight to the line that needs
+  fixing.** When an unpriced line blocks the figures, each one in the list
+  has a "Fix this line" button that closes the panel and opens that line's
+  price box on the bid — instead of only saying where to go.
 - **"Needs pricing" on the Materials screen now also lists BidRidge's
   example prices, not only $0 ones.** When the starter catalog ships with
   example prices, those rows are still not your prices — they show the
