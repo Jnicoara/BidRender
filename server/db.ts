@@ -8328,6 +8328,9 @@ export function pricingSnapshotOf(
     // (`tracedPartAnswers`) are not a snapshot and are not copied — a length
     // typed on one room is not a fact about the next.
     snapshotTracedParts: line.snapshotTracedParts,
+    // And its frozen charge rate (0165, method A): a copy charges the hour
+    // at the rate the original froze.
+    snapshotChargeRate: line.snapshotChargeRate,
     snapshotAt: line.snapshotAt,
   };
 }

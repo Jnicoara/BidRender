@@ -941,18 +941,28 @@ export const bidsRouter = router({
     .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const bid = await requireBid(input.id, ctx.scope.dataUserId);
-      const [lines, company, client, taxRules, jurisdictionRows, expenseRows] =
-        await Promise.all([
-          db.getRollupLines(bid.id, ctx.scope.dataUserId),
-          companyDefaultsFor(ctx.scope.dataUserId),
-          // Null for the great majority of bids, which have no client assigned.
-          bid.clientId
-            ? db.getClientById(bid.clientId, ctx.scope.dataUserId)
-            : Promise.resolve(undefined),
-          taxRulesFor(ctx.scope.dataUserId),
-          db.getTaxJurisdictions(ctx.scope.dataUserId),
-          db.getBidExpenses(bid.id),
-        ]);
+      const [
+        lines,
+        company,
+        client,
+        taxRules,
+        jurisdictionRows,
+        expenseRows,
+        defaultsRow,
+      ] = await Promise.all([
+        db.getRollupLines(bid.id, ctx.scope.dataUserId),
+        companyDefaultsFor(ctx.scope.dataUserId),
+        // Null for the great majority of bids, which have no client assigned.
+        bid.clientId
+          ? db.getClientById(bid.clientId, ctx.scope.dataUserId)
+          : Promise.resolve(undefined),
+        taxRulesFor(ctx.scope.dataUserId),
+        db.getTaxJurisdictions(ctx.scope.dataUserId),
+        db.getBidExpenses(bid.id),
+        // Only for the "not set" label's stamps (0164); pricing reads
+        // `company` above.
+        db.getPricingDefaults(ctx.scope.dataUserId),
+      ]);
 
       const expenses = expenseRows.map(row => ({
         name: row.name,
@@ -1131,7 +1141,10 @@ export const bidsRouter = router({
          * "Profit / overhead not set" — the bid follows a company default
          * of 0 (shared/marginsNotSet.ts). A label; it moves no number.
          */
-        marginsNotSet: marginsNotSet(settings),
+        marginsNotSet: marginsNotSet(settings, {
+          profitSetAt: defaultsRow?.profitSetAt ?? null,
+          overheadSetAt: defaultsRow?.overheadSetAt ?? null,
+        }),
         company,
         /** The linked client record, or null. */
         client: client ?? null,
@@ -2285,6 +2298,17 @@ export const bidsRouter = router({
       if (input.productivityPct !== undefined) {
         patch.productivityPct = toDecimal4(input.productivityPct);
       }
+      // N5 (0164): a save to a group, 0 included, is somebody's decision —
+      // the bid stops saying "not set" for it (shared/marginsNotSet.ts).
+      const savedAt = new Date();
+      if (input.profitMethod !== undefined || input.profitValue !== undefined)
+        patch.profitSetAt = savedAt;
+      if (
+        input.overheadEnabled !== undefined ||
+        input.overheadMode !== undefined ||
+        input.overheadValue !== undefined
+      )
+        patch.overheadSetAt = savedAt;
 
       if (Object.keys(patch).length > 0) {
         await db.updatePricingDefaults(ctx.scope.dataUserId, patch);

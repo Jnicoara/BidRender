@@ -1310,6 +1310,11 @@ export const laborRates = mysqlTable(
      */
     isExampleRate: boolean("isExampleRate"),
     /**
+     * BM-M4 (0165, bid-methods-plan.md): what an hour of this role is
+     * CHARGED at under method A (markup + charge rate). NULL = not set.
+     */
+    chargeRate: decimal("chargeRate", { precision: 10, scale: 4 }),
+    /**
      * The loaded rate as its parts (0134). All NULL = not broken down —
      * never 0. `hourlyCost` stays the number every bid uses; the editor
      * writes it as baseWage x (1 + the four parts), nothing derives it on
@@ -1795,6 +1800,24 @@ export const pricingDefaults = mysqlTable(
     profitValue: decimal("profitValue", { precision: 6, scale: 4 })
       .default("0")
       .notNull(),
+
+    /**
+     * When somebody last SAVED the profit / the overhead through Settings
+     * (0164, owner N5 2026-10-16). NULL = never set: the stored 0 is the
+     * shipped fallback, not a choice, and the bid says "not set"
+     * (shared/marginsNotSet.ts). Stamped by `bids.setPricingDefaults` on any
+     * write to that group, 0 included — a typed 0% is a decision. Nullable,
+     * no default, so "not yet set" is a value nothing else can produce.
+     */
+    profitSetAt: timestamp("profitSetAt"),
+    overheadSetAt: timestamp("overheadSetAt"),
+    /**
+     * BM-M2 / BM-M3 (0165, bid-methods-plan.md): the company's pricing
+     * method for NEW bids (NULL = cost_op) and how its material markup is
+     * entered (NULL = flat).
+     */
+    pricingMethod: mysqlEnum("pricingMethod", ["markup_rate", "cost_op"]),
+    materialMarkupMode: mysqlEnum("materialMarkupMode", ["flat", "brackets"]),
 
     /**
      * Company-wide productivity adjustment, as a fraction (0.10 = +10% hours).
@@ -2757,6 +2780,18 @@ export const bids = mysqlTable(
     /** What is shown beside the frozen rate: source, area, components. Display only. */
     taxRateFrozenDetail: json("taxRateFrozenDetail"),
     /**
+     * BM-M1, M8, M9 (0165, bid-methods-plan.md). `pricingMethod` NULL = priced
+     * before methods existed (the old stacked math — no existing bid moves).
+     * `wageRateSetId` NULL = no prevailing wage; `registeredApprentices` NULL
+     * = not asked (journeyman rate); `buildingSqFt` NULL = not given.
+     */
+    pricingMethod: mysqlEnum("pricingMethod", ["markup_rate", "cost_op"]),
+    wageRateSetId: int("wageRateSetId").references(() => wageRateSets.id, {
+      onDelete: "set null",
+    }),
+    registeredApprentices: boolean("registeredApprentices"),
+    buildingSqFt: decimal("buildingSqFt", { precision: 12, scale: 2 }),
+    /**
      * A locked bid's server-side warning counts, frozen at the lock (0156,
      * Track C's F13; `shared/lockedWarnings.ts` FrozenWarnings `{at, counts}`).
      * NULL = never frozen — unlocked, or locked before this column — and both
@@ -2792,6 +2827,53 @@ export const bids = mysqlTable(
 
 export type Bid = typeof bids.$inferSelect;
 export type InsertBid = typeof bids.$inferInsert;
+
+/**
+ * PREVAILING WAGE SETS — BM-M6 + BM-M10 (0165, bid-methods-plan.md § 9;
+ * Track B's drafts, owner picks 2026-10-12, Q15). One company's published
+ * wage determination: a name, its number, the date it was set. Archived,
+ * never deleted, in the app; the cascade is a backstop for a deleted user.
+ * `fringePaidAsCash` NULL = not ticked = fringe is not taxed (BM-M10, folded
+ * into the CREATE since the two ship together).
+ */
+export const wageRateSets = mysqlTable("wage_rate_sets", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  wageDeterminationNumber: varchar("wageDeterminationNumber", { length: 128 }),
+  dateSet: date("dateSet").notNull(),
+  archivedAt: timestamp("archivedAt"),
+  fringePaidAsCash: boolean("fringePaidAsCash"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WageRateSet = typeof wageRateSets.$inferSelect;
+
+/** BM-M7 (0165): one row per classification in a wage set. */
+export const wageRateSetRates = mysqlTable("wage_rate_set_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  setId: int("setId")
+    .notNull()
+    .references(() => wageRateSets.id, { onDelete: "cascade" }),
+  classification: mysqlEnum("classification", [
+    "journeyman",
+    "apprentice",
+    "trainee",
+    "other",
+  ]).notNull(),
+  label: varchar("label", { length: 255 }).notNull(),
+  laborRateId: int("laborRateId").references(() => laborRates.id, {
+    onDelete: "set null",
+  }),
+  baseWage: decimal("baseWage", { precision: 10, scale: 4 }).notNull(),
+  fringe: decimal("fringe", { precision: 10, scale: 4 }).notNull(),
+  sortOrder: int("sortOrder").default(0).notNull(),
+});
+
+export type WageRateSetRate = typeof wageRateSetRates.$inferSelect;
 
 /**
  * A Draft whose total moved when it was brought to a newer math version
@@ -5242,6 +5324,11 @@ export const bidLineItems = mysqlTable(
     snapshotPriceWasExample: boolean("snapshotPriceWasExample"),
     snapshotHoursWereExample: boolean("snapshotHoursWereExample"),
     snapshotLaborRateWasExample: boolean("snapshotLaborRateWasExample"),
+    /** BM-M5 (0165): the charge rate frozen on the line; NULL = none (every line before). */
+    snapshotChargeRate: decimal("snapshotChargeRate", {
+      precision: 10,
+      scale: 4,
+    }),
     snapshotAt: timestamp("snapshotAt").defaultNow().notNull(),
 
     /**

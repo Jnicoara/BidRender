@@ -72,7 +72,9 @@ This is the human-readable companion to the git history — read this to see wha
   The bid now shows an amber "Profit not set" or "Overhead not set" line,
   with a button to Settings › Pricing. It changes no number. A value
   typed on the bid itself, 0 included, counts as a decision and is never
-  flagged.
+  flagged. **Since migration 0164**, a company that saves 0% in Settings
+  has decided too: the app now records when profit and overhead were last
+  saved, so the line shows only for a 0 that nobody ever set.
 - **The 16 open pricing-name answers are recorded, and the owner approved
   all 30 mud ring names.** The end-of-pricing dry run now holds every
   decision: 656 changes, 0 problems. It is still a dry run only.
