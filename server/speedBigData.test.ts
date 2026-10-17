@@ -198,4 +198,27 @@ describe.skipIf(!run)("speed on big data", () => {
     }
     expect(over, "over the limit on big data").toEqual([]);
   }, 600_000);
+
+  /*
+    Diagnostic, not a limit: 2 of 4 stress runs on 2026-10-17 put the
+    Dashboard at ~1.85 s and 2 at under 0.1 s, each run's samples tight
+    (todo.md, "Over the speed limits in the stress harness"). This says
+    which half is slow and on what machine, so the next slow run explains
+    itself instead of being guessed at.
+  */
+  it("prints where the Dashboard spends its time, and on what runner", async () => {
+    const { cpus } = await import("node:os");
+    console.log(
+      `[big-detail] runner: ${cpus()[0]?.model ?? "unknown"} x${cpus().length}`
+    );
+    for (const [name, fn] of Object.entries({
+      "bids.dashboard": () => c.bids.dashboard(),
+      "bids.archived": () => c.bids.archived(),
+    })) {
+      const t = await timeIt(fn);
+      console.log(
+        `[big-detail] ${name}: median ${t.median.toFixed(0)} ms, max ${t.max.toFixed(0)} ms`
+      );
+    }
+  }, 120_000);
 });

@@ -24,6 +24,14 @@
 - Please fix in the app (not the test) and write "ready <commit>" in
   `track-a-handoff.md`; A lands it and re-runs the repeat
   (`smoke-repeat-*` branch, `.github/smoke-repeat.json`).
+- **Second, speed, not for this release:** the stress harness reopened a
+  308 MB / 400-sheet set from the staging bucket and **all 308 MB came down
+  (309 ranged requests) before sheet 1, 67 s.** Likely your panel
+  schedules: `schedulePagesOf` is `null` until every page's upload text is
+  stored, and `null` reads every page (`panelsInDoc`) — the 270 MB case you
+  fixed on 10-15, still open whenever the reads are incomplete (opened
+  early, or an older set). Evidence and how to prove it: `todo.md` top,
+  "Over the speed limits in the stress harness".
 
 ## BM migrations applied (0164+0165 on local-dev + staging)
 

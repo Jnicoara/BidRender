@@ -6,22 +6,33 @@ left as written rather than rewritten to match the rename.
 ## Over the speed limits in the stress harness (Track A, 2026-10-17 night, `references/stress-results.md`)
 
 - [ ] **A 308 MB / 400-sheet set reopened from the bucket: sheet 1 after
-      42.7 s** (staging, run 39050194392); 4.1 s from the local file while
-      uploading. Probably far more than byte ranges are read for this file
-      (synthetic, non-linearized, a 0.75 MB picture per page). **First
-      step:** measure bytes pulled before sheet 1 with
-      `scripts/stagingUploadTiming.mts` on the same file
-      (`server/stressPdf.testHelper.ts` writes it). Done when the cause is
-      named and either fixed or written beside the limit.
+      42.7 s, then 66.9 s** (staging, runs 39050194392 / 39050600645);
+      3–4 s from the local file while uploading. **MEASURED (run
+      39050600645): 309 plan requests, ALL with a Range header, 308.1 MB of
+      308 MB came down before sheet 1** — range loading works per request,
+      but something reads EVERY page first. **Likely cause (read, not
+      proven):** `db.schedulePagesOf` returns `null` unless every page's
+      upload text is stored, and `null` makes the worker's `panelsInDoc`
+      read every page for schedules (`pdfRenderer.worker.ts`, "or null to
+      read every page as before"). The test reopened 8 s after the attach,
+      probably before the 400 sheet reads were recorded. The same would
+      happen for anyone opening a big set early, or any set uploaded before
+      text reading existed. B's code (panel schedules, 2026-10-15): written
+      in `track-b-handoff.md`. **To prove it:** wait for the sheet reads
+      before the reopen in `e2e/stress/stress.spec.ts` and see the bytes
+      drop. Done when the cause is named and fixed or written beside the
+      limit.
 - [ ] **Dashboard on slow 3G: 5.1 s as the first screen of a cold load**
       (includes the app download; later screens 0.8–1.4 s). Measure the
       cold download separately from the Dashboard's own reads before
       deciding anything.
-- [ ] **Server Dashboard at 251 bids: one stress run measured 1,860 ms**
-      (limit 1 s); the runs before and after measured 100 ms and 71 ms.
-      Unexplained (suspect: a plan chosen on stale statistics after the
-      bulk build). If it comes back, run `EXPLAIN` on the list reads in that
-      run before guessing.
+- [ ] **Server Dashboard at 251 bids: 2 of 4 stress runs ~1.85 s** (1,860
+      and 1,829 ms; limit 1 s), the other two 100 and 71 ms — each run's
+      three samples tight, so it is the RUN, not noise. Unexplained.
+      Suspects, unchecked: a different runner CPU, or a plan chosen on
+      statistics not refreshed after the bulk build. `speedBigData` now
+      prints the runner's CPU and times `bids.dashboard` and `bids.archived`
+      apart (`[big-detail]`), so the next slow run says which.
 
 ## Stale-save guard: racing saves FIXED, the whole-second limit remains (Track A, 2026-10-16)
 
