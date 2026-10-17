@@ -1,0 +1,2 @@
+ALTER TABLE `company_invites` MODIFY COLUMN `role` enum('owner','admin','estimator','viewer','coowner','field') NOT NULL DEFAULT 'estimator';--> statement-breakpoint
+ALTER TABLE `company_members` MODIFY COLUMN `role` enum('owner','admin','estimator','viewer','coowner','field') NOT NULL DEFAULT 'estimator';
