@@ -12654,6 +12654,9 @@ export async function getStampIdsByClientKeys(
     .where(
       and(
         eq(takeoffStamps.bidId, bidId),
+        // A mark on a deleted plan set is not a placed mark (the caller then
+        // refuses that key rather than reporting a dead mark as placed).
+        onLivePlanSheet(takeoffStamps.sheetId, takeoffStamps.bidId),
         inArray(takeoffStamps.clientKey, [...keys])
       )
     );

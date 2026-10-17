@@ -447,6 +447,10 @@ describe("stored files", () => {
           // scope_prompts.shippedKey (0166, Track C's S2) — the shipped
           // prompt's stable name the seed matches by. An id, not a file.
           "shippedKey",
+          // takeoff_stamps.clientKey (0168) — the Plans screen's key for the
+          // click that placed a mark (page load + queue number). An id, not
+          // a file.
+          "clientKey",
         ].includes(column)
       ) {
         continue;
