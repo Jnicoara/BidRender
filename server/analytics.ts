@@ -30,18 +30,23 @@ import {
   getBidCosts,
   getClosedJobCosts,
   getEarliestBidDate,
+  getLiveBidExpenseLines,
   getOutcomeBuckets,
   type BidCostRow,
   type ClosedJobRow,
 } from "./db";
-import { companyDefaultsFor } from "./bidPricing";
 import {
-  calculateBidPrice,
+  bidPriceOrFallback,
+  bidPricingMethod,
+  companyDefaultsFor,
+} from "./bidPricing";
+import {
   resolveBidPricingSettings,
   roundMoney,
   type CompanyPricingDefaults,
 } from "../shared/pricing";
 import { closeoutActualHours } from "../shared/closeout";
+import type { ExpenseLine } from "../shared/bidExtras";
 import {
   tallyLeavesOut,
   withDropsNotPriced,
@@ -219,7 +224,9 @@ export function resolveRange(input: RangeInput, now: Date): ResolvedRange {
  */
 function priceBid(
   row: BidCostRow,
-  company: CompanyPricingDefaults
+  company: CompanyPricingDefaults,
+  /** The bid's charges: Markup + charge rate marks up the marked-up ones. */
+  charges: readonly ExpenseLine[]
 ): { price: number; priced: boolean } {
   const settings = resolveBidPricingSettings(company, {
     overheadEnabled: row.overheadEnabled,
@@ -229,24 +236,22 @@ function priceBid(
     profitValue: row.profitValue,
     productivityPct: row.productivityPct,
   });
-  try {
-    // The same inputs rollUpBid gives the engine: the lines' direct cost plus
-    // any marked-up charge, and the lines' material markup on its own.
-    const price = calculateBidPrice({
+  // The same inputs rollUpBid gives the engine — the lines' direct cost plus
+  // any marked-up charge, the lines' material and labor markup on their own —
+  // through the bid's own METHOD (0165), as the Dashboard and the bid screen
+  // price it. Until 2026-10-16 this called the old math for every bid.
+  const { bidPrice, error } = bidPriceOrFallback(
+    settings,
+    bidPricingMethod(row),
+    {
       directCost: roundMoney(row.directCost + row.markedUpExpenses),
       materialMarkup: row.materialMarkup,
-      overhead: settings.overhead,
-      profit: settings.profit,
-    });
-    return { price: price.finalPrice, priced: true };
-  } catch {
-    return {
-      price: roundMoney(
-        row.directCost + row.markedUpExpenses + row.materialMarkup
-      ),
-      priced: false,
-    };
-  }
+      laborMarkup: row.laborMarkup,
+    },
+    company,
+    charges
+  );
+  return { price: bidPrice.finalPrice, priced: error === null };
 }
 
 // ─── Outcomes: win rate and volume over time ──────────────────────────────────
@@ -323,7 +328,7 @@ export async function outcomesReport(
   const range = resolveRange(input, now);
   const company = await companyDefaultsFor(userId);
 
-  const [buckets, costRows, earliest] = await Promise.all([
+  const [buckets, costRows, earliest, charges] = await Promise.all([
     getOutcomeBuckets(userId, {
       start: range.start,
       end: range.end,
@@ -336,6 +341,7 @@ export async function outcomesReport(
       companyProductivityPct: company.productivityPct,
     }),
     getEarliestBidDate(userId),
+    getLiveBidExpenseLines(userId, { archivedToo: true }),
   ]);
   const costs = await withBidDrops(costRows, userId);
 
@@ -356,7 +362,7 @@ export async function outcomesReport(
     { won: number; lost: number; pending: number; total: number }
   >();
   for (const row of costs) {
-    const { price } = priceBid(row, company);
+    const { price } = priceBid(row, company, charges.get(row.id) ?? []);
     const current = valuesByBucket.get(row.bucket) ?? {
       won: 0,
       lost: 0,
@@ -497,7 +503,8 @@ export type ClosedJob = JobProfit & {
 
 function toClosedJob(
   row: ClosedJobRow,
-  company: CompanyPricingDefaults
+  company: CompanyPricingDefaults,
+  charges: readonly ExpenseLine[]
 ): ClosedJob {
   const actualHours = closeoutActualHours(
     row.mode,
@@ -514,7 +521,7 @@ function toClosedJob(
       },
     ]
   );
-  const { price } = priceBid(row, company);
+  const { price } = priceBid(row, company, charges);
   // The bid's own blended rate. Null when it carried no hours at all, which
   // jobProfitability reports rather than papering over.
   const rate = row.totalHours > 0 ? row.laborCost / row.totalHours : null;
@@ -552,7 +559,7 @@ export async function profitabilityReport(
   const range = resolveRange(input, now);
   const company = await companyDefaultsFor(userId);
 
-  const [jobRows, jobsInRange] = await Promise.all([
+  const [jobRows, jobsInRange, charges] = await Promise.all([
     getClosedJobCosts(userId, {
       start: range.start,
       end: range.end,
@@ -560,10 +567,13 @@ export async function profitabilityReport(
       companyProductivityPct: company.productivityPct,
     }),
     countClosedJobs(userId, { start: range.start, end: range.end }),
+    getLiveBidExpenseLines(userId, { archivedToo: true }),
   ]);
   const rows = await withBidDrops(jobRows, userId);
 
-  const jobs = rows.map(row => toClosedJob(row, company));
+  const jobs = rows.map(row =>
+    toClosedJob(row, company, charges.get(row.id) ?? [])
+  );
   const { groups, multiTradeJobs } = groupByTrade(jobs);
 
   // Closed-out jobs sit on the timeline by when they FINISHED, not by when they

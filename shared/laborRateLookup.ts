@@ -76,3 +76,21 @@ export function hourlyCostFor<T extends ResolvableLaborRate>(
 ): number {
   return hourlyCostOf(resolveLaborRate(rates, laborRateId));
 }
+
+/**
+ * What a role CHARGES an hour, as frozen onto a bid line
+ * (`bid_line_items.snapshotChargeRate`, 0165) — the decimal string, or NULL
+ * when the role has none or there is no role. NULL is "not set", never $0:
+ * on a Markup + charge rate bid it prices the line's labor as Not priced
+ * (shared/pricing.ts `laborNotPriced`, owner Q5), and on the other methods
+ * it is never read. Frozen on EVERY line whatever the bid's method, so a
+ * Draft switched to Markup + charge rate has a rate to read.
+ */
+export function frozenChargeRate(
+  rate: { chargeRate?: string | number | null } | undefined
+): string | null {
+  if (!rate || rate.chargeRate === null || rate.chargeRate === undefined)
+    return null;
+  const n = Number(rate.chargeRate);
+  return Number.isFinite(n) && n >= 0 ? n.toFixed(4) : null;
+}

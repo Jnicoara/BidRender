@@ -41,6 +41,7 @@ import type { TrpcContext } from "./_core/context";
 import { buildAccountingExport } from "../shared/accountingExport";
 import { buildProposal } from "../shared/proposal";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
+import { onOldMath } from "./bidBuilders.testHelper";
 
 // ─── The mixed bid, priced without a database ─────────────────────────────────
 
@@ -389,6 +390,10 @@ describe.skipIf(!hasDb)("markup from rule to line to dashboard", () => {
     // Failing here names the cause; letting it through failed later as
     // "cannot read properties of undefined" on whichever line touched it.
     if (!bid) throw new Error("bids.create returned no bid");
+    // The OLD math, where material markup stacks under overhead and profit:
+    // what this file pins (`onOldMath`). Cost + O&P, a new bid's default,
+    // carries no material markup; Markup + charge rate is bidMethodSurfaces'.
+    await onOldMath(bid.id);
     return bid;
   }
 

@@ -98,7 +98,9 @@ async function lockedBid(name: string) {
   const db = await getDb();
   await db!
     .update(bids)
-    .set({ quantitiesLockedAt: new Date() })
+    // The OLD math (pricingMethod NULL), where the 10% markup counts in the
+    // price this file pins; a new bid would be Cost + O&P (`onOldMath`).
+    .set({ quantitiesLockedAt: new Date(), pricingMethod: null })
     .where(eq(bids.id, bid.id));
   return bid.id;
 }

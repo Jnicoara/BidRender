@@ -93,15 +93,15 @@ export async function companyDefaultsFor(
 /**
  * The method a bid is priced by (references/bid-methods-plan.md § 7).
  *
- * NULL — the old stacked math — for EVERY bid today, and that is a fact, not
- * a shortcut: `bids.pricingMethod` (draft BM-M1) is not in the schema yet,
- * because migrations are Track A's (track-a-handoff.md, "Bid methods"). When
- * it lands this reads the column, `priceLine` reads `snapshotChargeRate`
- * (BM-M5), and the SQL sums in `db.ts` (`costSums`) learn the method — the
- * three places listed in todo.md under "Bid methods — wiring left".
+ * The bid's own column (0165). NULL — every bid made before methods existed —
+ * is the old stacked math, and stays it: nothing writes a method onto an
+ * existing bid except a person choosing one on a Draft. A new bid gets its
+ * company's method when it is created (`db.createBid`).
  */
-export function bidPricingMethod(_bid: Pick<Bid, "id">): PricingMethod | null {
-  return null;
+export function bidPricingMethod(
+  bid: Pick<Bid, "pricingMethod">
+): PricingMethod | null {
+  return bid.pricingMethod ?? null;
 }
 
 /**
@@ -344,12 +344,14 @@ export function priceLine(
     // rules — reads as 0%, which is what keeps every such line where it was.
     //
     // Cost + O&P reads no markup at all; Markup + charge rate also bills
-    // labor at the frozen charge rate (shared/bidMethods.ts). `chargeRate`
-    // is null until BM-M5's `snapshotChargeRate` exists — see
-    // `bidPricingMethod`, which keeps every bid off that path until then.
+    // labor at the charge rate frozen on the line (0165, shared/bidMethods.ts)
+    // — NULL there is labor Not priced, never at cost (owner Q5).
     ...lineMethodTerms(method, {
       materialMarkupPct: storedMarkupPct(line.snapshotMarkupPct),
-      chargeRate: null,
+      chargeRate:
+        line.snapshotChargeRate === null
+          ? null
+          : Number(line.snapshotChargeRate),
     }),
   });
 }
@@ -391,6 +393,7 @@ export function priceFromDirectCost(
     | "profitMethod"
     | "profitValue"
     | "productivityPct"
+    | "pricingMethod"
   >,
   directCost: number,
   /**
@@ -400,6 +403,11 @@ export function priceFromDirectCost(
    * the bid it opens.
    */
   materialMarkup: number,
+  /**
+   * Charge − cost over the lines, summed in SQL (`costSums`); 0 except on
+   * Markup + charge rate. Required for the same reason as the markup.
+   */
+  laborMarkup: number,
   company: CompanyPricingDefaults,
   /** For a marked-up charge on Markup + charge rate; see `bidPriceOrFallback`. */
   expenses: readonly ExpenseLine[]
@@ -420,15 +428,10 @@ export function priceFromDirectCost(
     productivityPct:
       bid.productivityPct === null ? null : Number(bid.productivityPct),
   });
-  /*
-    The SQL sums carry no labor markup: they have no charge rates. Every bid
-    is on the old math today (`bidPricingMethod`), where none applies; the
-    sums learn it with the column (todo.md, "Bid methods — wiring left").
-  */
   const { bidPrice, error } = bidPriceOrFallback(
     settings,
     bidPricingMethod(bid),
-    { directCost, materialMarkup, laborMarkup: 0 },
+    { directCost, materialMarkup, laborMarkup },
     company,
     expenses
   );

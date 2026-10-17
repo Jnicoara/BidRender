@@ -6,6 +6,15 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Bids now price by their own method, and new bids start on Cost + O&P.**
+  - A bid made from today takes the company's pricing method. That is Cost +
+    O&P unless the company picks Markup + charge rate, and Cost + O&P puts no
+    markup on material.
+  - Every bid made before today stays on the old math and keeps its numbers.
+  - Each line now remembers its role's charge rate beside its cost.
+  - The Dashboard, Find a bid and the Performance screen price each bid by
+    its method too, so they match the bid screen.
+  - The screens to choose a method are not built yet.
 - **Undo now takes back a mark the moment it is saved.** For about a
   second after each mark saved, while its list refreshed, Undo answered
   "Still saving" and did nothing. On a slower connection that was long

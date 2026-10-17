@@ -13,7 +13,7 @@
 import { eq } from "drizzle-orm";
 import { appRouter } from "./routers";
 import { getDb } from "./db";
-import { bidPdfs, users } from "../drizzle/schema";
+import { bidPdfs, bids, users } from "../drizzle/schema";
 import type { TrpcContext } from "./_core/context";
 
 export const as = (user: number) =>
@@ -54,6 +54,32 @@ export async function bidWithSheet(c: Caller, user: number, name: string) {
   const [sheet] = await c.bidPdfs.sheets({ bidPdfId: pdf.insertId });
   await c.bidPdfs.setSheetScale({ id: sheet.id, scaleText: `1/4" = 1'-0"` });
   return { bidId: bid.id, sheetId: sheet.id };
+}
+
+/**
+ * Put a bid on the OLD stacked math — `pricingMethod` NULL, what every bid
+ * made before methods existed holds (bid-methods-plan.md § 7). A new bid
+ * takes its company's method (Cost + O&P by default), so a test that pins
+ * the old math's numbers says so here rather than inheriting a method it
+ * was never about. Line snapshots do not depend on the method, so nothing
+ * else about the bid differs.
+ */
+export async function onOldMath(bidId: number) {
+  await (await getDb())!
+    .update(bids)
+    .set({ pricingMethod: null })
+    .where(eq(bids.id, bidId));
+}
+
+/** `bidWithSheet`, on the old math (`onOldMath`). */
+export async function oldMathBidWithSheet(
+  c: Caller,
+  user: number,
+  name: string
+) {
+  const made = await bidWithSheet(c, user, name);
+  await onOldMath(made.bidId);
+  return made;
 }
 
 /** A material of the test's own, at the test's own price. */

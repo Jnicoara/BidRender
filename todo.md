@@ -36,8 +36,18 @@ uplift), a per-line charge rate in `calculateLineItem` (`laborMarkup`,
 the prevailing-wage and bracket arithmetic (`shared/prevailingWage.ts`,
 `shared/markupBrackets.ts`). Tests: `server/bidMethods.test.ts` and siblings.
 
-**Every bid prices by the old math until these land, and that is enforced in
-one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL. The
+**Wired 2026-10-16 night (steps 1, 2, 3, 6), after 0164+0165:** a bid reads
+its own `pricingMethod`; `db.createBid` gives a new bid its company's method
+(Cost + O&P when none — morning Q8); every line freezes its role's
+`snapshotChargeRate` (`frozenChargeRate`); `costSums` adds the labor markup and
+drops no-charge-rate labor on A; analytics prices by method too. Step 6
+needs no write (a method is set at creation; NULL stays the old math) — the
+toggle must refuse a bid outside Draft. Tests: `server/bidMethodSurfaces.test.ts`.
+Old-math tests say so with `onOldMath` (golden file unchanged). **Left: 4
+and 5.**
+
+~~**Every bid prices by the old math until these land, and that is enforced in
+one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL.~~ (was) The
 SQL drafts are in `references/track-a-handoff.md` § "Bid methods". After A
 applies them and local-dev is merged into track-b:
 

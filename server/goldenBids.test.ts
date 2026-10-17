@@ -33,7 +33,7 @@ import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import {
   as,
   at,
-  bidWithSheet,
+  oldMathBidWithSheet,
   countOf,
   duplexAssembly,
   emtType,
@@ -166,7 +166,11 @@ async function buildPlain(): Promise<Built[]> {
 
   // 1 — counts, plus the same assembly added by hand.
   {
-    const { bidId, sheetId } = await bidWithSheet(c, PLAIN, "Golden 1 counts");
+    const { bidId, sheetId } = await oldMathBidWithSheet(
+      c,
+      PLAIN,
+      "Golden 1 counts"
+    );
     const g = await countOf(c, bidId, sheetId, duplex.id, [{ n: 7, y: 3000 }]);
     await c.takeoffGroups.sendToBid({ id: g });
     const light = await own(c, "Golden 2x4 LED troffer", 68.5, 0.75);
@@ -192,7 +196,11 @@ async function buildPlain(): Promise<Built[]> {
 
   // 2 — one homerun, 100 ft, with a circuit.
   {
-    const { bidId, sheetId } = await bidWithSheet(c, PLAIN, "Golden 2 homerun");
+    const { bidId, sheetId } = await oldMathBidWithSheet(
+      c,
+      PLAIN,
+      "Golden 2 homerun"
+    );
     const type = await emtType(c, "Golden EMT homerun");
     const run = await straightRun(
       c,
@@ -220,7 +228,11 @@ async function buildPlain(): Promise<Built[]> {
   // 3 — a run plus drops to counted receptacles.
   {
     await c.takeoffHeights.setCompanyDistribution({ inches: 120 });
-    const { bidId, sheetId } = await bidWithSheet(c, PLAIN, "Golden 3 drops");
+    const { bidId, sheetId } = await oldMathBidWithSheet(
+      c,
+      PLAIN,
+      "Golden 3 drops"
+    );
     const type = await emtType(c, "Golden EMT drops");
     await straightRun(c, bidId, sheetId, type.id, "Branch run", 60);
     await c.takeoffRunTypes.sendToBid({ bidId, runTypeId: type.id });
@@ -245,7 +257,7 @@ async function buildPlain(): Promise<Built[]> {
 
   // 4 — remove and relocate.
   {
-    const { bidId, sheetId } = await bidWithSheet(
+    const { bidId, sheetId } = await oldMathBidWithSheet(
       c,
       PLAIN,
       "Golden 4 remove relocate"
@@ -282,7 +294,11 @@ async function buildPlain(): Promise<Built[]> {
 
   // 5 — scope tags.
   {
-    const { bidId } = await bidWithSheet(c, PLAIN, "Golden 5 scope tags");
+    const { bidId } = await oldMathBidWithSheet(
+      c,
+      PLAIN,
+      "Golden 5 scope tags"
+    );
     const lines = [];
     for (let i = 0; i < 4; i++)
       lines.push(
@@ -314,7 +330,11 @@ async function buildPlain(): Promise<Built[]> {
 
   // 6 — labor only, and an assembly with no parts that is NOT ticked.
   {
-    const { bidId } = await bidWithSheet(c, PLAIN, "Golden 6 labor only");
+    const { bidId } = await oldMathBidWithSheet(
+      c,
+      PLAIN,
+      "Golden 6 labor only"
+    );
     const ticked = (await c.assemblies.create({
       name: "Golden trace and tag existing circuits",
       category: "General",
@@ -342,7 +362,7 @@ async function buildPlain(): Promise<Built[]> {
   // 7 — free count with a typed price (a supplier quote typed on the line),
   // and one left blank.
   {
-    const { bidId, sheetId } = await bidWithSheet(
+    const { bidId, sheetId } = await oldMathBidWithSheet(
       c,
       PLAIN,
       "Golden 7 free count"
@@ -423,7 +443,7 @@ async function buildPriced(): Promise<Built[]> {
   const type = await emtType(c, "Golden EMT priced");
 
   // 8 — everything, then out of Draft so its settings freeze.
-  const { bidId, sheetId } = await bidWithSheet(
+  const { bidId, sheetId } = await oldMathBidWithSheet(
     c,
     PRICED,
     "Golden 8 O&P and tax"
@@ -502,7 +522,7 @@ async function buildMarkup(): Promise<Built[]> {
   )!;
   await c.bids.setItemMarkupOverride({ materialId: emt.id, markupPct: 0.4 });
 
-  const { bidId, sheetId } = await bidWithSheet(
+  const { bidId, sheetId } = await oldMathBidWithSheet(
     c,
     MARKUP,
     "Golden 9 markup and extras"

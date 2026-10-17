@@ -45,7 +45,11 @@ import {
   resolvePartMarkup,
   storedMarkupPct,
 } from "../shared/materialMarkup";
-import { hourlyCostOf, resolveLaborRate } from "../shared/laborRateLookup";
+import {
+  frozenChargeRate,
+  hourlyCostOf,
+  resolveLaborRate,
+} from "../shared/laborRateLookup";
 import { snapshotHoursFor, assemblyHours } from "../shared/assemblyHours";
 import { needsPricing } from "../shared/materialPricing";
 
@@ -470,6 +474,7 @@ export async function fixLine(
           `${rate.name} has no rate yet. Give it one in Labor rates, or pick another role.`
         );
       patch.snapshotLaborRate = cost.toFixed(4);
+      patch.snapshotChargeRate = frozenChargeRate(rate);
       patch.snapshotLaborRateWasExample = rate.isExampleRate === true;
       library.assembly = {
         ...(library.assembly ?? {}),

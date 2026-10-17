@@ -102,3 +102,28 @@ small change if you say otherwise.
   decide.
 - **Q-C3** Ownership transfer (the owner leaves for good) — not built. Needed
   before a co-owner can take over the company's data.
+
+## Q8. Shops that already use material markup: their next NEW bid comes out lower — OK? (money)
+
+Wired 2026-10-16 night per the approved plan (Q1 in `bid-methods-plan.md`):
+a new bid takes its company's method, and a company that never chose one
+(every existing company) gets **Cost + O&P**, which has **no material
+markup**. Existing bids do not move: they hold NULL, the old math.
+
+What that does to a shop that set material markup: its next new bid prices
+lower than the same bid would have yesterday. Measured on the golden
+"op-and-tax" bid built fresh: **$1,369.54 → $1,349.40** (its $15.63 of
+material markup goes, and so does the overhead and profit on it). The plan
+says "moves a number: no, new bids only", which is true of existing bids
+but not of what a shop sees on its next one.
+
+1. **Keep it** (built): every company's new bids are Cost + O&P until it
+   picks otherwise.
+2. A company whose material markup is set (accepted rules or a company %)
+   gets **Markup + charge rate**, or the old math, for new bids until it
+   picks.
+3. Ask such a company once, on its next new bid.
+
+— **Suggested: 3** (nobody's next bid changes without being asked), but
+it is yours. Until you answer, 1 is what is on track-b. It lands only when
+A lands it.

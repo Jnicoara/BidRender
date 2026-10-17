@@ -85,7 +85,11 @@ import {
  */
 const NEEDS_RUN_RATE_MESSAGE =
   "This Draft has traced runs priced at $0 an hour, and there is no labor rate for traced runs to price them at. Pick one in Settings › Pricing (or give the picked role a rate in Labor rates) first, then update.";
-import { hourlyCostOf, resolveLaborRate } from "../../shared/laborRateLookup";
+import {
+  frozenChargeRate,
+  hourlyCostOf,
+  resolveLaborRate,
+} from "../../shared/laborRateLookup";
 import { resolveForkedRow } from "../../shared/forkedRows";
 import {
   MAX_MARKUP_PCT,
@@ -455,6 +459,7 @@ export const bidsRouter = router({
           laborCost,
           directCost,
           materialMarkup,
+          laborMarkup,
           markedUpExpenses,
           totalHours,
           brokenLines,
@@ -487,6 +492,7 @@ export const bidsRouter = router({
           bid,
           fullDirect,
           materialMarkup,
+          laborMarkup,
           company,
           chargesByBid.get(bid.id) ?? []
         );
@@ -1639,6 +1645,7 @@ export const bidsRouter = router({
             });
           }
           handPatch.snapshotLaborRate = toDecimal4(hourlyCostOf(rate));
+          handPatch.snapshotChargeRate = frozenChargeRate(rate);
           // The role picked may still carry BidRidge's example rate (0134).
           handPatch.snapshotLaborRateWasExample = rate.isExampleRate === true;
         }
@@ -1934,6 +1941,7 @@ export const bidsRouter = router({
 
       const hours = Number(line.snapshotLaborHours);
       let laborRate = 0;
+      let chargeRate: string | null = null;
       let laborRateWasExample = false;
       if (input.laborRateId !== null) {
         const rate = resolveLaborRate(
@@ -1946,6 +1954,7 @@ export const bidsRouter = router({
             message: "That labor role is not in your library.",
           });
         laborRate = hourlyCostOf(rate);
+        chargeRate = frozenChargeRate(rate);
         laborRateWasExample = rate.isExampleRate === true;
       } else if (hours > 0) {
         throw new TRPCError({
@@ -1979,6 +1988,7 @@ export const bidsRouter = router({
         category: input.category,
         laborRateId: input.laborRateId,
         laborRate,
+        chargeRate,
         laborRateWasExample,
         actorUserId: ctx.scope.actorUserId,
       });

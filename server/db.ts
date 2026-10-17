@@ -32,6 +32,7 @@ import {
 } from "../shared/markStatus";
 import { foldedStatus } from "../shared/twinFold";
 import { CURRENT_MATH_VERSION } from "../shared/mathVersion";
+import { methodForNewBid, type PricingMethod } from "../shared/bidMethods";
 import {
   InsertUser,
   InsertProject,
@@ -274,6 +275,7 @@ import {
 } from "../shared/seats";
 import {
   hourlyCostFor,
+  frozenChargeRate,
   hourlyCostOf,
   resolveLaborRate,
 } from "../shared/laborRateLookup";
@@ -5175,9 +5177,13 @@ export async function shippedRunLaborRoleId(): Promise<number | null> {
  * not an example when no role is picked. ONE reader for the send and the
  * math-version-2 repair, so the two cannot disagree.
  */
-export async function getRunLaborRate(
-  userId: number
-): Promise<{ cost: number; wasExample: boolean; name: string | null }> {
+export async function getRunLaborRate(userId: number): Promise<{
+  cost: number;
+  wasExample: boolean;
+  name: string | null;
+  /** What the run role charges (0165), NULL when it has none. */
+  chargeRate: string | null;
+}> {
   const [rates, defaults] = await Promise.all([
     getLibraryLaborRates(userId),
     getPricingDefaults(userId),
@@ -5187,6 +5193,7 @@ export async function getRunLaborRate(
     cost: hourlyCostOf(row),
     wasExample: row?.isExampleRate === true,
     name: row?.name ?? null,
+    chargeRate: frozenChargeRate(row),
   };
 }
 
@@ -5715,7 +5722,9 @@ export async function getBidExpenseLinesForBids(
  * per bid. Same shape as `getBidExpenseLines`, same order.
  */
 export async function getLiveBidExpenseLines(
-  userId: number
+  userId: number,
+  /** Archived bids' too — analytics values every bid, archived or not. */
+  opts: { archivedToo?: boolean } = {}
 ): Promise<Map<number, ExpenseLine[]>> {
   const db = await getDb();
   const byBid = new Map<number, ExpenseLine[]>();
@@ -5724,7 +5733,11 @@ export async function getLiveBidExpenseLines(
     .select({ expense: bidExpenses })
     .from(bidExpenses)
     .innerJoin(bids, eq(bids.id, bidExpenses.bidId))
-    .where(and(eq(bids.userId, userId), isNull(bids.archivedAt)))
+    .where(
+      opts.archivedToo
+        ? eq(bids.userId, userId)
+        : and(eq(bids.userId, userId), isNull(bids.archivedAt))
+    )
     .orderBy(asc(bidExpenses.sortOrder), asc(bidExpenses.id));
   for (const { expense } of rows) {
     const list = byBid.get(expense.bidId) ?? [];
@@ -6065,10 +6078,35 @@ export async function getBidById(
 export async function createBid(data: InsertBid): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db
-    .insert(bids)
-    .values({ ...data, mathVersion: data.mathVersion ?? CURRENT_MATH_VERSION });
+  const [result] = await db.insert(bids).values({
+    ...data,
+    mathVersion: data.mathVersion ?? CURRENT_MATH_VERSION,
+    // And on the company's METHOD (bid-methods-plan.md § 7): a bid created
+    // with NULL would price by the old stacked math forever — which is what
+    // NULL means, and only bids made before methods existed may hold it.
+    pricingMethod:
+      data.pricingMethod !== undefined
+        ? data.pricingMethod
+        : methodForNewBid(await companyPricingMethod(data.userId)),
+  });
   return result.insertId;
+}
+
+/**
+ * The company's method for new bids, READ ONLY — never `getPricingDefaults`,
+ * which creates the row it does not find. NULL (no row, or never chosen) is
+ * Cost + O&P through `methodForNewBid`.
+ */
+export async function companyPricingMethod(
+  userId: number
+): Promise<PricingMethod | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(pricingDefaults)
+    .where(eq(pricingDefaults.userId, userId));
+  return resolveForTrade(rows, TRADE_ALL)?.pricingMethod ?? null;
 }
 
 export async function updateBid(
@@ -7966,6 +8004,7 @@ async function snapshotForAssembly(
   snapshotLaborHours: string | null;
   snapshotModifierPct: string;
   snapshotLaborRate: string;
+  snapshotChargeRate: string | null;
   snapshotModifierNames: string[];
   snapshotMarkupPct: string;
   snapshotMarkupSource: LineMarkupSource;
@@ -8041,6 +8080,8 @@ async function snapshotForAssembly(
     ),
     snapshotModifierPct: modifierPct.toFixed(4),
     snapshotLaborRate: laborRate.toFixed(4),
+    // What the same role charges, frozen beside what it costs (0165).
+    snapshotChargeRate: frozenChargeRate(rateRow),
     snapshotModifierNames: applied.map(m => m.name),
     // Resolved per PART, over the same recipe lines the material cost above
     // was summed from, so the blend is weighted by exactly that cost.
@@ -8684,6 +8725,7 @@ export async function addLaborRoleLinesToBid(
       snapshotLaborHours: hours,
       snapshotModifierPct: base?.snapshotModifierPct ?? "0",
       snapshotLaborRate: base?.snapshotLaborRate ?? "0",
+      snapshotChargeRate: base?.snapshotChargeRate ?? null,
       snapshotModifierNames: base?.snapshotModifierNames ?? [],
       ...markup,
       snapshotUnpricedParts: 0,
@@ -8755,6 +8797,8 @@ export async function saveLineAsAssembly(input: {
   category: (typeof ASSEMBLY_CATEGORIES)[number];
   laborRateId: number | null;
   laborRate: number;
+  /** What that role charges, frozen with its cost (0165). */
+  chargeRate: string | null;
   /** Whether that rate is BidRidge's example rate (0134) — frozen with it. */
   laborRateWasExample: boolean;
   /** The person saving it, for the price history (never the owner's id). */
@@ -8801,6 +8845,7 @@ export async function saveLineAsAssembly(input: {
   await updateBidLineItem(line.id, bidId, {
     assemblyId,
     snapshotLaborRate: input.laborRate.toFixed(4),
+    snapshotChargeRate: input.chargeRate,
     snapshotLaborRateWasExample: input.laborRateWasExample,
     // Built from this line's typed price, so no part of it is $0 — said
     // rather than left NULL, which would read the new recipe live for ever.
@@ -13935,8 +13980,9 @@ export async function seedSampleProject(
     status: "Draft",
     trades: ["electrical"],
     isSample: true,
-    // A new bid starts on the current math, as createBid's do.
+    // A new bid starts on the current math and method, as createBid's do.
     mathVersion: CURRENT_MATH_VERSION,
+    pricingMethod: methodForNewBid(await companyPricingMethod(userId)),
     clientId: client.insertId,
     clientName: content.clientName,
     siteAddress: content.siteAddress,
@@ -14270,7 +14316,22 @@ function costSums(productivityPct: number) {
   const cents = lineCentsSql(productivityPct);
   const hours = cents.hours;
   const materialCents = ok(cents.materialCents);
-  const laborCents = ok(cents.laborCents);
+  /*
+    THE BID'S METHOD (0165, shared/bidMethods.ts), per line as the engine
+    prices it (`calculateLineItem`'s `chargeRate`). Only Markup + charge
+    rate reads the charge rate: there a line frozen with NONE prices its
+    labor as Not priced — no cost, no charge, never at cost (owner Q5) — and
+    a line with one adds charge − cost, each side rounded to the cent as the
+    engine rounds them. Cost + O&P and the old math are untouched here (Cost
+    + O&P drops the material markup in `priceBid`, from the same sums).
+  */
+  const onChargeRate = sql`(${bids.pricingMethod} <=> 'markup_rate')`;
+  const laborCents = ok(
+    sql`CASE WHEN ${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NULL THEN 0 ELSE ${cents.laborCents} END`
+  );
+  const laborMarkupCents = ok(
+    sql`CASE WHEN ${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NOT NULL THEN ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotChargeRate} * 100) - ${cents.laborCents} ELSE 0 END`
+  );
   /*
     MATERIAL MARKUP, per line, rounded exactly as the engine rounds it.
 
@@ -14327,6 +14388,7 @@ function costSums(productivityPct: number) {
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
     markupCents: sql<string>`COALESCE(SUM(${markupCents}), 0)`,
+    laborMarkupCents: sql<string>`COALESCE(SUM(${laborMarkupCents}), 0)`,
     /*
       Marked-up charges, which join the direct cost and take overhead and
       profit exactly as the bid screen prices them (server/bidPricing.ts,
@@ -14426,12 +14488,16 @@ export type BidCostRow = {
   profitMethod: "markup" | "margin" | null;
   profitValue: number | null;
   productivityPct: number | null;
+  /** The bid's method (0165); NULL is the old math. */
+  pricingMethod: PricingMethod | null;
   materialCost: number;
   laborCost: number;
   /** The LINES' direct cost. Marked-up charges are `markedUpExpenses`, apart. */
   directCost: number;
   /** Summed per line exactly as the engine rounds it. See costSums. */
   materialMarkup: number;
+  /** Charge − cost on a Markup + charge rate bid; 0 on the others. */
+  laborMarkup: number;
   /** Charges that join the direct cost before overhead and profit. */
   markedUpExpenses: number;
   totalHours: number;
@@ -14472,10 +14538,12 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     profitMethod: (row.profitMethod ?? null) as BidCostRow["profitMethod"],
     profitValue: num(row.profitValue),
     productivityPct: num(row.productivityPct),
+    pricingMethod: (row.pricingMethod ?? null) as PricingMethod | null,
     materialCost: Number(row.materialCents) / 100,
     laborCost: Number(row.laborCents) / 100,
     directCost: Number(row.directCents) / 100,
     materialMarkup: Number(row.markupCents) / 100,
+    laborMarkup: Number(row.laborMarkupCents) / 100,
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
@@ -14504,6 +14572,7 @@ function bidCostSelection(
     profitMethod: bids.profitMethod,
     profitValue: bids.profitValue,
     productivityPct: bids.productivityPct,
+    pricingMethod: bids.pricingMethod,
     ...sums,
   };
 }
@@ -14692,6 +14761,8 @@ export type DashboardBidRow = Bid & {
   laborCost: number;
   directCost: number;
   materialMarkup: number;
+  /** Charge − cost; 0 except on Markup + charge rate (costSums). */
+  laborMarkup: number;
   markedUpExpenses: number;
   totalHours: number;
   /** Lines the sums above leave out because they cannot be priced. */
@@ -14823,6 +14894,7 @@ export async function getDashboardBids(
     laborCost: Number(row.laborCents) / 100,
     directCost: Number(row.directCents) / 100,
     materialMarkup: Number(row.markupCents) / 100,
+    laborMarkup: Number(row.laborMarkupCents) / 100,
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
@@ -16005,6 +16077,7 @@ export async function addRunTypeRowToBid(
     // an operation, and this is a length of pipe.
     snapshotModifierPct: "0.0000",
     snapshotLaborRate: runRate.cost.toFixed(4),
+    snapshotChargeRate: runRate.chargeRate,
     snapshotLaborRateWasExample: runRate.wasExample,
     snapshotModifierNames: [],
     sortOrder: await nextBidSortOrder(bidId),
