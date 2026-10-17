@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Searching a material by its old name now always finds it.** Typing
+  '5/6" wafer LED downlight' (how that light used to be named) found
+  nothing, because "5/6"" read as a size no light has. It now finds the
+  light under its current name, first.
 - **A height area can now be reshaped after it is drawn.** In Ceilings,
   "Reshape" on an area lets you tap a corner and tap where it goes, add a
   corner between two, or remove one — then Done. Before, a wrong outline

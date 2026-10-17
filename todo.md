@@ -4372,7 +4372,14 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       `separateQueryWords` in `client/src/lib/smartSearch.ts` now turns
       , ; : brackets ! ? and a non-decimal full stop into spaces before the
       split, keeping " / - # . inside sizes. Pinned in `smartSearch.test.ts`.
-- [ ] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
+- [x] **FIXED 2026-10-16 (Track C), plan S2 as written:** `searchMaterials`
+      (`client/src/lib/materialSearch.ts`, the pipeline every search box
+      runs) lets an old name's row in before ranking (`renamedTo`), and the
+      ranker already puts a former name first. The rename-loop test now
+      calls that real pipeline instead of its own copy, and the 5/6" entry
+      left its "not a ranking problem" list — red without the fix, green
+      with ("6" canless wafer LED downlight" first).
+- [x] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
       and finds nothing.** Split out of the comma item above on 2026-09-26:
       a size-parsing problem, not punctuation. Found by
       `scripts/catalogRehearsal.mts search`. Planned 2026-09-29:
