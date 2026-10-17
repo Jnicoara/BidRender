@@ -3837,6 +3837,12 @@ path is ever revived, give it the same treatment first.
       "N remove/relocate — labour not on the bid". Their LABOUR is not on the
       bid anywhere yet. Recommendation: one labour line per status per count,
       at a rate the owner sets (demo hours each, relocate hours each).
+- [x] **CLOSED 2026-10-16 night (Track A):** the fold code is live (in
+      `60479773`), and the census on tonight's fresh copy of live
+      (`twinCountCensus.mts`, restored from the 05:02 UTC dump, dropped
+      after) reads **0 twin counts, 0 marks, 0 bid lines, 0 twin
+      assemblies** — nothing to fold, and the old "Count as existing" that
+      made twins is gone from live. No step-3 file. Original entry:
 - [ ] **Track A (step 3 file) + C: fold the "… - EXISTING TO REMAIN" twin
       counts into `status`.** The code now reads `status`; the twin counts
       (`shared/existingToRemain.ts`) still price as NEW if sent. Per 0098's
