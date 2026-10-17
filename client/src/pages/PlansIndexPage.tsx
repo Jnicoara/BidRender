@@ -162,9 +162,14 @@ export default function PlansIndexPage({
                     >
                       Bid
                     </Button>
+                    {/* Outlined, not filled: a filled button on every row
+                        made 150 "next steps" and hid the screen's one,
+                        Upload a plan (layout audit, 2026-10-16). The yellow
+                        edge still says which of the two a row is for. */}
                     <Button
                       size="sm"
-                      className="h-8 text-xs"
+                      variant="outline"
+                      className="h-8 text-xs border-[#F5C518]/60 text-[#F5C518] hover:text-[#F5C518]"
                       onClick={() => onOpenPlans(bid.id)}
                     >
                       Open plans

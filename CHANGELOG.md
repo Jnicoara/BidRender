@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Back now returns to the same place in a list.** Opening a bid from far
+  down the Dashboard, Bids or Plans list and pressing Back (the app's or the
+  browser's) used to put you back at the top; it now scrolls back to where
+  you were. The Plans list also shows one main button again ("Upload a
+  plan") instead of a yellow "Open plans" on every row.
+
 - **Every fix to an AI-found mark is now recorded.** When someone accepts,
   dismisses, re-labels, deletes, moves or tags a mark the plan reader
   proposed, one row goes into the AI correction log: what the AI said, what

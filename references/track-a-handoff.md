@@ -28,6 +28,23 @@ LOCAL branch `c-ai-log-optout` (`94333e7b`), rehearsed on a throwaway DB
 column is on local-dev, tell C and C merges it. **Ship the column and the
 switch WITH the log, never the log alone to live.**
 
+**Second draft, same shape — user levels (owner's night-4 item 3).**
+Additive, step 1, nothing to backfill; NULL = Pro = every person's menu
+unchanged:
+
+```sql
+-- 0167_users_work_level.sql
+ALTER TABLE `users` ADD `workLevel` enum('takeoff','estimate','pro');
+```
+
+Schema (in `users`, after `sessionsValidAfter`):
+`workLevel: mysqlEnum("workLevel", ["takeoff", "estimate", "pro"]),`
+— and `"workLevel"` joins `PUBLIC_USER_FIELDS` in `shared/publicUser.ts`
+(the drift test fails otherwise). Code on C's local `c-user-levels`
+(`fecebd3c`, stacked on `c-ai-log-optout`), behind the internal
+`work.levels` feature, so merging it changes nothing for a standard
+account. Rehearsed on a throwaway DB (168 applied).
+
 ## C ready cd1dde67 (2026-10-16 21:35; code = 7cb6aca9, Gate 38992731395 green, full code run)
 
 `cd1dde67` = `7cb6aca9` + a merge of your notes (`d9b8d412`), nothing

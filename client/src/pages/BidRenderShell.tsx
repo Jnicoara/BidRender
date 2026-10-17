@@ -38,6 +38,7 @@ import { PageLoading } from "@/components/PageLoading";
  */
 import { useApp } from "@/contexts/AppContext";
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { UIEvent } from "react";
 import { askToLeave, hasUnsaved } from "@/lib/unsavedGuard";
 import UnsavedChangesDialog from "@/components/UnsavedChangesDialog";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -139,6 +140,11 @@ import { cn } from "@/lib/utils";
 import { APP_VERSION_LABEL } from "@shared/version";
 import { buildAgeLabel, buildStampLabel } from "@shared/buildStamp";
 import { BUILD_STAMP } from "@/lib/buildStamp";
+import {
+  createScrollMemory,
+  restoreTarget,
+  shouldRestoreScroll,
+} from "@/lib/scrollMemory";
 import {
   pathToRoute,
   retiredAddress,
@@ -714,6 +720,69 @@ export default function BidRenderShell() {
   // frame — the tab strip is the only thing telling you the screen changed.
   const routeKey = `${route}:${activeView ?? ""}`;
 
+  /*
+    Back puts a list back where it was (client/src/lib/scrollMemory.ts).
+    Every scroll inside the content area is remembered against the address;
+    coming back to a list FROM A BID waits for its rows and scrolls there,
+    and stops the moment the person scrolls, taps or types themselves.
+  */
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scrollMemory = useRef(createScrollMemory()).current;
+  const rememberScroll = (e: UIEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement;
+    if (el.clientHeight > 200)
+      scrollMemory.save(window.location.hash, el.scrollTop);
+  };
+  useEffect(() => {
+    if (!shouldRestoreScroll(previousRoute, route)) return;
+    const address = window.location.hash;
+    const saved = scrollMemory.get(address);
+    if (!saved) return;
+    const started = performance.now();
+    let frame = 0;
+    let stopped = false;
+    const stop = () => {
+      stopped = true;
+    };
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    for (const name of events)
+      window.addEventListener(name, stop, { once: true, passive: true });
+    const tick = () => {
+      if (stopped || window.location.hash !== address) return;
+      const candidates = contentRef.current?.querySelectorAll<HTMLElement>(
+        ".overflow-y-auto, .overflow-auto"
+      );
+      const scroller = Array.from(candidates ?? []).reduce<HTMLElement | null>(
+        (best, el) =>
+          el.clientHeight > 200 &&
+          (!best || el.clientHeight > best.clientHeight)
+            ? el
+            : best,
+        null
+      );
+      const gaveUp = performance.now() - started > 3000;
+      const target = scroller
+        ? restoreTarget(
+            saved,
+            scroller.scrollHeight,
+            scroller.clientHeight,
+            gaveUp
+          )
+        : null;
+      if (scroller && target !== null) {
+        scroller.scrollTop = target;
+        return;
+      }
+      if (!gaveUp) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      for (const name of events) window.removeEventListener(name, stop);
+    };
+    // Once per arrival at a screen; previousRoute is set in the same update.
+  }, [routeKey]);
+
   return (
     <div
       /*
@@ -1047,6 +1116,8 @@ export default function BidRenderShell() {
 
         {/* Tab content */}
         <div
+          ref={contentRef}
+          onScrollCapture={rememberScroll}
           className="flex-1 min-h-0 overflow-hidden tab-enter"
           key={routeKey}
         >

@@ -6,6 +6,8 @@
  * from the sign-in page it is reached from (CLAUDE.md, "Copying a layout does
  * not copy the behaviour with it").
  */
+import { DEFAULT_TRADE } from "@/content/trades";
+
 export function AuthShell({
   children,
   footer,
@@ -37,9 +39,11 @@ export function AuthShell({
           {/* The landing page's own headline (owner's saved list,
               2026-10-14: "sign-in tagline"), so the page someone signs in
               from and the page they came from say the same thing. Was
-              "Electrical estimating for the field". */}
+              "Electrical estimating for the field". Read from the same
+              trade content as the landing page since 2026-10-16 — it was
+              typed here by hand, one edit away from disagreeing. */}
           <p className="text-muted-foreground text-sm">
-            Electrical estimating, built by an electrician
+            {DEFAULT_TRADE.hero.headline}
           </p>
         </div>
 
