@@ -596,3 +596,47 @@ process on a runner (no network, no browser). The browser job (staging,
 real network, slow 3G, the 300 MB set uploaded through the Plans screen)
 runs once staging serves the candidate — it shares the smoke account, so
 it never runs beside a Gate smoke.
+
+### Runs 2 and 3 — server + browser (`stress-night`, candidate `00777dba` on staging)
+
+- **Run 2 (39009798982):** server job RED on one number — Dashboard at 251
+  bids **1,860 ms** median (max 1,875; limit 1 s). Every other figure as
+  run 1. Browser job stopped at its first step (the spec's own fault:
+  `assemblies.list` takes `{}`; fixed).
+- **Run 3 (39050194392): both jobs GREEN.** Server Dashboard **71 ms**
+  (run 1: 100 ms). So 2 of 3 runs are ~0.1 s and one was 1.9 s with three
+  tight samples — not noise inside a run, a slow RUN. Unexplained; the
+  code between runs 1 and 2 does not touch the Dashboard (only the
+  stale-save claim and a Settings screen). Suspect, not checked: MySQL
+  choosing another plan on statistics not yet refreshed after the bulk
+  build. `todo.md` has it.
+
+**Browser, on staging (real R2, real network), run 3:**
+
+| What | Normal | Slow 3G (Chrome preset: 400 ms, 500 kb/s) |
+| --- | --- | --- |
+| Built: 50 bids, each a plan uploaded to R2 + scale + 50 marks + sent | 51 s | — |
+| Dashboard (first screen loaded — includes the app's own download) | 1,533 ms | **5,136 ms — OVER 2 s** |
+| Bids list | 872 ms | 846 ms |
+| Bid page | 1,371 ms | 1,418 ms |
+| Print view | 339 ms | 825 ms |
+| Big set 308 MB / 400 sheets: sheet 1 on screen while it uploads (drawn from the local file) | 4.1 s | — |
+| Big set: upload finished and attached | 8 s | — |
+| Big set: **reopened from the bucket**, sheet 1 on screen | **42.7 s — OVER** | — |
+
+Two over the limit, both in `todo.md` with what is and is not known:
+
+1. **A 308 MB set reopened from the bucket took 42.7 s to show sheet 1**,
+   against 4 s from the local file. At this runner's bandwidth (308 MB up
+   in 8 s) that is roughly the time to pull most of the file, so the
+   viewer is probably reading far more than byte ranges for THIS file —
+   which is a synthetic, non-linearized set whose pages each carry a
+   0.75 MB picture. Not checked: how many bytes came down before sheet 1
+   (`scripts/stagingUploadTiming.mts` measures exactly that).
+2. **Dashboard on slow 3G: 5.1 s**, as the FIRST screen of a cold page
+   load, so it includes downloading the app itself (C's "First load on a
+   phone" section above has the app's size). Later screens on slow 3G are
+   0.8–1.4 s.
+
+The 50 stress bids were archived by the spec; the big set's file stays
+in the staging bucket until the archive purge.

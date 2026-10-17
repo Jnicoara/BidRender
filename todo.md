@@ -3,6 +3,26 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Over the speed limits in the stress harness (Track A, 2026-10-17 night, `references/stress-results.md`)
+
+- [ ] **A 308 MB / 400-sheet set reopened from the bucket: sheet 1 after
+      42.7 s** (staging, run 39050194392); 4.1 s from the local file while
+      uploading. Probably far more than byte ranges are read for this file
+      (synthetic, non-linearized, a 0.75 MB picture per page). **First
+      step:** measure bytes pulled before sheet 1 with
+      `scripts/stagingUploadTiming.mts` on the same file
+      (`server/stressPdf.testHelper.ts` writes it). Done when the cause is
+      named and either fixed or written beside the limit.
+- [ ] **Dashboard on slow 3G: 5.1 s as the first screen of a cold load**
+      (includes the app download; later screens 0.8–1.4 s). Measure the
+      cold download separately from the Dashboard's own reads before
+      deciding anything.
+- [ ] **Server Dashboard at 251 bids: one stress run measured 1,860 ms**
+      (limit 1 s); the runs before and after measured 100 ms and 71 ms.
+      Unexplained (suspect: a plan chosen on stale statistics after the
+      bulk build). If it comes back, run `EXPLAIN` on the list reads in that
+      run before guessing.
+
 ## Stale-save guard: racing saves FIXED, the whole-second limit remains (Track A, 2026-10-16)
 
 - [x] Found by the stress harness: 24 saves of one assembly from screens
