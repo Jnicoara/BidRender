@@ -1,0 +1,102 @@
+# SMOKE REPEAT — run chosen smoke specs N times against staging, to prove a
+# fixed flake is gone (owner, 2026-10-16 overnight: "run the smoke tests B and
+# C fixed 5 times each in Gate").
+#
+# Started by pushing a branch named `smoke-repeat-<anything>` whose code is
+# what staging serves (the run checks, and refuses otherwise), or from the
+# Actions tab once this file is on the default branch. What it runs comes
+# from .github/smoke-repeat.json:
+#
+#   { "specs": ["plans.spec.ts", "marks.spec.ts"], "repeat": 5,
+#     "projects": ["desktop", "phone"] }
+#
+# The same staging account the Gate's smoke uses, so the two must never run
+# at once: both jobs sit in the `staging-smoke` concurrency group, queued,
+# never cancelled. Nothing here deploys, and the smoke test refuses
+# bidridge.com by name (scripts/smokeTarget.ts). Failure traces are sealed
+# exactly as gate.yml does it — the repo is public.
+name: Smoke repeat
+
+on:
+  push:
+    branches: ["smoke-repeat-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    concurrency:
+      group: staging-smoke
+      cancel-in-progress: false
+    env:
+      SMOKE_BASE_URL: https://staging.bidridge.com
+      SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+      SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+      SMOKE_STAGING_PASSWORD: ${{ secrets.SMOKE_STAGING_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The specs run from THIS checkout against whatever staging serves, so
+      # the two must hold the same code, or a green run proves nothing about
+      # the commit it is named after. Notes and workflow files may differ.
+      - name: Staging serves this code?
+        run: |
+          served=$(curl -fsS https://staging.bidridge.com/api/version | sed -n 's/.*"commit":"\([0-9a-f]*\)".*/\1/p')
+          echo "staging serves $served"
+          git cat-file -e "$served^{commit}" || { echo "::error::staging serves $served, which this checkout does not have"; exit 1; }
+          if ! git diff --quiet "$served" HEAD -- . ':!*.md' ':!references/' ':!.github/'; then
+            echo "::error::this checkout's code differs from what staging serves ($served):"
+            git diff --stat "$served" HEAD -- . ':!*.md' ':!references/' ':!.github/'
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Repeat the chosen specs
+        run: |
+          repeat=$(node -p 'require("./.github/smoke-repeat.json").repeat')
+          specs=$(node -p 'require("./.github/smoke-repeat.json").specs.join(" ")')
+          projects=$(node -p '(require("./.github/smoke-repeat.json").projects||[]).map(p=>"--project="+p).join(" ")')
+          echo "specs: $specs | repeat: $repeat | $projects"
+          npx playwright test -c e2e/playwright.config.ts $specs $projects --repeat-each="$repeat" --reporter=list
+
+      - name: Seal the failure traces
+        if: failure()
+        env:
+          TRACE_KEY: ${{ secrets.SMOKE_STAGING_PASSWORD }}${{ secrets.SMOKE_PASSWORD }}
+        run: |
+          find e2e/.results -name trace.zip -print0 2>/dev/null |
+            while IFS= read -r -d '' trace; do
+              openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+                -pass env:TRACE_KEY -in "$trace" -out "${trace%.zip}.trace.enc"
+              rm -f "$trace"
+            done
+
+      - name: Keep the failure screenshots and sealed traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-repeat-failures
+          path: |
+            e2e/.results/**/*.png
+            e2e/.results/**/*.trace.enc
+            !e2e/.auth/**
+          retention-days: 7
+          if-no-files-found: ignore
