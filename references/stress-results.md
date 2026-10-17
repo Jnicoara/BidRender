@@ -640,3 +640,19 @@ Two over the limit, both in `todo.md` with what is and is not known:
 
 The 50 stress bids were archived by the spec; the big set's file stays
 in the staging bucket until the archive purge.
+
+### Runs 5 and 6 — the two open questions (2026-10-17 ~01:00–01:40 local)
+
+- **Server Dashboard:** run 5 on AMD EPYC 7763 ×4 → 90 ms
+  (`bids.dashboard` 91, `bids.archived` 2); run 6 on Intel Xeon 8370C ×4 →
+  90 ms. The runner's CPU is not what made runs 2 and 4 slow (1.86 / 1.83
+  s). Still unexplained; `[big-detail]` stays in so the next slow run says
+  which call it is.
+- **The big set's reopen (run 6, 39051183730):** reopened at once → 60 s to
+  sheet 1, **309 ranged requests, 308.1 MB of 308 MB**. Then the spec
+  waited for `bidPdfs.schedulePages` to stop being `null` (= every page's
+  upload text stored): **it never did in 10 minutes.** The reload during
+  the uploader's sheet reading lost those reads, and nothing reads them
+  again, so every open of that set reads every page first. Handed to B
+  (`track-b-handoff.md`, `todo.md`). The spec fails on that wait by
+  design until it is fixed.

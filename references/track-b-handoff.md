@@ -31,7 +31,10 @@
   stored, and `null` reads every page (`panelsInDoc`) — the 270 MB case you
   fixed on 10-15, still open whenever the reads are incomplete (opened
   early, or an older set). Evidence and how to prove it: `todo.md` top,
-  "Over the speed limits in the stress harness".
+  "Over the speed limits in the stress harness". **Sharper (run
+  39051183730):** after a reload during upload the set's page text was
+  NEVER stored (`schedulePages` null for 10 min), so every later open of
+  that set reads all 308 MB first. Two asks in the todo entry.
 
 ## BM migrations applied (0164+0165 on local-dev + staging)
 

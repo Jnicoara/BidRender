@@ -18,10 +18,16 @@ left as written rather than rewritten to match the rename.
       probably before the 400 sheet reads were recorded. The same would
       happen for anyone opening a big set early, or any set uploaded before
       text reading existed. B's code (panel schedules, 2026-10-15): written
-      in `track-b-handoff.md`. **To prove it:** wait for the sheet reads
-      before the reopen in `e2e/stress/stress.spec.ts` and see the bytes
-      drop. Done when the cause is named and fixed or written beside the
-      limit.
+      in `track-b-handoff.md`. **Run 39051183730 sharpened it:** after the
+      reopen (60 s, 308.1 MB again), `bidPdfs.schedulePages` stayed `null`
+      for the full 10-minute wait — **the set's page text was never stored
+      at all.** So a reload while the uploader's browser is still reading
+      the sheets loses those reads for good, and from then on EVERY open of
+      that set reads every page (nothing reads them again). Two things for
+      B: (1) re-read missing sheet text when a set opens without it (or
+      record reads as they go), and (2) on a set above the auto-fetch limit,
+      `null` should not mean "read all 400 pages before sheet 1". Done when
+      a reopen of this set pulls a few MB before sheet 1.
 - [ ] **Dashboard on slow 3G: 5.1 s as the first screen of a cold load**
       (includes the app download; later screens 0.8–1.4 s). Measure the
       cold download separately from the Dashboard's own reads before
