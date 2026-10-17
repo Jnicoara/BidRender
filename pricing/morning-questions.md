@@ -47,6 +47,12 @@ pricing tier — so it hides screens and is never a lock on the server).
 - **TR5** A company's trades → **set in Settings, default electrical**;
   signup asks the level only.
 - **TR6** QuickBooks "Electrical work" → **booked by each line's trade.**
+- **Q-EV1 (from todo.md's oldest list)** Should signing up require
+  confirming the email address (a link sent to it) before the account
+  works? Password reset already sends mail, so it is buildable. → **Yes,
+  before beta, but let the person look around first and ask only before
+  sending a quote** — a typo'd email loses every reset and every invite.
+  Affects: sign-up steps.
 - **Q-ARCH1 (from todo.md, drill 2026-10-15)** A bid in Recently deleted
   can still be EDITED from another tab (lines, quantities, name) — the
   screen already says "This bid is in Recently deleted … Restore". Refuse

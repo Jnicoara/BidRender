@@ -2537,16 +2537,25 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       then re-added by mistake would come back), and write the test that
       seeds, retires, un-retires and re-seeds the same name.
 
-- [ ] Replace fractional resize recentering with true page-box centering in the PDF viewer
-- [ ] Ensure the PDF canvas stays fully within the left pane as the divider moves
-- [ ] Connect estimate engine to user's custom materials DB (fall back to built-in DB)
-- [ ] Connect estimate engine to user's active labor standard profile
-- [ ] Save estimate sessions to DB (currently frontend-only)
-- [ ] Project management UI (create/rename/archive projects from the sidebar)
+> **Reviewed 2026-10-16 (Track C), each checked against the code:** the
+> first six were for the four-workspace design whose screens were deleted
+> (CLAUDE.md § Architecture: `PlanPanel`, `PlanViewer`, the `pages/tabs/`
+> estimate screens, projects → bids) — closed as obsolete, not built.
+> Password reset is built (`authRouter.ts`, `password_reset_tokens`); the
+> admin screen is `AdminSettingsPage`. Stripe stays open (billing is
+> "unassigned" in the before-beta checklist); email verification stays open
+> as owner question Q-EV1 (`pricing/morning-questions.md`).
+
+- [x] ~~Replace fractional resize recentering with true page-box centering in the PDF viewer~~ (obsolete: `PlanViewer` deleted)
+- [x] ~~Ensure the PDF canvas stays fully within the left pane as the divider moves~~ (obsolete: `PlanPanel` deleted)
+- [x] ~~Connect estimate engine to user's custom materials DB (fall back to built-in DB)~~ (obsolete: bids price from `materials`)
+- [x] ~~Connect estimate engine to user's active labor standard profile~~ (obsolete: `labor_rates`)
+- [x] ~~Save estimate sessions to DB (currently frontend-only)~~ (obsolete: a bid is the unit of work, stored)
+- [x] ~~Project management UI (create/rename/archive projects from the sidebar)~~ (obsolete: bids, Dashboard, Recently deleted)
 - [ ] Stripe subscription billing (free trial → paid tier)
-- [ ] Email verification flow
-- [ ] Password reset via email
-- [ ] Admin dashboard for user management
+- [ ] Email verification flow — **Q-EV1, owner**
+- [x] Password reset via email (built: `authRouter.ts`)
+- [x] Admin dashboard for user management (built: `AdminSettingsPage`)
 
 ## Bug Fixes & UI Polish (v4.1)
 
