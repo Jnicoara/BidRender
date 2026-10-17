@@ -451,9 +451,17 @@ describe("what leaves the building", () => {
     });
     expect(
       notPricedLines([
-        { line: line(7, "Priced", 10), directCost: 10 },
-        { line: line(8, "Nothing priced", 0), directCost: 0 },
-        { line: line(9, "Short a lug", 10, 2), directCost: 10 },
+        { line: line(7, "Priced", 10), directCost: 10, laborNotPriced: false },
+        {
+          line: line(8, "Nothing priced", 0),
+          directCost: 0,
+          laborNotPriced: false,
+        },
+        {
+          line: line(9, "Short a lug", 10, 2),
+          directCost: 10,
+          laborNotPriced: false,
+        },
       ])
     ).toEqual([
       {
@@ -462,6 +470,7 @@ describe("what leaves the building", () => {
         wholeLine: true,
         parts: 0,
         hoursNotSet: false,
+        noChargeRate: false,
       },
       {
         lineId: 9,
@@ -469,6 +478,7 @@ describe("what leaves the building", () => {
         wholeLine: false,
         parts: 2,
         hoursNotSet: false,
+        noChargeRate: false,
       },
     ]);
   });
@@ -727,6 +737,7 @@ describe.skipIf(!hasDb)("proposals end to end", () => {
         wholeLine: true,
         parts: 0,
         hoursNotSet: false,
+        noChargeRate: false,
       },
     ]);
 

@@ -124,7 +124,7 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
     lineRole: "install",
     scopeTag: null,
     unpricedParts: 0,
-    breakdown: { directCost: 0 },
+    breakdown: { directCost: 0, laborNotPriced: false },
     ...over,
   });
 
@@ -136,7 +136,7 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
           // $12.50 of labor and material "0": until 2026-10-05 this was "a
           // priced one" and added nothing. Owner: labor with $0 material is
           // never fully priced — its material counts once.
-          line({ breakdown: { directCost: 12.5 } }),
+          line({ breakdown: { directCost: 12.5, laborNotPriced: false } }),
           line({ qty: 0 }),
         ],
         0
@@ -153,7 +153,7 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
             takeoffRunTypeId: 3,
             runMaterialRole: "raceway",
             snapshotMaterialCost: "0",
-            breakdown: { directCost: 4 },
+            breakdown: { directCost: 4, laborNotPriced: false },
           }),
         ],
         0
@@ -165,7 +165,10 @@ describe("bidNotPricedCount reads the same rule as the line cell", () => {
     expect(
       bidNotPricedCount(
         [
-          line({ unpricedParts: 2, breakdown: { directCost: 25 } }),
+          line({
+            unpricedParts: 2,
+            breakdown: { directCost: 25, laborNotPriced: false },
+          }),
           line({ unpricedParts: 2 }),
         ],
         0
@@ -186,7 +189,7 @@ describe("lines with labor and no material (owner, 2026-10-05)", () => {
     lineRole: "install",
     scopeTag: null,
     unpricedParts: 0,
-    breakdown: { directCost: 1440 },
+    breakdown: { directCost: 1440, laborNotPriced: false },
     ...over,
   });
   it("counts them apart from $0 parts, so the advice can differ", () => {
@@ -225,16 +228,22 @@ describe("lines whose assembly hours were not set (D1)", () => {
     lineRole: "install",
     scopeTag: null,
     unpricedParts: 0,
-    breakdown: { directCost: 10 },
+    breakdown: { directCost: 10, laborNotPriced: false },
     ...over,
   });
   it("counts them apart from parts, so the parts advice is not given for them", () => {
     const lines = [
       line({}), // hours not set, parts priced
       line({ unpricedParts: 1 }), // hours not set AND a $0 part
-      line({ snapshotLaborHours: "1", breakdown: { directCost: 90 } }), // fine
+      line({
+        snapshotLaborHours: "1",
+        breakdown: { directCost: 90, laborNotPriced: false },
+      }), // fine
       // Nothing priced at all: a whole line, not counted here.
-      line({ snapshotMaterialCost: "0", breakdown: { directCost: 0 } }),
+      line({
+        snapshotMaterialCost: "0",
+        breakdown: { directCost: 0, laborNotPriced: false },
+      }),
     ];
     const tally = bidNotPricedCount(lines, 0);
     // ONE real part, TWO lines with hours not set — never 3 "parts".
@@ -265,7 +274,11 @@ describe("lines whose assembly hours were not set (D1)", () => {
 
   it("names a line whose only gap is its hours in the print's list", () => {
     const named = notPricedLines([
-      { line: { ...line({}), id: 31, name: "Duplex" }, directCost: 10 },
+      {
+        line: { ...line({}), id: 31, name: "Duplex" },
+        directCost: 10,
+        laborNotPriced: false,
+      },
     ]);
     expect(named).toEqual([
       {
@@ -274,6 +287,7 @@ describe("lines whose assembly hours were not set (D1)", () => {
         wholeLine: false,
         parts: 0,
         hoursNotSet: true,
+        noChargeRate: false,
       },
     ]);
   });
@@ -302,5 +316,34 @@ describe("which row of the totals each gap belongs on", () => {
       parts: m.parts + l.parts,
       hours: m.hours + l.hours,
     }).toEqual(tally);
+  });
+});
+
+describe("labor with no charge rate (Markup + charge rate, 2026-10-16)", () => {
+  const tally = { lines: 0, parts: 0, hours: 0, rates: 2 };
+
+  it("is said on the total, as its own words, and is money left out", () => {
+    expect(notPricedSuffix(tally)).toBe("+ 2 lines no charge rate");
+    expect(notPricedHeadline({ ...tally, rates: 1 })).toEqual({
+      text: "1 line has no charge rate",
+      one: true,
+    });
+    expect(anyNotPriced(tally)).toBe(true);
+  });
+
+  it("belongs on the Labor row, never the Materials row", () => {
+    expect(laborShare(tally)).toEqual({
+      lines: 0,
+      parts: 0,
+      hours: 0,
+      rates: 2,
+    });
+    expect(materialsShare(tally)).toEqual({ lines: 0, parts: 0, hours: 0 });
+  });
+
+  it("an absent count reads as before — nothing added to a tally without it", () => {
+    expect(notPricedSuffix({ lines: 1, parts: 0, hours: 0 })).toBe(
+      "+ 1 line not priced"
+    );
   });
 });

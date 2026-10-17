@@ -43,8 +43,10 @@ its own `pricingMethod`; `db.createBid` gives a new bid its company's method
 drops no-charge-rate labor on A; analytics prices by method too. Step 6
 needs no write (a method is set at creation; NULL stays the old math) — the
 toggle must refuse a bid outside Draft. Tests: `server/bidMethodSurfaces.test.ts`.
-Old-math tests say so with `onOldMath` (golden file unchanged). **Left: 4
-and 5.**
+Old-math tests say so with `onOldMath` (golden file unchanged). **Step 4
+done too** (`lineChargeRateMissing`, tally `rates`, SQL `ratesMissing`;
+`lineCentsSql` reads the method so a labor-only A line with no rate is Not
+priced in SQL as in the engine). **Left: 5 (screens).**
 
 ~~**Every bid prices by the old math until these land, and that is enforced in
 one place:** `bidPricingMethod()` in `server/bidPricing.ts` returns NULL.~~ (was) The

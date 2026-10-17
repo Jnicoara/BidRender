@@ -555,6 +555,7 @@ export const proposalsRouter = router({
           priced.map(({ line, breakdown }) => ({
             line,
             directCost: breakdown?.directCost ?? null,
+            laborNotPriced: breakdown?.laborNotPriced ?? false,
           }))
         ),
         lineCount: lines.length,

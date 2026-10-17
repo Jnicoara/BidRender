@@ -14230,10 +14230,31 @@ function lineCentsSql(productivityPct: number) {
   const hours = sql`CASE WHEN ${lineScopeSql.pricesLabor} THEN ${lineHoursSql(productivityPct)} ELSE 0 END`;
   // COALESCE for the reason lineHoursSql gives: an untyped price (drizzle/0074)
   // must total as 0, not turn the whole line NULL and drop it from the sum.
+  const laborAtCost = sql`ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotLaborRate} * 100)`;
+  /*
+    THE BID'S METHOD (0165, shared/bidMethods.ts), per line as the engine
+    prices it (`calculateLineItem`'s `chargeRate`). Only Markup + charge
+    rate reads the charge rate: there a line frozen with NONE prices its
+    labor as Not priced — no cost, no charge, never at cost (owner Q5) — and
+    a line with one adds charge − cost, each side rounded to the cent as the
+    engine rounds them. HERE, not in `costSums`, so "is this line priced at
+    all" (`lineNotPricedSql`) reads the same labor the sums do: a labor-only
+    line with no charge rate is $0, and so Not priced, in both. Cost + O&P
+    and the old math are untouched (Cost + O&P drops the material markup in
+    `priceBid`, from the same sums).
+  */
+  const onChargeRate = sql`(${bids.pricingMethod} <=> 'markup_rate')`;
   return {
     hours,
     materialCents: sql`CASE WHEN ${lineScopeSql.pricesMaterial} THEN ROUND(COALESCE(${bidLineItems.snapshotMaterialCost}, 0) * 100) * ${bidLineItems.qty} ELSE 0 END`,
-    laborCents: sql`ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotLaborRate} * 100)`,
+    laborCents: sql`CASE WHEN ${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NULL THEN 0 ELSE ${laborAtCost} END`,
+    laborMarkupCents: sql`CASE WHEN ${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NOT NULL THEN ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotChargeRate} * 100) - ${laborAtCost} ELSE 0 END`,
+    /**
+     * `lineChargeRateMissing`: labor Not priced for want of a charge rate,
+     * on a line with hours (the engine's `laborNotPriced` is the NULL rate
+     * on an A bid; hours and scope are the predicate's own conditions).
+     */
+    chargeRateMissing: sql`(${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NULL AND COALESCE(${bidLineItems.snapshotLaborHours}, 0) > 0)`,
   };
 }
 
@@ -14316,22 +14337,9 @@ function costSums(productivityPct: number) {
   const cents = lineCentsSql(productivityPct);
   const hours = cents.hours;
   const materialCents = ok(cents.materialCents);
-  /*
-    THE BID'S METHOD (0165, shared/bidMethods.ts), per line as the engine
-    prices it (`calculateLineItem`'s `chargeRate`). Only Markup + charge
-    rate reads the charge rate: there a line frozen with NONE prices its
-    labor as Not priced — no cost, no charge, never at cost (owner Q5) — and
-    a line with one adds charge − cost, each side rounded to the cent as the
-    engine rounds them. Cost + O&P and the old math are untouched here (Cost
-    + O&P drops the material markup in `priceBid`, from the same sums).
-  */
-  const onChargeRate = sql`(${bids.pricingMethod} <=> 'markup_rate')`;
-  const laborCents = ok(
-    sql`CASE WHEN ${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NULL THEN 0 ELSE ${cents.laborCents} END`
-  );
-  const laborMarkupCents = ok(
-    sql`CASE WHEN ${onChargeRate} AND ${bidLineItems.snapshotChargeRate} IS NOT NULL THEN ROUND(${hours} * ${lineLaborQtySql} * ${bidLineItems.snapshotChargeRate} * 100) - ${cents.laborCents} ELSE 0 END`
-  );
+  // By the bid's method — see lineCentsSql.
+  const laborCents = ok(cents.laborCents);
+  const laborMarkupCents = ok(cents.laborMarkupCents);
   /*
     MATERIAL MARKUP, per line, rounded exactly as the engine rounds it.
 
@@ -14384,6 +14392,12 @@ function costSums(productivityPct: number) {
       count, never folded into parts (owner, 2026-10-07).
     */
     hoursMissing: sql<string>`COALESCE(SUM(CASE WHEN ${linePartsCountSql(productivityPct)} AND ${bidLineItems.snapshotLaborHours} IS NULL THEN 1 ELSE 0 END), 0)`,
+    /*
+      Lines whose labor is Not priced for want of a CHARGE RATE
+      (`lineChargeRateMissing`, Markup + charge rate bids): ours to price
+      (not off the bid), with hours, not already Not priced as a whole.
+    */
+    ratesMissing: sql<string>`COALESCE(SUM(CASE WHEN ${bidLineItems.id} IS NOT NULL AND ${bidLineItems.qty} > 0 AND ${lineIsPriceable} AND ${lineScopeSql.pricesLabor} AND ${cents.chargeRateMissing} AND NOT ${lineNotPricedSql(productivityPct)} THEN 1 ELSE 0 END), 0)`,
     materialCents: sql<string>`COALESCE(SUM(${materialCents}), 0)`,
     laborCents: sql<string>`COALESCE(SUM(${laborCents}), 0)`,
     directCents: sql<string>`COALESCE(SUM(ROUND(${materialCents} + ${laborCents})), 0)`,
@@ -14547,12 +14561,23 @@ function toBidCostRow(row: Record<string, unknown>): BidCostRow {
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
-    notPriced: {
-      lines: Number(row.notPricedLines),
-      parts: Number(row.frozenParts),
-      hours: Number(row.hoursMissing),
-    },
+    notPriced: withRatesMissing(
+      {
+        lines: Number(row.notPricedLines),
+        parts: Number(row.frozenParts),
+        hours: Number(row.hoursMissing),
+      },
+      Number(row.ratesMissing)
+    ),
   };
+}
+
+/** The tally, with `rates` only when some are missing (NotPricedTally.rates). */
+function withRatesMissing(
+  tally: NotPricedTally,
+  rates: number
+): NotPricedTally {
+  return rates > 0 ? { ...tally, rates } : tally;
 }
 
 /** The columns both rollup queries select, in one place so they cannot drift. */
@@ -14898,11 +14923,14 @@ export async function getDashboardBids(
     markedUpExpenses: Number(row.markedUpExpenseCents) / 100,
     totalHours: Number(row.totalHours),
     brokenLines: Number(row.brokenLines),
-    notPriced: {
-      lines: Number(row.notPricedLines),
-      parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
-      hours: Number(row.hoursMissing),
-    },
+    notPriced: withRatesMissing(
+      {
+        lines: Number(row.notPricedLines),
+        parts: Number(row.frozenParts) + (liveParts.get(row.bid.id) ?? 0),
+        hours: Number(row.hoursMissing),
+      },
+      Number(row.ratesMissing)
+    ),
     planLines: Number(row.planLines),
     plans: {
       sets: Number(row.planSets),

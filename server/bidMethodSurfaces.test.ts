@@ -39,6 +39,8 @@ import {
 } from "./bidBuilders.testHelper";
 import { dropFixtureUsersAfterAll } from "./testFixtureUsers";
 import { outcomesReport } from "./analytics";
+import { bidNotPricedCount } from "../client/src/lib/notPricedTotal";
+import { tallyLeavesOut } from "../shared/lineNotPriced";
 
 const USER = 9962;
 const c = as(USER);
@@ -194,5 +196,59 @@ withDb("a bid priced by its method", () => {
 
     const b = await frozen(uncharged, "Methods: no charge");
     expect(b.snapshotChargeRate).toBeNull();
+  });
+
+  /*
+    STEP 4 — a missing charge rate is said, the same on the bid screen and
+    the Dashboard card, and blocks the print (todo.md "Bid methods — wiring
+    left"). Two lines: one with material (its labor is what is missing —
+    "1 line no charge rate"), and a labor-only one with no material, which
+    is then $0 and so Not priced as a WHOLE line in both. That second half
+    is why the SQL's line cents read the method (`lineCentsSql`): with
+    labor at cost there, the card called the line priced.
+  */
+  it("a missing charge rate is counted the same on the bid screen and the card, and blocks the print", async () => {
+    const id = await bidWithLine("Methods: rate tally", null);
+    await setMethod(id, "markup_rate");
+    // An ASSEMBLY line: a hand line's typed $0 material is an answer, so
+    // only an assembly line at $0 direct cost is Not priced as a whole.
+    const labor = (await c.assemblies.create({
+      name: "Methods labor-only assembly",
+      category: "Devices",
+      trade: "electrical",
+      projectType: null,
+      baseLaborHours: 2,
+      laborRateId: null,
+      materials: [],
+      modifierIds: [],
+    }))!;
+    await (await getDb())!.insert(bidLineItems).values({
+      bidId: id,
+      assemblyId: labor.id,
+      name: "labor only, no charge rate",
+      qty: "1",
+      snapshotMaterialCost: "0.0000",
+      snapshotLaborHours: "2.0000",
+      snapshotLaborRate: "80.0000",
+      snapshotChargeRate: null,
+      snapshotModifierPct: "0.0000",
+      snapshotMarkupPct: "0.0000",
+      snapshotUnpricedParts: 0,
+      snapshotLaborOnly: true,
+    });
+    const bid = await c.bids.get({ id });
+    const onScreen = bidNotPricedCount(bid.lines, bid.dropsNotPriced);
+    expect(onScreen).toEqual({ lines: 1, parts: 0, hours: 0, rates: 1 });
+    const card = (await c.bids.dashboard()).find(b => b.id === id)!;
+    expect(card.notPriced).toEqual(onScreen);
+    expect(tallyLeavesOut(onScreen)).toBe(true);
+    // The same bid on Cost + O&P: labor at cost, nothing missing.
+    await setMethod(id, "cost_op");
+    const costOp = await c.bids.get({ id });
+    expect(bidNotPricedCount(costOp.lines, costOp.dropsNotPriced)).toEqual({
+      lines: 0,
+      parts: 0,
+      hours: 0,
+    });
   });
 });

@@ -33,6 +33,7 @@
  */
 import {
   countNotPriced,
+  lineChargeRateMissing,
   lineHoursMissing,
   lineMaterialNotPriced,
   linePartsNotPriced,
@@ -71,6 +72,9 @@ export function notPricedSuffix(notPriced: NotPricedTally): string {
   // print's block and every total say them like any other gap.
   const drops = whole(notPriced.drops ?? 0);
   const hours = whole(notPriced.hours);
+  // Labor Not priced for want of a charge rate (Markup + charge rate bids):
+  // its own words, because the fix is on Labor rates, not the assembly.
+  const rates = whole(notPriced.rates ?? 0);
   const priced = [
     lines > 0 ? plural(lines, "line") : "",
     parts > 0 ? plural(parts, "part") : "",
@@ -81,6 +85,7 @@ export function notPricedSuffix(notPriced: NotPricedTally): string {
   const pieces = [
     priced.length > 0 ? `${priced.join(", ")} not priced` : "",
     hours > 0 ? `${plural(hours, "line")} hours not set` : "",
+    rates > 0 ? `${plural(rates, "line")} no charge rate` : "",
     unassigned > 0 ? `${plural(unassigned, "mark")} unassigned` : "",
   ].filter(Boolean);
   return pieces.length === 0 ? "" : `+ ${pieces.join(", ")}`;
@@ -100,6 +105,7 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
   const parts = whole(notPriced.parts);
   const drops = whole(notPriced.drops ?? 0);
   const hours = whole(notPriced.hours);
+  const rates = whole(notPriced.rates ?? 0);
   const priced = [
     lines > 0 ? plural(lines, "line") : "",
     parts > 0 ? plural(parts, "part") : "",
@@ -113,10 +119,13 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
     hours > 0
       ? `${plural(hours, "line")} ${hours === 1 ? "has" : "have"} hours not set`
       : "",
+    rates > 0
+      ? `${plural(rates, "line")} ${rates === 1 ? "has" : "have"} no charge rate`
+      : "",
   ].filter(Boolean);
   return {
     text: pieces.join(" and "),
-    one: lines + parts + drops + hours === 1,
+    one: lines + parts + drops + hours + rates === 1,
   };
 }
 
@@ -131,10 +140,13 @@ export function notPricedHeadline(notPriced: NotPricedTally): {
  */
 export function lineShortfallWords(
   line: PartsLineLike,
-  directCost: number | null
+  directCost: number | null,
+  /** The engine's `laborNotPriced` (Markup + charge rate, no charge rate). */
+  laborNotPriced: boolean
 ): string {
   const parts = whole(linePartsNotPriced(line, directCost));
   const hours = lineHoursMissing(line, directCost);
+  const noRate = lineChargeRateMissing(line, directCost, laborNotPriced);
   const materialMissing =
     lineMaterialNotPriced(line, directCost) && whole(line.unpricedParts) === 0;
   return [
@@ -144,6 +156,7 @@ export function lineShortfallWords(
         ? "material not priced"
         : partsNotPricedWords(parts),
     hours ? "hours not set" : "",
+    noRate ? "no charge rate" : "",
   ]
     .filter(Boolean)
     .join(", ");
@@ -182,9 +195,15 @@ export function materialsShare(notPriced: NotPricedTally): NotPricedTally {
     : share;
 }
 
-/** The part that belongs on its LABOR row: lines whose hours are not set. */
+/**
+ * The part that belongs on its LABOR row: lines whose hours are not set,
+ * and lines whose labor has no charge rate (Markup + charge rate).
+ */
 export function laborShare(notPriced: NotPricedTally): NotPricedTally {
-  return { lines: 0, parts: 0, hours: notPriced.hours };
+  const share: NotPricedTally = { lines: 0, parts: 0, hours: notPriced.hours };
+  return (notPriced.rates ?? 0) > 0
+    ? { ...share, rates: notPriced.rates }
+    : share;
 }
 
 /** Whether a total leaves anything out at all. */
@@ -228,7 +247,9 @@ export function materialMissingLines(
 
 export function bidNotPricedCount(
   lines: readonly (PartsLineLike & {
-    breakdown: { directCost: number } | null;
+    // `laborNotPriced`: the engine's flag for a line on Markup + charge
+    // rate whose role has no charge rate (`lineChargeRateMissing`).
+    breakdown: { directCost: number; laborNotPriced: boolean } | null;
   })[],
   /**
    * The bid's drops with no material (`bids.get` → `dropsNotPriced`).
@@ -244,6 +265,7 @@ export function bidNotPricedCount(
       lines.map(line => ({
         line,
         directCost: line.breakdown?.directCost ?? null,
+        laborNotPriced: line.breakdown?.laborNotPriced ?? false,
       }))
     ),
     dropsNotPriced

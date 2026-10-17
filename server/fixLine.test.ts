@@ -333,6 +333,7 @@ describe.skipIf(!hasDb)("fixing a line on the bid, end to end", () => {
       (await linesOf(id)).map(line => ({
         line,
         directCost: line.breakdown?.directCost ?? null,
+        laborNotPriced: line.breakdown?.laborNotPriced ?? false,
       }))
     );
   const libraryLug = async () => {

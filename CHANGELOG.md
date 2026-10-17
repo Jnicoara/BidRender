@@ -15,6 +15,7 @@ This is the human-readable companion to the git history — read this to see wha
   - The Dashboard, Find a bid and the Performance screen price each bid by
     its method too, so they match the bid screen.
   - The screens to choose a method are not built yet.
+  - On a Markup + charge rate bid, a line whose role has no charge rate says so ("+ 1 line no charge rate") and blocks the printed price, rather than billing that labor at cost. The bid, the Dashboard and the print agree.
 - **Undo now takes back a mark the moment it is saved.** For about a
   second after each mark saved, while its list refreshed, Undo answered
   "Still saving" and did nothing. On a slower connection that was long

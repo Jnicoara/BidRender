@@ -154,7 +154,9 @@ describe("a line from an assembly", () => {
     const line = { ...assembly, snapshotLaborHours: "6", unpricedParts: 0 };
     expect(lineMaterialNotPriced(line, 510)).toBe(true);
     expect(linePartsNotPriced(line, 510)).toBe(1);
-    expect(countNotPriced([{ line, directCost: 510 }])).toEqual({
+    expect(
+      countNotPriced([{ line, directCost: 510, laborNotPriced: false }])
+    ).toEqual({
       lines: 0,
       parts: 1,
       hours: 0,
@@ -191,10 +193,11 @@ it("counts the lines a total leaves out", () => {
   const noParts = { unpricedParts: 0 };
   expect(
     countNotPriced([
-      { line: { ...base, ...noParts }, directCost: 0 },
+      { line: { ...base, ...noParts }, directCost: 0, laborNotPriced: false },
       {
         line: { ...base, ...noParts, snapshotMaterialCost: "0" },
         directCost: 0,
+        laborNotPriced: false,
       },
       {
         line: {
@@ -204,6 +207,7 @@ it("counts the lines a total leaves out", () => {
           snapshotMaterialCost: "0",
         },
         directCost: 0,
+        laborNotPriced: false,
       },
     ])
   ).toEqual({ lines: 2, parts: 0, hours: 0 });

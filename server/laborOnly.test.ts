@@ -75,7 +75,9 @@ describe("the rule reads the line's frozen tick", () => {
   it("never flags a TICKED line's material as not priced", () => {
     expect(lineMaterialNotPriced(laborLine(true), 160)).toBe(false);
     expect(
-      countNotPriced([{ line: laborLine(true), directCost: 160 }])
+      countNotPriced([
+        { line: laborLine(true), directCost: 160, laborNotPriced: false },
+      ])
     ).toEqual({ lines: 0, parts: 0, hours: 0 });
   });
 
@@ -83,7 +85,9 @@ describe("the rule reads the line's frozen tick", () => {
     for (const said of [null, false]) {
       expect(lineMaterialNotPriced(laborLine(said), 160)).toBe(true);
       expect(
-        countNotPriced([{ line: laborLine(said), directCost: 160 }])
+        countNotPriced([
+          { line: laborLine(said), directCost: 160, laborNotPriced: false },
+        ])
       ).toEqual({ lines: 0, parts: 1, hours: 0 });
     }
   });

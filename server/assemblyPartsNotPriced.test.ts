@@ -59,7 +59,13 @@ describe("counting unpriced parts", () => {
 
   it("counts the parts of a line that is otherwise priced", () => {
     expect(
-      countNotPriced([{ line: line({ unpricedParts: 2 }), directCost: 35 }])
+      countNotPriced([
+        {
+          line: line({ unpricedParts: 2 }),
+          directCost: 35,
+          laborNotPriced: false,
+        },
+      ])
     ).toEqual({ lines: 0, parts: 2, hours: 0 });
   });
 
@@ -71,6 +77,7 @@ describe("counting unpriced parts", () => {
         {
           line: line({ snapshotMaterialCost: "0", unpricedParts: 2 }),
           directCost: 0,
+          laborNotPriced: false,
         },
       ])
     ).toEqual({ lines: 1, parts: 0, hours: 0 });
@@ -79,7 +86,11 @@ describe("counting unpriced parts", () => {
   it("counts nothing on a line with no quantity", () => {
     expect(
       countNotPriced([
-        { line: line({ qty: 0, unpricedParts: 3 }), directCost: 0 },
+        {
+          line: line({ qty: 0, unpricedParts: 3 }),
+          directCost: 0,
+          laborNotPriced: false,
+        },
       ])
     ).toEqual({ lines: 0, parts: 0, hours: 0 });
   });

@@ -39,7 +39,7 @@ export function LineCost({
   onFix?: () => void;
   line: PartsLineLike &
     LineExampleFlags & {
-      breakdown: { directCost: number } | null;
+      breakdown: { directCost: number; laborNotPriced: boolean } | null;
       problem?: { message: string; ref?: string | null } | null;
     };
   /** Width and alignment, which differ between the two screens. */
@@ -138,7 +138,7 @@ export function LineCost({
   const materialMissing =
     lineMaterialNotPriced(line, cost) && Math.floor(line.unpricedParts) <= 0;
   const hoursMissing = lineHoursNotSet(line);
-  const parts = lineShortfallWords(line, cost);
+  const parts = lineShortfallWords(line, cost, line.breakdown.laborNotPriced);
   if (parts) {
     return (
       <span
@@ -161,9 +161,11 @@ export function LineCost({
             explanation={
               hoursMissing && parts === "hours not set"
                 ? `${money(cost)} of material is in the total. The assembly's hours were not set when this line was added, so its labor is not.`
-                : materialMissing
-                  ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
-                  : "This line's price was frozen when it was added, and some of the assembly's parts (or its hours) had no price then. They add nothing to it."
+                : parts === "no charge rate"
+                  ? `${money(cost)} of material is in the total. This bid bills labor at each role's charge rate, and this line's role had none when it was added, so its labor is not. Give the role a charge rate in Labor rates.`
+                  : materialMissing
+                    ? `${money(cost)} of labor is in the total. This line has no material price, so its material is not.`
+                    : "This line's price was frozen when it was added, and some of the assembly's parts (or its hours) had no price then. They add nothing to it."
             }
           >
             + {parts}

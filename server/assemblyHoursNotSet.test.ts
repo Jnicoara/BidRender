@@ -123,7 +123,11 @@ describe("a bid line whose assembly hours were not set", () => {
     expect(linePartsNotPriced({ ...noHours, unpricedParts: 2 }, 20)).toBe(2);
     expect(
       countNotPriced([
-        { line: { ...noHours, unpricedParts: 2 }, directCost: 20 },
+        {
+          line: { ...noHours, unpricedParts: 2 },
+          directCost: 20,
+          laborNotPriced: false,
+        },
       ])
     ).toEqual({ lines: 0, parts: 2, hours: 1 });
     // Hours set: nothing missing.
@@ -141,7 +145,9 @@ describe("a bid line whose assembly hours were not set", () => {
     });
     expect(lineNotPriced(nothing, 0)).toBe(true);
     expect(linePartsNotPriced(nothing, 0)).toBe(0);
-    expect(countNotPriced([{ line: nothing, directCost: 0 }])).toEqual({
+    expect(
+      countNotPriced([{ line: nothing, directCost: 0, laborNotPriced: false }])
+    ).toEqual({
       lines: 1,
       parts: 0,
       hours: 0,
@@ -171,15 +177,15 @@ describe("a bid line whose assembly hours were not set", () => {
 
   it("says so in words on the line, and the total counts it", () => {
     const noHours = aLine({ snapshotLaborHours: null });
-    expect(lineShortfallWords(noHours, 20)).toBe("hours not set");
-    expect(lineShortfallWords({ ...noHours, unpricedParts: 1 }, 20)).toBe(
-      "1 part not priced, hours not set"
-    );
-    expect(lineShortfallWords(aLine(), 70)).toBe("");
+    expect(lineShortfallWords(noHours, 20, false)).toBe("hours not set");
+    expect(
+      lineShortfallWords({ ...noHours, unpricedParts: 1 }, 20, false)
+    ).toBe("1 part not priced, hours not set");
+    expect(lineShortfallWords(aLine(), 70, false)).toBe("");
     expect(
       countNotPriced([
-        { line: noHours, directCost: 20 },
-        { line: aLine(), directCost: 70 },
+        { line: noHours, directCost: 20, laborNotPriced: false },
+        { line: aLine(), directCost: 70, laborNotPriced: false },
       ])
     ).toEqual({ lines: 0, parts: 0, hours: 1 });
     expect(hoursNotSetWords(1)).toBe("1 assembly with hours not set");

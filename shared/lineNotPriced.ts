@@ -307,6 +307,28 @@ export function lineHoursMissing(
 }
 
 /**
+ * Whether a line's LABOR is missing because its role has no CHARGE RATE —
+ * on a Markup + charge rate bid only, where labor is billed at the charge
+ * rate frozen on the line (0165) and a NULL one prices it as Not priced,
+ * never at cost (owner Q5, `calculateLineItem`'s `laborNotPriced`, which
+ * is what the caller passes). Only a line that HAS hours (NULL hours are
+ * `lineHoursMissing`'s to say), whose labor is ours, and that is not already
+ * Not priced as a whole. Its own count: the fix is on Labor rates.
+ */
+export function lineChargeRateMissing(
+  line: PartsLineLike,
+  directCost: number | null,
+  laborNotPriced: boolean
+): boolean {
+  return (
+    laborNotPriced &&
+    Number(line.snapshotLaborHours ?? 0) > 0 &&
+    !scopeIsOffBid(line) &&
+    !lineNotPriced(line, directCost)
+  );
+}
+
+/**
  * What a bid total leaves out: whole LINES nobody priced, and PARTS missing
  * from lines that are otherwise priced. Two numbers, not one, because they
  * are different things — "+ 2 lines, 3 parts not priced".
@@ -331,6 +353,14 @@ export type NotPricedTally = {
    * print are pinned by `server/dropsNotPriced.test.ts` instead.
    */
   drops?: number;
+  /**
+   * Lines whose labor is Not priced because the role has no CHARGE RATE
+   * (`lineChargeRateMissing`; Markup + charge rate bids only). Optional,
+   * absent = 0 and left out when 0, like `drops`, so a tally from a bid on
+   * any other method reads exactly as before. Money left out:
+   * `tallyLeavesOut` reads it, so the print is blocked until it is set.
+   */
+  rates?: number;
   /**
    * Marks in the bid's Unassigned count (references/count-first-plan.md).
    * A LABEL on the whole-bid totals only — "+ 3 marks unassigned" (owner,
@@ -363,7 +393,8 @@ export function tallyLeavesOut(notPriced: NotPricedTally): boolean {
     notPriced.lines > 0 ||
     notPriced.parts > 0 ||
     notPriced.hours > 0 ||
-    (notPriced.drops ?? 0) > 0
+    (notPriced.drops ?? 0) > 0 ||
+    (notPriced.rates ?? 0) > 0
   );
 }
 
@@ -398,36 +429,76 @@ export type NotPricedLine = {
   parts: number;
   /** Its assembly hours were not set — said apart from parts. */
   hoursNotSet: boolean;
+  /** Its role has no charge rate (Markup + charge rate bids). */
+  noChargeRate: boolean;
 };
 
 export function notPricedLines<
   L extends PartsLineLike & { id: number; name: string },
->(lines: readonly { line: L; directCost: number | null }[]): NotPricedLine[] {
-  return lines.flatMap(({ line, directCost }): NotPricedLine[] => {
-    const base = { lineId: line.id, name: line.name };
-    if (lineNotPriced(line, directCost)) {
-      return [{ ...base, wholeLine: true, parts: 0, hoursNotSet: false }];
+>(
+  lines: readonly {
+    line: L;
+    directCost: number | null;
+    /** The engine's `laborNotPriced` for this line. Required — see countNotPriced. */
+    laborNotPriced: boolean;
+  }[]
+): NotPricedLine[] {
+  return lines.flatMap(
+    ({ line, directCost, laborNotPriced }): NotPricedLine[] => {
+      const base = { lineId: line.id, name: line.name };
+      if (lineNotPriced(line, directCost)) {
+        return [
+          {
+            ...base,
+            wholeLine: true,
+            parts: 0,
+            hoursNotSet: false,
+            noChargeRate: false,
+          },
+        ];
+      }
+      const parts = linePartsNotPriced(line, directCost);
+      // A line whose ONLY gap is its hours is listed too: it used to appear
+      // because hours counted as a part, and must not drop out now they don't.
+      const hoursNotSet = lineHoursMissing(line, directCost);
+      const noChargeRate = lineChargeRateMissing(
+        line,
+        directCost,
+        laborNotPriced
+      );
+      return parts > 0 || hoursNotSet || noChargeRate
+        ? [{ ...base, wholeLine: false, parts, hoursNotSet, noChargeRate }]
+        : [];
     }
-    const parts = linePartsNotPriced(line, directCost);
-    // A line whose ONLY gap is its hours is listed too: it used to appear
-    // because hours counted as a part, and must not drop out now they don't.
-    const hoursNotSet = lineHoursMissing(line, directCost);
-    return parts > 0 || hoursNotSet
-      ? [{ ...base, wholeLine: false, parts, hoursNotSet }]
-      : [];
-  });
+  );
 }
 
 /** How much of a bid the total leaves unpriced. */
 export function countNotPriced(
-  lines: readonly { line: PartsLineLike; directCost: number | null }[]
+  lines: readonly {
+    line: PartsLineLike;
+    directCost: number | null;
+    /**
+     * The engine's `laborNotPriced` for this line (`calculateLineItem`):
+     * true only on a Markup + charge rate bid whose line froze no charge
+     * rate. REQUIRED, so neither the bid screen nor the server can build a
+     * tally that forgets it — the same reason `dropsNotPriced` is.
+     */
+    laborNotPriced: boolean;
+  }[]
 ): NotPricedTally {
-  return lines.reduce<NotPricedTally>(
-    (tally, { line, directCost }) => ({
+  const counted = lines.reduce<NotPricedTally & { rates: number }>(
+    (tally, { line, directCost, laborNotPriced }) => ({
       lines: tally.lines + (lineNotPriced(line, directCost) ? 1 : 0),
       parts: tally.parts + linePartsNotPriced(line, directCost),
       hours: tally.hours + (lineHoursMissing(line, directCost) ? 1 : 0),
+      rates:
+        tally.rates +
+        (lineChargeRateMissing(line, directCost, laborNotPriced) ? 1 : 0),
     }),
-    NOTHING_NOT_PRICED
+    { ...NOTHING_NOT_PRICED, rates: 0 }
   );
+  const { rates, ...rest } = counted;
+  // Left out when 0, as `drops` is: see NotPricedTally.rates.
+  return rates > 0 ? { ...rest, rates } : rest;
 }

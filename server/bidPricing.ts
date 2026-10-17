@@ -615,6 +615,7 @@ export function rollUpBid(
       lines.map((line, index) => ({
         line,
         directCost: breakdowns[index]?.directCost ?? null,
+        laborNotPriced: breakdowns[index]?.laborNotPriced ?? false,
       }))
     ),
   };
