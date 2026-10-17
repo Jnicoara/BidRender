@@ -57,8 +57,8 @@ reason in its row — checked against the code, not assumed.
 
 | Name                     | Where the value comes from today | On a new host                                |
 | ------------------------ | -------------------------------- | -------------------------------------------- |
-| `BUILT_IN_FORGE_API_URL` | Not set on DigitalOcean          | **Leave unset.** Dead code path.             |
-| `BUILT_IN_FORGE_API_KEY` | Not set on DigitalOcean          | **Leave unset.** Same.                       |
+| `BUILT_IN_FORGE_API_URL` | Not set anywhere                 | **Read by nothing since 2026-10-16.**        |
+| `BUILT_IN_FORGE_API_KEY` | Not set anywhere                 | **Read by nothing since 2026-10-16.**        |
 | `OWNER_OPEN_ID`          | Your own account id              | **Regenerate.** Owner-tier features need it. |
 
 **These two used to do double duty — object storage AND the LLM gateway. They do
@@ -68,13 +68,11 @@ neither now.**
   through `server/storage.ts`, chosen by `PLAN_STORAGE`. See § 6, which used to
   describe replacing Forge storage and now describes what actually exists.
 - **AI moved out earlier.** Every call goes through `server/llm` on
-  `ANTHROPIC_API_KEY`. The Forge gateway survives only as a fallback in
-  `server/_core/llm.ts` for when no Anthropic key is set, and since neither
-  variable is configured on DigitalOcean, that fallback is already dead on the
-  live site.
-
-Removing them entirely is tracked in `todo.md` § Manus removal. They are still
-read by `server/_core/env.ts`, which is the only reason they are listed at all.
+  `ANTHROPIC_API_KEY`. The Forge gateway survived as a fallback in
+  `server/_core/llm.ts` (and a presign path in `storageProxy.ts`) until
+  2026-10-16, dead because neither variable was set anywhere; both are gone,
+  and `server/_core/env.ts` no longer reads them. Listed here only so a
+  reader who finds them in an old note knows they do nothing.
 
 > **An error reading `OPENAI_API_KEY is not configured` means no Anthropic key.**
 > The message is wrong twice over: there is no OpenAI dependency anywhere in this

@@ -3369,7 +3369,7 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       backend name in `storageProxy.ts` or `storageBackend.ts`; the proxy
       resolves only disk and R2 (`resolveReadBackend`). The route name
       stays, as below. Was: Remove the dead Manus branch inside `server/_core/storageProxy.ts`. Since v5.141 it only ran when the storage backend was `manus`, which is no longer a backend, so it cannot be reached. **The `/manus-storage` web address itself stays exactly as it is** — it is written into `bid_pdfs.url` and the legacy `projects.pdfUrl` for every file already stored, so renaming it would break every existing plan link at once. It serves disk and R2 now; only the name is historical.
-- [ ] Remove `BUILT_IN_FORGE_API_KEY` and `BUILT_IN_FORGE_API_URL` when the Manus AI fallback in `server/_core/llm.ts` goes. Nothing else needs them once that and the proxy branch above are gone. Neither is set on DigitalOcean, so that fallback is already dead on the live site — the app runs on `ANTHROPIC_API_KEY`. They are still read by `server/_core/env.ts`, which is what defines `ENV.forgeApiUrl` / `ENV.forgeApiKey`.
+- [x] Remove `BUILT_IN_FORGE_API_KEY` and `BUILT_IN_FORGE_API_URL` when the Manus AI fallback in `server/_core/llm.ts` goes. Nothing else needs them once that and the proxy branch above are gone. Neither is set on DigitalOcean, so that fallback is already dead on the live site — the app runs on `ANTHROPIC_API_KEY`. They are still read by `server/_core/env.ts`, which is what defines `ENV.forgeApiUrl` / `ENV.forgeApiKey`.
 
 ### Docs (group F)
 
@@ -3713,7 +3713,18 @@ Anthropic whenever `ANTHROPIC_API_KEY` is set, and it is set in
 `.env.production.local`. Worth knowing rather than worth fixing; if the Forge
 path is ever revived, give it the same treatment first.
 
-- [ ] Delete the Manus Forge gateway path entirely (`server/_core/llm.ts`, the
+- [x] **DONE 2026-10-16 (Track C):** `server/_core/llm.ts` is types only;
+      the fallback branch in `server/llm/index.ts`, the unreachable Forge
+      presign path in `storageProxy.ts` (now an exhaustive `never` guard —
+      A's 10-15 check had missed it; the typecheck found it), and
+      `forgeApiUrl`/`forgeApiKey` in `env.ts` are gone. The two
+      "model exists" guards (`navigationModel`/`planCopilotModel` tests),
+      which asked the gateway and so had been SKIPPED everywhere, now ask
+      Anthropic (`anthropicModelExists`, a free lookup, aliases too) plus a
+      check that a made-up id is refused. They still skip without
+      `ANTHROPIC_API_KEY` — none is set locally or in the Gate, and the
+      live key was not borrowed for a test.
+- [x] Delete the Manus Forge gateway path entirely (`server/_core/llm.ts`, the
       `BUILT_IN_FORGE_API_KEY` env var, and the lazy import in
       `server/llm/index.ts`). It cannot run in production and it carries a
       second, unguarded copy of the parameter-dropping bug that cost real money

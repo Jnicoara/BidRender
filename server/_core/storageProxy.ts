@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { ENV } from "./env";
 import { verifyStorageToken } from "../storageTokens";
 import { serveDiskObject } from "../diskStorage";
 import { resolveReadBackend } from "../storage";
@@ -66,7 +65,7 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
-    // R2: redirect to a signed URL, the same shape as the Forge path below.
+    // R2: redirect to a signed URL.
     // Range requests survive the redirect, so a plan set still streams.
     if (backend === "r2") {
       try {
@@ -80,42 +79,14 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      res.status(500).send("Storage proxy not configured");
-      return;
-    }
-
-    try {
-      const forgeUrl = new URL(
-        "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/"
-      );
-      forgeUrl.searchParams.set("path", key);
-
-      const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
-      });
-
-      if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(
-          `[StorageProxy] forge error: ${forgeResp.status} ${body}`
-        );
-        res.status(502).send("Storage backend error");
-        return;
-      }
-
-      const { url } = (await forgeResp.json()) as { url: string };
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
-        return;
-      }
-
-      res.set("Cache-Control", "no-store");
-      res.redirect(307, url);
-    } catch (err) {
-      console.error("[StorageProxy] failed:", err);
-      res.status(502).send("Storage proxy error");
-    }
+    // Every backend `resolveReadBackend` can name is handled above. A new one
+    // is a COMPILE error here, not a silent 500 (`backend` is `never` now).
+    // The unreachable Manus "Forge" presign path that sat here was removed
+    // 2026-10-16 with BUILT_IN_FORGE_API_* (server/_core/llm.ts says why).
+    unhandledReadBackend(backend);
   });
+}
+
+function unhandledReadBackend(backend: never): never {
+  throw new Error(`Storage backend "${backend}" has no read path.`);
 }

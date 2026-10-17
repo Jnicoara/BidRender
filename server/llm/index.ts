@@ -25,7 +25,6 @@
  * the night nobody is watching.
  */
 import type { InvokeParams, InvokeResult } from "../_core/llm";
-import { ENV } from "../_core/env";
 import { anthropicConfigured, invokeAnthropic } from "./anthropic";
 import { AiUnavailable, keyRefusal, type AiRefusal } from "./unavailable";
 import {
@@ -167,13 +166,11 @@ export async function invokeLLM(
       }
       throw error;
     }
-  } else if (ENV.forgeApiKey) {
-    // The Manus gateway, while it is still reachable. Imported lazily so a
-    // deployment with only an Anthropic key never loads it.
-    const { invokeLLM: viaForge } = await import("../_core/llm");
-    result = await viaForge(request);
   } else {
-    // No key at all. This used to fall through to the gateway, which threw
+    // No key. (The Manus gateway fallback that sat here was removed
+    // 2026-10-16: its key is set nowhere, it could not run, and it carried a
+    // second, unguarded copy of the parameter-dropping bug — todo.md.) Before
+    // that, no key at all fell through to the gateway, which threw
     // "OPENAI_API_KEY is not configured" — the wrong layer naming the wrong
     // variable (deploying.md § 8).
     await noteRefusal(feature, "no-key", now);
