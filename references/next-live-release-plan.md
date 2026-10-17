@@ -145,6 +145,33 @@ The wording below was the question as asked.
 - **D4 — `SIGNUP_INVITE_ONLY`**: confirm the live app has no such variable
   (the gate ships OFF).
 
+### REHEARSAL on a fresh copy of live — DONE 2026-10-17 00:29–00:36 UTC (nothing changed on live)
+
+Copy: `scripts/_tmpCopyDb.mts`, read-only on live →
+`live-2026-10-17T00-29-25Z-rehearsal-copy.sql` (80 tables, 5,561 rows) →
+`bidrender_scratch_live_rehearsal`, **80/80 counts equal**. Live code =
+worktree at `60479773`; candidate = local-dev `5c089c11`.
+
+| Step on the copy                          | Printed                                                                                                   | As planned |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------- |
+| Drift before (live code)                  | 152 recorded, "matches", **183/183** FKs                                                                  | ✓          |
+| Census before                             | 4 users, 8 companies, 8 members; 2 bids (Draft, math v1, 0 lines); 1,935 shared materials (1,717 active), 224 starters, 6 shared roles; 3 settings rows, run rate NULL | — |
+| `bidTotals` before (live code)            | 2 bids (23, 25), $0.00                                                                                    | ✓          |
+| `migrate.mts` (candidate)                 | **"Applied 14 migrations … all 166"**; re-run "Nothing to apply"; "matches"; **209/209**                  | ✓          |
+| Live code on the migrated copy            | "ok all 2 bid(s): totalDue unchanged"                                                                     | ✓ (window between migrate and push is safe) |
+| First boot (`seedBaseline`, candidate)    | `[seed] starter: finding fields applied 0; proposed 0 (not applied), held 0, live ahead 0`; census unchanged (nothing inserted, renamed, retired or deleted) | ✓ |
+| `starterDrift.mts` (read)                 | 0 / 0 / 0 / 0                                                                                             | ✓          |
+| `freezeSentBids.mts` (dry)                | 0 non-Draft, 0 to lock, 0 to freeze                                                                       | ✓          |
+| `applyMathVersion.mts` (dry)              | **0 Draft(s) to move, 2 wait for the button** (v2 is button-only)                                         | ✓          |
+| `removeRaceCompanies --owner 3036` (dry)  | kept **4**; `removable: [5, 6, 7, 8]`                                                                     | ✓          |
+| `--apply --expect 5,6,7,8` (COPY), dry    | removed [5,6,7,8]; after: kept 4, 0 others; dry again `removable: []`; census companies 8→4, members 8→4, nothing else | ✓ |
+| Totals at the end                         | live code: "ok all 2 bid(s) unchanged"; candidate: bids 23, 25 $0.00, 0 lines                              | ✓          |
+
+**What this does not cover:** the candidate will be whatever local-dev
+holds once smoke is green (C's step-bar fix and B's undo fix land first).
+If those change no `drizzle/` or `server/seed/` file (P2), these figures
+stand; otherwise re-run this table on a fresh copy.
+
 ### Before the window (no live writes)
 
 P1. Candidate's Gate green **including smoke** (B's smoke now ~13 min).

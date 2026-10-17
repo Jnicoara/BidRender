@@ -613,3 +613,24 @@ draft's hand-typed START times ran ahead of the clock. Ends were always
   (`next-live-release-plan.md` top section): landing order, 26
   wrong-number fixes with commits, migrations 0152–0164 (13 additive,
   expect 165 / 205 FKs), decisions D1–D4, approval steps A–D.
+
+## 2026-10-16 evening queue (owner busy; live approvals only)
+
+- 15-min watcher stopped (memory critical); by-hand checks after.
+- B landed `230c18f5` (smoke 223/5 green), then `edcee8bc` via A's merge
+  `6eac3e6c`. C landed `e9dfc0ff` via A's merge `0fc489bf` (local-dev had
+  moved, so not a plain fast-forward; both merges' full Gates green first).
+- **Gate hole closed** (`6f84e7c4`, `0ba1779f`): notes pushes never start
+  the Gate; the Docs gate is red unless the code under it passed. Proven
+  live both ways; a-n5's first push found the new-branch case, fixed.
+- **Smoke red since C landed** (step-bar buttons named like the toolbar's;
+  guide text trips the pdfs detector; tablet undo intermittent since B) —
+  handed to C and B with screenshots and a one-line fix.
+- **N5 + B's BM-M1..M10** = 0164 + 0165: staging backup (87/87), rehearsal,
+  staging DB 166 / FKs 209, 1,589 bids 0 differ; local-dev `5c089c11`;
+  staging pushed by hand and serving it. Three guard tests forced real
+  decisions (forkable reference, starter field kind, re-count) — recorded,
+  none loosened; full suite 7,733 / 0 on a fresh 166 DB.
+- **Release rehearsal on a fresh copy of live**: every figure as planned
+  (table in `next-live-release-plan.md`).
+- `references/github-private-options.md`: 6,119 billed min / 7 days.
