@@ -13,8 +13,15 @@
    were done 10-06).
 5. **Plan-reading help — already built** (steps 1–6, labelled draft).
 6. **Field / Co-owner — looked at 5995d32d**; the rest waits on FR-M1.
-7. Plans regression — IN PROGRESS (local smoke of plans, marks, pdfs, demo,
-   touch at all sizes).
+7. Plans regression — PARTLY DONE. Server suites green (golden
+   measurements, golden bids, mark replay, run undo, deleted plans, Field
+   no-prices). Local smoke: **desktop 43 passed**. **Phone and tablets NOT
+   verified**: run 1 lost its server to my own seed edits restarting `tsx
+   watch`; run 2 was stopped by Claude Code for low memory. Next: run
+   `pnpm smoke` for the phone/tablet projects with nothing else open, or
+   read local-dev's Gate smoke after A lands this.
+   **Merged local-dev `448d1281` into track-b (f4e7987d)**: conflicts in
+   notes only (log, A handoff, todo — both sides kept).
 8. todo.md Track B items — IN PROGRESS: rename lock check was already done
    (ticked); starter assembly RENAME path built (four can lights renamed,
    proposals on existing databases).

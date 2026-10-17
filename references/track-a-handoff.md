@@ -6,6 +6,14 @@ release record is `deploying.md` § 11 "LIVE: `60479773`".
 
 ## FROM B — overnight 2026-10-16/17 (track-b; NOT for the live release without the owner)
 
+**ready f4e7987d** (track-b; Gate 39008182303 green, 528 files passed, 1
+skipped). It is local-dev `448d1281` merged in, plus everything below and the
+starter-assembly RENAME path (`4dad9fbf`: the four can lights renamed; on an
+existing database starterDrift shows "proposed 4" until someone runs
+`--apply` — nothing renames itself). Fast-forward of local-dev:
+`git push origin f4e7987d:local-dev`. Money items (Q8 behaviour, wage sets)
+are in it — the owner decides whether it goes live.
+
 - **Q8 done c6b5feec** (owner answered option 3). A company with material
   markup set that never chose a method keeps the OLD math on new bids until
   it answers a one-time "How do you bid?" (Dashboard card, Settings ›
