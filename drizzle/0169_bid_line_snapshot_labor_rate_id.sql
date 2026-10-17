@@ -1,0 +1,1 @@
+ALTER TABLE `bid_line_items` ADD `snapshotLaborRateId` int;

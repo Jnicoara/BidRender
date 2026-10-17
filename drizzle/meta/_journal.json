@@ -1184,6 +1184,13 @@
       "when": 1792213895086,
       "tag": "0168_takeoff_stamps_client_key",
       "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "5",
+      "when": 1792259537273,
+      "tag": "0169_bid_line_snapshot_labor_rate_id",
+      "breakpoints": true
     }
   ]
 }

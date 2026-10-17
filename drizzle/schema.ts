@@ -5280,6 +5280,15 @@ export const bidLineItems = mysqlTable(
     snapshotLaborRate: decimal("snapshotLaborRate", { precision: 10, scale: 4 })
       .default("0")
       .notNull(),
+    /**
+     * The ROLE that rate came from (BM-M11, Track B, bid-methods-plan § 5):
+     * re-costing a bid's labor at its wage set needs the role, and a line
+     * froze only the number. NULL = not recorded (every line before this
+     * column). No FK on purpose — a snapshot keeps the id after the role is
+     * deleted, as `snapshotLaborRate` keeps the number. DRAFT: not applied
+     * until the owner answers morning Q9 (money).
+     */
+    snapshotLaborRateId: int("snapshotLaborRateId"),
     /** Modifier names at add time, for showing why the hours are what they are. */
     snapshotModifierNames: json("snapshotModifierNames").$type<string[]>(),
     /**

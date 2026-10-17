@@ -8311,6 +8311,9 @@ export function pricingSnapshotOf(
     snapshotLaborHours: line.snapshotLaborHours,
     snapshotModifierPct: line.snapshotModifierPct,
     snapshotLaborRate: line.snapshotLaborRate,
+    // And the role that rate came from (BM-M11 draft): a copy is re-costed
+    // at a wage set by the same role as its original.
+    snapshotLaborRateId: line.snapshotLaborRateId,
     snapshotModifierNames: line.snapshotModifierNames,
     snapshotMarkupPct: line.snapshotMarkupPct,
     snapshotMarkupSource: line.snapshotMarkupSource,
