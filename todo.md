@@ -1789,7 +1789,15 @@ Design: `references/homerun-footage-plan.md` § 4.
       at each end's box, count drops at each mark, homeruns at their device
       (`shared/ceilingHeights.ts`). Reached from "Ceilings" on every scaled
       sheet.
-- [ ] **Reshape a height area after drawing — BEFORE BETA** (owner,
+- [x] **DONE 2026-10-16 (Track C):** "Reshape" on each area's row in the
+      Ceilings panel. Taps, like drawing: tap a corner, tap where it goes;
+      tap a side's dot to add a corner; "Remove corner" (never below
+      three); Done saves the outline (`updateHeightArea`), Cancel puts it
+      back. Handles and their reach are sized in screen pixels, so they
+      work at a tablet's fit zoom. Rules in `lib/heightAreaReshape.ts`
+      (7 tests); seen on laptop and iPad portrait, saved outline read back
+      (`overnight-shots/reshape-*.png`).
+- [x] **Reshape a height area after drawing — BEFORE BETA** (owner,
       2026-10-07). Today an outline is fixed once drawn: remove and redraw.
       Drag a corner (tablet: tap a corner, tap where it goes), add or drop a
       corner; the server already takes `outline` on `updateHeightArea`.

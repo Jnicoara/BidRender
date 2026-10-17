@@ -6,6 +6,10 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A height area can now be reshaped after it is drawn.** In Ceilings,
+  "Reshape" on an area lets you tap a corner and tap where it goes, add a
+  corner between two, or remove one — then Done. Before, a wrong outline
+  had to be deleted and drawn again. Works with a finger on a tablet.
 - **"For your quote app" now takes you straight to the line that needs
   fixing.** When an unpriced line blocks the figures, each one in the list
   has a "Fix this line" button that closes the panel and opens that line's
