@@ -75,7 +75,7 @@ jobs:
             2>&1 | tee stress-server.log
       - name: The timings
         if: always()
-        run: grep -E '\[(stress|speed|speed-detail)\]' stress-server.log || true
+        run: grep -E '\[(stress|big|speed|speed-detail)\]' stress-server.log || true
 
   browser:
     # "[server only]" in the pushed commit's message skips this job — e.g. while

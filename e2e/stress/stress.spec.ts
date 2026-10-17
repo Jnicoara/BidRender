@@ -89,7 +89,7 @@ test.afterAll(async ({ request }) => {
 test("build a company with fully marked bids", async ({ request }) => {
   const assemblies = await trpc<
     { id: number; name: string; userId: number | null }[]
-  >(request, "assemblies.list");
+  >(request, "assemblies.list", {});
   const starter = assemblies.find(a => /duplex/i.test(a.name)) ?? assemblies[0];
   assemblyName = starter.name;
   const plan = buildFixturePlan();
