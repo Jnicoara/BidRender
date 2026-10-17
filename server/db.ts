@@ -250,6 +250,7 @@ import {
 import { BASELINE_MODIFIERS } from "./seed/baselineModifiers";
 import {
   BASELINE_ASSEMBLIES,
+  RENAMED_BASELINE_ASSEMBLIES,
   DEFAULT_ASSEMBLY_ROLE,
 } from "./seed/baselineAssemblies";
 import {
@@ -4901,7 +4902,9 @@ function starterHoursValue(
 
 export async function seedBaselineAssemblies(
   /** The shipped starters; a test passes a probe list instead. */
-  specs: readonly BaselineAssembly[] = BASELINE_ASSEMBLIES
+  specs: readonly BaselineAssembly[] = BASELINE_ASSEMBLIES,
+  /** Old shared name -> seed name; a test passes a probe map. */
+  renames: Readonly<Record<string, string>> = RENAMED_BASELINE_ASSEMBLIES
 ): Promise<void> {
   await withSeedLock("helixbid:seed:assemblies", async () => {
     const db = await getDb();
@@ -4944,10 +4947,14 @@ export async function seedBaselineAssemblies(
       .select({ name: assemblies.name })
       .from(assemblies)
       .where(isNull(assemblies.userId));
+    // Through RENAMED_BASELINE_ASSEMBLIES: a starter under its OLD name is
+    // that starter, so its new name is never inserted beside it; the rename
+    // itself is proposed (seedProposal) and applied by a person.
     const alreadySeeded = await namesTheStarterAlreadyHas(
       "assemblies",
       "name",
-      existingRows.map(row => row.name)
+      existingRows.map(row => row.name),
+      renames
     );
 
     /**

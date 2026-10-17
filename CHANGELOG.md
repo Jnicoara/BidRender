@@ -6,6 +6,7 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-17]
 
+- **Starter assemblies can be renamed without duplicating them.** The four recessed can starters are now called '4" can light, new construction', '4" can light, remodel' and the same for 6". An existing database keeps the same items under their old names until the rename is confirmed with the starter-drift tool, and then the same items take the new names, so every bid and copy that uses them still does.
 - **More room for the drawing on the Plans screen.** A new "Slim" button beside Focus hides the bid header and shows the tools as icons only (laptop: 150 px of toolbar becomes 75). It is remembered in this browser, and "Full toolbar" brings everything back. The drop-heights warning keeps its words either way.
 - **The Plans screen tells a finger what it does.** On a phone or tablet, the first tip is "Tap to drop a point or a mark · drag to move the sheet · pinch to zoom".
 - **Material markup by price brackets.** Under Settings › Pricing › More options, a shop can mark up material by what it costs ("$1–$10: 40%") instead of one %. Brackets read the purchase price, so a 500 ft spool is one $200 purchase. Overlapping brackets are refused; a gap falls to the company %. Nothing changes until the shop picks "Price brackets", and lines already on a bid keep their markup. The suggested starter brackets fill the boxes and say they are a starter.

@@ -210,6 +210,23 @@ const FIRST_STARTERS: BaselineAssembly[] = [
   },
 ];
 
+/**
+ * A starter ASSEMBLY renamed: old shared name -> the seed's name now (owner,
+ * 2026-10-07: the '4" can light, new construction' style). The same shape and
+ * rules as RENAMED_BASELINE_MATERIALS: the seeder treats the old row as the
+ * starter (so a start never inserts the new name beside it), and the rename
+ * itself is a PROPOSAL (server/seedProposal.ts, owner Q17: a name is an
+ * offer) applied by `scripts/starterDrift.mts --apply` on the SAME row — same
+ * id, so bid lines, kits and forks still point at it; a company's fork keeps
+ * its own name. Point every old spelling straight at the final one.
+ */
+export const RENAMED_BASELINE_ASSEMBLIES: Readonly<Record<string, string>> = {
+  'Recessed can new construction, 4"': '4" can light, new construction',
+  'Recessed can retrofit, 4"': '4" can light, remodel',
+  'Recessed can new construction, 6"': '6" can light, new construction',
+  'Recessed can retrofit, 6"': '6" can light, remodel',
+};
+
 /** All 168: the first 8, then the planned 160 in plan order. */
 export const BASELINE_ASSEMBLIES: BaselineAssembly[] = [
   ...FIRST_STARTERS,

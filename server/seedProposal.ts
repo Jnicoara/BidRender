@@ -67,6 +67,7 @@ import {
 } from "./seed/baselineRunTypes";
 import {
   BASELINE_ASSEMBLIES,
+  RENAMED_BASELINE_ASSEMBLIES,
   DEFAULT_ASSEMBLY_ROLE,
 } from "./seed/baselineAssemblies";
 import type { BaselineAssembly } from "./seed/assemblyRecipe";
@@ -102,6 +103,8 @@ export type SeedProposal = {
 export type SeedSource = {
   materials?: readonly BaselineMaterial[];
   assemblies?: readonly BaselineAssembly[];
+  /** Old shared assembly name -> seed name; a test passes a probe map. */
+  assemblyRenames?: Readonly<Record<string, string>>;
 };
 
 /** Held, with this reason, because the tag must travel with its number. */
@@ -471,7 +474,8 @@ async function laborRateDiff(c: Collector) {
 async function assemblyDiff(
   c: Collector,
   specs: readonly BaselineAssembly[],
-  materialIdByName: Map<string, number>
+  materialIdByName: Map<string, number>,
+  renames: Readonly<Record<string, string>> = RENAMED_BASELINE_ASSEMBLIES
 ) {
   const handle = (await db.getDb())!;
   await c.loadLog("assemblies");
@@ -482,6 +486,17 @@ async function assemblyDiff(
   const byName = new Map(rows.map(r => [r.name, r]));
   const label = (r: { id: number; name: string }) =>
     `assembly #${r.id} "${r.name}"`;
+
+  // A rename the seed says and this database has not had (Q17: an offer),
+  // as materialDiff does. The row then answers to its seed name below, so
+  // the rest of its diff is read against the right spec.
+  const seedNames = new Set(specs.map(s => s.name));
+  for (const [from, to] of Object.entries(renames)) {
+    const row = byName.get(from);
+    if (!row || !seedNames.has(to) || byName.has(to)) continue;
+    c.field("assemblies", row.id, label(row), "name", row.name, to);
+    byName.set(to, row);
+  }
 
   // The role every starter is costed against, filled where none (F6).
   const [defaultRole] = await handle
@@ -762,7 +777,7 @@ export async function seedProposal(
   const materialIdByName = await db.shippedMaterialIdsByName();
   await materialDiff(c, catalog);
   await laborRateDiff(c);
-  await assemblyDiff(c, specs, materialIdByName);
+  await assemblyDiff(c, specs, materialIdByName, source.assemblyRenames);
   await runTypeDiff(c, materialIdByName);
   await laborStepDiff(c, specs);
   return c.result();

@@ -636,7 +636,20 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       2026-10-07: rebuild it AFTER B's new starter assemblies land** (on
       local-dev), so every starter has a row — and before the owner's filled
       copy is loaded, carry their typed hours across rather than overwriting.
-- [ ] **Build a starter RENAME path, then rename the four can lights**
+- [x] **BUILT 2026-10-17 (Track B):** `RENAMED_BASELINE_ASSEMBLIES`
+      (`server/seed/baselineAssemblies.ts`). A start treats the old shared
+      row as the starter (never inserts the new name beside it) and the
+      rename is PROPOSED on the old row's id (`seedProposal`), applied by
+      `scripts/starterDrift.mts --apply` — same id, forks keep their names.
+      The four cans are renamed in the seed ('4" can light, new
+      construction', '4" can light, remodel', and 6"). Rehearsed on
+      bidrender_test_b: proposed 4 → applied (batch 661, 404 pins) → proposed
+      0. `server/starterAssemblyRename.test.ts` (red without the renames in
+      the seeder). **On local-dev, staging and live the four show as
+      "proposed 4" in starterDrift until someone runs `--apply`**;
+      `scripts/stagingStartersCheck.mts` names the NEW names, so it reports
+      them missing on staging until then. Was:
+      **Build a starter RENAME path, then rename the four can lights**
       (owner, 2026-10-07). Keep 'Recessed can new construction, 4"/6"' and
       'Recessed can retrofit, 4"/6"' (LT5, LT4, LT33, LT6) until then.
   - **Why it is needed:** the seeder matches starters by NAME, so today a
@@ -3907,7 +3920,9 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       Additive, NULL = never renamed (or renamed before the column: fall back
       to `lookupKey`). Nothing is broken without it; batch it with the pin
       columns above rather than ship it alone.
-- [ ] **Track B, small: `takeoffGroups.rename` has no locked-bid check.**
+- [x] **DONE 2026-10-16 (`9f48431d`, `server/renameCount.test.ts`):** rename
+      refuses a locked bid and the Unassigned count. Checked 2026-10-17.
+      Was: **Track B, small: `takeoffGroups.rename` has no locked-bid check.**
       Found 2026-10-01 while adding the legend rename, which does refuse. No
       screen calls it today (grep `takeoffGroups.rename` in `client/src`), so
       nothing can reach it from the app — close it before anything does.

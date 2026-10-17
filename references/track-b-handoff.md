@@ -15,7 +15,19 @@
 6. **Field / Co-owner — looked at 5995d32d**; the rest waits on FR-M1.
 7. Plans regression — IN PROGRESS (local smoke of plans, marks, pdfs, demo,
    touch at all sizes).
-8. todo.md Track B items — next.
+8. todo.md Track B items — IN PROGRESS: rename lock check was already done
+   (ticked); starter assembly RENAME path built (four can lights renamed,
+   proposals on existing databases).
+
+**Local DB to clean (B's machine only):** `bidrender_local_b_new` holds four
+shared assemblies inserted 2026-10-16 22:38 PDT by a `tsx watch` restart
+between two seed edits — ids 365717–365720, the four "… can light, …" names,
+beside the old "Recessed can …" rows (365425–365427, 365564). Nothing points
+at them. Deleting them was refused by the session's permission check, so they
+are left for a person: `DELETE FROM assemblies WHERE id IN
+(365717,365718,365719,365720) AND userId IS NULL` on that database only,
+after checking nothing references them. Until then starterDrift there
+correctly proposes nothing for the cans (two rows are never merged).
 
 **Rules this run:** track-b only; notes pushed only after the code commit's
 Gate is green; a track branch may not touch `drizzle/` at ALL (the Gate's

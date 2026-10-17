@@ -79,10 +79,13 @@ describe('canless wafers: a starter at 2", 4", 6", 8" only', () => {
 */
 describe('can lights: 4" and 6", new construction and remodel', () => {
   const CANS: Array<[string, string, string, string]> = [
-    ["4", "new construction", "LT5", 'Recessed can new construction, 4"'],
-    ["4", "remodel", "LT33", 'Recessed can retrofit, 4"'],
-    ["6", "new construction", "LT4", 'Recessed can new construction, 6"'],
-    ["6", "remodel", "LT6", 'Recessed can retrofit, 6"'],
+    // Renamed 2026-10-17 (owner, 2026-10-07) through
+    // RENAMED_BASELINE_ASSEMBLIES — the old "Recessed can …" rows keep their
+    // ids and take these names when the proposal is applied.
+    ["4", "new construction", "LT5", '4" can light, new construction'],
+    ["4", "remodel", "LT33", '4" can light, remodel'],
+    ["6", "new construction", "LT4", '6" can light, new construction'],
+    ["6", "remodel", "LT6", '6" can light, remodel'],
   ];
 
   it.each(CANS)(

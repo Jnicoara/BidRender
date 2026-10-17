@@ -335,19 +335,19 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     p("14-3-nm-b", 20, { branchWhip: true }),
     p("wire-nuts", 4),
   ]),
-  starter("LT4", 'Recessed can new construction, 6"', "Lighting", "both", [
+  starter("LT4", '6" can light, new construction', "Lighting", "both", [
     p("6in-recessed-can-new-construction-ic", 1, { fixture: true }),
     p("5in-6in-led-retrofit-trim", 1),
     p("14-2-nm-b", 20, { branchWhip: true }),
     p("wire-nuts", 3),
   ]),
-  starter("LT5", 'Recessed can new construction, 4"', "Lighting", "both", [
+  starter("LT5", '4" can light, new construction', "Lighting", "both", [
     p("4in-recessed-can-new-construction-ic", 1, { fixture: true }),
     p("4in-led-retrofit-trim", 1),
     p("14-2-nm-b", 20, { branchWhip: true }),
     p("wire-nuts", 3),
   ]),
-  starter("LT6", 'Recessed can retrofit, 6"', "Lighting", "both", [
+  starter("LT6", '6" can light, remodel', "Lighting", "both", [
     p("6in-recessed-can-remodel-ic", 1, { fixture: true }),
     p("5in-6in-led-retrofit-trim", 1),
     p("14-2-nm-b", 20, { branchWhip: true }),
@@ -390,7 +390,7 @@ export const PLANNED_STARTER_ASSEMBLIES: BaselineAssembly[] = [
     database), so the four keep one naming family rather than splitting into
     two. Renaming all four is an owner question (todo.md).
   */
-  starter("LT33", 'Recessed can retrofit, 4"', "Lighting", "both", [
+  starter("LT33", '4" can light, remodel', "Lighting", "both", [
     p("4in-recessed-can-remodel-ic", 1, { fixture: true }),
     p("4in-led-retrofit-trim", 1),
     p("14-2-nm-b", 20, { branchWhip: true }),
