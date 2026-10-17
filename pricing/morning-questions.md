@@ -53,6 +53,11 @@ pricing tier — so it hides screens and is never a lock on the server).
   before beta, but let the person look around first and ask only before
   sending a quote** — a typo'd email loses every reset and every invite.
   Affects: sign-up steps.
+- **Q-SITE1** Is the reader accuracy test (the counter's test site on
+  port 3004, served from the `C:\dev\BidPhase-C-site` worktree since
+  2026-09-30) finished? → **If yes, I remove that worktree** (it only
+  serves the page; nothing in it is committed). Not removed until you say,
+  because the person counting would lose the page.
 - **Q-ARCH1 (from todo.md, drill 2026-10-15)** A bid in Recently deleted
   can still be EDITED from another tab (lines, quantities, name) — the
   screen already says "This bid is in Recently deleted … Restore". Refuse

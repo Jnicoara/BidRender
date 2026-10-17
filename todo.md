@@ -1355,6 +1355,8 @@ All additive and nullable. Specs are in the plans named.
 
 ### Capture fixes must ship in the next live release
 
+- [ ] **Asked 2026-10-16: Q-SITE1** (is the test finished?) — not removed
+      until the owner says.
 - [ ] **Remove `C:\dev\BidPhase-C-site` after the reader accuracy test, and
       never commit or merge from it.** It is a detached git worktree (at
       `52a6b0b` since 2026-10-01; was `9851c86`) that serves the counter's
