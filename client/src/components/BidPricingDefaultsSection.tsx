@@ -20,7 +20,7 @@
  * arithmetic wants. Nobody types "0.1" for ten percent, so the conversion
  * happens at this boundary and nowhere else.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Percent } from "lucide-react";
@@ -45,6 +45,7 @@ import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { PercentKindInput } from "@/components/PercentKindInput";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
+import { refreshUneditedText } from "@/lib/storedTextRefresh";
 
 /** Fraction (0.1) → percent string ("10"). Blank stays blank. */
 const toPercent = (fraction: number | string | null | undefined) =>
@@ -88,20 +89,55 @@ export function BidPricingDefaultsSection() {
   // Blank is "no company default" — a rule of nothing, not a rule of 0%.
   const [materialMarkupPct, setMaterialMarkupPct] = useState("");
 
-  const showStored = (d: NonNullable<typeof defaults>) => {
-    setMaterialMarkupPct(
-      d.materialMarkupPct === null ? "" : toPercent(d.materialMarkupPct)
-    );
+  const storedText = (d: NonNullable<typeof defaults>) => {
     const isPercentage = d.overheadMode === "percentage";
-    setOverheadPct(isPercentage ? toPercent(d.overheadValue) : "0");
-    setOverheadFlat(isPercentage ? "0" : String(Number(d.overheadValue)));
-    setProfitPct(toPercent(d.profitValue));
-    setProductivityPct(toPercent(d.productivityPct));
+    return {
+      materialMarkup:
+        d.materialMarkupPct === null ? "" : toPercent(d.materialMarkupPct),
+      overheadPct: isPercentage ? toPercent(d.overheadValue) : "0",
+      overheadFlat: isPercentage ? "0" : String(Number(d.overheadValue)),
+      profit: toPercent(d.profitValue),
+      productivity: toPercent(d.productivityPct),
+    };
+  };
+  // What each box last showed from storage, so a refetch can tell a box
+  // being typed in from an untouched one (refreshUneditedText).
+  const lastShown = useRef<ReturnType<typeof storedText> | null>(null);
+  const setAll = (t: ReturnType<typeof storedText>) => {
+    setMaterialMarkupPct(t.materialMarkup);
+    setOverheadPct(t.overheadPct);
+    setOverheadFlat(t.overheadFlat);
+    setProfitPct(t.profit);
+    setProductivityPct(t.productivity);
+  };
+  /** Every box back to what is stored — after a refused save. */
+  const showStored = (d: NonNullable<typeof defaults>) => {
+    const next = storedText(d);
+    lastShown.current = next;
+    setAll(next);
   };
 
   useEffect(() => {
-    if (defaults) showStored(defaults);
-    // showStored only calls setters; the stored row is what matters.
+    if (!defaults) return;
+    // A refetch rewrites only the boxes nobody has changed: a "20" being
+    // typed into Profit must not become the stored "0" under the cursor
+    // (found by the whole-job journey in CI, 2026-10-16).
+    const next = storedText(defaults);
+    setAll(
+      refreshUneditedText(
+        {
+          materialMarkup: materialMarkupPct,
+          overheadPct,
+          overheadFlat,
+          profit: profitPct,
+          productivity: productivityPct,
+        },
+        lastShown.current,
+        next
+      )
+    );
+    lastShown.current = next;
+    // Only a new stored row re-runs this; the box texts are read as they are.
   }, [defaults]);
 
   /**

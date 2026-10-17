@@ -44,6 +44,16 @@ async function trpc<T>(proc: string, input?: unknown, mutation = false) {
 const usd = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/**
+ * A real page load at `address`. Changing only the `#` part does not reload
+ * the app, so a screen would keep what it read before — signed out before
+ * the sign-up, or the figures read before the database went down.
+ */
+async function open(address: string) {
+  await page.goto(address);
+  await page.reload();
+}
+
 /** Every dollar figure on the screen right now. */
 async function dollars(): Promise<string[]> {
   const text = await page.locator("body").innerText();
@@ -116,7 +126,7 @@ test("a priced bid, seen on screen", async () => {
   expect(due).toBeGreaterThan(0);
   total = usd(due);
 
-  await page.goto(`/#/bids/${bidId}`);
+  await open(`/#/bids/${bidId}`);
   await expect(page.getByText(total).first()).toBeVisible();
 });
 
@@ -128,7 +138,7 @@ test("database DOWN: every screen says so, and states no number", async () => {
     `/#/bids/${bidId}/proposal`,
     "/#/bids",
   ]) {
-    await page.goto(address);
+    await open(address);
     await expect(
       page
         .getByText(/Can't reach BidRidge|couldn't load|Could not load/i)
@@ -144,7 +154,7 @@ test("database DOWN: every screen says so, and states no number", async () => {
 });
 
 test("database BACK: the open screen recovers by itself, the total unchanged", async () => {
-  await page.goto(`/#/bids/${bidId}`);
+  await open(`/#/bids/${bidId}`);
   await expect(page.getByText(/Can't reach BidRidge/i).first()).toBeVisible({
     timeout: 60_000,
   });
@@ -156,7 +166,7 @@ test("database BACK: the open screen recovers by itself, the total unchanged", a
 
 test("plan store DOWN: the plan says it cannot open, the bid's money is untouched; BACK: it opens", async () => {
   test.skip(!STORAGE, "LOCAL_STORAGE_DIR is not set");
-  await page.goto(`/#/bids/${bidId}/plans`);
+  await open(`/#/bids/${bidId}/plans`);
   const attached = page.waitForResponse(
     r => r.url().includes("bidPdfs.confirmAttach") && r.ok(),
     { timeout: 120_000 }
@@ -184,6 +194,6 @@ test("plan store DOWN: the plan says it cannot open, the bid's money is untouche
   } finally {
     execSync(`chmod -R u+rwX "${STORAGE}"`);
   }
-  await page.goto(`/#/bids/${bidId}/plans`);
+  await open(`/#/bids/${bidId}/plans`);
   await expect(sheetCanvas(page)).toBeVisible({ timeout: 90_000 });
 });

@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **A percentage typed in Settings › Pricing is no longer wiped while you
+  type it.** When the page refreshed its saved settings in the background
+  (as it can right after it opens), every box was reset to the stored
+  value, so a "20" typed into Profit could turn back into "0" under the
+  cursor and Enter then saved nothing. Now a refresh only updates boxes
+  you have not touched.
 - **Two people saving the same assembly, kit, client, labor rate, material
   or modifier at the same moment can no longer silently undo each other.**
   The "someone saved this since you opened it" check could be passed by
