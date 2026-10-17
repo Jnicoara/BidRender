@@ -41,7 +41,39 @@ export function needsPricing(
   return value === 0;
 }
 
-/** How many of these still need a price. Drives the filter's count badge. */
+/**
+ * The MATERIALS SCREEN's question — "is this price still not the shop's
+ * own?" — which is `needsPricing` OR an example price
+ * (`materials.isExamplePrice`, owner 2026-10-07: every shipped preset price
+ * says "Example price" until a shop edits it).
+ *
+ * Why a second function rather than widening `needsPricing`: that one
+ * decides "Not priced" on BID LINES too, and the owner decided an
+ * example-priced line is a WARNING before printing, never a not-priced line
+ * (CLAUDE.md § "Where a priced catalog lands"). On the worklist, though, a
+ * zero stops meaning "nobody priced this" the day the priced catalog loads
+ * (`server/seed/materials/starterPrices.ts`, empty until then) — and
+ * "Needs pricing" would then report a fully priced library nobody has
+ * checked a line of (todo.md, "give nobody has priced this its own signal").
+ */
+export function needsYourPrice(material: {
+  costPerUnit: string | number | null | undefined;
+  isExamplePrice?: boolean | null;
+}): boolean {
+  return needsPricing(material.costPerUnit) || material.isExamplePrice === true;
+}
+
+/** How many of these still need the shop's own price — the filter's badge. */
+export function countNeedingYourPrice(
+  materials: {
+    costPerUnit: string | number | null;
+    isExamplePrice?: boolean | null;
+  }[]
+): number {
+  return materials.reduce((n, m) => (needsYourPrice(m) ? n + 1 : n), 0);
+}
+
+/** How many of these still carry $0 (no example price counted). */
 export function countNeedingPricing(
   materials: { costPerUnit: string | number | null }[]
 ): number {

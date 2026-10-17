@@ -304,6 +304,11 @@ export function decodeNameCursor(
  *
  * Typed drizzle comparisons (`gte(column, date)`) go through the column's
  * mapper and are already correct. This is for the raw predicates that cannot.
+ *
+ * Since 2026-10-16 the app's pool also sends Dates as UTC (`timezone: "Z"`,
+ * server/appPool.ts), so the driver half of the disagreement above is gone
+ * for the app. This stays: it is right either way, and scripts and tests
+ * that build their own connection still get the driver's default.
  */
 export function toSqlTimestamp(date: Date): string {
   const pad = (n: number, width = 2) => String(n).padStart(width, "0");

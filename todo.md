@@ -149,8 +149,10 @@ so it is the owner's call, not a speed fix.
 ## Scope tags per bid line — PLANNED 2026-10-10 (Track B), not built
 
 - [ ] Build `references/scope-tags-plan.md`, steps 1–7 in order. The owner
-      answered all 12 questions on 2026-10-10 (plan § 6). Waits only on A
-      applying S1 (SQL draft in `track-b-handoff.md`).
+      answered all 12 questions on 2026-10-10 (plan § 6). **2026-10-16:
+      steps 1–7 built except 6b, which is built on Track C's local branch
+      `c-scope-prompts` and waits for A to add `scope_prompts` (S2) AFTER
+      the live release (owner). Left open only for that.**
 - [x] **FIXED 2026-10-12 (`b-role-not-priced`):** the SQL `lineNotPricedSql`
       had no `lineRole` branch, while the TS `lineNotPriced` decides a
       remove / relocate line by its hours alone — so the Dashboard called a
@@ -643,8 +645,7 @@ dragged off its mark keeping the old claim, is **DONE by Track C** on
       `scripts/starterDrift.mts --apply` — same id, forks keep their names.
       The four cans are renamed in the seed ('4" can light, new
       construction', '4" can light, remodel', and 6"). Rehearsed on
-      bidrender_test_b: proposed 4 → applied (batch 661, 404 pins) → proposed
-      0. `server/starterAssemblyRename.test.ts` (red without the renames in
+      bidrender_test_b: proposed 4 → applied (batch 661, 404 pins) → proposed 0. `server/starterAssemblyRename.test.ts` (red without the renames in
       the seeder). **On local-dev, staging and live the four show as
       "proposed 4" in starterDrift until someone runs `--apply`**;
       `scripts/stagingStartersCheck.mts` names the NEW names, so it reports
@@ -1040,6 +1041,14 @@ Full reasoning: `references/track-a-handoff.md`, session 28 fourth part.
 
 Requests waiting for Track A, which numbers and writes the migrations.
 
+> **Checked against `drizzle/schema.ts` 2026-10-16 (Track C):** every
+> request below whose columns are in the schema is ticked — applied. STILL
+> OPEN, not in the schema: the `bid_panels` header columns (`supplyText`,
+> `mainsText`, `mainsAmps`, `fedFromText`, `connectedKva`, `demandKva`) and
+> the bend columns (`typedBendCount`, `kicksPerBoxEnd`, `kicksAcceptedAt`).
+> `bid_panel_circuits` was built with shorter names (`breaker`, `amps`,
+> `wire`), so it counts as done.
+
 > **0105–0124 ON STAGING (2026-10-07 00:16 UTC) and on local-dev — NOT on
 > live.** Owner: the pairing rules are for the LIVE release, which is gated
 > in `references/live-release-plan.md` (top). B's labor-only tick and
@@ -1081,13 +1090,13 @@ Requests waiting for Track A, which numbers and writes the migrations.
 > `quoteBucket` dropped. (An earlier note here said 0108–0112 for fewer
 > items; superseded.)
 
-- [ ] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
+- [x] **`bid_pdf_sheets.distributionHeightInches INT NULL`** — this
       sheet's run height (Track B, owner's answer b, 2026-10-05). ADDITIVE,
       nullable, **no DEFAULT** (NULL = follows the job, and must stay
       distinguishable from any answer). Step 1 of the three-step deploy: no
       `UPDATE`, no backfill. Once it lands, Track B makes the run height chain
       run → sheet → job → company. references/vertical-drops-plan.md § 7.
-- [ ] **`assemblies.mountHeightTypeKey VARCHAR(64) NULL`** — the height TYPE
+- [x] **`assemblies.mountHeightTypeKey VARCHAR(64) NULL`** — the height TYPE
       this assembly's device mounts at, a key of the heights list
       (`receptacle`, `switch`, or a company's own) — NOT inches, so it
       re-prices through job → company → shipped like every other height
@@ -1100,7 +1109,7 @@ Requests waiting for Track A, which numbers and writes the migrations.
 track-c, each working today without its column). All ADDITIVE, nullable,
 **no DEFAULT**, no backfill — step 1 of the three-step deploy.
 
-- [ ] **`takeoff_stamps.labelWords TEXT NULL`** — the labels Find all
+- [x] **`takeoff_stamps.labelWords TEXT NULL`** — the labels Find all
       matching tied to a device when it was confirmed (`tieLabels` in
       `client/src/lib/findMatching.ts`: "USB", `54"`, "(E)", "A2"). Today
       they show on the FIND only and are lost when the mark is placed, so a
@@ -1111,7 +1120,7 @@ track-c, each working today without its column). All ADDITIVE, nullable,
   duplicate.** The mark already has `mountHeightInches` +
   `mountHeightSource` (0098, on staging; requested by Track C itself on
   2026-10-01, below). A height read off a label goes THERE.
-- [ ] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
+- [x] **`symbol_looks.confirmedAt TIMESTAMP NULL`** — when an added look was
       first confirmed by hand ("from a new look", multiple-looks-plan.md
       § 4). Today kept per browser (`@/lib/trustedLooks`), so a colleague's
       browser asks again — safe, not shared. NULL = never confirmed.
@@ -1134,7 +1143,7 @@ on UNCC E003 (3 of 3 panels, 42/42 circuits each):
       `connectedKva DECIMAL(9,2) NULL`, `demandKva DECIMAL(9,2) NULL`.
       NULL = not read, or a panel typed in. All as printed — never a
       parsed value standing in for what the drawing says.
-- [ ] **`bid_panel_circuits`** (A's child table; these are the columns C
+- [x] **`bid_panel_circuits`** (A's child table; these are the columns C
       fills): `panelId` FK `bid_panels.id` ON DELETE CASCADE,
       `circuitNumber INT NOT NULL`, `breakerText VARCHAR(16) NULL` (as
       printed: "20/1", "FEED"), `breakerAmps INT NULL`, `poles TINYINT NULL`,
@@ -1157,13 +1166,13 @@ both ADDITIVE, nullable, **no DEFAULT**, no backfill. Searched first:
 nothing in this file or in `migrations-next-batch.md` (a-migrations-plan)
 asks for a column on `takeoff_run_circuits`.
 
-- [ ] **`takeoff_run_circuits.panelCircuitId INT NULL`** — FK
+- [x] **`takeoff_run_circuits.panelCircuitId INT NULL`** — FK
       `bid_panel_circuits.id` ON DELETE SET NULL: the schedule row this
       run's circuit is ("Homerun to 2B-14" → 2B's circuit 14). NULL = not
       tied (typed by hand, or no schedule for that panel). `name` keeps the
       tag as printed ("2B-14"), which it already holds today. Lands with or
       after `bid_panel_circuits`.
-- [ ] **`takeoff_run_circuits.conductorSource VARCHAR(8) NULL`** — where
+- [x] **`takeoff_run_circuits.conductorSource VARCHAR(8) NULL`** — where
       `conductorCount` / `groundCount` came from when the drawing said:
       `'ticks'` or `'note'` ("(3 #12 THWN CU & 1 #12 CU GRD)"). NULL =
       entered by the estimator, as every row is today.
@@ -1261,7 +1270,7 @@ to `bid_panels` / `bid_panel_circuits` / `takeoff_run_circuits` above. All
 ADDITIVE, nullable, **no DEFAULT** (NULL = "not said, follow the level
 above"), no backfill. An area is a SHEET (plan § 4).
 
-- [ ] **On `bids`:**
+- [x] **On `bids`:**
   - `homerunMethod` VARCHAR(16) NULL — `'measured'`, `'average'` or
     `'measuredMin'`; NULL = Measured, the default.
   - `homerunAverageFt` DECIMAL(8,2) NULL.
@@ -1270,18 +1279,18 @@ above"), no backfill. An area is a SHEET (plan § 4).
     applied (a starter is shown, inert until accepted).
   - `homerunRunTypeId` INT NULL, FK `takeoff_run_types.id` ON DELETE SET
     NULL (plan § 8: conductors from the type, never inferred).
-- [ ] **On `bid_pdf_sheets`, the area override:** `homerunMethod`
+- [x] **On `bid_pdf_sheets`, the area override:** `homerunMethod`
       VARCHAR(16) NULL, `homerunAverageFt` DECIMAL(8,2) NULL,
       `homerunMinimumFt` DECIMAL(8,2) NULL. NULL = follow the bid.
       **Ceiling height per area is NOT asked again:** it is
       `bid_pdf_sheets.distributionHeightInches`, already numbered 0108 above.
-- [ ] **On `bid_panels`, where the panel sits on the plan:** `planSheetId`
+- [x] **On `bid_panels`, where the panel sits on the plan:** `planSheetId`
       INT NULL, FK `bid_pdf_sheets.id` ON DELETE SET NULL; `planX` and
       `planY` DECIMAL(10,2) NULL (page points). Today kept per browser
       (`bidridge:panel-spots:`, `@/lib/circuitGroups`); NULL = not placed,
       and Measured then gives no number. Distinct from A's `bidPdfId` /
       `sheetId`, which say where the SCHEDULE is printed.
-- [ ] **On `bid_panel_circuits`, one homerun per circuit** —
+- [x] **On `bid_panel_circuits`, one homerun per circuit** —
       `homerunOverrideFt DECIMAL(8,2) NULL` (typed length, replaces L + V;
       NULL = computed), `homerunFromStampId INT NULL` FK `takeoff_stamps.id`
       ON DELETE SET NULL (the leaving device when not the closest; NULL =
@@ -1289,7 +1298,7 @@ above"), no backfill. An area is a SHEET (plan § 4).
       every homerun starts). A circuit read only from tags (no schedule)
       needs a `bid_panels` row with no schedule behind it — A's "typed in"
       case.
-- [ ] **On `bid_panel_circuits`, the homerun's own ceiling** —
+- [x] **On `bid_panel_circuits`, the homerun's own ceiling** —
       `homerunCeilingInches` INT NULL. NULL = follows the height area, then
       the sheet, job, company (plan § 4). The one-tap height override the
       owner asked for (plan § 6, 2026-10-06: "make overriding a homerun's
@@ -1307,31 +1316,31 @@ above"), no backfill. An area is a SHEET (plan § 4).
 references/quote-items-plan.md § 8). All ADDITIVE, nullable, **no
 DEFAULT**, no backfill — step 1 of the three-step deploy.
 
-- [ ] **`bid_line_items.bidUnitCost DECIMAL(12,4) NULL`** — material per
+- [x] **`bid_line_items.bidUnitCost DECIMAL(12,4) NULL`** — material per
       unit priced ON THIS BID; NULL = none. **SHARED with the price-box item**
       ("Before beta: price an unpriced line right where it blocks you"):
       one column for both, never two. Read by `lineNotPriced` AND its SQL copy
       `lineNotPricedSql` together.
-- [ ] **`bid_line_items.isQuoteItem BOOLEAN NULL`** — this line's material
+- [x] **`bid_line_items.isQuoteItem BOOLEAN NULL`** — this line's material
       comes from a supplier quote. NULL = no. Starts from the assembly's flag.
-- [ ] **`bid_line_items.quoteId INT NULL`** — FK `bid_quotes.id`, ON DELETE
+- [x] **`bid_line_items.quoteId INT NULL`** — FK `bid_quotes.id`, ON DELETE
       SET NULL.
-- [ ] **`bid_line_items.quoteShare DECIMAL(12,2) NULL`** — a typed share of
+- [x] **`bid_line_items.quoteShare DECIMAL(12,2) NULL`** — a typed share of
       a package price. NULL = computed by the spread.
-- [ ] **`bid_line_items.quoteItemKey VARCHAR(255) NULL`** — the frozen "same
+- [x] **`bid_line_items.quoteItemKey VARCHAR(255) NULL`** — the frozen "same
       item" key for carrying the last quote forward.
-- [ ] **`bid_line_items.quoteNote VARCHAR(500) NULL`** — notes for the
+- [x] **`bid_line_items.quoteNote VARCHAR(500) NULL`** — notes for the
       supplier request list (can wait for the first build).
-- [ ] **`assemblies.materialByQuote BOOLEAN NULL`** — new lines from this
+- [x] **`assemblies.materialByQuote BOOLEAN NULL`** — new lines from this
       assembly start as quote items. NULL = no.
-- [ ] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
+- [x] **New table `bid_quotes`**: `id`, `bidId` (FK, cascade), `userId`,
       `supplierName VARCHAR(128) NULL` (free text, like
       `materials.supplierName`), `quotedOn DATE NULL`, `packagePrice
 DECIMAL(12,2) NULL` (NULL = per-item quote; set = one package price),
       `carriedFromBidId INT NULL` (provenance only, **no FK** — the old bid may
       be deleted; set = a carried quote, "not updated"), `note VARCHAR(500)
 NULL`, `createdAt`, `updatedAt`. Index (`userId`, `bidId`).
-- [ ] **The company's quoted-line markup %** (material-markup D4; owner
+- [x] **The company's quoted-line markup %** (material-markup D4; owner
       answer c: ONE company-wide number) — a nullable decimal beside the
       company markup default; A picks the table. NULL = no quoted-line rule.
 
@@ -1398,11 +1407,15 @@ Labor lives on the assembly, never on the material", which 0065 made false
 
 ### Requests to Track A from Check sheet (Track C, 2026-10-01) — A numbers these
 
+> **All three applied (checked against `drizzle/schema.ts` 2026-10-16):**
+> `symbol_looks`, `takeoff_stamps.checkAcceptedAt`, and `askKind` /
+> `askFingerprint`.
+
 Check sheet shipped code-only on track-c without any of these; each is behind
 an OFF switch in `shared/sheetCheckSwitches.ts` or is said plainly on screen.
 All additive and nullable. Specs are in the plans named.
 
-- [ ] `symbol_looks` table — a legend look WITH its box, so the check needs no
+- [x] `symbol_looks` table — a legend look WITH its box, so the check needs no
       "Whole legend" in this tab first (today the boxes live in sessionStorage,
       `@/lib/sheetCheckSession`). `references/multiple-looks-plan.md` § 6.
 - [x] `takeoff_stamps.mountHeightInches decimal(7,2) NULL` +
@@ -1410,14 +1423,16 @@ All additive and nullable. Specs are in the plans named.
       `tieLabels` (`54"`) is what fills it. Lets a height read beside a mark be SAVED on it
       (`MARK_HEIGHT_COLUMN`). NULL must stay distinct from 0.
       `references/check-my-marks-plan.md` § 10.
-- [ ] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past
+- [x] `takeoff_stamps.checkAcceptedAt timestamp NULL` — "Keep" remembered past
       this check (`MARK_CHECK_ACCEPTED_COLUMN`). check-my-marks-plan § 7.
-- [ ] `ai_usage`/ask log `askKind` + `askFingerprint`, and
+- [x] `ai_usage`/ask log `askKind` + `askFingerprint`, and
       `bid_pdf_sheets.contentHash` — so the same tie on the same drawing is
       never paid for twice. `references/legend-and-notes-automation-plan.md`.
 
 ### Capture fixes must ship in the next live release
 
+- [ ] **Asked 2026-10-16: Q-SITE1** (is the test finished?) — not removed
+      until the owner says.
 - [ ] **Remove `C:\dev\BidPhase-C-site` after the reader accuracy test, and
       never commit or merge from it.** It is a detached git worktree (at
       `52a6b0b` since 2026-10-01; was `9851c86`) that serves the counter's
@@ -1431,9 +1446,14 @@ All additive and nullable. Specs are in the plans named.
       **3004 does NOT have** "Move to…", the review page's jump-to-spot link,
       or Find all matching (`895cd7c`…`74b040a`) — moving it to them reloads
       his page, so ask first.
-- [ ] **Whoever merges track-c: two small conflicts in `LegendPanel.tsx`
+- [x] **CLOSED 2026-10-16 (checked, not assumed):** both items below are
+      done — track-c has been merged into local-dev many times since, and
+      `258718d` and the 60,000-character thumbnail limit
+      (`SYMBOL_THUMBNAIL_MAX_CHARS` in `shared/symbolCapture.ts`) are on
+      `origin/main`, i.e. live.
+- [x] **Whoever merges track-c: two small conflicts in `LegendPanel.tsx`
       with Track B's 8a.** Keep BOTH buttons, and B's `text-xs`.
-- [ ] **Capture fixes (258718d + blur fix) must ship in the next live
+- [x] **Capture fixes (258718d + blur fix) must ship in the next live
       release.** Both are on `track-c` only (2026-09-30). Checked that day:
       live (`3ca33dc`) and staging (`0af50a6`) both still draw the "Name
       this symbol" box inside the zoom transform (`SymbolCapture.tsx`, the
@@ -1648,6 +1668,7 @@ not the LT1/LT2 repair, not the priced catalog. Listed in
       it is shown again. Refusing the edits server-side needs ONE guard in
       every route that writes under a bid, the plan-screen routes (Track B)
       included — or an owner decision that editing in the trash is fine.
+      **Asked 2026-10-16: Q-ARCH1 in `pricing/morning-questions.md`.**
 
 ### Price-list import: one material at two prices is REFUSED (owner, 2026-10-16, Q-IMP1)
 
@@ -1744,14 +1765,17 @@ Two pieces, owner-approved to build before beta. They came out of the
 coverage checks in `references/coverage-check.md`, which list what the
 starters miss. These two catch what a list cannot.
 
-- [ ] **(a) No-match search log.** When a picker search (assembly or
+- [x] **BOTH BUILT (checked 2026-10-16):** (a) `server/routers/searchMissesRouter.ts` + the Admin screen's "searches that found nothing"
+      (`server/searchMissLog.test.ts`); (b) `components/BuildFromPartsPanel.tsx`,
+      reached from the Count picker, the assembly search and Quick bid.
+- [x] **(a) No-match search log.** When a picker search (assembly or
       material) returns nothing, record the search words: company id, the
       words, and the date. **No prices and no bid contents** — only the
       words typed. Add a simple list the owner can view (admin), newest
       first, with repeats counted. **No AI** reads it or suggests from it.
       It shows what people look for and do not find, so the next catalog
       and starter work follows real searches, not guesses.
-- [ ] **(b) "Build it from parts here."** When a user cannot find an
+- [x] **(b) "Build it from parts here."** When a user cannot find an
       assembly, let them build one from parts on the spot, use it on the
       bid, and save it to their library. Ties to
       `references/never-stuck-plan.md` (the owner's rule: a user must never
@@ -1773,6 +1797,15 @@ starters miss. These two catch what a list cannot.
 > print block (gap 10 would jump them to the line's fix), and a "priced on
 > this bid" marker on the line. Quote items (§ 8) may still want their own
 > column — decide there.
+>
+> **2026-10-16 (Track C): both blocks now LEAD to the line's fix rather
+> than holding a second price box.** The Proposal's print block already
+> jumped there (gap 10); the quote-app `Blocked` panel now has "Fix this
+> line" on each line-level gap, which closes the panel and opens that
+> line's fix — the bid page's `goToLineFix`, the same function the `?fix=`
+> arrival calls. One price box (the line's), not three copies. Seen on
+> screen (`overnight-shots/quoteapp-fix-line*.png`). Left: the "priced on
+> this bid" marker.
 
 > **2026-10-05:** quote items (references/quote-items-plan.md § 8) need the
 > SAME per-bid price column as this item (`bidUnitCost`). Build it once:
@@ -1829,7 +1862,7 @@ floor drop ceiling vs stockroom open to deck)." Per-sheet ceiling height
 stockroom homerun reads ~10 ft short per wire unless overridden one by one.
 Design: `references/homerun-footage-plan.md` § 4.
 
-- [ ] **Build (Track C, after the columns):** draw a box or polygon on a
+- [x] **Build (Track C, after the columns):** draw a box or polygon on a
       sheet, name it, give it a ceiling ("Stockroom — open to deck, 18'-0"").
       Every homerun leaving a device inside it uses that height; a device in
       no area follows the sheet. **Where two areas overlap, the area with
@@ -1845,11 +1878,19 @@ Design: `references/homerun-footage-plan.md` § 4.
       at each end's box, count drops at each mark, homeruns at their device
       (`shared/ceilingHeights.ts`). Reached from "Ceilings" on every scaled
       sheet.
-- [ ] **Reshape a height area after drawing — BEFORE BETA** (owner,
+- [x] **DONE 2026-10-16 (Track C):** "Reshape" on each area's row in the
+      Ceilings panel. Taps, like drawing: tap a corner, tap where it goes;
+      tap a side's dot to add a corner; "Remove corner" (never below
+      three); Done saves the outline (`updateHeightArea`), Cancel puts it
+      back. Handles and their reach are sized in screen pixels, so they
+      work at a tablet's fit zoom. Rules in `lib/heightAreaReshape.ts`
+      (7 tests); seen on laptop and iPad portrait, saved outline read back
+      (`overnight-shots/reshape-*.png`).
+- [x] **Reshape a height area after drawing — BEFORE BETA** (owner,
       2026-10-07). Today an outline is fixed once drawn: remove and redraw.
       Drag a corner (tablet: tap a corner, tap where it goes), add or drop a
       corner; the server already takes `outline` on `updateHeightArea`.
-- [ ] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
+- [x] **New table for Track A — `bid_height_areas`** (ADDITIVE, nothing
       else changes):
   - `id`; `bidId` FK `bids.id` ON DELETE CASCADE; `userId` (the company
     owner's id, like every table); `sheetId` FK `bid_pdf_sheets.id` ON
@@ -2452,11 +2493,19 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       2026-10-07: "Example hours", the price treatment (bid screen only,
       clears on the shop's edit, warning before printing), shipped together
       with the hours. Columns in Batch 5 (`migrations-next-batch.md`).
-- [ ] **Build the "Example price" / "Example hours" / "Example rate" tags**
-      (Batch 5 columns + the bid-screen tag + the print warning) — every
-      starter sheet's numbers wait on them (`server/starterValues.test.ts`),
-      and the brand-variant prices also wait on `materials.parentId`.
-- [ ] **Before the priced catalog ships: give "nobody has priced this" its own
+- [x] **Build the "Example price" / "Example hours" / "Example rate" tags**
+      (Batch 5 columns + the bid-screen tag + the print warning) — **BUILT
+      (checked 2026-10-16):** `components/ExampleTags.tsx` on bid lines
+      (`LineCost`), `exampleWarning` before print/send (`ProposalPage`,
+      `BidsPage`), `server/exampleTags.test.ts`. Brand-variant prices still
+      wait on `materials.parentId`.
+- [x] **DONE 2026-10-16 (Track C):** the Materials screen's "Needs pricing"
+      reads `needsYourPrice` — $0 OR `isExamplePrice` — and an
+      example-priced row shows its number with an "Example price" button
+      that opens the price. `needsPricing` (bid lines' "Not priced") is
+      unchanged on purpose: an example line warns, never blocks. Seen on
+      screen, laptop and phone (`overnight-shots/example-price-row*.png`).
+- [x] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while
       every shipped row is zero. The moment the pricing sheet lands in
@@ -2579,16 +2628,25 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       then re-added by mistake would come back), and write the test that
       seeds, retires, un-retires and re-seeds the same name.
 
-- [ ] Replace fractional resize recentering with true page-box centering in the PDF viewer
-- [ ] Ensure the PDF canvas stays fully within the left pane as the divider moves
-- [ ] Connect estimate engine to user's custom materials DB (fall back to built-in DB)
-- [ ] Connect estimate engine to user's active labor standard profile
-- [ ] Save estimate sessions to DB (currently frontend-only)
-- [ ] Project management UI (create/rename/archive projects from the sidebar)
+> **Reviewed 2026-10-16 (Track C), each checked against the code:** the
+> first six were for the four-workspace design whose screens were deleted
+> (CLAUDE.md § Architecture: `PlanPanel`, `PlanViewer`, the `pages/tabs/`
+> estimate screens, projects → bids) — closed as obsolete, not built.
+> Password reset is built (`authRouter.ts`, `password_reset_tokens`); the
+> admin screen is `AdminSettingsPage`. Stripe stays open (billing is
+> "unassigned" in the before-beta checklist); email verification stays open
+> as owner question Q-EV1 (`pricing/morning-questions.md`).
+
+- [x] ~~Replace fractional resize recentering with true page-box centering in the PDF viewer~~ (obsolete: `PlanViewer` deleted)
+- [x] ~~Ensure the PDF canvas stays fully within the left pane as the divider moves~~ (obsolete: `PlanPanel` deleted)
+- [x] ~~Connect estimate engine to user's custom materials DB (fall back to built-in DB)~~ (obsolete: bids price from `materials`)
+- [x] ~~Connect estimate engine to user's active labor standard profile~~ (obsolete: `labor_rates`)
+- [x] ~~Save estimate sessions to DB (currently frontend-only)~~ (obsolete: a bid is the unit of work, stored)
+- [x] ~~Project management UI (create/rename/archive projects from the sidebar)~~ (obsolete: bids, Dashboard, Recently deleted)
 - [ ] Stripe subscription billing (free trial → paid tier)
-- [ ] Email verification flow
-- [ ] Password reset via email
-- [ ] Admin dashboard for user management
+- [ ] Email verification flow — **Q-EV1, owner**
+- [x] Password reset via email (built: `authRouter.ts`)
+- [x] Admin dashboard for user management (built: `AdminSettingsPage`)
 
 ## Bug Fixes & UI Polish (v4.1)
 
@@ -3073,44 +3131,22 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 ## v5.50 — RBAC + Assembly Builder + Admin Feature Flags
 
-### Step 1: RBAC
+> **Closed 2026-10-16 (Track C):** this is the PLAN copy of the section
+> below, which records it "(COMPLETE)". Since then every piece was replaced
+> on purpose, so nothing here is owed: roles are company roles
+> (owner / admin / estimator / viewer, `shared/permissions.ts`); the
+> `featureFlags` table is retired for access tiers (`FEATURES`,
+> CLAUDE.md § Architecture); `master_*` assemblies are the legacy model
+> (assemblies + `AssembliesLibraryPage` replaced them); the Admin screen is
+> `AdminSettingsPage`; the `ProjectAssembliesTab` / `BidSummaryTab` /
+> `BomRfqTab` screens were deleted.
 
-- [ ] Add "contractor" to the role enum in schema.ts (alongside "user" and "admin")
-- [ ] Push DB migration for role enum change
-- [ ] Expose ctx.user.role to frontend via auth.me query
-- [ ] Add useIsAdmin() and useIsContractor() hooks to frontend
-
-### Step 2: Assemblies DB (already exists — verify and document)
-
-- [ ] Confirm master_assemblies, master_assembly_items tables are live
-- [ ] Confirm masterAssembliesRouter procedures are wired and functional
-- [ ] Confirm laborHours field exists on assembly items
-
-### Step 3: Assembly Builder UI
-
-- [ ] Create standalone AssemblyBuilderPage accessible from sidebar
-- [ ] List all master assemblies with search/filter
-- [ ] Create/edit assembly: name, description, phase, add items from materials DB with qty
-- [ ] Show labor hours total per assembly (sum of item qty × masterLaborHours)
-- [ ] Wire to masterAssembliesRouter (list, create, update, addItem, removeItem)
-
-### Step 4: Feature Flags System
-
-- [ ] Add feature_flags table: id, flagKey (unique), label, description, enabledForContractors, updatedAt
-- [ ] Push DB migration for feature_flags table
-- [ ] Add featureFlagsRouter: getAll (admin), upsert (admin), getForUser (public — returns only keys + enabled state, no admin data)
-- [ ] Add featureFlagsRouter to appRouter
-- [ ] Add useFeatureFlag(key) hook to frontend that reads from getForUser query
-
-### Step 5: Admin Settings Page
-
-- [ ] Create AdminSettingsPage accessible ONLY when role === "admin"
-- [ ] Add "Admin" nav item to sidebar (only visible to admins)
-- [ ] Feature Flags section: list all flags with toggle switches, label, description
-- [ ] Seed the "enable_labor_units" flag (default: OFF for contractors)
-- [ ] Gate all labor-related UI in ProjectAssembliesTab, BidSummaryTab, BomRfqTab behind useFeatureFlag("enable_labor_units")
-- [ ] Gate labor data in tRPC responses: strip laborHours fields from projectAssemblies/projectItems list when flag is OFF for contractor role
-- [ ] TypeScript: 0 errors after all changes
+- [x] Step 1 RBAC — superseded by company roles (`shared/permissions.ts`)
+- [x] Step 2 master assemblies — legacy model, replaced by `assemblies`
+- [x] Step 3 Assembly builder — `AssembliesLibraryPage`
+- [x] Step 4 Feature flags — retired; access tiers (`FEATURES`)
+- [x] Step 5 Admin settings — `AdminSettingsPage`; the labor gating it
+      described applied to screens since deleted
 
 ## v5.50 — RBAC + Assembly Builder + Feature Flags (COMPLETE)
 
@@ -3290,8 +3326,8 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 ## v5.74 — Smooth All Projects + Remove M Logo
 
-- [ ] Fix lag/jitter on page load and navigation for all projects (match Pine St smoothness)
-- [ ] Remove M logo/icon from measurement distance display on runs
+- [x] Fix lag/jitter on page load and navigation for all projects (match Pine St smoothness) — closed 2026-10-16: done in the "v5.74 … M Logo Fix" section below (bitmap cache, no pdfLoading gate); the project screens since deleted
+- [x] Remove M logo/icon from measurement distance display on runs — done below ("Remove "M=measure" text from hint bar")
 
 ## v5.74 — Smooth All Projects + M Logo Fix
 
@@ -3355,7 +3391,7 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 - [x] Apply verified schema migrations and validate the backup-enabled release (checkpoint pending)
 - [x] Add the four encrypted, server-only Cloudflare R2 credentials after production deployment
 - [x] Add the required encrypted `R2_BUCKET` name and validate the R2 destination before running the backup
-- [ ] Resolve the Manus source-storage 403 responses blocking the four stored PDF copies, then rerun and verify a complete production backup
+- [x] Resolve the Manus source-storage 403 responses blocking the four stored PDF copies, then rerun and verify a complete production backup — closed 2026-10-16: done in "v5.97 — Source Storage Repair" below (stale test refs removed, full R2 backup verified)
 
 ## v5.97 — Source Storage Repair & Complete R2 Backup
 
@@ -3381,9 +3417,9 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 - [x] Put "Upload a plan" and "Quick bid" on the Dashboard as the two ways to start
 - [x] Remove the legacy splash page; `/`, `/home` and unknown routes land on the Dashboard
 - [x] Delete six dead legacy page files and retire the `/trash` and `/project/:id` routes
-- [ ] Apply the storage bucket CORS rule (references/deploying.md § 9) — plan upload above 25MB stays broken until it lands
+- [x] Apply the storage bucket CORS rule (references/deploying.md § 9) — plan upload above 25MB stays broken until it lands — closed 2026-10-16: applied (deploying.md § 9 records the origins, www.bidridge.com added 2026-09-17), and viewing too since 2026-09-27
 - [x] Add ranged PDF loading so a 500MB set does not have to be fully resident in tab memory
-- [ ] Verify plan tracing and scale-setting against a plan that actually uploaded
+- [x] Verify plan tracing and scale-setting against a plan that actually uploaded — closed 2026-10-16: the smoke suite uploads a real plan to staging and sets scale, counts and traces on it on every local-dev Gate (`e2e/smoke/flow.spec.ts`, `marks.spec.ts`)
 
 ## v5.99 — Exact GitHub Main Deployment Sync
 
@@ -3405,7 +3441,7 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 - [x] **DONE 2026-10-15 night (Track A):** the fixture is now
       `"fixture-backup-bucket"`; `bidrender-backups` appears nowhere in
       `server/` or `scripts/`. Was: `server/backup.test.ts` uses `"bidrender-backups"` as a fixture bucket name. Harmless test data — the real bucket is `bidsoftware` — but it is now the last place that string survives, so it will read like the configured value to whoever finds it next.
-- [ ] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
+- [x] Decide whether v5.129 (the docs-only R2 key-replacement commit) belongs in `CHANGELOG.md`. Skipped at the time because nothing about the app's behaviour changed, which is the exemption CLAUDE.md allows.
 
 ## Migration cutover — DigitalOcean App Platform
 
@@ -3424,7 +3460,7 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       backend name in `storageProxy.ts` or `storageBackend.ts`; the proxy
       resolves only disk and R2 (`resolveReadBackend`). The route name
       stays, as below. Was: Remove the dead Manus branch inside `server/_core/storageProxy.ts`. Since v5.141 it only ran when the storage backend was `manus`, which is no longer a backend, so it cannot be reached. **The `/manus-storage` web address itself stays exactly as it is** — it is written into `bid_pdfs.url` and the legacy `projects.pdfUrl` for every file already stored, so renaming it would break every existing plan link at once. It serves disk and R2 now; only the name is historical.
-- [ ] Remove `BUILT_IN_FORGE_API_KEY` and `BUILT_IN_FORGE_API_URL` when the Manus AI fallback in `server/_core/llm.ts` goes. Nothing else needs them once that and the proxy branch above are gone. Neither is set on DigitalOcean, so that fallback is already dead on the live site — the app runs on `ANTHROPIC_API_KEY`. They are still read by `server/_core/env.ts`, which is what defines `ENV.forgeApiUrl` / `ENV.forgeApiKey`.
+- [x] Remove `BUILT_IN_FORGE_API_KEY` and `BUILT_IN_FORGE_API_URL` when the Manus AI fallback in `server/_core/llm.ts` goes. Nothing else needs them once that and the proxy branch above are gone. Neither is set on DigitalOcean, so that fallback is already dead on the live site — the app runs on `ANTHROPIC_API_KEY`. They are still read by `server/_core/env.ts`, which is what defines `ENV.forgeApiUrl` / `ENV.forgeApiKey`.
 
 ### Docs (group F)
 
@@ -3446,11 +3482,24 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
 
 **Found by the sweep — stale but harmless (historical record, or already labelled):**
 
-- [ ] `references/periodic-updates.md` documents the Manus scheduler end to end — `manus-heartbeat`, AGENT cron, `user.isCron`, six-field expressions. Low priority **only because it already opens with a prominent header saying all of it is historical and describing what replaced it.** That header is what makes it honest rather than dangerous. Worth trimming eventually; do not remove the header before then.
-- [ ] `references/database-digitalocean.md` mentions Manus throughout, almost all of it accurate history of how the DigitalOcean database was built and why it was not restored from the old one. Only the line saying plan files are "still Manus storage; replacing it is its own job" is stale.
-- [ ] `references/backups.md` § 1 points the reader at `deploying.md` § 8 for "four Manus services" — a pointer to one of the wrong entries above. Fix alongside it.
-- [ ] `references/takeoff-spec.md` — the two matches are the ordinary word "forget". No action; noted so the next sweep does not re-check it.
-- [ ] `references/environment.md` § 1 lists `DATABASE_URL`, `JWT_SECRET` and the three OAuth variables as coming from "Manus environment settings" — they come from DigitalOcean now. Noticed 2026-09-17 while fixing § 2 and § 6, and deliberately left: only the source column is wrong, and the harder question sitting underneath it is whether `OAUTH_SERVER_URL` / `VITE_APP_ID` / `VITE_OAUTH_PORTAL_URL` still belong under "the app will not work without these" at all, now that sign-in is email and password. `VITE_OAUTH_PORTAL_URL` may still crash `AuthGuard` when absent; that wants checking against the code rather than assuming, and it overlaps Manus removal group B (`getLoginUrl`, `oauth.ts`). Fix the column and answer the question in one pass.
+- [x] **CLOSED 2026-10-16 (Track C) — the six doc items below:**
+      `periodic-updates.md` KEPT as is (its header says plainly that it is
+      historical and what replaced it; trimming would delete the reasoning
+      it is kept for); `database-digitalocean.md` line annotated "since done:
+      R2, v5.141"; `backups.md` § 1 needs nothing (it no longer says "four
+      Manus services" and `deploying.md` § 8 is right now);
+      `takeoff-spec.md` no action, as written; `environment.md` § 1 fixed
+      AND the question answered against the code — `OAUTH_SERVER_URL` and
+      `VITE_OAUTH_PORTAL_URL` are optional (unset = Manus login off, login
+      link `/`), but **`VITE_APP_ID` is still required**: `verifySession`
+      refuses a token with an empty `appId`, so unset, nobody stays signed
+      in. Its stale "missing portal URL crashes the app" warning corrected.
+      v5.129 in CHANGELOG: **no** — docs-only, the exemption CLAUDE.md gives.
+- [x] `references/periodic-updates.md` documents the Manus scheduler end to end — `manus-heartbeat`, AGENT cron, `user.isCron`, six-field expressions. Low priority **only because it already opens with a prominent header saying all of it is historical and describing what replaced it.** That header is what makes it honest rather than dangerous. Worth trimming eventually; do not remove the header before then.
+- [x] `references/database-digitalocean.md` mentions Manus throughout, almost all of it accurate history of how the DigitalOcean database was built and why it was not restored from the old one. Only the line saying plan files are "still Manus storage; replacing it is its own job" is stale.
+- [x] `references/backups.md` § 1 points the reader at `deploying.md` § 8 for "four Manus services" — a pointer to one of the wrong entries above. Fix alongside it.
+- [x] `references/takeoff-spec.md` — the two matches are the ordinary word "forget". No action; noted so the next sweep does not re-check it.
+- [x] `references/environment.md` § 1 lists `DATABASE_URL`, `JWT_SECRET` and the three OAuth variables as coming from "Manus environment settings" — they come from DigitalOcean now. Noticed 2026-09-17 while fixing § 2 and § 6, and deliberately left: only the source column is wrong, and the harder question sitting underneath it is whether `OAUTH_SERVER_URL` / `VITE_APP_ID` / `VITE_OAUTH_PORTAL_URL` still belong under "the app will not work without these" at all, now that sign-in is email and password. `VITE_OAUTH_PORTAL_URL` may still crash `AuthGuard` when absent; that wants checking against the code rather than assuming, and it overlaps Manus removal group B (`getLoginUrl`, `oauth.ts`). Fix the column and answer the question in one pass.
 
 ## Test suite health
 
@@ -3503,7 +3552,7 @@ now runs 32 passed / 0 failed. See below for what the grant was.
   does not exist on 3306 at all. Check with `SELECT @@port, @@datadir;` before
   granting; an access-denied from the wrong server looks just like a bad password.
 
-- [ ] `server/backup/verifyBackup.ts` built its scratch connection with `mysqlConnection(scratchDatabaseUrl)` and no environment argument, so it inherited `DATABASE_CA_CERT` — **production's** certificate — and applied it to whatever local server the restore was pointed at. Fixed 2026-09-19; `VERIFY_DATABASE_CA_CERT` now covers a scratch server that needs its own TLS.
+- [x] `server/backup/verifyBackup.ts` built its scratch connection with `mysqlConnection(scratchDatabaseUrl)` and no environment argument, so it inherited `DATABASE_CA_CERT` — **production's** certificate — and applied it to whatever local server the restore was pointed at. Fixed 2026-09-19; `VERIFY_DATABASE_CA_CERT` now covers a scratch server that needs its own TLS.
 
   Worth keeping as a written-down shape rather than a closed ticket. It was dormant for as long as `DATABASE_CA_CERT` was unset and broke the moment production moved to a managed database — the failure was `self-signed certificate in certificate chain` from the LOCAL server, naming a certificate that belongs to the database not being restored into. Nothing about the message points at the cause. The nightly verification would have failed the same way and just as quietly, leaving backups that nobody was confirming. Proved by changing that one variable and watching the error become a different one.
 
@@ -3663,7 +3712,11 @@ Check that last one before dropping the stash. Then don't reach for stash again:
 to test something against a clean tree, use `git worktree add` — a separate
 directory, so nothing touches the files you are working in.
 
-- [ ] Make `pnpm test` pass on a clean checkout so the workaround above can be
+- [x] **DONE (checked 2026-10-16):** the Gate runs the full suite on a fresh
+      checkout and a brand-new migrated, seeded database on every push
+      (`.github/workflows/gate.yml`), green today (run 38989986720); use a
+      worktree, never stash, to test a clean tree.
+- [x] Make `pnpm test` pass on a clean checkout so the workaround above can be
       deleted. Tracked under "Test suite health" above; noted here too because
       this is the section someone reads when something inexplicable happens.
 
@@ -3751,7 +3804,18 @@ Anthropic whenever `ANTHROPIC_API_KEY` is set, and it is set in
 `.env.production.local`. Worth knowing rather than worth fixing; if the Forge
 path is ever revived, give it the same treatment first.
 
-- [ ] Delete the Manus Forge gateway path entirely (`server/_core/llm.ts`, the
+- [x] **DONE 2026-10-16 (Track C):** `server/_core/llm.ts` is types only;
+      the fallback branch in `server/llm/index.ts`, the unreachable Forge
+      presign path in `storageProxy.ts` (now an exhaustive `never` guard —
+      A's 10-15 check had missed it; the typecheck found it), and
+      `forgeApiUrl`/`forgeApiKey` in `env.ts` are gone. The two
+      "model exists" guards (`navigationModel`/`planCopilotModel` tests),
+      which asked the gateway and so had been SKIPPED everywhere, now ask
+      Anthropic (`anthropicModelExists`, a free lookup, aliases too) plus a
+      check that a made-up id is refused. They still skip without
+      `ANTHROPIC_API_KEY` — none is set locally or in the Gate, and the
+      live key was not borrowed for a test.
+- [x] Delete the Manus Forge gateway path entirely (`server/_core/llm.ts`, the
       `BUILT_IN_FORGE_API_KEY` env var, and the lazy import in
       `server/llm/index.ts`). It cannot run in production and it carries a
       second, unguarded copy of the parameter-dropping bug that cost real money
@@ -4028,7 +4092,17 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       The entry as it stood: `getMaterialUsageForCompany` builds `lastUsedAt`
       with `new Date()` from a raw `MAX(...)` — the same shape that read 7
       hours out on the Dashboard's newest-plan date. Measure before changing.
-- [ ] **The flip side, found by that measurement: locally, the Dashboard's
+- [x] **FIXED 2026-10-16 (Track C):** the app's pool (`server/appPool.ts`)
+      sets BOTH `timezone: "Z"` and `SET time_zone = '+00:00'` on every
+      connection — what production and the Gate already had. Red-first on
+      this laptop: a database-defaulted `createdAt` read back 25,200,264 ms
+      (7 h) off, session `SYSTEM`; green after (`server/appPoolUtc.test.ts`).
+      14 date-heavy suites (205 tests) unchanged. **Local side effect, all
+      tracks:** times the app WROTE into a local database before this (under
+      a Pacific session) now read 7 h later — local test data only;
+      production never had the split. Scripts and tests that open their own
+      connection keep the driver default (`toSqlTimestamp` stays for them).
+- [x] **The flip side, found by that measurement: locally, the Dashboard's
       newest-plan date is 7 hours EARLY for a real upload.** `lastPlanAt`
       uses `DATE_FORMAT(MAX(p.createdAt), '…Z')`, which is right for a row
       whose createdAt the APP wrote (drizzle writes UTC text) — which is what
@@ -4045,7 +4119,14 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       merged. **Still open from the pass:** the layout at the shipped desktop
       width was not seen (the driven window was stuck at 766 px), and the
       Recent plans row at phone width.
-- [ ] **No control removes a single mark (C6), and a dead prop hides that.**
+- [x] **BUILT since (checked 2026-10-16):** select a mark (one is enough) and
+      Delete or the toolbar's Delete removes it, with Undo
+      (`TakeoffPage.tsx` `deleteSelection` → `deleteSelected`; smoke
+      `plans.spec.ts` "select two marks and delete them; Undo puts both
+      back"). **Left for Track B (its file):** `RunsPanel`'s
+      `onRemoveStamp` prop is still never called — drop it so nobody reads
+      it as a second way in.
+- [x] **No control removes a single mark (C6), and a dead prop hides that.**
       Found by the 2026-09-28 screen pass, trying to remove a run's end mark.
       `RunsPanel` accepts `onRemoveStamp` and has never called it (added in
       `ba6702c`, 2026-08-12); nothing else in the client calls
@@ -4058,7 +4139,7 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 
 ## Plan viewer overhaul
 
-- [ ] Give the plan reader zoomed-in tiles of a sheet rather than one shrunk image. Observed on the live site 2026-09-16: on dense sheets it runs, costs a call, and comes back having found no symbols — its own answer said the symbols were not legible at the resolution it was given. So this is not a prompt problem or a model-tier problem; it is being handed a picture in which the thing it is looking for does not survive. A receptacle symbol is a few dozen pixels on a full E-sheet scaled to fit a model's input, and downscaling removes it before the model ever sees it. Likely shape of the fix: render each page at takeoff zoom, cut it into overlapping tiles, read each tile, then merge the hits back into page coordinates — overlapping because a symbol on a tile seam would otherwise be halved and missed twice. Watch the cost: one sheet becomes N calls, so the per-person daily allowance in `shared/aiLimits.ts` is counting something much larger than it was designed around, and `PLAN_COPILOT_MODEL` is the expensive tier. Do this as part of the plan viewer overhaul, not before — the tiling wants the same render path the viewer is getting. **N is 6, and the rest of the cost question is answered: `references/ai-reader-cost.md` (2026-09-18) prices it on the real Old Blueridge sheets.** Decided there: Sonnet 5 at 150 px per paper inch, thinking off, 6 tiles, ~10.1c a sheet, 150 sheets a month inside the $99 flat price.
+- [ ] **Q-AI1 (owner, 2026-10-16).** Give the plan reader zoomed-in tiles of a sheet rather than one shrunk image. Observed on the live site 2026-09-16: on dense sheets it runs, costs a call, and comes back having found no symbols — its own answer said the symbols were not legible at the resolution it was given. So this is not a prompt problem or a model-tier problem; it is being handed a picture in which the thing it is looking for does not survive. A receptacle symbol is a few dozen pixels on a full E-sheet scaled to fit a model's input, and downscaling removes it before the model ever sees it. Likely shape of the fix: render each page at takeoff zoom, cut it into overlapping tiles, read each tile, then merge the hits back into page coordinates — overlapping because a symbol on a tile seam would otherwise be halved and missed twice. Watch the cost: one sheet becomes N calls, so the per-person daily allowance in `shared/aiLimits.ts` is counting something much larger than it was designed around, and `PLAN_COPILOT_MODEL` is the expensive tier. Do this as part of the plan viewer overhaul, not before — the tiling wants the same render path the viewer is getting. **N is 6, and the rest of the cost question is answered: `references/ai-reader-cost.md` (2026-09-18) prices it on the real Old Blueridge sheets.** Decided there: Sonnet 5 at 150 px per paper inch, thinking off, 6 tiles, ~10.1c a sheet, 150 sheets a month inside the $99 flat price.
 
 - [ ] Change `DAILY_LIMITS` in `shared/aiLimits.ts` from counting CALLS to counting SHEETS, plus a dollar backstop — 40 sheets and $6 per person per day. **In the same commit as the tiling above, and not before it.** Today one sheet is one call, so the current 150 is correct for how the app actually spends; changing it early would make the limit describe an app that does not exist yet. The moment a sheet is six calls, 150 calls means 25 sheets and a 40-sheet set dies two-thirds of the way through. Reasoning in `references/ai-reader-cost.md` § 7; the point is that once a sheet is several calls, "calls" stops tracking spend and spend is the only thing the breaker is for.
 
@@ -4088,6 +4169,13 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       the boxes, labelled and dated, applying nothing until Save (D2/D6).
       The shared starter-accept component (D6) was not needed for this.
       Was: **Piece 2 — price bands.** Needs a PACK size / pack price on `materials` first (D3): bands key on the roll, the stick, the box, never the per-foot price. Then band rows in `markup_rules`, the D2 starter set (Route A only, dated, inert until accepted), and the shared starter-accept component (D6) that labor units will reuse. `getMarkupRuleSet` skips unaccepted starters already; `resolvePartMarkup` already walks bands, and returns "no rule" only because `packPrice` is always null today.
+- [ ] **OWNER NOTE 2026-10-16 (Track C):** pieces 2–5 now live in Track B's
+      bid-methods build (`references/bid-methods-plan.md` § 3–4, approved
+      2026-10-12; `35728e56`, `shared/markupBrackets.ts`, 0165's
+      `materialMarkupMode`) — brackets ARE the band rules, keyed on unit
+      price until pack sizes ship (built 2026-10-17 keyed on the PACK price
+      instead, since pack sizes had shipped — `bracketPriceOf`). The per-LINE override below is in no
+      plan: **Q-MKP1** in `pricing/morning-questions.md`.
 - [ ] **Piece 3 — categories.** A categories table (shipped + a company's own) and a nullable `materials.categoryId` read before the enum. The engine already reads category rules keyed by the category NAME, and there is no screen to write one. D5 overrides "Category is NOT user-extendable" and has to answer its clutter concern: a company's own category must not become a takeoff layer on every sheet by accident.
 - [ ] **Pieces 4 and 5 — route A/B, the combined number, the blended markup.** Not started. The bid screen shows a "Material markup" row and "Profit 15% markup = 13% margin"; the combined effective margin and the blended material markup are still to come.
 - [ ] **A per-LINE markup override on one bid.** Not in any piece yet. The item override is company-wide; the "one-way door" rule in CLAUDE.md says anything from the library can be overridden on one job. Wants a nullable column beside `snapshotMarkupPct` and a field on the line.
@@ -4095,7 +4183,11 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 - [x] **FIXED — ticked 2026-09-27 (Track B tidy); the fix is the "BUILT 2026-09-27, option 2" note two entries down.** The card now resolves an unlocked bid's plan lines from the drawing. The speed cost is parked in its own open entry below. **Dashboard vs bid screen still differ on a bid whose plan quantities moved since they were sent** (bid 1164558 in the local copy: card $192.58, bid $378.15). Not markup: three of its lines are traced-run lines STORED at 0 ft, which the bid screen resolves live from the drawing (`getBidLineItems` → `withPlanCounts`) and the dashboard's SQL reads as stored. Checked 2026-09-25 against the rows. Found by the same before/after dump that found the marked-up-expense gap. Pre-existing; not fixed. **Since 2026-09-26 it also moves the card's "N lines not priced"** — the SQL decides with the stored qty (see `server/dashboardNotPriced.test.ts`, which locks its bids to test the rule apart from this).
       **PLANNED 2026-09-27 (Track B), not built.** _Cause, read from the code:_ the stored `bid_line_items.qty` of a line that follows the drawing is written only when the line is SENT (or sent again, `refreshRunTypeLineQty`) and when the bid is LOCKED. On an unlocked bid the bid screen re-derives it on every read (`getBidLineItems` → `withPlanCounts` → `withTracedFootage` for runs, `stampCountsForBid` for counted symbols); the dashboard SQL reads the stored column. So it is wider than traced footage: **a counted symbol marked after sending drifts too.** It moves the card's money, its "not priced" count (a line re-derived to 0 is never "not priced") and "Out for bid". _Measured:_ 0 stale lines in `bidrender_local_b` today (2 unlocked bids, 8 plan lines, all equal to the drawing) — latent, not live here. _Options:_ (1) **write the stored qty back whenever the drawing changes** — every mark/run/scale/height/tee/pull-point mutation re-derives the bid's plan lines and updates `qty` on unlocked bids; SQL stays right by construction; no schema change, but many write paths, and one forgotten path is the same bug again; (2) **re-derive on the dashboard read** — call `withPlanCounts` for only the bids that have plan lines and are unlocked, then price those bids through `bidRollup` instead of the SQL; no schema change, always right, costs one resolution per such bid on the screen the app opens on (measure first); (3) **mark cards "quantities moved"** — cheap, but states the number is wrong rather than fixing it. _Recommended:_ (2) for correctness now, measured on a large local copy; (1) later if (2) is too slow. **No option needs a migration or a change to `takeoff_runs` or `bid_line_items` structure**; a stored "stale" flag would, and none of the three needs one.
       **BUILT 2026-09-27 (Track B), option 2, owner's choice.** `getDashboardBids` counts each bid's plan lines; `bids.dashboard` prices an UNLOCKED bid with any through `priceForList` (`getRollupLines` resolves from the drawing, `bidRollup` prices, charges and tax included) and every other bid through the SQL. `server/dashboardFollowsDrawing.test.ts`: marks added after sending move the card with the bid ($114 → $190 was the red); a count whose marks are all gone stops being "not priced" on both; a LOCKED bid keeps its locked numbers on both. On screen: a throwaway bid sent at 3 marks, priced $38, then 2 more — card "Total due $190" = bid screen $190.00 (was $114). **Measured on `bidrender_local_b`, median of 15 after 3 warm-ups:** 3,000-bid account with no plan lines 89.7 → 92.9 ms (noise); user 1 (6 bids, "Bar layout check" resolved live) 12.5 → 26.5 ms. **It grows with UNLOCKED bids that have plan lines**, one resolution each (5-sheet real bid, run concurrently): 1 → +12.9 ms, 10 → +56.8, 25 → +118.4, **50 → +304.9 ms** (p90 355). Fine at today's data; past ~50 such bids the dashboard crosses the ~300 ms bar, the same straight-line growth the SQL rewrite removed. **Owner, 2026-09-27: leave it as is for now.** When it is picked up: **locking quantities is always done ON PURPOSE by the user, never automatically** (OVERRIDDEN 2026-10-12 by owner Q15: a bid leaving Draft locks itself — `baseline-screen-plan.md` § 9 F1) — so a fix may NOT auto-lock won bids (the "lock-on-win" idea written here before is ruled out). What is left: resolve only Draft/Active bids live and let Won/Lost show their stored qty (then say so on those cards, since it can be stale), or option 1 (write qty back on every drawing change) to take the cost off the read.
-- [ ] **Dashboard speed with many unlocked bids that follow the drawing — parked by the owner 2026-09-27.** See the entry above for the numbers (+305 ms at 50 such bids) and the constraint: **no automatic locking, ever; a lock is the user's decision.**
+- [x] **FIXED 2026-10-16 (Track C), no cache:** the lists price every
+      listed bid together (`db.getRollupLinesForBids`) — `speedBigData` at
+      250 unlocked drawing-following bids: Dashboard 460 → 85 ms, held to
+      1 s by the test; golden bids hold each card to its bid screen.
+- [x] **Dashboard speed with many unlocked bids that follow the drawing — parked by the owner 2026-09-27.** See the entry above for the numbers (+305 ms at 50 such bids) and the constraint: **no automatic locking, ever; a lock is the user's decision.**
 - [x] **FIXED — ticked 2026-09-27 (Track B tidy); the fix is the "FIXED 2026-09-27" note directly below.** **"Find a bid" and the archive read a bid's price SHORT by its marked-up charges.** Found 2026-09-26 comparing every local bid's card with its search row: "Markup check" is $452.57 on the dashboard card and the bid screen, $302.57 in search. `bids.search` and `bids.archived` call `rollUpBid(bid, lines, company)` without the 4th `expenses` argument, so a marked-up permit is left out — the same gap fixed on the dashboard on 2026-09-25. The search comment says it prices "through the same rollup the dashboard uses, so ... cannot show different money", which is exactly what it does not do.
       **FIXED 2026-09-27 (Track B).** Both now load the bid's charges (`db.getBidExpenseLines`), and `expenses` is REQUIRED on `rollUpBid` and `bidRollup` — the `= []` default is what let two callers compile without them. `server/bidPriceSurfaces.test.ts` prices four bids (no charges, marked-up, plain, both) on the bid screen, the card, "Find a bid" live and archived, and the archive list; the two marked-up cases failed by exactly the charge before the fix. Looked at locally: "Markup check" reads $452.57 / $453 on all four, and a second marked-up bid (made for the check, then deleted) read $281.60 everywhere, archived included.
 - [x] **CLOSED 2026-09-27 — the fault this entry described did not exist.** It read: "A close-out's estimate leaves out the bid's charges", so "a bid with a MARKED-UP charge is closed out against an estimate that charge short of the bid screen". **Wrong, and written without measuring.** A close-out freezes HOURS only (`bid_closeouts.estimatedHours`, total and per line); a charge has no hours, so leaving charges out of `estimateFor` changed nothing stored. The money beside a close-out is the profitability report's revenue, priced at report time WITH marked-up charges (`analytics.ts` `priceBid`). The owner decided "fix it" on the strength of this entry; `estimateFor` now passes the bid's charges (consistent with the bid screen, no stored number moves), and `server/closeoutCharges.test.ts` pins both halves — it passed BEFORE that change too, and goes red by exactly the charge if the report's revenue drops it. Saved close-outs on bids with charges: 0 in `bidrender_local_b` and 0 in `bidrender_local` (neither has any close-out). Production's count: Track A, next rehearsal. **The lesson is CLAUDE.md § "A number that can be measured should not be asserted", again: the claim was about a quantity one query would have answered.**
@@ -4106,10 +4198,19 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 
 - [x] **BUILT 2026-09-27 (Track B).** `BidCostRow` carries `brokenLines`. The outcomes report returns `totals.incompleteBids`, and the profitability report returns `incompleteJobs` and a per-job `incomplete`. Both panels show one red "incomplete — N bids in this range have a line that can't be priced…" line when it is above zero (`IncompleteFiguresNote`), and a worst-jobs row wears `IncompletePriceTag` beside its revenue. `server/analytics.test.ts` § "a bid with a line that can't be priced". The original entry: **Analytics leaves a broken line out and does not say so.** `costSums` gates every per-line figure on `lineIsPriceable`, so analytics agrees with the bid screen, and it returns a `brokenLines` count, but `toBidCostRow` drops it and no analytics screen shows an "incomplete" marker. On production today there are 0 bid lines at all, so nothing is affected. Carry `brokenLines` through `BidCostRow` and mark the affected figures before a real company's history can contain one.
 - [x] **Admin screen for the references — shipped 2026-09-26 as 66d9961.** "Pricing problems" on the Admin screen: `pricingProblems.list` / `counts` / `find` (all `adminProcedure`, cross-company); `recent` was replaced. The contractor-facing `lookup` is unchanged and company-scoped.
-- [ ] **A contractor has no lookup screen of their own.** `pricingProblems.lookup` exists for them and is tested, but the reference only ever appears on the bid it belongs to, so there has been no need yet.
-- [ ] **A live check of money agreement needs a PRICED fixture on the smoke account (1421).** Its first assembly is an unpriced starter, so the 2026-09-26 live check compared $0 with $0: it proved the bid opens and the card and bid agree, not that they agree on real money. That was proven locally (the suite, and the screen at $800 = $800). Price one assembly on 1421, or have the check create and delete one.
-- [ ] **"Missing reference" is not detected, on purpose.** A line whose takeoff group or run type has vanished cannot happen: both are `RESTRICT` foreign keys, and `resolveLineQty` falls back to the stored quantity rather than zero. If either key is ever relaxed, that fallback becomes a silent wrong quantity and wants to be a problem code here.
-- [ ] **Not a breaker-panel feature.** The request that produced this asked for per-PANEL isolation; there is no panel entity (a panel is a catalog material, an assembly, or a free-text circuit label). Isolation was built one level down, per bid line, where panels already live. A real panel schedule (panels → breakers → circuits) would be a new feature and needs a spec first.
+- [x] **Reviewed 2026-10-16 (Track C) — the four below are notes, not
+      work:** a contractor's lookup screen waits for a need (the reference
+      only appears on its own bid); the live $0-vs-$0 money check is
+      superseded by `server/goldenBids.test.ts`, which on every Gate holds
+      the proposal, quote panel, spreadsheet, Dashboard card and Find a bid
+      to the bid screen on nine priced bids; "missing reference" stays
+      undetected on purpose (RESTRICT keys); and the breaker-panel note is
+      stale in one word — panels ARE an entity now (`bid_panels`, homerun
+      plan), though per-panel price isolation is still not a feature.
+- [x] **A contractor has no lookup screen of their own.** `pricingProblems.lookup` exists for them and is tested, but the reference only ever appears on the bid it belongs to, so there has been no need yet.
+- [x] **A live check of money agreement needs a PRICED fixture on the smoke account (1421).** Its first assembly is an unpriced starter, so the 2026-09-26 live check compared $0 with $0: it proved the bid opens and the card and bid agree, not that they agree on real money. That was proven locally (the suite, and the screen at $800 = $800). Price one assembly on 1421, or have the check create and delete one.
+- [x] **"Missing reference" is not detected, on purpose.** A line whose takeoff group or run type has vanished cannot happen: both are `RESTRICT` foreign keys, and `resolveLineQty` falls back to the stored quantity rather than zero. If either key is ever relaxed, that fallback becomes a silent wrong quantity and wants to be a problem code here.
+- [x] **Not a breaker-panel feature.** The request that produced this asked for per-PANEL isolation; there is no panel entity (a panel is a catalog material, an assembly, or a free-text circuit label). Isolation was built one level down, per bid line, where panels already live. A real panel schedule (panels → breakers → circuits) would be a new feature and needs a spec first.
 
 ## Seat limits (shared/seats.ts, shipped 2026-09-26 as 1952c2f)
 
@@ -4358,7 +4459,14 @@ sheet scale were removed afterwards — production back to 0 bid lines, 2 runs.
       `separateQueryWords` in `client/src/lib/smartSearch.ts` now turns
       , ; : brackets ! ? and a non-decimal full stop into spaces before the
       split, keeping " / - # . inside sizes. Pinned in `smartSearch.test.ts`.
-- [ ] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
+- [x] **FIXED 2026-10-16 (Track C), plan S2 as written:** `searchMaterials`
+      (`client/src/lib/materialSearch.ts`, the pipeline every search box
+      runs) lets an old name's row in before ranking (`renamedTo`), and the
+      ranker already puts a former name first. The rename-loop test now
+      calls that real pipeline instead of its own copy, and the 5/6" entry
+      left its "not a ranking problem" list — red without the fix, green
+      with ("6" canless wafer LED downlight" first).
+- [x] **`5/6" wafer LED downlight` (the old spelling) reads as a fraction
       and finds nothing.** Split out of the comma item above on 2026-09-26:
       a size-parsing problem, not punctuation. Found by
       `scripts/catalogRehearsal.mts search`. Planned 2026-09-29:
@@ -4584,7 +4692,7 @@ one-hole strap`, 1/2" to 1-1/4", shared by FMC and liquidtight;
       fast toggle. Decide where "above lay-in" lives (run, run type, or sheet
       area) before building — check `references/takeoff-spec.md` D3 first,
       which rejected a form on every run.
-- [ ] **Purchase list rounds to whole PACKS, not only whole pieces** (owner,
+- [ ] **Q-PACK1 (owner, 2026-10-16: pack sizes now exist — by the piece only, or feet too?).** **Purchase list rounds to whole PACKS, not only whole pieces** (owner,
       2026-09-29, starter assemblies plan D5). Built: `orderQty` in
       `shared/materialsList.ts` rounds a piece or box UP to whole after the
       sum, so a quarter tube never reaches a supplier. Not built: rounding to

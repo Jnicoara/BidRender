@@ -11819,6 +11819,9 @@ export default function TakeoffPage({
                     updateHeightArea.mutate({ id, heightInches: inches })
                   }
                   onRemove={id => removeHeightArea.mutate({ id })}
+                  onReshape={(id, outline) =>
+                    updateHeightArea.mutate({ id, outline })
+                  }
                 />
               </CeilingsPanel>
             )}

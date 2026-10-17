@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -44,10 +45,18 @@ export function QuoteAppPanel({
   bidId,
   open,
   onOpenChange,
+  onFixLine,
 }: {
   bidId: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Take the person to a line's fix (the bid page's `goToLineFix`): each
+   * unfinished line in the blocked list gets a "Fix this line" button, so
+   * it is not a dead end that only says where to go (todo.md, "price an
+   * unpriced line right where it blocks you").
+   */
+  onFixLine?: (lineId: number) => void;
 }) {
   const utils = trpc.useUtils();
   const query = trpc.quoteApp.get.useQuery(
@@ -148,7 +157,19 @@ export function QuoteAppPanel({
           ) : doc.state === "blocked" ? (
             <>
               <PlanWarnings lines={doc.planWarnings} />
-              <Blocked doc={doc} />
+              <Blocked
+                doc={doc}
+                onFixLine={
+                  onFixLine
+                    ? lineId => {
+                        // Close first: the fix panel is on the bid page under
+                        // this dialog.
+                        onOpenChange(false);
+                        onFixLine(lineId);
+                      }
+                    : undefined
+                }
+              />
             </>
           ) : (
             <>
@@ -290,7 +311,13 @@ function PlanWarnings({ lines }: { lines: readonly string[] }) {
   );
 }
 
-function Blocked({ doc }: { doc: Extract<QuoteAppDoc, { state: "blocked" }> }) {
+function Blocked({
+  doc,
+  onFixLine,
+}: {
+  doc: Extract<QuoteAppDoc, { state: "blocked" }>;
+  onFixLine?: (lineId: number) => void;
+}) {
   return (
     <div className="space-y-3">
       {doc.isSample && <SampleWarning />}
@@ -315,6 +342,16 @@ function Blocked({ doc }: { doc: Extract<QuoteAppDoc, { state: "blocked" }> }) {
             <p className="text-xs text-muted-foreground">
               {gap.detail} — {gap.fix}
             </p>
+            {onFixLine && gap.lineId !== null && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-1.5 h-7 text-xs"
+                onClick={() => onFixLine(gap.lineId!)}
+              >
+                Fix this line
+              </Button>
+            )}
           </li>
         ))}
       </ul>

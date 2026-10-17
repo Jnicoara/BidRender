@@ -29,7 +29,12 @@ import {
   seedBaselineMaterials,
   updateMaterial,
 } from "./db";
-import { countNeedingPricing, needsPricing } from "../shared/materialPricing";
+import {
+  countNeedingPricing,
+  countNeedingYourPrice,
+  needsPricing,
+  needsYourPrice,
+} from "../shared/materialPricing";
 import { smartSearch } from "../client/src/lib/smartSearch";
 import { wordsInName } from "../shared/aliasSuggestions";
 import {
@@ -678,6 +683,30 @@ describe("needsPricing", () => {
         { costPerUnit: "0.0000" },
         { costPerUnit: "2.5000" },
         { costPerUnit: "0" },
+      ])
+    ).toBe(2);
+  });
+
+  it("the Materials worklist also counts an EXAMPLE price as not the shop's", () => {
+    // The day the priced catalog loads, a shipped row is not $0 — and must
+    // still read "needs your price" there, or the screen reports a fully
+    // priced library nobody checked (todo.md). A bid line does NOT change:
+    // needsPricing stays "is it $0" (an example line warns, never blocks).
+    expect(
+      needsYourPrice({ costPerUnit: "0.4000", isExamplePrice: true })
+    ).toBe(true);
+    expect(needsPricing("0.4000")).toBe(false);
+    expect(
+      needsYourPrice({ costPerUnit: "0.4000", isExamplePrice: false })
+    ).toBe(false);
+    expect(needsYourPrice({ costPerUnit: "0", isExamplePrice: false })).toBe(
+      true
+    );
+    expect(
+      countNeedingYourPrice([
+        { costPerUnit: "0.0000", isExamplePrice: false },
+        { costPerUnit: "2.5000", isExamplePrice: true },
+        { costPerUnit: "2.5000", isExamplePrice: false },
       ])
     ).toBe(2);
   });

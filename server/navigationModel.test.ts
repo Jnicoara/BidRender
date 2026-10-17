@@ -14,17 +14,20 @@
  * while the id was wrong.
  *
  * ── Why it skips instead of failing without a key ────────────────────────────
- * `listLLMModels` needs BUILT_IN_FORGE_API_KEY. Local checkouts and CI often do
- * not have it, and a test that fails there would be turned off within a week —
+ * The lookup needs ANTHROPIC_API_KEY (`anthropicModelExists`, a free lookup,
+ * never a call). Until 2026-10-16 it asked the Manus gateway's model list,
+ * which needed BUILT_IN_FORGE_API_KEY — set nowhere, so this guard had been
+ * skipped everywhere since the move. Local checkouts and CI often do
+ * not have a key, and a test that fails there would be turned off within a week —
  * at which point it stops guarding anything. Skipping keeps it honest: it is
  * silent where it cannot know, and definitive wherever a credential exists,
  * which includes any environment the feature could actually run in.
  */
 import { describe, it, expect } from "vitest";
-import { listLLMModels } from "./_core/llm";
+import { anthropicModelExists } from "./llm/anthropic";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";
 
-const hasGateway = !!process.env.BUILT_IN_FORGE_API_KEY;
+const hasKey = !!process.env.ANTHROPIC_API_KEY?.trim();
 
 describe("navigation helper model", () => {
   it("is a Claude model", () => {
@@ -42,34 +45,23 @@ describe("navigation helper model", () => {
     expect(NAVIGATION_MODEL.toLowerCase()).toContain("haiku");
   });
 
-  it.skipIf(!hasGateway)("exists on the connected gateway", async () => {
-    const models = await listLLMModels();
-    const available = models.data.map(m => m.id);
-
+  it.skipIf(!hasKey)("exists for this Anthropic key", async () => {
     expect(
-      available,
-      `NAVIGATION_MODEL "${NAVIGATION_MODEL}" is not offered by this gateway.\n` +
-        `Available ids:\n  ${available.join("\n  ")}`
-    ).toContain(NAVIGATION_MODEL);
+      await anthropicModelExists(NAVIGATION_MODEL),
+      `NAVIGATION_MODEL "${NAVIGATION_MODEL}" is not a model Anthropic knows for this key.`
+    ).toBe(true);
   });
 
-  it.skipIf(!hasGateway)(
-    "the gateway offers at least one Claude model",
+  it.skipIf(!hasKey)(
+    "a made-up id is refused (the check can fail)",
     async () => {
-      // Separate from the check above so a failure says which problem it is: the
-      // id being wrong, or the gateway not carrying Claude at all. Those need
-      // completely different fixes and the distinction is invisible otherwise.
-      const models = await listLLMModels();
-      const claude = models.data
-        .map(m => m.id)
-        .filter(id => id.toLowerCase().includes("claude"));
-
-      expect(
-        claude.length,
-        `This gateway offers no Claude models at all. Available ids:\n  ${models.data
-          .map(m => m.id)
-          .join("\n  ")}`
-      ).toBeGreaterThan(0);
+      // Separate from the check above so a failure says which problem it is:
+      // the id being wrong, or the lookup itself not working (a wrong key, no
+      // network). A lookup that answered "yes" to anything would pass the check
+      // above while guarding nothing.
+      expect(await anthropicModelExists("claude-no-such-model-0000")).toBe(
+        false
+      );
     }
   );
 });

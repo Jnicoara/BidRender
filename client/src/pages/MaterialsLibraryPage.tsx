@@ -71,7 +71,11 @@ import {
   AliasSuggestions,
   type AliasSuggestionResult,
 } from "@/components/AliasSuggestions";
-import { countNeedingPricing, needsPricing } from "@shared/materialPricing";
+import {
+  countNeedingYourPrice,
+  needsPricing,
+  needsYourPrice,
+} from "@shared/materialPricing";
 import {
   countNeedingLaborUnit,
   needsLaborUnit,
@@ -144,6 +148,11 @@ type Material = {
   packQty: string | null;
   packLabel: string | null;
   packPrice: string | null;
+  /**
+   * BidRidge's example price, not the shop's (0132; owner 2026-10-07).
+   * Cleared when the shop edits the price. Counts in "Needs pricing".
+   */
+  isExamplePrice: boolean;
   /** When the row was last saved; the editor sends it back (staleEdit.ts). */
   updatedAt: Date;
 };
@@ -1074,6 +1083,24 @@ function MaterialRow({
         >
           Needs price
         </button>
+      ) : material.isExamplePrice ? (
+        // BidRidge's example price, not the shop's (owner 2026-10-07): the
+        // number shows, tagged, and the tag opens the price like "Needs
+        // price" does — it counts in "Needs pricing" (needsYourPrice).
+        <span className="md:w-24 shrink-0 flex flex-col items-end">
+          <span className="text-sm font-mono">
+            {unitCost(material.costPerUnit)}
+          </span>
+          <button
+            type="button"
+            onClick={() => startEditing("price")}
+            disabled={isBusy}
+            className="text-[11px] text-[#F5C518] underline decoration-dotted underline-offset-2 hover:decoration-solid"
+            aria-label={`Example price — set your own price for ${material.name}`}
+          >
+            Example price
+          </button>
+        </span>
       ) : (
         <span className="text-sm font-mono md:w-24 text-right shrink-0">
           {unitCost(material.costPerUnit)}
@@ -1338,8 +1365,7 @@ export default function MaterialsLibraryPage() {
     // pricing filter joins it for the same reason — both are "which rows am I
     // looking at", and search ranks whatever survives them.
     let inScope = filterByScope(materials, scope);
-    if (onlyUnpriced)
-      inScope = inScope.filter(m => needsPricing(m.costPerUnit));
+    if (onlyUnpriced) inScope = inScope.filter(m => needsYourPrice(m));
     if (onlyUnhoured)
       inScope = inScope.filter(m => needsLaborUnit(m.laborHours));
     if (!searching) return inScope;
@@ -1370,7 +1396,7 @@ export default function MaterialsLibraryPage() {
   }, [materials, searched, searching, scope, onlyUnpriced, onlyUnhoured]);
 
   const unpricedCount = useMemo(
-    () => countNeedingPricing(materials),
+    () => countNeedingYourPrice(materials),
     [materials]
   );
 
@@ -1739,7 +1765,7 @@ export default function MaterialsLibraryPage() {
             className="h-8 gap-1.5 text-xs"
             onClick={() => setOnlyUnpriced(v => !v)}
             aria-pressed={onlyUnpriced}
-            title="Show only the materials still carrying the shipped $0"
+            title="Show only the materials still at $0 or at BidRidge's example price"
           >
             <CircleDollarSign className="w-3.5 h-3.5" />
             Needs pricing

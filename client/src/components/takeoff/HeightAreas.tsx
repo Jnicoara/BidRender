@@ -13,7 +13,13 @@
  * Where two overlap, the SMALLER outline wins, and the sheet says so in
  * amber, naming both. A shared wall is not an overlap and says nothing.
  */
-import { useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { ArrowUpToLine, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,8 +29,14 @@ import { cn } from "@/lib/utils";
 import { formatElevation } from "@shared/takeoffHeights";
 import { overlappingHeightAreas } from "@shared/homerunFootage";
 import { selectOnFocus } from "@/lib/selectOnFocus";
-
-type Pt = { x: number; y: number };
+import {
+  removePickedCorner,
+  reshapeChanged,
+  reshapeTap,
+  sideMidpoints,
+  type Pt,
+  type Reshape,
+} from "@/lib/heightAreaReshape";
 
 export type HeightAreaView = {
   id: number;
@@ -36,6 +48,32 @@ export type HeightAreaView = {
 
 const AREA = "#0284C7";
 const WARN = "#F59E0B";
+const PICKED = "#F5C518";
+
+/*
+  RESHAPING (todo.md "Reshape a height area after drawing — BEFORE BETA").
+  The row starts it and the layer on the sheet takes the taps, and the two are
+  rendered apart by the Plans screen — so the one reshape in progress lives
+  here, shared by both, rather than as more state threaded through
+  TakeoffPage. The rules are `@/lib/heightAreaReshape` (tested).
+*/
+let reshapeNow: Reshape | null = null;
+const reshapeListeners = new Set<() => void>();
+function setReshape(next: Reshape | null) {
+  reshapeNow = next;
+  reshapeListeners.forEach(l => l());
+}
+function useReshape(): Reshape | null {
+  return useSyncExternalStore(
+    l => {
+      reshapeListeners.add(l);
+      return () => reshapeListeners.delete(l);
+    },
+    () => reshapeNow
+  );
+}
+/** How far from a handle a finger may land and still be on it, in CSS px. */
+const HANDLE_REACH_PX = 22;
 
 /** The toolbar button: on every scaled sheet (owner, 2026-10-07). */
 export function CeilingsToggle({
@@ -153,6 +191,7 @@ export function HeightAreasSection({
   onRename,
   onHeight,
   onRemove,
+  onReshape,
   finishError,
 }: {
   /** This sheet's areas only. */
@@ -170,9 +209,18 @@ export function HeightAreasSection({
   onRename: (id: number, name: string) => void;
   onHeight: (id: number, inches: number | null) => void;
   onRemove: (id: number) => void;
+  /** Save a reshaped outline (`homeruns.updateHeightArea`'s `outline`). */
+  onReshape: (id: number, outline: Pt[]) => void;
   /** Why the last Finish made nothing, or null. */
   finishError: string | null;
 }) {
+  const reshape = useReshape();
+  // The panel closing, or the area leaving this sheet, ends a reshape: the
+  // sheet must never keep taking taps for controls nobody can see.
+  useEffect(() => () => setReshape(null), []);
+  useEffect(() => {
+    if (reshape && !areas.some(a => a.id === reshape.areaId)) setReshape(null);
+  }, [reshape, areas]);
   return (
     <div className="rounded-md border border-border p-2 space-y-2 text-xs">
       <div className="flex items-center gap-2">
@@ -183,7 +231,7 @@ export function HeightAreasSection({
             one climbs to its height.
           </div>
         </div>
-        {!drawing && !locked && (
+        {!drawing && !locked && reshape === null && (
           <Button
             size="sm"
             variant="outline"
@@ -264,6 +312,17 @@ export function HeightAreasSection({
           onRename={name => onRename(a.id, name)}
           onHeight={inches => onHeight(a.id, inches)}
           onRemove={() => onRemove(a.id)}
+          // One tool at a time: no reshaping while drawing a new area, and
+          // one area reshaped at a time.
+          canReshape={!drawing && (reshape === null || reshape.areaId === a.id)}
+          reshape={reshape?.areaId === a.id ? reshape : null}
+          onReshapeDone={outline => {
+            if (
+              reshapeChanged({ areaId: a.id, outline, picked: null }, a.outline)
+            )
+              onReshape(a.id, outline);
+            setReshape(null);
+          }}
         />
       ))}
     </div>
@@ -277,6 +336,9 @@ function AreaRow({
   onRename,
   onHeight,
   onRemove,
+  canReshape,
+  reshape,
+  onReshapeDone,
 }: {
   area: HeightAreaView;
   locked: boolean;
@@ -284,6 +346,10 @@ function AreaRow({
   onRename: (name: string) => void;
   onHeight: (inches: number | null) => void;
   onRemove: () => void;
+  canReshape: boolean;
+  /** This area's reshape in progress, or null. */
+  reshape: Reshape | null;
+  onReshapeDone: (outline: Pt[]) => void;
 }) {
   const [draft, setDraft] = useState(area.name);
   const commit = () => {
@@ -336,6 +402,60 @@ function AreaRow({
         onSave={inches => onHeight(inches)}
         onClear={() => onHeight(null)}
       />
+      {!locked &&
+        (reshape ? (
+          <div className="space-y-1.5 rounded bg-muted/40 p-2">
+            <div className="text-muted-foreground">
+              Tap a corner, then tap where it goes. Tap a small dot between two
+              corners to add one there.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-11 text-xs"
+                disabled={
+                  reshape.picked === null || reshape.outline.length <= 3
+                }
+                onClick={() => setReshape(removePickedCorner(reshape))}
+              >
+                Remove corner
+              </Button>
+              <Button
+                size="sm"
+                className="min-h-11 text-xs"
+                onClick={() => onReshapeDone(reshape.outline)}
+              >
+                Done
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="min-h-11 text-xs"
+                onClick={() => setReshape(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          canReshape && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-11 text-xs"
+              onClick={() =>
+                setReshape({
+                  areaId: area.id,
+                  outline: area.outline.map(p => ({ ...p })),
+                  picked: null,
+                })
+              }
+            >
+              Reshape
+            </Button>
+          )
+        ))}
     </div>
   );
 }
@@ -365,7 +485,34 @@ export function HeightAreasLayer({
   const k = renderScale;
   const downRef = useRef({ x: 0, y: 0 });
   const down = downRef.current;
-  const overlapping = new Set(overlappingHeightAreas(areas).flat());
+  // A reshape of an area on THIS sheet takes the taps, like drawing does.
+  const reshapeAll = useReshape();
+  const reshape =
+    reshapeAll && areas.some(a => a.id === reshapeAll.areaId)
+      ? reshapeAll
+      : null;
+  const taking = drawing || reshape !== null;
+  // Handles are sized in SCREEN pixels, like their reach: in page points they
+  // shrank to a dot at a tablet's fit zoom (seen 2026-10-16, 10%). The layer
+  // sits inside the zoom, so its on-screen scale is measured, not assumed.
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [pxPerPoint, setPxPerPoint] = useState(1);
+  useLayoutEffect(() => {
+    if (!reshape || !svgRef.current) return;
+    const shownWidth = svgRef.current.getBoundingClientRect().width;
+    const next = (shownWidth / width) * k;
+    if (next > 0 && Math.abs(next - pxPerPoint) / pxPerPoint > 0.05)
+      setPxPerPoint(next);
+  });
+  /** A size in screen px, in this svg's units. */
+  const px = (n: number) => (n / pxPerPoint) * k;
+  // While reshaping, the area is drawn with the outline being edited.
+  const shown = reshape
+    ? areas.map(a =>
+        a.id === reshape.areaId ? { ...a, outline: reshape.outline } : a
+      )
+    : areas;
+  const overlapping = new Set(overlappingHeightAreas(shown).flat());
   const path = (pts: readonly Pt[]) =>
     pts.map(p => `${p.x * k},${p.y * k}`).join(" ");
   return (
@@ -375,29 +522,38 @@ export function HeightAreasLayer({
       viewBox={`0 0 ${width} ${height}`}
       className={cn(
         "absolute inset-0 w-full h-full z-10",
-        drawing ? "pointer-events-auto cursor-crosshair" : "pointer-events-none"
+        taking ? "pointer-events-auto cursor-crosshair" : "pointer-events-none"
       )}
-      style={drawing ? { touchAction: "none" } : undefined}
+      style={taking ? { touchAction: "none" } : undefined}
       aria-label="Height areas"
+      ref={svgRef}
       onPointerDown={e => {
-        if (!drawing) return;
+        if (!taking) return;
         e.stopPropagation();
         down.x = e.clientX;
         down.y = e.clientY;
       }}
       onPointerUp={e => {
-        if (!drawing) return;
+        if (!taking) return;
         e.stopPropagation();
         if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10) return;
         const r = e.currentTarget.getBoundingClientRect();
-        onTap({
+        const at = {
           x: (((e.clientX - r.left) / r.width) * width) / k,
           y: (((e.clientY - r.top) / r.height) * height) / k,
-        });
+        };
+        if (reshape) {
+          // A handle's reach is a finger's, whatever the zoom: CSS px turned
+          // into page points at this zoom.
+          const pxPerPoint = (r.width / width) * k;
+          setReshape(reshapeTap(reshape, at, HANDLE_REACH_PX / pxPerPoint));
+          return;
+        }
+        onTap(at);
       }}
-      onClick={e => drawing && e.stopPropagation()}
+      onClick={e => taking && e.stopPropagation()}
     >
-      {areas.map(a => {
+      {shown.map(a => {
         const warn = overlapping.has(a.id);
         const tone = warn ? WARN : AREA;
         const top = a.outline.reduce(
@@ -435,6 +591,32 @@ export function HeightAreasLayer({
           </g>
         );
       })}
+      {reshape && (
+        <g>
+          {sideMidpoints(reshape.outline).map((p, i) => (
+            <circle
+              key={`mid-${i}`}
+              cx={p.x * k}
+              cy={p.y * k}
+              r={px(5)}
+              fill="white"
+              stroke={AREA}
+              strokeWidth={px(2)}
+            />
+          ))}
+          {reshape.outline.map((p, i) => (
+            <circle
+              key={`corner-${i}`}
+              cx={p.x * k}
+              cy={p.y * k}
+              r={px(reshape.picked === i ? 10 : 7)}
+              fill={reshape.picked === i ? PICKED : AREA}
+              stroke="white"
+              strokeWidth={px(2)}
+            />
+          ))}
+        </g>
+      )}
       {drawing && taps.length > 0 && (
         <g>
           {taps.length === 2 ? (
