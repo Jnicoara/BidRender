@@ -212,12 +212,30 @@ test("a large plan set uploaded through the screen", async ({
     record(
       `big set: upload finished and attached after ${((Date.now() - t0) / 1000).toFixed(0)} s`
     );
-    // Opened again from the bucket, as a colleague would.
+    // Opened again from the bucket, as a colleague would. Every byte of
+    // the plan that comes down before sheet 1 is on screen is counted, so a
+    // slow reopen says whether it read byte ranges or most of the file.
+    const planReads: { range: string; bytes: number }[] = [];
+    const isPlan = (url: string) =>
+      /r2\.cloudflarestorage\.com|\/manus-storage\//.test(url) &&
+      url.includes("ci-stress-big-set");
+    const onFinished = async (req: import("@playwright/test").Request) => {
+      if (!isPlan(req.url())) return;
+      const sizes = await req.sizes().catch(() => null);
+      planReads.push({
+        range: req.headers()["range"] ?? "(whole)",
+        bytes: sizes?.responseBodySize ?? 0,
+      });
+    };
+    page.context().on("requestfinished", onFinished);
     const t1 = Date.now();
     await page.reload();
     await expect(sheetCanvas(page)).toBeVisible({ timeout: 10 * 60_000 });
+    const ms = Date.now() - t1;
+    page.context().off("requestfinished", onFinished);
+    const down = planReads.reduce((n, r) => n + r.bytes, 0);
     record(
-      `big set: reopened from the bucket, sheet 1 on screen after ${Date.now() - t1} ms`
+      `big set: reopened from the bucket, sheet 1 on screen after ${ms} ms; ${planReads.length} plan request(s), ${(down / 1024 / 1024).toFixed(1)} MB of ${(big.bytes / 1024 / 1024).toFixed(0)} MB came down (${planReads.filter(r => r.range === "(whole)").length} without a Range header)`
     );
   } finally {
     rmSync(dir, { recursive: true, force: true });
