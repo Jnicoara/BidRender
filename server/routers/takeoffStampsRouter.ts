@@ -114,6 +114,12 @@ import { placedBefore, rememberPlaced } from "../markReplay";
  * without anyone remembering to tag it. See _core/trpc.ts.
  */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 const nameSchema = z.string().trim().min(1).max(255);
 
@@ -687,7 +693,7 @@ export const takeoffStampsRouter = router({
     }),
 
   /** Every stamp on a sheet, for drawing the marks. */
-  listForSheet: procedure
+  listForSheet: plansRead
     .input(z.object({ sheetId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       await requireSheet(input.sheetId, ctx.scope.dataUserId);

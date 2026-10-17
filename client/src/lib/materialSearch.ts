@@ -12,6 +12,7 @@
  */
 import { smartSearchCorrected } from "@/lib/smartSearch";
 import { familySizes, rankMaterialHits } from "@shared/materialSearchRank";
+import { renamedTo } from "@shared/renamedMaterials";
 import {
   commonnessPoints,
   type MaterialUsage,
@@ -45,6 +46,8 @@ export type MaterialSearchIndex<T extends SearchableCatalogRow> = {
     searchAliases: string | null;
   }[];
   byId: Map<string, T>;
+  /** Lower-cased name → row, for an old name's rescue (see searchMaterials). */
+  byName: Map<string, T>;
   families: Map<string, number>;
 };
 
@@ -63,6 +66,7 @@ export function materialSearchIndex<T extends SearchableCatalogRow>(
       searchAliases: r.searchAliases ?? null,
     })),
     byId: new Map(rows.map(r => [String(r.id), r])),
+    byName: new Map(rows.map(r => [r.name.toLowerCase(), r])),
     families: familySizes(rows),
   };
 }
@@ -84,6 +88,21 @@ export function searchMaterials<T extends SearchableCatalogRow>(
   const hits = results
     .map(hit => ({ row: index.byId.get(hit.item.id), score: hit.score }))
     .filter((h): h is { row: T; score: number } => Boolean(h.row));
+  /*
+    AN OLD NAME FINDS ITS ROW even when the matcher cannot (todo.md, "5/6"
+    wafer LED downlight (the old spelling) reads as a fraction"; plan
+    track-c-next-batch § S2). The matcher needs every term to match, and
+    `5/6"` reads as a size no row has, so the renamed row never reached the
+    ranker — which already ranks a former name first (`phraseTier`). Here it
+    is let in, at the best score present, and the ranker does the rest.
+  */
+  const formerOf = renamedTo(query);
+  const rescued = formerOf ? index.byName.get(formerOf.toLowerCase()) : null;
+  if (rescued && !hits.some(h => h.row === rescued))
+    hits.push({
+      row: rescued,
+      score: hits.reduce((best, h) => Math.max(best, h.score), 1),
+    });
   return {
     rows: rankMaterialHits(hits, searchedQuery, {
       families: index.families,

@@ -32,6 +32,12 @@ import {
 import { ceilingAt, NO_CEILINGS } from "../../shared/ceilingHeights";
 
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 const feetSchema = z.number().min(0).max(10000);
 const pointSchema = z.object({
@@ -86,7 +92,7 @@ async function requireSheetOnBid(
 
 export const homerunsRouter = router({
   /** Every homerun on a bid, with the settings that made them. */
-  forBid: procedure
+  forBid: plansRead
     .input(z.object({ bidId: z.number().int() }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.scope.dataUserId;
@@ -430,7 +436,7 @@ export const homerunsRouter = router({
    * the SMALLER outline wins (never just the lower height), and the overlap
    * is warned about on the sheet. A shared wall is not an overlap.
    */
-  heightAreas: procedure
+  heightAreas: plansRead
     .input(z.object({ bidId: z.number().int() }))
     .query(async ({ ctx, input }) => {
       const userId = ctx.scope.dataUserId;

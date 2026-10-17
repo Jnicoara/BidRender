@@ -58,6 +58,25 @@ function client(): Anthropic {
   return cached;
 }
 
+/**
+ * Whether Anthropic answers to this model id (an alias or a dated id) for this
+ * key — the "is the configured model real?" guard in
+ * `server/navigationModel.test.ts` and `server/planCopilotModel.test.ts`. A
+ * lookup, never a call: it costs nothing. A wrong id does not fail at start-up
+ * or in a type check; the feature just degrades to its fallback forever.
+ * Replaced the Manus gateway's model list (2026-10-16), which needed a key
+ * that is set nowhere, so the guards had been skipped everywhere.
+ */
+export async function anthropicModelExists(id: string): Promise<boolean> {
+  try {
+    await client().models.retrieve(id);
+    return true;
+  } catch (error) {
+    if (error instanceof Anthropic.NotFoundError) return false;
+    throw error;
+  }
+}
+
 /** Drop the memoised client. For tests that change the environment. */
 export function resetAnthropicForTests(): void {
   cached = null;

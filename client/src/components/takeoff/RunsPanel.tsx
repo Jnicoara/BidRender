@@ -1319,6 +1319,7 @@ export function RunsPanel({
   onSendRunType,
   sendingRunTypeId,
   quantitiesLocked = false,
+  viewOnly = false,
   onAnswerPullPoint,
   onUndoPullPoint,
   pullPointBusy = false,
@@ -1428,6 +1429,12 @@ export function RunsPanel({
    * the query landing rather than by a flicker.
    */
   quantitiesLocked?: boolean;
+  /**
+   * This person cannot edit bids at all (a viewer, a Field member):
+   * `quantitiesLocked` is true too, and the line says "view only" rather
+   * than telling them to unlock a bid they cannot change.
+   */
+  viewOnly?: boolean;
   /**
    * How many counts are priced, marked, and not yet on the bid.
    *
@@ -1725,11 +1732,17 @@ export function RunsPanel({
           planUnopened={planUnopened}
           className="text-foreground"
         />
-        {quantitiesLocked && (
+        {viewOnly ? (
           <p className="text-muted-foreground mt-0.5">
-            This bid's quantities are locked, so its plans cannot be marked,
-            traced, changed or sent to it. Unlock it on the bid first.
+            View only: you can look at these plans and counts, not change them.
           </p>
+        ) : (
+          quantitiesLocked && (
+            <p className="text-muted-foreground mt-0.5">
+              This bid's quantities are locked, so its plans cannot be marked,
+              traced, changed or sent to it. Unlock it on the bid first.
+            </p>
+          )
         )}
       </div>
 
@@ -1783,10 +1796,13 @@ export function RunsPanel({
               <p className="text-sm font-medium text-muted-foreground">
                 Nothing counted on this sheet yet
               </p>
-              <p className="text-xs text-muted-foreground/70 mt-1.5">
-                Pick something to count from Count in the toolbar, or click a
-                symbol on the Legend tab, then click on the drawing.
-              </p>
+              {/* How to count — not to someone who cannot (view only). */}
+              {!viewOnly && (
+                <p className="text-xs text-muted-foreground/70 mt-1.5">
+                  Pick something to count from Count in the toolbar, or click a
+                  symbol on the Legend tab, then click on the drawing.
+                </p>
+              )}
             </div>
           )}
         {tab === "counts" &&
@@ -1850,15 +1866,16 @@ export function RunsPanel({
                   <span className="font-mono text-sm tabular-nums">
                     {group.count}
                   </span>
-                  {/* Undo and trash, as on a run card (owner, 2026-09-29). */}
-                  {group.groupId !== null && (
+                  {/* Undo and trash, as on a run card (owner, 2026-09-29).
+                      Not view-only: nothing here may change for them. */}
+                  {!viewOnly && group.groupId !== null && (
                     <CardUndo
                       subject={{ kind: "count", id: group.groupId }}
                       cardUndo={cardUndo}
                       onCardUndo={onCardUndo}
                     />
                   )}
-                  {onDeleteCountMarks && (
+                  {!viewOnly && onDeleteCountMarks && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -2478,10 +2495,12 @@ export function RunsPanel({
             <p className="text-sm font-medium text-muted-foreground">
               No runs on this sheet yet
             </p>
-            <p className="text-xs text-muted-foreground/70 mt-1.5">
-              Trace a conduit or cable run on the drawing. Each one appears here
-              as you go, with what it puts on the bid.
-            </p>
+            {!viewOnly && (
+              <p className="text-xs text-muted-foreground/70 mt-1.5">
+                Trace a conduit or cable run on the drawing. Each one appears
+                here as you go, with what it puts on the bid.
+              </p>
+            )}
           </div>
         ) : (
           layoutLegs(runs).map(({ row: run, place }) => {

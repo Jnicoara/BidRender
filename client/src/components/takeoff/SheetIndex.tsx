@@ -447,8 +447,11 @@ export function SheetIndex({
   onOpenPage: (pageNumber: number) => void;
   onRename: (sheetId: number, name: string) => void;
   onSetNumber: (pageNumber: number, sheetNumber: string | null) => void;
-  /** Read (or re-read) this plan's numbers from storage. */
-  onReadNumbers: () => void;
+  /**
+   * Read (or re-read) this plan's numbers — which SAVES them, so NULL for
+   * someone who cannot edit the bid: the offer is not shown at all.
+   */
+  onReadNumbers: (() => void) | null;
   loading?: boolean;
   /** What an empty list says, when the default would be untrue. */
   emptyNote?: string;
@@ -515,7 +518,7 @@ export function SheetIndex({
             better reader — so once a plan is read it is one quiet icon, not a
             line of text. Hand-typed numbers survive it.
           */}
-              {fullyRead && !reading && (
+              {onReadNumbers && fullyRead && !reading && (
                 <button
                   type="button"
                   onClick={onReadNumbers}
@@ -571,7 +574,7 @@ export function SheetIndex({
         </div>
       </div>
 
-      {!loading && (
+      {!loading && onReadNumbers && (
         <ReadStatusLine status={readStatus} onRead={onReadNumbers} />
       )}
 

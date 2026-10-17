@@ -478,34 +478,46 @@ export default function BidsPage({
    */
   const arrivedFix = useRef(fixLineId ?? null);
   const [outlinedLineId, setOutlinedLineId] = useState<number | null>(null);
+  /**
+   * Take the person to one line's fix: its "Fix this line" panel open, or —
+   * a line fixed by hand on the line itself — scrolled to and outlined. ONE
+   * function for every way in: the Proposal's `?fix=` (gap 10) and the
+   * quote-app panel's "Fix this line" (2026-10-16), so the two cannot open
+   * different things for the same line.
+   */
+  const goToLineFix = useCallback(
+    (lineId: number) => {
+      const line = detailQuery.data?.lines.find(l => l.id === lineId);
+      if (!line) {
+        toast.info("That line is no longer on this bid.");
+        return;
+      }
+      if (hasLineFixGap(fixGapsOf(line))) {
+        openWalkAt(null);
+        scrollToFix.current = true;
+        setFixingLineId(line.id);
+        return;
+      }
+      setOutlinedLineId(line.id);
+      requestAnimationFrame(() =>
+        document
+          .getElementById(`bid-line-${line.id}`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" })
+      );
+    },
+    [detailQuery.data, openWalkAt]
+  );
   useEffect(() => {
     const target = arrivedFix.current;
-    const arrivedLines = detailQuery.data?.lines;
-    if (target === null || !arrivedLines) return;
+    if (target === null || !detailQuery.data?.lines) return;
     arrivedFix.current = null;
     window.history.replaceState(
       null,
       "",
       `#${routeToPath("bids", { id: bidId })}`
     );
-    const line = arrivedLines.find(l => l.id === target);
-    if (!line) {
-      toast.info("That line is no longer on this bid.");
-      return;
-    }
-    if (hasLineFixGap(fixGapsOf(line))) {
-      openWalkAt(null);
-      scrollToFix.current = true;
-      setFixingLineId(line.id);
-      return;
-    }
-    setOutlinedLineId(line.id);
-    requestAnimationFrame(() =>
-      document
-        .getElementById(`bid-line-${line.id}`)
-        ?.scrollIntoView({ block: "center", behavior: "smooth" })
-    );
-  }, [detailQuery.data, bidId, openWalkAt]);
+    goToLineFix(target);
+  }, [detailQuery.data, bidId, goToLineFix]);
   useEffect(() => {
     if (outlinedLineId === null) return;
     const t = window.setTimeout(() => setOutlinedLineId(null), 4000);
@@ -1002,6 +1014,7 @@ export default function BidsPage({
         bidId={bidId}
         open={quoteAppOpen}
         onOpenChange={setQuoteAppOpen}
+        onFixLine={goToLineFix}
       />
       <TakeoffExportDialog
         bidId={bidId}

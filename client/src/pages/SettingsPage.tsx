@@ -28,6 +28,7 @@
 import { useApp } from "@/contexts/AppContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
+import { useCompany } from "@/hooks/useCompany";
 import {
   Sun,
   Moon,
@@ -544,6 +545,13 @@ export default function SettingsPage({
   section: SettingsSection;
 }) {
   const info = SECTION_INFO[section] ?? SECTION_INFO.pricing;
+  // A Field member has their own account and nothing else here: every other
+  // panel is the company's pricing or setup (field-and-coowner-plan.md, F3).
+  const access = useCompany();
+  const fieldOnly = access.can("plans.view") && !access.can("bids.view");
+  const sections = fieldOnly
+    ? SETTINGS_SECTIONS.filter(key => key === "account")
+    : SETTINGS_SECTIONS;
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -564,7 +572,7 @@ export default function SettingsPage({
           role="tablist"
           aria-label="Settings sections"
         >
-          {SETTINGS_SECTIONS.map(key => {
+          {sections.map(key => {
             const active = key === section;
             return (
               <button

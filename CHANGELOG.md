@@ -6,6 +6,65 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Undo now takes back a mark the moment it is saved.** For about a
+  second after each mark saved, while its list refreshed, Undo answered
+  "Still saving" and did nothing. On a slower connection that was long
+  enough to swallow a tap.
+- **On Plans the drawing no longer jumps while you mark.** The guide strip
+  and the bid step bar changed height as the bid moved from one step to the
+  next. Each change re-fitted the drawing, so a tap aimed at a symbol could
+  land beside it, mostly on a phone. Both now keep one height on Plans,
+  with long tips cut short (the whole tip shows on hover).
+- **The tab no longer reloads by itself when the signal comes back.** Pages
+  load in the background a few seconds after the app opens. If the signal
+  dropped in those seconds, the tab reloaded when it returned, and the tool
+  you had picked up was lost. Only a page you actually open can reload now.
+- **A count can no longer be renamed on a locked bid, and the "Unassigned"
+  count can't be renamed into an ordinary one.** Renaming the Unassigned
+  count used to turn marks nobody had named into a normal count, which
+  lifted the block on printing a priced quote. Those marks are named by
+  picking what they are, as before. No screen offered either rename; a
+  direct request could.
+- **A "Field" role for crews is built, and it cannot reach a price.** A Field
+  member gets a Jobs list, each job's Plans (sheets, marks, counts by name
+  and quantity, runs and footage) and the materials list. Nothing can be
+  changed, and no price is shown anywhere. The server enforces it, not the
+  screen: Field holds one permission ("see plans"), and every other route
+  refuses it. A test calls every route in the app as a Field member and
+  checks that none answers with a price. A "Co-owner" role (everything the
+  owner can do, under the one company) is built as rules. Both become
+  choosable on the Crew page once Track A adds them to the database.
+- **The Plans screen is view-only for anyone who cannot edit bids.** A
+  viewer used to see every tool and then be refused when using one. Now the
+  tools are hidden and the panel says "View only".
+- **In a narrow laptop window the Plans drawing gets room.** With the sheet
+  list and the counts panel both open, an 820 px window left the drawing
+  about 80 px wide. Now, when both would leave it under 400 px, the screen
+  opens with the sheet list folded (one click brings it back). At 820 px the
+  drawing gets 310 px. Wider windows, tablets and phones open as before, and
+  the choice you have saved is not changed.
+- **Searching a material by its old name now always finds it.** Typing
+  '5/6" wafer LED downlight' (how that light used to be named) found
+  nothing, because "5/6"" read as a size no light has. It now finds the
+  light under its current name, first.
+- **A height area can now be reshaped after it is drawn.** In Ceilings,
+  "Reshape" on an area lets you tap a corner and tap where it goes, add a
+  corner between two, or remove one — then Done. Before, a wrong outline
+  had to be deleted and drawn again. Works with a finger on a tablet.
+- **"For your quote app" now takes you straight to the line that needs
+  fixing.** When an unpriced line blocks the figures, each one in the list
+  has a "Fix this line" button that closes the panel and opens that line's
+  price box on the bid — instead of only saying where to go.
+- **"Needs pricing" on the Materials screen now also lists BidRidge's
+  example prices, not only $0 ones.** When the starter catalog ships with
+  example prices, those rows are still not your prices — they show the
+  number with an "Example price" tag you can click to set your own, and
+  they count in "Needs pricing". Bid lines are unchanged.
+- **The step bar's buttons now have their own names for screen readers
+  and tests: "Step: Count", "Step: Runs" and so on.** On the Plans screen
+  the step bar sits above tools also called "Count" and "Runs", so asking
+  for "Count" could reach the wrong button. The words on screen are
+  unchanged.
 - **The Dashboard, the Bids list and the archive open about five times
   faster for a company with many bids.** They priced every bid one at a
   time; now they read all the listed bids together. Measured on 250 bids:

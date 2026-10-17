@@ -74,6 +74,12 @@ import { deleteBidPdfWithFile } from "../storedFiles";
  * without anyone remembering to tag it. See _core/trpc.ts.
  */
 const procedure = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 /** Filenames are shown, never used as a path. Kept sane rather than sanitised. */
 const filenameSchema = z.string().trim().min(1).max(512);
@@ -210,7 +216,7 @@ async function toView(row: Awaited<ReturnType<typeof db.getBidPdf>> & object) {
 
 export const bidPdfsRouter = router({
   /** Every sheet on a bid, in the order they were attached. */
-  list: procedure
+  list: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
@@ -536,7 +542,7 @@ export const bidPdfsRouter = router({
    * "Read sheet numbers". Keyed by page, so it can land before the sheet rows
    * exist. See drizzle/schema.ts, bid_pdf_sheet_identity.
    */
-  sheetIdentities: procedure
+  sheetIdentities: plansRead
     .input(z.object({ bidPdfId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
@@ -549,7 +555,7 @@ export const bidPdfsRouter = router({
    * `sheetDisplay` the list uses, so the box and the list cannot disagree
    * about what a sheet is called. Pages are in plan order, then page order.
    */
-  sheetJumpList: procedure
+  sheetJumpList: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       await requireBid(input.bidId, ctx.scope.dataUserId);
@@ -610,7 +616,7 @@ export const bidPdfsRouter = router({
    * the drawings" when it may well be (CLAUDE.md: an audit reports what it
    * searched for).
    */
-  searchText: procedure
+  searchText: plansRead
     .input(
       z.object({
         bidId: z.number().int().positive(),
@@ -866,7 +872,7 @@ export const bidPdfsRouter = router({
   // ── Sheets (phase 2a) ──────────────────────────────────────────────────────
 
   /** Every page of one document, in order, with its name and scale. */
-  sheets: procedure
+  sheets: plansRead
     .input(z.object({ bidPdfId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       await requirePdf(input.bidPdfId, ctx.scope.dataUserId);
@@ -883,7 +889,7 @@ export const bidPdfsRouter = router({
    * page of the set (`db.schedulePagesOf`). Null when the stored text does
    * not cover every page: the viewer then reads them all, as before.
    */
-  schedulePages: procedure
+  schedulePages: plansRead
     .input(z.object({ bidPdfId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const pdf = await requirePdf(input.bidPdfId, ctx.scope.dataUserId);

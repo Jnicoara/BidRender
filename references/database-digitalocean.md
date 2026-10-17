@@ -186,5 +186,7 @@ database address.
   That is a later step.
 - **Stored files were not migrated.** Plan PDFs and company logos still live in
   Manus storage; replacing it is its own job (`references/environment.md` § 6).
+  _(Since done: they moved to Cloudflare R2 in v5.141, and the Manus store was
+  removed — CLAUDE.md § Stored files. This line is the 2026-09 state.)_
   The cleaned backup had no stored files, so nothing here refers to one.
 - **The old database is still running.** Nothing was switched over.

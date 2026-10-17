@@ -52,6 +52,12 @@ import * as db from "../db";
 const settings = scoped("pricing.view", "pricing.edit");
 /** One job's overrides: an ordinary edit to that bid. */
 const perBid = scoped("bids.view", "bids.edit");
+/**
+ * Reads a FIELD member may make: no money in the answer
+ * (references/field-and-coowner-plan.md § 1; server/fieldNoPrices.test.ts).
+ * Every role holds `plans.view`, so opening a read here takes nothing away.
+ */
+const plansRead = scoped("plans.view", "bids.edit");
 
 /**
  * A believable elevation, in inches.
@@ -102,7 +108,7 @@ export const takeoffHeightsRouter = router({
   }),
 
   /** The heights in effect on one job, and where each one comes from. */
-  forBid: perBid
+  forBid: plansRead
     .input(z.object({ bidId: z.number().int().positive() }))
     .query(async ({ input, ctx }) => {
       const userId = ctx.scope.dataUserId;

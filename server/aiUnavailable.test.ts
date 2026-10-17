@@ -40,7 +40,6 @@ vi.mock("./llm/anthropic", async () => {
 import { anthropicConfigured, invokeAnthropic } from "./llm/anthropic";
 import { AiUnavailable, invokeLLM } from "./llm";
 import { keyRefusal } from "./llm/unavailable";
-import { ENV } from "./_core/env";
 import { getDb, getAiServiceStatus } from "./db";
 import { aiServiceStatus, aiUsageDaily, users } from "../drizzle/schema";
 import { appRouter } from "./routers";
@@ -136,8 +135,6 @@ describe("the admin notice", () => {
 });
 
 withDb("the door, on a database", () => {
-  const forgeKey = ENV.forgeApiKey;
-
   beforeAll(async () => {
     const db = (await getDb())!;
     await db
@@ -148,8 +145,8 @@ withDb("the door, on a database", () => {
         name: "AI unavailable fixture",
       })
       .onDuplicateKeyUpdate({ set: { name: "AI unavailable fixture" } });
-    // No gateway either, so "no key" really is no key.
-    ENV.forgeApiKey = "";
+    // "No key" really is no key: there is no gateway fallback any more
+    // (removed 2026-10-16), so nothing here has to switch one off.
   });
 
   beforeEach(async () => {
@@ -161,7 +158,6 @@ withDb("the door, on a database", () => {
   });
 
   afterAll(async () => {
-    ENV.forgeApiKey = forgeKey;
     const db = (await getDb())!;
     await db.delete(aiServiceStatus);
   });

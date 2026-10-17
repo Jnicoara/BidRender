@@ -17,11 +17,13 @@
  * that fails on every local checkout gets switched off, and then guards nothing.
  */
 import { describe, it, expect } from "vitest";
-import { listLLMModels } from "./_core/llm";
+import { anthropicModelExists } from "./llm/anthropic";
 import { PLAN_COPILOT_MODEL } from "./routers/planCopilotRouter";
 import { NAVIGATION_MODEL } from "./routers/navigationRouter";
 
-const hasGateway = !!process.env.BUILT_IN_FORGE_API_KEY;
+// Asked of Anthropic since 2026-10-16 (it asked the Manus gateway, whose key
+// is set nowhere, so it had been skipped everywhere).
+const hasKey = !!process.env.ANTHROPIC_API_KEY?.trim();
 
 describe("plan co-pilot model", () => {
   it("is a Claude model", () => {
@@ -37,30 +39,20 @@ describe("plan co-pilot model", () => {
     expect(PLAN_COPILOT_MODEL).not.toBe(NAVIGATION_MODEL);
   });
 
-  it.skipIf(!hasGateway)("exists on the connected gateway", async () => {
-    const models = await listLLMModels();
-    const available = models.data.map(m => m.id);
-
-    expect(
-      available,
-      `PLAN_COPILOT_MODEL "${PLAN_COPILOT_MODEL}" is not offered by this gateway.\n` +
-        `Set PLAN_COPILOT_MODEL to one of:\n  ${available.join("\n  ")}`
-    ).toContain(PLAN_COPILOT_MODEL);
-  });
-
-  it.skipIf(!hasGateway)("is a model that can look at an image", async () => {
-    // The reader sends a rasterised page. A text-only model would reject every
-    // request, and the router would record a `failed` run for each one — the
-    // feature silently doing nothing, sheet after sheet.
-    const models = await listLLMModels();
-    const entry = models.data.find(m => m.id === PLAN_COPILOT_MODEL);
-    expect(
-      entry,
-      `PLAN_COPILOT_MODEL "${PLAN_COPILOT_MODEL}" is not on this gateway at all.`
-    ).toBeDefined();
-    // Every Claude model from Sonnet 3 onwards accepts images, so membership of
-    // the Claude family plus not being a legacy id is as much as the model list
-    // can tell us. The real proof is a read that comes back with findings.
-    expect(PLAN_COPILOT_MODEL.toLowerCase()).toContain("claude");
-  });
+  it.skipIf(!hasKey)(
+    "exists for this Anthropic key, so it can look at an image",
+    async () => {
+      // The reader sends a rasterised page. A text-only model would reject
+      // every request, and the router would record a `failed` run for each one
+      // — the feature silently doing nothing, sheet after sheet. Every Claude
+      // model from Sonnet 3 onwards accepts images, so a real Claude id is as
+      // much as a lookup can tell us. The real proof is a read that comes back
+      // with findings.
+      expect(
+        await anthropicModelExists(PLAN_COPILOT_MODEL),
+        `PLAN_COPILOT_MODEL "${PLAN_COPILOT_MODEL}" is not a model Anthropic knows for this key.`
+      ).toBe(true);
+      expect(PLAN_COPILOT_MODEL.toLowerCase()).toContain("claude");
+    }
+  );
 });

@@ -83,3 +83,22 @@ Suggested answers are what was built.
 `references/user-levels-plan.md` asks L1–L6 (is a level a plan you sell or
 a per-person mode; does Takeoff show money; names) and T1–T6 (which trade
 is second; may the no-number, no-migration steps 1–3 start). Nothing built.
+
+## Q7. Field and Co-owner roles — five choices (built on the defaults, none blocks)
+
+Plan: `references/field-and-coowner-plan.md`. Built as suggested; each is a
+small change if you say otherwise.
+
+- **Q-F1** Can a Field worker place or move marks, or only look? —
+  **Built: only look.** Saying yes means letting `plans.view` members save
+  marks; their counts would then move bid quantities.
+- **Q-F2** Does the Field job list show the client's name? — **Built: no**
+  (name, address, status, date). Client details are their own permission.
+- **Q-C1** Can the owner demote or suspend a co-owner? — **Built: yes**
+  (someone must, when a co-owner leaves). Co-owners cannot act on each other
+  or on the owner.
+- **Q-C2** When billing exists: who pays, and can a co-owner cancel the
+  subscription or close the company? — **Not built**; owner-only until you
+  decide.
+- **Q-C3** Ownership transfer (the owner leaves for good) — not built. Needed
+  before a co-owner can take over the company's data.

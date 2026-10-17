@@ -24,6 +24,43 @@ methods do not release without it.** So B's `eef749b1`/`e65f8e32`/`89068f91`
 7. POST-RELEASE BATCH re-test — todo.
 8. todo.md Track A items — todo.
 
+## C fix ready 335dec58 (2026-10-16 18:33; Gate 38989986720 green, full code run)
+
+The smoke fix you asked for, plus the day's items. **local-dev has moved
+since by your notes only** (`76887886`…`d9b8d412`, no code), so land it by
+merge as you did `e9dfc0ff`; no `drizzle/` change.
+
+- **Step bar** (`BidStepBar.tsx`): each step button is named "Step: Count",
+  "Step: Runs"… (visible words unchanged; the state stays the
+  description). Smoke clicks the toolbar's exact "Count"; the step-bar
+  spec asserts every "Step: X" and no bare "Count" in the bar.
+- **Guide text vs the PDF check**: `pdfs.spec.ts` reads the viewer's words
+  and skips the Guide `<aside>` (the check got narrower, not looser).
+- **Local smoke on the affected specs**: demo, marks two-sheets, count,
+  hugeVector — green. **Still red locally, not from this:** phone
+  `plans.spec.ts:244` "select two marks … Undo" — red on B's `230c18f5`
+  too, and with the guide switched off (the step bar is laptop-only, so
+  it is not on that screen); `marks.spec.ts:359` "a LOST ANSWER" on
+  desktop and phone. For B.
+- Also: Materials "Needs pricing" counts example prices; quote-app panel
+  "Fix this line"; reshape a height area (all seen on screen); user-levels
+  plan (no code).
+
+## C ready 0f7206a7 (2026-10-16 15:00; code = e9dfc0ff, Gate 38968275571 green, full code run)
+
+`git push origin 0f7206a7:local-dev` (fast-forward: contains local-dev
+`907f289d`; 0f7206a7 only merges your notes over e9dfc0ff — no code
+differs). **No `drizzle/` change.** What it adds on top of local-dev:
+ONE `DraftNumberInput` (B's API + C's `parseTypedNumber` reading and
+show-what-is-held on blur; C's copy deleted, all tests kept); Q-IMP1 built
+(a price list naming one material at two prices refuses it); the
+unsaved-changes guard on every library editor and Clients; the Dashboard,
+Find a bid and archive priced for the whole list at once (250 bids 460 →
+85 ms; golden bids now hold each card to its bid screen); add-material
+labor hours read the way they are checked. The first merge Gate was RED
+(`priceHistoryDoor.test.ts` could not see B's generic fork) — fixed in
+28d99416. S2 for scope-tags 6b is below.
+
 ## FOR A — S2 `scope_prompts` (scope-tags step 6b), FINAL 2026-10-16 (Track C)
 
 Replaces the 2026-10-12 S2 draft in `track-b-handoff.md`. Additive, step 1
@@ -108,6 +145,40 @@ and the owner work against the same MySQL on 3307, so an unannounced swap
 reads to everyone else as a fault in their code. Throwaway databases you
 create and drop yourself are exempt. (Prompted by A's own false alarm on
 2026-10-16 — nobody had replaced `bidrender_local`; see session 48.)
+
+## FROM B — 2026-10-16 evening: Field and Co-owner roles, SQL draft FR-M1 for A
+
+**Owner: "PLAN then BUILD 'Field' role … and 'Co-owner' role. Migrations:
+throwaway DB only, SQL drafts for A."** Plan:
+`references/field-and-coowner-plan.md`. One draft, ADDITIVE (step 1; step 3
+empty): the two values are APPENDED, so every stored role keeps its value
+and its index.
+
+```sql
+-- FR-M1  two more company roles: co-owner, field
+ALTER TABLE `company_members` MODIFY `role`
+  enum('owner','admin','estimator','viewer','coowner','field')
+  NOT NULL DEFAULT 'estimator';
+ALTER TABLE `company_invites` MODIFY `role`
+  enum('owner','admin','estimator','viewer','coowner','field')
+  NOT NULL DEFAULT 'estimator';
+```
+
+**Schema, same commit:** `COMPANY_ROLE_VALUES` in `drizzle/schema.ts` gains
+`"coowner", "field"` at the END. (Rank is code — `ROLE_RANK` in
+`shared/permissions.ts` — not the enum order.)
+
+**Tested by B on a throwaway DB** (`bidrender_test_field_throwaway`, 164
+migrated from zero, FR-M1 applied, then dropped): both ALTERs clean; on a
+probe table with the old enum, rows 'owner','admin','estimator','viewer'
+kept their values AND indexes 1–4 and 'field' stored at 6. A dev server on
+that DB with a real `field` member: the scope read `["plans.view"]`, the job
+list carried no money, `bids.get` was refused, and the Plans screen at
+laptop / iPad / phone sent no request the server refused. No FK change.
+
+**After you apply it,** B moves the two roles into `COMPANY_ROLES`, the Crew
+page offers them, and `server/fieldNoPrices.test.ts` uses a real Field row
+(`todo.md` § "Field and Co-owner — after FR-M1").
 
 ## FROM B — 2026-10-16: Bid methods + prevailing wage, SQL drafts BM-M1..M10 for A
 

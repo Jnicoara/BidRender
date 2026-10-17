@@ -414,3 +414,42 @@ track-b-handoff.md first, checked hourly. Free memory 3.7 GB at start.
 - Safe todo: two flaky-test entries that were already fixed are ticked.
   The dashboard batching is left for when a company nears 100 marked bids,
   as its entry says.
+
+# 2026-10-16, late afternoon (owner busy; queue: narrow window, BM wiring, Field/Co-owner, break-it)
+
+## Item 1 — narrow laptop window (14:45–15:26) · `9d0890ae`
+
+- `openingPanels`: the sheet list starts folded when both panels would
+  leave the drawing under 400 px. "Under ~900 px" alone left 900 px at
+  160 px of drawing, so the rule is the room, measured: 820 px 80 → 310 px,
+  900 px 160 → 390 px; 1440, iPad, phone unchanged (`narrow-laptop-*.png`).
+  Not stored. Gate green.
+- Fault of mine: the dev server from this item was still up when item 3
+  started a second one (it landed on 3003). Found from the port message,
+  the old tree stopped at once; one server from then on.
+
+## Item 2 — bid methods wiring: WAITING (A has not written "BM migrations applied")
+
+## Item 3 — Field and Co-owner roles (15:30–16:11) · `82100644`
+
+- Plan `references/field-and-coowner-plan.md`; Q-F1/F2/C1–C3 parked in
+  `morning-questions-b.md` § Q7 (built on the defaults).
+- Field holds ONE capability, `plans.view`; 17 Plans reads + `bids.fieldList`
+  / `bids.basics` opened to it. `server/fieldNoPrices.test.ts` calls EVERY
+  procedure as a Field member (refused, or listed and scanned for money);
+  red both ways when a money route was opened.
+- FR-M1 tested on a throwaway DB with a real `field` row: Jobs → Plans at
+  laptop / iPad / phone sent 0 refused requests after gating two background
+  writes; shots `field-*.png`. DB dropped. Draft in `track-a-handoff.md`.
+- Plans now view-only for anyone without `bids.edit` (viewers too).
+  Editors' smoke (plans, flow, screens, marks): 62 passed / 1 skipped.
+
+## Item 4 — Plans break-it (16:11–16:18) · `9f48431d`, `d261554f`
+
+- **Found, fixed red-first:** `takeoffGroups.rename` renamed the Unassigned
+  count into an ordinary one (unnamed marks became sendable, print block
+  lifted) and renamed counts on a locked bid. No screen calls it.
+- Probed and sound: run points bounded, `setDrop` / `setLaborRoleHours` /
+  `setSource` refuse on a lock, moving marks checks the bid.
+- Safe todo: view-only count rows lose their greyed undo / bin (built, not
+  looked at — no Field login without FR-M1).

@@ -9,6 +9,83 @@ Every EARLIER review (Conduit through Fasteners & Anchors) is fully
 answered; the only open item there is Breakers Q9, which waits for the
 brand-variants pass by design and needs nothing from you now.
 
+## NEW 2026-10-16 — user levels + trade-ready core (PLAN ONLY, nothing built)
+
+Plan: `references/user-levels-plan.md` (replaces B's 10-15 draft: you
+decided a level is how a PERSON works, picked at signup, switchable, not a
+pricing tier — so it hides screens and is never a lock on the server).
+
+- **UL2** The three levels' screens (table in plan § 1.2: Takeoff = plans,
+  counts, quantities, export; Estimate adds pricing, proposal, clients,
+  labor rates; Pro adds Performance, close-out, QuickBooks) → **yes, as a
+  start**. Affects: what each level's menu shows.
+- **UL3** On Takeoff, is money shown anywhere? → **No — quantities only.**
+  Prices still exist, just not shown. Affects: bid page, Dashboard cards.
+- **UL4** On Takeoff, the library? → **Materials and Assemblies visible,
+  price columns hidden.** Affects: what a Takeoff user picks counts from.
+- **UL5** A link to a screen your level hides → **open it, with one line:
+  "This is part of Estimate. Switch · Not now".** Never a dead end.
+- **UL6** Per person or per company? → **Per person**; an invitee starts
+  on the owner's level. Affects: a field counter and an estimator in one
+  company each see their own view.
+- **UL7** Signup and existing users → **signup asks once (default
+  Estimate); every existing user is Pro**, so nobody's screen changes on
+  the day it ships. Needs one new column on users (A, additive).
+- **UL8** The guide and step bar follow the level → **yes**: Takeoff's
+  last step is "Export the quantities", not "Print it".
+- **UL9** Names → yours to pick ("Takeoff / Estimate / Pro" for now);
+  the code stores a key, so renaming is wording only.
+- **TR1** Second trade → **plumbing** (closest to what exists). Affects:
+  which real takeoff the run model is designed against.
+- **TR2** Start trade steps 1–3 now (new rows say their trade, content
+  keyed by trade, AI prompts take the bid's trades) → **yes**; no number
+  moves, no migration.
+- **TR3** Take shelf categories out of the database ENUM → **yes, before
+  any second trade** (a migration for A).
+- **TR4** Give the scope-prompts table a trade column now, inside the
+  still-unrun S2 draft → **yes** — one line now vs a second migration later.
+- **TR5** A company's trades → **set in Settings, default electrical**;
+  signup asks the level only.
+- **TR6** QuickBooks "Electrical work" → **booked by each line's trade.**
+- **Q-EV1 (from todo.md's oldest list)** Should signing up require
+  confirming the email address (a link sent to it) before the account
+  works? Password reset already sends mail, so it is buildable. → **Yes,
+  before beta, but let the person look around first and ask only before
+  sending a quote** — a typo'd email loses every reset and every invite.
+  Affects: sign-up steps.
+- **Q-SITE1** Is the reader accuracy test (the counter's test site on
+  port 3004, served from the `C:\dev\BidPhase-C-site` worktree since
+  2026-09-30) finished? → **If yes, I remove that worktree** (it only
+  serves the page; nothing in it is committed). Not removed until you say,
+  because the person counting would lose the page.
+- **Q-MKP1** Override the material markup on ONE line of one bid (today
+  an override is company-wide, per material)? CLAUDE.md's "one-way door"
+  says anything from the library can be overridden on one job. → **Yes,
+  after bid methods lands** — one nullable column beside the line's frozen
+  markup (A), a field on the line. Affects: bid numbers, only where typed.
+- **Q-AI1** Plan reader: send zoomed-in TILES of a dense sheet instead of
+  one shrunk image (on dense sheets it currently finds nothing — its own
+  answer says the symbols were too small), and change the daily AI limit
+  from 150 calls to 40 sheets + $6 per person per day in the same change?
+  → **Yes, as one change** — it costs more per sheet (several tiles, ~a few
+  cents each, `references/ai-reader-cost.md`) but a read that finds nothing
+  costs money for nothing. Affects: AI spend per sheet; nothing without the
+  button.
+- **Q-PACK1** Pack sizes now exist on materials (a box of 100 wire nuts, a
+  500 ft spool). Should the purchase list round up to whole PACKS? →
+  **Yes for things counted by the piece or box (100 wire nuts → "1 box of
+  100"), NO for anything bought by the foot** — wire and pipe are cut to
+  length at the counter, so 330 ft must not become a 500 ft spool. Shown as
+  "2 × box of 100 (200)". Affects: quantities on the materials list sent to
+  suppliers; never a bid price. (D5 in `starter-assemblies-plan.md` left
+  packs for when pack sizes existed.)
+- **Q-ARCH1 (from todo.md, drill 2026-10-15)** A bid in Recently deleted
+  can still be EDITED from another tab (lines, quantities, name) — the
+  screen already says "This bid is in Recently deleted … Restore". Refuse
+  every edit on the server until it is restored? → **Yes, refuse** ("Restore
+  it first"). Affects: one guard on every route that writes under a bid,
+  Plans-screen routes included (B's).
+
 ## ⚠⚠ NIGHT 3 (2026-10-15 → 16) — WRONG NUMBERS FOUND, fixed on track-c, need your call on what is already saved
 
 - **Q-DEF1 ⚠⚠ CHANGES BID MONEY (already saved data), the widest one** —
