@@ -6,6 +6,11 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **"Needs pricing" on the Materials screen now also lists BidRidge's
+  example prices, not only $0 ones.** When the starter catalog ships with
+  example prices, those rows are still not your prices — they show the
+  number with an "Example price" tag you can click to set your own, and
+  they count in "Needs pricing". Bid lines are unchanged.
 - **The step bar's buttons now have their own names for screen readers
   and tests: "Step: Count", "Step: Runs" and so on.** On the Plans screen
   the step bar sits above tools also called "Count" and "Runs", so asking

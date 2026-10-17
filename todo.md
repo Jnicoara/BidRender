@@ -2382,11 +2382,19 @@ Aluminum`, `#12 THHN Copper`, `20A 1-Pole breaker`. The parts the
       2026-10-07: "Example hours", the price treatment (bid screen only,
       clears on the shop's edit, warning before printing), shipped together
       with the hours. Columns in Batch 5 (`migrations-next-batch.md`).
-- [ ] **Build the "Example price" / "Example hours" / "Example rate" tags**
-      (Batch 5 columns + the bid-screen tag + the print warning) — every
-      starter sheet's numbers wait on them (`server/starterValues.test.ts`),
-      and the brand-variant prices also wait on `materials.parentId`.
-- [ ] **Before the priced catalog ships: give "nobody has priced this" its own
+- [x] **Build the "Example price" / "Example hours" / "Example rate" tags**
+      (Batch 5 columns + the bid-screen tag + the print warning) — **BUILT
+      (checked 2026-10-16):** `components/ExampleTags.tsx` on bid lines
+      (`LineCost`), `exampleWarning` before print/send (`ProposalPage`,
+      `BidsPage`), `server/exampleTags.test.ts`. Brand-variant prices still
+      wait on `materials.parentId`.
+- [x] **DONE 2026-10-16 (Track C):** the Materials screen's "Needs pricing"
+      reads `needsYourPrice` — $0 OR `isExamplePrice` — and an
+      example-priced row shows its number with an "Example price" button
+      that opens the price. `needsPricing` (bid lines' "Not priced") is
+      unchanged on purpose: an example line warns, never blocks. Seen on
+      screen, laptop and phone (`overnight-shots/example-price-row*.png`).
+- [x] **Before the priced catalog ships: give "nobody has priced this" its own
       signal.** `shared/materialPricing.ts` and the Materials screen's unpriced
       filter both decide it from `costPerUnit === 0`. That works only while
       every shipped row is zero. The moment the pricing sheet lands in
