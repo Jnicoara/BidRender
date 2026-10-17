@@ -22,9 +22,11 @@ Looked at with a real `field` row on a throwaway DB
    co-owners not on each other (already true by `outranks`). Add a test.
 4. `server/fieldNoPrices.test.ts`: store the member as `field` and drop the
    `capabilitiesFor` mock.
-5. **Built 2026-10-16, NOT looked at yet:** a view-only Plans screen no longer
-   shows each count row's undo and bin icons (they were greyed, as on a
-   locked bid). Look at it with the first real Field login.
+5. **Looked at 2026-10-17** (a throwaway `viewer` of user 1's company, which
+   has no `bids.edit` — the same screen Field gets): laptop and upright iPad
+   show "View only: you can look at these plans and counts, not change
+   them." and no undo or bin on the count rows (`scripts/viewOnlyPlansCheck.mts`,
+   0 such buttons at both sizes). Look again with the first real Field login.
 
 ## Bid methods — wiring left (Track B, 2026-10-16, waits for A's BM-M1..M10)
 
