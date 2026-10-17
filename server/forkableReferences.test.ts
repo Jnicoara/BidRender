@@ -214,8 +214,10 @@ const REGISTRY: Record<string, Entry> = {
     why: "Same family as takeoff_groups.assemblyId; not traced.",
   },
   "wage_rate_set_rates.laborRateId": {
-    kind: "exempt",
-    why: "Migration 0165 (B's BM-M7, bid-methods-plan.md § 9), 2026-10-16: nothing reads or writes it yet. The 'unused wage-set role' test below goes red the day server code queries it; then a classification row tied to a SHIPPED role must reach the shop's fork through resolveLaborRate (as assemblies.laborRateId does) — a role the shop edited would otherwise price from the shipped row — and this entry becomes a resolver.",
+    kind: "resolver",
+    resolver: "resolveLaborRate",
+    readBy: "shared/prevailingWage.ts",
+    note: "Became a resolver 2026-10-17 when Track B built wage sets (bid-methods-plan.md § 5). Was 'exempt' (0165, nothing read it). `bidWageRows` reaches the role ONLY through resolveLaborRate, so a row tied to a SHIPPED role reads the shop's fork; the Labor screen names the role from the same rows. The server stores the id as picked (validated against the company's library in wageSetsRouter).",
   },
   "takeoff_run_type_extras.runTypeId": {
     kind: "exempt",
@@ -501,33 +503,6 @@ describe("every stored id into a forkable row is accounted for", () => {
         else if (/\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) {
           if (
             fs.readFileSync(full, "utf8").includes("takeoffGroups.laborRateId")
-          )
-            readers.push(path.relative(root, full));
-        }
-      }
-    };
-    walk(root);
-    expect(readers).toEqual([]);
-  });
-
-  it("unused wage-set role: nothing on the server reads wage_rate_set_rates.laborRateId", () => {
-    /*
-      Same shape as the group labor rate above: its entry is `exempt` because
-      nothing reads it (0165, before Track B wires prevailing wage). The day a
-      server file names the column accessor, this goes red and the entry must
-      become a resolver through resolveLaborRate, or say why not.
-    */
-    const root = path.resolve(__dirname);
-    const readers: string[] = [];
-    const walk = (dir: string) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) walk(full);
-        else if (/\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name)) {
-          if (
-            fs
-              .readFileSync(full, "utf8")
-              .includes("wageRateSetRates.laborRateId")
           )
             readers.push(path.relative(root, full));
         }

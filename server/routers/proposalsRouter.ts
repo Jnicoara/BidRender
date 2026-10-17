@@ -568,6 +568,28 @@ export const proposalsRouter = router({
          */
         examples: exampleSummary(lines),
         /**
+         * The bid's prevailing-wage set, for the re-check warning before
+         * printing (bid-methods-plan.md § 5, owner Q12 — a warning, not a
+         * block). The browser decides "past six months" from its own day.
+         * Shop's screen only; nothing in the document reads it.
+         */
+        wageSet:
+          bid.wageRateSetId === null
+            ? null
+            : await (async () => {
+                const set = await db.getWageSet(
+                  ctx.scope.dataUserId,
+                  bid.wageRateSetId!
+                );
+                return set
+                  ? {
+                      name: set.name,
+                      wageDeterminationNumber: set.wageDeterminationNumber,
+                      dateSet: set.dateSet,
+                    }
+                  : null;
+              })(),
+        /**
          * Marks in the bid's Unassigned count (references/count-first-plan.md):
          * they block a priced print, like a line not priced, until somebody
          * says what they are. In the tally above as a LABEL only (owner Q5);

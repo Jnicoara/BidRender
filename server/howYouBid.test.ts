@@ -162,9 +162,11 @@ withDb("a shop with no markup", () => {
     expect(bid.pricingMethod).toBe("cost_op");
   });
 
-  it("an unaccepted starter markup band is not markup it would lose; accepted, it is", async () => {
-    // Starters price nothing until accepted (CLAUDE.md § Starter content).
+  it("a starter bracket counts only once accepted AND brackets are picked", async () => {
+    // Starters price nothing until accepted (CLAUDE.md § Starter content),
+    // and brackets price nothing until the company picks them (§ 3).
     const database = (await getDb())!;
+    await c.bids.setPricingDefaults({ materialMarkupMode: "brackets" });
     const [row] = await database.insert(markupRules).values({
       userId: PLAIN_SHOP,
       kind: "band",
@@ -184,6 +186,8 @@ withDb("a shop with no markup", () => {
         usesMaterialMarkup: true,
         open: true,
       });
+      await c.bids.setPricingDefaults({ materialMarkupMode: "flat" });
+      expect((await c.bids.howYouBid()).usesMaterialMarkup).toBe(false);
     } finally {
       await database
         .delete(markupRules)

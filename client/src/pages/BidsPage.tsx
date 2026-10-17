@@ -85,6 +85,7 @@ import {
   methodSummary,
   useMethodSource,
 } from "@/components/BidMethodControls";
+import { BidWageControls } from "@/components/BidWageControls";
 import { TakeoffExportDialog } from "@/components/TakeoffExportDialog";
 import { AccountingExportDialog } from "@/components/AccountingExportDialog";
 import { QuoteAppPanel } from "@/components/QuoteAppPanel";
@@ -2988,6 +2989,10 @@ export default function BidsPage({
               }
             >
               <BidMethodRow bidId={bid.id} canEdit={access.can("bids.edit")} />
+              <BidWageControls
+                bidId={bid.id}
+                canEdit={access.can("bids.edit")}
+              />
               {/*
                 NOT USED IN Markup + charge rate (bid-methods-plan.md § 2): A
                 prices labor at the charge rate and puts nothing on top, so

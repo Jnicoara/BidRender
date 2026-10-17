@@ -15,6 +15,12 @@
  * only cost moves (§ 2).
  */
 
+import {
+  hourlyCostOf,
+  resolveLaborRate,
+  type ResolvableLaborRate,
+} from "./laborRateLookup";
+
 export type WageClassification =
   | "journeyman"
   | "apprentice"
@@ -173,4 +179,127 @@ export function chargeBelowCostWarning(
   if (chargeRate === null || chargeRate >= prevailingCost) return null;
   const usd = (n: number) => `$${n.toFixed(2)}`;
   return `Charge rate ${usd(chargeRate)}/h is below this job's prevailing wage cost ${usd(prevailingCost)}/h`;
+}
+
+// ─── A bid on a wage set: what each classification costs, beside the role ───
+
+/** A role as the comparison needs it (`labor_rates`, fractions). */
+export type RoleForWage = ResolvableLaborRate & {
+  name: string;
+  chargeRate: string | number | null;
+  payrollTaxPct: string | number | null;
+  workersCompPct: string | number | null;
+  insurancePct: string | number | null;
+};
+
+export type BidWageRow = {
+  label: string;
+  classification: WageClassification;
+  /** The role this row stands in for, resolved through its fork. */
+  roleName: string | null;
+  /** Loaded prevailing cost per hour this row costs at on this bid. */
+  prevailingCost: number | null;
+  /** What the role costs on the Labor rates screen — what lines price at. */
+  roleCost: number | null;
+  warnings: string[];
+};
+
+const dollars = (n: number) => `$${n.toFixed(2)}`;
+
+function burdenOf(role: RoleForWage): RoleBurden | null {
+  const parts = [role.payrollTaxPct, role.workersCompPct, role.insurancePct];
+  if (parts.every(p => p === null)) return null;
+  return {
+    payrollTaxPct: Number(role.payrollTaxPct ?? 0),
+    workersCompPct: Number(role.workersCompPct ?? 0),
+    insurancePct: Number(role.insurancePct ?? 0),
+  };
+}
+
+/**
+ * Each row of a bid's wage set: its prevailing cost on THIS bid (the
+ * apprentice answer applied — unanswered is never yes), beside the cost the
+ * role carries in the library, with what is wrong said in words. Moves no
+ * number: lines keep the rate they froze (bid-methods-plan.md § 5 re-costing
+ * is not built — morning-questions-b.md Q9).
+ */
+export function bidWageRows(
+  set: Pick<WageSet, "rates" | "fringePaidAsCash">,
+  roles: readonly RoleForWage[],
+  registeredApprentices: boolean | null,
+  method: "markup_rate" | "cost_op" | null
+): BidWageRow[] {
+  return set.rates.map(row => {
+    const role =
+      row.laborRateId === null
+        ? undefined
+        : resolveLaborRate([...roles], row.laborRateId);
+    const warnings: string[] = [];
+    let costRow: { baseWage: number; fringe: number } = row;
+    if (row.classification === "apprentice" && registeredApprentices !== true) {
+      const j = set.rates.find(r => r.classification === "journeyman");
+      if (!j) {
+        warnings.push(
+          "No journeyman row in this set to cost apprentice hours at — add one."
+        );
+        return {
+          label: row.label,
+          classification: row.classification,
+          roleName: role?.name ?? null,
+          prevailingCost: null,
+          roleCost: role ? hourlyCostOf(role) : null,
+          warnings,
+        };
+      }
+      costRow = j;
+      warnings.push(
+        registeredApprentices === null
+          ? "Costs at the journeyman rate until you answer: will registered apprentices work this job?"
+          : "Costs at the journeyman rate: no registered apprentices on this job."
+      );
+    }
+    const { cost, burdenMissing } = prevailingLoadedCost(
+      costRow,
+      role ? burdenOf(role) : null,
+      set.fringePaidAsCash
+    );
+    if (!role)
+      warnings.push(
+        "Not tied to a role — pick the role this row stands in for."
+      );
+    else {
+      if (burdenMissing)
+        warnings.push(
+          `${role.name} has no payroll tax, comp or insurance broken down, so this is wage + fringe only.`
+        );
+      const roleCost = hourlyCostOf(role);
+      if (roleCost < cost)
+        warnings.push(
+          `${role.name} is ${dollars(roleCost)}/h on your Labor rates — below this job's prevailing cost of ${dollars(cost)}/h. Lines on this bid are priced at ${dollars(roleCost)}/h.`
+        );
+      if (method === "markup_rate") {
+        const charge =
+          role.chargeRate === null ? null : Number(role.chargeRate);
+        const below = chargeBelowCostWarning(charge, cost);
+        if (below) warnings.push(below);
+      }
+    }
+    return {
+      label: row.label,
+      classification: row.classification,
+      roleName: role?.name ?? null,
+      prevailingCost: cost,
+      roleCost: role ? hourlyCostOf(role) : null,
+      warnings,
+    };
+  });
+}
+
+/**
+ * A Date as "YYYY-MM-DD" in the zone it is read in — the browser's day, for
+ * the reminder. Never `toISOString().slice(0, 10)`, which is UTC: tomorrow
+ * every American evening.
+ */
+export function localDay(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

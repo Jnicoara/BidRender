@@ -38,6 +38,7 @@ const part = (over: Partial<MarkupPart> = {}): MarkupPart => ({
   itemKey: 1,
   category: "Wire & Cable",
   packPrice: null,
+  bracketPrice: null,
   cost: 10,
   ...over,
 });

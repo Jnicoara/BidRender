@@ -43,6 +43,8 @@ import { selectOnFocus } from "@/lib/selectOnFocus";
 import { hourlyCostOf, resolveLaborRate } from "@shared/laborRateLookup";
 import { CompanyDefaultNotice } from "@/components/CompanyDefaultNotice";
 import { PercentKindInput } from "@/components/PercentKindInput";
+import { MarkupBracketsEditor } from "@/components/MarkupBracketsEditor";
+import { useCompany } from "@/hooks/useCompany";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,7 @@ export function BidPricingDefaultsSection() {
   const defaultsQuery = trpc.bids.pricingDefaults.useQuery();
   const defaults = defaultsQuery.data;
   const howYouBid = trpc.bids.howYouBid.useQuery();
+  const canEditPricing = useCompany().can("pricing.edit");
 
   const save = trpc.bids.setPricingDefaults.useMutation({
     onSuccess: () => {
@@ -276,6 +279,11 @@ export function BidPricingDefaultsSection() {
           whenBlank="No company default — lines get no markup unless their material has one"
           ariaLabel="Default material markup"
           className="h-8 w-36 text-sm"
+        />
+
+        <MarkupBracketsEditor
+          mode={defaults.materialMarkupMode ?? null}
+          canEdit={canEditPricing}
         />
 
         {method === "cost_op" && (

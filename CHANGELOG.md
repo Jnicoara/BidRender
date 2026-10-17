@@ -4,6 +4,11 @@ Plain-English record of what changed and when. Newest first.
 
 This is the human-readable companion to the git history — read this to see what happened, read the commits for the technical detail.
 
+## [2026-10-17]
+
+- **Material markup by price brackets.** Under Settings › Pricing › More options, a shop can mark up material by what it costs ("$1–$10: 40%") instead of one %. Brackets read the purchase price, so a 500 ft spool is one $200 purchase. Overlapping brackets are refused; a gap falls to the company %. Nothing changes until the shop picks "Price brackets", and lines already on a bid keep their markup. The suggested starter brackets fill the boxes and say they are a starter.
+- **Prevailing wage sets.** Labor rates › More options now saves each wage determination (base wage and fringe per classification, the date set) and reminds you to re-check it after six months. A bid can be set to one: it asks whether registered apprentices will work the job (unanswered costs apprentices at the journeyman rate), shows each classification's prevailing cost beside your own rate, and warns before printing a bid whose wage set is due a re-check. It does not re-price lines yet — that is an open question for the owner.
+
 ## [2026-10-16]
 
 - **A shop that marks up material is asked "How do you bid?" before anything prices lower.** Until it answers, its new bids keep today's math (markup, then overhead and profit), so the next bid comes out the same as yesterday's. The question sits on the Dashboard with one button per answer, and Settings › Pricing says "Not chosen yet". On a bid, Pricing settings now says whether its method is the company standard or "This job only" — changing it there never touches the company setting or another bid.

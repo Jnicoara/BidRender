@@ -13,6 +13,7 @@ import { projectItemsRouter } from "./routers/projectItemsRouter";
 import { bidSummaryRouter } from "./routers/bidSummaryRouter";
 import { materialsRouter } from "./routers/materialsRouter";
 import { laborRatesRouter } from "./routers/laborRatesRouter";
+import { wageSetsRouter } from "./routers/wageSetsRouter";
 import { modifiersRouter } from "./routers/modifiersRouter";
 import { assembliesRouter } from "./routers/assembliesRouter";
 import { bidsRouter } from "./routers/bidsRouter";
@@ -65,6 +66,7 @@ export const appRouter = router({
   bidSummary: bidSummaryRouter,
   materials: materialsRouter,
   laborRates: laborRatesRouter,
+  wageSets: wageSetsRouter,
   modifiers: modifiersRouter,
   assemblies: assembliesRouter,
   bids: bidsRouter,

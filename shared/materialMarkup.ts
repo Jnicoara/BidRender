@@ -95,6 +95,23 @@ export const NO_MARKUP_RULES: MarkupRuleSet = {
  * silently fall to the category or the default. Keying by the shipped id
  * keeps one item one item, whichever row the bid happened to read.
  */
+/**
+ * The price a BRACKET reads for a material — the pack / purchase price (D3,
+ * references/material-markup.md; pricing-safety-plan.md § 2): the pack
+ * price as typed, else unit cost × pack quantity, with no pack quantity read
+ * as 1 (sold singly). So a 500 ft spool at $0.40/ft is a $200 purchase, not
+ * a 40-cent one landing in the under-$1 bracket.
+ */
+export function bracketPriceOf(material: {
+  costPerUnit: string | number;
+  packQty: string | number | null;
+  packPrice: string | number | null;
+}): number {
+  if (material.packPrice !== null) return Number(material.packPrice);
+  const qty = material.packQty === null ? 1 : Number(material.packQty);
+  return Number(material.costPerUnit) * (qty > 0 ? qty : 1);
+}
+
 export function materialItemKey(material: {
   id: number;
   baselineId: number | null;
@@ -111,6 +128,13 @@ export type MarkupPart = {
   category: string | null;
   /** D3. The pack / purchase price. Null until pack sizes exist (Piece 2). */
   packPrice: number | null;
+  /**
+   * The price a bracket reads, `bracketPriceOf`: pack price as typed, else
+   * unit cost × pack quantity (D3). `packPrice` above wins when a caller
+   * sets it. Null = no price to place in a bracket (a material deleted
+   * since) — it falls to the company %.
+   */
+  bracketPrice: number | null;
   /**
    * This part's cost inside ONE unit of the line — cost per unit × qty in the
    * recipe. Only its proportion matters: it weights the blend when an
@@ -177,8 +201,9 @@ export function resolvePartMarkup(
         break;
       }
       case "band": {
-        if (part.packPrice === null) break;
-        const band = bandFor(rules.bands, part.packPrice);
+        const price = part.packPrice ?? part.bracketPrice;
+        if (price === null) break;
+        const band = bandFor(rules.bands, price);
         if (band)
           return { pct: band.pct, level, label: `from ${bandLabel(band)}` };
         break;
@@ -237,7 +262,7 @@ export function resolveLineMarkup(
 ): { pct: number; source: LineMarkupSource } {
   if (parts.length === 0) {
     const one = resolvePartMarkup(
-      { itemKey: null, category: null, packPrice: null },
+      { itemKey: null, category: null, packPrice: null, bracketPrice: null },
       rules,
       context
     );

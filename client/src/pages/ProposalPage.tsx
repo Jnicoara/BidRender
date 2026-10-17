@@ -51,6 +51,8 @@ import {
 } from "@/lib/notPricedTotal";
 import { NOTHING_NOT_PRICED } from "@shared/lineNotPriced";
 import { exampleWarning } from "@shared/exampleTags";
+import { localDay, recheckPrintWarning } from "@shared/prevailingWage";
+
 import { unassignedSentence } from "@shared/unassignedCount";
 import {
   AlertDialog,
@@ -254,6 +256,12 @@ export default function ProposalPage({
   */
   const examples = mode === "full" && data ? data.examples : null;
   const [confirmExamples, setConfirmExamples] = useState(false);
+  // A wage determination past its re-check date: the same warning dialog
+  // (owner Q12, a warning, never a block), from the browser's own day.
+  const wageWarning =
+    mode === "full" && data?.wageSet
+      ? recheckPrintWarning(data.wageSet, localDay(new Date()))
+      : null;
   /*
     Marks nobody has said what they are (references/count-first-plan.md)
     block a priced print like a line not priced: they are work the total
@@ -263,7 +271,8 @@ export default function ProposalPage({
   const requestPrint = () => {
     if (noWork || anyNotPriced(notPriced) || unassigned > 0)
       setConfirmPrint(true);
-    else if (examples && examples.lines > 0) setConfirmExamples(true);
+    else if ((examples && examples.lines > 0) || wageWarning)
+      setConfirmExamples(true);
     else print();
   };
   // Ctrl+P goes through the same question as the button. A ref, so the
@@ -799,10 +808,23 @@ export default function ProposalPage({
       <AlertDialog open={confirmExamples} onOpenChange={setConfirmExamples}>
         <AlertDialogContent className="bp-no-print">
           <AlertDialogHeader>
-            <AlertDialogTitle>Check the example numbers</AlertDialogTitle>
+            <AlertDialogTitle>
+              {examples && examples.lines > 0
+                ? "Check the example numbers"
+                : "Check the wage determination"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {examples ? exampleWarning(examples) : null} The customer's copy
-              does not show which lines these are.
+              {examples && examples.lines > 0 ? (
+                <>
+                  {exampleWarning(examples)} The customer's copy does not show
+                  which lines these are.
+                </>
+              ) : null}
+              {wageWarning && (
+                <span className="block mt-2" data-testid="wage-recheck-warning">
+                  {wageWarning}
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

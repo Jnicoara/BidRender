@@ -23,6 +23,12 @@ import {
   newBidMethod,
   type PricingMethod,
 } from "../../shared/bidMethods";
+import { checkBrackets } from "../../shared/markupBrackets";
+import {
+  asksAboutApprentices,
+  bidWageRows,
+  recheckReminder,
+} from "../../shared/prevailingWage";
 import {
   ASSEMBLY_CATEGORIES,
   BID_STATUSES,
@@ -1373,6 +1379,131 @@ export const bidsRouter = router({
     }),
 
   /**
+   * PREVAILING WAGE on a bid (bid-methods-plan.md § 5): the set it uses,
+   * the sets it could, the apprentice question, and each classification's
+   * prevailing cost beside its role's own (`bidWageRows`). Moves no number:
+   * lines keep the rate they froze — re-costing them waits on a line→role
+   * column (morning-questions-b.md Q9), so the screen says so.
+   */
+  wageForBid: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        /** The browser's day, for the re-check reminder. */
+        today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const userId = ctx.scope.dataUserId;
+      const bid = await requireBid(input.id, userId);
+      const [sets, roles] = await Promise.all([
+        db.listWageSets(userId),
+        db.getLibraryLaborRates(userId),
+      ]);
+      const set =
+        bid.wageRateSetId === null
+          ? null
+          : ((await db.getWageSet(userId, bid.wageRateSetId)) ?? null);
+      return {
+        changeable: methodChangeRefusal(bid) === null,
+        sets: sets.map(s => ({ id: s.id, name: s.name })),
+        set: set && {
+          id: set.id,
+          name: set.name,
+          wageDeterminationNumber: set.wageDeterminationNumber,
+          dateSet: set.dateSet,
+          archived: set.archivedAt !== null,
+          reminder: recheckReminder(set, input.today),
+        },
+        asksApprentices: set
+          ? asksAboutApprentices({
+              rates: set.rates.map(r => ({
+                ...r,
+                baseWage: Number(r.baseWage),
+                fringe: Number(r.fringe),
+              })),
+            })
+          : false,
+        registeredApprentices: bid.registeredApprentices,
+        rows: set
+          ? bidWageRows(
+              {
+                fringePaidAsCash: set.fringePaidAsCash,
+                rates: set.rates.map(r => ({
+                  classification: r.classification,
+                  label: r.label,
+                  laborRateId: r.laborRateId,
+                  baseWage: Number(r.baseWage),
+                  fringe: Number(r.fringe),
+                })),
+              },
+              roles,
+              bid.registeredApprentices,
+              bid.pricingMethod
+            )
+          : [],
+      };
+    }),
+
+  /**
+   * Choose a bid's wage set, or none. An unlocked Draft only, as the method
+   * (owner Q14). `registeredApprentices` is answered separately and kept.
+   */
+  setWageSet: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        wageRateSetId: z.number().int().positive().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.id, ctx.scope.dataUserId);
+      const refusal = methodChangeRefusal(bid);
+      if (refusal !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: refusal.replace("how it is priced", "its wage set"),
+        });
+      if (
+        input.wageRateSetId !== null &&
+        !(await db.getWageSet(ctx.scope.dataUserId, input.wageRateSetId))
+      )
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Wage set not found.",
+        });
+      await db.updateBid(bid.id, ctx.scope.dataUserId, {
+        wageRateSetId: input.wageRateSetId,
+      });
+      return { id: bid.id, wageRateSetId: input.wageRateSetId };
+    }),
+
+  /**
+   * "Will registered apprentices work this job?" — yes, no, or not answered
+   * (NULL). Unanswered is never yes: apprentice hours cost at journeyman.
+   */
+  setRegisteredApprentices: procedure
+    .input(
+      z.object({
+        id: z.number().int().positive(),
+        answer: z.boolean().nullable(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const bid = await requireBid(input.id, ctx.scope.dataUserId);
+      const refusal = methodChangeRefusal(bid);
+      if (refusal !== null)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: refusal.replace("how it is priced", "its apprentice answer"),
+        });
+      await db.updateBid(bid.id, ctx.scope.dataUserId, {
+        registeredApprentices: input.answer,
+      });
+      return { id: bid.id, registeredApprentices: input.answer };
+    }),
+
+  /**
    * The step bar's counts (shared/bidSteps.ts): plan pages, scaled pages,
    * marks, runs, lines and status. Read-only; moves no number.
    */
@@ -2410,6 +2541,12 @@ export const bidsRouter = router({
          */
         materialMarkupPct: markupPctSchema.nullable().optional(),
         /**
+         * Which shape the company level of the material markup takes
+         * (bid-methods-plan.md § 3): one flat % or the price brackets. Moves
+         * no line already on a bid — each froze its markup when added.
+         */
+        materialMarkupMode: z.enum(["flat", "brackets"]).optional(),
+        /**
          * The labor role a TRACED RUN's hours are priced at (the run lines
          * sent from the Plans screen). Until 2026-10-16 nothing could set
          * this, so every run line froze at $0/h (found by the whole-job
@@ -2446,6 +2583,8 @@ export const bidsRouter = router({
         }
         patch.defaultLaborRateId = input.defaultLaborRateId;
       }
+      if (input.materialMarkupMode !== undefined)
+        patch.materialMarkupMode = input.materialMarkupMode;
       if (input.materialMarkupPct !== undefined) {
         patch.materialMarkupPct =
           input.materialMarkupPct === null
@@ -2560,5 +2699,45 @@ export const bidsRouter = router({
         input.markupPct
       );
       return { itemKey: materialItemKey(material) };
+    }),
+
+  /**
+   * The company's price brackets (bid-methods-plan.md § 3) — its own band
+   * rows, plus the gaps that fall to the company % (`checkBrackets`).
+   * Whether they price anything is `materialMarkupMode`, read beside them.
+   */
+  markupBrackets: procedure.query(async ({ ctx }) => {
+    const bands = await db.listCompanyBrackets(ctx.scope.dataUserId);
+    return { bands, gaps: checkBrackets(bands).gaps };
+  }),
+
+  /**
+   * Replace the company's price brackets, whole. `pricing.edit`, like every
+   * company markup. Refused while any two overlap (a price in two brackets
+   * has two markups); a gap is allowed and said. Moves no line already on a
+   * bid — each froze its markup when it was added; Re-apply does that on a
+   * Draft. Saving the starter set here IS accepting it (D2: inert until
+   * the person chooses it).
+   */
+  setMarkupBrackets: requireCapability("pricing.edit")
+    .input(
+      z.object({
+        bands: z
+          .array(
+            z.object({
+              minPrice: z.number().min(0).max(10_000_000),
+              maxPrice: z.number().min(0).max(10_000_000).nullable(),
+              pct: markupPctSchema,
+            })
+          )
+          .max(40),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { problems } = checkBrackets(input.bands);
+      if (problems.length > 0)
+        throw new TRPCError({ code: "BAD_REQUEST", message: problems[0] });
+      await db.replaceCompanyBrackets(ctx.scope.dataUserId, input.bands);
+      return { saved: input.bands.length };
     }),
 });

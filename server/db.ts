@@ -57,6 +57,8 @@ import {
   InsertLaborRate,
   LaborRate,
   laborRates,
+  wageRateSets,
+  wageRateSetRates,
   InsertModifier,
   Modifier,
   ModifierStatus,
@@ -384,12 +386,14 @@ import { sameStarterValue } from "../shared/starterChange";
 import { priceWrite, type PriceWrite } from "../shared/packPricing";
 import {
   markupDiffers,
+  bracketPriceOf,
   materialItemKey,
   NO_MARKUP_RULES,
   resolveLineMarkup,
   type LineMarkupSource,
   type MarkupPart,
   type MarkupRuleSet,
+  type PriceBand,
 } from "../shared/materialMarkup";
 import {
   resolveLineQty,
@@ -3618,6 +3622,8 @@ export type AssemblyMaterialLine = {
    * Required for the same reason as `isExamplePrice`.
    */
   isExampleLaborHours: boolean;
+  /** What a markup bracket reads for this part (`bracketPriceOf`, D3). */
+  bracketPrice: number;
 };
 
 export type AssemblyDetail = Assembly & {
@@ -3837,6 +3843,7 @@ export async function getAssemblyMaterialLines(
       itemKey: materialItemKey(material),
       isExamplePrice: material.isExamplePrice === true,
       isExampleLaborHours: material.isExampleLaborHours === true,
+      bracketPrice: bracketPriceOf(material),
     });
   }
   return resolved;
@@ -6113,6 +6120,7 @@ export async function companyMethodState(
     db.select().from(pricingDefaults).where(eq(pricingDefaults.userId, userId)),
     db
       .select({
+        kind: markupRules.kind,
         markupPct: markupRules.markupPct,
         isStarter: markupRules.isStarter,
         acceptedAt: markupRules.acceptedAt,
@@ -6126,9 +6134,13 @@ export async function companyMethodState(
       ? 0
       : Number(row.materialMarkupPct);
   // The same "in force" rule as getMarkupRuleSet: an unaccepted starter
-  // prices nothing, so it is not markup this company would lose.
+  // prices nothing, so it is not markup this company would lose; and a
+  // bracket prices only while the company has picked brackets.
   const ruleInForce = rules.some(
-    r => (!r.isStarter || r.acceptedAt !== null) && Number(r.markupPct) > 0
+    r =>
+      (!r.isStarter || r.acceptedAt !== null) &&
+      Number(r.markupPct) > 0 &&
+      (r.kind !== "band" || row?.materialMarkupMode === "brackets")
   );
   return {
     method: row?.pricingMethod ?? null,
@@ -8320,9 +8332,34 @@ export async function getMarkupRuleSet(userId: number): Promise<MarkupRuleSet> {
     items,
     quotedLinePct: null,
     categories,
-    bands: [],
+    bands: bracketsInForce(defaults, live),
     companyDefault,
   };
+}
+
+/**
+ * The price brackets the walk reads (bid-methods-plan.md § 3): the company's
+ * live `band` rows, ONLY while it has picked brackets
+ * (`materialMarkupMode = 'brackets'`). NULL or 'flat' reads none, so no
+ * company's numbers move until it switches — and a line freezes its markup
+ * when added, so switching moves new lines only. Rows are passed already
+ * filtered of unaccepted starters.
+ */
+export function bracketsInForce(
+  defaults: Pick<PricingDefaults, "materialMarkupMode"> | undefined,
+  live: ReadonlyArray<
+    Pick<MarkupRule, "kind" | "bandMinPrice" | "bandMaxPrice" | "markupPct">
+  >
+): PriceBand[] {
+  if (defaults?.materialMarkupMode !== "brackets") return [];
+  return live
+    .filter(row => row.kind === "band" && row.bandMinPrice !== null)
+    .map(row => ({
+      minPrice: Number(row.bandMinPrice),
+      maxPrice: row.bandMaxPrice === null ? null : Number(row.bandMaxPrice),
+      pct: Number(row.markupPct),
+    }))
+    .sort((a, b) => a.minPrice - b.minPrice);
 }
 
 /** A recipe's material lines as the markup rules see them. */
@@ -8334,6 +8371,7 @@ export function markupPartsForAssembly(detail: {
     itemKey: line.itemKey,
     category: line.category,
     packPrice: null,
+    bracketPrice: line.bracketPrice,
     cost: Number(line.costPerUnit) * Number(line.qty),
   }));
 }
@@ -8348,6 +8386,7 @@ export function markupPartForMaterial(
     itemKey: materialItemKey(material),
     category: material.category,
     packPrice: null,
+    bracketPrice: bracketPriceOf(material),
     cost: Number(material.costPerUnit),
   };
 }
@@ -8473,6 +8512,7 @@ export async function planMarkupReapply(
               itemKey: null,
               category: null,
               packPrice: null,
+              bracketPrice: null,
               cost: stored.cost,
             };
       });
@@ -8547,6 +8587,55 @@ export async function listMarkupRules(userId: number): Promise<MarkupRule[]> {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(markupRules).where(eq(markupRules.userId, userId));
+}
+
+/**
+ * The company's OWN price brackets: band rows that are not an unaccepted
+ * starter, lowest first. What the editor shows and what `bracketsInForce`
+ * reads when the company has picked brackets.
+ */
+export async function listCompanyBrackets(
+  userId: number
+): Promise<PriceBand[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select()
+    .from(markupRules)
+    .where(and(eq(markupRules.userId, userId), eq(markupRules.kind, "band")));
+  return bracketsInForce(
+    { materialMarkupMode: "brackets" },
+    rows.filter(row => !row.isStarter || row.acceptedAt !== null)
+  );
+}
+
+/**
+ * Replace the company's price brackets, whole, in one transaction — so a
+ * failed save leaves the old set rather than half of each. Every band row of
+ * the company goes, starter or not: the set saved is the set chosen.
+ * Validation is the caller's (`checkBrackets`).
+ */
+export async function replaceCompanyBrackets(
+  userId: number,
+  bands: readonly PriceBand[]
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.transaction(async tx => {
+    await tx
+      .delete(markupRules)
+      .where(and(eq(markupRules.userId, userId), eq(markupRules.kind, "band")));
+    if (bands.length === 0) return;
+    await tx.insert(markupRules).values(
+      bands.map(b => ({
+        userId,
+        kind: "band" as const,
+        bandMinPrice: b.minPrice.toFixed(2),
+        bandMaxPrice: b.maxPrice === null ? null : b.maxPrice.toFixed(2),
+        markupPct: b.pct.toFixed(6),
+      }))
+    );
+  });
 }
 
 /**
@@ -17899,4 +17988,153 @@ export async function getStarterRunTypes() {
       and(isNull(takeoffRunTypes.userId), eq(takeoffRunTypes.status, "active"))
     )
     .orderBy(asc(takeoffRunTypes.label));
+}
+
+// ─── Prevailing wage sets (0165, bid-methods-plan.md § 5) ────────────────────
+
+export type WageSetRow = typeof wageRateSets.$inferSelect;
+export type WageSetRateRow = typeof wageRateSetRates.$inferSelect;
+/**
+ * A set as the app reads it: `dateSet` as the calendar day "YYYY-MM-DD".
+ *
+ * MEASURED 2026-10-17: drizzle's DATE column goes through a JS Date and
+ * the local zone — written as `new Date("2026-03-31T00:00:00Z")` on a
+ * Pacific machine it stored 2026-03-30. So the day is written and read as
+ * TEXT in SQL and no Date ever holds it. (A track branch cannot touch
+ * drizzle/, so the mapping lives here.)
+ */
+export type WageSetWithRates = Omit<WageSetRow, "dateSet"> & {
+  dateSet: string;
+  rates: WageSetRateRow[];
+};
+
+const storedDay = sql<string>`DATE_FORMAT(${wageRateSets.dateSet}, '%Y-%m-%d')`;
+
+/**
+ * A company's wage sets with their classification rows, newest date first.
+ * Archived sets come too (`includeArchived`) only for a bid that still
+ * points at one, so its name never turns into nothing.
+ */
+export async function listWageSets(
+  userId: number,
+  options: { includeArchived?: boolean } = {}
+): Promise<WageSetWithRates[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const sets = await db
+    .select({ set: wageRateSets, day: storedDay })
+    .from(wageRateSets)
+    .where(
+      options.includeArchived
+        ? eq(wageRateSets.userId, userId)
+        : and(eq(wageRateSets.userId, userId), isNull(wageRateSets.archivedAt))
+    )
+    .orderBy(desc(wageRateSets.dateSet), desc(wageRateSets.id));
+  if (sets.length === 0) return [];
+  const rates = await db
+    .select()
+    .from(wageRateSetRates)
+    .where(
+      inArray(
+        wageRateSetRates.setId,
+        sets.map(s => s.set.id)
+      )
+    )
+    .orderBy(asc(wageRateSetRates.sortOrder), asc(wageRateSetRates.id));
+  return sets.map(({ set, day }) => ({
+    ...set,
+    dateSet: day,
+    rates: rates.filter(r => r.setId === set.id),
+  }));
+}
+
+/** One of THIS company's sets, or undefined — never another company's. */
+export async function getWageSet(
+  userId: number,
+  setId: number
+): Promise<WageSetWithRates | undefined> {
+  return (await listWageSets(userId, { includeArchived: true })).find(
+    s => s.id === setId
+  );
+}
+
+export type WageSetInput = {
+  name: string;
+  wageDeterminationNumber: string | null;
+  dateSet: string;
+  fringePaidAsCash: boolean;
+  rates: Array<{
+    classification: "journeyman" | "apprentice" | "trainee" | "other";
+    label: string;
+    laborRateId: number | null;
+    baseWage: number;
+    fringe: number;
+  }>;
+};
+
+/**
+ * Create a set, or replace an existing one's details and rows, in one
+ * transaction — a failed save leaves the set as it was rather than half of
+ * its rows. Rows are replaced whole: a set is one wage determination, typed
+ * as a table, saved as one.
+ */
+export async function saveWageSet(
+  userId: number,
+  setId: number | null,
+  input: WageSetInput
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.transaction(async tx => {
+    const fields = {
+      name: input.name,
+      wageDeterminationNumber: input.wageDeterminationNumber,
+      // As text: see `storedDay`. The type wants a Date; the SQL is a DATE.
+      dateSet: sql`${input.dateSet}` as unknown as Date,
+      fringePaidAsCash: input.fringePaidAsCash,
+    };
+    let id = setId;
+    if (id === null) {
+      const [made] = await tx
+        .insert(wageRateSets)
+        .values({ userId, ...fields });
+      id = made.insertId;
+    } else {
+      await tx
+        .update(wageRateSets)
+        .set(fields)
+        .where(and(eq(wageRateSets.id, id), eq(wageRateSets.userId, userId)));
+      await tx.delete(wageRateSetRates).where(eq(wageRateSetRates.setId, id));
+    }
+    if (input.rates.length > 0)
+      await tx.insert(wageRateSetRates).values(
+        input.rates.map((r, i) => ({
+          setId: id!,
+          classification: r.classification,
+          label: r.label,
+          laborRateId: r.laborRateId,
+          baseWage: r.baseWage.toFixed(4),
+          fringe: r.fringe.toFixed(4),
+          sortOrder: i,
+        }))
+      );
+    return id!;
+  });
+}
+
+/**
+ * Archive (or bring back) a set. Never a delete: a bid pointing at it keeps
+ * its name and its rows (CLAUDE.md § Retire, never delete).
+ */
+export async function setWageSetArchived(
+  userId: number,
+  setId: number,
+  archived: boolean
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(wageRateSets)
+    .set({ archivedAt: archived ? new Date() : null })
+    .where(and(eq(wageRateSets.id, setId), eq(wageRateSets.userId, userId)));
 }

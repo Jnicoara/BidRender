@@ -41,6 +41,7 @@ import {
 import { canPriceByHand } from "../shared/handPricedLines";
 import { resolveMaterial } from "../shared/materialLookup";
 import {
+  bracketPriceOf,
   materialItemKey,
   resolvePartMarkup,
   storedMarkupPct,
@@ -324,13 +325,18 @@ export async function fixLine(
         ...(input.addMaterial ? [input.addMaterial.materialId] : []),
       ];
       const named = await db.getMaterialsByIds(ids, userId);
-      const markupOf = (materialId: number) => {
+      const markupOf = (materialId: number, unitPrice: number) => {
         const m = resolveMaterial(named, materialId);
         return resolvePartMarkup(
           {
             itemKey: m ? materialItemKey(m) : null,
             category: m?.category ?? null,
             packPrice: null,
+            bracketPrice: bracketPriceOf({
+              costPerUnit: unitPrice,
+              packQty: m?.packQty ?? null,
+              packPrice: null,
+            }),
           },
           rules
         ).pct;
@@ -356,7 +362,7 @@ export async function fixLine(
             materialId: p.materialId,
             qtyPerOne: Number(row.qty),
             price: p.price,
-            markupPct: markupOf(p.materialId),
+            markupPct: markupOf(p.materialId, p.price),
           });
           library.materials.push({
             id: p.materialId,
@@ -390,7 +396,7 @@ export async function fixLine(
           materialId: add.materialId,
           qtyPerOne: add.qtyPerOne,
           price,
-          markupPct: markupOf(add.materialId),
+          markupPct: markupOf(add.materialId, price),
         });
         if (!result.ok) throw bad(result.message);
         state = result.state;
@@ -522,6 +528,11 @@ export async function fixLine(
           itemKey: materialItemKey(material),
           category: material.category,
           packPrice: null,
+          bracketPrice: bracketPriceOf({
+            costPerUnit: input.runPrice,
+            packQty: material.packQty,
+            packPrice: null,
+          }),
         },
         rules
       );

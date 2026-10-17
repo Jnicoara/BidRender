@@ -69,6 +69,7 @@ import {
 } from "@shared/loadedRate";
 import { errorText } from "@/lib/errorText";
 import { LoadFailed } from "@/components/LoadFailed";
+import { WageSetsSection } from "@/components/WageSetsSection";
 import { sameToSave } from "@/lib/unsavedGuard";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 
@@ -1134,6 +1135,8 @@ export default function LaborRatesPage() {
           hours are usually lower. Editing a starter role gives you your own
           copy; the original stays untouched and can be restored any time.
         </p>
+
+        <WageSetsSection />
       </div>
     </div>
   );
