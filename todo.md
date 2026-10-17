@@ -4080,7 +4080,14 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
 
 ## Material markup (references/material-markup.md)
 
-- [ ] **Piece 2 — price bands.** Needs a PACK size / pack price on `materials` first (D3): bands key on the roll, the stick, the box, never the per-foot price. Then band rows in `markup_rules`, the D2 starter set (Route A only, dated, inert until accepted), and the shared starter-accept component (D6) that labor units will reuse. `getMarkupRuleSet` skips unaccepted starters already; `resolvePartMarkup` already walks bands, and returns "no rule" only because `packPrice` is always null today.
+- [x] **Piece 2 — BUILT 2026-10-17 (Track B, `b1da7480`) as bid-methods
+      "price brackets":** band rows in `markup_rules`, read only when the
+      company picks brackets (`materialMarkupMode`); the key is the pack
+      price (`bracketPriceOf`: packPrice, else cost × packQty — D3); editor
+      under Settings › Pricing › More options with the D2 starter set filling
+      the boxes, labelled and dated, applying nothing until Save (D2/D6).
+      The shared starter-accept component (D6) was not needed for this.
+      Was: **Piece 2 — price bands.** Needs a PACK size / pack price on `materials` first (D3): bands key on the roll, the stick, the box, never the per-foot price. Then band rows in `markup_rules`, the D2 starter set (Route A only, dated, inert until accepted), and the shared starter-accept component (D6) that labor units will reuse. `getMarkupRuleSet` skips unaccepted starters already; `resolvePartMarkup` already walks bands, and returns "no rule" only because `packPrice` is always null today.
 - [ ] **Piece 3 — categories.** A categories table (shipped + a company's own) and a nullable `materials.categoryId` read before the enum. The engine already reads category rules keyed by the category NAME, and there is no screen to write one. D5 overrides "Category is NOT user-extendable" and has to answer its clutter concern: a company's own category must not become a takeoff layer on every sheet by accident.
 - [ ] **Pieces 4 and 5 — route A/B, the combined number, the blended markup.** Not started. The bid screen shows a "Material markup" row and "Profit 15% markup = 13% margin"; the combined effective margin and the blended material markup are still to come.
 - [ ] **A per-LINE markup override on one bid.** Not in any piece yet. The item override is company-wide; the "one-way door" rule in CLAUDE.md says anything from the library can be overridden on one job. Wants a nullable column beside `snapshotMarkupPct` and a field on the line.
