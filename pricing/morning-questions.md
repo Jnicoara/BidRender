@@ -58,6 +58,19 @@ pricing tier — so it hides screens and is never a lock on the server).
   2026-09-30) finished? → **If yes, I remove that worktree** (it only
   serves the page; nothing in it is committed). Not removed until you say,
   because the person counting would lose the page.
+- **Q-MKP1** Override the material markup on ONE line of one bid (today
+  an override is company-wide, per material)? CLAUDE.md's "one-way door"
+  says anything from the library can be overridden on one job. → **Yes,
+  after bid methods lands** — one nullable column beside the line's frozen
+  markup (A), a field on the line. Affects: bid numbers, only where typed.
+- **Q-AI1** Plan reader: send zoomed-in TILES of a dense sheet instead of
+  one shrunk image (on dense sheets it currently finds nothing — its own
+  answer says the symbols were too small), and change the daily AI limit
+  from 150 calls to 40 sheets + $6 per person per day in the same change?
+  → **Yes, as one change** — it costs more per sheet (several tiles, ~a few
+  cents each, `references/ai-reader-cost.md`) but a read that finds nothing
+  costs money for nothing. Affects: AI spend per sheet; nothing without the
+  button.
 - **Q-ARCH1 (from todo.md, drill 2026-10-15)** A bid in Recently deleted
   can still be EDITED from another tab (lines, quantities, name) — the
   screen already says "This bid is in Recently deleted … Restore". Refuse
