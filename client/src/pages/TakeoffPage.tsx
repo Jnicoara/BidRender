@@ -3228,6 +3228,12 @@ type PendingMark = {
   status: UserMarkStatus;
   /** In flight. Still drawn, no longer waiting to be sent. */
   sent: boolean;
+  /**
+   * The server confirmed it and its undo step is pushed; the drawn copy
+   * waits only for the sheet's list to come back. Not "still saving" — an
+   * Undo pressed now must take it back (@/lib/undoStack stillSavingMessage).
+   */
+  saved?: boolean;
 };
 
 /**
@@ -7053,7 +7059,12 @@ export default function TakeoffPage({
         pendingStamps.current
           // A provisional count's id means nothing after a reload; its marks
           // are mirrored once the count exists (`armWhileCreating`).
-          .filter(m => m.sheetId === sheetId && !isProvisionalGroup(m.groupId))
+          .filter(
+            m =>
+              m.sheetId === sheetId &&
+              !m.saved &&
+              !isProvisionalGroup(m.groupId)
+          )
           .map(m => ({
             groupId: m.groupId,
             x: m.x,
@@ -7200,6 +7211,21 @@ export default function TakeoffPage({
               redo: null,
               subject: { kind: "count", id: groupId },
             });
+          /*
+            Saved: its undo step is on the stack from here, so Undo may take
+            it back while the copy below waits for the list. Until 2026-10-16
+            the copy counted as "still saving" for that whole refetch, and an
+            Undo pressed in it was refused — on staging that was the length of
+            a tablet tap, so the smoke's Undo did nothing (track-b-handoff.md,
+            "undo and redo a mark"). Off the mirror too: a reload now must not
+            send it again.
+          */
+          setPending(
+            pendingStamps.current.map(m =>
+              keys.has(m.key) ? { ...m, saved: true } : m
+            )
+          );
+          mirrorQueue(sheetId);
           /*
             CANCEL first, then refresh. React Query's invalidate does NOT
             cancel a query that is still on its FIRST fetch (no data yet): it

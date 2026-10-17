@@ -282,31 +282,33 @@ const NavSection = ({
  * 2026-10-15: 834 KB → 217 KB gzipped before the Dashboard shows).
  */
 const PAGE_LOADERS = [
-  SettingsPage.preload,
-  MaterialDatabasePage.preload,
-  AdminSettingsPage.preload,
-  MaterialsLibraryPage.preload,
-  LaborRatesPage.preload,
-  ModifiersPage.preload,
-  AssembliesLibraryPage.preload,
-  BidsPage.preload,
-  QuickBidPage.preload,
-  TakeoffPage.preload,
-  ProposalPage.preload,
-  BidArchivePage.preload,
-  BidListPage.preload,
-  PlansIndexPage.preload,
-  TrashPage.preload,
-  KitsPage.preload,
-  ClientsPage.preload,
-  TeamPage.preload,
-  AnalyticsPage.preload,
+  SettingsPage.prefetch,
+  MaterialDatabasePage.prefetch,
+  AdminSettingsPage.prefetch,
+  MaterialsLibraryPage.prefetch,
+  LaborRatesPage.prefetch,
+  ModifiersPage.prefetch,
+  AssembliesLibraryPage.prefetch,
+  BidsPage.prefetch,
+  QuickBidPage.prefetch,
+  TakeoffPage.prefetch,
+  ProposalPage.prefetch,
+  BidArchivePage.prefetch,
+  BidListPage.prefetch,
+  PlansIndexPage.prefetch,
+  TrashPage.prefetch,
+  KitsPage.prefetch,
+  ClientsPage.prefetch,
+  TeamPage.prefetch,
+  AnalyticsPage.prefetch,
 ];
 
 export default function BidRenderShell() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      for (const load of PAGE_LOADERS) void load().catch(() => {});
+      // `prefetch`, never `preload`: a page nobody opened must not reload
+      // the tab when its fetch meets a dropped signal (@/lib/lazyPage).
+      for (const prefetch of PAGE_LOADERS) void prefetch();
     }, 4000);
     return () => window.clearTimeout(timer);
   }, []);

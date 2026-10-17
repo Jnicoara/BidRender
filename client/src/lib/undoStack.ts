@@ -285,10 +285,18 @@ export function notUndoableMessage(state: UndoState): string | null {
  * either did nothing at all or took back that older step, with no word
  * either way (todo.md, smoke step 10). Now it says so and takes nothing.
  * Every mark still drawn from the queue counts — queued, in flight, or
- * waiting on a count or sheet the server has not made yet.
+ * waiting on a count or sheet the server has not made yet — EXCEPT one the
+ * server has confirmed (`saved`): its step is already on the stack, and its
+ * drawn copy only waits for the sheet's list. Counting that too refused an
+ * Undo for a whole refetch after the mark was safe (smoke "undo and redo a
+ * mark", flaky on tablets against staging, fixed 2026-10-16).
  */
-export function stillSavingMessage(queue: readonly unknown[]): string | null {
-  return queue.length > 0 ? "Still saving — try again in a second." : null;
+export function stillSavingMessage(
+  queue: readonly { sent: boolean; saved?: boolean }[]
+): string | null {
+  return queue.some(m => !m.saved)
+    ? "Still saving — try again in a second."
+    : null;
 }
 
 export function nextUndo(state: UndoState): UndoEntry | null {

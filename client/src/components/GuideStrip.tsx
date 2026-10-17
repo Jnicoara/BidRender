@@ -69,7 +69,7 @@ export function GuideStrip({
     return () => window.clearInterval(timer);
   }, [screen, on]);
 
-  const tip = guideTip({
+  const ask = {
     screen,
     progress: bidId !== null ? (progress.data ?? null) : null,
     hasBids: bids.data
@@ -79,24 +79,59 @@ export function GuideStrip({
     planTipShowing,
     stepBarShown,
     canEdit,
-  });
+  };
+  const shown = guideTip(ask);
+  /*
+    On Plans, giving way to a tip card keeps the strip's ROOM: the tip it
+    would show is drawn invisible in the same place. Taking the row away and
+    putting it back re-fitted the drawing twice, 51 px each way, while marks
+    were being placed (measured 2026-10-16) — see `steady` below.
+  */
+  const held =
+    !shown && screen === "plans" && planTipShowing
+      ? guideTip({ ...ask, planTipShowing: false })
+      : null;
+  const tip = shown ?? held;
   if (!tip) return null;
 
   const close = () => setState({ ...state, hidden: [...state.hidden, tip.id] });
   const turnOff = () => setState({ ...state, off: true });
+  /*
+    On the Plans screen the strip is ONE HEIGHT whatever the tip says: one
+    line on a phone, a title line and a body line wider up, each cut short
+    rather than wrapped. It sits under the drawing, so any change in its
+    height re-centres the sheet — and it changed every time the step moved
+    on (the first mark takes "Count" to "Runs", whose tip has a button that
+    wrapped to a second row), so the drawing jumped between aiming a tap and
+    making it. Taps landed off their symbols; found by B's phone smoke on
+    local-dev's Gate, 2026-10-16 ("select two marks", "reload"). The whole
+    tip is in the title attribute.
+  */
+  const steady = screen === "plans";
 
   return (
     <aside
-      aria-label="Guide"
-      className="shrink-0 border-t border-border bg-sidebar px-3 md:px-6 py-2"
+      aria-label={held ? undefined : "Guide"}
+      aria-hidden={held ? true : undefined}
+      inert={held ? true : undefined}
+      className={cn(
+        "shrink-0 border-t border-border bg-sidebar px-3 md:px-6 py-2",
+        held && "[&>*]:invisible"
+      )}
     >
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 max-w-5xl">
+      <div
+        className={cn(
+          "flex items-start gap-x-3 gap-y-1.5 max-w-5xl",
+          steady ? "flex-nowrap items-center" : "flex-wrap"
+        )}
+        title={steady ? `${tip.title}. ${tip.body}` : undefined}
+      >
         <Compass
           className="w-4 h-4 mt-0.5 shrink-0 text-[#F5C518]"
           aria-hidden
         />
-        <div className="flex-1 min-w-[12rem]">
-          <p className="text-xs">
+        <div className={cn("flex-1", steady ? "min-w-0" : "min-w-[12rem]")}>
+          <p className={cn("text-xs", steady && "truncate")}>
             {tip.stepLabel && (
               <span className="text-[#F5C518] mr-1.5">{tip.stepLabel}</span>
             )}
@@ -106,7 +141,7 @@ export function GuideStrip({
             className={cn(
               "text-xs text-muted-foreground mt-0.5",
               // The Plans screen is the tightest on a phone: one line there.
-              screen === "plans" && "hidden md:block",
+              steady && "hidden md:block truncate",
               // A short screen (a phone turned sideways, 375 px tall): one
               // line everywhere — the body took a fifth of the height and
               // left the drawing a sliver (rotate drill, 2026-10-14).

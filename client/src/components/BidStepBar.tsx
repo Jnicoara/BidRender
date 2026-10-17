@@ -63,6 +63,14 @@ export function BidStepBar({
         {BID_STEPS.map((step, i) => {
           const state = states[step];
           const isHere = STEP_PLACE[step] === here;
+          /*
+            A step done on THIS screen is a label, not a button: a button
+            that goes nowhere is a dead control, and on Plans its name
+            ("Count") was the Count tool's, so the first "Count" a finger or a
+            test reached did nothing (B, 2026-10-16: three desktop smoke steps
+            failed on local-dev's Gate). Same look either way.
+          */
+          const Step = isHere ? "span" : "button";
           return (
             <li key={step} className="flex items-center gap-0.5 shrink-0">
               {i > 0 && (
@@ -71,9 +79,10 @@ export function BidStepBar({
                   aria-hidden
                 />
               )}
-              <button
-                type="button"
-                onClick={() => go(step)}
+              <Step
+                {...(isHere
+                  ? {}
+                  : { type: "button" as const, onClick: () => go(step) })}
                 aria-current={state === "next" ? "step" : undefined}
                 title={
                   state === "done"
@@ -117,14 +126,17 @@ export function BidStepBar({
                 >
                   {STEP_LABEL[step]}
                 </span>
-              </button>
+              </Step>
             </li>
           );
         })}
       </ol>
       {next &&
         (STEP_PLACE[next] === here ? (
-          <span className="ml-auto shrink-0 text-muted-foreground">
+          // h-7, the button's height: the bar must not change height when
+          // the next step moves off this screen, or the drawing under it
+          // re-fits mid-count (B, 2026-10-16, measured 24 -> 28 px).
+          <span className="ml-auto shrink-0 h-7 leading-7 text-muted-foreground">
             Next: <span className="text-foreground">{NEXT_LABEL[next]}</span> —
             here
           </span>
