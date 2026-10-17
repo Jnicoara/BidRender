@@ -4011,7 +4011,17 @@ varchar(255) NULL`.** Renaming a legend symbol shipped 2026-10-01
       The entry as it stood: `getMaterialUsageForCompany` builds `lastUsedAt`
       with `new Date()` from a raw `MAX(...)` — the same shape that read 7
       hours out on the Dashboard's newest-plan date. Measure before changing.
-- [ ] **The flip side, found by that measurement: locally, the Dashboard's
+- [x] **FIXED 2026-10-16 (Track C):** the app's pool (`server/appPool.ts`)
+      sets BOTH `timezone: "Z"` and `SET time_zone = '+00:00'` on every
+      connection — what production and the Gate already had. Red-first on
+      this laptop: a database-defaulted `createdAt` read back 25,200,264 ms
+      (7 h) off, session `SYSTEM`; green after (`server/appPoolUtc.test.ts`).
+      14 date-heavy suites (205 tests) unchanged. **Local side effect, all
+      tracks:** times the app WROTE into a local database before this (under
+      a Pacific session) now read 7 h later — local test data only;
+      production never had the split. Scripts and tests that open their own
+      connection keep the driver default (`toSqlTimestamp` stays for them).
+- [x] **The flip side, found by that measurement: locally, the Dashboard's
       newest-plan date is 7 hours EARLY for a real upload.** `lastPlanAt`
       uses `DATE_FORMAT(MAX(p.createdAt), '…Z')`, which is right for a row
       whose createdAt the APP wrote (drizzle writes UTC text) — which is what
