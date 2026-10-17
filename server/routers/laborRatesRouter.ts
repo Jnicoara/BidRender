@@ -21,7 +21,7 @@ import { TRADE_ALL } from "../../shared/trades";
 import { loadedRate } from "../../shared/loadedRate";
 import { changed } from "../../shared/exampleTags";
 import * as db from "../db";
-import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
+import { refuseStaleSave } from "../staleSave";
 
 /**
  * This router's gate: a query needs `pricing.view`, a mutation needs `pricing.edit`.
@@ -223,8 +223,12 @@ export const laborRatesRouter = router({
         });
       // The row editor saves its whole form, so a save from a screen opened
       // before somebody else's would put their change back (staleEdit.ts).
-      if (savedSinceOpened(target.updatedAt, openedAt))
-        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
+      await refuseStaleSave(
+        "laborRates",
+        target,
+        openedAt,
+        ctx.scope.dataUserId
+      );
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline

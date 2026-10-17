@@ -3,6 +3,27 @@
 Entries below v5.75 say "BidPhase" — that was the name at the time, and they are
 left as written rather than rewritten to match the rename.
 
+## Stale-save guard: racing saves FIXED, the whole-second limit remains (Track A, 2026-10-16)
+
+- [x] Found by the stress harness: 24 saves of one assembly from screens
+      opened on the same version ALL saved — the last silently undid 23
+      (`savedSinceOpened` was read-then-write). Fixed for all six editors
+      (assemblies, kits, clients, labor rates, materials, modifiers) by one
+      conditional UPDATE that claims the opened version
+      (`server/staleSave.ts`, `db.claimOwnRowVersion`); red-first in
+      `server/staleSaveRace.test.ts` (6 racers each: 4–6 saved before, 1
+      after).
+- [ ] **Still open, older than the fix:** `updatedAt` is whole seconds and
+      the save's write sets it to "now", so a save inside the SAME second
+      as the version it opened can leave that version in place, and a
+      stale screen opened on it then passes. Closing it needs a version
+      that cannot repeat — `timestamp(fsp: 3)` (a migration on six tables)
+      or a `version int` bumped by the claim. Not a release blocker: it
+      needs two saves of one row inside one second.
+- [ ] A shared starter row is not claimed (it is forked on save, not
+      written), so two people forking the SAME starter at the same moment
+      can still make two forks. Measure before building.
+
 ## Field and Co-owner — after FR-M1 (Track B, 2026-10-16, waits for A)
 
 `references/field-and-coowner-plan.md`. **Built on track-b with no column:**

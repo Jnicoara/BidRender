@@ -31,7 +31,7 @@ import { heightList } from "../../shared/takeoffHeights";
 import { MOST_USED_WINDOW_DAYS, rankMostUsed } from "../../shared/mostUsed";
 import { resolveAssembly } from "../../shared/assemblyLookup";
 import { changed } from "../../shared/exampleTags";
-import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
+import { refuseStaleSave } from "../staleSave";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -301,8 +301,7 @@ export const assembliesRouter = router({
       });
     // The editor saves its whole form, so a save from a screen opened before
     // somebody else's would put their change back (shared/staleEdit.ts).
-    if (savedSinceOpened(target.updatedAt, openedAt))
-      throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
+    await refuseStaleSave("assemblies", target, openedAt, ctx.scope.dataUserId);
 
     // Checked BEFORE the fork, so a refusal leaves no fork behind. Every
     // stored reference must be this company's or shared (libraryRefs.ts).

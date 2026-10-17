@@ -17,7 +17,7 @@ import { z } from "zod";
 import { router, scoped } from "../_core/trpc";
 import { MODIFIER_STATUSES, type Modifier } from "../../drizzle/schema";
 import * as db from "../db";
-import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
+import { refuseStaleSave } from "../staleSave";
 
 /**
  * This router's gate: a query needs `library.view`, a mutation needs `library.edit`.
@@ -117,8 +117,12 @@ export const modifiersRouter = router({
         });
       // The row editor saves its whole form, so a save from a screen opened
       // before somebody else's would put their change back (staleEdit.ts).
-      if (savedSinceOpened(target.updatedAt, openedAt))
-        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
+      await refuseStaleSave(
+        "modifiers",
+        target,
+        openedAt,
+        ctx.scope.dataUserId
+      );
 
       const isBaseline = target.userId === null;
       const editableId = isBaseline

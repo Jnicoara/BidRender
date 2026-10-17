@@ -1693,6 +1693,68 @@ export async function withNamedLock<T>(
   }
 }
 
+/** The library tables whose editors send `openedAt` (shared/staleEdit.ts). */
+const VERSIONED_TABLES = {
+  assemblies,
+  kits,
+  modifiers,
+  clients,
+  laborRates,
+  materials,
+} as const;
+export type VersionedTable = keyof typeof VERSIONED_TABLES;
+
+/**
+ * Claim the saved version an editor opened, so ONE save wins it.
+ *
+ * `savedSinceOpened` alone is a read-then-write: 24 people saving one
+ * assembly from screens opened on the same version all read the old
+ * `updatedAt`, all pass, and the last write silently undoes the other 23
+ * (server/stressManyUsers.test.ts, 2026-10-16: "24 saved, 0 refused"). This
+ * is one conditional UPDATE, so MySQL's row lock lets exactly one request
+ * see `affectedRows = 1` per version — the same shape as
+ * `completePasswordReset` above.
+ *
+ * The claim moves `updatedAt` forward at least one second
+ * (`GREATEST(now, updatedAt + 1 s)`), because the column holds whole
+ * seconds: a claim that left it on the same second would let the next
+ * claimer of the same version through. The save's own write then sets it to
+ * "now" again (ON UPDATE CURRENT_TIMESTAMP) — so a save made inside the SAME
+ * second as the version it opened can leave that version in place. That
+ * whole-second limit predates this claim (todo.md, 2026-10-16); racing saves
+ * from an older second are all caught (server/staleSaveRace.test.ts).
+ *
+ * Only a company's OWN row (`userId = dataUserId`). A shared starter row is
+ * forked on save, never written, so it is not claimed: bumping it would make
+ * every other company's open editor on that starter look stale.
+ *
+ * Returns false when somebody else claimed that version first.
+ */
+export async function claimOwnRowVersion(
+  tableName: VersionedTable,
+  id: number,
+  dataUserId: number,
+  openedAt: Date | string | number
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const table = VERSIONED_TABLES[tableName];
+  const openedSeconds = Math.floor(new Date(openedAt).getTime() / 1000);
+  const [claim] = await db
+    .update(table)
+    .set({
+      updatedAt: sql`GREATEST(CURRENT_TIMESTAMP, ${table.updatedAt} + INTERVAL 1 SECOND)`,
+    })
+    .where(
+      and(
+        eq(table.id, id),
+        eq(table.userId, dataUserId),
+        sql`UNIX_TIMESTAMP(${table.updatedAt}) = ${openedSeconds}`
+      )
+    );
+  return claim.affectedRows === 1;
+}
+
 /**
  * Drop duplicate baseline rows left by a pre-lock race, keeping the lowest id
  * — and keeping any duplicate that something still points at (see below).

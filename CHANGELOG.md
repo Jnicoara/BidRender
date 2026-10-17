@@ -6,6 +6,12 @@ This is the human-readable companion to the git history — read this to see wha
 
 ## [2026-10-16]
 
+- **Two people saving the same assembly, kit, client, labor rate, material
+  or modifier at the same moment can no longer silently undo each other.**
+  The "someone saved this since you opened it" check could be passed by
+  several saves at once, so the last one won and the others' changes
+  vanished. Now exactly one save goes through and the rest are told to
+  reload. Found by a new stress test with 24 people on one company.
 - **Undo now takes back a mark the moment it is saved.** For about a
   second after each mark saved, while its list refreshed, Undo answered
   "Still saving" and did nothing. On a slower connection that was long

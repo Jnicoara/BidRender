@@ -19,7 +19,7 @@ import { previewAssembly } from "../../shared/assemblyHours";
 import { hourlyCostFor } from "../../shared/laborRateLookup";
 import { appliedModifiers } from "../../shared/modifierLookup";
 import { DEFAULT_TRADE } from "../../shared/trades";
-import { savedSinceOpened, STALE_EDIT_MESSAGE } from "../../shared/staleEdit";
+import { refuseStaleSave } from "../staleSave";
 import * as db from "../db";
 import { requireLibraryRefs } from "../libraryRefs";
 
@@ -251,8 +251,12 @@ export const kitsRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Kit not found." });
       // The editor saves its whole item list, so a save from a screen opened
       // before somebody else's would put their change back.
-      if (savedSinceOpened(target.updatedAt, input.openedAt))
-        throw new TRPCError({ code: "CONFLICT", message: STALE_EDIT_MESSAGE });
+      await refuseStaleSave(
+        "kits",
+        target,
+        input.openedAt,
+        ctx.scope.dataUserId
+      );
       // Before the fork, so a refusal leaves no fork behind.
       await requireLibraryRefs(ctx.scope.dataUserId, {
         assemblies: input.items?.map(i => i.assemblyId),
